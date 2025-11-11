@@ -1,0 +1,25 @@
+{
+  "name": "crm-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r --parallel run dev",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "format": "prettier . --write"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.19",
+    "eslint": "8.57.0",
+    "@typescript-eslint/parser": "7.0.2",
+    "@typescript-eslint/eslint-plugin": "7.0.2",
+    "typescript": "5.4.5",
+    "prettier": "3.3.3"
+  }
+}
