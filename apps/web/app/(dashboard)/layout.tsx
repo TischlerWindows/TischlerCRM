@@ -70,7 +70,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
             {!sidebarCollapsed && (
               <Link href="/" className="text-xl font-bold text-indigo-600">
-                TCP
+                TCES
               </Link>
             )}
             <button
