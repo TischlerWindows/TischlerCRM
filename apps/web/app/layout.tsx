@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'TCP',
+  title: 'TCES',
   description: 'tishcler crm prototype'
 };
 
