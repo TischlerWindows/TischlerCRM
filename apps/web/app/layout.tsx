@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'TCP',
-  description: 'Lightweight TCP with Dropbox integration'
+  description: 'tishcler crm prototype'
 };
 
 import type { ReactNode } from 'react';
