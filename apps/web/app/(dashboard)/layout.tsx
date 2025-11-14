@@ -14,21 +14,47 @@ import {
   Search,
   User,
   LogOut,
-  Bell
+  Bell,
+  MapPin,
+  Briefcase,
+  Lightbulb,
+  ClipboardCheck,
+  Wrench,
+  FileText,
+  HardHat,
+  Package
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ToastProvider } from '@/components/toast';
+import { Cog } from 'lucide-react';
 
 const navigation = [
   { name: 'Home', href: '/dashboard', icon: Home },
-  { name: 'Opportunities', href: '/opportunities', icon: Target },
+  { name: 'Settings', href: '/settings', icon: Settings },
+];
+
+// Information Modules - Reference and context data
+const informationModules = [
+  { name: 'Properties', href: '/properties', icon: MapPin },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Accounts', href: '/accounts', icon: Building2 },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Products', href: '/products', icon: Package },
+];
+
+// Pipeline Modules - Business activities tracking
+const pipelineModules = [
+  { name: 'Leads', href: '/leads', icon: Lightbulb },
+  { name: 'Deals', href: '/deals', icon: Target },
+  { name: 'Projects', href: '/projects', icon: Briefcase },
+  { name: 'Service', href: '/service', icon: Wrench },
+];
+
+// Financial Tool Modules - Price breakdowns
+const financialModules = [
+  { name: 'Quotes', href: '/quotes', icon: FileText },
+  { name: 'Installations', href: '/installations', icon: HardHat },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -122,8 +148,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           )}
         >
           {/* Header */}
-          <header className="sticky top-0 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-30">
-            <div className="h-full px-4 flex items-center gap-4">
+          <header className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-30">
+            <div className="h-16 px-4 flex items-center gap-4">
               {/* Mobile menu button */}
               <button
                 onClick={() => setSidebarOpen(true)}
@@ -148,6 +174,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
               {/* Right side */}
               <div className="flex items-center gap-2">
+                {/* Object Manager */}
+                <Link
+                  href="/object-manager"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                  title="Object Manager"
+                  aria-label="Object Manager"
+                >
+                  <Cog className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                </Link>
+
                 {/* Notifications */}
                 <button
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors relative"
@@ -205,6 +241,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     </>
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Tabs Navigation */}
+            <div className="border-t border-gray-200 dark:border-gray-800">
+              <div className="px-4 flex items-center gap-1 overflow-x-auto py-2">
+                {[...informationModules, ...pipelineModules, ...financialModules].map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
+                        isActive
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400'
+                          : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-200'
+                      )}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </header>

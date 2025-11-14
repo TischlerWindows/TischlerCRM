@@ -2,10 +2,53 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { User, HelpCircle } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { 
+  User, 
+  HelpCircle, 
+  Building2, 
+  Users, 
+  Target, 
+  CheckSquare, 
+  FolderOpen, 
+  BarChart3, 
+  Search,
+  Cog,
+  MapPin,
+  Briefcase,
+  Lightbulb,
+  Wrench,
+  FileText,
+  HardHat,
+  Package
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+// Information Modules - Reference and context data
+const informationModules = [
+  { name: 'Properties', href: '/properties', icon: MapPin },
+  { name: 'Contacts', href: '/contacts', icon: Users },
+  { name: 'Accounts', href: '/accounts', icon: Building2 },
+  { name: 'Products', href: '/products', icon: Package },
+];
+
+// Pipeline Modules - Business activities tracking
+const pipelineModules = [
+  { name: 'Leads', href: '/leads', icon: Lightbulb },
+  { name: 'Deals', href: '/deals', icon: Target },
+  { name: 'Projects', href: '/projects', icon: Briefcase },
+  { name: 'Service', href: '/service', icon: Wrench },
+];
+
+// Financial Tool Modules - Price breakdowns
+const financialModules = [
+  { name: 'Quotes', href: '/quotes', icon: FileText },
+  { name: 'Installations', href: '/installations', icon: HardHat },
+];
 
 export default function HomePage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -14,13 +57,21 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      <nav className="bg-white shadow-sm">
+      <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
               <Link href="/" className="text-2xl font-bold text-indigo-600">TCES</Link>
             <div className="flex items-center space-x-4">
               {isLoggedIn ? (
                 <>
+                  <Link
+                    href="/object-manager"
+                    className="p-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none flex items-center"
+                    aria-label="Object Manager"
+                    title="Object Manager"
+                  >
+                    <Cog className="w-6 h-6" />
+                  </Link>
                   <button
                     className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 focus:outline-none flex items-center"
                     onClick={() => window.location.href = '/help'}
@@ -61,6 +112,34 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* Tabs Navigation - Only show when logged in */}
+        {isLoggedIn && (
+          <div className="border-t border-gray-200">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-1 overflow-x-auto py-2">
+                {[...informationModules, ...pipelineModules, ...financialModules].map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
+                        isActive
+                          ? 'bg-indigo-50 text-indigo-600'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      )}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -96,39 +175,7 @@ export default function HomePage() {
         </div>
 
         <div id="features" className="mt-24">
-          <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">Core Features</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <FeatureCard
-              title="Accounts"
-              description="Manage your customer accounts and company relationships in one place."
-              icon=""
-            />
-            <FeatureCard
-              title="Contacts"
-              description="Track all your contacts with detailed profiles and communication history."
-              icon=""
-            />
-            <FeatureCard
-              title="Opportunities"
-              description="Pipeline management with stages, amounts, and probability tracking."
-              icon=""
-            />
-            <FeatureCard
-              title="Activities"
-              description="Log calls, emails, meetings, notes, and tasks linked to your records."
-              icon=""
-            />
-            <FeatureCard
-              title="Dropbox Files"
-              description={<span>Possible link to Tischler dropbox here:<br /><a href="https://www.dropbox.com" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">Fast link to Dropbox homepage</a></span>}
-              icon=""
-            />
-            <FeatureCard
-              title="Reports & Search"
-              description="Search by name, email, stage, owner. Pipeline reports by stage/owner."
-              icon=""
-            />
-          </div>
+          {/* Core Features section removed */}
         </div>
 
         {/* CTA Banner (removed Phase 0 message) */}
