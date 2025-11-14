@@ -16,15 +16,25 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:4000/auth/login', {
+      console.log('Fetching /api/auth/login');
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
 
+      console.log('Response status:', res.status);
+      console.log('Response Content-Type:', res.headers.get('content-type'));
+
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Login failed');
+        const text = await res.text();
+        console.log('Error response:', text);
+        try {
+          const data = JSON.parse(text);
+          throw new Error(data.error || 'Login failed');
+        } catch {
+          throw new Error(text.substring(0, 100) || 'Login failed');
+        }
       }
 
   const data = await res.json();
