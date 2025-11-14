@@ -65,9 +65,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
+    // Authentication disabled
+    router.push('/');
   };
 
   return (
@@ -216,7 +215,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                       <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20">
                         <div className="p-3 border-b border-gray-200 dark:border-gray-700">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {JSON.parse(localStorage.getItem('user') || '{}').email || 'User'}
+                            Development User
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400">Administrator</p>
                         </div>

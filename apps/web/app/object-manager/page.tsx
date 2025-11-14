@@ -80,14 +80,8 @@ export default function ObjectManagerPage() {
   const [importData, setImportData] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
     loadSchema();
-  }, [router, loadSchema]);
+  }, [loadSchema]);
 
   const filteredObjects = schema?.objects.filter(obj =>
     obj.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
