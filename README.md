@@ -34,12 +34,6 @@ pnpm --filter web dev
 pnpm --filter api dev
 ```
 
-## Initial Entities (MVP)
-- Account
-- Contact
-- Opportunity
-- Activity
-- FileLink (Dropbox folder + file metadata)
 
 ## Scripts (planned)
 - `pnpm build` – build all packages
