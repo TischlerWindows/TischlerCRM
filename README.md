@@ -3,11 +3,6 @@
 ## Executive Summary
 We are building a web-hosted CRM focusing on Accounts, Contacts, Opportunities, Activities, and Files. Dropbox will serve as the initial embedded storage layer (linked folders with in-app preview) to accelerate time-to-value.
 
-### Phased Delivery
-- **Phase 0 – Foundations (Week 1):** Project setup, auth baseline, minimal schema, environments, CI/CD.
-- **Phase 1 – Dropbox File Layer (Weeks 2–3):** Auto-create folders, store links, in-app file list + preview.
-- **Phase 2 – Core CRM (Weeks 3–5):** CRUD UI, pipeline views, search, reporting, alerts.
-- **Phase 3 – Hardening (Weeks 6–8):** RBAC, audit, rate limits, SSO, backups, monitoring, cost controls.
 
 ## Tech Stack
 - Frontend: Next.js (App Router) + React + Tailwind + shadcn/ui
