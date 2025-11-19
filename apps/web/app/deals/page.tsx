@@ -34,7 +34,7 @@ export default function DealsPage() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      router.push('/login');
+      router.push('/');
       return;
     }
 

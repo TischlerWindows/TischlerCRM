@@ -29,29 +29,12 @@ export default function AccountsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    fetchAccounts(token);
+    fetchAccounts();
   }, [router]);
 
-  const fetchAccounts = async (token: string) => {
+  const fetchAccounts = async () => {
     try {
-      const res = await fetch('http://localhost:4000/accounts', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (res.status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        router.push('/login');
-        return;
-      }
+      const res = await fetch('http://localhost:4000/accounts');
 
       if (!res.ok) {
         throw new Error('Failed to fetch accounts');
@@ -66,12 +49,6 @@ export default function AccountsPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
-
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -81,7 +58,7 @@ export default function AccountsPage() {
       const token = localStorage.getItem('token');
       const userStr = localStorage.getItem('user');
       if (!token || !userStr) {
-        router.push('/login');
+        router.push('/');
         return;
       }
 
@@ -103,7 +80,7 @@ export default function AccountsPage() {
       if (res.status === 401) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        router.push('/login');
+        router.push('/');
         return;
       }
 

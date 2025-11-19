@@ -56,10 +56,10 @@ export default function HomePage() {
               <Link href="/" className="text-2xl font-bold text-indigo-600">TCES</Link>
             <div className="flex items-center space-x-4">
               <Link
-                href="/object-manager"
+                href="/settings"
                 className="p-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none flex items-center"
-                aria-label="Object Manager"
-                title="Object Manager"
+                aria-label="Settings"
+                title="Settings"
               >
                 <Cog className="w-6 h-6" />
               </Link>
@@ -75,8 +75,7 @@ export default function HomePage() {
         </div>
 
         {/* Tabs Navigation */}
-        {
-          <div className="border-t border-gray-200">
+        <div className="border-t border-gray-200">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex items-center gap-1 overflow-x-auto py-2">
                 {[...informationModules, ...pipelineModules, ...financialModules].map((item) => {
@@ -100,7 +99,6 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        }
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
