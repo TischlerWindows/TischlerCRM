@@ -180,9 +180,12 @@ export default function ObjectManagerPage() {
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Link href="/" className="text-xl font-bold text-indigo-600">TCES</Link>
-              <span className="ml-4 text-2xl font-bold text-gray-900">Object Manager</span>
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-xl font-bold text-indigo-600 hover:text-indigo-700">
+                TCES
+              </Link>
+              <span className="text-gray-300">|</span>
+              <span className="text-2xl font-bold text-gray-900">Object Manager</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="outline" onClick={handleExportAll}>
