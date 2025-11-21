@@ -65,14 +65,6 @@ const SIDEBAR_SECTIONS = [
     featured: true
   },
   { 
-    id: 'page-layouts', 
-    label: 'Page Layouts', 
-    icon: Layout,
-    description: 'Manage page layouts',
-    category: 'Layouts & UI',
-    featured: true
-  },
-  { 
     id: 'compact-layouts', 
     label: 'Compact Layouts', 
     icon: Square,
