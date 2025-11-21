@@ -215,26 +215,6 @@ export default function PropertiesPage() {
             </button>
           </div>
 
-          {/* Info Banner */}
-          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
-              <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-1">About Properties</p>
-                <p>Properties are automatically marked as <strong>Inactive</strong> after 8 months of no activity or when a project is completed. All documentation is filed under the unique Property Number in SharePoint.</p>
-                {hasCreateLayout ? (
-                  <p className="mt-2">
-                    <strong>✨ Using Dynamic Forms:</strong> This page uses {createLayouts.length} {createLayouts.length === 1 ? 'layout' : 'layouts'} configured in Object Manager.
-                    {createLayouts.length > 1 && ' Click "New Property" to choose which layout to use.'}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-amber-700">
-                    <strong>⚠️ No Create Page Layout Found:</strong> Using legacy form. <Link href="/object-manager/Property" className="underline font-medium">Go to Object Manager → Property → Page Editor</Link> and create a new page layout with "Mode: New" to enable dynamic forms with custom fields and sections.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Search */}
@@ -251,122 +231,58 @@ export default function PropertiesPage() {
           </div>
         </div>
 
-        {/* Properties Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProperties.map((property) => (
-            <div
-              key={property.id}
-              className="bg-white rounded-lg border border-gray-200 hover:shadow-lg transition-shadow"
-            >
-              <div className="p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <Link
-                      href={`/properties/${property.id}`}
-                      className="text-lg font-bold text-indigo-600 hover:text-indigo-800"
-                    >
-                      {property.propertyNumber}
-                    </Link>
-                    <div className="mt-1">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        property.status === 'Active'
+        {/* Properties List */}
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Property Records</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">State</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Activity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredProperties.map((property) => (
+                  <tr key={property.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-indigo-600">
+                      <Link href={`/properties/${property.id}`} className="hover:text-indigo-800">
+                        {property.propertyNumber}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{property.address}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{property.city}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{property.state}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        property.status === 'Active' 
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}>
                         {property.status}
                       </span>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <button className="p-1 hover:bg-gray-100 rounded">
-                      <MoreVertical className="w-5 h-5 text-gray-400" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Address Section */}
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    <em><strong>Address</strong></em>
-                  </h3>
-                  <p className="text-sm text-gray-900 font-medium">{property.address}</p>
-                  <p className="text-sm text-gray-600">
-                    {property.city}, {property.state} {property.zipCode}
-                  </p>
-                </div>
-
-                {/* Contact Information */}
-                <div className="mb-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    <em><strong>Contact Information</strong></em>
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm">
-                      <Users className="w-4 h-4 text-gray-400 mr-2" />
-                      <span className="text-gray-600">
-                        {property.contacts.length > 0 
-                          ? property.contacts.join(', ')
-                          : 'No contacts'}
-                      </span>
-                    </div>
-                    <div className="flex items-center text-sm">
-                      <Building2 className="w-4 h-4 text-gray-400 mr-2" />
-                      <span className="text-gray-600">
-                        {property.accounts.length > 0 
-                          ? property.accounts.join(', ')
-                          : 'No accounts'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Files/Storage */}
-                {property.sharepointFolder && (
-                  <div className="mb-4">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      <em><strong>Files/Storage</strong></em>
-                    </h3>
-                    <div className="flex items-center text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer">
-                      <FolderOpen className="w-4 h-4 mr-2" />
-                      <span>SharePoint: {property.sharepointFolder}</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* System Information */}
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    <em><strong>System Information</strong></em>
-                  </h3>
-                  <div className="space-y-1 text-xs text-gray-600">
-                    <div className="flex items-center">
-                      <Calendar className="w-3 h-3 mr-2" />
-                      <span>Last Activity: {property.lastActivity}</span>
-                    </div>
-                    <p><em><strong>Created By:</strong></em> {property.createdBy} on {property.createdAt}</p>
-                    <p><em><strong>Last Modified:</strong></em> {property.lastModifiedBy} on {property.lastModifiedAt}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions Footer */}
-              <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 flex gap-2">
-                <button
-                  onClick={() => router.push(`/properties/${property.id}`)}
-                  className="flex-1 text-sm text-indigo-600 hover:text-indigo-800 font-medium"
-                >
-                  View Details
-                </button>
-                <button
-                  onClick={() => handleDeleteProperty(property.id)}
-                  className="text-sm text-red-600 hover:text-red-800 font-medium"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{property.lastActivity}</td>
+                    <td className="px-6 py-4 text-sm">
+                      <button 
+                        onClick={() => handleDeleteProperty(property.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {filteredProperties.length === 0 && (
