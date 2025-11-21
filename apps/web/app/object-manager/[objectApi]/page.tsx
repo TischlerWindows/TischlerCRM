@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { cn } from '@/lib/utils';
+import PageEditor from './page-editor';
+import FieldsRelationships from './fields-relationships';
 
 const SIDEBAR_SECTIONS = [
   // Data Model
@@ -353,7 +355,17 @@ export default function ObjectDetailPage() {
             </div>
           )}
 
-          {activeSection !== 'details' && (
+          {activeSection === 'fields' && (
+            <FieldsRelationships objectApiName={objectApi} />
+          )}
+
+          {activeSection === 'page-editor' && (
+            <div className="h-[calc(100vh-200px)]">
+              <PageEditor objectApiName={objectApi} />
+            </div>
+          )}
+
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

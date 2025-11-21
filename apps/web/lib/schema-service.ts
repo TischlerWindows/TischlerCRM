@@ -149,281 +149,641 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   createSampleData(): OrgSchema {
-    const opportunityId = generateId();
-    const contactId = generateId();
-    
-    // Create sample Opportunity object
-    const opportunityLayout = createDefaultPageLayout('Opportunity');
-    opportunityLayout.tabs = [
-      {
-        id: generateId(),
-        label: 'Details',
-        sections: [
-          {
-            id: generateId(),
-            label: 'Opportunity Information',
-            columns: 2,
-            fields: ['Name', 'Amount', 'CloseDate', 'StageName', 'Probability']
-          },
-          {
-            id: generateId(),
-            label: 'Description Information',
-            columns: 1,
-            fields: ['Description']
-          }
-        ]
-      },
-      {
-        id: generateId(),
-        label: 'Additional Information',
-        sections: [
-          {
-            id: generateId(),
-            label: 'System Information',
-            columns: 2,
-            fields: ['CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById']
-          }
-        ]
-      }
-    ];
+    const objects: ObjectDef[] = [];
+    const now = new Date().toISOString();
 
-    const opportunityRecordType = createDefaultRecordType('Opportunity', opportunityLayout.id);
-
-    const opportunityObject: ObjectDef = {
-      id: opportunityId,
-      apiName: 'Opportunity',
-      label: 'Opportunity',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      fields: [
-        ...SYSTEM_FIELDS,
-        {
-          id: generateId(),
-          apiName: 'Name',
-          label: 'Opportunity Name',
-          type: 'text',
-          required: true,
-          maxLength: 120,
-          helpText: 'The name of this opportunity'
-        },
-        {
-          id: generateId(),
-          apiName: 'Amount',
-          label: 'Amount',
-          type: 'currency',
-          precision: 18,
-          scale: 2,
-          helpText: 'Expected revenue for this opportunity'
-        },
-        {
-          id: generateId(),
-          apiName: 'CloseDate',
-          label: 'Close Date',
-          type: 'date',
-          required: true,
-          helpText: 'Date when the opportunity is expected to close'
-        },
-        {
-          id: generateId(),
-          apiName: 'StageName',
-          label: 'Stage',
-          type: 'picklist',
-          required: true,
-          picklistValues: ['Prospecting', 'Qualification', 'Proposal/Quote', 'Negotiation/Review', 'Closed Won', 'Closed Lost'],
-          defaultValue: 'Prospecting',
-          helpText: 'Current stage of the opportunity'
-        },
-        {
-          id: generateId(),
-          apiName: 'Probability',
-          label: 'Probability (%)',
-          type: 'percent',
-          precision: 3,
-          scale: 0,
-          helpText: 'Likelihood of closing this opportunity successfully'
-        },
-        {
-          id: generateId(),
-          apiName: 'Description',
-          label: 'Description',
-          type: 'textarea',
-          maxLength: 32768,
-          helpText: 'Additional details about this opportunity'
-        },
-        {
-          id: generateId(),
-          apiName: 'LeadSource',
-          label: 'Lead Source',
-          type: 'picklist',
-          picklistValues: ['Web', 'Phone Inquiry', 'Partner Referral', 'Purchased List', 'Other'],
-          helpText: 'Source that generated this opportunity'
-        }
-      ],
-      recordTypes: [opportunityRecordType],
-      pageLayouts: [opportunityLayout],
-      validationRules: [
-        {
-          id: generateId(),
-          name: 'Amount_Required_For_Negotiation',
-          errorMessage: 'Amount is required when stage is Negotiation/Review or later',
-          active: true,
-          condition: 'StageName IN ["Negotiation/Review", "Closed Won", "Closed Lost"] && Amount == null'
-        },
-        {
-          id: generateId(),
-          name: 'Probability_Range_Validation',
-          errorMessage: 'Probability must be between 0 and 100',
-          active: true,
-          condition: 'Probability < 0 || Probability > 100'
-        }
-      ],
-      defaultRecordTypeId: opportunityRecordType.id
+    // Helper to create basic object structure
+    const createBasicObject = (apiName: string, label: string, pluralLabel: string, description: string, fields: any[]) => {
+      const layout = createDefaultPageLayout(apiName);
+      const recordType = createDefaultRecordType(apiName, layout.id);
+      
+      return {
+        id: generateId(),
+        apiName,
+        label,
+        pluralLabel,
+        description,
+        createdAt: now,
+        updatedAt: now,
+        fields: [...SYSTEM_FIELDS, ...fields],
+        recordTypes: [recordType],
+        pageLayouts: [layout],
+        validationRules: [],
+        defaultRecordTypeId: recordType.id
+      };
     };
 
-    // Create sample Contact object
-    const contactLayout = createDefaultPageLayout('Contact');
-    contactLayout.tabs = [
-      {
-        id: generateId(),
-        label: 'Details',
-        sections: [
-          {
-            id: generateId(),
-            label: 'Name',
-            columns: 2,
-            fields: ['FirstName', 'LastName', 'Email', 'Phone']
-          },
-          {
-            id: generateId(),
-            label: 'Address Information',
-            columns: 2,
-            fields: ['MailingStreet', 'MailingCity', 'MailingState', 'MailingPostalCode']
-          }
-        ]
-      }
-    ];
-
-    const contactRecordType = createDefaultRecordType('Contact', contactLayout.id);
-
-    const contactObject: ObjectDef = {
-      id: contactId,
-      apiName: 'Contact',
-      label: 'Contact',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      fields: [
-        ...SYSTEM_FIELDS,
+    // 1. Property
+    objects.push(createBasicObject(
+      'Property',
+      'Property',
+      'Properties',
+      'Physical locations and real estate properties',
+      [
         {
           id: generateId(),
-          apiName: 'FirstName',
-          label: 'First Name',
-          type: 'text',
-          maxLength: 40,
-          helpText: 'The contact\'s first name'
-        },
-        {
-          id: generateId(),
-          apiName: 'LastName',
-          label: 'Last Name',
-          type: 'text',
+          apiName: 'Property__propertyNumber',
+          label: 'Property Number',
+          type: 'AutoNumber',
           required: true,
-          maxLength: 80,
-          helpText: 'The contact\'s last name'
+          autoNumber: { displayFormat: 'P-{0000}', startingNumber: 1 },
+          helpText: 'Auto-generated property identifier'
         },
         {
           id: generateId(),
-          apiName: 'Email',
-          label: 'Email',
-          type: 'text',
-          unique: true,
-          maxLength: 80,
-          helpText: 'The contact\'s email address'
-        },
-        {
-          id: generateId(),
-          apiName: 'Phone',
-          label: 'Phone',
-          type: 'text',
-          maxLength: 40,
-          helpText: 'The contact\'s phone number'
-        },
-        {
-          id: generateId(),
-          apiName: 'MailingStreet',
-          label: 'Mailing Street',
-          type: 'textarea',
+          apiName: 'Property__address',
+          label: 'Address',
+          type: 'Text',
+          required: true,
           maxLength: 255,
-          helpText: 'Street address for mailing'
+          helpText: 'Street address of the property'
         },
         {
           id: generateId(),
-          apiName: 'MailingCity',
-          label: 'Mailing City',
-          type: 'text',
-          maxLength: 40,
-          helpText: 'City for mailing address'
+          apiName: 'Property__city',
+          label: 'City',
+          type: 'Text',
+          required: true,
+          maxLength: 100
         },
         {
           id: generateId(),
-          apiName: 'MailingState',
-          label: 'Mailing State/Province',
-          type: 'text',
-          maxLength: 80,
-          helpText: 'State or province for mailing address'
+          apiName: 'Property__state',
+          label: 'State/Province',
+          type: 'Text',
+          required: true,
+          maxLength: 50
         },
         {
           id: generateId(),
-          apiName: 'MailingPostalCode',
-          label: 'Mailing Zip/Postal Code',
-          type: 'text',
-          maxLength: 20,
-          helpText: 'Postal code for mailing address'
+          apiName: 'Property__zipCode',
+          label: 'Zip/Postal Code',
+          type: 'Text',
+          required: true,
+          maxLength: 20
+        },
+        {
+          id: generateId(),
+          apiName: 'Property__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Active', 'Inactive'],
+          defaultValue: 'Active',
+          helpText: 'Properties automatically become Inactive after 8 months of no activity'
+        },
+        {
+          id: generateId(),
+          apiName: 'Property__sharepointFolder',
+          label: 'SharePoint Folder',
+          type: 'Text',
+          maxLength: 255,
+          helpText: 'Link to SharePoint document folder'
         }
-      ],
-      recordTypes: [contactRecordType],
-      pageLayouts: [contactLayout],
-      validationRules: [
+      ]
+    ));
+
+    // 2. Contact
+    objects.push(createBasicObject(
+      'Contact',
+      'Contact',
+      'Contacts',
+      'People and their contact information',
+      [
         {
           id: generateId(),
-          name: 'Email_Format_Validation',
-          errorMessage: 'Please enter a valid email address',
-          active: true,
-          condition: 'Email != null && !Email.includes("@")'
+          apiName: 'Contact__firstName',
+          label: 'First Name',
+          type: 'Text',
+          maxLength: 100
+        },
+        {
+          id: generateId(),
+          apiName: 'Contact__lastName',
+          label: 'Last Name',
+          type: 'Text',
+          required: true,
+          maxLength: 100
+        },
+        {
+          id: generateId(),
+          apiName: 'Contact__email',
+          label: 'Email',
+          type: 'Email',
+          unique: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Contact__phone',
+          label: 'Phone',
+          type: 'Phone',
+          maxLength: 40
+        },
+        {
+          id: generateId(),
+          apiName: 'Contact__title',
+          label: 'Job Title',
+          type: 'Text',
+          maxLength: 128
         }
-      ],
-      defaultRecordTypeId: contactRecordType.id
-    };
+      ]
+    ));
+
+    // 3. Account
+    objects.push(createBasicObject(
+      'Account',
+      'Account',
+      'Accounts',
+      'Companies and organizations',
+      [
+        {
+          id: generateId(),
+          apiName: 'Account__accountName',
+          label: 'Account Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__accountNumber',
+          label: 'Account Number',
+          type: 'AutoNumber',
+          autoNumber: { displayFormat: 'A-{00000}', startingNumber: 10000 }
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__accountType',
+          label: 'Account Type',
+          type: 'Picklist',
+          picklistValues: ['General Contractor', 'Sub-Contractor', 'Property Management', 'Developer', 'Consultant', 'Supplier', 'Government', 'Non-Profit', 'Other']
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Active', 'Inactive'],
+          defaultValue: 'Active'
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__website',
+          label: 'Website',
+          type: 'URL',
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__primaryEmail',
+          label: 'Primary Email',
+          type: 'Email',
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Account__primaryPhone',
+          label: 'Primary Phone',
+          type: 'Phone',
+          maxLength: 40
+        }
+      ]
+    ));
+
+    // 4. Product
+    objects.push(createBasicObject(
+      'Product',
+      'Product',
+      'Products',
+      'Products and services offered',
+      [
+        {
+          id: generateId(),
+          apiName: 'Product__productName',
+          label: 'Product Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Product__productCode',
+          label: 'Product Code',
+          type: 'Text',
+          unique: true,
+          maxLength: 50
+        },
+        {
+          id: generateId(),
+          apiName: 'Product__category',
+          label: 'Category',
+          type: 'Picklist',
+          picklistValues: ['Service', 'Equipment', 'Material', 'Labor', 'Other']
+        },
+        {
+          id: generateId(),
+          apiName: 'Product__unitPrice',
+          label: 'Unit Price',
+          type: 'Currency',
+          precision: 18,
+          scale: 2
+        },
+        {
+          id: generateId(),
+          apiName: 'Product__isActive',
+          label: 'Active',
+          type: 'Checkbox',
+          defaultValue: true
+        },
+        {
+          id: generateId(),
+          apiName: 'Product__description',
+          label: 'Description',
+          type: 'TextArea',
+          maxLength: 2000
+        }
+      ]
+    ));
+
+    // 5. Lead
+    objects.push(createBasicObject(
+      'Lead',
+      'Lead',
+      'Leads',
+      'Potential customers and opportunities',
+      [
+        {
+          id: generateId(),
+          apiName: 'Lead__firstName',
+          label: 'First Name',
+          type: 'Text',
+          maxLength: 100
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__lastName',
+          label: 'Last Name',
+          type: 'Text',
+          required: true,
+          maxLength: 100
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__company',
+          label: 'Company',
+          type: 'Text',
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__email',
+          label: 'Email',
+          type: 'Email',
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__phone',
+          label: 'Phone',
+          type: 'Phone',
+          maxLength: 40
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['New', 'Contacted', 'Qualified', 'Unqualified', 'Converted'],
+          defaultValue: 'New'
+        },
+        {
+          id: generateId(),
+          apiName: 'Lead__leadSource',
+          label: 'Lead Source',
+          type: 'Picklist',
+          picklistValues: ['Web', 'Phone', 'Referral', 'Event', 'Partner', 'Other']
+        }
+      ]
+    ));
+
+    // 6. Deal
+    objects.push(createBasicObject(
+      'Deal',
+      'Deal',
+      'Deals',
+      'Sales opportunities and deals',
+      [
+        {
+          id: generateId(),
+          apiName: 'Deal__dealName',
+          label: 'Deal Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Deal__amount',
+          label: 'Amount',
+          type: 'Currency',
+          precision: 18,
+          scale: 2
+        },
+        {
+          id: generateId(),
+          apiName: 'Deal__closeDate',
+          label: 'Expected Close Date',
+          type: 'Date',
+          required: true
+        },
+        {
+          id: generateId(),
+          apiName: 'Deal__stage',
+          label: 'Stage',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'],
+          defaultValue: 'Prospecting'
+        },
+        {
+          id: generateId(),
+          apiName: 'Deal__probability',
+          label: 'Probability (%)',
+          type: 'Percent',
+          precision: 3,
+          scale: 0
+        },
+        {
+          id: generateId(),
+          apiName: 'Deal__description',
+          label: 'Description',
+          type: 'TextArea',
+          maxLength: 5000
+        }
+      ]
+    ));
+
+    // 7. Project
+    objects.push(createBasicObject(
+      'Project',
+      'Project',
+      'Projects',
+      'Construction and service projects',
+      [
+        {
+          id: generateId(),
+          apiName: 'Project__projectName',
+          label: 'Project Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__projectNumber',
+          label: 'Project Number',
+          type: 'AutoNumber',
+          autoNumber: { displayFormat: 'PRJ-{0000}', startingNumber: 1 }
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'],
+          defaultValue: 'Planning'
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__startDate',
+          label: 'Start Date',
+          type: 'Date'
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__endDate',
+          label: 'End Date',
+          type: 'Date'
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__budget',
+          label: 'Budget',
+          type: 'Currency',
+          precision: 18,
+          scale: 2
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__description',
+          label: 'Description',
+          type: 'LongTextArea',
+          maxLength: 10000
+        }
+      ]
+    ));
+
+    // 8. Service
+    objects.push(createBasicObject(
+      'Service',
+      'Service',
+      'Services',
+      'Service requests and work orders',
+      [
+        {
+          id: generateId(),
+          apiName: 'Service__serviceNumber',
+          label: 'Service Number',
+          type: 'AutoNumber',
+          autoNumber: { displayFormat: 'SRV-{00000}', startingNumber: 1 }
+        },
+        {
+          id: generateId(),
+          apiName: 'Service__subject',
+          label: 'Subject',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Service__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['New', 'In Progress', 'On Hold', 'Resolved', 'Closed'],
+          defaultValue: 'New'
+        },
+        {
+          id: generateId(),
+          apiName: 'Service__priority',
+          label: 'Priority',
+          type: 'Picklist',
+          picklistValues: ['Low', 'Medium', 'High', 'Urgent'],
+          defaultValue: 'Medium'
+        },
+        {
+          id: generateId(),
+          apiName: 'Service__description',
+          label: 'Description',
+          type: 'LongTextArea',
+          maxLength: 10000
+        },
+        {
+          id: generateId(),
+          apiName: 'Service__scheduledDate',
+          label: 'Scheduled Date',
+          type: 'DateTime'
+        }
+      ]
+    ));
+
+    // 9. Quote
+    objects.push(createBasicObject(
+      'Quote',
+      'Quote',
+      'Quotes',
+      'Price quotes and estimates',
+      [
+        {
+          id: generateId(),
+          apiName: 'Quote__quoteNumber',
+          label: 'Quote Number',
+          type: 'AutoNumber',
+          autoNumber: { displayFormat: 'Q-{00000}', startingNumber: 1 }
+        },
+        {
+          id: generateId(),
+          apiName: 'Quote__quoteName',
+          label: 'Quote Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Quote__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Draft', 'Pending', 'Approved', 'Rejected', 'Accepted'],
+          defaultValue: 'Draft'
+        },
+        {
+          id: generateId(),
+          apiName: 'Quote__totalAmount',
+          label: 'Total Amount',
+          type: 'Currency',
+          precision: 18,
+          scale: 2
+        },
+        {
+          id: generateId(),
+          apiName: 'Quote__validUntil',
+          label: 'Valid Until',
+          type: 'Date'
+        },
+        {
+          id: generateId(),
+          apiName: 'Quote__description',
+          label: 'Description',
+          type: 'TextArea',
+          maxLength: 5000
+        }
+      ]
+    ));
+
+    // 10. Installation
+    objects.push(createBasicObject(
+      'Installation',
+      'Installation',
+      'Installations',
+      'Equipment and system installations',
+      [
+        {
+          id: generateId(),
+          apiName: 'Installation__installationNumber',
+          label: 'Installation Number',
+          type: 'AutoNumber',
+          autoNumber: { displayFormat: 'INST-{0000}', startingNumber: 1 }
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__installationName',
+          label: 'Installation Name',
+          type: 'Text',
+          required: true,
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__status',
+          label: 'Status',
+          type: 'Picklist',
+          required: true,
+          picklistValues: ['Scheduled', 'In Progress', 'Completed', 'Cancelled', 'Failed'],
+          defaultValue: 'Scheduled'
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__scheduledDate',
+          label: 'Scheduled Date',
+          type: 'DateTime'
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__completedDate',
+          label: 'Completed Date',
+          type: 'DateTime'
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__technician',
+          label: 'Technician',
+          type: 'Text',
+          maxLength: 255
+        },
+        {
+          id: generateId(),
+          apiName: 'Installation__notes',
+          label: 'Installation Notes',
+          type: 'LongTextArea',
+          maxLength: 10000
+        }
+      ]
+    ));
+
+    // Create permission sets for all objects
+    const allObjectPermissions: Record<string, any> = {};
+    objects.forEach(obj => {
+      allObjectPermissions[obj.apiName] = { read: true, create: true, edit: true, delete: false };
+    });
 
     return {
       version: 1,
-      objects: [opportunityObject, contactObject],
+      objects,
       permissionSets: [
         {
           id: generateId(),
           name: 'Standard User',
-          objectPermissions: {
-            'Opportunity': { read: true, create: true, edit: true, delete: false },
-            'Contact': { read: true, create: true, edit: true, delete: false }
-          },
-          fieldPermissions: {
-            'Opportunity.Amount': { read: true, edit: true },
-            'Contact.Email': { read: true, edit: true }
-          }
+          objectPermissions: allObjectPermissions,
+          fieldPermissions: {}
         },
         {
           id: generateId(),
           name: 'System Administrator',
-          objectPermissions: {
-            'Opportunity': { read: true, create: true, edit: true, delete: true },
-            'Contact': { read: true, create: true, edit: true, delete: true }
-          },
-          fieldPermissions: {
-            'Opportunity.Amount': { read: true, edit: true },
-            'Contact.Email': { read: true, edit: true }
-          }
+          objectPermissions: Object.keys(allObjectPermissions).reduce((acc, key) => {
+            acc[key] = { read: true, create: true, edit: true, delete: true };
+            return acc;
+          }, {} as Record<string, any>),
+          fieldPermissions: {}
         }
       ],
-      updatedAt: new Date().toISOString()
+      updatedAt: now
     };
   }
 }

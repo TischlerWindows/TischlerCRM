@@ -217,7 +217,7 @@ export default function AccountsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <Link href="/dashboard" className="text-xl font-bold text-indigo-600">TCES</Link>
+              <Link href="/" className="text-xl font-bold text-indigo-600">TCES</Link>
               <span className="ml-4 text-2xl font-bold text-gray-900 flex items-center gap-2">
                 <Building2 className="w-7 h-7" />
                 Companies/Accounts

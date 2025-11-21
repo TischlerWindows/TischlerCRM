@@ -14,8 +14,11 @@ import {
   Users,
   Calendar,
   FolderOpen,
-  AlertCircle
+  AlertCircle,
+  Layout
 } from 'lucide-react';
+import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface Property {
   id: string;
@@ -39,7 +42,10 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
+  const [showDynamicForm, setShowDynamicForm] = useState(false);
+  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ 
     address: '',
     city: '',
@@ -48,6 +54,20 @@ export default function PropertiesPage() {
     status: 'Active' as 'Active' | 'Inactive'
   });
   const router = useRouter();
+  const { schema } = useSchemaStore();
+  
+  // Check if Property object exists with page layouts
+  const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
+  const createLayouts = propertyObject?.pageLayouts?.filter(l => l.layoutType === 'create') || [];
+  const hasCreateLayout = createLayouts.length > 0;
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Property Object:', propertyObject);
+    console.log('📋 All Page Layouts:', propertyObject?.pageLayouts);
+    console.log('✨ Create Layouts:', createLayouts);
+    console.log('✅ Has Create Layout:', hasCreateLayout);
+  }, [propertyObject, createLayouts, hasCreateLayout]);
 
   useEffect(() => {
     // Mock data - replace with actual API call
@@ -113,9 +133,9 @@ export default function PropertiesPage() {
     property.city.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleCreateProperty = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+
+
+  const handleDynamicFormSubmit = (data: Record<string, any>) => {
     // Generate next property number
     const nextNumber = properties.length + 1;
     const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
@@ -125,13 +145,13 @@ export default function PropertiesPage() {
     const newProperty: Property = {
       id: String(Date.now()),
       propertyNumber,
-      address: formData.address,
-      city: formData.city,
-      state: formData.state,
-      zipCode: formData.zipCode,
-      status: formData.status,
-      contacts: [],
-      accounts: [],
+      address: data.Property__address || '',
+      city: data.Property__city || '',
+      state: data.Property__state || '',
+      zipCode: data.Property__zipCode || '',
+      status: data.Property__status || 'Active',
+      contacts: data.Property__contacts || [],
+      accounts: data.Property__accounts || [],
       lastActivity: today || '',
       createdBy: 'Development User',
       createdAt: today || '',
@@ -141,8 +161,7 @@ export default function PropertiesPage() {
     };
 
     setProperties([newProperty, ...properties]);
-    setFormData({ address: '', city: '', state: '', zipCode: '', status: 'Active' });
-    setShowCreateDialog(false);
+    console.log('Dynamic form submitted:', data);
   };
 
   const handleDeleteProperty = (id: string) => {
@@ -166,13 +185,29 @@ export default function PropertiesPage() {
         <div className="mb-8">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                <MapPin className="w-8 h-8 text-indigo-600" />
-                Properties
-              </h1>
+              <div className="flex items-center gap-4 mb-2">
+                <Link href="/" className="text-xl font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                  TCES
+                </Link>
+                <span className="text-gray-300">|</span>
+                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-8 h-8 text-indigo-600" />
+                  Properties
+                </h1>
+              </div>
+              <p className="text-gray-600 mt-1">Manage property records and locations</p>
             </div>
             <button
-              onClick={() => setShowCreateDialog(true)}
+              onClick={() => {
+                if (!hasCreateLayout) {
+                  setShowNoLayoutsDialog(true);
+                } else if (createLayouts.length === 1 && createLayouts[0]) {
+                  setSelectedLayoutId(createLayouts[0].id);
+                  setShowDynamicForm(true);
+                } else {
+                  setShowLayoutSelector(true);
+                }
+              }}
               className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
             >
               <Plus className="w-5 h-5 mr-2" />
@@ -187,6 +222,16 @@ export default function PropertiesPage() {
               <div className="text-sm text-blue-800">
                 <p className="font-semibold mb-1">About Properties</p>
                 <p>Properties are automatically marked as <strong>Inactive</strong> after 8 months of no activity or when a project is completed. All documentation is filed under the unique Property Number in SharePoint.</p>
+                {hasCreateLayout ? (
+                  <p className="mt-2">
+                    <strong>✨ Using Dynamic Forms:</strong> This page uses {createLayouts.length} {createLayouts.length === 1 ? 'layout' : 'layouts'} configured in Object Manager.
+                    {createLayouts.length > 1 && ' Click "New Property" to choose which layout to use.'}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-amber-700">
+                    <strong>⚠️ No Create Page Layout Found:</strong> Using legacy form. <Link href="/object-manager/Property" className="underline font-medium">Go to Object Manager → Property → Page Editor</Link> and create a new page layout with "Mode: New" to enable dynamic forms with custom fields and sections.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -335,116 +380,112 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* Create Property Dialog */}
-      {showCreateDialog && (
+      {/* No Page Layouts Dialog */}
+      {showNoLayoutsDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Create New Property</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                <em><strong>Property Number</strong></em> will be auto-generated (format: P-00)
-              </p>
+              <h2 className="text-xl font-bold text-gray-900">No Page Layouts Created</h2>
             </div>
-
-            <form onSubmit={handleCreateProperty} className="p-6 space-y-6">
-              {/* Address Section */}
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700 mb-3"><em><strong>Address</strong></em></h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <em><strong>Address</strong></em> *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="123 Main Street"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      May start as a general location during Leads pipeline
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.state}
-                        onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                        placeholder="ON"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Zip Code *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.zipCode}
-                        onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      />
-                    </div>
-                  </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-700">
+                  <p className="mb-3">
+                    To create new properties, you need to configure a page layout in the Page Editor first.
+                  </p>
+                  <p className="font-medium text-gray-900">
+                    This allows you to:
+                  </p>
+                  <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
+                    <li>Customize which fields appear</li>
+                    <li>Organize fields into sections</li>
+                    <li>Create multiple layout options</li>
+                    <li>Control field validation</li>
+                  </ul>
                 </div>
               </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'Active' | 'Inactive' })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
-
-              {/* Info Note */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
-                  <strong>Note:</strong> <em><strong>Contacts</strong></em> and <em><strong>Accounts</strong></em> will be automatically linked as they are connected during pipeline activities. SharePoint folder will be created automatically.
-                </p>
-              </div>
-
-              {/* Actions */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateDialog(false)}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
-                  Create Property
-                </button>
-              </div>
-            </form>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowNoLayoutsDialog(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <Link
+                href="/object-manager/Property"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                onClick={() => setShowNoLayoutsDialog(false)}
+              >
+                <Layout className="w-4 h-4 mr-2" />
+                Go to Page Editor
+              </Link>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Layout Selector Dialog */}
+      {showLayoutSelector && createLayouts.length > 1 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Choose which form layout to use for creating a new property
+              </p>
+            </div>
+            <div className="p-6 space-y-3">
+              {createLayouts.map((layout) => (
+                <button
+                  key={layout.id}
+                  onClick={() => {
+                    setSelectedLayoutId(layout.id);
+                    setShowLayoutSelector(false);
+                    setShowDynamicForm(true);
+                  }}
+                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <MapPin className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900">{layout.name}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
+                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowLayoutSelector(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Form Dialog */}
+      {hasCreateLayout && selectedLayoutId && (
+        <DynamicFormDialog
+          open={showDynamicForm}
+          onOpenChange={(open) => {
+            setShowDynamicForm(open);
+            if (!open) setSelectedLayoutId(null);
+          }}
+          objectApiName="Property"
+          layoutType="create"
+          layoutId={selectedLayoutId}
+          onSubmit={handleDynamicFormSubmit}
+          title="New Property"
+        />
       )}
     </div>
   );

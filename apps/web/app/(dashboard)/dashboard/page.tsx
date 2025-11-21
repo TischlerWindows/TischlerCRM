@@ -19,14 +19,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const { showToast } = useToast();
 
-  // Auth check
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-    }
-  }, [router]);
-
   // State
   const [kpis, setKpis] = useState<Kpi[]>([]);
   const [kpisLoading, setKpisLoading] = useState(true);

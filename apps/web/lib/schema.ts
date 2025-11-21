@@ -16,9 +16,13 @@ export interface FieldDef {
   type: FieldType;
   required?: boolean;
   unique?: boolean;
+  readOnly?: boolean;
   precision?: number;
   scale?: number;
   maxLength?: number;
+  minLength?: number;
+  min?: number;
+  max?: number;
   picklistValues?: string[];
   defaultValue?: any;
   helpText?: string;
@@ -26,6 +30,7 @@ export interface FieldDef {
   visibleIf?: ConditionExpr[]; // conditional visibility rules
   formulaExpr?: string;        // for formula fields
   lookupObject?: string;       // target object for lookup fields
+  relationshipName?: string;   // name to display for relationship
   dependentValues?: { [controllingValue: string]: string[] }; // dependent picklist values
   relationship?: {
     targetObject: string;
@@ -85,19 +90,28 @@ export interface PageSection {
   id: string;
   label: string;
   columns: 1 | 2 | 3;
-  fields: string[]; // field apiNames
+  order: number;
+  fields: PageField[];
   visibleIf?: ConditionExpr[];
+}
+
+export interface PageField {
+  apiName: string;
+  column: number;
+  order: number;
 }
 
 export interface PageTab {
   id: string;
   label: string;
+  order: number;
   sections: PageSection[];
 }
 
 export interface PageLayout {
   id: string;
   name: string;
+  layoutType: 'create' | 'edit'; // New Record vs Existing Record
   tabs: PageTab[];
   formattingRules?: FormattingRule[];
 }
