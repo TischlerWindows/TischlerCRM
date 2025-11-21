@@ -24,17 +24,44 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { cn } from '@/lib/utils';
 
 const SIDEBAR_SECTIONS = [
-  { 
-    id: 'details', 
-    label: 'Details', 
-    icon: Database,
-    description: 'Object metadata and summary'
-  },
+  // Data Model
   { 
     id: 'fields', 
     label: 'Fields & Relationships', 
     icon: Grid3x3,
     description: 'Manage fields and relationships',
+    category: 'Data Model',
+    featured: true
+  },
+  { 
+    id: 'record-types', 
+    label: 'Record Types', 
+    icon: GitBranch,
+    description: 'Manage record types',
+    category: 'Data Model'
+  },
+  { 
+    id: 'field-sets', 
+    label: 'Field Sets', 
+    icon: List,
+    description: 'Reusable field groups',
+    category: 'Data Model'
+  },
+  { 
+    id: 'lookup-filters', 
+    label: 'Related Lookup Filters', 
+    icon: SearchIcon,
+    description: 'Configure lookup filters',
+    category: 'Data Model'
+  },
+  
+  // Layouts & UI
+  { 
+    id: 'page-editor', 
+    label: 'Page Editor', 
+    icon: Palette,
+    description: 'Visual page editor',
+    category: 'Layouts & UI',
     featured: true
   },
   { 
@@ -42,93 +69,61 @@ const SIDEBAR_SECTIONS = [
     label: 'Page Layouts', 
     icon: Layout,
     description: 'Manage page layouts',
+    category: 'Layouts & UI',
     featured: true
-  },
-  { 
-    id: 'page-editor', 
-    label: 'Lightning Record Pages', 
-    icon: Palette,
-    description: 'Visual page editor',
-    featured: true,
-    badge: 'Page Editor'
-  },
-  { 
-    id: 'buttons', 
-    label: 'Buttons, Links, and Actions', 
-    icon: Zap,
-    description: 'Custom buttons and actions'
   },
   { 
     id: 'compact-layouts', 
     label: 'Compact Layouts', 
     icon: Square,
-    description: 'Compact view configuration'
-  },
-  { 
-    id: 'field-sets', 
-    label: 'Field Sets', 
-    icon: List,
-    description: 'Reusable field groups'
-  },
-  { 
-    id: 'limits', 
-    label: 'Object Limits', 
-    icon: BarChart3,
-    description: 'View object limits'
-  },
-  { 
-    id: 'record-types', 
-    label: 'Record Types', 
-    icon: GitBranch,
-    description: 'Manage record types'
-  },
-  { 
-    id: 'lookup-filters', 
-    label: 'Related Lookup Filters', 
-    icon: SearchIcon,
-    description: 'Configure lookup filters'
-  },
-  { 
-    id: 'search-layouts', 
-    label: 'Search Layouts', 
-    icon: SearchIcon,
-    description: 'Configure search layouts'
-  },
-  { 
-    id: 'list-button-layout', 
-    label: 'List View Button Layout', 
-    icon: Settings,
-    description: 'Configure list buttons'
-  },
-  { 
-    id: 'object-access', 
-    label: 'Object Access', 
-    icon: Shield,
-    description: 'Manage permissions'
-  },
-  { 
-    id: 'triggers', 
-    label: 'Triggers', 
-    icon: Code,
-    description: 'Apex triggers'
-  },
-  { 
-    id: 'flow-triggers', 
-    label: 'Flow Triggers', 
-    icon: GitBranch,
-    description: 'Flow-based triggers'
-  },
-  { 
-    id: 'validation-rules', 
-    label: 'Validation Rules', 
-    icon: CheckCircle2,
-    description: 'Field validation rules'
+    description: 'Compact view configuration',
+    category: 'Layouts & UI'
   },
   { 
     id: 'conditional-formatting', 
     label: 'Conditional Field Formatting', 
     icon: Palette,
-    description: 'Dynamic field styling'
+    description: 'Dynamic field styling',
+    category: 'Layouts & UI'
+  },
+  
+  // Automation
+  { 
+    id: 'workflow-triggers', 
+    label: 'Workflow Triggers', 
+    icon: Zap,
+    description: 'Workflow automation',
+    category: 'Automation'
+  },
+  { 
+    id: 'functions', 
+    label: 'Functions / Scripts', 
+    icon: Code,
+    description: 'Custom functions and scripts',
+    category: 'Automation'
+  },
+  
+  // Security & Access
+  { 
+    id: 'permissions', 
+    label: 'Permissions', 
+    icon: Shield,
+    description: 'Manage permissions',
+    category: 'Security & Access'
+  },
+  { 
+    id: 'object-access', 
+    label: 'Object Access', 
+    icon: Shield,
+    description: 'Object-level access control',
+    category: 'Security & Access'
+  },
+  { 
+    id: 'validation-rules', 
+    label: 'Validation Rules', 
+    icon: CheckCircle2,
+    description: 'Field validation rules',
+    category: 'Security & Access'
   },
 ];
 
@@ -219,42 +214,70 @@ export default function ObjectDetailPage() {
 
         {/* Navigation */}
         <nav className="p-2 overflow-y-auto" style={{ height: 'calc(100vh - 180px)' }}>
-          {SIDEBAR_SECTIONS.map((section) => {
-            const Icon = section.icon;
-            const isActive = activeSection === section.id;
-            
-            return (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 text-left',
-                  isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-gray-700 hover:bg-gray-100',
-                  section.featured && !isActive && 'font-medium'
-                )}
-                title={sidebarCollapsed ? section.label : undefined}
-              >
-                <Icon className={cn('w-5 h-5 flex-shrink-0', section.featured && 'text-indigo-600')} />
-                {!sidebarCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm truncate">{section.label}</span>
-                      {section.badge && (
-                        <span className="text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded">
-                          {section.badge}
-                        </span>
-                      )}
+          {!sidebarCollapsed && (
+            <>
+              {['Data Model', 'Layouts & UI', 'Automation', 'Security & Access'].map((category) => {
+                const categoryItems = SIDEBAR_SECTIONS.filter(s => s.category === category);
+                if (categoryItems.length === 0) return null;
+                
+                return (
+                  <div key={category} className="mb-4">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      {category}
                     </div>
-                    {section.description && (
-                      <p className="text-xs text-gray-500 truncate">{section.description}</p>
-                    )}
+                    {categoryItems.map((section) => {
+                      const Icon = section.icon;
+                      const isActive = activeSection === section.id;
+                      
+                      return (
+                        <button
+                          key={section.id}
+                          onClick={() => setActiveSection(section.id)}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 text-left',
+                            isActive
+                              ? 'bg-indigo-50 text-indigo-600'
+                              : 'text-gray-700 hover:bg-gray-100',
+                            section.featured && !isActive && 'font-medium'
+                          )}
+                        >
+                          <Icon className={cn('w-5 h-5 flex-shrink-0', section.featured && 'text-indigo-600')} />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm truncate">{section.label}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </button>
-            );
-          })}
+                );
+              })}
+            </>
+          )}
+          
+          {sidebarCollapsed && (
+            <>
+              {SIDEBAR_SECTIONS.map((section) => {
+                const Icon = section.icon;
+                const isActive = activeSection === section.id;
+                
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => setActiveSection(section.id)}
+                    className={cn(
+                      'w-full flex items-center justify-center p-2.5 rounded-lg transition-colors mb-1',
+                      isActive
+                        ? 'bg-indigo-50 text-indigo-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    )}
+                    title={section.label}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </button>
+                );
+              })}
+            </>
+          )}
         </nav>
       </aside>
 
