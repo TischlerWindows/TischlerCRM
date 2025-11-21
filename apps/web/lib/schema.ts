@@ -1,18 +1,13 @@
 // Core schema types for the Object Manager system
 
 export type FieldType =
-  | "text" 
-  | "textarea" 
-  | "number" 
-  | "currency" 
-  | "percent"
-  | "checkbox" 
-  | "date" 
-  | "datetime"
-  | "picklist" 
-  | "multipicklist"
-  | "lookup"   // reference to another object by id
-  | "formula"; // eval read-only, simple functions, e.g., CONCAT, SUM
+  | "AutoNumber" | "Formula" | "RollupSummary"
+  | "Lookup" | "ExternalLookup"
+  | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
+  | "Geolocation" | "Number" | "Percent" | "Phone"
+  | "Picklist" | "MultiPicklist"
+  | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
+  | "Time" | "URL" | "Address";
 
 export interface FieldDef {
   id: string;
@@ -25,13 +20,35 @@ export interface FieldDef {
   scale?: number;
   maxLength?: number;
   picklistValues?: string[];
-  defaultValue?: string | number | boolean | null;
+  defaultValue?: any;
   helpText?: string;
   controllingField?: string; // for dependent picklists
   visibleIf?: ConditionExpr[]; // conditional visibility rules
   formulaExpr?: string;        // for formula fields
   lookupObject?: string;       // target object for lookup fields
   dependentValues?: { [controllingValue: string]: string[] }; // dependent picklist values
+  relationship?: {
+    targetObject: string;
+    behavior?: "restrict" | "cascade" | "nullify";
+  };
+  rollup?: {
+    relatedObject: string;
+    relationshipField: string;
+    aggregate: "COUNT" | "SUM" | "MIN" | "MAX";
+    targetField?: string;
+    filterExpr?: string;
+  };
+  encryption?: {
+    strategy: "atRest";
+    masked: boolean;
+  };
+  geolocation?: {
+    format: "decimal";
+  };
+  autoNumber?: {
+    displayFormat: string;
+    startingNumber: number;
+  };
 }
 
 export interface ValidationRule {
@@ -48,6 +65,20 @@ export interface RecordType {
   description?: string;
   default?: boolean;
   pageLayoutId?: string;
+}
+
+export interface FormattingRule {
+  id: string;
+  name: string;
+  active: boolean;
+  when: string; // boolean expr using field apiNames
+  effects: {
+    hidden?: boolean;
+    readOnly?: boolean;
+    badge?: "success" | "warning" | "destructive";
+    className?: string;
+    icon?: string;
+  };
 }
 
 export interface PageSection {
@@ -68,6 +99,7 @@ export interface PageLayout {
   id: string;
   name: string;
   tabs: PageTab[];
+  formattingRules?: FormattingRule[];
 }
 
 export interface PermissionSet {
@@ -100,6 +132,14 @@ export interface ObjectDef {
   defaultRecordTypeId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SchemaVersion {
+  version: number;
+  timestamp: string;
+  schema: OrgSchema;
+  changedBy?: string;
+  description?: string;
 }
 
 export interface OrgSchema {
@@ -175,19 +215,73 @@ export const SYSTEM_FIELDS: FieldDef[] = [
 
 // Field type metadata for UI
 export const FIELD_TYPES: FieldOption[] = [
-  { label: 'Text', value: 'text', type: 'text' },
-  { label: 'Text Area', value: 'textarea', type: 'textarea' },
-  { label: 'Number', value: 'number', type: 'number' },
-  { label: 'Currency', value: 'currency', type: 'currency' },
-  { label: 'Percent', value: 'percent', type: 'percent' },
-  { label: 'Checkbox', value: 'checkbox', type: 'checkbox' },
-  { label: 'Date', value: 'date', type: 'date' },
-  { label: 'Date & Time', value: 'datetime', type: 'datetime' },
-  { label: 'Picklist', value: 'picklist', type: 'picklist' },
-  { label: 'Multi-Select Picklist', value: 'multipicklist', type: 'multipicklist' },
-  { label: 'Lookup Relationship', value: 'lookup', type: 'lookup' },
-  { label: 'Formula', value: 'formula', type: 'formula' }
+  { label: 'Auto Number', value: 'AutoNumber', type: 'AutoNumber' },
+  { label: 'Formula', value: 'Formula', type: 'Formula' },
+  { label: 'Roll-Up Summary', value: 'RollupSummary', type: 'RollupSummary' },
+  { label: 'Lookup Relationship', value: 'Lookup', type: 'Lookup' },
+  { label: 'External Lookup', value: 'ExternalLookup', type: 'ExternalLookup' },
+  { label: 'Checkbox', value: 'Checkbox', type: 'Checkbox' },
+  { label: 'Currency', value: 'Currency', type: 'Currency' },
+  { label: 'Date', value: 'Date', type: 'Date' },
+  { label: 'Date/Time', value: 'DateTime', type: 'DateTime' },
+  { label: 'Email', value: 'Email', type: 'Email' },
+  { label: 'Geolocation', value: 'Geolocation', type: 'Geolocation' },
+  { label: 'Number', value: 'Number', type: 'Number' },
+  { label: 'Percent', value: 'Percent', type: 'Percent' },
+  { label: 'Phone', value: 'Phone', type: 'Phone' },
+  { label: 'Picklist', value: 'Picklist', type: 'Picklist' },
+  { label: 'Multi-Select Picklist', value: 'MultiPicklist', type: 'MultiPicklist' },
+  { label: 'Text', value: 'Text', type: 'Text' },
+  { label: 'Text Area', value: 'TextArea', type: 'TextArea' },
+  { label: 'Text Area (Long)', value: 'LongTextArea', type: 'LongTextArea' },
+  { label: 'Text Area (Rich)', value: 'RichTextArea', type: 'RichTextArea' },
+  { label: 'Text (Encrypted)', value: 'EncryptedText', type: 'EncryptedText' },
+  { label: 'Time', value: 'Time', type: 'Time' },
+  { label: 'URL', value: 'URL', type: 'URL' },
+  { label: 'Address', value: 'Address', type: 'Address' }
 ];
+
+// Helper to get field type categories
+export const getFieldTypeCategory = (type: FieldType): string => {
+  if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
+  if (["Lookup", "ExternalLookup"].includes(type)) return "Relationship";
+  if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
+  if (["Number", "Currency", "Percent"].includes(type)) return "Number";
+  if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
+  if (["Picklist", "MultiPicklist"].includes(type)) return "Selection";
+  return "Other";
+};
+
+// Helper to get field type icon
+export const getFieldTypeIcon = (type: FieldType): string => {
+  const icons: Record<string, string> = {
+    AutoNumber: "hash",
+    Formula: "function",
+    RollupSummary: "sigma",
+    Lookup: "link",
+    ExternalLookup: "external-link",
+    Checkbox: "check-square",
+    Currency: "dollar-sign",
+    Date: "calendar",
+    DateTime: "calendar-clock",
+    Email: "mail",
+    Geolocation: "map-pin",
+    Number: "hash",
+    Percent: "percent",
+    Phone: "phone",
+    Picklist: "list",
+    MultiPicklist: "list-checks",
+    Text: "type",
+    TextArea: "align-left",
+    LongTextArea: "file-text",
+    RichTextArea: "file-edit",
+    EncryptedText: "lock",
+    Time: "clock",
+    URL: "link",
+    Address: "map",
+  };
+  return icons[type] || "circle";
+};
 
 // Utility functions
 export function generateId(): string {

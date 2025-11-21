@@ -32,6 +32,7 @@ import { Cog } from 'lucide-react';
 
 const navigation = [
   { name: 'Home', href: '/dashboard', icon: Home },
+  { name: 'Object Manager', href: '/object-manager', icon: Cog },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
