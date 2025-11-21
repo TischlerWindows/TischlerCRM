@@ -125,10 +125,21 @@ export interface ObjectDef {
   id: string;
   apiName: string;
   label: string;
+  pluralLabel?: string;
+  description?: string;
   fields: FieldDef[];
   recordTypes: RecordType[];
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
+  searchLayouts?: {
+    defaultFields: string[];
+    lookupDialogFields: string[];
+    listViewFields: string[];
+  };
+  compactLayout?: {
+    fieldApiNames: string[];
+  };
+  permissionSets?: string[];
   defaultRecordTypeId?: string;
   createdAt: string;
   updatedAt: string;
