@@ -22,6 +22,7 @@ import {
   Package
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import UniversalSearch from '@/components/universal-search';
 
 // Information Modules - Reference and context data
 const informationModules = [
@@ -52,9 +53,12 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
       <nav className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-              <Link href="/" className="text-2xl font-bold text-indigo-600">TCES</Link>
-            <div className="flex items-center space-x-4">
+          <div className="flex justify-between h-16 items-center gap-4">
+              <Link href="/" className="text-2xl font-bold text-indigo-600 flex-shrink-0">TCES</Link>
+            <div className="flex-1 max-w-2xl">
+              <UniversalSearch />
+            </div>
+            <div className="flex items-center space-x-4 flex-shrink-0">
               <Link
                 href="/settings"
                 className="p-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none flex items-center"
@@ -101,14 +105,15 @@ export default function HomePage() {
           </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mt-16">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
             Tischler CRM ProtoType
           </h1>
           <div className="mt-2 text-base text-gray-600">
             --<br />Basic prototpye for Tischler CRM software
           </div>
+
           <div className="mt-10 flex items-center justify-center gap-x-6">
             <Link
               href="/dashboard"

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import PageHeader from '@/components/page-header';
 
 interface Property {
   id: string;
@@ -46,84 +47,84 @@ export default function PropertiesPage() {
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ 
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    status: 'Active' as 'Active' | 'Inactive'
-  });
   const router = useRouter();
   const { schema } = useSchemaStore();
   
   // Check if Property object exists with page layouts
   const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
-  const createLayouts = propertyObject?.pageLayouts?.filter(l => l.layoutType === 'create') || [];
-  const hasCreateLayout = createLayouts.length > 0;
+  const pageLayouts = propertyObject?.pageLayouts || [];
+  const hasPageLayout = pageLayouts.length > 0;
 
   // Debug logging
   useEffect(() => {
     console.log('🔍 Property Object:', propertyObject);
-    console.log('📋 All Page Layouts:', propertyObject?.pageLayouts);
-    console.log('✨ Create Layouts:', createLayouts);
-    console.log('✅ Has Create Layout:', hasCreateLayout);
-  }, [propertyObject, createLayouts, hasCreateLayout]);
+    console.log('📋 Page Layouts:', pageLayouts);
+    console.log('✅ Has Page Layout:', hasPageLayout);
+  }, [propertyObject, pageLayouts, hasPageLayout]);
 
   useEffect(() => {
-    // Mock data - replace with actual API call
-    setProperties([
-      {
-        id: '1',
-        propertyNumber: 'P-001',
-        address: '123 Main Street',
-        city: 'Toronto',
-        state: 'ON',
-        zipCode: 'M5V 3A3',
-        status: 'Active',
-        contacts: ['John Smith', 'Mary Johnson'],
-        accounts: ['ABC Corporation'],
-        lastActivity: '2024-11-10',
-        createdBy: 'Development User',
-        createdAt: '2024-01-15',
-        lastModifiedBy: 'Development User',
-        lastModifiedAt: '2024-11-10',
-        sharepointFolder: 'P-001'
-      },
-      {
-        id: '2',
-        propertyNumber: 'P-002',
-        address: '456 Oak Avenue',
-        city: 'Mississauga',
-        state: 'ON',
-        zipCode: 'L5B 2K5',
-        status: 'Active',
-        contacts: ['Sarah Williams'],
-        accounts: ['XYZ Enterprises'],
-        lastActivity: '2024-11-12',
-        createdBy: 'Development User',
-        createdAt: '2024-02-20',
-        lastModifiedBy: 'Development User',
-        lastModifiedAt: '2024-11-12',
-        sharepointFolder: 'P-002'
-      },
-      {
-        id: '3',
-        propertyNumber: 'P-003',
-        address: '789 Pine Road',
-        city: 'Brampton',
-        state: 'ON',
-        zipCode: 'L6Y 1M4',
-        status: 'Inactive',
-        contacts: [],
-        accounts: [],
-        lastActivity: '2024-03-15',
-        createdBy: 'Development User',
-        createdAt: '2024-01-10',
-        lastModifiedBy: 'System',
-        lastModifiedAt: '2024-11-10',
-        sharepointFolder: 'P-003'
-      }
-    ]);
+    // Load properties from localStorage or use mock data
+    const storedProperties = localStorage.getItem('properties');
+    if (storedProperties) {
+      setProperties(JSON.parse(storedProperties));
+    } else {
+      // Initial mock data
+      const mockData = [
+        {
+          id: '1',
+          propertyNumber: 'P-001',
+          address: '123 Main Street',
+          city: 'Toronto',
+          state: 'ON',
+          zipCode: 'M5V 3A3',
+          status: 'Active' as const,
+          contacts: ['John Smith', 'Mary Johnson'],
+          accounts: ['ABC Corporation'],
+          lastActivity: '2024-11-10',
+          createdBy: 'Development User',
+          createdAt: '2024-01-15',
+          lastModifiedBy: 'Development User',
+          lastModifiedAt: '2024-11-10',
+          sharepointFolder: 'P-001'
+        },
+        {
+          id: '2',
+          propertyNumber: 'P-002',
+          address: '456 Oak Avenue',
+          city: 'Mississauga',
+          state: 'ON',
+          zipCode: 'L5B 2K5',
+          status: 'Active' as const,
+          contacts: ['Sarah Williams'],
+          accounts: ['XYZ Enterprises'],
+          lastActivity: '2024-11-12',
+          createdBy: 'Development User',
+          createdAt: '2024-02-20',
+          lastModifiedBy: 'Development User',
+          lastModifiedAt: '2024-11-12',
+          sharepointFolder: 'P-002'
+        },
+        {
+          id: '3',
+          propertyNumber: 'P-003',
+          address: '789 Pine Road',
+          city: 'Brampton',
+          state: 'ON',
+          zipCode: 'L6Y 1M4',
+          status: 'Inactive' as const,
+          contacts: [],
+          accounts: [],
+          lastActivity: '2024-03-15',
+          createdBy: 'Development User',
+          createdAt: '2024-01-10',
+          lastModifiedBy: 'System',
+          lastModifiedAt: '2024-11-10',
+          sharepointFolder: 'P-003'
+        }
+      ];
+      setProperties(mockData);
+      localStorage.setItem('properties', JSON.stringify(mockData));
+    }
     setLoading(false);
   }, []);
 
@@ -136,8 +137,15 @@ export default function PropertiesPage() {
 
 
   const handleDynamicFormSubmit = (data: Record<string, any>) => {
-    // Generate next property number
-    const nextNumber = properties.length + 1;
+    // Generate unique property number by finding the highest existing number
+    const existingNumbers = properties
+      .map(p => p.propertyNumber)
+      .filter(num => num.startsWith('P-'))
+      .map(num => parseInt(num.replace('P-', ''), 10))
+      .filter(num => !isNaN(num));
+    
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    const nextNumber = maxNumber + 1;
     const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
@@ -145,28 +153,33 @@ export default function PropertiesPage() {
     const newProperty: Property = {
       id: String(Date.now()),
       propertyNumber,
-      address: data.Property__address || '',
-      city: data.Property__city || '',
-      state: data.Property__state || '',
-      zipCode: data.Property__zipCode || '',
-      status: data.Property__status || 'Active',
-      contacts: data.Property__contacts || [],
-      accounts: data.Property__accounts || [],
+      address: data.address || '',
+      city: data.city || '',
+      state: data.state || '',
+      zipCode: data.zipCode || '',
+      status: data.status || 'Active',
+      contacts: data.contacts || [],
+      accounts: data.accounts || [],
       lastActivity: today || '',
       createdBy: 'Development User',
       createdAt: today || '',
       lastModifiedBy: 'Development User',
       lastModifiedAt: today || '',
-      sharepointFolder: propertyNumber
+      sharepointFolder: propertyNumber,
+      ...data // Include any other fields from the form
     };
 
-    setProperties([newProperty, ...properties]);
+    const updatedProperties = [newProperty, ...properties];
+    setProperties(updatedProperties);
+    localStorage.setItem('properties', JSON.stringify(updatedProperties));
     console.log('Dynamic form submitted:', data);
   };
 
   const handleDeleteProperty = (id: string) => {
     if (confirm('Are you sure you want to delete this property?')) {
-      setProperties(properties.filter(p => p.id !== id));
+      const updatedProperties = properties.filter(p => p.id !== id);
+      setProperties(updatedProperties);
+      localStorage.setItem('properties', JSON.stringify(updatedProperties));
     }
   };
 
@@ -180,29 +193,21 @@ export default function PropertiesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PageHeader 
+        title="Properties" 
+        icon={MapPin} 
+        subtitle="Manage property records and locations"
+      />
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-4 mb-2">
-                <Link href="/" className="text-xl font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
-                  TCES
-                </Link>
-                <span className="text-gray-300">|</span>
-                <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-                  <MapPin className="w-8 h-8 text-indigo-600" />
-                  Properties
-                </h1>
-              </div>
-              <p className="text-gray-600 mt-1">Manage property records and locations</p>
-            </div>
-            <button
+        {/* Actions */}
+        <div className="mb-8 flex justify-end">
+          <button
               onClick={() => {
-                if (!hasCreateLayout) {
+                if (!hasPageLayout) {
                   setShowNoLayoutsDialog(true);
-                } else if (createLayouts.length === 1 && createLayouts[0]) {
-                  setSelectedLayoutId(createLayouts[0].id);
+                } else if (pageLayouts.length === 1 && pageLayouts[0]) {
+                  setSelectedLayoutId(pageLayouts[0].id);
                   setShowDynamicForm(true);
                 } else {
                   setShowLayoutSelector(true);
@@ -213,8 +218,6 @@ export default function PropertiesPage() {
               <Plus className="w-5 h-5 mr-2" />
               New Property
             </button>
-          </div>
-
         </div>
 
         {/* Search */}
@@ -343,7 +346,7 @@ export default function PropertiesPage() {
       )}
 
       {/* Layout Selector Dialog */}
-      {showLayoutSelector && createLayouts.length > 1 && (
+      {showLayoutSelector && pageLayouts.length > 1 && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
@@ -353,7 +356,7 @@ export default function PropertiesPage() {
               </p>
             </div>
             <div className="p-6 space-y-3">
-              {createLayouts.map((layout) => (
+              {pageLayouts.map((layout) => (
                 <button
                   key={layout.id}
                   onClick={() => {
@@ -389,7 +392,7 @@ export default function PropertiesPage() {
       )}
 
       {/* Dynamic Form Dialog */}
-      {hasCreateLayout && selectedLayoutId && (
+      {hasPageLayout && selectedLayoutId && (
         <DynamicFormDialog
           open={showDynamicForm}
           onOpenChange={(open) => {
