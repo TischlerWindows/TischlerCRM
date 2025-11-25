@@ -29,6 +29,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ToastProvider } from '@/components/toast';
 import { Cog } from 'lucide-react';
+import UniversalSearch from '@/components/universal-search';
 
 const navigation = [
   { name: 'Home', href: '/dashboard', icon: Home },
@@ -160,17 +161,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </button>
 
               {/* Search */}
-              <div className="flex-1 max-w-2xl">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search accounts, contacts, opportunities..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white text-sm"
-                    aria-label="Global search"
-                  />
-                </div>
-              </div>
+              <UniversalSearch />
 
               {/* Right side */}
               <div className="flex items-center gap-2">

@@ -45,7 +45,6 @@ interface PageEditorProps {
   objectApiName: string;
 }
 
-type LayoutMode = 'new' | 'existing';
 type ColumnCount = 1 | 2 | 3;
 
 interface DraggedField {
@@ -80,10 +79,11 @@ interface CanvasTab {
 }
 
 export default function PageEditor({ objectApiName }: PageEditorProps) {
-  const { schema, updateObject } = useSchemaStore();
+  const { schema, updateObject, saveSchema } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>('new');
+  const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
+  const [editingLayoutId, setEditingLayoutId] = useState<string | null>(null);
   const [tabs, setTabs] = useState<CanvasTab[]>([
     { id: 'tab-1', label: 'General Information', order: 0 },
   ]);
@@ -227,11 +227,17 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const saveLayout = () => {
     if (!object) return;
 
+    const layoutName = prompt(
+      'Enter a name for this layout:',
+      'Page Layout'
+    );
+    if (!layoutName) return;
+
     // Convert canvas state to PageLayout
     const pageLayout: PageLayout = {
-      id: `layout-${layoutMode}-${Date.now()}`,
-      name: `${layoutMode === 'new' ? 'New' : 'Edit'} Record Layout`,
-      layoutType: layoutMode === 'new' ? 'create' : 'edit',
+      id: editingLayoutId || `layout-${Date.now()}`,
+      name: layoutName,
+      layoutType: 'edit',
       tabs: tabs.map((tab) => ({
         id: tab.id,
         label: tab.label,
@@ -256,24 +262,42 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
     // Update object with new page layout
     const existingLayouts = object.pageLayouts || [];
-    const updatedLayouts = existingLayouts.filter(
-      (l) => l.layoutType !== pageLayout.layoutType
-    );
-    updatedLayouts.push(pageLayout);
+    let updatedLayouts: PageLayout[];
+
+    if (editingLayoutId) {
+      // Update existing layout
+      updatedLayouts = existingLayouts.map((l) =>
+        l.id === editingLayoutId ? pageLayout : l
+      );
+    } else {
+      // Add new layout
+      updatedLayouts = [...existingLayouts, pageLayout];
+    }
+
+    console.log('Saving layout for object:', objectApiName);
+    console.log('Current layouts:', existingLayouts);
+    console.log('New layout:', pageLayout);
+    console.log('Updated layouts:', updatedLayouts);
 
     updateObject(objectApiName, {
       pageLayouts: updatedLayouts,
     });
 
-    alert(`Layout saved for ${layoutMode === 'new' ? 'New Record' : 'Existing Record'} mode!`);
+    // Manually trigger persistence by calling saveSchema
+    setTimeout(async () => {
+      await saveSchema();
+      console.log('Schema saved to localStorage');
+      const updatedObject = schema?.objects.find((o) => o.apiName === objectApiName);
+      console.log('After update - object layouts:', updatedObject?.pageLayouts);
+      alert(`Layout "${layoutName}" saved successfully!`);
+      setViewMode('list');
+    }, 100);
   };
 
-  const loadLayout = (mode: LayoutMode) => {
+  const loadLayout = (layoutId: string) => {
     if (!object) return;
 
-    const layout = object.pageLayouts?.find(
-      (l) => l.layoutType === (mode === 'new' ? 'create' : 'edit')
-    );
+    const layout = object.pageLayouts?.find((l) => l.id === layoutId);
 
     if (!layout) {
       // Reset to default
@@ -336,10 +360,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     setActiveTab(newTabs[0]?.id || 'tab-1');
   };
 
-  const handleLayoutModeChange = (mode: LayoutMode) => {
-    setLayoutMode(mode);
-    loadLayout(mode);
-  };
+
 
   const getFieldDef = (apiName: string): FieldDef | undefined => {
     return object?.fields.find((f) => f.apiName === apiName);
@@ -407,6 +428,188 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
   const activeSections = sections.filter((s) => s.tabId === activeTab);
 
+  const createNewLayout = () => {
+    setEditingLayoutId(null);
+    setTabs([{ id: 'tab-1', label: 'General Information', order: 0 }]);
+    setSections([
+      {
+        id: 'section-1',
+        label: 'Basic Details',
+        tabId: 'tab-1',
+        columns: 2,
+        order: 0,
+        collapsed: false,
+      },
+    ]);
+    setFields([]);
+    setActiveTab('tab-1');
+    setViewMode('editor');
+  };
+
+  const editExistingLayout = (layoutId: string) => {
+    const layout = object?.pageLayouts?.find((l) => l.id === layoutId);
+    if (!layout) return;
+
+    setEditingLayoutId(layoutId);
+
+    // Convert PageLayout to canvas state
+    const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
+      id: `tab-${idx + 1}`,
+      label: tab.label,
+      order: tab.order,
+    }));
+
+    const newSections: CanvasSection[] = [];
+    const newFields: CanvasField[] = [];
+    let sectionCounter = 1;
+    let fieldCounter = 1;
+
+    layout.tabs.forEach((tab, tabIdx) => {
+      const tabId = `tab-${tabIdx + 1}`;
+      tab.sections.forEach((section) => {
+        const sectionId = `section-${sectionCounter++}`;
+        newSections.push({
+          id: sectionId,
+          label: section.label,
+          tabId,
+          columns: section.columns,
+          order: section.order,
+          collapsed: false,
+        });
+
+        section.fields.forEach((field) => {
+          newFields.push({
+            id: `field-${fieldCounter++}`,
+            fieldApiName: field.apiName,
+            sectionId,
+            column: field.column,
+            order: field.order,
+          });
+        });
+      });
+    });
+
+    setTabs(newTabs);
+    setSections(newSections);
+    setFields(newFields);
+    setActiveTab(newTabs[0]?.id || 'tab-1');
+    setViewMode('editor');
+  };
+
+  const deleteLayout = (layoutId: string) => {
+    if (!object) return;
+    if (!confirm('Are you sure you want to delete this page layout?')) return;
+
+    const updatedLayouts = (object.pageLayouts || []).filter((l) => l.id !== layoutId);
+    updateObject(objectApiName, {
+      pageLayouts: updatedLayouts,
+    });
+  };
+
+  if (viewMode === 'list') {
+    const existingLayouts = object?.pageLayouts || [];
+    
+    console.log('Page Editor List View - Object:', objectApiName);
+    console.log('Page Editor List View - Layouts:', existingLayouts);
+
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-2">Page Layouts</h2>
+          <p className="text-gray-600">
+            Manage page layouts for {object?.label}. Page layouts control which fields appear on
+            forms and their arrangement.
+          </p>
+        </div>
+
+        <div className="mb-6 flex gap-2">
+          <Button onClick={createNewLayout} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create New Layout
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              const stored = localStorage.getItem('schema-store');
+              console.log('Raw localStorage data:', stored);
+              if (stored) {
+                const parsed = JSON.parse(stored);
+                console.log('Parsed schema:', parsed);
+                const propObj = parsed.state?.schema?.objects?.find((o: any) => o.apiName === 'Property');
+                console.log('Property object from storage:', propObj);
+                console.log('Property pageLayouts from storage:', propObj?.pageLayouts);
+              }
+            }}
+          >
+            Debug Storage
+          </Button>
+        </div>
+
+        {existingLayouts.length === 0 ? (
+          <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+            <Layout className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Page Layouts</h3>
+            <p className="text-gray-600 mb-4">
+              Create your first page layout to define how forms appear for this object.
+            </p>
+            <Button onClick={createNewLayout} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Layout
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {existingLayouts.map((layout) => (
+              <div
+                key={layout.id}
+                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-semibold text-lg">{layout.name}</h3>
+                  </div>
+                </div>
+
+                <div className="text-sm text-gray-600 mb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Layout className="h-4 w-4" />
+                    <span>{layout.tabs.length} tab{layout.tabs.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Grid2x2 className="h-4 w-4" />
+                    <span>
+                      {layout.tabs.reduce((sum, tab) => sum + tab.sections.length, 0)} section
+                      {layout.tabs.reduce((sum, tab) => sum + tab.sections.length, 0) !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => editExistingLayout(layout.id)}
+                    className="flex-1"
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => deleteLayout(layout.id)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <DndContext
       sensors={sensors}
@@ -414,39 +617,49 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex h-full">
-        {/* Left Palette */}
-        <div className="w-64 border-r bg-gray-50 p-4 overflow-y-auto">
-          <div className="mb-4">
-            <h3 className="text-sm font-semibold mb-2">Layout Mode</h3>
-            <div className="flex gap-2">
-              <Button
-                variant={layoutMode === 'new' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleLayoutModeChange('new')}
-                className="flex-1"
-              >
-                New
-              </Button>
-              <Button
-                variant={layoutMode === 'existing' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => handleLayoutModeChange('existing')}
-                className="flex-1"
-              >
-                Edit
-              </Button>
+      <div className="flex flex-col h-full">
+        {/* Editor Header */}
+        <div className="border-b bg-white p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="flex items-center gap-2"
+            >
+              <ChevronRight className="h-4 w-4 rotate-180" />
+              Back to Layouts
+            </Button>
+            <div>
+              <h2 className="text-lg font-semibold">
+                {editingLayoutId ? 'Edit Layout' : 'Create New Layout'}
+              </h2>
+              <p className="text-sm text-gray-600">
+                Design how forms appear for this object
+              </p>
             </div>
           </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
+            </Button>
+            <Button onClick={saveLayout} size="sm">
+              <Save className="h-4 w-4 mr-2" />
+              Save Layout
+            </Button>
+          </div>
+        </div>
 
+        <div className="flex flex-1 overflow-hidden">
+        {/* Left Palette */}
+        <div className="w-64 border-r bg-gray-50 p-4 overflow-y-auto">
           <div className="mb-4">
             <h3 className="text-sm font-semibold mb-2">Available Fields</h3>
             <div className="text-xs text-gray-500 mb-2">
               {availableFields.length} of {object.fields.length} fields
             </div>
-          </div>
-
-          <div className="space-y-2">
+          </div>          <div className="space-y-2">
             {availableFields.map((field) => (
               <DraggableField key={field.apiName} field={field} />
             ))}
@@ -692,6 +905,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               <li>Use tabs for complex layouts</li>
             </ul>
           </div>
+        </div>
         </div>
       </div>
 

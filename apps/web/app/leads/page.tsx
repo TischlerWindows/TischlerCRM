@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Lightbulb } from 'lucide-react';
+import PageHeader from '@/components/page-header';
 
 interface Lead {
   id: string;
@@ -90,20 +92,13 @@ export default function LeadsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Link href="/" className="text-xl font-bold text-indigo-600">TCES</Link>
-              <span className="ml-4 text-2xl font-bold text-gray-900">Leads</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader 
+        title="Leads" 
+        icon={Lightbulb} 
+        subtitle="Track and qualify potential opportunities"
+      />
 
-      {/* Module Description */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
           <h2 className="text-lg font-semibold text-orange-900 mb-2">Leads Pipeline Module</h2>
           <p className="text-orange-700 text-sm">

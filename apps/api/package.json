@@ -9,7 +9,10 @@
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --format=cjs --outfile=dist/lambda.cjs",
     "package:lambda": "mkdir -p dist/lambda && copy dist\\lambda.cjs dist\\lambda\\index.js && powershell Compress-Archive -Path dist\\lambda\\index.js -DestinationPath dist\\lambda.zip -Force",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "seed": "tsx prisma-seed.ts"
+    "seed": "tsx seed.ts",
+    "db:generate": "cd ../../packages/db && pnpm exec prisma generate",
+    "db:migrate": "cd ../../packages/db && pnpm exec prisma migrate dev",
+    "db:setup": "pnpm run db:generate && pnpm run db:migrate && pnpm run seed"
   },
   "dependencies": {
     "@crm/db": "workspace:*",

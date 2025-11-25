@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Building2, Search, Plus } from 'lucide-react';
+import PageHeader from '@/components/page-header';
 
 interface Account {
   id: string;
@@ -212,20 +213,11 @@ export default function AccountsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <Link href="/" className="text-xl font-bold text-indigo-600">TCES</Link>
-              <span className="ml-4 text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Building2 className="w-7 h-7" />
-                Companies/Accounts
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader 
+        title="Companies/Accounts" 
+        icon={Building2} 
+        subtitle="Manage company and account information"
+      />
 
       {/* Module Description */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

@@ -4,6 +4,10 @@ import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 import { authenticate, signJwt, verifyJwt } from './auth';
 import { loadEnv } from './config';
+import { objectRoutes } from './routes/objects';
+import { fieldRoutes } from './routes/fields';
+import { layoutRoutes } from './routes/layouts';
+import { recordRoutes } from './routes/records';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -66,6 +70,12 @@ export function buildApp() {
     await prisma.account.delete({ where: { id } });
     reply.code(204).send();
   });
+
+  // Register new API routes
+  app.register(objectRoutes);
+  app.register(fieldRoutes);
+  app.register(layoutRoutes);
+  app.register(recordRoutes);
 
   return app;
 }

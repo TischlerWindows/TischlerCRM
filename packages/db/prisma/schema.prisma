@@ -3,104 +3,229 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// User Management
+// ============================================
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id           String   @id @default(uuid())
+  email        String   @unique
   passwordHash String?
-  name      String?
-  role      String   @default("USER")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name         String?
+  role         String   @default("USER")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  accounts      Account[]
-  contacts      Contact[]
-  opportunities Opportunity[]
-  activities    Activity[]
+  createdObjects      CustomObject[]  @relation("CreatedObjects")
+  modifiedObjects     CustomObject[]  @relation("ModifiedObjects")
+  createdFields       CustomField[]   @relation("CreatedFields")
+  modifiedFields      CustomField[]   @relation("ModifiedFields")
+  createdLayouts      PageLayout[]    @relation("CreatedLayouts")
+  modifiedLayouts     PageLayout[]    @relation("ModifiedLayouts")
+  createdRecords      Record[]        @relation("CreatedRecords")
+  modifiedRecords     Record[]        @relation("ModifiedRecords")
 }
 
-model Account {
-  id        String   @id @default(uuid())
-  name      String
-  domain    String?
-  owner     User     @relation(fields: [ownerId], references: [id])
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================
+// Schema/Metadata Models (Custom Objects & Fields)
+// ============================================
 
-  contacts      Contact[]
-  opportunities Opportunity[]
-  files         FileLink[]
-  activities    Activity[]
+model CustomObject {
+  id              String   @id @default(uuid())
+  apiName         String   @unique
+  label           String
+  pluralLabel     String
+  description     String?
+  isCustom        Boolean  @default(true)
+  isActive        Boolean  @default(true)
+  enableHistory   Boolean  @default(false)
+  enableSearch    Boolean  @default(true)
+  
+  createdBy       User     @relation("CreatedObjects", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedObjects", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  fields          CustomField[]
+  pageLayouts     PageLayout[]
+  records         Record[]
+  relationships   Relationship[] @relation("ParentObject")
+  childRelations  Relationship[] @relation("ChildObject")
+
+  @@index([apiName])
 }
 
-model Contact {
-  id        String   @id @default(uuid())
-  account   Account? @relation(fields: [accountId], references: [id])
-  accountId String?
-  firstName String
-  lastName  String
-  email     String   @unique
-  phone     String?
-  title     String?
-  owner     User?    @relation(fields: [ownerId], references: [id])
-  ownerId   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model CustomField {
+  id              String   @id @default(uuid())
+  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId        String
+  
+  apiName         String
+  label           String
+  type            String   // Text, Number, Currency, Date, DateTime, Checkbox, Picklist, etc.
+  description     String?
+  helpText        String?
+  
+  // Field constraints
+  required        Boolean  @default(false)
+  unique          Boolean  @default(false)
+  readOnly        Boolean  @default(false)
+  
+  // Length/Size constraints
+  maxLength       Int?
+  minLength       Int?
+  
+  // Number constraints
+  scale           Int?     // Decimal places
+  precision       Int?     // Total digits
+  min             Float?
+  max             Float?
+  
+  // Picklist values (JSON array)
+  picklistValues  Json?
+  
+  // Default value
+  defaultValue    String?
+  
+  // Relationship info (for Lookup fields)
+  relationshipId  String?  @unique
+  
+  isCustom        Boolean  @default(true)
+  isActive        Boolean  @default(true)
+  
+  createdBy       User     @relation("CreatedFields", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedFields", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  files FileLink[]
-  activities Activity[]
+  relationship    Relationship? @relation("FieldRelationship")
+  layoutFields    LayoutField[]
+
+  @@unique([objectId, apiName])
+  @@index([objectId])
+  @@index([type])
 }
 
-model Opportunity {
-  id          String           @id @default(uuid())
-  account     Account          @relation(fields: [accountId], references: [id])
-  accountId   String
-  name        String
-  stage       String           @default("prospect")
-  amount      Float?
-  closeDate   DateTime?
-  owner       User             @relation(fields: [ownerId], references: [id])
-  ownerId     String
-  probability Float?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+model Relationship {
+  id                String   @id @default(uuid())
+  
+  parentObject      CustomObject @relation("ParentObject", fields: [parentObjectId], references: [id], onDelete: Cascade)
+  parentObjectId    String
+  
+  childObject       CustomObject @relation("ChildObject", fields: [childObjectId], references: [id], onDelete: Cascade)
+  childObjectId     String
+  
+  field             CustomField @relation("FieldRelationship", fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId           String      @unique
+  
+  relationshipName  String
+  type              String      // Lookup, MasterDetail
+  cascadeDelete     Boolean     @default(false)
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
-  files FileLink[]
-  activities Activity[]
+  @@index([parentObjectId])
+  @@index([childObjectId])
 }
 
-model Activity {
-  id          String      @id @default(uuid())
-  account     Account?    @relation(fields: [accountId], references: [id])
-  accountId   String?
-  contact     Contact?    @relation(fields: [contactId], references: [id])
-  contactId   String?
-  opportunity Opportunity? @relation(fields: [opportunityId], references: [id])
-  opportunityId String?
-  type        String
-  dueDate     DateTime?
-  completedAt DateTime?
-  content     String?
-  owner       User        @relation(fields: [ownerId], references: [id])
-  ownerId     String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+// ============================================
+// Page Layouts (UI Configuration)
+// ============================================
+
+model PageLayout {
+  id              String   @id @default(uuid())
+  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId        String
+  
+  name            String
+  layoutType      String   // 'edit' (used for both create and edit now)
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  
+  createdBy       User     @relation("CreatedLayouts", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedLayouts", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tabs            LayoutTab[]
+
+  @@index([objectId])
+  @@index([layoutType])
 }
 
-model FileLink {
-  id              String     @id @default(uuid())
-  account         Account?   @relation(fields: [accountId], references: [id])
-  accountId       String?
-  contact         Contact?   @relation(fields: [contactId], references: [id])
-  contactId       String?
-  opportunity     Opportunity? @relation(fields: [opportunityId], references: [id])
-  opportunityId   String?
-  dropboxFolderUrl String
-  lastSyncedAt    DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+model LayoutTab {
+  id              String   @id @default(uuid())
+  layout          PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  layoutId        String
+  
+  label           String
+  order           Int      @default(0)
+  
+  sections        LayoutSection[]
+
+  @@index([layoutId])
+}
+
+model LayoutSection {
+  id              String   @id @default(uuid())
+  tab             LayoutTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  tabId           String
+  
+  label           String
+  columns         Int      @default(2)
+  order           Int      @default(0)
+  
+  fields          LayoutField[]
+
+  @@index([tabId])
+}
+
+model LayoutField {
+  id              String   @id @default(uuid())
+  section         LayoutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId       String
+  
+  field           CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId         String
+  
+  column          Int      @default(0)
+  order           Int      @default(0)
+
+  @@index([sectionId])
+  @@index([fieldId])
+}
+
+// ============================================
+// Dynamic Records (Actual Data)
+// ============================================
+
+model Record {
+  id              String   @id @default(uuid())
+  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId        String
+  
+  // Store all field values as JSON
+  data            Json     @default("{}")
+  
+  // System fields
+  createdBy       User     @relation("CreatedRecords", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedRecords", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([objectId])
+  @@index([createdAt])
+  @@index([updatedAt])
 }
