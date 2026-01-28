@@ -8,6 +8,7 @@ import { objectRoutes } from './routes/objects';
 import { fieldRoutes } from './routes/fields';
 import { layoutRoutes } from './routes/layouts';
 import { recordRoutes } from './routes/records';
+import { reportRoutes } from './routes/reports';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -76,6 +77,7 @@ export function buildApp() {
   app.register(fieldRoutes);
   app.register(layoutRoutes);
   app.register(recordRoutes);
+  app.register(reportRoutes);
 
   return app;
 }

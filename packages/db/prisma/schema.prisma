@@ -27,6 +27,10 @@ model User {
   modifiedLayouts     PageLayout[]    @relation("ModifiedLayouts")
   createdRecords      Record[]        @relation("CreatedRecords")
   modifiedRecords     Record[]        @relation("ModifiedRecords")
+  createdReports      Report[]        @relation("CreatedReports")
+  modifiedReports     Report[]        @relation("ModifiedReports")
+  createdFolders      ReportFolder[]  @relation("CreatedFolders")
+  modifiedFolders     ReportFolder[]  @relation("ModifiedFolders")
 }
 
 // ============================================
@@ -228,4 +232,74 @@ model Record {
   @@index([objectId])
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+// ============================================
+// Reports & Analytics
+// ============================================
+
+model Report {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  objectType      String   // properties, contacts, accounts, etc.
+  format          String   // tabular, summary, matrix
+  
+  // Report configuration
+  fields          Json     // Array of field names to display
+  filters         Json     // Array of filter objects
+  groupBy         String?  // Field to group by (for summary/matrix)
+  sortBy          String?  // Field to sort by
+  sortOrder       String?  // asc or desc
+  
+  // Permissions and sharing
+  isStandard      Boolean  @default(false)
+  isPrivate       Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  isFavorite      Boolean  @default(false)
+  
+  // Folder organization
+  folderId        String?
+  folder          ReportFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedReports", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedReports", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([objectType])
+  @@index([format])
+  @@index([createdById])
+  @@index([folderId])
+  @@index([isPrivate])
+  @@index([isFavorite])
+}
+
+model ReportFolder {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  parentId        String?
+  parent          ReportFolder? @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        ReportFolder[] @relation("FolderHierarchy")
+  
+  // Permissions
+  isPrivate       Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedFolders", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedFolders", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reports         Report[]
+
+  @@index([createdById])
+  @@index([parentId])
 }

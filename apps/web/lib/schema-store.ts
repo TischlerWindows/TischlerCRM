@@ -56,6 +56,9 @@ export interface SchemaStore {
   exportSchema: (objectApi?: string) => string;
   importSchema: (jsonData: string, merge?: boolean) => Promise<void>;
   
+  // Schema reset
+  resetSchema: () => Promise<void>;
+  
   // UI state management
   setSelectedObject: (objectApi: string | null) => void;
   setSelectedField: (fieldId: string | null) => void;
@@ -189,12 +192,16 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service
+        schemaService.saveSchema(updatedSchema);
 
         return fieldId;
       },
@@ -209,23 +216,27 @@ export const useSchemaStore = create<SchemaStore>()(
             ? {
                 ...obj,
                 fields: obj.fields.map(field =>
-                  field.id === fieldId ? { ...field, ...updates } : field
+                  (field.id === fieldId || field.apiName === fieldId) ? { ...field, ...updates } : field
                 ),
                 updatedAt: new Date().toISOString()
               }
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete field
-      deleteField: (objectApi, fieldId) => {
+      deleteField: (objectApi, fieldIdOrApiName) => {
         const { schema } = get();
         if (!schema) return;
 
@@ -233,18 +244,24 @@ export const useSchemaStore = create<SchemaStore>()(
           obj.apiName === objectApi 
             ? {
                 ...obj,
-                fields: obj.fields.filter(field => field.id !== fieldId),
+                fields: obj.fields.filter(field => 
+                  field.id !== fieldIdOrApiName && field.apiName !== fieldIdOrApiName
+                ),
                 updatedAt: new Date().toISOString()
               }
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Explicitly save to localStorage to ensure persistence
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Reorder fields
@@ -570,6 +587,20 @@ export const useSchemaStore = create<SchemaStore>()(
           }
         } catch (error) {
           set({ error: 'Invalid JSON format' });
+        }
+      },
+
+      // Reset schema to defaults and clear cache
+      resetSchema: async () => {
+        set({ loading: true, error: null });
+        try {
+          const freshSchema = await schemaService.resetSchema();
+          set({ schema: freshSchema, loading: false });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to reset schema',
+            loading: false 
+          });
         }
       },
 

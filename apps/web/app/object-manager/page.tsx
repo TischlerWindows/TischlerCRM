@@ -66,6 +66,7 @@ export default function ObjectManagerPage() {
     deleteObject,
     exportSchema,
     importSchema,
+    resetSchema,
     clearError 
   } = useSchemaStore();
 
@@ -160,6 +161,18 @@ export default function ObjectManagerPage() {
       setImportData('');
     } catch (err) {
       console.error('Failed to import schema:', err);
+    }
+  };
+
+  const handleResetSchema = async () => {
+    if (!confirm('Are you sure? This will clear the cache and reload the schema with all new fields. Any unsaved changes will be lost.')) {
+      return;
+    }
+
+    try {
+      await resetSchema();
+    } catch (err) {
+      console.error('Failed to reset schema:', err);
     }
   };
 
@@ -287,17 +300,6 @@ export default function ObjectManagerPage() {
           </div>
           
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (confirm('This will reset all objects to the default set. Are you sure?')) {
-                  localStorage.clear();
-                  location.reload();
-                }
-              }}
-            >
-              Reset to Defaults
-            </Button>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
                 <Button>

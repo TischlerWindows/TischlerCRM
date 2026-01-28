@@ -356,7 +356,9 @@ export default function ObjectDetailPage() {
           )}
 
           {activeSection === 'fields' && (
-            <FieldsRelationships objectApiName={objectApi} />
+            <div className="px-6 py-6">
+              <FieldsRelationships objectApiName={objectApi} />
+            </div>
           )}
 
           {activeSection === 'page-editor' && (

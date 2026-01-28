@@ -1,110 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  HelpCircle, 
-  Building2, 
-  Users, 
-  Target, 
-  CheckSquare, 
-  FolderOpen, 
-  BarChart3, 
-  Search,
-  Cog,
-  MapPin,
-  Briefcase,
-  Lightbulb,
-  Wrench,
-  FileText,
-  HardHat,
-  Package
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import UniversalSearch from '@/components/universal-search';
-
-// Information Modules - Reference and context data
-const informationModules = [
-  { name: 'Properties', href: '/properties', icon: MapPin },
-  { name: 'Contacts', href: '/contacts', icon: Users },
-  { name: 'Accounts', href: '/accounts', icon: Building2 },
-  { name: 'Products', href: '/products', icon: Package },
-];
-
-// Pipeline Modules - Business activities tracking
-const pipelineModules = [
-  { name: 'Leads', href: '/leads', icon: Lightbulb },
-  { name: 'Deals', href: '/deals', icon: Target },
-  { name: 'Projects', href: '/projects', icon: Briefcase },
-  { name: 'Service', href: '/service', icon: Wrench },
-];
-
-// Financial Tool Modules - Price breakdowns
-const financialModules = [
-  { name: 'Quotes', href: '/quotes', icon: FileText },
-  { name: 'Installations', href: '/installations', icon: HardHat },
-];
-
 export default function HomePage() {
-  const pathname = usePathname();
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      <nav className="bg-white shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center gap-4">
-              <Link href="/" className="text-2xl font-bold text-indigo-600 flex-shrink-0">TCES</Link>
-            <div className="flex-1 max-w-2xl">
-              <UniversalSearch />
-            </div>
-            <div className="flex items-center space-x-4 flex-shrink-0">
-              <Link
-                href="/settings"
-                className="p-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none flex items-center"
-                aria-label="Settings"
-                title="Settings"
-              >
-                <Cog className="w-6 h-6" />
-              </Link>
-              <button
-                className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-md hover:bg-indigo-100 focus:outline-none flex items-center"
-                onClick={() => window.location.href = '/help'}
-                aria-label="Help"
-              >
-                <HelpCircle className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabs Navigation */}
-        <div className="border-t border-gray-200">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-1 overflow-x-auto py-2">
-                {[...informationModules, ...pipelineModules, ...financialModules].map((item) => {
-                  const isActive = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap',
-                        isActive
-                          ? 'bg-indigo-50 text-indigo-600'
-                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                      )}
-                    >
-                      <item.icon className="w-4 h-4" />
-                      {item.name}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-      </nav>
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mt-16">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">
@@ -114,14 +12,6 @@ export default function HomePage() {
             --<br />Basic prototpye for Tischler CRM software
           </div>
 
-          <div className="mt-10 flex items-center justify-center gap-x-6">
-            <Link
-              href="/dashboard"
-              className="rounded-md bg-indigo-600 px-6 py-3 text-lg font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-            >
-              View Dashboard
-            </Link>
-          </div>
         </div>
 
         <div id="features" className="mt-24">

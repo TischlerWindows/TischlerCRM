@@ -14,6 +14,7 @@ export interface FieldDef {
   apiName: string;
   label: string;
   type: FieldType;
+  custom?: boolean;        // true for custom fields, false/undefined for system fields
   required?: boolean;
   unique?: boolean;
   readOnly?: boolean;

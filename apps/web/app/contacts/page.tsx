@@ -1,575 +1,628 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Users } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { 
+  Users, 
+  Plus, 
+  Search, 
+  AlertCircle,
+  Layout,
+  Settings,
+  X,
+  Clock,
+  User,
+  Star,
+  List,
+  MoreVertical,
+  Edit,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  HelpCircle,
+  Cog,
+  Edit3,
+  GripVertical
+} from 'lucide-react';
+import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
+import UniversalSearch from '@/components/universal-search';
+import { cn } from '@/lib/utils';
+import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Contact {
   id: string;
+  contactNumber: string;
   firstName: string;
   lastName: string;
-  salutation: string;
-  account: string;
-  contactType: string;
+  email: string;
+  phone: string;
+  company: string;
   title: string;
   status: 'Active' | 'Inactive';
-  primaryEmail: string;
-  primaryPhone: string;
+  lastActivity: string;
+  createdBy: string;
   createdAt: string;
-  lastActivity?: string;
+  lastModifiedBy: string;
+  lastModifiedAt: string;
+  isFavorite?: boolean;
+  [key: string]: any;
 }
+
+
+
+const informationModules = [
+  { name: 'Properties', href: '/properties' },
+  { name: 'Contacts', href: '/contacts' },
+  { name: 'Accounts', href: '/accounts' },
+  { name: 'Products', href: '/products' },
+];
+
+const pipelineModules = [
+  { name: 'Leads', href: '/leads' },
+  { name: 'Deals', href: '/deals' },
+  { name: 'Projects', href: '/projects' },
+  { name: 'Service', href: '/service' },
+];
+
+const financialModules = [
+  { name: 'Quotes', href: '/quotes' },
+  { name: 'Installations', href: '/installations' },
+];
+
+const analyticsModules = [
+  { name: 'Dashboards', href: '/dashboard' },
+  { name: 'Reports', href: '/reports' },
+];
+
+const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [showForm, setShowForm] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [formData, setFormData] = useState({ 
-    firstName: '',
-    lastName: '',
-    salutation: 'Mr.',
-    account: '',
-    contactType: '',
-    title: '',
-    reportsTo: '',
-    status: 'Active' as 'Active' | 'Inactive',
-    primaryEmail: '',
-    secondaryEmail: '',
-    primaryPhone: '',
-    secondaryPhone: '',
-    fax: '',
-    primaryAddress: '',
-    secondaryAddress: '',
-    poBox: '',
-    associatedProperties: '',
-    contactNotes: '',
-    contactOwner: ''
-  });
-  const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
+  const [showDynamicForm, setShowDynamicForm] = useState(false);
+  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const { schema } = useSchemaStore();
+  const pathname = usePathname();
+  
+  const [editMode, setEditMode] = useState(false);
+  const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showAddTab, setShowAddTab] = useState(false);
+  const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
+  const [showAddColumn, setShowAddColumn] = useState(false);
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
+  
+  const contactObject = schema?.objects.find(obj => obj.apiName === 'Contact');
+  const pageLayouts = contactObject?.pageLayouts || [];
+  const hasPageLayout = pageLayouts.length > 0;
+
+  // Dynamically generate available columns from schema
+  const AVAILABLE_COLUMNS = useMemo(() => {
+    if (!contactObject?.fields) {
+      // Fallback to hard-coded columns if schema not loaded
+      return [
+        { id: 'contactNumber', label: 'Contact #', defaultVisible: true },
+        { id: 'firstName', label: 'First Name', defaultVisible: true },
+        { id: 'lastName', label: 'Last Name', defaultVisible: true },
+        { id: 'email', label: 'Email', defaultVisible: true },
+        { id: 'phone', label: 'Phone', defaultVisible: true },
+        { id: 'company', label: 'Company', defaultVisible: true },
+        { id: 'title', label: 'Title', defaultVisible: true },
+        { id: 'status', label: 'Status', defaultVisible: true },
+        { id: 'lastActivity', label: 'Last Activity', defaultVisible: false },
+        { id: 'createdBy', label: 'Created By', defaultVisible: false },
+        { id: 'createdAt', label: 'Created Date', defaultVisible: false },
+        { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
+        { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false }
+      ];
+    }
+
+    // Generate columns from schema fields
+    return contactObject.fields.map((field, index) => {
+      // Strip the Contact__ prefix for display
+      const cleanApiName = field.apiName.replace('Contact__', '');
+      
+      // Determine if field should be visible by default (first 10 non-system fields)
+      const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
+      const defaultVisible = !isSystemField && index < 10;
+      
+      return {
+        id: cleanApiName,
+        label: field.label,
+        defaultVisible
+      };
+    });
+  }, [contactObject]);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/');
-      return;
-    }
-
-    // Mock data for now - replace with actual API call
-    setContacts([
-      {
-        id: '1',
-        firstName: 'John',
-        lastName: 'Smith',
-        salutation: 'Mr.',
-        account: 'Smith Residence',
-        contactType: 'Client/Homeowner',
-        title: 'Property Owner',
-        status: 'Active',
-        primaryEmail: 'john.smith@email.com',
-        primaryPhone: '(416) 555-0123',
-        createdAt: '2024-01-15',
-        lastActivity: '2024-11-10'
-      },
-      {
-        id: '2',
-        firstName: 'Sarah',
-        lastName: 'Johnson',
-        salutation: 'Ms.',
-        account: 'Johnson Construction',
-        contactType: 'Project Manager',
-        title: 'Senior Project Manager',
-        status: 'Active',
-        primaryEmail: 'sarah.johnson@johnsoncorp.com',
-        primaryPhone: '(416) 555-0456',
-        createdAt: '2024-02-20',
-        lastActivity: '2024-11-08'
+    const savedTabsStr = localStorage.getItem('tabConfiguration');
+    if (savedTabsStr) {
+      try {
+        const savedTabs = JSON.parse(savedTabsStr);
+        setTabs(savedTabs);
+      } catch (e) {
+        console.error('Error loading tab configuration:', e);
+        setTabs(defaultTabs);
       }
-    ]);
-    setLoading(false);
-  }, [router]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (editingContact) {
-      // Update existing contact
-      const updatedContact: Contact = {
-        ...editingContact,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        salutation: formData.salutation,
-        account: formData.account,
-        contactType: formData.contactType,
-        title: formData.title,
-        status: formData.status,
-        primaryEmail: formData.primaryEmail,
-        primaryPhone: formData.primaryPhone
-      };
-      
-      setContacts(contacts.map(contact => 
-        contact.id === editingContact.id ? updatedContact : contact
-      ));
-      setEditingContact(null);
     } else {
-      // Add new contact
-      const newContact: Contact = {
-        id: Date.now().toString(),
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        salutation: formData.salutation,
-        account: formData.account,
-        contactType: formData.contactType,
-        title: formData.title,
-        status: formData.status,
-        primaryEmail: formData.primaryEmail,
-        primaryPhone: formData.primaryPhone,
-        createdAt: new Date().toISOString().split('T')[0] || ''
-      };
-      
-      setContacts([newContact, ...contacts]);
+      setTabs(defaultTabs);
     }
     
-    setFormData({ 
-      firstName: '',
-      lastName: '',
-      salutation: 'Mr.',
-      account: '',
-      contactType: '',
-      title: '',
-      reportsTo: '',
-      status: 'Active',
-      primaryEmail: '',
-      secondaryEmail: '',
-      primaryPhone: '',
-      secondaryPhone: '',
-      fax: '',
-      primaryAddress: '',
-      secondaryAddress: '',
-      poBox: '',
-      associatedProperties: '',
-      contactNotes: '',
-      contactOwner: ''
-    });
-    setShowForm(false);
+    const storedObjects = localStorage.getItem('customObjects');
+    if (storedObjects) {
+      try {
+        const objects = JSON.parse(storedObjects);
+        const objectTabs = objects.map((obj: any) => ({
+          name: obj.label,
+          href: `/${obj.apiName.toLowerCase()}`
+        }));
+        setAvailableObjects(objectTabs);
+      } catch (e) {
+        console.error('Error loading custom objects:', e);
+      }
+    }
+    
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    const storedContacts = localStorage.getItem('contacts');
+    if (storedContacts) {
+      const parsedContacts = JSON.parse(storedContacts);
+      const migratedContacts = parsedContacts.map((contact: any) => {
+        const migrated = { ...contact };
+        migrated.firstName = contact['Contact__firstName'] || contact.firstName || '';
+        migrated.lastName = contact['Contact__lastName'] || contact.lastName || '';
+        migrated.email = contact['Contact__email'] || contact.email || '';
+        migrated.phone = contact['Contact__phone'] || contact.phone || '';
+        migrated.company = contact['Contact__company'] || contact.company || '';
+        migrated.title = contact['Contact__title'] || contact.title || '';
+        return migrated as Contact;
+      });
+      setContacts(migratedContacts);
+      localStorage.setItem('contacts', JSON.stringify(migratedContacts));
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const savedColumns = localStorage.getItem('contactsVisibleColumns');
+    if (savedColumns) {
+      setVisibleColumns(JSON.parse(savedColumns));
+    } else {
+      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
+    }
+  }, []);
+
+  const toggleColumnVisibility = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.includes(columnId)
+      ? visibleColumns.filter(id => id !== columnId)
+      : [...visibleColumns, columnId];
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
   };
 
-  const handleEdit = (contact: Contact) => {
-    setEditingContact(contact);
-    setFormData({
-      firstName: contact.firstName,
-      lastName: contact.lastName,
-      salutation: contact.salutation,
-      account: contact.account,
-      contactType: contact.contactType,
-      title: contact.title,
-      reportsTo: '',
-      status: contact.status,
-      primaryEmail: contact.primaryEmail,
-      secondaryEmail: '',
-      primaryPhone: contact.primaryPhone,
-      secondaryPhone: '',
-      fax: '',
-      primaryAddress: '',
-      secondaryAddress: '',
-      poBox: '',
-      associatedProperties: '',
-      contactNotes: '',
-      contactOwner: ''
-    });
-    setShowForm(true);
+  const handleColumnDragStart = (index: number) => {
+    setDraggedColumnIndex(index);
   };
 
-  const handleDelete = (contactId: string) => {
-    if (window.confirm('Are you sure you want to delete this contact?')) {
-      setContacts(contacts.filter(contact => contact.id !== contactId));
+  const handleColumnDragOver = (index: number) => {
+    if (draggedColumnIndex === null || draggedColumnIndex === index) return;
+
+    const newColumns = [...visibleColumns];
+    const draggedColumn = newColumns[draggedColumnIndex];
+    if (!draggedColumn) return;
+    newColumns.splice(draggedColumnIndex, 1);
+    newColumns.splice(index, 0, draggedColumn);
+
+    setVisibleColumns(newColumns);
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+    localStorage.setItem('contactsVisibleColumns', JSON.stringify(visibleColumns));
+  };
+
+  const handleAddColumn = (columnId: string) => {
+    if (!visibleColumns.includes(columnId)) {
+      const newVisibleColumns = [...visibleColumns, columnId];
+      setVisibleColumns(newVisibleColumns);
+      localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
+    }
+    setShowAddColumn(false);
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
+  };
+
+  const handleResetColumns = () => {
+    const defaultColumns = AVAILABLE_COLUMNS
+      .filter(col => col.defaultVisible)
+      .map(col => col.id);
+    setVisibleColumns(defaultColumns);
+    localStorage.setItem('contactsVisibleColumns', JSON.stringify(defaultColumns));
+  };
+
+  const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
+
+  const formatColumnValue = (contact: Contact, columnId: string) => {
+    const value = contact[columnId];
+    if (value === null || value === undefined) return '-';
+    if (Array.isArray(value)) return value.join(', ') || '-';
+    return value;
+  };
+
+  const handleSort = (columnId: string) => {
+    if (sortColumn === columnId) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(columnId);
+      setSortDirection('asc');
     }
   };
 
-  const handleCancel = () => {
-    setEditingContact(null);
-    setFormData({ 
-      firstName: '',
-      lastName: '',
-      salutation: 'Mr.',
-      account: '',
-      contactType: '',
-      title: '',
-      reportsTo: '',
-      status: 'Active',
-      primaryEmail: '',
-      secondaryEmail: '',
-      primaryPhone: '',
-      secondaryPhone: '',
-      fax: '',
-      primaryAddress: '',
-      secondaryAddress: '',
-      poBox: '',
-      associatedProperties: '',
-      contactNotes: '',
-      contactOwner: ''
-    });
-    setShowForm(false);
+  const filteredContacts = contacts.filter(contact => {
+    const matchesSearch = contact.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.company?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const currentUser = 'Development User';
+    let matchesSidebar = true;
+    
+    switch (sidebarFilter) {
+      case 'recent':
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        matchesSidebar = new Date(contact.lastModifiedAt) >= thirtyDaysAgo;
+        break;
+      case 'created-by-me':
+        matchesSidebar = contact.createdBy === currentUser;
+        break;
+      case 'favorites':
+        matchesSidebar = (contact as any).isFavorite === true;
+        break;
+      case 'all':
+      default:
+        matchesSidebar = true;
+        break;
+    }
+    
+    return matchesSearch && matchesSidebar;
+  }).sort((a, b) => {
+    if (!sortColumn) return 0;
+    
+    const aValue = (a as any)[sortColumn];
+    const bValue = (b as any)[sortColumn];
+    
+    if (Array.isArray(aValue) && Array.isArray(bValue)) {
+      const aStr = aValue.join(', ').toLowerCase();
+      const bStr = bValue.join(', ').toLowerCase();
+      return sortDirection === 'asc' 
+        ? aStr.localeCompare(bStr)
+        : bStr.localeCompare(aStr);
+    }
+    
+    if (aValue == null && bValue == null) return 0;
+    if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
+    if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
+    
+    if (sortColumn.includes('At') || sortColumn === 'lastActivity') {
+      const aDate = new Date(aValue).getTime();
+      const bDate = new Date(bValue).getTime();
+      return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+    }
+    
+    const aStr = String(aValue).toLowerCase();
+    const bStr = String(bValue).toLowerCase();
+    
+    return sortDirection === 'asc' 
+      ? aStr.localeCompare(bStr, undefined, { numeric: true })
+      : bStr.localeCompare(aStr, undefined, { numeric: true });
+  });
+
+  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+    const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C-')).map(num => parseInt(num.replace('C-', ''), 10)).filter(num => !isNaN(num));
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
+    const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
+    
+    const newContact: Contact = {
+      id: String(Date.now()),
+      contactNumber,
+      lastActivity: today,
+      createdBy: 'Development User',
+      createdAt: today,
+      lastModifiedBy: 'Development User',
+      lastModifiedAt: today,
+      ...data,
+      firstName: data['Contact__firstName'] || data.firstName || '',
+      lastName: data['Contact__lastName'] || data.lastName || '',
+      email: data['Contact__email'] || data.email || '',
+      phone: data['Contact__phone'] || data.phone || '',
+      company: data['Contact__company'] || data.company || '',
+      title: data['Contact__title'] || data.title || '',
+      status: data.status || 'Active'
+    };
+
+    const updatedContacts = [newContact, ...contacts];
+    setContacts(updatedContacts);
+    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
   };
 
-  if (loading) return <div className="p-8">Loading...</div>;
+  const handleDeleteContact = (id: string) => {
+    if (confirm('Are you sure you want to delete this contact?')) {
+      const updatedContacts = contacts.filter(c => c.id !== id);
+      setContacts(updatedContacts);
+      localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+    }
+  };
+
+  const handleToggleFavorite = (id: string) => {
+    const updatedContacts = contacts.map(c => 
+      c.id === id ? { ...c, isFavorite: !c.isFavorite } : c
+    );
+    setContacts(updatedContacts);
+    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+    setOpenDropdown(null);
+  };
+
+  const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
+    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+  };
+
+  const handleResetToDefault = () => {
+    setTabs(defaultTabs);
+    saveTabConfiguration(defaultTabs);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newTabs = [...tabs];
+    const draggedTab = newTabs[draggedIndex];
+    if (!draggedTab) return;
+    
+    newTabs.splice(draggedIndex, 1);
+    newTabs.splice(index, 0, draggedTab);
+    
+    setTabs(newTabs);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    saveTabConfiguration(tabs);
+  };
+
+  const handleAddTab = (tab: { name: string; href: string }) => {
+    const newTabs = [...tabs, tab];
+    setTabs(newTabs);
+    saveTabConfiguration(newTabs);
+    setShowAddTab(false);
+  };
+
+  const handleRemoveTab = (index: number) => {
+    const newTabs = tabs.filter((_, i) => i !== index);
+    setTabs(newTabs);
+    saveTabConfiguration(newTabs);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-600">Loading contacts...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader 
-        title="Contacts" 
-        icon={Users} 
-        subtitle="Manage contact information and relationships"
-      />
+    <div className="flex flex-1 overflow-hidden bg-gray-50">
+        {/* Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+          <div className="space-y-6">
+            <div className="pb-6 border-b border-gray-200">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-indigo-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+              </div>
+              <p className="text-sm text-gray-600 ml-13">Manage contact information and relationships</p>
+            </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Actions */}
-        <div className="mb-6">
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700"
-          >
-            Add New Contact
-          </button>
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Contacts</h3>
+              <nav className="space-y-1">
+                <button
+                  onClick={() => setSidebarFilter('recent')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'recent'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  Recent
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('created-by-me')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'created-by-me'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  Created by Me
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('all')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'all'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                  All Contacts
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('favorites')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'favorites'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Star className="w-4 h-4" />
+                  All Favorites
+                </button>
+              </nav>
+            </div>
+          </div>
         </div>
 
-        {/* Add/Edit Contact Form */}
-        {showForm && (
-          <div className="bg-white p-6 rounded-lg shadow mb-6">
-            <h3 className="text-lg font-medium mb-4">
-              {editingContact ? 'Edit Contact' : 'Add New Contact'}
-            </h3>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              
-              {/* Contact Information Section */}
-              <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Salutation</em></strong></label>
-                    <select
-                      value={formData.salutation}
-                      onChange={(e) => setFormData({...formData, salutation: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="Mr.">Mr.</option>
-                      <option value="Ms.">Ms.</option>
-                      <option value="Mrs.">Mrs.</option>
-                      <option value="Dr.">Dr.</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>First Name</em></strong></label>
-                    <input
-                      type="text"
-                      value={formData.firstName}
-                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Last Name</em></strong></label>
-                    <input
-                      type="text"
-                      value={formData.lastName}
-                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Account</em></strong></label>
-                    <input
-                      type="text"
-                      value={formData.account}
-                      onChange={(e) => setFormData({...formData, account: e.target.value})}
-                      placeholder="Search accounts..."
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Type</em></strong></label>
-                    <select
-                      value={formData.contactType}
-                      onChange={(e) => setFormData({...formData, contactType: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    >
-                      <option value="">Select type</option>
-                      <option value="Architect">Architect</option>
-                      <option value="Associate">Associate</option>
-                      <option value="CEO">CEO</option>
-                      <option value="Client/Homeowner">Client/Homeowner</option>
-                      <option value="Designer">Designer</option>
-                      <option value="Engineer">Engineer</option>
-                      <option value="Property Manager">Property Manager</option>
-                      <option value="Project Manager">Project Manager</option>
-                      <option value="President">President</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Title</em></strong></label>
-                    <select
-                      value={formData.title}
-                      onChange={(e) => setFormData({...formData, title: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="">Select title</option>
-                      <option value="Senior Architect">Senior Architect</option>
-                      <option value="Junior Architect">Junior Architect</option>
-                      <option value="Executive Assistant">Executive Assistant</option>
-                      <option value="Senior Project Manager">Senior Project Manager</option>
-                      <option value="Project Coordinator">Project Coordinator</option>
-                      <option value="Design Director">Design Director</option>
-                      <option value="Operations Manager">Operations Manager</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Reports To</em></strong></label>
-                    <input
-                      type="text"
-                      value={formData.reportsTo}
-                      onChange={(e) => setFormData({...formData, reportsTo: e.target.value})}
-                      placeholder="Search contacts..."
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Status</em></strong></label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({...formData, status: e.target.value as 'Active' | 'Inactive'})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Email</em></strong></label>
-                    <input
-                      type="email"
-                      value={formData.primaryEmail}
-                      onChange={(e) => setFormData({...formData, primaryEmail: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Email</em></strong></label>
-                    <input
-                      type="email"
-                      value={formData.secondaryEmail}
-                      onChange={(e) => setFormData({...formData, secondaryEmail: e.target.value})}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Phone</em></strong></label>
-                    <input
-                      type="tel"
-                      value={formData.primaryPhone}
-                      onChange={(e) => setFormData({...formData, primaryPhone: e.target.value})}
-                      placeholder="(416) 555-0123"
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Phone</em></strong></label>
-                    <input
-                      type="tel"
-                      value={formData.secondaryPhone}
-                      onChange={(e) => setFormData({...formData, secondaryPhone: e.target.value})}
-                      placeholder="(416) 555-0456"
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Fax</em></strong></label>
-                    <input
-                      type="tel"
-                      value={formData.fax}
-                      onChange={(e) => setFormData({...formData, fax: e.target.value})}
-                      placeholder="(416) 555-0789"
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Address Information Section */}
-              <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Address Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Address</em></strong></label>
-                    <textarea
-                      value={formData.primaryAddress}
-                      onChange={(e) => setFormData({...formData, primaryAddress: e.target.value})}
-                      placeholder="Used for mailing..."
-                      rows={3}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Address</em></strong></label>
-                    <textarea
-                      value={formData.secondaryAddress}
-                      onChange={(e) => setFormData({...formData, secondaryAddress: e.target.value})}
-                      placeholder="Used as needed..."
-                      rows={3}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>PO Box</em></strong></label>
-                    <textarea
-                      value={formData.poBox}
-                      onChange={(e) => setFormData({...formData, poBox: e.target.value})}
-                      placeholder="Used as needed..."
-                      rows={2}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Associated Properties Section */}
-              <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Associated Properties</h4>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700"><strong><em>Properties</em></strong></label>
-                  <input
-                    type="text"
-                    value={formData.associatedProperties}
-                    onChange={(e) => setFormData({...formData, associatedProperties: e.target.value})}
-                    placeholder="Search and select property records..."
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-
-              {/* Notes Section */}
-              <div className="border-b border-gray-200 pb-6">
-                <h4 className="text-md font-semibold text-gray-900 mb-4">Notes</h4>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Notes</em></strong></label>
-                  <textarea
-                    value={formData.contactNotes}
-                    onChange={(e) => setFormData({...formData, contactNotes: e.target.value})}
-                    placeholder="Records any pertinent information regarding contact..."
-                    rows={4}
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
-
-              {/* System Information Section */}
-              <div>
-                <h4 className="text-md font-semibold text-gray-900 mb-4">System Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500"><strong><em>Created By</em></strong></label>
-                    <input
-                      type="text"
-                      value="Current User"
-                      disabled
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500"><strong><em>Last Modified By</em></strong></label>
-                    <input
-                      type="text"
-                      value="Auto-generated"
-                      disabled
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Owner</em></strong></label>
-                    <input
-                      type="text"
-                      value={formData.contactOwner}
-                      onChange={(e) => setFormData({...formData, contactOwner: e.target.value})}
-                      placeholder="Search users..."
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button type="submit" className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700">
-                  {editingContact ? 'Update Contact' : 'Add Contact'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={handleCancel}
-                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+      <div className="px-6 py-6">
+        <div className="mb-6 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900">Contact Records</h3>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowFilterSettings(true)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Settings className="w-5 h-5 mr-2" />
+              Configure Columns
+            </button>
+            <button onClick={() => { if (!hasPageLayout) { setShowNoLayoutsDialog(true); } else if (pageLayouts.length === 1 && pageLayouts[0]) { setSelectedLayoutId(pageLayouts[0].id); setShowDynamicForm(true); } else { setShowLayoutSelector(true); } }} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+              <Plus className="w-5 h-5 mr-2" />New Contact
+            </button>
           </div>
-        )}
-
-        {/* Contacts List */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Contact Records</h3>
+        </div>
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
           </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  {visibleColumns.map(columnId => {
+                    const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                    if (!column) return null;
+                    return (
+                      <th 
+                        key={column.id} 
+                        className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort(column.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{column.label}</span>
+                          {sortColumn === column.id && (
+                            sortDirection === 'asc' 
+                              ? <ChevronUp className="w-4 h-4" />
+                              : <ChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
+                  <th className="px-6 py-3"></th>
+                  <th className="px-6 py-3"></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {contacts.map((contact) => (
+                {filteredContacts.map((contact) => (
                   <tr key={contact.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-teal-600">
-                      {contact.salutation} {contact.firstName} {contact.lastName}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{contact.account}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{contact.contactType}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{contact.title}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{contact.primaryEmail}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{contact.primaryPhone}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        contact.status === 'Active' 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {contact.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      <button 
-                        onClick={() => handleEdit(contact)}
-                        className="text-teal-600 hover:text-teal-900 mr-3"
+                    {visibleColumns.map(columnId => {
+                      const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                      if (!column) return null;
+                      return (
+                        <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
+                          {column.id === 'contactNumber' ? (
+                            <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {contact.contactNumber}
+                            </Link>
+                          ) : column.id === 'firstName' || column.id === 'lastName' ? (
+                            column.id === 'firstName' && isColumnVisible('lastName') ? (
+                              `${contact.firstName} ${contact.lastName}`
+                            ) : column.id === 'lastName' && !isColumnVisible('firstName') ? (
+                              contact.lastName
+                            ) : column.id === 'firstName' ? (
+                              contact.firstName
+                            ) : null
+                          ) : column.id === 'status' ? (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              contact.status === 'Active' 
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {contact.status}
+                            </span>
+                          ) : (
+                            formatColumnValue(contact, column.id)
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-6 py-4 text-sm relative">
+                      <button
+                        onClick={() => setOpenDropdown(openDropdown === contact.id ? null : contact.id)}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
-                        Edit
+                        <MoreVertical className="w-5 h-5 text-gray-600" />
                       </button>
-                      <button 
-                        onClick={() => handleDelete(contact.id)}
-                        className="text-red-600 hover:text-red-900"
+                      {openDropdown === contact.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                handleDeleteContact(contact.id);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => handleToggleFavorite(contact.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
                       >
-                        Delete
+                        <Star className={`w-5 h-5 ${contact.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                       </button>
                     </td>
                   </tr>
@@ -578,12 +631,184 @@ export default function ContactsPage() {
             </table>
           </div>
         </div>
-
-        {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
-            {error}
+        {filteredContacts.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
+            <p className="text-gray-600">{searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first contact.'}</p>
           </div>
         )}
+      </div>
+      {showNoLayoutsDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">No Page Layouts Created</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-700">
+                  <p className="mb-3">To create new contacts, you need to configure a page layout in the Page Editor first.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button onClick={() => setShowNoLayoutsDialog(false)} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <Link href="/object-manager/Contact" className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" onClick={() => setShowNoLayoutsDialog(false)}>
+                <Layout className="w-4 h-4 mr-2" />Go to Page Editor
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+      {showLayoutSelector && pageLayouts.length > 1 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+            </div>
+            <div className="p-6 space-y-3">
+              {pageLayouts.map((layout) => (
+                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left">
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900">{layout.name}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button onClick={() => setShowLayoutSelector(false)} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {hasPageLayout && selectedLayoutId && (
+        <DynamicFormDialog open={showDynamicForm} onOpenChange={(open) => { setShowDynamicForm(open); if (!open) setSelectedLayoutId(null); }} objectApiName="Contact" layoutType="create" layoutId={selectedLayoutId} onSubmit={handleDynamicFormSubmit} title="New Contact" />
+      )}
+
+      {/* Column Filter Settings Dialog */}
+      {showFilterSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={() => setShowFilterSettings(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Configure Columns</h2>
+                <button
+                  onClick={() => setShowFilterSettings(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-gray-600">
+                Drag to reorder, click X to remove columns
+              </p>
+            </div>
+            
+            <div className="px-6 py-4 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
+                {visibleColumns.map((columnId, index) => {
+                  const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                  if (!column) return null;
+                  return (
+                    <div
+                      key={column.id}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(index)}
+                      onDragOver={(e) => { e.preventDefault(); handleColumnDragOver(index); }}
+                      onDragEnd={handleColumnDragEnd}
+                      className={`group flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg cursor-move hover:border-indigo-300 hover:bg-indigo-50 transition-all ${
+                        draggedColumnIndex === index ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <GripVertical className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-900 flex-1">{column.label}</span>
+                      <button
+                        onClick={() => handleRemoveColumn(column.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 rounded transition-all"
+                        title="Remove column"
+                      >
+                        <X className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <button 
+                onClick={() => setShowAddColumn(true)}
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add More Columns
+              </button>
+              
+              <button 
+                onClick={handleResetColumns} 
+                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                Reset Columns to Default
+              </button>
+            </div>
+            
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Column Modal */}
+      {showAddColumn && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
+          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
+            </div>
+            <div className="px-6 py-4 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
+                {AVAILABLE_COLUMNS
+                  .filter(col => !visibleColumns.includes(col.id))
+                  .map((column) => (
+                    <button
+                      key={column.id}
+                      onClick={() => handleAddColumn(column.id)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
+                    >
+                      <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                    </button>
+                  ))}
+                {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id)).length === 0 && (
+                  <p className="text-gray-500 text-sm py-8 text-center">All available columns are already visible.</p>
+                )}
+              </div>
+            </div>
+            <div className="border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => setShowAddColumn(false)}
+                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

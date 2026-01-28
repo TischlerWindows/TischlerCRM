@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { evaluateVisibility } from '@/lib/field-visibility';
 import {
   ChevronDown,
   ChevronRight,
@@ -216,6 +217,12 @@ export default function DynamicForm({
   };
 
   const renderField = (fieldDef: FieldDef) => {
+    // Check if field should be visible based on visibility rules
+    const isVisible = evaluateVisibility(fieldDef.visibleIf, formData);
+    if (!isVisible) {
+      return null; // Field is not visible
+    }
+
     const value = formData[fieldDef.apiName];
     const error = errors[fieldDef.apiName];
     const Icon = getFieldIcon(fieldDef.type);
@@ -534,23 +541,36 @@ export default function DynamicForm({
         {currentTab.sections
           .sort((a, b) => a.order - b.order)
           .map((section) => {
+            // Check if section should be visible based on visibility rules
+            const isSectionVisible = evaluateVisibility(section.visibleIf, formData);
+            if (!isSectionVisible) {
+              return null; // Section is not visible
+            }
+
             const isCollapsed = collapsedSections.has(section.id);
-            const sectionFields = section.fields
-              .map((f) => getFieldDef(f.apiName))
-              .filter((f): f is FieldDef => f !== undefined);
+            
+            // Organize fields by column, sorted by order within each column (vertical layout)
+            const columnArrays: FieldDef[][] = [];
+            for (let i = 0; i < section.columns; i++) {
+              columnArrays[i] = section.fields
+                .filter((f) => f.column === i)
+                .sort((a, b) => a.order - b.order)
+                .map((f) => getFieldDef(f.apiName))
+                .filter((f): f is FieldDef => f !== undefined);
+            }
 
             return (
               <div key={section.id} className="bg-white rounded-lg border border-gray-200">
                 <button
                   type="button"
                   onClick={() => toggleSection(section.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg"
                 >
                   <h3 className="text-lg font-semibold text-gray-900">{section.label}</h3>
                   {isCollapsed ? (
-                    <ChevronRight className="h-5 w-5 text-gray-400" />
+                    <ChevronRight className="h-5 w-5 text-gray-600" />
                   ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                    <ChevronDown className="h-5 w-5 text-gray-600" />
                   )}
                 </button>
 
@@ -564,7 +584,11 @@ export default function DynamicForm({
                         section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                       )}
                     >
-                      {sectionFields.map((fieldDef) => renderField(fieldDef))}
+                      {columnArrays.map((columnFields, colIndex) => (
+                        <div key={`col-${colIndex}`} className="flex flex-col gap-4">
+                          {columnFields.map((fieldDef) => renderField(fieldDef))}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
