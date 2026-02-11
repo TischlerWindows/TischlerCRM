@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -116,6 +116,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [fieldSearchTerm, setFieldSearchTerm] = useState<string>('');
   const [selectedFieldObjects, setSelectedFieldObjects] = useState<string[]>([objectApiName]);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
+  const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
+  const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -131,20 +133,48 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   // Get all objects for filtering
   const allObjects = schema?.objects || [];
   
-  // Filter fields based on search term and selected objects
-  const availableFields = object.fields.filter((field) => {
-    // If search term is empty, show all fields
+  useEffect(() => {
+    if (objectApiName !== 'Home') return;
+
+    const savedReports = localStorage.getItem('customReports');
+    const customReports = savedReports ? JSON.parse(savedReports) : [];
+    setHomeReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
+
+    const savedDashboards = localStorage.getItem('dashboards');
+    const dashboards = savedDashboards ? JSON.parse(savedDashboards) : [];
+    setHomeDashboards(dashboards.map((d: any) => ({ id: d.id, name: d.name })));
+  }, [objectApiName]);
+
+  const availableFields = useMemo(() => {
+    const baseFields: FieldDef[] = objectApiName === 'Home'
+      ? [
+          ...homeReports.map((report) => ({
+            id: `report-${report.id}`,
+            apiName: `Home__Report__${report.id}`,
+            label: `Report: ${report.name}`,
+            type: 'Text' as FieldType,
+            required: false,
+          })),
+          ...homeDashboards.map((dashboard) => ({
+            id: `dashboard-${dashboard.id}`,
+            apiName: `Home__Dashboard__${dashboard.id}`,
+            label: `Dashboard: ${dashboard.name}`,
+            type: 'Text' as FieldType,
+            required: false,
+          })),
+        ]
+      : object.fields;
+
     if (!fieldSearchTerm.trim()) {
-      return true;
+      return baseFields;
     }
-    
-    // Search in label and apiName
+
     const searchLower = fieldSearchTerm.toLowerCase();
-    return (
+    return baseFields.filter((field) =>
       field.label.toLowerCase().includes(searchLower) ||
       field.apiName.toLowerCase().includes(searchLower)
     );
-  });
+  }, [objectApiName, object.fields, homeReports, homeDashboards, fieldSearchTerm]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const activeId = event.active.id.toString();

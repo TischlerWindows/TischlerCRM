@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-primary: #f5f5f4;
+  --color-secondary: #9f9fa2;
+}
+
+body {
+  background-color: var(--color-primary);
+  color: #111827;
+}
+
 @layer utilities {
   .animate-in {
     animation: in 0.3s ease-out;
@@ -9,5 +19,13 @@
   
   .slide-in-from-right {
     animation: slide-in-from-right 0.3s ease-out;
+  }
+
+  .bg-gray-50 {
+    background-color: var(--color-primary) !important;
+  }
+
+  .border-gray-200 {
+    border-color: var(--color-secondary) !important;
   }
 }

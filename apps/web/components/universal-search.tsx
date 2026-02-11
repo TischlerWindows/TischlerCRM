@@ -53,7 +53,7 @@ const typeConfig = {
   },
 };
 
-export default function UniversalSearch() {
+export default function UniversalSearch({ inputClassName }: { inputClassName?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -354,7 +354,10 @@ export default function UniversalSearch() {
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search properties, accounts, contacts, leads, deals, projects..."
-          className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white text-sm"
+          className={cn(
+            'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:text-white text-sm',
+            inputClassName
+          )}
           aria-label="Universal search"
         />
         {searchTerm && (

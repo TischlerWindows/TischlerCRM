@@ -2,13 +2,14 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
-import { authenticate, signJwt, verifyJwt } from './auth';
+import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
 import { loadEnv } from './config';
 import { objectRoutes } from './routes/objects';
 import { fieldRoutes } from './routes/fields';
 import { layoutRoutes } from './routes/layouts';
 import { recordRoutes } from './routes/records';
 import { reportRoutes } from './routes/reports';
+import { dashboardRoutes } from './routes/dashboards';
 
 export function buildApp() {
   const app = Fastify({ logger: true });
@@ -16,16 +17,89 @@ export function buildApp() {
 
   app.get('/health', async () => ({ ok: true }));
 
+  // Auth: signup
+  app.post('/auth/signup', async (req, reply) => {
+    const schema = z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      password: z.string().min(6),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+
+    // Check if user already exists
+    const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    if (existing) return reply.code(409).send({ error: 'Email already registered' });
+
+    try {
+      const passwordHash = hashPassword(parsed.data.password);
+      const user = await prisma.user.create({
+        data: {
+          email: parsed.data.email,
+          name: parsed.data.name,
+          passwordHash,
+          role: 'USER',
+        },
+      });
+
+      const env = loadEnv();
+      const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+
+      return reply.code(201).send({
+        token,
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      });
+    } catch (err) {
+      app.log.error(err);
+      return reply.code(500).send({ error: 'Signup failed' });
+    }
+  });
+
   // Auth: login -> JWT
   app.post('/auth/login', async (req, reply) => {
-    const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
+    const schema = z.object({
+      email: z.string().email(),
+      password: z.string().min(6),
+      accountId: z.string().uuid().optional().nullable(),
+    });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
     const user = await authenticate(parsed.data.email, parsed.data.password);
     if (!user) return reply.code(401).send({ error: 'Invalid credentials' });
     const env = loadEnv();
     const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    const ip = (forwardedIp ? forwardedIp.split(',')[0].trim() : undefined) || req.ip || req.socket?.remoteAddress || 'unknown';
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+    await prisma.loginEvent.create({
+      data: {
+        userId: user.id,
+        accountId: parsed.data.accountId ?? null,
+        ip,
+        userAgent,
+      },
+    });
     return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+  });
+
+  // Security: login history
+  app.get('/security/login-events', async (req, reply) => {
+    const querySchema = z.object({
+      accountId: z.string().uuid().optional(),
+      take: z.coerce.number().int().min(1).max(500).optional(),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    const events = await prisma.loginEvent.findMany({
+      where: parsed.data.accountId ? { accountId: parsed.data.accountId } : undefined,
+      take: parsed.data.take ?? 100,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, email: true, name: true, role: true } },
+      },
+    });
+    reply.send(events);
   });
 
   // Auth guard hook
@@ -78,6 +152,7 @@ export function buildApp() {
   app.register(layoutRoutes);
   app.register(recordRoutes);
   app.register(reportRoutes);
+  app.register(dashboardRoutes);
 
   return app;
 }

@@ -8,8 +8,10 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const EnvSchema = z.object({
   NODE_ENV: z.string().default('development'),
-  PORT: z.string().optional(),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 chars'),
+  APP_ENV: z.enum(['development', 'production']).default('development'),
+  PORT: z.string().optional().default('4000'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -21,7 +23,7 @@ export function loadEnv(): Env {
     const message = Object.entries(flat)
       .map(([k, v]) => `${k}: ${v?.join(', ')}`)
       .join('; ');
-    throw new Error(`Invalid environment: ${message}`);
+    throw new Error(`Invalid environment configuration: ${message}`);
   }
   return parsed.data;
 }

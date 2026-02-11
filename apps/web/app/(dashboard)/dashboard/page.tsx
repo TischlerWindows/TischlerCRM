@@ -43,7 +43,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { aggregateChartData, getAvailableFields } from '@/lib/chart-data-utils';
+import { aggregateChartData, aggregateStackedChartData, getAvailableFields } from '@/lib/chart-data-utils';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn } from '@/lib/utils';
@@ -341,9 +341,40 @@ export default function DashboardPage() {
 
   // Generate preview data based on widget config
   const previewData = useMemo(() => {
-    console.log('🎯 useMemo running - selectedWidgetType:', selectedWidgetType, 'reportId:', widgetConfig.reportId, 'xAxis:', widgetConfig.xAxis, 'yAxis:', widgetConfig.yAxis);
+    console.log('🎯 useMemo running - selectedWidgetType:', selectedWidgetType, 'reportId:', widgetConfig.reportId, 'xAxis:', widgetConfig.xAxis, 'yAxis:', widgetConfig.yAxis, 'stackBy:', widgetConfig.stackBy);
     
     if (!selectedWidgetType) return null;
+    
+    // For stacked bar charts with real data
+    if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis && widgetConfig.stackBy) {
+      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+      
+      if (selectedReport) {
+        console.log('✅ Fetching stacked data for:', { objectType: selectedReport.objectType, xAxis: widgetConfig.xAxis, yAxis: widgetConfig.yAxis, stackBy: widgetConfig.stackBy });
+        
+        try {
+          // Use the stacked aggregation utility to get real data from localStorage
+          const { data, stackKeys } = aggregateStackedChartData({
+            objectType: selectedReport.objectType,
+            xAxisField: widgetConfig.xAxis,
+            yAxisField: widgetConfig.yAxis,
+            stackByField: widgetConfig.stackBy,
+            aggregationType: widgetConfig.aggregationType || 'sum'
+          });
+          
+          console.log('📊 Stacked aggregated data:', { data, stackKeys });
+          
+          if (data && data.length > 0) {
+            return { data, stackKeys };
+          } else {
+            return { data: [], stackKeys: [] };
+          }
+        } catch (error) {
+          console.error('❌ Error aggregating stacked data:', error);
+          return { data: [], stackKeys: [] };
+        }
+      }
+    }
     
     // For bar charts with real data
     if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
@@ -393,6 +424,16 @@ export default function DashboardPage() {
             { label: 'May', value: 52 }
           ]
         };
+      } else if (selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') {
+        return {
+          data: [
+            { label: 'Q1', 'Series A': 30, 'Series B': 45, 'Series C': 25 },
+            { label: 'Q2', 'Series A': 40, 'Series B': 35, 'Series C': 30 },
+            { label: 'Q3', 'Series A': 35, 'Series B': 50, 'Series C': 20 },
+            { label: 'Q4', 'Series A': 45, 'Series B': 40, 'Series C': 35 }
+          ],
+          stackKeys: ['Series A', 'Series B', 'Series C']
+        };
       } else if (selectedWidgetType === 'line') {
         return {
           data: [
@@ -422,7 +463,7 @@ export default function DashboardPage() {
     }
     
     return null;
-  }, [selectedWidgetType, widgetConfig.reportId, widgetConfig.xAxis, widgetConfig.yAxis, availableReports]);
+  }, [selectedWidgetType, widgetConfig.reportId, widgetConfig.xAxis, widgetConfig.yAxis, widgetConfig.stackBy, availableReports]);
 
   const handleResizeStart = (e: React.MouseEvent, widget: DashboardWidget) => {
     if (!dashEditMode) return;
@@ -672,6 +713,9 @@ export default function DashboardPage() {
       if (previewData.data) {
         configData.data = previewData.data;
       }
+      if (previewData.stackKeys) {
+        configData.stackKeys = previewData.stackKeys;
+      }
       if (previewData.value !== undefined) {
         configData.value = previewData.value;
         configData.prefix = previewData.prefix || '$';
@@ -736,6 +780,7 @@ export default function DashboardPage() {
     const objectType = report.objectType;
     const xField = widget.config?.xAxis;
     const yField = widget.config?.yAxis;
+    const stackByField = widget.config?.stackBy;
 
     if (!objectType || !xField || !yField) {
       console.warn('Widget missing configuration for refresh');
@@ -743,42 +788,80 @@ export default function DashboardPage() {
       return;
     }
 
-    console.log(`🔄 Refreshing widget: ${widget.title} with ${objectType}, ${xField}, ${yField}`);
+    console.log(`🔄 Refreshing widget: ${widget.title} with ${objectType}, ${xField}, ${yField}, ${stackByField || 'no stack'}`);
 
     try {
-      // Use aggregateChartData utility to recompute widget data
-      const aggregatedData = aggregateChartData({
-        objectType,
-        xAxisField: xField,
-        yAxisField: yField,
-        aggregationType: widget.config?.aggregationType || 'sum'
-      });
+      // Check if this is a stacked chart
+      if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
+        // Use stacked aggregation
+        const { data, stackKeys } = aggregateStackedChartData({
+          objectType,
+          xAxisField: xField,
+          yAxisField: yField,
+          stackByField: stackByField,
+          aggregationType: widget.config?.aggregationType || 'sum'
+        });
 
-      if (!aggregatedData || aggregatedData.length === 0) {
-        console.warn('No data available after refresh');
-        setRefreshingWidgetId(null);
-        return;
+        if (!data || data.length === 0) {
+          console.warn('No data available after refresh');
+          setRefreshingWidgetId(null);
+          return;
+        }
+
+        // Update the widget with fresh stacked data
+        const updatedWidgets = selectedDashboard.widgets.map(w => 
+          w.id === widget.id 
+            ? { ...w, config: { ...w.config, data, stackKeys } }
+            : w
+        );
+
+        const updatedDashboard = {
+          ...selectedDashboard,
+          widgets: updatedWidgets,
+          lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+        };
+
+        const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+        setDashboards(updated);
+        setSelectedDashboard(updatedDashboard);
+        localStorage.setItem('dashboards', JSON.stringify(updated));
+
+        console.log(`✨ Refreshed stacked widget: ${widget.title} with ${data.length} data points and ${stackKeys.length} stacks`);
+      } else {
+        // Use regular aggregation for non-stacked charts
+        const aggregatedData = aggregateChartData({
+          objectType,
+          xAxisField: xField,
+          yAxisField: yField,
+          aggregationType: widget.config?.aggregationType || 'sum'
+        });
+
+        if (!aggregatedData || aggregatedData.length === 0) {
+          console.warn('No data available after refresh');
+          setRefreshingWidgetId(null);
+          return;
+        }
+
+        // Update the widget with fresh data
+        const updatedWidgets = selectedDashboard.widgets.map(w => 
+          w.id === widget.id 
+            ? { ...w, config: { ...w.config, data: aggregatedData } }
+            : w
+        );
+
+        const updatedDashboard = {
+          ...selectedDashboard,
+          widgets: updatedWidgets,
+          lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+        };
+
+        const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+        setDashboards(updated);
+        setSelectedDashboard(updatedDashboard);
+        localStorage.setItem('dashboards', JSON.stringify(updated));
+
+        console.log(`✨ Refreshed widget: ${widget.title} with ${aggregatedData.length} data points`);
       }
-
-      // Update the widget with fresh data
-      const updatedWidgets = selectedDashboard.widgets.map(w => 
-        w.id === widget.id 
-          ? { ...w, config: { ...w.config, data: aggregatedData } }
-          : w
-      );
-
-      const updatedDashboard = {
-        ...selectedDashboard,
-        widgets: updatedWidgets,
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-
-      const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
-      setDashboards(updated);
-      setSelectedDashboard(updatedDashboard);
-      localStorage.setItem('dashboards', JSON.stringify(updated));
-
-      console.log(`✨ Refreshed widget: ${widget.title} with ${aggregatedData.length} data points`);
       
       // Hide loading overlay after a brief moment
       setTimeout(() => {
@@ -799,6 +882,7 @@ export default function DashboardPage() {
       dataSource: widget.dataSource,
       xAxis: widget.config?.xAxis || '',
       yAxis: widget.config?.yAxis || '',
+      stackBy: widget.config?.stackBy || '',
       aggregationType: widget.config?.aggregationType || 'sum',
       displayUnits: widget.config?.displayUnits || 'actual',
       showValues: widget.config?.showValues !== false,
@@ -829,6 +913,9 @@ export default function DashboardPage() {
     if (previewData) {
       if (previewData.data) {
         configData.data = previewData.data;
+      }
+      if (previewData.stackKeys) {
+        configData.stackKeys = previewData.stackKeys;
       }
       if (previewData.value !== undefined) {
         configData.value = previewData.value;
@@ -1100,6 +1187,124 @@ export default function DashboardPage() {
                 );
               })}
             </div>
+          </div>
+        );
+
+      case 'stacked-horizontal-bar':
+        const stackKeys = widget.config.stackKeys || [];
+        const colors = ['#4f46e5', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316', '#84cc16'];
+        
+        return (
+          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+            {refreshingWidgetId === widget.id && (
+              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+            )}
+            <div className="absolute top-2 right-2 flex gap-1 z-10">
+              <button
+                onClick={() => handleRefreshWidget(widget)}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                title="Refresh widget"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              {dashEditMode && (
+                <>
+                  <button
+                    onClick={() => handleEditWidget(widget)}
+                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    title="Edit widget"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWidget(widget.id)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    title="Delete widget"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500 rounded-tl cursor-se-resize hover:bg-indigo-600 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to resize"
+              />
+            )}
+            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            
+            {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
+              <div className="flex flex-col gap-3 flex-1 min-h-0">
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3 justify-center pb-2 border-b">
+                  {stackKeys.map((key: string, idx: number) => (
+                    <div key={key} className="flex items-center gap-1.5">
+                      <div 
+                        className="w-3 h-3 rounded" 
+                        style={{ backgroundColor: colors[idx % colors.length] }}
+                      />
+                      <span className="text-xs text-gray-600">{key}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Stacked Bars */}
+                <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto">
+                  {widget.config.data.map((item: any, idx: number) => {
+                    // Calculate total for this row
+                    const total = stackKeys.reduce((sum: number, key: string) => {
+                      return sum + (Number(item[key]) || 0);
+                    }, 0);
+                    
+                    const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
+                    
+                    return (
+                      <div key={idx} className="flex items-center gap-3">
+                        <div className="text-xs text-gray-600 w-24 text-right truncate flex-shrink-0" title={item.label}>
+                          {item.label}
+                        </div>
+                        <div className="flex-1 bg-gray-100 rounded-full flex items-center overflow-hidden" style={{ height: `${barHeight}px` }}>
+                          {stackKeys.map((key: string, stackIdx: number) => {
+                            const value = Number(item[key]) || 0;
+                            const widthPercent = total > 0 ? (value / total) * 100 : 0;
+                            
+                            if (widthPercent === 0) return null;
+                            
+                            return (
+                              <div
+                                key={key}
+                                className="h-full transition-all hover:opacity-80 flex items-center justify-center"
+                                style={{ 
+                                  width: `${widthPercent}%`,
+                                  backgroundColor: colors[stackIdx % colors.length],
+                                  minWidth: widthPercent > 5 ? 'auto' : '2px'
+                                }}
+                                title={`${key}: ${value}`}
+                              >
+                                {widthPercent > 8 && (
+                                  <span className="text-xs text-white font-medium px-1">
+                                    {value}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-700 font-medium w-12 text-right flex-shrink-0">
+                          {total.toFixed(0)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-gray-400 text-sm flex-1">
+                {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
+              </div>
+            )}
           </div>
         );
 
@@ -1958,6 +2163,39 @@ export default function DashboardPage() {
                     </select>
                   </div>
 
+                  {/* Stack By - Only show for stacked chart types */}
+                  {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Stack By
+                        <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
+                      </label>
+                      <select
+                        value={widgetConfig.stackBy}
+                        onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">Select field...</option>
+                        {(() => {
+                          const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                          if (selectedReport?.fields && selectedReport.fields.length > 0) {
+                            return selectedReport.fields.map((field: string) => (
+                              <option key={field} value={field}>{field}</option>
+                            ));
+                          }
+                          // Fallback to utility fields
+                          const fields = getAvailableFields(widgetConfig.dataSource);
+                          return fields.map(field => (
+                            <option key={field} value={field}>{field}</option>
+                          ));
+                        })()}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        This field will create separate stacks in the chart
+                      </p>
+                    </div>
+                  )}
+
                   {/* Display Units */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Display Units</label>
@@ -2209,7 +2447,13 @@ export default function DashboardPage() {
                   <div><strong>Widget Type:</strong> {selectedWidgetType || 'None'}</div>
                   <div><strong>X-Axis:</strong> {widgetConfig.xAxis || 'Not set'}</div>
                   <div><strong>Y-Axis:</strong> {widgetConfig.yAxis || 'Not set'}</div>
+                  {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
+                    <div><strong>Stack By:</strong> {widgetConfig.stackBy || 'Not set'}</div>
+                  )}
                   <div><strong>Data Points:</strong> {previewData?.data?.length || 0}</div>
+                  {previewData?.stackKeys && previewData.stackKeys.length > 0 && (
+                    <div><strong>Stack Keys:</strong> {previewData.stackKeys.join(', ')}</div>
+                  )}
                   {previewData?.data && previewData.data.length > 0 && (
                     <div className="mt-2">
                       <strong>Sample Data:</strong>

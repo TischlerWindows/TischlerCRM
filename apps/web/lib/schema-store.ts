@@ -71,6 +71,85 @@ function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
 
+const RELATIONSHIP_EXCLUSIONS = new Set(['Home']);
+
+function hasRelationshipField(fields: FieldDef[], targetApi: string): boolean {
+  return fields.some((field) => {
+    const relatedObject = (field as any).relatedObject as string | undefined;
+    return (
+      (field.type === 'Lookup' || field.type === 'ExternalLookup') &&
+      ((field.lookupObject && field.lookupObject === targetApi) || (relatedObject && relatedObject === targetApi))
+    ) || field.apiName === `${targetApi}Id`;
+  });
+}
+
+function createRelationshipField(target: ObjectDef): FieldDef {
+  return {
+    id: generateId(),
+    apiName: `${target.apiName}Id`,
+    label: target.label,
+    type: 'Lookup',
+    lookupObject: target.apiName,
+    relationshipName: target.pluralLabel || target.label,
+    custom: false,
+    helpText: `Lookup to ${target.label}`
+  };
+}
+
+function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
+  if (!objectDef.pageLayouts || objectDef.pageLayouts.length === 0) return objectDef;
+
+  const lookupFields = objectDef.fields.filter(
+    (field) => field.type === 'Lookup' || field.type === 'ExternalLookup'
+  );
+
+  const pageLayouts = objectDef.pageLayouts.map((layout) => {
+    if (!layout.tabs.length || !layout.tabs[0] || !layout.tabs[0].sections.length || !layout.tabs[0].sections[0]) {
+      return layout;
+    }
+
+    const tab = layout.tabs[0];
+    const section = tab.sections[0];
+    const existingFieldApi = new Set(section.fields.map((f) => f.apiName));
+    const missingLookups = lookupFields.filter((field) => !existingFieldApi.has(field.apiName));
+
+    if (missingLookups.length === 0) return layout;
+
+    const nextFields = section.fields.slice();
+    const nextOrderStart = nextFields.length;
+
+    missingLookups.forEach((field, index) => {
+      nextFields.push({
+        apiName: field.apiName,
+        column: index % section.columns,
+        order: nextOrderStart + index
+      });
+    });
+
+    return {
+      ...layout,
+      tabs: [
+        {
+          ...tab,
+          sections: [
+            {
+              ...section,
+              fields: nextFields
+            },
+            ...tab.sections.slice(1)
+          ]
+        },
+        ...layout.tabs.slice(1)
+      ]
+    };
+  });
+
+  return {
+    ...objectDef,
+    pageLayouts
+  };
+}
+
 export const useSchemaStore = create<SchemaStore>()(
   persist(
     (set, get) => ({
@@ -132,9 +211,40 @@ export const useSchemaStore = create<SchemaStore>()(
           updatedAt: new Date().toISOString()
         };
 
+        const shouldRelateNewObject = !RELATIONSHIP_EXCLUSIONS.has(newObject.apiName);
+        const relatedObjects = schema.objects.filter((obj) => !RELATIONSHIP_EXCLUSIONS.has(obj.apiName));
+
+        const newObjectWithRelations: ObjectDef = shouldRelateNewObject
+          ? {
+              ...newObject,
+              fields: relatedObjects.reduce((fields, target) => {
+                if (target.apiName === newObject.apiName) return fields;
+                if (hasRelationshipField(fields, target.apiName)) return fields;
+                return [...fields, createRelationshipField(target)];
+              }, newObject.fields || [])
+            }
+          : newObject;
+
+        const newObjectWithLayouts = addLookupFieldsToLayouts(newObjectWithRelations);
+
+        const updatedExisting = schema.objects.map((obj) => {
+          if (RELATIONSHIP_EXCLUSIONS.has(obj.apiName) || !shouldRelateNewObject) {
+            return obj;
+          }
+          if (hasRelationshipField(obj.fields, newObject.apiName)) {
+            return obj;
+          }
+          const updatedObject = {
+            ...obj,
+            fields: [...obj.fields, createRelationshipField(newObject)],
+            updatedAt: new Date().toISOString()
+          };
+          return addLookupFieldsToLayouts(updatedObject);
+        });
+
         const updatedSchema = {
           ...schema,
-          objects: [...schema.objects, newObject]
+          objects: [...updatedExisting, newObjectWithLayouts]
         };
 
         set({ schema: updatedSchema });

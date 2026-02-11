@@ -50,6 +50,8 @@ export default function DynamicForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<string>('');
+  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
+  const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
   // If layoutId is provided, use it; otherwise fall back to finding by layoutType
@@ -75,6 +77,60 @@ export default function DynamicForm({
 
   const getFieldDef = (apiName: string): FieldDef | undefined => {
     return object.fields.find((f) => f.apiName === apiName);
+  };
+
+  const getLookupTargetApi = (fieldDef: FieldDef): string | undefined => {
+    const relatedObject = (fieldDef as any).relatedObject as string | undefined;
+    return fieldDef.lookupObject || fieldDef.relationship?.targetObject || relatedObject;
+  };
+
+  const getLookupRecords = (targetApi: string) => {
+    const targetObject = schema?.objects.find((o) => o.apiName === targetApi);
+    const base = targetApi.toLowerCase();
+    const pluralFromSchema = targetObject?.pluralLabel?.toLowerCase();
+    const plural = base.endsWith('y') ? `${base.slice(0, -1)}ies` : `${base}s`;
+    const keys = [targetApi, base, pluralFromSchema, plural].filter(Boolean) as string[];
+
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        try {
+          return JSON.parse(raw) as any[];
+        } catch {
+          return [];
+        }
+      }
+    }
+
+    return [] as any[];
+  };
+
+  const getRecordLabel = (record: any) => {
+    if (!record) return '';
+    if (record.name) return record.name;
+    if (record.title) return record.title;
+    if (record.propertyNumber) return record.propertyNumber;
+    if (record.accountName) return record.accountName;
+    if (record.firstName || record.lastName) {
+      return `${record.firstName || ''} ${record.lastName || ''}`.trim();
+    }
+    if (record.email) return record.email;
+    if (record.address) return record.address;
+    const keys = Object.keys(record);
+    const firstNameKey = keys.find((key) => key.toLowerCase().endsWith('__firstname'));
+    const lastNameKey = keys.find((key) => key.toLowerCase().endsWith('__lastname'));
+    if (firstNameKey || lastNameKey) {
+      return `${record[firstNameKey || ''] || ''} ${record[lastNameKey || ''] || ''}`.trim();
+    }
+    const nameKey = keys.find((key) => key.toLowerCase().endsWith('__name'));
+    if (nameKey && record[nameKey]) return record[nameKey];
+    const accountKey = keys.find((key) => key.toLowerCase().endsWith('__accountname'));
+    if (accountKey && record[accountKey]) return record[accountKey];
+    const propertyKey = keys.find((key) => key.toLowerCase().endsWith('__propertynumber'));
+    if (propertyKey && record[propertyKey]) return record[propertyKey];
+    const emailKey = keys.find((key) => key.toLowerCase().endsWith('__email'));
+    if (emailKey && record[emailKey]) return record[emailKey];
+    return record.id || 'Record';
   };
 
   const getFieldIcon = (type: FieldType) => {
@@ -473,15 +529,67 @@ export default function DynamicForm({
 
       case 'Lookup':
       case 'ExternalLookup':
+        const targetApi = getLookupTargetApi(fieldDef);
+        const records = targetApi ? getLookupRecords(targetApi) : [];
+        const selectedRecord = records.find((r) => r.id === value);
+        const selectedLabel = selectedRecord ? getRecordLabel(selectedRecord) : '';
+        const lookupQuery = lookupQueries[fieldDef.apiName] ?? '';
+        const isLookupActive = activeLookupField === fieldDef.apiName;
+        const displayValue = isLookupActive ? lookupQuery : selectedLabel;
+
+        const filteredRecords = records.filter((record) => {
+          const label = getRecordLabel(record).toLowerCase();
+          const query = lookupQuery.toLowerCase();
+          if (label.includes(query)) return true;
+          return Object.values(record).some((value) =>
+            typeof value === 'string' && value.toLowerCase().includes(query)
+          );
+        });
+
         inputElement = (
-          <div className="flex gap-2">
+          <div className="relative">
             <Input
               {...commonProps}
-              placeholder={`Search ${fieldDef.relationshipName || 'records'}...`}
+              value={displayValue}
+              placeholder={`Search ${fieldDef.relationshipName || targetApi || 'records'}...`}
+              onChange={(e) => {
+                setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: e.target.value }));
+                setActiveLookupField(fieldDef.apiName);
+              }}
+              onFocus={() => setActiveLookupField(fieldDef.apiName)}
+              onBlur={() => {
+                setTimeout(() => {
+                  setActiveLookupField((current) => (current === fieldDef.apiName ? null : current));
+                }, 150);
+              }}
             />
-            <Button type="button" variant="outline" size="sm" disabled={isReadOnly}>
-              Search
-            </Button>
+            {isLookupActive && filteredRecords.length > 0 && (
+              <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {filteredRecords.slice(0, 20).map((record) => {
+                  const label = getRecordLabel(record);
+                  return (
+                    <button
+                      key={record.id}
+                      type="button"
+                      onClick={() => {
+                        handleFieldChange(fieldDef.apiName, record.id);
+                        setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: label }));
+                        setActiveLookupField(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    >
+                      <div className="font-medium text-gray-900 truncate">{label}</div>
+                      <div className="text-xs text-gray-500">{record.id}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {isLookupActive && filteredRecords.length === 0 && lookupQuery && (
+              <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-500 shadow-lg">
+                No matches found.
+              </div>
+            )}
           </div>
         );
         break;

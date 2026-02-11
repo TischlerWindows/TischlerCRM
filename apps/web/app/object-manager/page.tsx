@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSchemaStore } from '@/lib/schema-store';
 import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from '@/lib/schema';
 import { 
@@ -190,12 +191,18 @@ export default function ObjectManagerPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-[#9f9fa2] shadow border-b border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <Link href="/" className="text-xl font-bold text-indigo-600 hover:text-indigo-700">
-                TCES
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/tces-logo.png"
+                  alt="TCES"
+                  width={32}
+                  height={32}
+                  priority
+                />
               </Link>
               <span className="text-gray-300">|</span>
               <span className="text-2xl font-bold text-gray-900">Object Manager</span>
@@ -398,14 +405,14 @@ export default function ObjectManagerPage() {
                     <TableCell className="font-mono text-sm text-gray-600">
                       {object.apiName}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.fields.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.fields.length}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.recordTypes.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.recordTypes.length}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.validationRules.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.validationRules.length}
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
                       {new Date(object.updatedAt).toLocaleDateString()}

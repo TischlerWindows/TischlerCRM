@@ -2,25 +2,30 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { HelpCircle, Cog, Edit3, GripVertical, X } from 'lucide-react';
+import Image from 'next/image';
+import { usePathname, useRouter } from 'next/navigation';
+import { HelpCircle, Cog, Edit3, GripVertical, X, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { useAuth } from '@/lib/auth-context';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function AppWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
+  const allowPageScroll = pathname === '/';
 
-  // Check if we should show the headbar (exclude only object-manager pages)
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager');
+  // Check if we should show the headbar (exclude only object-manager pages and auth pages)
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
@@ -103,32 +108,55 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Top Navigation Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+      <div className="bg-[#9f9fa2] border-b border-black px-6 py-3 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-8">
-          <Link href="/" className="text-2xl font-bold text-indigo-600">
-            TCES
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/tces-logo.png"
+              alt="TCES"
+              width={40}
+              height={40}
+              priority
+            />
           </Link>
         </div>
         <div className="flex-1 max-w-2xl mx-8">
-          <UniversalSearch />
+          <UniversalSearch inputClassName={allowPageScroll ? 'bg-white' : ''} />
         </div>
         <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <HelpCircle className="w-5 h-5 text-gray-600" />
+          <button className="p-2 hover:bg-black/5 rounded-lg transition-colors">
+            <HelpCircle className="w-5 h-5 text-[#151f6d]" />
           </button>
           <Link
             href="/settings"
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-black/5 rounded-lg transition-colors"
             aria-label="Settings"
           >
-            <Cog className="w-5 h-5 text-gray-600" />
+            <Cog className="w-5 h-5 text-[#151f6d]" />
           </Link>
+          {user && (
+            <>
+              <div className="text-sm text-gray-600 px-3 py-1">
+                {user.name || user.email}
+              </div>
+              <button
+                onClick={() => {
+                  logout();
+                  router.push('/login');
+                }}
+                className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 text-[#151f6d]" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Tab Navigation Row */}
       {isLoaded && (
-        <div className="bg-white border-b border-gray-200 px-6 flex items-center justify-between sticky top-[60px] z-40">
+        <div className="bg-[#f5f5f4] border-b border-black px-6 flex items-center justify-between sticky top-[60px] z-40">
           <div className="flex items-center gap-1 overflow-x-auto flex-1">
             {tabs.map((item) => {
               const isActive = pathname === item.href;
@@ -137,10 +165,10 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors',
+                    'px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors text-[#151f6d]',
                     isActive
-                      ? 'border-indigo-600 text-indigo-600'
-                      : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                      ? 'border-[#151f6d]'
+                      : 'border-transparent hover:text-[#da291c] hover:border-[#da291c]'
                   )}
                 >
                   {item.name}
@@ -159,7 +187,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className={cn('flex-1', allowPageScroll ? 'overflow-y-auto' : 'overflow-hidden')}>
         {children}
       </div>
 

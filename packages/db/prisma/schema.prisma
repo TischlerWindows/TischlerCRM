@@ -31,6 +31,23 @@ model User {
   modifiedReports     Report[]        @relation("ModifiedReports")
   createdFolders      ReportFolder[]  @relation("CreatedFolders")
   modifiedFolders     ReportFolder[]  @relation("ModifiedFolders")
+  createdDashboards   Dashboard[]     @relation("CreatedDashboards")
+  modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
+  loginEvents         LoginEvent[]
+}
+
+model LoginEvent {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  accountId  String?
+  ip         String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([createdAt])
 }
 
 // ============================================
@@ -302,4 +319,58 @@ model ReportFolder {
 
   @@index([createdById])
   @@index([parentId])
+}
+
+// ============================================
+// Dashboards
+// ============================================
+
+model Dashboard {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  
+  // Permissions and sharing
+  isPrivate       Boolean  @default(false)
+  isFavorite      Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedDashboards", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedDashboards", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  widgets         DashboardWidget[]
+
+  @@index([createdById])
+  @@index([isFavorite])
+  @@index([isPrivate])
+}
+
+model DashboardWidget {
+  id              String   @id @default(uuid())
+  dashboard       Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  dashboardId     String
+  
+  type            String   // 'vertical-bar', 'horizontal-bar', 'line', 'donut', 'metric', etc.
+  title           String
+  reportId        String?  // Optional reference to a Report
+  dataSource      String   // Object type (e.g., 'accounts', 'contacts')
+  
+  // Widget configuration stored as JSON
+  config          Json     @default("{}")
+  
+  // Position and size (grid coordinates)
+  positionX       Int      @default(0)
+  positionY       Int      @default(0)
+  width           Int      @default(4)
+  height          Int      @default(2)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([dashboardId])
 }

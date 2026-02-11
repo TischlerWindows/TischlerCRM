@@ -7,6 +7,10 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      colors: {
+        primary: '#f5f5f4',
+        secondary: '#9f9fa2',
+      },
       animation: {
         'in': 'in 0.2s ease-out',
       },

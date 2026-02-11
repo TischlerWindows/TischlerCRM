@@ -9,11 +9,17 @@ export interface ChartDataPoint {
   [key: string]: any;
 }
 
+export interface StackedChartDataPoint {
+  label: string;
+  [key: string]: string | number; // Dynamic keys for each stack
+}
+
 export interface AggregationConfig {
   xAxisField: string;
   yAxisField: string;
   objectType: string;
   aggregationType?: 'sum' | 'count' | 'avg' | 'max' | 'min';
+  stackByField?: string; // For stacked charts
 }
 
 /**
@@ -311,4 +317,146 @@ export function getAvailableFields(objectType: string): string[] {
   };
 
   return fieldsMap[objectType.toLowerCase()] || [];
+}
+/**
+ * Aggregate stacked chart data based on configuration
+ * Groups records by X-axis field, then by stack field, and aggregates Y-axis values
+ */
+export function aggregateStackedChartData(config: AggregationConfig): { data: StackedChartDataPoint[]; stackKeys: string[] } {
+  // Get records from localStorage
+  const storageKey = getPluralObjectKey(config.objectType);
+  const recordsJson = localStorage.getItem(storageKey);
+  
+  if (!recordsJson || !config.stackByField) {
+    console.warn(`No records found for ${storageKey} or stackByField not provided`);
+    return { data: [], stackKeys: [] };
+  }
+
+  let records: any[];
+  try {
+    records = JSON.parse(recordsJson);
+  } catch (e) {
+    console.error(`Failed to parse ${storageKey}:`, e);
+    return { data: [], stackKeys: [] };
+  }
+
+  if (!Array.isArray(records) || records.length === 0) {
+    return { data: [], stackKeys: [] };
+  }
+
+  // Strip prefixes from field names for lookups
+  const xField = stripFieldPrefix(config.xAxisField);
+  const yField = stripFieldPrefix(config.yAxisField);
+  const stackField = stripFieldPrefix(config.stackByField);
+  const aggregationType = config.aggregationType || determineAggregationType(records, yField);
+
+  // Collect all unique stack values
+  const stackValues = new Set<string>();
+  
+  // Group records by X-axis value, then by stack value
+  const grouped: Record<string, Record<string, any[]>> = {};
+
+  for (const record of records) {
+    // Get X-axis value
+    let xValue = record[config.xAxisField] || record[xField];
+    if (xValue === null || xValue === undefined || xValue === '') {
+      xValue = 'Unspecified';
+    } else {
+      xValue = formatDisplayValue(xValue);
+    }
+
+    // Get stack value
+    let stackValue = record[config.stackByField] || record[stackField];
+    if (stackValue === null || stackValue === undefined || stackValue === '') {
+      stackValue = 'Unspecified';
+    } else {
+      stackValue = formatDisplayValue(stackValue);
+    }
+    
+    stackValues.add(stackValue);
+
+    // Initialize nested structure
+    if (!grouped[xValue]) {
+      grouped[xValue] = {};
+    }
+    const xGroup = grouped[xValue];
+    if (xGroup) {
+      if (!xGroup[stackValue]) {
+        xGroup[stackValue] = [];
+      }
+      const stackGroup = xGroup[stackValue];
+      if (stackGroup) {
+        stackGroup.push(record);
+      }
+    }
+  }
+
+  const stackKeys = Array.from(stackValues).sort();
+
+  // Aggregate Y-axis values for each X-axis and stack combination
+  const result: StackedChartDataPoint[] = [];
+
+  for (const [xValue, stackGroups] of Object.entries(grouped)) {
+    const dataPoint: StackedChartDataPoint = { label: xValue };
+
+    // For each stack key, calculate the aggregated value
+    for (const stackKey of stackKeys) {
+      const groupRecords = stackGroups[stackKey] || [];
+      let aggregatedValue = 0;
+
+      if (groupRecords.length > 0) {
+        switch (aggregationType) {
+          case 'sum':
+            aggregatedValue = groupRecords.reduce((sum, record) => {
+              const val = record[config.yAxisField] || record[yField];
+              return sum + toNumber(val);
+            }, 0);
+            break;
+
+          case 'count':
+            aggregatedValue = groupRecords.length;
+            break;
+
+          case 'avg':
+            const total = groupRecords.reduce((sum, record) => {
+              const val = record[config.yAxisField] || record[yField];
+              return sum + toNumber(val);
+            }, 0);
+            aggregatedValue = total / groupRecords.length;
+            break;
+
+          case 'max':
+            aggregatedValue = Math.max(
+              ...groupRecords.map(record => {
+                const val = record[config.yAxisField] || record[yField];
+                return toNumber(val);
+              })
+            );
+            break;
+
+          case 'min':
+            aggregatedValue = Math.min(
+              ...groupRecords.map(record => {
+                const val = record[config.yAxisField] || record[yField];
+                return toNumber(val);
+              })
+            );
+            break;
+
+          default:
+            aggregatedValue = groupRecords.length;
+        }
+      }
+
+      dataPoint[stackKey] = Math.round(aggregatedValue * 100) / 100; // Round to 2 decimals
+    }
+
+    result.push(dataPoint);
+  }
+
+  // Sort by label for consistent display
+  return {
+    data: result.sort((a, b) => String(a.label).localeCompare(String(b.label))),
+    stackKeys
+  };
 }
