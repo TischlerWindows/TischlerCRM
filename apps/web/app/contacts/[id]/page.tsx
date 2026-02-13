@@ -10,7 +10,10 @@ import {
   Trash2,
   Calendar,
   User,
-  Clock
+  Clock,
+  Plus,
+  Search,
+  FileText
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -22,24 +25,50 @@ interface Contact {
   recordTypeId?: string;
   pageLayoutId?: string;
   contactNumber: string;
+  
+  // Contact Information
+  salutation?: string;
   firstName: string;
+  middleName?: string;
   lastName: string;
-  email: string;
-  phone: string;
-  mobilePhone: string;
-  fax: string;
-  accountName: string;
-  jobTitle: string;
-  department: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  country: string;
+  accountId?: string;
+  accountName?: string;
+  contactType?: string;
+  title?: string;
+  reportsToId?: string;
+  reportsToName?: string;
+  status?: string;
+  primaryEmail: string;
+  secondaryEmail?: string;
+  primaryPhone: string;
+  secondaryPhone?: string;
+  fax?: string;
+  
+  // Address Information
+  primaryAddressStreet?: string;
+  primaryAddressCity?: string;
+  primaryAddressState?: string;
+  primaryAddressZip?: string;
+  secondaryAddressStreet?: string;
+  secondaryAddressCity?: string;
+  secondaryAddressState?: string;
+  secondaryAddressZip?: string;
+  poBox?: string;
+  
+  // Associated Properties
+  properties?: string[];
+  
+  // Notes
+  contactNotes?: string;
+  
+  // System Information
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
   lastModifiedAt: string;
+  contactOwnerId?: string;
+  contactOwnerName?: string;
+  
   [key: string]: any;
 }
 
@@ -66,58 +95,13 @@ export default function ContactDetailPage() {
     setLoading(false);
   }, [params?.id]);
 
-  // Get the layout based on contact's pageLayoutId or recordTypeId
-  const getLayoutForContact = () => {
-    if (!contact || !contactObject) return null;
-
-    // First, try to use the layout stored on the record itself
-    if (contact.pageLayoutId) {
-      const pageLayout = contactObject.pageLayouts?.find(l => l.id === contact.pageLayoutId);
-      if (pageLayout) {
-        return pageLayout;
-      }
-    }
-
-    // Fall back to the layout from the record type
-    const recordTypeId = contact.recordTypeId;
-    const recordType = recordTypeId
-      ? contactObject.recordTypes?.find(rt => rt.id === recordTypeId)
-      : contactObject.recordTypes?.[0];
-
-    // Get page layout from record type
-    const pageLayoutId = recordType?.pageLayoutId;
-    const pageLayout = pageLayoutId
-      ? contactObject.pageLayouts?.find(l => l.id === pageLayoutId)
-      : contactObject.pageLayouts?.[0];
-
-    return pageLayout;
+  // Get the first available layout for edit dialog purposes
+  const getDefaultLayout = () => {
+    if (!contactObject) return null;
+    return contactObject.pageLayouts?.[0];
   };
 
-  const pageLayout = getLayoutForContact();
-
-  // Get fields to display from the layout
-  const getFieldsFromLayout = () => {
-    if (!pageLayout || !contactObject) return [];
-
-    const layoutFieldApiNames = new Set<string>();
-    
-    pageLayout.tabs?.forEach((tab: any) => {
-      tab.sections?.forEach((section: any) => {
-        section.fields?.forEach((field: any) => {
-          layoutFieldApiNames.add(field.apiName);
-        });
-      });
-    });
-
-    // Only return fields that are in the layout
-    if (layoutFieldApiNames.size === 0) return [];
-    
-    return (contactObject.fields || []).filter(field => 
-      layoutFieldApiNames.has(field.apiName)
-    );
-  };
-
-  const displayFields = getFieldsFromLayout();
+  const pageLayout = getDefaultLayout();
 
   const handleEdit = () => {
     if (!pageLayout) {
@@ -134,7 +118,7 @@ export default function ContactDetailPage() {
         ...contact,
         ...data,
         lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
+        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
       };
       
       const storedContacts = localStorage.getItem('contacts');
@@ -219,8 +203,8 @@ export default function ContactDetailPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{contact.contactNumber}</h1>
                   <p className="text-gray-600">
-                    {contact.firstName} {contact.lastName}
-                    {contact.email && <> ({contact.email})</>}
+                    {contact.salutation && <>{contact.salutation} </>}{contact.firstName} {contact.lastName}
+                    {contact.primaryEmail && <> ({contact.primaryEmail})</>}
                   </p>
                 </div>
               </div>
@@ -244,101 +228,235 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* Layout Info */}
-        {pageLayout && (
-          <div className="mb-4 text-sm text-gray-500">
-            Using layout: <span className="font-medium">{pageLayout.name}</span>
-            {displayFields.length > 0 && (
-              <span className="ml-2">({displayFields.length} fields)</span>
-            )}
+        {/* Contact Information */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+            <h3 className="font-medium text-gray-900">Contact Information</h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Name Fields */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Salutation</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.salutation || '-'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">First Name</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.firstName || '-'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Middle Name</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.middleName || '-'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Last Name</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.lastName || '-'}</p>
+              </div>
+              
+              {/* Account */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">Account</label>
+                {contact.accountName ? (
+                  <Link href={`/accounts/${contact.accountId}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                    {contact.accountName}
+                  </Link>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">-</p>
+                )}
+              </div>
+
+              {/* Contact Type */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Contact Type</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.contactType || '-'}</p>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Title</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.title || '-'}</p>
+              </div>
+
+              {/* Reports To */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">Reports To</label>
+                {contact.reportsToName ? (
+                  <Link href={`/contacts/${contact.reportsToId}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                    {contact.reportsToName}
+                  </Link>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">-</p>
+                )}
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Status</label>
+                <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  contact.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {contact.status || '-'}
+                </span>
+              </div>
+
+              {/* Emails */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Primary Email</label>
+                <a href={`mailto:${contact.primaryEmail}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                  {contact.primaryEmail || '-'}
+                </a>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Secondary Email</label>
+                {contact.secondaryEmail ? (
+                  <a href={`mailto:${contact.secondaryEmail}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                    {contact.secondaryEmail}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">-</p>
+                )}
+              </div>
+
+              {/* Phones */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Primary Phone</label>
+                <a href={`tel:${contact.primaryPhone}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                  {contact.primaryPhone || '-'}
+                </a>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Secondary Phone</label>
+                {contact.secondaryPhone ? (
+                  <a href={`tel:${contact.secondaryPhone}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                    {contact.secondaryPhone}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">-</p>
+                )}
+              </div>
+
+              {/* Fax */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Fax</label>
+                {contact.fax ? (
+                  <a href={`tel:${contact.fax}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
+                    {contact.fax}
+                  </a>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-900">-</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Address Information */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+            <h3 className="font-medium text-gray-900">Address Information</h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Primary Address */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Primary Address</label>
+                <div className="mt-1 text-sm text-gray-900">
+                  {contact.primaryAddressStreet && <div>{contact.primaryAddressStreet}</div>}
+                  {(contact.primaryAddressCity || contact.primaryAddressState || contact.primaryAddressZip) && (
+                    <div>
+                      {contact.primaryAddressCity}{contact.primaryAddressCity && contact.primaryAddressState && ', '}
+                      {contact.primaryAddressState} {contact.primaryAddressZip}
+                    </div>
+                  )}
+                  {!contact.primaryAddressStreet && !contact.primaryAddressCity && !contact.primaryAddressState && <span>-</span>}
+                </div>
+              </div>
+
+              {/* Secondary Address */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Secondary Address</label>
+                <div className="mt-1 text-sm text-gray-900">
+                  {contact.secondaryAddressStreet && <div>{contact.secondaryAddressStreet}</div>}
+                  {(contact.secondaryAddressCity || contact.secondaryAddressState || contact.secondaryAddressZip) && (
+                    <div>
+                      {contact.secondaryAddressCity}{contact.secondaryAddressCity && contact.secondaryAddressState && ', '}
+                      {contact.secondaryAddressState} {contact.secondaryAddressZip}
+                    </div>
+                  )}
+                  {!contact.secondaryAddressStreet && !contact.secondaryAddressCity && !contact.secondaryAddressState && <span>-</span>}
+                </div>
+              </div>
+
+              {/* PO Box */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">PO Box</label>
+                <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{contact.poBox || '-'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Associated Properties */}
+        {contact.properties && contact.properties.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+              <h3 className="font-medium text-gray-900">Associated Properties</h3>
+            </div>
+            <div className="p-6">
+              <div className="text-sm text-gray-900">
+                {Array.isArray(contact.properties) ? (
+                  <ul className="space-y-2">
+                    {contact.properties.map((prop, idx) => (
+                      <li key={idx}>{prop}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>{contact.properties}</p>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Content based on layout */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {pageLayout?.tabs?.map((tab: any, tabIndex: number) => (
-            <div key={tabIndex}>
-              {tab.sections?.map((section: any, sectionIndex: number) => (
-                <div key={sectionIndex} className="border-b border-gray-200 last:border-b-0">
-                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h3 className="font-medium text-gray-900">{section.name}</h3>
-                  </div>
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {section.fields?.map((layoutField: any, fieldIndex: number) => {
-                        // Normalize field name - remove object prefix like "Contact__"
-                        const normalizedFieldName = layoutField.apiName.replace(/^[^_]+__/, '');
-                        
-                        const fieldDef = contactObject?.fields?.find(
-                          f => f.apiName === layoutField.apiName || f.apiName === normalizedFieldName
-                        );
-                        const value = contact[normalizedFieldName] || contact[layoutField.apiName];
-                        
-                        return (
-                          <div key={fieldIndex}>
-                            <dt className="text-sm font-medium text-gray-500">
-                              {fieldDef?.label || layoutField.apiName}
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {formatFieldValue(value, fieldDef?.type) || '-'}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Notes */}
+        {contact.contactNotes && (
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+              <h3 className="font-medium text-gray-900">Notes</h3>
             </div>
-          ))}
-
-          {/* Fallback if no layout sections */}
-          {(!pageLayout?.tabs || pageLayout.tabs.length === 0) && displayFields.length > 0 && (
             <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {displayFields.map((field, index) => (
-                  <div key={index}>
-                    <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {formatFieldValue(contact[field.apiName], field.type) || '-'}
-                    </dd>
-                  </div>
-                ))}
+              <p className="text-sm text-gray-900 whitespace-pre-wrap">{contact.contactNotes}</p>
+            </div>
+          </div>
+        )}
+
+        {/* System Information */}
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+            <h3 className="font-medium text-gray-900">System Information</h3>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Created By</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.createdBy || '-'}</p>
               </div>
-            </div>
-          )}
-
-          {/* No layout configured */}
-          {!pageLayout && (
-            <div className="p-6 text-center text-gray-500">
-              No page layout configured for this contact's record type.
-            </div>
-          )}
-        </div>
-
-        {/* System Info */}
-        <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-medium text-gray-900 mb-4">System Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Created by:</span>
-              <span className="text-gray-900">{contact.createdBy}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Created:</span>
-              <span className="text-gray-900">{contact.createdAt}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Modified by:</span>
-              <span className="text-gray-900">{contact.lastModifiedBy}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Modified:</span>
-              <span className="text-gray-900">{contact.lastModifiedAt}</span>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Created Date</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.createdAt || '-'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Last Modified By</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.lastModifiedBy || '-'}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Last Modified Date</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.lastModifiedAt || '-'}</p>
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">Contact Owner</label>
+                <p className="mt-1 text-sm text-gray-900">{contact.contactOwnerName || '-'}</p>
+              </div>
             </div>
           </div>
         </div>
