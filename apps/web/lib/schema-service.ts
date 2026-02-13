@@ -35,6 +35,7 @@ const CONTACT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields
     label: 'Contact Information',
     columns: 2,
     fields: [
+      'Name',
       'Salutation',
       'First Name',
       'Middle Name',
@@ -2802,6 +2803,15 @@ class LocalStorageSchemaService implements SchemaService {
     // 2. Contact (with custom page layout)
     const contactFields = [
         // Contact Information Section
+        {
+          id: generateId(),
+          apiName: 'Contact__name',
+          label: 'Name',
+          type: 'Text',
+          readOnly: true,
+          maxLength: 255,
+          helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)'
+        },
         {
           id: generateId(),
           apiName: 'Contact__salutation',

@@ -235,6 +235,14 @@ export default function ContactDetailPage() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Full Name - Auto-Summarized */}
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium text-gray-700">Name</label>
+                <p className="mt-1 text-sm text-gray-900 font-semibold">
+                  {contact.salutation && <>{contact.salutation} </>}{contact.firstName} {contact.lastName}
+                </p>
+              </div>
+
               {/* Name Fields */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Salutation</label>
