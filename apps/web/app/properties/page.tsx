@@ -115,6 +115,7 @@ export default function PropertiesPage() {
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showAddColumn, setShowAddColumn] = useState(false);
+  const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
@@ -1020,27 +1021,44 @@ export default function PropertiesPage() {
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
             </div>
-            <div className="px-6 py-4 max-h-96 overflow-y-auto">
-              <div className="space-y-2">
-                {AVAILABLE_COLUMNS
-                  .filter(col => !visibleColumns.includes(col.id))
-                  .map((column) => (
-                    <button
-                      key={column.id}
-                      onClick={() => handleAddColumn(column.id)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
-                    >
-                      <span className="text-sm font-medium text-gray-900">{column.label}</span>
-                    </button>
-                  ))}
-                {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id)).length === 0 && (
-                  <p className="text-gray-500 text-sm py-8 text-center">All available columns are already visible.</p>
-                )}
+            <div className="px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={columnSearchTerm}
+                onChange={(e) => setColumnSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              />
+              <div className="max-h-80 overflow-y-auto">
+                <div className="space-y-2">
+                  {AVAILABLE_COLUMNS
+                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
+                    .map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => {
+                          handleAddColumn(column.id);
+                          setColumnSearchTerm('');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
+                      >
+                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                      </button>
+                    ))}
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                    <p className="text-gray-500 text-sm py-8 text-center">
+                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <div className="border-t border-gray-200 px-6 py-4">
               <button
-                onClick={() => setShowAddColumn(false)}
+                onClick={() => {
+                  setShowAddColumn(false);
+                  setColumnSearchTerm('');
+                }}
                 className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               >
                 Close

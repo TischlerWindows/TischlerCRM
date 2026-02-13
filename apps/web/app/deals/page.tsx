@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue } from '@/lib/utils';
@@ -94,6 +95,7 @@ export default function DealsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { schema } = useSchemaStore();
+  const { user } = useAuth();
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -102,6 +104,7 @@ export default function DealsPage() {
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
   const [showAddColumn, setShowAddColumn] = useState(false);
+  const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
   // Check if Deal object exists with page layouts
@@ -329,12 +332,14 @@ export default function DealsPage() {
     setDraggedColumnIndex(index);
   };
 
-  const handleColumnDragOver = (index: number) => {
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
     if (draggedColumnIndex === null || draggedColumnIndex === index) return;
 
     const newColumns = [...visibleColumns];
     const draggedColumn = newColumns[draggedColumnIndex];
     if (!draggedColumn) return;
+    
     newColumns.splice(draggedColumnIndex, 1);
     newColumns.splice(index, 0, draggedColumn);
 
@@ -400,6 +405,18 @@ export default function DealsPage() {
   };
 
   const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+    // Map schema field names (e.g., Deal__dealName) to simple field names
+    const normalizeFieldName = (fieldName: string): string => {
+      return fieldName.replace('Deal__', '');
+    };
+
+    // Create normalized data object with simple field names
+    const normalizedData: Record<string, any> = {};
+    Object.entries(data).forEach(([key, value]) => {
+      const cleanKey = normalizeFieldName(key);
+      normalizedData[cleanKey] = value;
+    });
+
     // Generate unique deal number
     const existingNumbers = deals
       .map(d => d.dealNumber)
@@ -413,23 +430,23 @@ export default function DealsPage() {
     
     const today = new Date().toISOString().split('T')[0];
     const newDealId = String(Date.now());
+    const currentUserName = user?.name || user?.email || 'Development User';
     
     const newDeal: Deal = {
       id: newDealId,
-      pageLayoutId: layoutId,
       dealNumber,
-      dealName: data.dealName || '',
-      accountName: data.accountName || '',
-      stage: data.stage || 'Proposal',
-      value: data.value || 0,
-      closeDate: data.closeDate || today,
-      assignedTo: data.assignedTo || '',
-      probability: data.probability || 50,
-      createdBy: 'Development User',
+      ...normalizedData,
+      dealName: normalizedData.dealName || '',
+      accountName: normalizedData.accountName || '',
+      stage: normalizedData.stage || 'Proposal',
+      value: normalizedData.value || 0,
+      closeDate: normalizedData.closeDate || today,
+      assignedTo: normalizedData.assignedTo || '',
+      probability: normalizedData.probability || 50,
+      createdBy: currentUserName,
       createdAt: today || '',
-      lastModifiedBy: 'Development User',
-      lastModifiedAt: today || '',
-      ...data
+      lastModifiedBy: currentUserName,
+      lastModifiedAt: today || ''
     };
 
     const updatedDeals = [newDeal, ...deals];
@@ -670,6 +687,10 @@ export default function DealsPage() {
                             <Link href={`/deals/${deal.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                               {deal.dealNumber}
                             </Link>
+                          ) : column.id === 'dealName' ? (
+                            <Link href={`/deals/${deal.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {deal.dealName}
+                            </Link>
                           ) : column.id === 'stage' ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               deal.stage === 'Closed Won' ? 'bg-green-100 text-green-800' :
@@ -868,7 +889,7 @@ export default function DealsPage() {
                       key={column.id}
                       draggable
                       onDragStart={() => handleColumnDragStart(index)}
-                      onDragOver={(e) => { e.preventDefault(); handleColumnDragOver(index); }}
+                      onDragOver={(e) => handleColumnDragOver(e, index)}
                       onDragEnd={handleColumnDragEnd}
                       className={`group flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg cursor-move hover:border-indigo-300 hover:bg-indigo-50 transition-all ${
                         draggedColumnIndex === index ? 'opacity-50' : ''
@@ -909,20 +930,29 @@ export default function DealsPage() {
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
             </div>
-            <div className="px-6 py-4 max-h-96 overflow-y-auto">
-              <div className="space-y-2">
-                {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id)).map((column) => (
-                  <button key={column.id} onClick={() => handleAddColumn(column.id)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
-                    <span className="text-sm font-medium text-gray-900">{column.label}</span>
-                  </button>
-                ))}
-                {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id)).length === 0 && (
-                  <p className="text-gray-500 text-sm py-8 text-center">All available columns are already visible.</p>
-                )}
+            <div className="px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={columnSearchTerm}
+                onChange={(e) => setColumnSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              />
+              <div className="max-h-80 overflow-y-auto">
+                <div className="space-y-2">
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).map((column) => (
+                    <button key={column.id} onClick={() => { handleAddColumn(column.id); setColumnSearchTerm(''); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
+                      <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                    </button>
+                  ))}
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                    <p className="text-gray-500 text-sm py-8 text-center">{columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}</p>
+                  )}
+                </div>
               </div>
             </div>
             <div className="border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setShowAddColumn(false)} className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">Close</button>
+              <button onClick={() => { setShowAddColumn(false); setColumnSearchTerm(''); }} className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">Close</button>
             </div>
           </div>
         </div>

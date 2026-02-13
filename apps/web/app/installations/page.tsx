@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue } from '@/lib/utils';
@@ -71,6 +72,7 @@ export default function InstallationsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { schema } = useSchemaStore();
+  const { user } = useAuth();
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -79,6 +81,7 @@ export default function InstallationsPage() {
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
   const [showAddColumn, setShowAddColumn] = useState(false);
+  const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
   // Check if Installation object exists with page layouts
@@ -309,7 +312,66 @@ export default function InstallationsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
+  const handleColumnDragStart = (index: number) => {
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null || draggedColumnIndex === index) return;
+
+    const newColumns = [...visibleColumns];
+    const draggedColumn = newColumns[draggedColumnIndex];
+    if (!draggedColumn) return;
+    
+    newColumns.splice(draggedColumnIndex, 1);
+    newColumns.splice(index, 0, draggedColumn);
+
+    setVisibleColumns(newColumns);
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+    localStorage.setItem('installationsVisibleColumns', JSON.stringify(visibleColumns));
+  };
+
+  const handleAddColumn = (columnId: string) => {
+    if (!visibleColumns.includes(columnId)) {
+      const newVisibleColumns = [...visibleColumns, columnId];
+      setVisibleColumns(newVisibleColumns);
+      localStorage.setItem('installationsVisibleColumns', JSON.stringify(newVisibleColumns));
+    }
+    setShowAddColumn(false);
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('installationsVisibleColumns', JSON.stringify(newVisibleColumns));
+  };
+
+  const handleResetColumns = () => {
+    const defaultColumns = AVAILABLE_COLUMNS
+      .filter(col => col.defaultVisible)
+      .map(col => col.id);
+    setVisibleColumns(defaultColumns);
+    localStorage.setItem('installationsVisibleColumns', JSON.stringify(defaultColumns));
+  };
+
   const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+    // Map schema field names (e.g., Installation__installationName) to simple field names
+    const normalizeFieldName = (fieldName: string): string => {
+      return fieldName.replace('Installation__', '');
+    };
+
+    // Create normalized data object with simple field names
+    const normalizedData: Record<string, any> = {};
+    Object.entries(data).forEach(([key, value]) => {
+      const cleanKey = normalizeFieldName(key);
+      normalizedData[cleanKey] = value;
+    });
+
     // Generate unique installation number
     const existingNumbers = installations
       .map(i => i.installationNumber)
@@ -323,24 +385,24 @@ export default function InstallationsPage() {
     
     const today = new Date().toISOString().split('T')[0];
     const newInstallationId = String(Date.now());
+    const currentUserName = user?.name || user?.email || 'Development User';
     
     const newInstallation: Installation = {
       id: newInstallationId,
-      pageLayoutId: layoutId,
       installationNumber,
-      installationName: data.installationName || '',
-      accountName: data.accountName || '',
-      projectNumber: data.projectNumber || '',
-      status: data.status || 'Scheduled',
-      startDate: data.startDate || today,
-      completionDate: data.completionDate || today,
-      leadInstaller: data.leadInstaller || '',
-      teamSize: data.teamSize || 2,
-      createdBy: 'Development User',
+      ...normalizedData,
+      installationName: normalizedData.installationName || '',
+      accountName: normalizedData.accountName || '',
+      projectNumber: normalizedData.projectNumber || '',
+      status: normalizedData.status || 'Scheduled',
+      startDate: normalizedData.startDate || today,
+      completionDate: normalizedData.completionDate || today,
+      leadInstaller: normalizedData.leadInstaller || '',
+      teamSize: normalizedData.teamSize || 2,
+      createdBy: currentUserName,
       createdAt: today || '',
-      lastModifiedBy: 'Development User',
-      lastModifiedAt: today || '',
-      ...data
+      lastModifiedBy: currentUserName,
+      lastModifiedAt: today || ''
     };
 
     const updatedInstallations = [newInstallation, ...installations];
@@ -576,6 +638,10 @@ export default function InstallationsPage() {
                           <Link href={`/installations/${installation.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                             {installation.installationNumber}
                           </Link>
+                        ) : column.id === 'installationName' ? (
+                          <Link href={`/installations/${installation.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            {installation.installationName}
+                          </Link>
                         ) : column.id === 'status' ? (
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             installation.status === 'Completed' ? 'bg-green-100 text-green-800' :
@@ -750,48 +816,124 @@ export default function InstallationsPage() {
 
       {/* Column Filter Settings Dialog */}
       {showFilterSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">Configure Columns</h2>
-                <button
-                  onClick={() => setShowFilterSettings(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="mt-2 text-sm text-gray-600">
-                Select which columns to display in the installations list
-              </p>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowFilterSettings(false)}>
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold text-gray-900">Configure Table Columns</h2>
+              <p className="text-sm text-gray-600 mt-1">Customize which columns appear in your table. Drag to reorder, click to remove.</p>
             </div>
             
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="space-y-3">
-                {AVAILABLE_COLUMNS.map((column) => (
-                  <label
-                    key={column.id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isColumnVisible(column.id)}
-                      onChange={() => toggleColumnVisibility(column.id)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">
-                      {column.label}
-                    </span>
-                  </label>
-                ))}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-700 uppercase">Visible Columns ({visibleColumns.length})</h3>
+                <button 
+                  onClick={() => setShowAddColumn(true)} 
+                  className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Add More Columns
+                </button>
               </div>
+              
+              <div className="space-y-2">
+                {visibleColumns.map((columnId, index) => {
+                  const column = AVAILABLE_COLUMNS.find(c => c.id === columnId);
+                  if (!column) return null;
+                  
+                  return (
+                    <div
+                      key={columnId}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(index)}
+                      onDragOver={(e) => handleColumnDragOver(e, index)}
+                      onDragEnd={handleColumnDragEnd}
+                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 cursor-move group"
+                    >
+                      <GripVertical className="w-5 h-5 text-gray-400" />
+                      <span className="flex-1 text-sm font-medium text-gray-900">{column.label}</span>
+                      <button
+                        onClick={() => handleRemoveColumn(columnId)}
+                        className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <button 
+                onClick={handleResetColumns} 
+                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                Reset Columns to Default
+              </button>
             </div>
-
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowFilterSettings(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Column Modal */}
+      {showAddColumn && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
+          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
+            </div>
+            <div className="px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={columnSearchTerm}
+                onChange={(e) => setColumnSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              />
+              <div className="max-h-80 overflow-y-auto">
+                <div className="space-y-2">
+                  {AVAILABLE_COLUMNS
+                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
+                    .map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => {
+                          handleAddColumn(column.id);
+                          setColumnSearchTerm('');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
+                      >
+                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                      </button>
+                    ))}
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                    <p className="text-gray-500 text-sm py-8 text-center">
+                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => {
+                  setShowAddColumn(false);
+                  setColumnSearchTerm('');
+                }}
+                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               >
                 Close
               </button>

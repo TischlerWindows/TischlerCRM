@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  FileText, 
+  Package, 
   Plus, 
   Search, 
   MoreVertical,
@@ -33,15 +33,16 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
-interface Quote {
+interface Product {
   id: string;
-  quoteNumber: string;
-  quoteName: string;
-  accountName: string;
-  dealNumber: string;
-  status: string;
-  totalAmount: number;
-  validUntil: string;
+  productCode: string;
+  productName: string;
+  category: string;
+  unitPrice: number;
+  unitOfMeasure: string;
+  inStock: boolean;
+  stockQuantity: number;
+  supplier: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -51,10 +52,34 @@ interface Quote {
 
 
 
+const informationModules = [
+  { name: 'Properties', href: '/properties' },
+  { name: 'Contacts', href: '/contacts' },
+  { name: 'Accounts', href: '/accounts' },
+  { name: 'Products', href: '/products' },
+];
+
+const pipelineModules = [
+  { name: 'Leads', href: '/leads' },
+  { name: 'Deals', href: '/deals' },
+  { name: 'Projects', href: '/projects' },
+  { name: 'Service', href: '/service' },
+];
+
+const financialModules = [
+  { name: 'Quotes', href: '/quotes' },
+  { name: 'Installations', href: '/installations' },
+];
+
+const analyticsModules = [
+  { name: 'Dashboards', href: '/dashboard' },
+  { name: 'Reports', href: '/reports' },
+];
+
 const defaultTabs = DEFAULT_TAB_ORDER;
 
-export default function QuotesPage() {
-  const [quotes, setQuotes] = useState<Quote[]>([]);
+export default function ProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
@@ -82,41 +107,41 @@ export default function QuotesPage() {
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
-  // Check if Quote object exists with page layouts
-  const quoteObject = schema?.objects.find(obj => obj.apiName === 'Quote');
-  const pageLayouts = quoteObject?.pageLayouts || [];
+  const productObject = schema?.objects.find(obj => obj.apiName === 'Product');
+  const pageLayouts = productObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
   const AVAILABLE_COLUMNS = useMemo(() => {
-    if (!quoteObject?.fields) {
+    if (!productObject?.fields) {
       return [
-        { id: 'quoteNumber', label: 'Quote #', defaultVisible: true },
-        { id: 'quoteName', label: 'Quote Name', defaultVisible: true },
-        { id: 'accountName', label: 'Account', defaultVisible: true },
-        { id: 'dealNumber', label: 'Deal #', defaultVisible: true },
-        { id: 'totalAmount', label: 'Amount', defaultVisible: true },
-        { id: 'status', label: 'Status', defaultVisible: true },
-        { id: 'validUntil', label: 'Valid Until', defaultVisible: true },
+        { id: 'productCode', label: 'Product Code', defaultVisible: true },
+        { id: 'productName', label: 'Product Name', defaultVisible: true },
+        { id: 'category', label: 'Category', defaultVisible: true },
+        { id: 'unitPrice', label: 'Unit Price', defaultVisible: true },
+        { id: 'unitOfMeasure', label: 'Unit of Measure', defaultVisible: true },
+        { id: 'inStock', label: 'In Stock', defaultVisible: true },
+        { id: 'stockQuantity', label: 'Stock Quantity', defaultVisible: false },
+        { id: 'supplier', label: 'Supplier', defaultVisible: true },
         { id: 'createdBy', label: 'Created By', defaultVisible: false },
         { id: 'createdAt', label: 'Created Date', defaultVisible: false },
         { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
         { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false }
       ];
     }
-    return quoteObject.fields.map((field, index) => {
-      const cleanApiName = field.apiName.replace('Quote__', '');
+    return productObject.fields.map((field, index) => {
+      const cleanApiName = field.apiName.replace('Product__', '');
       const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
       const defaultVisible = !isSystemField && index < 10;
       return { id: cleanApiName, label: field.label, defaultVisible };
     });
-  }, [quoteObject]);
+  }, [productObject]);
 
   // Debug logging
   useEffect(() => {
-    console.log('🔍 Quote Object:', quoteObject);
+    console.log('🔍 Product Object:', productObject);
     console.log('📋 Page Layouts:', pageLayouts);
     console.log('✅ Has Page Layout:', hasPageLayout);
-  }, [quoteObject, pageLayouts, hasPageLayout]);
+  }, [productObject, pageLayouts, hasPageLayout]);
 
   useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
@@ -145,92 +170,75 @@ export default function QuotesPage() {
   }, []);
 
   useEffect(() => {
-    // Load quotes from localStorage or use mock data
-    const storedQuotes = localStorage.getItem('quotes');
-    if (storedQuotes) {
-      setQuotes(JSON.parse(storedQuotes));
+    // Load visible columns from localStorage or use defaults
+    const storedColumns = localStorage.getItem('productsVisibleColumns');
+    if (storedColumns) {
+      setVisibleColumns(JSON.parse(storedColumns));
+    } else {
+      const defaultColumns = AVAILABLE_COLUMNS
+        .filter(col => col.defaultVisible)
+        .map(col => col.id);
+      setVisibleColumns(defaultColumns);
+    }
+
+    // Load products from localStorage or use mock data
+    const storedProducts = localStorage.getItem('products');
+    if (storedProducts) {
+      setProducts(JSON.parse(storedProducts));
     } else {
       // Initial mock data
       const mockData = [
         {
           id: '1',
-          quoteNumber: 'QTE-001',
-          quoteName: 'Window Replacement Quote',
-          accountName: 'Smith Residence',
-          dealNumber: 'DEAL-001',
-          status: 'Sent',
-          totalAmount: 25000,
-          validUntil: '2024-12-31',
+          productCode: 'PROD-001',
+          productName: 'Vinyl Double-Hung Window',
+          category: 'Windows',
+          unitPrice: 450.00,
+          unitOfMeasure: 'Each',
+          inStock: true,
+          stockQuantity: 25,
+          supplier: 'Anderson Windows',
           createdBy: 'Development User',
-          createdAt: '2024-11-15',
+          createdAt: '2024-10-15',
+          lastModifiedBy: 'Development User',
+          lastModifiedAt: '2024-11-20'
+        },
+        {
+          id: '2',
+          productCode: 'PROD-002',
+          productName: 'Aluminum Sliding Patio Door',
+          category: 'Doors',
+          unitPrice: 1200.00,
+          unitOfMeasure: 'Each',
+          inStock: true,
+          stockQuantity: 12,
+          supplier: 'Pella Corporation',
+          createdBy: 'Development User',
+          createdAt: '2024-10-20',
           lastModifiedBy: 'Development User',
           lastModifiedAt: '2024-11-15'
         },
         {
-          id: '2',
-          quoteNumber: 'QTE-002',
-          quoteName: 'Door Installation Quote',
-          accountName: 'Garcia Property',
-          dealNumber: 'DEAL-002',
-          status: 'Draft',
-          totalAmount: 8500,
-          validUntil: '2024-12-20',
-          createdBy: 'Development User',
-          createdAt: '2024-11-18',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-25'
-        },
-        {
           id: '3',
-          quoteNumber: 'QTE-003',
-          quoteName: 'Full Home Window Upgrade',
-          accountName: 'Chen Family Home',
-          dealNumber: 'DEAL-003',
-          status: 'Accepted',
-          totalAmount: 42000,
-          validUntil: '2024-12-25',
+          productCode: 'PROD-003',
+          productName: 'Fiberglass Entry Door',
+          category: 'Doors',
+          unitPrice: 850.00,
+          unitOfMeasure: 'Each',
+          inStock: false,
+          stockQuantity: 0,
+          supplier: 'Therma-Tru Doors',
           createdBy: 'Development User',
-          createdAt: '2024-11-10',
+          createdAt: '2024-11-01',
           lastModifiedBy: 'Development User',
           lastModifiedAt: '2024-11-28'
         }
       ];
-      setQuotes(mockData);
-      localStorage.setItem('quotes', JSON.stringify(mockData));
+      setProducts(mockData);
+      localStorage.setItem('products', JSON.stringify(mockData));
     }
     setLoading(false);
   }, []);
-
-  useEffect(() => {
-    const savedColumns = localStorage.getItem('quotesVisibleColumns');
-    if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns));
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
-    }
-  }, []);
-
-  const toggleColumnVisibility = (columnId: string) => {
-    const newVisibleColumns = visibleColumns.includes(columnId)
-      ? visibleColumns.filter(id => id !== columnId)
-      : [...visibleColumns, columnId];
-    setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
-  };
-
-  const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
-
-  const formatColumnValue = (quote: Quote, columnId: string) => {
-    const value = quote[columnId as keyof Quote];
-    if (value === null || value === undefined) return '-';
-    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
-    if (typeof value === 'object') {
-      let fieldType = undefined;
-      return formatFieldValue(value, fieldType);
-    }
-    if (columnId === 'totalAmount') return `$${Number(value).toLocaleString()}`;
-    return String(value);
-  };
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -241,11 +249,11 @@ export default function QuotesPage() {
     }
   };
 
-  const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.quoteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.status.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.supplier.toLowerCase().includes(searchTerm.toLowerCase());
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -253,13 +261,13 @@ export default function QuotesPage() {
     
     switch (sidebarFilter) {
       case 'recent':
-        matchesSidebar = new Date(quote.lastModifiedAt) >= thirtyDaysAgo;
+        matchesSidebar = new Date(product.lastModifiedAt) >= thirtyDaysAgo;
         break;
       case 'created-by-me':
-        matchesSidebar = quote.createdBy === 'Development User';
+        matchesSidebar = product.createdBy === 'Development User';
         break;
       case 'favorites':
-        matchesSidebar = (quote as any).isFavorite === true;
+        matchesSidebar = (product as any).isFavorite === true;
         break;
       case 'all':
       default:
@@ -285,14 +293,22 @@ export default function QuotesPage() {
     if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
     if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
     
-    if (sortColumn.includes('At') || sortColumn === 'validUntil') {
+    if (sortColumn.includes('At')) {
       const aDate = new Date(aValue).getTime();
       const bDate = new Date(bValue).getTime();
       return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
     }
     
-    if (sortColumn === 'totalAmount') {
+    // Handle numeric values like unitPrice and stockQuantity
+    if (sortColumn === 'unitPrice' || sortColumn === 'stockQuantity') {
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
+    }
+    
+    // Handle boolean values like inStock
+    if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
+      return sortDirection === 'asc' 
+        ? (aValue === bValue ? 0 : aValue ? -1 : 1)
+        : (aValue === bValue ? 0 : aValue ? 1 : -1);
     }
     
     const aStr = String(aValue).toLowerCase();
@@ -303,134 +319,112 @@ export default function QuotesPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleColumnDragStart = (index: number) => {
-    setDraggedColumnIndex(index);
-  };
-
-  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedColumnIndex === null || draggedColumnIndex === index) return;
-
-    const newColumns = [...visibleColumns];
-    const draggedColumn = newColumns[draggedColumnIndex];
-    if (!draggedColumn) return;
+  const toggleColumnVisibility = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.includes(columnId)
+      ? visibleColumns.filter(id => id !== columnId)
+      : [...visibleColumns, columnId];
     
-    newColumns.splice(draggedColumnIndex, 1);
-    newColumns.splice(index, 0, draggedColumn);
-
-    setVisibleColumns(newColumns);
-    setDraggedColumnIndex(index);
-  };
-
-  const handleColumnDragEnd = () => {
-    setDraggedColumnIndex(null);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(visibleColumns));
-  };
-
-  const handleAddColumn = (columnId: string) => {
-    if (!visibleColumns.includes(columnId)) {
-      const newVisibleColumns = [...visibleColumns, columnId];
-      setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
-    }
-    setShowAddColumn(false);
-  };
-
-  const handleRemoveColumn = (columnId: string) => {
-    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
+    localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
   };
 
-  const handleResetColumns = () => {
-    const defaultColumns = AVAILABLE_COLUMNS
-      .filter(col => col.defaultVisible)
-      .map(col => col.id);
-    setVisibleColumns(defaultColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(defaultColumns));
+  const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
+
+  const formatColumnValue = (product: Product, columnId: string) => {
+    const value = (product as any)[columnId];
+    
+    if (value === null || value === undefined) {
+      return '-';
+    }
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
+    
+    if (columnId === 'unitPrice' && typeof value === 'number') {
+      return `$${value.toFixed(2)}`;
+    }
+    
+    if (columnId === 'inStock') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    return String(value);
   };
 
   const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Quote__quoteName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Quote__', '');
-    };
-
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
-
-    // Generate unique quote number
-    const existingNumbers = quotes
-      .map(q => q.quoteNumber)
-      .filter(num => num.startsWith('QTE-'))
-      .map(num => parseInt(num.replace('QTE-', ''), 10))
+    // Generate unique product code
+    const existingNumbers = products
+      .map(p => p.productCode)
+      .filter(code => code.startsWith('PROD-'))
+      .map(code => parseInt(code.replace('PROD-', ''), 10))
       .filter(num => !isNaN(num));
     
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const nextNumber = maxNumber + 1;
-    const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
+    const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 30);
-    const validUntilStr = validUntil.toISOString().split('T')[0];
-    const newQuoteId = String(Date.now());
+    const newProductId = String(Date.now());
     const currentUserName = user?.name || user?.email || 'Development User';
     
-    const newQuote: Quote = {
-      id: newQuoteId,
-      quoteNumber,
-      ...normalizedData,
-      quoteName: normalizedData.quoteName || '',
-      accountName: normalizedData.accountName || '',
-      dealNumber: normalizedData.dealNumber || '',
-      status: normalizedData.status || 'Draft',
-      totalAmount: normalizedData.totalAmount || 0,
-      validUntil: normalizedData.validUntil || validUntilStr,
+    const newProduct: Product = {
+      id: newProductId,
+      pageLayoutId: layoutId,
+      productCode,
+      ...data,
+      productName: data.productName || '',
+      category: data.category || '',
+      unitPrice: data.unitPrice || 0,
+      unitOfMeasure: data.unitOfMeasure || 'Each',
+      inStock: data.inStock ?? true,
+      stockQuantity: data.stockQuantity || 0,
+      supplier: data.supplier || '',
       createdBy: currentUserName,
       createdAt: today || '',
       lastModifiedBy: currentUserName,
       lastModifiedAt: today || ''
     };
 
-    const updatedQuotes = [newQuote, ...quotes];
-    setQuotes(updatedQuotes);
-    localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+    const updatedProducts = [newProduct, ...products];
+    setProducts(updatedProducts);
+    localStorage.setItem('products', JSON.stringify(updatedProducts));
     
     // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('quoteLayoutAssociations') || '{}');
+    const layoutAssociations = JSON.parse(localStorage.getItem('productLayoutAssociations') || '{}');
     if (selectedLayoutId) {
-      layoutAssociations[newQuoteId] = selectedLayoutId;
-      localStorage.setItem('quoteLayoutAssociations', JSON.stringify(layoutAssociations));
+      layoutAssociations[newProductId] = selectedLayoutId;
+      localStorage.setItem('productLayoutAssociations', JSON.stringify(layoutAssociations));
     }
     
     // Close the form and reset state
     setShowDynamicForm(false);
     setSelectedLayoutId(null);
     
-    // Redirect to the newly created quote's detail page
-    router.push(`/quotes/${newQuoteId}`);
+    // Redirect to the newly created product's detail page
+    router.push(`/products/${newProductId}`);
     console.log('Dynamic form submitted:', data);
   };
 
-  const handleDeleteQuote = (id: string) => {
-    if (confirm('Are you sure you want to delete this quote?')) {
-      const updatedQuotes = quotes.filter(q => q.id !== id);
-      setQuotes(updatedQuotes);
-      localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+  const handleDeleteProduct = (id: string) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      const updatedProducts = products.filter(p => p.id !== id);
+      setProducts(updatedProducts);
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
     }
   };
 
   const handleToggleFavorite = (id: string) => {
-    const updatedQuotes = quotes.map(q => 
-      q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
+    const updatedProducts = products.map(p => 
+      p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
     );
-    setQuotes(updatedQuotes);
-    localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+    setProducts(updatedProducts);
+    localStorage.setItem('products', JSON.stringify(updatedProducts));
     setOpenDropdown(null);
   };
 
@@ -480,7 +474,7 @@ export default function QuotesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading quotes...</div>
+        <div className="text-gray-600">Loading products...</div>
       </div>
     );
   }
@@ -490,16 +484,19 @@ export default function QuotesPage() {
         {/* Sidebar */}
         <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="space-y-6">
+            {/* Page Header in Sidebar */}
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center"><FileText className="w-6 h-6 text-indigo-600" /></div>
-                <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Package className="w-6 h-6 text-indigo-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Products</h1>
               </div>
-              <p className="text-sm text-gray-600 ml-13">Generate and manage price quotes for deals</p>
+              <p className="text-sm text-gray-600 ml-13">Manage product catalog and inventory</p>
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Quotes</h3>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Products</h3>
               <nav className="space-y-1">
                 <button
                   onClick={() => setSidebarFilter('recent')}
@@ -532,7 +529,7 @@ export default function QuotesPage() {
                   }`}
                 >
                   <List className="w-4 h-4" />
-                  All Quotes
+                  All Products
                 </button>
                 <button
                   onClick={() => setSidebarFilter('favorites')}
@@ -553,9 +550,8 @@ export default function QuotesPage() {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
       <div className="px-6 py-6">
-        {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Quote Records</h3>
+          <h3 className="text-lg font-medium text-gray-900">Product Records</h3>
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilterSettings(true)}
@@ -565,21 +561,21 @@ export default function QuotesPage() {
               Configure Columns
             </button>
             <button
-                onClick={() => {
-                  if (!hasPageLayout) {
-                    setShowNoLayoutsDialog(true);
-                  } else if (pageLayouts.length === 1 && pageLayouts[0]) {
-                    setSelectedLayoutId(pageLayouts[0].id);
-                    setShowDynamicForm(true);
-                  } else {
-                    setShowLayoutSelector(true);
-                  }
-                }}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                New Quote
-              </button>
+              onClick={() => {
+                if (!hasPageLayout) {
+                  setShowNoLayoutsDialog(true);
+                } else if (pageLayouts.length === 1 && pageLayouts[0]) {
+                  setSelectedLayoutId(pageLayouts[0].id);
+                  setShowDynamicForm(true);
+                } else {
+                  setShowLayoutSelector(true);
+                }
+              }}
+              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-5 h-5 mr-2" />
+              New Product
+            </button>
           </div>
         </div>
 
@@ -589,7 +585,7 @@ export default function QuotesPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search quotes by number, name, account, or status..."
+              placeholder="Search products by code, name, category, or supplier..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -597,7 +593,7 @@ export default function QuotesPage() {
           </div>
         </div>
 
-        {/* Quotes List */}
+        {/* Products List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
             <table className="w-full divide-y divide-gray-200">
@@ -624,45 +620,40 @@ export default function QuotesPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredQuotes.map((quote) => (
-                  <tr key={quote.id} className="hover:bg-gray-50">
+                {filteredProducts.map((product) => (
+                  <tr key={product.id} className="hover:bg-gray-50">
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
-                        {column.id === 'quoteNumber' ? (
-                          <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                            {quote.quoteNumber}
+                        {column.id === 'productCode' ? (
+                          <Link href={`/products/${product.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            {product.productCode}
                           </Link>
-                        ) : column.id === 'quoteName' ? (
-                          <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                            {quote.quoteName}
-                          </Link>
-                        ) : column.id === 'status' ? (
+                        ) : column.id === 'inStock' ? (
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            quote.status === 'Accepted' ? 'bg-green-100 text-green-800' :
-                            quote.status === 'Sent' ? 'bg-blue-100 text-blue-800' :
-                            quote.status === 'Rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
+                            product.inStock
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
                           }`}>
-                            {quote.status}
+                            {product.inStock ? 'In Stock' : 'Out of Stock'}
                           </span>
                         ) : (
-                          formatColumnValue(quote, column.id)
+                          formatColumnValue(product, column.id)
                         )}
                       </td>
                     ))}
                     <td className="px-6 py-4 text-sm relative">
                       <button
-                        onClick={() => setOpenDropdown(openDropdown === quote.id ? null : quote.id)}
+                        onClick={() => setOpenDropdown(openDropdown === product.id ? null : product.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
                         <MoreVertical className="w-5 h-5 text-gray-600" />
                       </button>
-                      {openDropdown === quote.id && (
+                      {openDropdown === product.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
                             <button
                               onClick={() => {
-                                handleDeleteQuote(quote.id);
+                                handleDeleteProduct(product.id);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -676,10 +667,10 @@ export default function QuotesPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
-                        onClick={() => handleToggleFavorite(quote.id)}
+                        onClick={() => handleToggleFavorite(product.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
                       >
-                        <Star className={`w-5 h-5 ${quote.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
+                        <Star className={`w-5 h-5 ${product.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                       </button>
                     </td>
                   </tr>
@@ -689,12 +680,12 @@ export default function QuotesPage() {
           </div>
         </div>
 
-        {filteredQuotes.length === 0 && (
+        {filteredProducts.length === 0 && (
           <div className="text-center py-12">
-            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No quotes found</h3>
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
             <p className="text-gray-600">
-              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first quote.'}
+              {searchTerm ? 'Try adjusting your search.' : 'Get started by adding your first product.'}
             </p>
           </div>
         )}
@@ -712,7 +703,7 @@ export default function QuotesPage() {
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-gray-700">
                   <p className="mb-3">
-                    To create new quotes, you need to configure a page layout in the Page Editor first.
+                    To create new products, you need to configure a page layout in the Page Editor first.
                   </p>
                   <p className="font-medium text-gray-900">
                     This allows you to:
@@ -734,7 +725,7 @@ export default function QuotesPage() {
                 Cancel
               </button>
               <Link
-                href="/object-manager/Quote"
+                href="/object-manager/Product"
                 className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
                 onClick={() => setShowNoLayoutsDialog(false)}
               >
@@ -753,7 +744,7 @@ export default function QuotesPage() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Choose which form layout to use for creating a new quote
+                Choose which form layout to use for creating a new product
               </p>
             </div>
             <div className="p-6 space-y-3">
@@ -768,7 +759,7 @@ export default function QuotesPage() {
                   className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
                 >
                   <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-indigo-600" />
+                    <Package className="w-5 h-5 text-indigo-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
@@ -800,134 +791,58 @@ export default function QuotesPage() {
             setShowDynamicForm(open);
             if (!open) setSelectedLayoutId(null);
           }}
-          objectApiName="Quote"
+          objectApiName="Product"
           layoutType="create"
           layoutId={selectedLayoutId}
           onSubmit={handleDynamicFormSubmit}
-          title="New Quote"
+          title="New Product"
         />
       )}
 
       {/* Column Filter Settings Dialog */}
       {showFilterSettings && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowFilterSettings(false)}>
-          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-semibold text-gray-900">Configure Table Columns</h2>
-              <p className="text-sm text-gray-600 mt-1">Customize which columns appear in your table. Drag to reorder, click to remove.</p>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-700 uppercase">Visible Columns ({visibleColumns.length})</h3>
-                <button 
-                  onClick={() => setShowAddColumn(true)} 
-                  className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Configure Columns</h2>
+                <button
+                  onClick={() => setShowFilterSettings(false)}
+                  className="text-gray-400 hover:text-gray-600"
                 >
-                  Add More Columns
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-              
-              <div className="space-y-2">
-                {visibleColumns.map((columnId, index) => {
-                  const column = AVAILABLE_COLUMNS.find(c => c.id === columnId);
-                  if (!column) return null;
-                  
-                  return (
-                    <div
-                      key={columnId}
-                      draggable
-                      onDragStart={() => handleColumnDragStart(index)}
-                      onDragOver={(e) => handleColumnDragOver(e, index)}
-                      onDragEnd={handleColumnDragEnd}
-                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 cursor-move group"
-                    >
-                      <GripVertical className="w-5 h-5 text-gray-400" />
-                      <span className="flex-1 text-sm font-medium text-gray-900">{column.label}</span>
-                      <button
-                        onClick={() => handleRemoveColumn(columnId)}
-                        className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100"
-                        title="Remove"
-                      >
-                        <X className="w-4 h-4 text-gray-500" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              <button 
-                onClick={handleResetColumns} 
-                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-              >
-                Reset Columns to Default
-              </button>
+              <p className="mt-2 text-sm text-gray-600">
+                Select which columns to display in the products list
+              </p>
             </div>
             
-            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Column Modal */}
-      {showAddColumn && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
-          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
-            </div>
-            <div className="px-6 py-4">
-              <input
-                type="text"
-                placeholder="Search fields..."
-                value={columnSearchTerm}
-                onChange={(e) => setColumnSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
-              />
-              <div className="max-h-80 overflow-y-auto">
-                <div className="space-y-2">
-                  {AVAILABLE_COLUMNS
-                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
-                    .map((column) => (
-                      <button
-                        key={column.id}
-                        onClick={() => {
-                          handleAddColumn(column.id);
-                          setColumnSearchTerm('');
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
-                      >
-                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
-                      </button>
-                    ))}
-                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
-                    <p className="text-gray-500 text-sm py-8 text-center">
-                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
-                    </p>
-                  )}
-                </div>
+            <div className="p-6 max-h-96 overflow-y-auto">
+              <div className="space-y-3">
+                {AVAILABLE_COLUMNS.map((column) => (
+                  <label
+                    key={column.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isColumnVisible(column.id)}
+                      onChange={() => toggleColumnVisibility(column.id)}
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">
+                      {column.label}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
-            <div className="border-t border-gray-200 px-6 py-4">
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
-                onClick={() => {
-                  setShowAddColumn(false);
-                  setColumnSearchTerm('');
-                }}
-                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                onClick={() => setShowFilterSettings(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Close
               </button>
@@ -935,7 +850,6 @@ export default function QuotesPage() {
           </div>
         </div>
       )}
-
       </div>
     </div>
   );

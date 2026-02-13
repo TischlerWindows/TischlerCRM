@@ -7,17 +7,17 @@ import {
   Package, 
   Plus, 
   Search, 
-  MoreVertical,
-  Edit,
+  MoreVertical, 
   Trash2,
   AlertCircle,
   Layout,
+  Filter,
   Settings,
   X,
   Clock,
   User,
-  List,
   Star,
+  List,
   ChevronUp,
   ChevronDown,
   HelpCircle,
@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue } from '@/lib/utils';
@@ -34,6 +35,8 @@ import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Product {
   id: string;
+  recordTypeId?: string;
+  pageLayoutId?: string;
   productCode: string;
   productName: string;
   category: string;
@@ -49,8 +52,23 @@ interface Product {
   isFavorite?: boolean;
 }
 
+// Available columns that can be filtered
+const AVAILABLE_COLUMNS = [
+  { id: 'productCode', label: 'Product Code', defaultVisible: true },
+  { id: 'productName', label: 'Product Name', defaultVisible: true },
+  { id: 'category', label: 'Category', defaultVisible: true },
+  { id: 'unitPrice', label: 'Unit Price', defaultVisible: true },
+  { id: 'unitOfMeasure', label: 'Unit Of Measure', defaultVisible: true },
+  { id: 'inStock', label: 'In Stock', defaultVisible: true },
+  { id: 'stockQuantity', label: 'Stock Quantity', defaultVisible: false },
+  { id: 'supplier', label: 'Supplier', defaultVisible: false },
+  { id: 'createdBy', label: 'Created By', defaultVisible: false },
+  { id: 'createdAt', label: 'Created At', defaultVisible: false },
+  { id: 'lastModifiedBy', label: 'Modified By', defaultVisible: false },
+  { id: 'lastModifiedAt', label: 'Modified At', defaultVisible: false }
+];
 
-
+// Default tabs configuration
 const informationModules = [
   { name: 'Properties', href: '/properties' },
   { name: 'Contacts', href: '/contacts' },
@@ -78,6 +96,7 @@ const analyticsModules = [
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function ProductsPage() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,6 +105,9 @@ export default function ProductsPage() {
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [showAddColumn, setShowAddColumn] = useState(false);
+  const [columnSearchTerm, setColumnSearchTerm] = useState('');
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -95,41 +117,40 @@ export default function ProductsPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   
+  // Tab navigation state
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
-  const [showAddColumn, setShowAddColumn] = useState(false);
-  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
+  // Check if Product object exists with page layouts
   const productObject = schema?.objects.find(obj => obj.apiName === 'Product');
   const pageLayouts = productObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
-  const AVAILABLE_COLUMNS = useMemo(() => {
+  // Dynamically generate available columns from schema
+  const AVAILABLE_COLUMNS_DYNAMIC = useMemo(() => {
     if (!productObject?.fields) {
-      return [
-        { id: 'productCode', label: 'Product Code', defaultVisible: true },
-        { id: 'productName', label: 'Product Name', defaultVisible: true },
-        { id: 'category', label: 'Category', defaultVisible: true },
-        { id: 'unitPrice', label: 'Unit Price', defaultVisible: true },
-        { id: 'unitOfMeasure', label: 'Unit of Measure', defaultVisible: true },
-        { id: 'inStock', label: 'In Stock', defaultVisible: true },
-        { id: 'stockQuantity', label: 'Stock Quantity', defaultVisible: false },
-        { id: 'supplier', label: 'Supplier', defaultVisible: true },
-        { id: 'createdBy', label: 'Created By', defaultVisible: false },
-        { id: 'createdAt', label: 'Created Date', defaultVisible: false },
-        { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
-        { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false }
-      ];
+      // Fallback to hard-coded columns if schema not loaded
+      return AVAILABLE_COLUMNS;
     }
+
+    // Generate columns from schema fields
     return productObject.fields.map((field, index) => {
+      // Strip the Product__ prefix for display
       const cleanApiName = field.apiName.replace('Product__', '');
+      
+      // Determine if field should be visible by default (first 5 non-system fields)
       const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
       const defaultVisible = !isSystemField && index < 10;
-      return { id: cleanApiName, label: field.label, defaultVisible };
+      
+      return {
+        id: cleanApiName,
+        label: field.label,
+        defaultVisible
+      };
     });
   }, [productObject]);
 
@@ -140,27 +161,34 @@ export default function ProductsPage() {
     console.log('✅ Has Page Layout:', hasPageLayout);
   }, [productObject, pageLayouts, hasPageLayout]);
 
+  // Load saved tab configuration
   useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
     if (savedTabsStr) {
       try {
-        setTabs(JSON.parse(savedTabsStr));
+        const savedTabs = JSON.parse(savedTabsStr);
+        setTabs(savedTabs);
       } catch (e) {
+        console.error('Error loading tab configuration:', e);
         setTabs(defaultTabs);
       }
     } else {
       setTabs(defaultTabs);
     }
     
+    // Load available objects from object-manager
     const storedObjects = localStorage.getItem('customObjects');
     if (storedObjects) {
       try {
         const objects = JSON.parse(storedObjects);
-        setAvailableObjects(objects.map((obj: any) => ({
+        const objectTabs = objects.map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
-        })));
-      } catch (e) {}
+        }));
+        setAvailableObjects(objectTabs);
+      } catch (e) {
+        console.error('Error loading custom objects:', e);
+      }
     }
     
     setIsLoaded(true);
@@ -187,48 +215,35 @@ export default function ProductsPage() {
       const mockData = [
         {
           id: '1',
+          recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
           productCode: 'PROD-001',
-          productName: 'Vinyl Double-Hung Window',
+          productName: 'Double-Hung Window 32x48',
           category: 'Windows',
           unitPrice: 450.00,
           unitOfMeasure: 'Each',
           inStock: true,
           stockQuantity: 25,
-          supplier: 'Anderson Windows',
+          supplier: 'Premier Glass Co',
           createdBy: 'Development User',
-          createdAt: '2024-10-15',
+          createdAt: '2024-01-20',
           lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-20'
+          lastModifiedAt: '2024-11-10'
         },
         {
           id: '2',
+          recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
           productCode: 'PROD-002',
-          productName: 'Aluminum Sliding Patio Door',
-          category: 'Doors',
-          unitPrice: 1200.00,
-          unitOfMeasure: 'Each',
-          inStock: true,
-          stockQuantity: 12,
-          supplier: 'Pella Corporation',
-          createdBy: 'Development User',
-          createdAt: '2024-10-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-15'
-        },
-        {
-          id: '3',
-          productCode: 'PROD-003',
-          productName: 'Fiberglass Entry Door',
+          productName: 'Energy-Efficient Doors',
           category: 'Doors',
           unitPrice: 850.00,
           unitOfMeasure: 'Each',
-          inStock: false,
-          stockQuantity: 0,
-          supplier: 'Therma-Tru Doors',
+          inStock: true,
+          stockQuantity: 12,
+          supplier: 'DuraDoor Manufacturing',
           createdBy: 'Development User',
-          createdAt: '2024-11-01',
+          createdAt: '2024-02-10',
           lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-28'
+          lastModifiedAt: '2024-11-12'
         }
       ];
       setProducts(mockData);
@@ -239,8 +254,10 @@ export default function ProductsPage() {
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
+      // Toggle direction if clicking the same column
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
+      // Set new column and default to ascending
       setSortColumn(columnId);
       setSortDirection('asc');
     }
@@ -249,19 +266,19 @@ export default function ProductsPage() {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.supplier.toLowerCase().includes(searchTerm.toLowerCase());
-
+      product.category.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const currentUser = 'Development User';
     let matchesSidebar = true;
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     
     switch (sidebarFilter) {
       case 'recent':
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         matchesSidebar = new Date(product.lastModifiedAt) >= thirtyDaysAgo;
         break;
       case 'created-by-me':
-        matchesSidebar = product.createdBy === 'Development User';
+        matchesSidebar = product.createdBy === currentUser;
         break;
       case 'favorites':
         matchesSidebar = (product as any).isFavorite === true;
@@ -269,6 +286,7 @@ export default function ProductsPage() {
       case 'all':
       default:
         matchesSidebar = true;
+        break;
     }
     
     return matchesSearch && matchesSidebar;
@@ -278,6 +296,7 @@ export default function ProductsPage() {
     const aValue = (a as any)[sortColumn];
     const bValue = (b as any)[sortColumn];
     
+    // Handle arrays
     if (Array.isArray(aValue) && Array.isArray(bValue)) {
       const aStr = aValue.join(', ').toLowerCase();
       const bStr = bValue.join(', ').toLowerCase();
@@ -286,28 +305,30 @@ export default function ProductsPage() {
         : bStr.localeCompare(aStr);
     }
     
+    // Handle null/undefined
     if (aValue == null && bValue == null) return 0;
     if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
     if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
     
-    if (sortColumn.includes('At')) {
+    // Handle dates
+    if (sortColumn.includes('At') || sortColumn === 'lastModifiedAt') {
       const aDate = new Date(aValue).getTime();
       const bDate = new Date(bValue).getTime();
       return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
     }
     
-    // Handle numeric values like unitPrice and stockQuantity
-    if (sortColumn === 'unitPrice' || sortColumn === 'stockQuantity') {
+    // Handle booleans and numbers
+    if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
+      return sortDirection === 'asc' 
+        ? (aValue === bValue ? 0 : aValue ? 1 : -1)
+        : (aValue === bValue ? 0 : aValue ? -1 : 1);
+    }
+    
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
       return sortDirection === 'asc' ? aValue - bValue : bValue - aValue;
     }
     
-    // Handle boolean values like inStock
-    if (typeof aValue === 'boolean' && typeof bValue === 'boolean') {
-      return sortDirection === 'asc' 
-        ? (aValue === bValue ? 0 : aValue ? -1 : 1)
-        : (aValue === bValue ? 0 : aValue ? 1 : -1);
-    }
-    
+    // Handle strings and numbers
     const aStr = String(aValue).toLowerCase();
     const bStr = String(bValue).toLowerCase();
     
@@ -325,37 +346,99 @@ export default function ProductsPage() {
     localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
   };
 
+  const handleColumnDragStart = (index: number) => {
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null || draggedColumnIndex === index) return;
+
+    const newColumns = [...visibleColumns];
+    const draggedColumn = newColumns[draggedColumnIndex];
+    if (!draggedColumn) return;
+    
+    newColumns.splice(draggedColumnIndex, 1);
+    newColumns.splice(index, 0, draggedColumn);
+
+    setVisibleColumns(newColumns);
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+    localStorage.setItem('productsVisibleColumns', JSON.stringify(visibleColumns));
+  };
+
+  const handleAddColumn = (columnId: string) => {
+    if (!visibleColumns.includes(columnId)) {
+      const newVisibleColumns = [...visibleColumns, columnId];
+      setVisibleColumns(newVisibleColumns);
+      localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
+    }
+    setShowAddColumn(false);
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
+  };
+
+  const handleResetColumns = () => {
+    const defaultColumns = AVAILABLE_COLUMNS
+      .filter(col => col.defaultVisible)
+      .map(col => col.id);
+    setVisibleColumns(defaultColumns);
+    localStorage.setItem('productsVisibleColumns', JSON.stringify(defaultColumns));
+  };
+
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (product: Product, columnId: string) => {
     const value = (product as any)[columnId];
     
-    if (value === null || value === undefined) {
-      return '-';
-    }
-
     if (Array.isArray(value)) {
-      return value.length > 0 ? value.join(', ') : '-';
+      return value.length > 0 ? value.join(', ') : 'None';
+    }
+    
+    if (value === null || value === undefined) {
+      return 'N/A';
     }
 
+    // Handle booleans
+    if (typeof value === 'boolean') {
+      return value ? 'Yes' : 'No';
+    }
+    
+    // Use formatFieldValue to handle objects
     if (typeof value === 'object') {
+      // Determine field type based on column ID
       let fieldType = undefined;
       return formatFieldValue(value, fieldType);
-    }
-    
-    if (columnId === 'unitPrice' && typeof value === 'number') {
-      return `$${value.toFixed(2)}`;
-    }
-    
-    if (columnId === 'inStock') {
-      return value ? 'Yes' : 'No';
     }
     
     return String(value);
   };
 
   const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Generate unique product code
+    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
+    
+    // Map schema field names (e.g., Product__productName) to simple property names
+    const normalizeFieldName = (fieldName: string): string => {
+      return fieldName.replace('Product__', '');
+    };
+
+    // Create normalized data object with simple field names
+    const normalizedData: Record<string, any> = {};
+    Object.entries(data).forEach(([key, value]) => {
+      const cleanKey = normalizeFieldName(key);
+      normalizedData[cleanKey] = value;
+      console.log(`  ${key} -> ${cleanKey}:`, value);
+    });
+    
+    console.log('📝 Normalized data:', normalizedData);
+    
     const existingNumbers = products
       .map(p => p.productCode)
       .filter(code => code.startsWith('PROD-'))
@@ -368,43 +451,49 @@ export default function ProductsPage() {
     
     const today = new Date().toISOString().split('T')[0];
     const newProductId = String(Date.now());
+    const currentUserName = user?.name || user?.email || 'System';
+    
+    // Get default record type
+    const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
     
     const newProduct: Product = {
       id: newProductId,
-      pageLayoutId: layoutId,
+      recordTypeId: defaultRecordType?.id,
+      pageLayoutId: layoutId, // Store the layout ID used to create this record
       productCode,
-      productName: data.productName || '',
-      category: data.category || '',
-      unitPrice: data.unitPrice || 0,
-      unitOfMeasure: data.unitOfMeasure || 'Each',
-      inStock: data.inStock ?? true,
-      stockQuantity: data.stockQuantity || 0,
-      supplier: data.supplier || '',
-      createdBy: 'Development User',
+      createdBy: currentUserName,
       createdAt: today || '',
-      lastModifiedBy: 'Development User',
+      lastModifiedBy: currentUserName,
       lastModifiedAt: today || '',
-      ...data
+      ...normalizedData, // Include all fields from the form
+      // Override with defaults only if not provided
+      productName: normalizedData.productName || '',
+      category: normalizedData.category || '',
+      unitPrice: normalizedData.unitPrice || 0,
+      unitOfMeasure: normalizedData.unitOfMeasure || '',
+      inStock: normalizedData.inStock ?? false,
+      stockQuantity: normalizedData.stockQuantity || 0,
+      supplier: normalizedData.supplier || '',
     };
+    
+    console.log('💾 New product object:', newProduct);
 
     const updatedProducts = [newProduct, ...products];
     setProducts(updatedProducts);
     localStorage.setItem('products', JSON.stringify(updatedProducts));
     
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('productLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newProductId] = selectedLayoutId;
-      localStorage.setItem('productLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
+    console.log('✅ New product saved:', newProduct);
+    console.log('📍 Redirecting to:', `/products/${newProductId}`);
     
     // Close the form and reset state
     setShowDynamicForm(false);
-    setSelectedLayoutId(null);
     
-    // Redirect to the newly created product's detail page
-    router.push(`/products/${newProductId}`);
-    console.log('Dynamic form submitted:', data);
+    // Redirect to the newly created product's detail page after a small delay to ensure data is persisted
+    setTimeout(() => {
+      console.log('🔄 Pushing route to:', `/products/${newProductId}`);
+      console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('products') || '[]').map((p: any) => p.id));
+      router.push(`/products/${newProductId}`);
+    }, 200);
   };
 
   const handleDeleteProduct = (id: string) => {
@@ -424,6 +513,7 @@ export default function ProductsPage() {
     setOpenDropdown(null);
   };
 
+  // Tab management functions
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
     localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
   };
@@ -440,11 +530,14 @@ export default function ProductsPage() {
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === index) return;
+    
     const newTabs = [...tabs];
     const draggedTab = newTabs[draggedIndex];
     if (!draggedTab) return;
+    
     newTabs.splice(draggedIndex, 1);
     newTabs.splice(index, 0, draggedTab);
+    
     setTabs(newTabs);
     setDraggedIndex(index);
   };
@@ -488,7 +581,7 @@ export default function ProductsPage() {
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900">Products</h1>
               </div>
-              <p className="text-sm text-gray-600 ml-13">Manage product catalog and inventory</p>
+              <p className="text-sm text-gray-600 ml-13">Manage product inventory and information</p>
             </div>
 
             <div>
@@ -546,6 +639,7 @@ export default function ProductsPage() {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
       <div className="px-6 py-6">
+        {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">Product Records</h3>
           <div className="flex gap-3">
@@ -557,21 +651,21 @@ export default function ProductsPage() {
               Configure Columns
             </button>
             <button
-              onClick={() => {
-                if (!hasPageLayout) {
-                  setShowNoLayoutsDialog(true);
-                } else if (pageLayouts.length === 1 && pageLayouts[0]) {
-                  setSelectedLayoutId(pageLayouts[0].id);
-                  setShowDynamicForm(true);
-                } else {
-                  setShowLayoutSelector(true);
-                }
-              }}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              New Product
-            </button>
+                onClick={() => {
+                  if (!hasPageLayout) {
+                    setShowNoLayoutsDialog(true);
+                  } else if (pageLayouts.length === 1 && pageLayouts[0]) {
+                    setSelectedLayoutId(pageLayouts[0].id);
+                    setShowDynamicForm(true);
+                  } else {
+                    setShowLayoutSelector(true);
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                New Product
+              </button>
           </div>
         </div>
 
@@ -581,7 +675,7 @@ export default function ProductsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search products by code, name, category, or supplier..."
+              placeholder="Search products by code, name, or category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -595,22 +689,26 @@ export default function ProductsPage() {
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
-                    <th 
-                      key={column.id} 
-                      className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => handleSort(column.id)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{column.label}</span>
-                        {sortColumn === column.id && (
-                          sortDirection === 'asc' 
-                            ? <ChevronUp className="w-4 h-4" />
-                            : <ChevronDown className="w-4 h-4" />
-                        )}
-                      </div>
-                    </th>
-                  ))}
+                  {visibleColumns.map(columnId => {
+                    const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                    if (!column) return null;
+                    return (
+                      <th 
+                        key={column.id} 
+                        className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort(column.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{column.label}</span>
+                          {sortColumn === column.id && (
+                            sortDirection === 'asc' 
+                              ? <ChevronUp className="w-4 h-4" />
+                              : <ChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
                   <th className="px-6 py-3"></th>
                   <th className="px-6 py-3"></th>
                 </tr>
@@ -618,25 +716,27 @@ export default function ProductsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-gray-50">
-                    {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
-                      <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
-                        {column.id === 'productCode' ? (
-                          <Link href={`/products/${product.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                            {product.productCode}
-                          </Link>
-                        ) : column.id === 'inStock' ? (
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            product.inStock
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {product.inStock ? 'In Stock' : 'Out of Stock'}
-                          </span>
-                        ) : (
-                          formatColumnValue(product, column.id)
-                        )}
-                      </td>
-                    ))}
+                    {visibleColumns.map(columnId => {
+                      const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                      if (!column) return null;
+                      return (
+                        <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
+                          {column.id === 'productCode' ? (
+                            <Link href={`/products/${product.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {product.productCode}
+                            </Link>
+                          ) : column.id === 'productName' ? (
+                            <Link href={`/products/${product.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {product.productName}
+                            </Link>
+                          ) : column.id === 'unitPrice' ? (
+                            `$${(product.unitPrice || 0).toFixed(2)}`
+                          ) : (
+                            formatColumnValue(product, column.id)
+                          )}
+                        </td>
+                      );
+                    })}
                     <td className="px-6 py-4 text-sm relative">
                       <button
                         onClick={() => setOpenDropdown(openDropdown === product.id ? null : product.id)}
@@ -681,7 +781,7 @@ export default function ProductsPage() {
             <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
             <p className="text-gray-600">
-              {searchTerm ? 'Try adjusting your search.' : 'Get started by adding your first product.'}
+              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first product.'}
             </p>
           </div>
         )}
@@ -738,7 +838,7 @@ export default function ProductsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+              <h2 className="text-xl font-bold text-gray-900">Select a Page Layout</h2>
               <p className="text-sm text-gray-600 mt-1">
                 Choose which form layout to use for creating a new product
               </p>
@@ -760,8 +860,8 @@ export default function ProductsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
-                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs?.length || 0} {(layout.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} • {' '}
+                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.sections?.length || 0), 0) || 0} sections
                     </div>
                   </div>
                 </button>
@@ -795,50 +895,126 @@ export default function ProductsPage() {
         />
       )}
 
-      {/* Column Filter Settings Dialog */}
+      {/* Column Configuration Dialog */}
       {showFilterSettings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900">Configure Columns</h2>
-                <button
-                  onClick={() => setShowFilterSettings(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="mt-2 text-sm text-gray-600">
-                Select which columns to display in the products list
-              </p>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowFilterSettings(false)}>
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold text-gray-900">Configure Table Columns</h2>
+              <p className="text-sm text-gray-600 mt-1">Customize which columns appear in your table. Drag to reorder, click to remove.</p>
             </div>
             
-            <div className="p-6 max-h-96 overflow-y-auto">
-              <div className="space-y-3">
-                {AVAILABLE_COLUMNS.map((column) => (
-                  <label
-                    key={column.id}
-                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isColumnVisible(column.id)}
-                      onChange={() => toggleColumnVisibility(column.id)}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">
-                      {column.label}
-                    </span>
-                  </label>
-                ))}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-700 uppercase">Visible Columns ({visibleColumns.length})</h3>
+                <button 
+                  onClick={() => setShowAddColumn(true)} 
+                  className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Add More Columns
+                </button>
               </div>
+              
+              <div className="space-y-2">
+                {visibleColumns.map((columnId, index) => {
+                  const column = AVAILABLE_COLUMNS.find(c => c.id === columnId);
+                  if (!column) return null;
+                  
+                  return (
+                    <div
+                      key={columnId}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(index)}
+                      onDragOver={(e) => handleColumnDragOver(e, index)}
+                      onDragEnd={handleColumnDragEnd}
+                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 cursor-move group"
+                    >
+                      <GripVertical className="w-5 h-5 text-gray-400" />
+                      <span className="flex-1 text-sm font-medium text-gray-900">{column.label}</span>
+                      <button
+                        onClick={() => handleRemoveColumn(columnId)}
+                        className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <button 
+                onClick={handleResetColumns} 
+                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                Reset Columns to Default
+              </button>
             </div>
-
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
               <button
                 onClick={() => setShowFilterSettings(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Column Modal */}
+      {showAddColumn && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
+          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
+            </div>
+            <div className="px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={columnSearchTerm}
+                onChange={(e) => setColumnSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              />
+              <div className="max-h-80 overflow-y-auto">
+                <div className="space-y-2">
+                  {AVAILABLE_COLUMNS
+                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
+                    .map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => {
+                          handleAddColumn(column.id);
+                          setColumnSearchTerm('');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
+                      >
+                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                      </button>
+                    ))}
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                    <p className="text-gray-500 text-sm py-8 text-center">
+                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => {
+                  setShowAddColumn(false);
+                  setColumnSearchTerm('');
+                }}
+                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
               >
                 Close
               </button>
