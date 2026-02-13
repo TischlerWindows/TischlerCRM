@@ -35,37 +35,43 @@ const CONTACT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields
     label: 'Contact Information',
     columns: 2,
     fields: [
-      'Name',
-      'Account Name',
-      'Contact type',
+      'Salutation',
+      'First Name',
+      'Middle Name',
+      'Last Name',
+      'Account',
+      'Contact Type',
+      'Title',
       'Reports To',
-      'Email',
-      'Secondary E-Mail',
-      'Mobile',
-      'Fax',
-      'Phone',
-      'Other Phone'
+      'Status',
+      'Primary Email',
+      'Secondary Email',
+      'Primary Phone',
+      'Secondary Phone',
+      'Fax'
     ]
   },
   {
     label: 'Address Information',
     columns: 2,
     fields: [
-      'Mailing Address',
-      'Other Address',
+      'Primary Address',
+      'Secondary Address',
       'PO Box'
     ]
   },
   {
-    label: 'Additional Information',
-    columns: 1,
-    fields: []
-  },
-  {
-    label: 'Description Information',
+    label: 'Associated Properties',
     columns: 1,
     fields: [
-      'General Notes'
+      'Associated Properties'
+    ]
+  },
+  {
+    label: 'Notes',
+    columns: 1,
+    fields: [
+      'Contact Notes'
     ]
   },
   {
@@ -75,14 +81,6 @@ const CONTACT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields
       'Created By',
       'Last Modified By',
       'Contact Owner'
-    ]
-  },
-  {
-    label: 'Custom Links',
-    columns: 2,
-    fields: [
-      'Google Maps',
-      'Google Search'
     ]
   }
 ];
@@ -2820,6 +2818,14 @@ class LocalStorageSchemaService implements SchemaService {
           type: 'Text',
           required: true,
           maxLength: 100
+        },
+        {
+          id: generateId(),
+          apiName: 'Contact__middleName',
+          label: 'Middle Name',
+          type: 'Text',
+          maxLength: 100,
+          helpText: 'Middle name of the contact'
         },
         {
           id: generateId(),
