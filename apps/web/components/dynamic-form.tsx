@@ -33,7 +33,7 @@ interface DynamicFormProps {
   layoutType: 'create' | 'edit';
   layoutId?: string;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>) => void;
+  onSubmit: (data: Record<string, any>, layoutId?: string) => void;
   onCancel?: () => void;
 }
 
@@ -252,13 +252,14 @@ export default function DynamicForm({
     });
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const hasErrors = Object.keys(newErrors).length > 0;
+    return !hasErrors;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit(formData, layoutId);
     }
   };
 
@@ -531,13 +532,14 @@ export default function DynamicForm({
       case 'ExternalLookup':
         const targetApi = getLookupTargetApi(fieldDef);
         const records = targetApi ? getLookupRecords(targetApi) : [];
-        const selectedRecord = records.find((r) => r.id === value);
+        const recordsArray = Array.isArray(records) ? records : [];
+        const selectedRecord = recordsArray.find((r) => r.id === value);
         const selectedLabel = selectedRecord ? getRecordLabel(selectedRecord) : '';
         const lookupQuery = lookupQueries[fieldDef.apiName] ?? '';
         const isLookupActive = activeLookupField === fieldDef.apiName;
         const displayValue = isLookupActive ? lookupQuery : selectedLabel;
 
-        const filteredRecords = records.filter((record) => {
+        const filteredRecords = recordsArray.filter((record) => {
           const label = getRecordLabel(record).toLowerCase();
           const query = lookupQuery.toLowerCase();
           if (label.includes(query)) return true;

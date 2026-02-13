@@ -1,7 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { PrismaClient } from '@crm/db';
-
-const prisma = new PrismaClient();
+import { prisma } from '@crm/db/client';
 
 export async function dashboardRoutes(app: FastifyInstance) {
   // GET /dashboards - List all dashboards for the current user

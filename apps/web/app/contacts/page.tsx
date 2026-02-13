@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   Users, 
   Plus, 
@@ -31,7 +31,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
 import { applyFilters, describeCondition } from '@/lib/filter-utils';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Contact {
@@ -100,6 +100,7 @@ export default function ContactsPage() {
   const [showBulkActions, setShowBulkActions] = useState(false);
   const { schema } = useSchemaStore();
   const pathname = usePathname();
+  const router = useRouter();
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -270,8 +271,13 @@ export default function ContactsPage() {
   const formatColumnValue = (contact: Contact, columnId: string) => {
     const value = contact[columnId];
     if (value === null || value === undefined) return '-';
-    if (Array.isArray(value)) return value.join(', ') || '-';
-    return value;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      if (columnId === 'address') fieldType = 'Address';
+      return formatFieldValue(value, fieldType);
+    }
+    return String(value);
   };
 
   const handleSort = (columnId: string) => {
@@ -404,9 +410,10 @@ export default function ContactsPage() {
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
     const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
+    const newContactId = String(Date.now());
     
     const newContact: Contact = {
-      id: String(Date.now()),
+      id: newContactId,
       contactNumber,
       lastActivity: today,
       createdBy: 'Development User',
@@ -426,6 +433,20 @@ export default function ContactsPage() {
     const updatedContacts = [newContact, ...contacts];
     setContacts(updatedContacts);
     localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('contactLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newContactId] = selectedLayoutId;
+      localStorage.setItem('contactLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created contact's detail page
+    router.push(`/contacts/${newContactId}`);
   };
 
   const handleDeleteContact = (id: string) => {

@@ -67,6 +67,9 @@ importers:
       '@types/node':
         specifier: 20.11.19
         version: 20.11.19
+      dotenv-cli:
+        specifier: 7.4.2
+        version: 7.4.2
       esbuild:
         specifier: 0.21.5
         version: 0.21.5

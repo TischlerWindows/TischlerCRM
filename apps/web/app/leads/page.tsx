@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Lead {
@@ -388,6 +388,16 @@ export default function LeadsPage() {
       return '-';
     }
     
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+    
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      if (columnId === 'propertyAddress') fieldType = 'Address';
+      return formatFieldValue(value, fieldType);
+    }
+    
     if (typeof value === 'number' && columnId === 'estimatedValue') {
       return `$${value.toLocaleString()}`;
     }
@@ -395,7 +405,7 @@ export default function LeadsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique lead number
     const existingNumbers = leads
       .map(l => l.leadNumber)
@@ -408,9 +418,11 @@ export default function LeadsPage() {
     const leadNumber = `LEAD-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newLeadId = String(Date.now());
     
     const newLead: Lead = {
-      id: String(Date.now()),
+      id: newLeadId,
+      pageLayoutId: layoutId,
       leadNumber,
       contactName: data.contactName || '',
       propertyAddress: data.propertyAddress || '',
@@ -429,6 +441,20 @@ export default function LeadsPage() {
     const updatedLeads = [newLead, ...leads];
     setLeads(updatedLeads);
     localStorage.setItem('leads', JSON.stringify(updatedLeads));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('leadLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newLeadId] = selectedLayoutId;
+      localStorage.setItem('leadLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created lead's detail page
+    router.push(`/leads/${newLeadId}`);
     console.log('Dynamic form submitted:', data);
   };
 

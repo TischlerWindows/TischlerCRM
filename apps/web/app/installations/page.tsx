@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Installation {
@@ -230,8 +230,12 @@ export default function InstallationsPage() {
   const formatColumnValue = (installation: Installation, columnId: string) => {
     const value = installation[columnId as keyof Installation];
     if (value === null || value === undefined) return '-';
-    if (Array.isArray(value)) return value.join(', ') || '-';
-    return value;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
+    return String(value);
   };
 
   const handleSort = (columnId: string) => {
@@ -305,7 +309,7 @@ export default function InstallationsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique installation number
     const existingNumbers = installations
       .map(i => i.installationNumber)
@@ -318,9 +322,11 @@ export default function InstallationsPage() {
     const installationNumber = `INST-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newInstallationId = String(Date.now());
     
     const newInstallation: Installation = {
-      id: String(Date.now()),
+      id: newInstallationId,
+      pageLayoutId: layoutId,
       installationNumber,
       installationName: data.installationName || '',
       accountName: data.accountName || '',
@@ -340,6 +346,20 @@ export default function InstallationsPage() {
     const updatedInstallations = [newInstallation, ...installations];
     setInstallations(updatedInstallations);
     localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('installationLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newInstallationId] = selectedLayoutId;
+      localStorage.setItem('installationLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created installation's detail page
+    router.push(`/installations/${newInstallationId}`);
     console.log('Dynamic form submitted:', data);
   };
 

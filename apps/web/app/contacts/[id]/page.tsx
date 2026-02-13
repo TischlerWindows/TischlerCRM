@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  MapPin, 
+  Users, 
   ArrowLeft, 
   Edit, 
   Trash2,
@@ -17,82 +17,87 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 
-interface Property {
+interface Contact {
   id: string;
   recordTypeId?: string;
   pageLayoutId?: string;
-  propertyNumber: string;
+  contactNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  mobilePhone: string;
+  fax: string;
+  accountName: string;
+  jobTitle: string;
+  department: string;
   address: string;
   city: string;
   state: string;
   zipCode: string;
-  status: 'Active' | 'Inactive';
-  contacts: string[];
-  accounts: string[];
-  lastActivity: string;
+  country: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
   lastModifiedAt: string;
-  sharepointFolder?: string;
   [key: string]: any;
 }
 
-export default function PropertyDetailPage() {
+export default function ContactDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
-  const [property, setProperty] = useState<Property | null>(null);
+  const [contact, setContact] = useState<Contact | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  // Get Property object from schema
-  const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
+  // Get Contact object from schema
+  const contactObject = schema?.objects.find(obj => obj.apiName === 'Contact');
 
-  // Load property from localStorage
+  // Load contact from localStorage
   useEffect(() => {
-    const storedProperties = localStorage.getItem('properties');
-    if (storedProperties && params?.id) {
-      const properties: Property[] = JSON.parse(storedProperties);
-      const foundProperty = properties.find(p => p.id === params.id as string);
-      setProperty(foundProperty || null);
+    const storedContacts = localStorage.getItem('contacts');
+    if (storedContacts && params?.id) {
+      const contacts: Contact[] = JSON.parse(storedContacts);
+      const foundContact = contacts.find(c => c.id === params.id as string);
+      setContact(foundContact || null);
     }
     setLoading(false);
   }, [params?.id]);
 
-  // Get the layout based on property's pageLayoutId or recordTypeId
-  const getLayoutForProperty = () => {
-    if (!property || !propertyObject) return null;
+  // Get the layout based on contact's pageLayoutId or recordTypeId
+  const getLayoutForContact = () => {
+    if (!contact || !contactObject) return null;
 
     // First, try to use the layout stored on the record itself
-    if (property.pageLayoutId) {
-      const pageLayout = propertyObject.pageLayouts?.find(l => l.id === property.pageLayoutId);
+    if (contact.pageLayoutId) {
+      const pageLayout = contactObject.pageLayouts?.find(l => l.id === contact.pageLayoutId);
       if (pageLayout) {
         return pageLayout;
       }
     }
 
     // Fall back to the layout from the record type
-    const recordTypeId = property.recordTypeId;
+    const recordTypeId = contact.recordTypeId;
     const recordType = recordTypeId
-      ? propertyObject.recordTypes?.find(rt => rt.id === recordTypeId)
-      : propertyObject.recordTypes?.[0];
+      ? contactObject.recordTypes?.find(rt => rt.id === recordTypeId)
+      : contactObject.recordTypes?.[0];
 
     // Get page layout from record type
     const pageLayoutId = recordType?.pageLayoutId;
     const pageLayout = pageLayoutId
-      ? propertyObject.pageLayouts?.find(l => l.id === pageLayoutId)
-      : propertyObject.pageLayouts?.[0];
+      ? contactObject.pageLayouts?.find(l => l.id === pageLayoutId)
+      : contactObject.pageLayouts?.[0];
 
     return pageLayout;
   };
 
-  const pageLayout = getLayoutForProperty();
+  const pageLayout = getLayoutForContact();
 
   // Get fields to display from the layout
   const getFieldsFromLayout = () => {
-    if (!pageLayout || !propertyObject) return [];
+    if (!pageLayout || !contactObject) return [];
 
     const layoutFieldApiNames = new Set<string>();
     
@@ -107,7 +112,7 @@ export default function PropertyDetailPage() {
     // Only return fields that are in the layout
     if (layoutFieldApiNames.size === 0) return [];
     
-    return (propertyObject.fields || []).filter(field => 
+    return (contactObject.fields || []).filter(field => 
       layoutFieldApiNames.has(field.apiName)
     );
   };
@@ -123,44 +128,44 @@ export default function PropertyDetailPage() {
   };
 
   const handleEditSubmit = (data: Record<string, any>) => {
-    if (property) {
+    if (contact) {
       const currentUserName = user?.name || user?.email || 'System';
-      const updatedProperty: Property = {
-        ...property,
+      const updatedContact: Contact = {
+        ...contact,
         ...data,
         lastModifiedBy: currentUserName,
         lastModifiedAt: new Date().toISOString().split('T')[0]
       };
       
-      const storedProperties = localStorage.getItem('properties');
-      if (storedProperties) {
-        const properties: Property[] = JSON.parse(storedProperties);
-        const updatedProperties = properties.map(p => 
-          p.id === property.id ? updatedProperty : p
+      const storedContacts = localStorage.getItem('contacts');
+      if (storedContacts) {
+        const contacts: Contact[] = JSON.parse(storedContacts);
+        const updatedContacts = contacts.map(c => 
+          c.id === contact.id ? updatedContact : c
         );
-        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
       }
       
-      setProperty(updatedProperty);
+      setContact(updatedContact);
     }
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      const storedProperties = localStorage.getItem('properties');
-      if (storedProperties && property) {
-        const properties: Property[] = JSON.parse(storedProperties);
-        const updatedProperties = properties.filter(p => p.id !== property.id);
-        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+    if (confirm('Are you sure you want to delete this contact?')) {
+      const storedContacts = localStorage.getItem('contacts');
+      if (storedContacts && contact) {
+        const contacts: Contact[] = JSON.parse(storedContacts);
+        const updatedContacts = contacts.filter(c => c.id !== contact.id);
+        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
       }
-      router.push('/properties');
+      router.push('/contacts');
     }
   };
 
-  const convertPropertyToFormData = (prop: Property): Record<string, any> => {
+  const convertContactToFormData = (cont: Contact): Record<string, any> => {
     const formData: Record<string, any> = {};
-    Object.keys(prop).forEach(key => {
-      formData[key] = prop[key];
+    Object.keys(cont).forEach(key => {
+      formData[key] = cont[key];
     });
     return formData;
   };
@@ -168,24 +173,24 @@ export default function PropertyDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading property...</div>
+        <div className="text-gray-600">Loading contact...</div>
       </div>
     );
   }
 
-  if (!property) {
+  if (!contact) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Property Not Found</h2>
-          <p className="text-gray-600 mb-6">The property you're looking for doesn't exist.</p>
+          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Contact Not Found</h2>
+          <p className="text-gray-600 mb-6">The contact you're looking for doesn't exist.</p>
           <Link
-            href="/properties"
+            href="/contacts"
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Properties
+            Back to Contacts
           </Link>
         </div>
       </div>
@@ -198,37 +203,24 @@ export default function PropertyDetailPage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            href="/properties"
+            href="/contacts"
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Properties
+            Back to Contacts
           </Link>
           
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <MapPin className="w-6 h-6 text-indigo-600" />
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{property.propertyNumber}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900">{contact.contactNumber}</h1>
                   <p className="text-gray-600">
-                    {typeof property.address === 'object' ? (
-                      <>
-                        {property.address?.street && <>{property.address.street}</>}
-                        {property.address?.city && <>, {property.address.city}</>}
-                        {property.address?.state && <>, {property.address.state}</>}
-                        {property.address?.postalCode && <> {property.address.postalCode}</>}
-                      </>
-                    ) : (
-                      <>
-                        {property.address}
-                        {property.city && `, ${property.city}`}
-                        {property.state && `, ${property.state}`}
-                        {property.zipCode && ` ${property.zipCode}`}
-                      </>
-                    )}
+                    {contact.firstName} {contact.lastName}
+                    {contact.email && <> ({contact.email})</>}
                   </p>
                 </div>
               </div>
@@ -274,13 +266,13 @@ export default function PropertyDetailPage() {
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {section.fields?.map((layoutField: any, fieldIndex: number) => {
-                        // Normalize field name - remove object prefix like "Property__"
+                        // Normalize field name - remove object prefix like "Contact__"
                         const normalizedFieldName = layoutField.apiName.replace(/^[^_]+__/, '');
                         
-                        const fieldDef = propertyObject?.fields?.find(
+                        const fieldDef = contactObject?.fields?.find(
                           f => f.apiName === layoutField.apiName || f.apiName === normalizedFieldName
                         );
-                        const value = property[normalizedFieldName] || property[layoutField.apiName];
+                        const value = contact[normalizedFieldName] || contact[layoutField.apiName];
                         
                         return (
                           <div key={fieldIndex}>
@@ -308,7 +300,7 @@ export default function PropertyDetailPage() {
                   <div key={index}>
                     <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
                     <dd className="mt-1 text-sm text-gray-900">
-                      {formatFieldValue(property[field.apiName], field.type) || '-'}
+                      {formatFieldValue(contact[field.apiName], field.type) || '-'}
                     </dd>
                   </div>
                 ))}
@@ -319,7 +311,7 @@ export default function PropertyDetailPage() {
           {/* No layout configured */}
           {!pageLayout && (
             <div className="p-6 text-center text-gray-500">
-              No page layout configured for this property's record type.
+              No page layout configured for this contact's record type.
             </div>
           )}
         </div>
@@ -331,22 +323,22 @@ export default function PropertyDetailPage() {
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-gray-400" />
               <span className="text-gray-500">Created by:</span>
-              <span className="text-gray-900">{property.createdBy}</span>
+              <span className="text-gray-900">{contact.createdBy}</span>
             </div>
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-gray-400" />
               <span className="text-gray-500">Created:</span>
-              <span className="text-gray-900">{property.createdAt}</span>
+              <span className="text-gray-900">{contact.createdAt}</span>
             </div>
             <div className="flex items-center gap-2">
               <User className="w-4 h-4 text-gray-400" />
               <span className="text-gray-500">Modified by:</span>
-              <span className="text-gray-900">{property.lastModifiedBy}</span>
+              <span className="text-gray-900">{contact.lastModifiedBy}</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-gray-400" />
               <span className="text-gray-500">Modified:</span>
-              <span className="text-gray-900">{property.lastModifiedAt}</span>
+              <span className="text-gray-900">{contact.lastModifiedAt}</span>
             </div>
           </div>
         </div>
@@ -357,12 +349,12 @@ export default function PropertyDetailPage() {
         <DynamicFormDialog
           open={showEditForm}
           onOpenChange={setShowEditForm}
-          objectApiName="Property"
+          objectApiName="Contact"
           layoutType="edit"
           layoutId={pageLayout.id}
-          recordData={convertPropertyToFormData(property)}
+          recordData={convertContactToFormData(contact)}
           onSubmit={handleEditSubmit}
-          title={`Edit ${property.propertyNumber}`}
+          title={`Edit ${contact.contactNumber}`}
         />
       )}
     </div>

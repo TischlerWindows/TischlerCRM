@@ -736,15 +736,30 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               <div className="text-xs text-gray-500">{fieldDef.type}</div>
             </div>
           </div>
-          <button
-            className="opacity-0 group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteField(field.id);
-            }}
-          >
-            <Trash2 className="h-3 w-3 text-red-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            {fieldDef.visibleIf && fieldDef.visibleIf.length > 0 && (
+              <div 
+                className="p-1 bg-orange-500 rounded flex-shrink-0"
+                title={`Visibility filter: ${fieldDef.visibleIf.map((f: any) => `${f.fieldApiName} ${f.operator} ${f.value}`).join(', ')}`}
+              >
+                <Eye 
+                  className="w-3 h-3" 
+                  fill="white"
+                  stroke="black"
+                  strokeWidth="0.5px"
+                />
+              </div>
+            )}
+            <button
+              className="opacity-0 group-hover:opacity-100"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteField(field.id);
+              }}
+            >
+              <Trash2 className="h-3 w-3 text-red-500" />
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Project {
@@ -281,9 +281,13 @@ export default function ProjectsPage() {
   const formatColumnValue = (project: Project, columnId: string) => {
     const value = project[columnId as keyof Project];
     if (value === null || value === undefined) return '-';
-    if (columnId === 'budget') return `$${value.toLocaleString()}`;
-    if (Array.isArray(value)) return value.join(', ') || '-';
-    return value;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
+    if (columnId === 'budget') return `$${Number(value).toLocaleString()}`;
+    return String(value);
   };
 
   const handleSort = (columnId: string) => {
@@ -356,7 +360,7 @@ export default function ProjectsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique project number
     const existingNumbers = projects
       .map(p => p.projectNumber)
@@ -369,9 +373,11 @@ export default function ProjectsPage() {
     const projectNumber = `PRJ-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newProjectId = String(Date.now());
     
     const newProject: Project = {
-      id: String(Date.now()),
+      id: newProjectId,
+      pageLayoutId: layoutId,
       projectNumber,
       projectName: data.projectName || '',
       status: data.status || 'Planning',
@@ -389,6 +395,20 @@ export default function ProjectsPage() {
     const updatedProjects = [newProject, ...projects];
     setProjects(updatedProjects);
     localStorage.setItem('projects', JSON.stringify(updatedProjects));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('projectLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newProjectId] = selectedLayoutId;
+      localStorage.setItem('projectLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created project's detail page
+    router.push(`/projects/${newProjectId}`);
     console.log('Dynamic form submitted:', data);
   };
 

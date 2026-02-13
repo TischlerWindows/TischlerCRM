@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Deal {
@@ -378,6 +378,15 @@ export default function DealsPage() {
     if (value === null || value === undefined) {
       return '-';
     }
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
     
     if (typeof value === 'number' && columnId === 'value') {
       return `$${value.toLocaleString()}`;
@@ -390,7 +399,7 @@ export default function DealsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique deal number
     const existingNumbers = deals
       .map(d => d.dealNumber)
@@ -403,9 +412,11 @@ export default function DealsPage() {
     const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newDealId = String(Date.now());
     
     const newDeal: Deal = {
-      id: String(Date.now()),
+      id: newDealId,
+      pageLayoutId: layoutId,
       dealNumber,
       dealName: data.dealName || '',
       accountName: data.accountName || '',
@@ -424,6 +435,20 @@ export default function DealsPage() {
     const updatedDeals = [newDeal, ...deals];
     setDeals(updatedDeals);
     localStorage.setItem('deals', JSON.stringify(updatedDeals));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('dealLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newDealId] = selectedLayoutId;
+      localStorage.setItem('dealLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created deal's detail page
+    router.push(`/deals/${newDealId}`);
     console.log('Dynamic form submitted:', data);
   };
 

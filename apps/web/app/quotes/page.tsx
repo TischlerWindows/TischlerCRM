@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Quote {
@@ -220,9 +220,13 @@ export default function QuotesPage() {
   const formatColumnValue = (quote: Quote, columnId: string) => {
     const value = quote[columnId as keyof Quote];
     if (value === null || value === undefined) return '-';
-    if (columnId === 'totalAmount') return `$${value.toLocaleString()}`;
-    if (Array.isArray(value)) return value.join(', ') || '-';
-    return value;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
+    if (columnId === 'totalAmount') return `$${Number(value).toLocaleString()}`;
+    return String(value);
   };
 
   const handleSort = (columnId: string) => {
@@ -296,7 +300,7 @@ export default function QuotesPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique quote number
     const existingNumbers = quotes
       .map(q => q.quoteNumber)
@@ -312,9 +316,11 @@ export default function QuotesPage() {
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 30);
     const validUntilStr = validUntil.toISOString().split('T')[0];
+    const newQuoteId = String(Date.now());
     
     const newQuote: Quote = {
-      id: String(Date.now()),
+      id: newQuoteId,
+      pageLayoutId: layoutId,
       quoteNumber,
       quoteName: data.quoteName || '',
       accountName: data.accountName || '',
@@ -332,6 +338,20 @@ export default function QuotesPage() {
     const updatedQuotes = [newQuote, ...quotes];
     setQuotes(updatedQuotes);
     localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('quoteLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newQuoteId] = selectedLayoutId;
+      localStorage.setItem('quoteLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created quote's detail page
+    router.push(`/quotes/${newQuoteId}`);
     console.log('Dynamic form submitted:', data);
   };
 

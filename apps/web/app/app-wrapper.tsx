@@ -22,7 +22,25 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
-  const allowPageScroll = pathname === '/';
+  const allowPageScroll = pathname === '/' || 
+    pathname?.includes('/[id]') || 
+    pathname?.includes('/new') ||
+    pathname?.startsWith('/contacts') ||
+    pathname?.startsWith('/leads') ||
+    pathname?.startsWith('/opportunities') ||
+    pathname?.startsWith('/properties') ||
+    pathname?.startsWith('/accounts') ||
+    pathname?.startsWith('/deals') ||
+    pathname?.startsWith('/projects') ||
+    pathname?.startsWith('/installations') ||
+    pathname?.startsWith('/products') ||
+    pathname?.startsWith('/quotes') ||
+    pathname?.startsWith('/reports') ||
+    pathname?.startsWith('/settings') ||
+    pathname?.startsWith('/service') ||
+    pathname?.startsWith('/summary') ||
+    pathname?.startsWith('/dashboard') ||
+    pathname?.includes('demo');
 
   // Check if we should show the headbar (exclude only object-manager pages and auth pages)
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');

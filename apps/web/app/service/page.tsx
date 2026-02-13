@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Service {
@@ -327,11 +327,20 @@ export default function ServicePage() {
     if (value === null || value === undefined) {
       return '-';
     }
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
     
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique service number
     const existingNumbers = services
       .map(s => s.serviceNumber)
@@ -344,9 +353,11 @@ export default function ServicePage() {
     const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newServiceId = String(Date.now());
     
     const newService: Service = {
-      id: String(Date.now()),
+      id: newServiceId,
+      pageLayoutId: layoutId,
       serviceNumber,
       serviceName: data.serviceName || '',
       accountName: data.accountName || '',
@@ -366,6 +377,20 @@ export default function ServicePage() {
     const updatedServices = [newService, ...services];
     setServices(updatedServices);
     localStorage.setItem('services', JSON.stringify(updatedServices));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('serviceLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newServiceId] = selectedLayoutId;
+      localStorage.setItem('serviceLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created service's detail page
+    router.push(`/service/${newServiceId}`);
     console.log('Dynamic form submitted:', data);
   };
 

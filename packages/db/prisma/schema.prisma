@@ -179,6 +179,7 @@ model PageLayout {
   updatedAt       DateTime @updatedAt
 
   tabs            LayoutTab[]
+  records         Record[]
 
   @@index([objectId])
   @@index([layoutType])
@@ -235,6 +236,10 @@ model Record {
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   
+  // Page layout used to create/edit this record
+  pageLayout      PageLayout? @relation(fields: [pageLayoutId], references: [id], onDelete: SetNull)
+  pageLayoutId    String?
+  
   // Store all field values as JSON
   data            Json     @default("{}")
   
@@ -247,6 +252,7 @@ model Record {
   updatedAt       DateTime @updatedAt
 
   @@index([objectId])
+  @@index([pageLayoutId])
   @@index([createdAt])
   @@index([updatedAt])
 }

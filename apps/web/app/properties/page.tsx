@@ -32,13 +32,16 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Property {
   id: string;
+  recordTypeId?: string;
+  pageLayoutId?: string;
   propertyNumber: string;
   address: string;
   city: string;
@@ -102,6 +105,7 @@ const analyticsModules = [
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function PropertiesPage() {
+  const { user } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -178,13 +182,7 @@ export default function PropertiesPage() {
     console.log('🔍 Property Object:', propertyObject);
     console.log('📋 Page Layouts:', pageLayouts);
     console.log('✅ Has Page Layout:', hasPageLayout);
-    console.log('📊 Available Columns:', AVAILABLE_COLUMNS.map(c => ({ id: c.id, label: c.label })));
-    console.log('👁️ Visible Columns:', visibleColumns);
-    console.log('➕ Columns available to add:', AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id)).map(c => ({ id: c.id, label: c.label })));
-    if (propertyObject?.fields) {
-      console.log('🏗️ All Property fields from schema:', propertyObject.fields.map(f => ({ apiName: f.apiName, label: f.label, type: f.type })));
-    }
-  }, [propertyObject, pageLayouts, hasPageLayout, AVAILABLE_COLUMNS, visibleColumns]);
+  }, [propertyObject, pageLayouts, hasPageLayout]);
 
   // Load saved tab configuration
   useEffect(() => {
@@ -240,6 +238,7 @@ export default function PropertiesPage() {
       const mockData = [
         {
           id: '1',
+          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
           propertyNumber: 'P-001',
           address: '123 Main Street',
           city: 'Toronto',
@@ -257,6 +256,7 @@ export default function PropertiesPage() {
         },
         {
           id: '2',
+          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
           propertyNumber: 'P-002',
           address: '456 Oak Avenue',
           city: 'Mississauga',
@@ -274,6 +274,7 @@ export default function PropertiesPage() {
         },
         {
           id: '3',
+          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
           propertyNumber: 'P-003',
           address: '789 Pine Road',
           city: 'Brampton',
@@ -308,8 +309,12 @@ export default function PropertiesPage() {
   };
 
   const filteredProperties = properties.filter(property => {
+    const addressString = typeof property.address === 'object' 
+      ? formatFieldValue(property.address, 'Address')
+      : property.address;
+    
     const matchesSearch = property.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      addressString.toLowerCase().includes(searchTerm.toLowerCase()) ||
       property.city.toLowerCase().includes(searchTerm.toLowerCase());
     
     const currentUser = 'Development User';
@@ -439,13 +444,21 @@ export default function PropertiesPage() {
       return 'N/A';
     }
     
+    // Use formatFieldValue to handle objects like Address and Geolocation
+    if (typeof value === 'object') {
+      // Determine field type based on column ID
+      let fieldType = undefined;
+      if (columnId === 'address') fieldType = 'Address';
+      return formatFieldValue(value, fieldType);
+    }
+    
     return String(value);
   };
 
 
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
-    console.log('📋 Raw form data received:', data);
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
     
     // Map schema field names (e.g., Property__city) to simple property names
     const normalizeFieldName = (fieldName: string): string => {
@@ -457,14 +470,11 @@ export default function PropertiesPage() {
     Object.entries(data).forEach(([key, value]) => {
       const cleanKey = normalizeFieldName(key);
       normalizedData[cleanKey] = value;
-      if (value) {
-        console.log(`  ${key} -> ${cleanKey}: ${value}`);
-      }
+      console.log(`  ${key} -> ${cleanKey}:`, value);
     });
-
-    console.log('📊 Normalized data:', normalizedData);
-
-    // Generate unique property number by finding the highest existing number
+    
+    console.log('📝 Normalized data:', normalizedData);
+    console.log('📍 Address field value:', normalizedData.address, 'Type:', typeof normalizedData.address);
     const existingNumbers = properties
       .map(p => p.propertyNumber)
       .filter(num => num.startsWith('P-'))
@@ -476,31 +486,52 @@ export default function PropertiesPage() {
     const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newPropertyId = String(Date.now());
+    const currentUserName = user?.name || user?.email || 'System';
+    
+    // Get default record type
+    const defaultRecordType = schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0];
     
     const newProperty: Property = {
-      id: String(Date.now()),
+      id: newPropertyId,
+      recordTypeId: defaultRecordType?.id,
+      pageLayoutId: layoutId, // Store the layout ID used to create this record
       propertyNumber,
-      address: normalizedData.address || '',
-      city: normalizedData.city || '',
-      state: normalizedData.state || '',
-      zipCode: normalizedData.zipCode || '',
       status: normalizedData.status || 'Active',
       contacts: normalizedData.contacts || [],
       accounts: normalizedData.accounts || [],
       lastActivity: today || '',
-      createdBy: 'Development User',
+      createdBy: currentUserName,
       createdAt: today || '',
-      lastModifiedBy: 'Development User',
+      lastModifiedBy: currentUserName,
       lastModifiedAt: today || '',
       sharepointFolder: propertyNumber,
-      ...normalizedData // Include any other fields from the form
+      ...normalizedData, // Include all fields from the form (preserves Address objects)
+      // Override with defaults only if not provided
+      address: normalizedData.address !== undefined ? normalizedData.address : '',
+      city: normalizedData.city || '',
+      state: normalizedData.state || '',
+      zipCode: normalizedData.zipCode || '',
     };
-
-    console.log('✅ New property object:', newProperty);
+    
+    console.log('💾 New property object:', newProperty);
 
     const updatedProperties = [newProperty, ...properties];
     setProperties(updatedProperties);
     localStorage.setItem('properties', JSON.stringify(updatedProperties));
+    
+    console.log('✅ New property saved:', newProperty);
+    console.log('📍 Redirecting to:', `/properties/${newPropertyId}`);
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    
+    // Redirect to the newly created property's detail page after a small delay to ensure data is persisted
+    setTimeout(() => {
+      console.log('🔄 Pushing route to:', `/properties/${newPropertyId}`);
+      console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('properties') || '[]').map((p: any) => p.id));
+      router.push(`/properties/${newPropertyId}`);
+    }, 200);
   };
 
   const handleDeleteProperty = (id: string) => {
@@ -661,7 +692,7 @@ export default function PropertiesPage() {
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
-                  } else if (pageLayouts.length === 1 && pageLayouts[0]) {
+                  } else if (pageLayouts.length === 1) {
                     setSelectedLayoutId(pageLayouts[0].id);
                     setShowDynamicForm(true);
                   } else {
@@ -731,6 +762,10 @@ export default function PropertiesPage() {
                           {column.id === 'propertyNumber' ? (
                             <Link href={`/properties/${property.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                               {property.propertyNumber}
+                            </Link>
+                          ) : column.id === 'address' ? (
+                            <Link href={`/properties/${property.id}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
+                              {formatColumnValue(property, column.id)}
                             </Link>
                           ) : column.id === 'status' ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -847,7 +882,7 @@ export default function PropertiesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+              <h2 className="text-xl font-bold text-gray-900">Select a Page Layout</h2>
               <p className="text-sm text-gray-600 mt-1">
                 Choose which form layout to use for creating a new property
               </p>
@@ -869,8 +904,8 @@ export default function PropertiesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
-                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs?.length || 0} {(layout.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} • {' '}
+                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.sections?.length || 0), 0) || 0} sections
                     </div>
                   </div>
                 </button>

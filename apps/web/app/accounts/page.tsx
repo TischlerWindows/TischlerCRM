@@ -7,7 +7,7 @@ import { Building2, Search, Plus, Settings, X, Clock, User, List, Star, MoreVert
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { useSchemaStore } from '@/lib/schema-store';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
@@ -289,8 +289,13 @@ export default function AccountsPage() {
   const formatColumnValue = (account: Account, columnId: string) => {
     const value = account[columnId as keyof Account];
     if (value === null || value === undefined || value === '') return '-';
-    if (Array.isArray(value)) return value.join(', ') || '-';
-    return value;
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
+      return formatFieldValue(value, fieldType);
+    }
+    return String(value);
   };
 
   const handleSort = (columnId: string) => {
@@ -420,12 +425,14 @@ export default function AccountsPage() {
     setShowForm(false);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     const today = new Date().toISOString().split('T')[0];
     const nextNumber = String(accounts.length + 1).padStart(5, '0');
+    const newAccountId = Date.now().toString();
     
     const newAccount: Account = {
-      id: Date.now().toString(),
+      id: newAccountId,
+      pageLayoutId: layoutId,
       accountNumber: nextNumber,
       accountName: data.accountName || '',
       accountType: data.accountType || '',
@@ -446,8 +453,19 @@ export default function AccountsPage() {
     };
     
     setAccounts([...accounts, newAccount]);
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('accountLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newAccountId] = selectedLayoutId;
+      localStorage.setItem('accountLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
     setShowDynamicForm(false);
     setSelectedLayoutId(null);
+    
+    // Redirect to the newly created account's detail page
+    router.push(`/accounts/${newAccountId}`);
   };
 
   const handleEdit = (account: Account) => {
@@ -1139,7 +1157,7 @@ export default function AccountsPage() {
               </div>
               <div className="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
                 {accountObject.pageLayouts
-                  .filter((layout) => layout.layoutType === 'create')
+                  .filter((layout) => layout.layoutType === 'edit' || layout.layoutType === 'create')
                   .map((layout) => (
                     <button
                       key={layout.id}

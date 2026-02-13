@@ -1,3 +1,13 @@
+import path from 'path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Load env FIRST before any other imports
+// Load from the api app directory
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
 import { buildApp } from './app';
 
 const port = Number(process.env.PORT || 4000);

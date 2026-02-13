@@ -29,7 +29,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, formatFieldValue } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Product {
@@ -333,6 +333,15 @@ export default function ProductsPage() {
     if (value === null || value === undefined) {
       return '-';
     }
+
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : '-';
+    }
+
+    if (typeof value === 'object') {
+      let fieldType = undefined;
+      return formatFieldValue(value, fieldType);
+    }
     
     if (columnId === 'unitPrice' && typeof value === 'number') {
       return `$${value.toFixed(2)}`;
@@ -345,7 +354,7 @@ export default function ProductsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
     // Generate unique product code
     const existingNumbers = products
       .map(p => p.productCode)
@@ -358,9 +367,11 @@ export default function ProductsPage() {
     const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const newProductId = String(Date.now());
     
     const newProduct: Product = {
-      id: String(Date.now()),
+      id: newProductId,
+      pageLayoutId: layoutId,
       productCode,
       productName: data.productName || '',
       category: data.category || '',
@@ -379,6 +390,20 @@ export default function ProductsPage() {
     const updatedProducts = [newProduct, ...products];
     setProducts(updatedProducts);
     localStorage.setItem('products', JSON.stringify(updatedProducts));
+    
+    // Save the layout association for this record
+    const layoutAssociations = JSON.parse(localStorage.getItem('productLayoutAssociations') || '{}');
+    if (selectedLayoutId) {
+      layoutAssociations[newProductId] = selectedLayoutId;
+      localStorage.setItem('productLayoutAssociations', JSON.stringify(layoutAssociations));
+    }
+    
+    // Close the form and reset state
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    
+    // Redirect to the newly created product's detail page
+    router.push(`/products/${newProductId}`);
     console.log('Dynamic form submitted:', data);
   };
 
