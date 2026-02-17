@@ -242,6 +242,38 @@ export default function ReportViewerPage() {
   const formatValue = (field: string, value: any) => {
     if (value === null || value === undefined) return 'N/A';
     
+    // Handle composite objects (Address, Name, etc.)
+    if (typeof value === 'object' && value !== null) {
+      // Address object: {street, city, state, postalCode, country}
+      if ('street' in value || 'city' in value || 'postalCode' in value) {
+        const parts = [
+          value.street,
+          value.city,
+          value.state,
+          value.postalCode,
+          value.country
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(', ') : 'N/A';
+      }
+      
+      // Name object: {salutation, firstName, lastName} or Contact prefixed keys
+      if ('firstName' in value || 'lastName' in value || 'Contact__name_firstName' in value) {
+        const parts = [
+          value.salutation || value.Contact__name_salutation,
+          value.firstName || value.Contact__name_firstName,
+          value.lastName || value.Contact__name_lastName
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(' ') : 'N/A';
+      }
+      
+      // Generic object - try to stringify
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '[Object]';
+      }
+    }
+    
     // Format numbers with commas
     if (field.includes('value') || field.includes('Amount') || field.includes('price') || field.includes('budget')) {
       if (typeof value === 'number') {

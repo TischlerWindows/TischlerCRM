@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { useAuth } from '@/lib/auth-context';
+import { useSchemaStore } from '@/lib/schema-store';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -16,6 +17,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -46,6 +48,13 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   useEffect(() => {
+    // Load schema if not already loaded
+    if (!schema) {
+      loadSchema();
+    }
+  }, [schema, loadSchema]);
+
+  useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
     if (savedTabsStr) {
       try {
@@ -58,22 +67,53 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       setTabs(defaultTabs);
     }
 
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
+    // Load available objects from schema
+    if (schema?.objects) {
+      // Exclude system objects like 'Home'
+      const excludedObjects = new Set(['Home']);
+      
+      // Built-in objects that have dedicated routes
+      const builtInRoutes: Record<string, string> = {
+        'Property': '/properties',
+        'Contact': '/contacts',
+        'Account': '/accounts',
+        'Product': '/products',
+        'Lead': '/leads',
+        'Deal': '/deals',
+        'Project': '/projects',
+        'Service': '/service',
+        'Quote': '/quotes',
+        'Installation': '/installations',
+      };
+      
+      const objectTabs = schema.objects
+        .filter(obj => !excludedObjects.has(obj.apiName))
+        .map(obj => ({
+          name: obj.pluralLabel || obj.label,
+          // Use built-in route if available, otherwise use /objects/[slug]
+          href: builtInRoutes[obj.apiName] || `/objects/${obj.apiName.toLowerCase()}`
         }));
-        setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
+      setAvailableObjects(objectTabs);
+    } else {
+      // Fallback to old customObjects storage
+      const storedObjects = localStorage.getItem('customObjects');
+      if (storedObjects) {
+        try {
+          const objects = JSON.parse(storedObjects);
+          const objectTabs = objects.map((obj: any) => ({
+            name: obj.label,
+            // Custom objects always use /objects/[slug]
+            href: `/objects/${obj.apiName.toLowerCase()}`
+          }));
+          setAvailableObjects(objectTabs);
+        } catch (e) {
+          console.error('Error loading custom objects:', e);
+        }
       }
     }
 
     setIsLoaded(true);
-  }, []);
+  }, [schema]);
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
     localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
@@ -94,6 +134,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
 
     const newTabs = [...tabs];
     const draggedTab = newTabs[draggedIndex];
+    if (!draggedTab) return;
     newTabs.splice(draggedIndex, 1);
     newTabs.splice(index, 0, draggedTab);
 
@@ -250,17 +291,24 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
             </div>
             <div className="px-6 py-4 max-h-96 overflow-y-auto">
               <div className="space-y-2">
+                {/* Show default tabs that aren't already in the nav */}
                 {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).map((item) => (
                   <button key={item.href} onClick={() => handleAddTab(item)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
                     <span className="text-sm font-medium text-gray-900">{item.name}</span>
                   </button>
                 ))}
-                {availableObjects.filter(obj => !tabs.some(t => t.href === obj.href)).map((obj) => (
+                {/* Show schema objects that aren't in tabs AND aren't in defaultTabs */}
+                {availableObjects
+                  .filter(obj => !tabs.some(t => t.href === obj.href))
+                  .filter(obj => !defaultTabs.some(dt => dt.href === obj.href))
+                  .map((obj) => (
                   <button key={obj.href} onClick={() => handleAddTab(obj)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
                     <span className="text-sm font-medium text-gray-900">{obj.name}</span>
+                    <span className="text-xs text-gray-400 ml-auto">Custom Object</span>
                   </button>
                 ))}
-                {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).length === 0 && availableObjects.filter(obj => !tabs.some(t => t.href === obj.href)).length === 0 && (
+                {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).length === 0 && 
+                 availableObjects.filter(obj => !tabs.some(t => t.href === obj.href) && !defaultTabs.some(dt => dt.href === obj.href)).length === 0 && (
                   <p className="text-gray-500 text-sm py-8 text-center">All available items are already added to navigation.</p>
                 )}
               </div>

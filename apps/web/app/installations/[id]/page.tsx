@@ -4,39 +4,155 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Package, 
+  Zap, 
   ArrowLeft, 
   Edit, 
-  Trash2,
-  Calendar,
-  User,
-  Clock
+  Trash2
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Installation {
   id: string;
   recordTypeId?: string;
   pageLayoutId?: string;
   installationNumber: string;
-  installationName: string;
-  accountName: string;
-  status: string;
-  installationType: string;
-  location: string;
-  installationDate: string;
-  dueDate: string;
-  technician: string;
-  createdBy: string;
-  createdAt: string;
-  lastModifiedBy: string;
-  lastModifiedAt: string;
-  description?: string;
-  isFavorite?: boolean;
   [key: string]: any;
+}
+
+function getLayoutForRecord(record: Installation | null, object: any): PageLayout | null {
+  if (!record || !object) return null;
+
+  if (record.pageLayoutId) {
+    const pageLayout = object.pageLayouts?.find((l: any) => l.id === record.pageLayoutId);
+    if (pageLayout) return pageLayout;
+  }
+
+  const recordType = record.recordTypeId
+    ? object.recordTypes?.find((rt: any) => rt.id === record.recordTypeId)
+    : object.recordTypes?.[0];
+
+  if (recordType?.pageLayoutId) {
+    const pageLayout = object.pageLayouts?.find((l: any) => l.id === recordType.pageLayoutId);
+    if (pageLayout) return pageLayout;
+  }
+
+  return object.pageLayouts?.[0] || null;
+}
+
+function getFieldDef(object: any, apiName: string): FieldDef | undefined {
+  return object?.fields.find((f: any) => f.apiName === apiName);
+}
+
+function getLookupDisplayName(object: any, fieldDef: FieldDef, value: any): string {
+  if (!value) return '-';
+  
+  const lookupObject = fieldDef.lookupObject;
+  if (!lookupObject) return String(value);
+
+  const storageKeyMap: Record<string, string> = {
+    'Contact': 'contacts',
+    'Account': 'accounts',
+    'Property': 'properties',
+    'Lead': 'leads',
+    'Deal': 'deals',
+    'User': 'users',
+    'Product': 'products',
+    'Quote': 'quotes',
+    'Project': 'projects',
+    'Service': 'services',
+    'Installation': 'installations'
+  };
+  
+  const storageKey = storageKeyMap[lookupObject];
+  if (!storageKey) return String(value);
+
+  const storedRecords = localStorage.getItem(storageKey);
+  if (!storedRecords) return String(value);
+
+  try {
+    const records = JSON.parse(storedRecords);
+    const relatedRecord = records.find((r: any) => String(r.id) === String(value));
+    
+    if (relatedRecord) {
+      switch (lookupObject) {
+        case 'Contact': {
+          const name = relatedRecord.name;
+          if (name && typeof name === 'object') {
+            const parts = [name.salutation, name.firstName, name.lastName].filter(Boolean);
+            if (parts.length > 0) return parts.join(' ');
+          }
+          if (relatedRecord.firstName || relatedRecord.lastName) {
+            return [relatedRecord.firstName, relatedRecord.lastName].filter(Boolean).join(' ');
+          }
+          return relatedRecord.email || relatedRecord.contactNumber || String(value);
+        }
+        case 'Account':
+          return relatedRecord.accountName || relatedRecord.name || relatedRecord.accountNumber || String(value);
+        case 'Property':
+          return relatedRecord.propertyName || relatedRecord.name || relatedRecord.propertyNumber || relatedRecord.address || String(value);
+        case 'Lead':
+          return relatedRecord.leadName || relatedRecord.name || relatedRecord.leadNumber || relatedRecord.company || String(value);
+        case 'Deal':
+          return relatedRecord.dealName || relatedRecord.name || relatedRecord.dealNumber || String(value);
+        case 'Product':
+          return relatedRecord.productName || relatedRecord.name || relatedRecord.productNumber || String(value);
+        case 'Quote':
+          return relatedRecord.quoteName || relatedRecord.name || relatedRecord.quoteNumber || String(value);
+        case 'Project':
+          return relatedRecord.projectName || relatedRecord.name || relatedRecord.projectNumber || String(value);
+        case 'Service':
+          return relatedRecord.serviceName || relatedRecord.name || relatedRecord.serviceNumber || String(value);
+        case 'Installation':
+          return relatedRecord.installationName || relatedRecord.name || relatedRecord.installationNumber || String(value);
+        case 'User':
+          return relatedRecord.name || relatedRecord.email || String(value);
+        default:
+          return relatedRecord.name || relatedRecord.label || String(value);
+      }
+    }
+  } catch { /* ignore */ }
+
+  return String(value);
+}
+
+function renderFieldValue(object: any, record: Installation, apiName: string, value: any, fieldDef?: FieldDef): React.ReactNode {
+  if (!value) return '-';
+  
+  // Handle Lookup fields
+  if (fieldDef?.type === 'Lookup' && fieldDef) {
+    const displayName = getLookupDisplayName(object, fieldDef, value);
+    const lookupObject = fieldDef.lookupObject;
+    
+    if (lookupObject) {
+      const routeMap: Record<string, string> = {
+        'Contact': 'contacts',
+        'Account': 'accounts',
+        'Property': 'properties',
+        'Lead': 'leads',
+        'Deal': 'deals',
+        'Project': 'projects',
+        'Quote': 'quotes',
+        'Product': 'products',
+        'Service': 'service',
+        'Installation': 'installations'
+      };
+      const route = routeMap[lookupObject];
+      if (route) {
+        return (
+          <Link href={`/${route}/${value}`} className="text-indigo-600 hover:text-indigo-700">
+            {displayName}
+          </Link>
+        );
+      }
+    }
+    return displayName;
+  }
+  
+  return formatFieldValue(value, fieldDef?.type);
 }
 
 export default function InstallationDetailPage() {
@@ -62,53 +178,7 @@ export default function InstallationDetailPage() {
     setLoading(false);
   }, [params?.id]);
 
-  // Get the layout based on installation's pageLayoutId or recordTypeId
-  const getLayoutForInstallation = () => {
-    if (!installation || !installationObject) return null;
-
-    if (installation.pageLayoutId) {
-      const pageLayout = installationObject.pageLayouts?.find(l => l.id === installation.pageLayoutId);
-      if (pageLayout) {
-        return pageLayout;
-      }
-    }
-
-    const recordTypeId = installation.recordTypeId;
-    const recordType = recordTypeId
-      ? installationObject.recordTypes?.find(rt => rt.id === recordTypeId)
-      : installationObject.recordTypes?.[0];
-
-    const pageLayoutId = recordType?.pageLayoutId;
-    const pageLayout = pageLayoutId
-      ? installationObject.pageLayouts?.find(l => l.id === pageLayoutId)
-      : installationObject.pageLayouts?.[0];
-
-    return pageLayout;
-  };
-
-  const pageLayout = getLayoutForInstallation();
-
-  const getFieldsFromLayout = () => {
-    if (!pageLayout || !installationObject) return [];
-
-    const layoutFieldApiNames = new Set<string>();
-    
-    pageLayout.tabs?.forEach((tab: any) => {
-      tab.sections?.forEach((section: any) => {
-        section.fields?.forEach((field: any) => {
-          layoutFieldApiNames.add(field.apiName);
-        });
-      });
-    });
-
-    if (layoutFieldApiNames.size === 0) return [];
-    
-    return (installationObject.fields || []).filter(field => 
-      layoutFieldApiNames.has(field.apiName)
-    );
-  };
-
-  const displayFields = getFieldsFromLayout();
+  const pageLayout = getLayoutForRecord(installation, installationObject);
 
   const handleEdit = () => {
     if (!pageLayout) {
@@ -173,7 +243,7 @@ export default function InstallationDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <Zap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Installation Not Found</h2>
           <p className="text-gray-600 mb-6">The installation you're looking for doesn't exist.</p>
           <Link
@@ -204,8 +274,8 @@ export default function InstallationDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Package className="w-6 h-6 text-indigo-600" />
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{installation.installationNumber}</h1>
@@ -235,101 +305,76 @@ export default function InstallationDetailPage() {
           </div>
         </div>
 
-        {/* Layout Info */}
-        {pageLayout && (
-          <div className="mb-4 text-sm text-gray-500">
-            Using layout: <span className="font-medium">{pageLayout.name}</span>
-            {displayFields.length > 0 && (
-              <span className="ml-2">({displayFields.length} fields)</span>
-            )}
+        {/* Dynamic Layout Rendering */}
+        {pageLayout ? (
+          <div className="space-y-6">
+            {pageLayout.tabs.map((tab, tabIndex) => (
+              <div key={tabIndex}>
+                {tab.sections.map((section, sectionIndex) => {
+                  // Organize fields by column and row
+                  const fieldsByRow: Record<number, Record<number, typeof section.fields[0]>> = {};
+                  section.fields.forEach(field => {
+                    const row = Math.floor(field.order / section.columns);
+                    if (!fieldsByRow[row]) fieldsByRow[row] = {};
+                    fieldsByRow[row][field.column] = field;
+                  });
+
+                  return (
+                    <div key={sectionIndex} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+                      <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                        <h3 className="font-medium text-gray-900">{section.label}</h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="space-y-6">
+                          {Object.keys(fieldsByRow).sort((a, b) => parseInt(a) - parseInt(b)).map((rowKey) => {
+                            const row = fieldsByRow[parseInt(rowKey)];
+                            if (!row) return null;
+                            const rowFields = Object.keys(row).sort((a, b) => parseInt(a) - parseInt(b)).map(col => row[parseInt(col)]).filter(Boolean);
+                            
+                            return (
+                              <div
+                                key={rowKey}
+                                className={`grid gap-6 ${
+                                  section.columns === 1 ? 'grid-cols-1' :
+                                  section.columns === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                                  'grid-cols-1 md:grid-cols-3'
+                                }`}
+                              >
+                                {rowFields.map((layoutField) => {
+                                  if (!layoutField) return null;
+                                  const fieldDef = getFieldDef(installationObject, layoutField.apiName);
+                                  const value = installation[layoutField.apiName] || installation[layoutField.apiName.replace(/^[^_]+__/, '')];
+                                  
+                                  if (!fieldDef) return null;
+
+                                  return (
+                                    <div key={layoutField.apiName}>
+                                      <dt className="text-sm font-medium text-gray-700">
+                                        {fieldDef.label}
+                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                      </dt>
+                                      <dd className="mt-1 text-sm text-gray-900">
+                                        {renderFieldValue(installationObject, installation, layoutField.apiName, value, fieldDef)}
+                                      </dd>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
+            No page layout configured for this installation's record type.
           </div>
         )}
-
-        {/* Content based on layout */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {pageLayout?.tabs?.map((tab: any, tabIndex: number) => (
-            <div key={tabIndex}>
-              {tab.sections?.map((section: any, sectionIndex: number) => (
-                <div key={sectionIndex} className="border-b border-gray-200 last:border-b-0">
-                  <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                    <h3 className="font-medium text-gray-900">{section.name}</h3>
-                  </div>
-                  <div className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {section.fields?.map((layoutField: any, fieldIndex: number) => {
-                        const normalizedFieldName = layoutField.apiName.replace(/^[^_]+__/, '');
-                        
-                        const fieldDef = installationObject?.fields?.find(
-                          f => f.apiName === layoutField.apiName || f.apiName === normalizedFieldName
-                        );
-                        const value = installation[normalizedFieldName] || installation[layoutField.apiName];
-                        
-                        return (
-                          <div key={fieldIndex}>
-                            <dt className="text-sm font-medium text-gray-500">
-                              {fieldDef?.label || layoutField.apiName}
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900">
-                              {formatFieldValue(value, fieldDef?.type) || '-'}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))}
-
-          {(!pageLayout?.tabs || pageLayout.tabs.length === 0) && displayFields.length > 0 && (
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {displayFields.map((field, index) => (
-                  <div key={index}>
-                    <dt className="text-sm font-medium text-gray-500">{field.label}</dt>
-                    <dd className="mt-1 text-sm text-gray-900">
-                      {formatFieldValue(installation[field.apiName], field.type) || '-'}
-                    </dd>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!pageLayout && (
-            <div className="p-6 text-center text-gray-500">
-              No page layout configured for this installation's record type.
-            </div>
-          )}
-        </div>
-
-        {/* System Info */}
-        <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="font-medium text-gray-900 mb-4">System Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Created by:</span>
-              <span className="text-gray-900">{installation.createdBy}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Created:</span>
-              <span className="text-gray-900">{installation.createdAt}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Modified by:</span>
-              <span className="text-gray-900">{installation.lastModifiedBy}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-500">Modified:</span>
-              <span className="text-gray-900">{installation.lastModifiedAt}</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Edit Form Dialog */}

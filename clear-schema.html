@@ -12,8 +12,16 @@ function clearAll() {
     localStorage.removeItem(key);
     console.log('Removed:', key);
   });
-  document.getElementById('result').innerHTML = '<p style=\"color: green;\">All schema data cleared! Refresh your app now.</p>';
+  document.getElementById('result').innerHTML = '<p style="color: green;">All schema data cleared! Redirecting to contacts in 2 seconds...</p>';
+  setTimeout(() => {
+    window.location.href = '/contacts';
+  }, 2000);
 }
+
+// Auto-clear on page load
+window.addEventListener('load', () => {
+  clearAll();
+});
 </script>
 </body>
 </html>

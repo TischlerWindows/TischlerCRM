@@ -30,7 +30,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Installation {
@@ -114,6 +114,18 @@ export default function InstallationsPage() {
       return { id: cleanApiName, label: field.label, defaultVisible };
     });
   }, [installationObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('installationSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
   useEffect(() => {
@@ -233,6 +245,13 @@ export default function InstallationsPage() {
   const formatColumnValue = (installation: Installation, columnId: string) => {
     const value = installation[columnId as keyof Installation];
     if (value === null || value === undefined) return '-';
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
       let fieldType = undefined;
@@ -390,6 +409,7 @@ export default function InstallationsPage() {
     const newInstallation: Installation = {
       id: newInstallationId,
       installationNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       ...normalizedData,
       installationName: normalizedData.installationName || '',
       accountName: normalizedData.accountName || '',
@@ -631,11 +651,11 @@ export default function InstallationsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredInstallations.map((installation) => (
-                  <tr key={installation.id} className="hover:bg-gray-50">
+                  <tr key={installation.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/installations/${installation.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'installationNumber' ? (
-                          <Link href={`/installations/${installation.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/installations/${installation.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                             {installation.installationNumber}
                           </Link>
                         ) : column.id === 'installationName' ? (
@@ -656,7 +676,7 @@ export default function InstallationsPage() {
                         )}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === installation.id ? null : installation.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -666,6 +686,16 @@ export default function InstallationsPage() {
                       {openDropdown === installation.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/installations/${installation.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteInstallation(installation.id);
@@ -680,7 +710,7 @@ export default function InstallationsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(installation.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -768,6 +798,7 @@ export default function InstallationsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('installationSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

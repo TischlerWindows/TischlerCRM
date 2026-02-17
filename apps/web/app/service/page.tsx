@@ -30,7 +30,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Service {
@@ -137,6 +137,18 @@ export default function ServicePage() {
       return { id: cleanApiName, label: field.label, defaultVisible };
     });
   }, [serviceObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('serviceSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
   useEffect(() => {
@@ -368,6 +380,12 @@ export default function ServicePage() {
     if (value === null || value === undefined) {
       return '-';
     }
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
 
     if (Array.isArray(value)) {
       return value.length > 0 ? value.join(', ') : '-';
@@ -412,6 +430,7 @@ export default function ServicePage() {
     const newService: Service = {
       id: newServiceId,
       serviceNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       ...normalizedData,
       serviceName: normalizedData.serviceName || '',
       accountName: normalizedData.accountName || '',
@@ -658,15 +677,15 @@ export default function ServicePage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredServices.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50">
+                  <tr key={service.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/service/${service.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'serviceNumber' ? (
-                          <Link href={`/service/${service.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/service/${selectedLayoutId}/${service.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                             {service.serviceNumber}
                           </Link>
                         ) : column.id === 'serviceName' ? (
-                          <Link href={`/service/${service.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                          <Link href={`/service/${selectedLayoutId}/${service.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                             {service.serviceName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -691,7 +710,7 @@ export default function ServicePage() {
                         )}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === service.id ? null : service.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -701,6 +720,16 @@ export default function ServicePage() {
                       {openDropdown === service.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/service/${service.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteService(service.id);
@@ -715,7 +744,7 @@ export default function ServicePage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(service.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -803,6 +832,7 @@ export default function ServicePage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('serviceSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

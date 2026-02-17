@@ -146,7 +146,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   }, [objectApiName]);
 
   const availableFields = useMemo(() => {
-    const baseFields: FieldDef[] = objectApiName === 'Home'
+    let baseFields: FieldDef[] = objectApiName === 'Home'
       ? [
           ...homeReports.map((report) => ({
             id: `report-${report.id}`,
@@ -164,6 +164,22 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           })),
         ]
       : object.fields;
+
+    // Add hardcoded Name field for Contact objects
+    if (objectApiName === 'Contact' && !baseFields.find(f => f.apiName === 'Contact__name')) {
+      const nameField: FieldDef = {
+        id: 'hardcoded-name-field',
+        apiName: 'Contact__name',
+        label: 'Name',
+        type: 'Text',
+        readOnly: true,
+        custom: false,
+        required: false,
+        maxLength: 255,
+        helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)'
+      };
+      baseFields = [nameField, ...baseFields];
+    }
 
     if (!fieldSearchTerm.trim()) {
       return baseFields;
@@ -620,7 +636,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
 
   const getFieldDef = (apiName: string): FieldDef | undefined => {
-    return object?.fields.find((f) => f.apiName === apiName);
+    return availableFields.find((f) => f.apiName === apiName);
   };
 
   const DraggableField = ({ field }: { field: FieldDef }) => {

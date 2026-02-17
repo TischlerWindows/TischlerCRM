@@ -30,7 +30,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Quote {
@@ -117,6 +117,20 @@ export default function QuotesPage() {
     console.log('📋 Page Layouts:', pageLayouts);
     console.log('✅ Has Page Layout:', hasPageLayout);
   }, [quoteObject, pageLayouts, hasPageLayout]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      // Try to restore from localStorage
+      const savedLayoutId = localStorage.getItem('quoteSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        // Default to first layout if nothing saved
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
@@ -223,6 +237,13 @@ export default function QuotesPage() {
   const formatColumnValue = (quote: Quote, columnId: string) => {
     const value = quote[columnId as keyof Quote];
     if (value === null || value === undefined) return '-';
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
       let fieldType = undefined;
@@ -384,6 +405,7 @@ export default function QuotesPage() {
     const newQuote: Quote = {
       id: newQuoteId,
       quoteNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       ...normalizedData,
       quoteName: normalizedData.quoteName || '',
       accountName: normalizedData.accountName || '',
@@ -625,11 +647,11 @@ export default function QuotesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredQuotes.map((quote) => (
-                  <tr key={quote.id} className="hover:bg-gray-50">
+                  <tr key={quote.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/quotes/${quote.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'quoteNumber' ? (
-                          <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                             {quote.quoteNumber}
                           </Link>
                         ) : column.id === 'quoteName' ? (
@@ -650,7 +672,7 @@ export default function QuotesPage() {
                         )}
                       </td>
                     ))}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === quote.id ? null : quote.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -660,6 +682,16 @@ export default function QuotesPage() {
                       {openDropdown === quote.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/quotes/${quote.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteQuote(quote.id);
@@ -674,7 +706,7 @@ export default function QuotesPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(quote.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -762,6 +794,7 @@ export default function QuotesPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('quoteSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

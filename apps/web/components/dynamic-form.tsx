@@ -107,15 +107,60 @@ export default function DynamicForm({
 
   const getRecordLabel = (record: any) => {
     if (!record) return '';
-    if (record.name) return record.name;
+    
+    // Handle name object (Contact name with salutation, firstName, lastName)
+    if (record.name && typeof record.name === 'object') {
+      const nameObj = record.name;
+      const nameParts = [
+        nameObj.salutation || nameObj.Contact__name_salutation,
+        nameObj.firstName || nameObj.Contact__name_firstName,
+        nameObj.lastName || nameObj.Contact__name_lastName
+      ].filter(Boolean);
+      if (nameParts.length > 0) return nameParts.join(' ');
+    }
+    
+    // Handle simple name string
+    if (record.name && typeof record.name === 'string') return record.name;
+    
     if (record.title) return record.title;
-    if (record.propertyNumber) return record.propertyNumber;
+    
+    // Account name - check multiple variations
     if (record.accountName) return record.accountName;
+    if (record.Account__accountName) return record.Account__accountName;
+    
+    // Property number
+    if (record.propertyNumber) return record.propertyNumber;
+    if (record.Property__propertyNumber) return record.Property__propertyNumber;
+    
+    // Account number as fallback for accounts
+    if (record.accountNumber) return record.accountNumber;
+    
+    // Contact names
     if (record.firstName || record.lastName) {
       return `${record.firstName || ''} ${record.lastName || ''}`.trim();
     }
     if (record.email) return record.email;
-    if (record.address) return record.address;
+    
+    // Lead/Deal/Project numbers
+    if (record.leadNumber) return record.leadNumber;
+    if (record.dealNumber) return record.dealNumber;
+    if (record.projectNumber) return record.projectNumber;
+    if (record.quoteNumber) return record.quoteNumber;
+    if (record.serviceNumber) return record.serviceNumber;
+    if (record.installationNumber) return record.installationNumber;
+    if (record.productName) return record.productName;
+    
+    // Handle address - could be string or object
+    if (record.address) {
+      if (typeof record.address === 'object') {
+        const addrParts = [record.address.street, record.address.city, record.address.state].filter(Boolean);
+        if (addrParts.length > 0) return addrParts.join(', ');
+      } else {
+        return record.address;
+      }
+    }
+    
+    // Search for prefixed field names as last resort
     const keys = Object.keys(record);
     const firstNameKey = keys.find((key) => key.toLowerCase().endsWith('__firstname'));
     const lastNameKey = keys.find((key) => key.toLowerCase().endsWith('__lastname'));
@@ -130,7 +175,14 @@ export default function DynamicForm({
     if (propertyKey && record[propertyKey]) return record[propertyKey];
     const emailKey = keys.find((key) => key.toLowerCase().endsWith('__email'));
     if (emailKey && record[emailKey]) return record[emailKey];
-    return record.id || 'Record';
+    
+    // Final fallback - use any "name" or "number" field
+    const anyNameField = keys.find((key) => key.toLowerCase().includes('name') && record[key]);
+    if (anyNameField && record[anyNameField]) return String(record[anyNameField]);
+    const anyNumberField = keys.find((key) => key.toLowerCase().includes('number') && record[key]);
+    if (anyNumberField && record[anyNumberField]) return String(record[anyNumberField]);
+    
+    return String(record.id || 'Record');
   };
 
   const getFieldIcon = (type: FieldType) => {
@@ -159,6 +211,7 @@ export default function DynamicForm({
       AutoNumber: Hash,
       Formula: Hash,
       RollupSummary: Hash,
+      CompositeText: FileText,
     };
     return iconMap[type] || FileText;
   };
@@ -533,18 +586,26 @@ export default function DynamicForm({
         const targetApi = getLookupTargetApi(fieldDef);
         const records = targetApi ? getLookupRecords(targetApi) : [];
         const recordsArray = Array.isArray(records) ? records : [];
-        const selectedRecord = recordsArray.find((r) => r.id === value);
+        // Compare as strings to handle type mismatches (e.g., number vs string IDs)
+        const selectedRecord = value ? recordsArray.find((r) => String(r.id) === String(value)) : null;
         const selectedLabel = selectedRecord ? getRecordLabel(selectedRecord) : '';
         const lookupQuery = lookupQueries[fieldDef.apiName] ?? '';
         const isLookupActive = activeLookupField === fieldDef.apiName;
+        
+        // Determine what to display:
+        // - If lookup is active (user is typing), show the query
+        // - If we have a selected label (found the record), show that
+        // - Otherwise show empty (don't show raw ID to users)
         const displayValue = isLookupActive ? lookupQuery : selectedLabel;
 
         const filteredRecords = recordsArray.filter((record) => {
-          const label = getRecordLabel(record).toLowerCase();
+          const label = getRecordLabel(record);
+          const labelStr = typeof label === 'string' ? label : String(label || '');
+          if (!labelStr) return true; // Include records with no label in results
           const query = lookupQuery.toLowerCase();
-          if (label.includes(query)) return true;
-          return Object.values(record).some((value) =>
-            typeof value === 'string' && value.toLowerCase().includes(query)
+          if (labelStr.toLowerCase().includes(query)) return true;
+          return Object.values(record).some((val) =>
+            typeof val === 'string' && val.toLowerCase().includes(query)
           );
         });
 
@@ -569,18 +630,19 @@ export default function DynamicForm({
               <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
                 {filteredRecords.slice(0, 20).map((record) => {
                   const label = getRecordLabel(record);
+                  const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
                   return (
                     <button
                       key={record.id}
                       type="button"
                       onClick={() => {
                         handleFieldChange(fieldDef.apiName, record.id);
-                        setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: label }));
+                        setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: displayLabel }));
                         setActiveLookupField(null);
                       }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                     >
-                      <div className="font-medium text-gray-900 truncate">{label}</div>
+                      <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
                       <div className="text-xs text-gray-500">{record.id}</div>
                     </button>
                   );
@@ -592,6 +654,63 @@ export default function DynamicForm({
                 No matches found.
               </div>
             )}
+          </div>
+        );
+        break;
+
+      case 'CompositeText':
+        const compositeValue = value || {};
+        inputElement = (
+          <div className="space-y-3 border border-gray-300 rounded-lg p-3">
+            {fieldDef.subFields && fieldDef.subFields.map((subField) => {
+              if (subField.type === 'Picklist') {
+                return (
+                  <div key={subField.apiName} className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{subField.label}</label>
+                    <select
+                      value={compositeValue[subField.apiName] || ''}
+                      onChange={(e) =>
+                        handleFieldChange(fieldDef.apiName, {
+                          ...compositeValue,
+                          [subField.apiName]: e.target.value
+                        })
+                      }
+                      disabled={isReadOnly}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    >
+                      <option value="">-- Select --</option>
+                      {fieldDef.apiName === 'Contact__name' && subField.apiName === 'Contact__name_salutation' && (
+                        <>
+                          <option value="Mr.">Mr.</option>
+                          <option value="Mrs.">Mrs.</option>
+                          <option value="Ms.">Ms.</option>
+                          <option value="Dr.">Dr.</option>
+                          <option value="Prof.">Prof.</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                );
+              } else {
+                return (
+                  <div key={subField.apiName} className="flex flex-col space-y-1">
+                    <label className="text-sm font-medium text-gray-700">{subField.label}</label>
+                    <Input
+                      type="text"
+                      value={compositeValue[subField.apiName] || ''}
+                      onChange={(e) =>
+                        handleFieldChange(fieldDef.apiName, {
+                          ...compositeValue,
+                          [subField.apiName]: e.target.value
+                        })
+                      }
+                      disabled={isReadOnly}
+                      placeholder={subField.label}
+                    />
+                  </div>
+                );
+              }
+            })}
           </div>
         );
         break;

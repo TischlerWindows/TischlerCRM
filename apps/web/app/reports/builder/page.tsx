@@ -18,6 +18,45 @@ import {
 import PageHeader from '@/components/page-header';
 import { useSchemaStore } from '@/lib/schema-store';
 
+// Helper to format composite field values (Address, Name, etc.)
+const formatDisplayValue = (value: any): string => {
+  if (value === null || value === undefined) return '-';
+  
+  // Handle Address object
+  if (typeof value === 'object' && value !== null) {
+    // Address object: {street, city, state, postalCode, country}
+    if ('street' in value || 'city' in value || 'postalCode' in value) {
+      const parts = [
+        value.street,
+        value.city,
+        value.state,
+        value.postalCode,
+        value.country
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(', ') : '-';
+    }
+    
+    // Name object: {salutation, firstName, lastName} or Contact prefixed keys
+    if ('firstName' in value || 'lastName' in value || 'Contact__name_firstName' in value) {
+      const parts = [
+        value.salutation || value.Contact__name_salutation,
+        value.firstName || value.Contact__name_firstName,
+        value.lastName || value.Contact__name_lastName
+      ].filter(Boolean);
+      return parts.length > 0 ? parts.join(' ') : '-';
+    }
+    
+    // Generic object - try to stringify or return placeholder
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[Object]';
+    }
+  }
+  
+  return String(value);
+};
+
 interface ReportFilter {
   field: string;
   operator: 'equals' | 'contains' | 'greaterThan' | 'lessThan' | 'between' | 'in';
@@ -771,7 +810,7 @@ export default function ReportBuilderPage() {
                                   <tr key={idx} className="hover:bg-gray-50">
                                     {columns.map(col => (
                                       <td key={col.id} className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                                        {row[col.field] || '-'}
+                                        {formatDisplayValue(row[col.field])}
                                       </td>
                                     ))}
                                   </tr>
@@ -785,7 +824,7 @@ export default function ReportBuilderPage() {
                             <tr key={idx} className="hover:bg-gray-50">
                               {columns.map(col => (
                                 <td key={col.id} className="px-6 py-3 whitespace-nowrap text-sm text-gray-900">
-                                  {row[col.field] || '-'}
+                                  {formatDisplayValue(row[col.field])}
                                 </td>
                               ))}
                             </tr>

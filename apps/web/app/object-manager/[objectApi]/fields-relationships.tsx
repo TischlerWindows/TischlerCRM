@@ -109,7 +109,26 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   });
 
   const object = schema?.objects.find(o => o.apiName === objectApiName);
-  const fields = object?.fields || [];
+  let fields = object?.fields || [];
+
+  // Add hardcoded Name field for Contact objects
+  if (objectApiName === 'Contact') {
+    const nameField = {
+      id: 'hardcoded-name-field',
+      apiName: 'Contact__name',
+      label: 'Name',
+      type: 'Text' as FieldType,
+      readOnly: true,
+      custom: false,
+      required: false,
+      maxLength: 255,
+      helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)'
+    };
+    // Add at the beginning if not already present
+    if (!fields.find(f => f.apiName === 'Contact__name')) {
+      fields = [nameField, ...fields];
+    }
+  }
 
   const filteredFields = fields.filter(field =>
     field.label.toLowerCase().includes(searchTerm.toLowerCase()) ||

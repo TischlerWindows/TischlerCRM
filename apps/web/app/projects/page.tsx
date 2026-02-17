@@ -30,7 +30,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Project {
@@ -140,6 +140,18 @@ export default function ProjectsPage() {
       };
     });
   }, [projectObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('projectSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
   useEffect(() => {
@@ -284,6 +296,13 @@ export default function ProjectsPage() {
   const formatColumnValue = (project: Project, columnId: string) => {
     const value = project[columnId as keyof Project];
     if (value === null || value === undefined) return '-';
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
       let fieldType = undefined;
@@ -394,6 +413,7 @@ export default function ProjectsPage() {
     const newProject: Project = {
       id: newProjectId,
       projectNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       ...normalizedData,
       projectName: normalizedData.projectName || '',
       status: normalizedData.status || 'Planning',
@@ -642,7 +662,7 @@ export default function ProjectsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50">
+                  <tr key={project.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/projects/${project.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
@@ -672,7 +692,7 @@ export default function ProjectsPage() {
                         </td>
                       );
                     })}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === project.id ? null : project.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -682,6 +702,16 @@ export default function ProjectsPage() {
                       {openDropdown === project.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/projects/${project.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteProject(project.id);
@@ -696,7 +726,7 @@ export default function ProjectsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(project.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -784,6 +814,7 @@ export default function ProjectsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('projectSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

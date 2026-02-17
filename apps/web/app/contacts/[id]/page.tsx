@@ -10,65 +10,19 @@ import {
   Trash2,
   Calendar,
   User,
-  Clock,
-  Plus,
-  Search,
-  FileText
+  Clock
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Contact {
   id: string;
   recordTypeId?: string;
   pageLayoutId?: string;
   contactNumber: string;
-  
-  // Contact Information
-  salutation?: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  accountId?: string;
-  accountName?: string;
-  contactType?: string;
-  title?: string;
-  reportsToId?: string;
-  reportsToName?: string;
-  status?: string;
-  primaryEmail: string;
-  secondaryEmail?: string;
-  primaryPhone: string;
-  secondaryPhone?: string;
-  fax?: string;
-  
-  // Address Information
-  primaryAddressStreet?: string;
-  primaryAddressCity?: string;
-  primaryAddressState?: string;
-  primaryAddressZip?: string;
-  secondaryAddressStreet?: string;
-  secondaryAddressCity?: string;
-  secondaryAddressState?: string;
-  secondaryAddressZip?: string;
-  poBox?: string;
-  
-  // Associated Properties
-  properties?: string[];
-  
-  // Notes
-  contactNotes?: string;
-  
-  // System Information
-  createdBy: string;
-  createdAt: string;
-  lastModifiedBy: string;
-  lastModifiedAt: string;
-  contactOwnerId?: string;
-  contactOwnerName?: string;
-  
   [key: string]: any;
 }
 
@@ -95,13 +49,169 @@ export default function ContactDetailPage() {
     setLoading(false);
   }, [params?.id]);
 
-  // Get the first available layout for edit dialog purposes
-  const getDefaultLayout = () => {
-    if (!contactObject) return null;
-    return contactObject.pageLayouts?.[0];
+  // Get the page layout for this contact
+  const getLayoutForContact = (): PageLayout | null => {
+    if (!contact || !contactObject) return null;
+
+    // Try to use the layout stored on the record
+    if (contact.pageLayoutId) {
+      const pageLayout = contactObject.pageLayouts?.find(l => l.id === contact.pageLayoutId);
+      if (pageLayout) return pageLayout;
+    }
+
+    // Fall back to the layout from the record type
+    const recordTypeId = contact.recordTypeId;
+    const recordType = recordTypeId
+      ? contactObject.recordTypes?.find(rt => rt.id === recordTypeId)
+      : contactObject.recordTypes?.[0];
+
+    if (recordType?.pageLayoutId) {
+      const pageLayout = contactObject.pageLayouts?.find(l => l.id === recordType.pageLayoutId);
+      if (pageLayout) return pageLayout;
+    }
+
+    // Default to first layout
+    return contactObject.pageLayouts?.[0] || null;
   };
 
-  const pageLayout = getDefaultLayout();
+  const pageLayout = getLayoutForContact();
+
+  // Helper function to get field definition
+  const getFieldDef = (apiName: string): FieldDef | undefined => {
+    return contactObject?.fields.find(f => f.apiName === apiName);
+  };
+
+  // Helper function to get lookup record display name
+  const getLookupDisplayName = (fieldDef: FieldDef, value: any): string => {
+    if (!value) return '-';
+    
+    const lookupObject = fieldDef.lookupObject;
+    if (!lookupObject) return String(value);
+
+    const storageKeyMap: Record<string, string> = {
+      'Contact': 'contacts',
+      'Account': 'accounts',
+      'Property': 'properties',
+      'Lead': 'leads',
+      'Deal': 'deals',
+      'User': 'users',
+      'Product': 'products',
+      'Quote': 'quotes',
+      'Project': 'projects',
+      'Service': 'services',
+      'Installation': 'installations'
+    };
+    
+    const storageKey = storageKeyMap[lookupObject];
+    if (!storageKey) return String(value);
+
+    const storedRecords = localStorage.getItem(storageKey);
+    if (!storedRecords) return String(value);
+
+    try {
+      const records = JSON.parse(storedRecords);
+      const relatedRecord = records.find((r: any) => String(r.id) === String(value));
+      
+      if (relatedRecord) {
+        // Handle each object type with appropriate display fields
+        switch (lookupObject) {
+          case 'Contact': {
+            const name = relatedRecord.name;
+            if (name && typeof name === 'object') {
+              const parts = [name.salutation, name.firstName, name.lastName].filter(Boolean);
+              if (parts.length > 0) return parts.join(' ');
+            }
+            if (relatedRecord.firstName || relatedRecord.lastName) {
+              return [relatedRecord.firstName, relatedRecord.lastName].filter(Boolean).join(' ');
+            }
+            return relatedRecord.email || relatedRecord.contactNumber || String(value);
+          }
+          case 'Account':
+            return relatedRecord.accountName || relatedRecord.name || relatedRecord.accountNumber || String(value);
+          case 'Property':
+            return relatedRecord.propertyName || relatedRecord.name || relatedRecord.propertyNumber || relatedRecord.address || String(value);
+          case 'Lead':
+            return relatedRecord.leadName || relatedRecord.name || relatedRecord.leadNumber || relatedRecord.company || String(value);
+          case 'Deal':
+            return relatedRecord.dealName || relatedRecord.name || relatedRecord.dealNumber || String(value);
+          case 'Product':
+            return relatedRecord.productName || relatedRecord.name || relatedRecord.productNumber || String(value);
+          case 'Quote':
+            return relatedRecord.quoteName || relatedRecord.name || relatedRecord.quoteNumber || String(value);
+          case 'Project':
+            return relatedRecord.projectName || relatedRecord.name || relatedRecord.projectNumber || String(value);
+          case 'Service':
+            return relatedRecord.serviceName || relatedRecord.name || relatedRecord.serviceNumber || String(value);
+          case 'Installation':
+            return relatedRecord.installationName || relatedRecord.name || relatedRecord.installationNumber || String(value);
+          case 'User':
+            return relatedRecord.name || relatedRecord.email || String(value);
+          default:
+            return relatedRecord.name || relatedRecord.label || String(value);
+        }
+      }
+    } catch { /* ignore */ }
+
+    return String(value);
+  };
+
+  // Helper function to render field value with links
+  const renderFieldValue = (apiName: string, value: any, fieldDef?: FieldDef): React.ReactNode => {
+    if (!value) return '-';
+
+    const fieldType = fieldDef?.type;
+
+    // Handle Lookup fields
+    if (fieldType === 'Lookup' && fieldDef) {
+      const displayName = getLookupDisplayName(fieldDef, value);
+      const lookupObject = fieldDef.lookupObject;
+      
+      if (lookupObject) {
+        const routeMap: Record<string, string> = {
+          'Contact': 'contacts',
+          'Account': 'accounts',
+          'Property': 'properties',
+          'Lead': 'leads',
+          'Deal': 'deals',
+          'Project': 'projects',
+          'Product': 'products',
+          'Quote': 'quotes',
+          'Service': 'service',
+          'Installation': 'installations'
+        };
+        const route = routeMap[lookupObject];
+        if (route) {
+          return (
+            <Link href={`/${route}/${value}`} className="text-indigo-600 hover:text-indigo-700">
+              {displayName}
+            </Link>
+          );
+        }
+      }
+      return displayName;
+    }
+
+    // Handle email links
+    if (fieldType === 'Email') {
+      return (
+        <a href={`mailto:${value}`} className="text-indigo-600 hover:text-indigo-700">
+          {value}
+        </a>
+      );
+    }
+
+    // Handle phone links
+    if (fieldType === 'Phone') {
+      return (
+        <a href={`tel:${value}`} className="text-indigo-600 hover:text-indigo-700">
+          {value}
+        </a>
+      );
+    }
+
+    // Format the value
+    return formatFieldValue(value, fieldType);
+  };
 
   const handleEdit = () => {
     if (!pageLayout) {
@@ -203,7 +313,7 @@ export default function ContactDetailPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{contact.contactNumber}</h1>
                   <p className="text-gray-600">
-                    {contact.salutation && <>{contact.salutation} </>}{contact.firstName} {contact.lastName}
+                    {contact.firstName} {contact.lastName}
                     {contact.primaryEmail && <> ({contact.primaryEmail})</>}
                   </p>
                 </div>
@@ -228,246 +338,76 @@ export default function ContactDetailPage() {
           </div>
         </div>
 
-        {/* Contact Information */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-            <h3 className="font-medium text-gray-900">Contact Information</h3>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Full Name - Auto-Summarized */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Name</label>
-                <p className="mt-1 text-sm text-gray-900 font-semibold">
-                  {contact.salutation && <>{contact.salutation} </>}{contact.firstName} {contact.lastName}
-                </p>
-              </div>
+        {/* Dynamic Layout Rendering */}
+        {pageLayout ? (
+          <div className="space-y-6">
+            {pageLayout.tabs.map((tab, tabIndex) => (
+              <div key={tabIndex}>
+                {tab.sections.map((section, sectionIndex) => {
+                  // Organize fields by column and row
+                  const fieldsByRow: Record<number, Record<number, typeof section.fields[0]>> = {};
+                  section.fields.forEach(field => {
+                    const row = Math.floor(field.order / section.columns);
+                    if (!fieldsByRow[row]) fieldsByRow[row] = {};
+                    fieldsByRow[row][field.column] = field;
+                  });
 
-              {/* Name Fields */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Salutation</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.salutation || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">First Name</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.firstName || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Middle Name</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.middleName || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Last Name</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.lastName || '-'}</p>
-              </div>
-              
-              {/* Account */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Account</label>
-                {contact.accountName ? (
-                  <Link href={`/accounts/${contact.accountId}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                    {contact.accountName}
-                  </Link>
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900">-</p>
-                )}
-              </div>
+                  return (
+                    <div key={sectionIndex} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+                      <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+                        <h3 className="font-medium text-gray-900">{section.label}</h3>
+                      </div>
+                      <div className="p-6">
+                        <div className="space-y-6">
+                          {Object.keys(fieldsByRow).sort((a, b) => parseInt(a) - parseInt(b)).map((rowKey) => {
+                            const row = fieldsByRow[parseInt(rowKey)];
+                            if (!row) return null;
+                            const rowFields = Object.keys(row).sort((a, b) => parseInt(a) - parseInt(b)).map(col => row[parseInt(col)]).filter(Boolean);
+                            
+                            return (
+                              <div
+                                key={rowKey}
+                                className={`grid gap-6 ${
+                                  section.columns === 1 ? 'grid-cols-1' :
+                                  section.columns === 2 ? 'grid-cols-1 md:grid-cols-2' :
+                                  'grid-cols-1 md:grid-cols-3'
+                                }`}
+                              >
+                                {rowFields.map((layoutField) => {
+                                  if (!layoutField) return null;
+                                  const fieldDef = getFieldDef(layoutField.apiName);
+                                  const value = contact[layoutField.apiName] || contact[layoutField.apiName.replace(/^[^_]+__/, '')];
+                                  
+                                  if (!fieldDef) return null;
 
-              {/* Contact Type */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Contact Type</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.contactType || '-'}</p>
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Title</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.title || '-'}</p>
-              </div>
-
-              {/* Reports To */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Reports To</label>
-                {contact.reportsToName ? (
-                  <Link href={`/contacts/${contact.reportsToId}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                    {contact.reportsToName}
-                  </Link>
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900">-</p>
-                )}
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Status</label>
-                <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  contact.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}>
-                  {contact.status || '-'}
-                </span>
-              </div>
-
-              {/* Emails */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Primary Email</label>
-                <a href={`mailto:${contact.primaryEmail}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                  {contact.primaryEmail || '-'}
-                </a>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Secondary Email</label>
-                {contact.secondaryEmail ? (
-                  <a href={`mailto:${contact.secondaryEmail}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                    {contact.secondaryEmail}
-                  </a>
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900">-</p>
-                )}
-              </div>
-
-              {/* Phones */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Primary Phone</label>
-                <a href={`tel:${contact.primaryPhone}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                  {contact.primaryPhone || '-'}
-                </a>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Secondary Phone</label>
-                {contact.secondaryPhone ? (
-                  <a href={`tel:${contact.secondaryPhone}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                    {contact.secondaryPhone}
-                  </a>
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900">-</p>
-                )}
-              </div>
-
-              {/* Fax */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Fax</label>
-                {contact.fax ? (
-                  <a href={`tel:${contact.fax}`} className="mt-1 text-sm text-indigo-600 hover:text-indigo-700">
-                    {contact.fax}
-                  </a>
-                ) : (
-                  <p className="mt-1 text-sm text-gray-900">-</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Address Information */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-            <h3 className="font-medium text-gray-900">Address Information</h3>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Primary Address */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Primary Address</label>
-                <div className="mt-1 text-sm text-gray-900">
-                  {contact.primaryAddressStreet && <div>{contact.primaryAddressStreet}</div>}
-                  {(contact.primaryAddressCity || contact.primaryAddressState || contact.primaryAddressZip) && (
-                    <div>
-                      {contact.primaryAddressCity}{contact.primaryAddressCity && contact.primaryAddressState && ', '}
-                      {contact.primaryAddressState} {contact.primaryAddressZip}
+                                  return (
+                                    <div key={layoutField.apiName}>
+                                      <dt className="text-sm font-medium text-gray-700">
+                                        {fieldDef.label}
+                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                      </dt>
+                                      <dd className="mt-1 text-sm text-gray-900">
+                                        {renderFieldValue(layoutField.apiName, value, fieldDef)}
+                                      </dd>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  {!contact.primaryAddressStreet && !contact.primaryAddressCity && !contact.primaryAddressState && <span>-</span>}
-                </div>
+                  );
+                })}
               </div>
-
-              {/* Secondary Address */}
-              <div>
-                <label className="text-sm font-medium text-gray-700">Secondary Address</label>
-                <div className="mt-1 text-sm text-gray-900">
-                  {contact.secondaryAddressStreet && <div>{contact.secondaryAddressStreet}</div>}
-                  {(contact.secondaryAddressCity || contact.secondaryAddressState || contact.secondaryAddressZip) && (
-                    <div>
-                      {contact.secondaryAddressCity}{contact.secondaryAddressCity && contact.secondaryAddressState && ', '}
-                      {contact.secondaryAddressState} {contact.secondaryAddressZip}
-                    </div>
-                  )}
-                  {!contact.secondaryAddressStreet && !contact.secondaryAddressCity && !contact.secondaryAddressState && <span>-</span>}
-                </div>
-              </div>
-
-              {/* PO Box */}
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">PO Box</label>
-                <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">{contact.poBox || '-'}</p>
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
-
-        {/* Associated Properties */}
-        {contact.properties && contact.properties.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-              <h3 className="font-medium text-gray-900">Associated Properties</h3>
-            </div>
-            <div className="p-6">
-              <div className="text-sm text-gray-900">
-                {Array.isArray(contact.properties) ? (
-                  <ul className="space-y-2">
-                    {contact.properties.map((prop, idx) => (
-                      <li key={idx}>{prop}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p>{contact.properties}</p>
-                )}
-              </div>
-            </div>
+        ) : (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
+            No page layout configured for this contact's record type.
           </div>
         )}
-
-        {/* Notes */}
-        {contact.contactNotes && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-              <h3 className="font-medium text-gray-900">Notes</h3>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-900 whitespace-pre-wrap">{contact.contactNotes}</p>
-            </div>
-          </div>
-        )}
-
-        {/* System Information */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-            <h3 className="font-medium text-gray-900">System Information</h3>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Created By</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.createdBy || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Created Date</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.createdAt || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Last Modified By</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.lastModifiedBy || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-700">Last Modified Date</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.lastModifiedAt || '-'}</p>
-              </div>
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium text-gray-700">Contact Owner</label>
-                <p className="mt-1 text-sm text-gray-900">{contact.contactOwnerName || '-'}</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Edit Form Dialog */}

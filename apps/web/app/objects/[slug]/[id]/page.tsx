@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Lightbulb, 
+  Database, 
   ArrowLeft, 
   Edit, 
   Trash2
@@ -15,67 +15,87 @@ import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
-interface Lead {
+interface CustomRecord {
   id: string;
   recordTypeId?: string;
   pageLayoutId?: string;
-  leadNumber: string;
   [key: string]: any;
 }
 
-export default function LeadDetailPage() {
+export default function CustomObjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { schema } = useSchemaStore();
+  const { schema, loadSchema } = useSchemaStore();
   const { user } = useAuth();
-  const [lead, setLead] = useState<Lead | null>(null);
+  const [record, setRecord] = useState<CustomRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditForm, setShowEditForm] = useState(false);
 
-  // Get Lead object from schema
-  const leadObject = schema?.objects.find(obj => obj.apiName === 'Lead');
+  const slug = params.slug as string;
+  const recordId = params.id as string;
+  const storageKey = `custom_records_${slug}`;
 
-  // Load lead from localStorage
+  // Find the object definition from schema
+  const objectDef = useMemo(() => {
+    if (!schema) return null;
+    return schema.objects.find(obj => 
+      obj.apiName.toLowerCase() === slug.toLowerCase() ||
+      obj.label.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase()
+    );
+  }, [schema, slug]);
+
+  // Load schema on mount
   useEffect(() => {
-    const storedLeads = localStorage.getItem('leads');
-    if (storedLeads && params?.id) {
-      const leads: Lead[] = JSON.parse(storedLeads);
-      const foundLead = leads.find(l => l.id === params.id as string);
-      setLead(foundLead || null);
+    if (!schema) {
+      loadSchema();
+    }
+  }, [schema, loadSchema]);
+
+  // Load record from localStorage
+  useEffect(() => {
+    const storedRecords = localStorage.getItem(storageKey);
+    if (storedRecords && recordId) {
+      try {
+        const records: CustomRecord[] = JSON.parse(storedRecords);
+        const foundRecord = records.find(r => r.id === recordId);
+        setRecord(foundRecord || null);
+      } catch {
+        setRecord(null);
+      }
     }
     setLoading(false);
-  }, [params?.id]);
+  }, [recordId, storageKey]);
 
-  // Get the page layout for this lead
-  const getLayoutForLead = (): PageLayout | null => {
-    if (!lead || !leadObject) return null;
+  // Get the page layout for this record
+  const getLayoutForRecord = (): PageLayout | null => {
+    if (!record || !objectDef) return null;
 
     // Try to use the layout stored on the record
-    if (lead.pageLayoutId) {
-      const pageLayout = leadObject.pageLayouts?.find(l => l.id === lead.pageLayoutId);
+    if (record.pageLayoutId) {
+      const pageLayout = objectDef.pageLayouts?.find(l => l.id === record.pageLayoutId);
       if (pageLayout) return pageLayout;
     }
 
     // Fall back to the layout from the record type
-    const recordTypeId = lead.recordTypeId;
+    const recordTypeId = record.recordTypeId;
     const recordType = recordTypeId
-      ? leadObject.recordTypes?.find(rt => rt.id === recordTypeId)
-      : leadObject.recordTypes?.[0];
+      ? objectDef.recordTypes?.find(rt => rt.id === recordTypeId)
+      : objectDef.recordTypes?.[0];
 
     if (recordType?.pageLayoutId) {
-      const pageLayout = leadObject.pageLayouts?.find(l => l.id === recordType.pageLayoutId);
+      const pageLayout = objectDef.pageLayouts?.find(l => l.id === recordType.pageLayoutId);
       if (pageLayout) return pageLayout;
     }
 
     // Default to first layout
-    return leadObject.pageLayouts?.[0] || null;
+    return objectDef.pageLayouts?.[0] || null;
   };
 
-  const pageLayout = getLayoutForLead();
+  const pageLayout = getLayoutForRecord();
 
   // Helper function to get field definition
   const getFieldDef = (apiName: string): FieldDef | undefined => {
-    return leadObject?.fields.find(f => f.apiName === apiName);
+    return objectDef?.fields.find(f => f.apiName === apiName);
   };
 
   // Helper function to get lookup record display name
@@ -100,7 +120,23 @@ export default function LeadDetailPage() {
     };
     
     const storageKey = storageKeyMap[lookupObject];
-    if (!storageKey) return String(value);
+    if (!storageKey) {
+      // Check if it's a custom object
+      const customStorageKey = `custom_records_${lookupObject.toLowerCase()}`;
+      const customRecords = localStorage.getItem(customStorageKey);
+      if (customRecords) {
+        try {
+          const records = JSON.parse(customRecords);
+          const relatedRecord = records.find((r: any) => String(r.id) === String(value));
+          if (relatedRecord) {
+            return relatedRecord.name || relatedRecord.label || relatedRecord.title || String(value);
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+      return String(value);
+    }
 
     const storedRecords = localStorage.getItem(storageKey);
     if (!storedRecords) return String(value);
@@ -110,7 +146,6 @@ export default function LeadDetailPage() {
       const relatedRecord = records.find((r: any) => String(r.id) === String(value));
       
       if (relatedRecord) {
-        // Handle each object type with appropriate display fields
         switch (lookupObject) {
           case 'Contact': {
             const name = relatedRecord.name;
@@ -147,7 +182,9 @@ export default function LeadDetailPage() {
             return relatedRecord.name || relatedRecord.label || String(value);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Ignore parse errors
+    }
 
     return String(value);
   };
@@ -158,11 +195,12 @@ export default function LeadDetailPage() {
 
     const fieldType = fieldDef?.type;
 
-    // Handle Lookup fields
+    // Handle Lookup fields - show the related record's name, not the ID
     if (fieldType === 'Lookup' && fieldDef) {
       const displayName = getLookupDisplayName(fieldDef, value);
       const lookupObject = fieldDef.lookupObject;
       
+      // Make it a link if we know the object type
       if (lookupObject) {
         const routeMap: Record<string, string> = {
           'Contact': 'contacts',
@@ -170,9 +208,9 @@ export default function LeadDetailPage() {
           'Property': 'properties',
           'Lead': 'leads',
           'Deal': 'deals',
-          'Project': 'projects',
           'Product': 'products',
           'Quote': 'quotes',
+          'Project': 'projects',
           'Service': 'service',
           'Installation': 'installations'
         };
@@ -184,6 +222,12 @@ export default function LeadDetailPage() {
             </Link>
           );
         }
+        // Check if it's a custom object
+        return (
+          <Link href={`/objects/${lookupObject.toLowerCase()}/${value}`} className="text-indigo-600 hover:text-indigo-700">
+            {displayName}
+          </Link>
+        );
       }
       return displayName;
     }
@@ -219,69 +263,102 @@ export default function LeadDetailPage() {
   };
 
   const handleEditSubmit = (data: Record<string, any>) => {
-    if (lead) {
+    if (record && objectDef) {
       const currentUserName = user?.name || user?.email || 'System';
-      const updatedLead: Lead = {
-        ...lead,
+      const updatedRecord: CustomRecord = {
+        ...record,
         ...data,
         lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
+        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
       };
       
-      const storedLeads = localStorage.getItem('leads');
-      if (storedLeads) {
-        const leads: Lead[] = JSON.parse(storedLeads);
-        const updatedLeads = leads.map(l => 
-          l.id === lead.id ? updatedLead : l
-        );
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      const storedRecords = localStorage.getItem(storageKey);
+      if (storedRecords) {
+        try {
+          const records: CustomRecord[] = JSON.parse(storedRecords);
+          const updatedRecords = records.map(r => 
+            r.id === record.id ? updatedRecord : r
+          );
+          localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
+        } catch {
+          // Ignore parse errors
+        }
       }
       
-      setLead(updatedLead);
+      setRecord(updatedRecord);
     }
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this lead?')) {
-      const storedLeads = localStorage.getItem('leads');
-      if (storedLeads && lead) {
-        const leads: Lead[] = JSON.parse(storedLeads);
-        const updatedLeads = leads.filter(l => l.id !== lead.id);
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+    if (confirm('Are you sure you want to delete this record?')) {
+      const storedRecords = localStorage.getItem(storageKey);
+      if (storedRecords && record) {
+        try {
+          const records: CustomRecord[] = JSON.parse(storedRecords);
+          const updatedRecords = records.filter(r => r.id !== record.id);
+          localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
+        } catch {
+          // Ignore parse errors
+        }
       }
-      router.push('/leads');
+      router.push(`/objects/${slug}`);
     }
   };
 
-  const convertLeadToFormData = (l: Lead): Record<string, any> => {
+  const convertRecordToFormData = (rec: CustomRecord): Record<string, any> => {
     const formData: Record<string, any> = {};
-    Object.keys(l).forEach(key => {
-      formData[key] = l[key];
+    Object.keys(rec).forEach(key => {
+      formData[key] = rec[key];
     });
     return formData;
   };
 
-  if (loading) {
+  // Get display name for the record
+  const getRecordDisplayName = (): string => {
+    if (!record) return 'Record';
+    // Try common name fields
+    return record.name || record.title || record.label || record.id || 'Record';
+  };
+
+  if (loading || !schema) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading lead...</div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
-  if (!lead) {
+  if (!objectDef) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Lightbulb className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Lead Not Found</h2>
-          <p className="text-gray-600 mb-6">The lead you're looking for doesn't exist.</p>
+          <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Object Not Found</h2>
+          <p className="text-gray-600 mb-6">The object &quot;{slug}&quot; does not exist.</p>
           <Link
-            href="/leads"
+            href="/object-manager"
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+          >
+            Go to Object Manager
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!record) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Database className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Record Not Found</h2>
+          <p className="text-gray-600 mb-6">The record you&apos;re looking for doesn&apos;t exist.</p>
+          <Link
+            href={`/objects/${slug}`}
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Leads
+            Back to {objectDef.label}
           </Link>
         </div>
       </div>
@@ -294,25 +371,22 @@ export default function LeadDetailPage() {
         {/* Header */}
         <div className="mb-8">
           <Link
-            href="/leads"
+            href={`/objects/${slug}`}
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Leads
+            Back to {objectDef.label}
           </Link>
           
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <Lightbulb className="w-6 h-6 text-yellow-600" />
+                <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <Database className="w-6 h-6 text-indigo-600" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{lead.leadNumber}</h1>
-                  <p className="text-gray-600">
-                    {typeof lead.contactName === 'object' ? formatFieldValue(lead.contactName, 'Name') : lead.contactName}
-                    {lead.stage && <> - {lead.stage}</>}
-                  </p>
+                  <h1 className="text-2xl font-bold text-gray-900">{getRecordDisplayName()}</h1>
+                  <p className="text-gray-600">{objectDef.label}</p>
                 </div>
               </div>
             </div>
@@ -373,7 +447,8 @@ export default function LeadDetailPage() {
                                 {rowFields.map((layoutField) => {
                                   if (!layoutField) return null;
                                   const fieldDef = getFieldDef(layoutField.apiName);
-                                  const value = lead[layoutField.apiName] || lead[layoutField.apiName.replace(/^[^_]+__/, '')];
+                                  // Try both with and without prefix
+                                  const value = record[layoutField.apiName] || record[layoutField.apiName.replace(/^[^_]+__/, '')];
                                   
                                   if (!fieldDef) return null;
 
@@ -402,22 +477,25 @@ export default function LeadDetailPage() {
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
-            No page layout configured for this lead's record type.
+            No page layout configured for this record type.
+            <Link href={`/object-manager/${objectDef.apiName}`} className="ml-2 text-indigo-600 hover:underline">
+              Configure in Object Manager
+            </Link>
           </div>
         )}
       </div>
 
       {/* Edit Form Dialog */}
-      {pageLayout && (
+      {pageLayout && objectDef && (
         <DynamicFormDialog
           open={showEditForm}
           onOpenChange={setShowEditForm}
-          objectApiName="Lead"
+          objectApiName={objectDef.apiName}
           layoutType="edit"
           layoutId={pageLayout.id}
-          recordData={convertLeadToFormData(lead)}
+          recordData={convertRecordToFormData(record)}
           onSubmit={handleEditSubmit}
-          title={`Edit ${lead.leadNumber}`}
+          title={`Edit ${getRecordDisplayName()}`}
         />
       )}
     </div>

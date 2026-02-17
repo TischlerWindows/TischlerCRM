@@ -30,7 +30,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Lead {
@@ -139,6 +139,18 @@ export default function LeadsPage() {
       };
     });
   }, [leadObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('leadSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
   useEffect(() => {
@@ -266,9 +278,18 @@ export default function LeadsPage() {
   };
 
   const filteredLeads = leads.filter(lead => {
+    // Format contactName for search - handle both string and object
+    const contactNameStr = typeof lead.contactName === 'object' 
+      ? formatFieldValue(lead.contactName, 'Name') 
+      : String(lead.contactName || '');
+    // Format propertyAddress for search - handle both string and object
+    const propertyAddressStr = typeof lead.propertyAddress === 'object'
+      ? formatFieldValue(lead.propertyAddress, 'Address')
+      : String(lead.propertyAddress || '');
+    
     const matchesSearch = lead.leadNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.contactName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.propertyAddress.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contactNameStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      propertyAddressStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.stage.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.source.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -393,6 +414,12 @@ export default function LeadsPage() {
       return '-';
     }
     
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
     if (Array.isArray(value)) {
       return value.length > 0 ? value.join(', ') : '-';
     }
@@ -400,6 +427,7 @@ export default function LeadsPage() {
     if (typeof value === 'object') {
       let fieldType = undefined;
       if (columnId === 'propertyAddress') fieldType = 'Address';
+      if (columnId === 'contactName' || columnId.toLowerCase().includes('name')) fieldType = 'Name';
       return formatFieldValue(value, fieldType);
     }
     
@@ -441,6 +469,7 @@ export default function LeadsPage() {
     const newLead: Lead = {
       id: newLeadId,
       leadNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       ...normalizedData,
       contactName: normalizedData.contactName || '',
       propertyAddress: normalizedData.propertyAddress || '',
@@ -691,7 +720,7 @@ export default function LeadsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50">
+                  <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
@@ -703,7 +732,7 @@ export default function LeadsPage() {
                           </Link>
                         ) : column.id === 'contactName' ? (
                           <Link href={`/leads/${lead.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                            {lead.contactName}
+                            {formatColumnValue(lead, 'contactName')}
                           </Link>
                         ) : column.id === 'stage' ? (
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -721,7 +750,7 @@ export default function LeadsPage() {
                         </td>
                       );
                     })}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === lead.id ? null : lead.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -731,6 +760,16 @@ export default function LeadsPage() {
                       {openDropdown === lead.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/leads/${lead.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteLead(lead.id);
@@ -745,7 +784,7 @@ export default function LeadsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(lead.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -833,6 +872,7 @@ export default function LeadsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('leadSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

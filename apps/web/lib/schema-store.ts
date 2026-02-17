@@ -21,7 +21,7 @@ export interface SchemaStore {
   loadSchema: () => Promise<void>;
   saveSchema: () => Promise<void>;
   createObject: (objectDef: Omit<ObjectDef, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  updateObject: (objectApi: string, updates: Partial<ObjectDef>) => void;
+  updateObject: (objectApi: string, updates: Partial<ObjectDef>) => Promise<void>;
   deleteObject: (objectApi: string) => Promise<void>;
   
   // Field operations
@@ -244,15 +244,21 @@ export const useSchemaStore = create<SchemaStore>()(
 
         const updatedSchema = {
           ...schema,
-          objects: [...updatedExisting, newObjectWithLayouts]
+          objects: [...updatedExisting, newObjectWithLayouts],
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
         };
 
         set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
+        
         return newObject.id;
       },
 
       // Update existing object
-      updateObject: (objectApi, updates) => {
+      updateObject: async (objectApi, updates) => {
         const { schema } = get();
         if (!schema) return;
 
@@ -262,12 +268,17 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+        
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
       },
 
       // Delete object
@@ -276,12 +287,17 @@ export const useSchemaStore = create<SchemaStore>()(
         if (!schema) return;
 
         const updatedObjects = schema.objects.filter(obj => obj.apiName !== objectApi);
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+        
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
       },
 
       // Add field to object
@@ -447,12 +463,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete record type
@@ -470,12 +488,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Add page layout
@@ -496,12 +516,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
 
         return layoutId;
       },
@@ -523,12 +545,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete page layout
@@ -546,12 +570,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Add validation rule
@@ -572,12 +598,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
 
         return ruleId;
       },
@@ -599,12 +627,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete validation rule
@@ -622,12 +652,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Update permissions
@@ -639,12 +671,14 @@ export const useSchemaStore = create<SchemaStore>()(
           ? schema.permissionSets.map(ps => ps.id === permissionSet.id ? permissionSet : ps)
           : [...schema.permissionSets, permissionSet];
 
-        set({
-          schema: {
-            ...schema,
-            permissionSets: updatedPermissionSets
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          permissionSets: updatedPermissionSets,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Get version history

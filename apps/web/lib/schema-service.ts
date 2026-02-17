@@ -429,6 +429,50 @@ class LocalStorageSchemaService implements SchemaService {
       try {
         const schema = JSON.parse(stored);
         
+        // Check if Contact object has Name field - if not, add it
+        // Also fix if it exists but is not CompositeText with proper subFields
+        const contactObj = schema.objects?.find((o: any) => o.apiName === 'Contact');
+        if (contactObj) {
+          const nameFieldIndex = contactObj.fields?.findIndex((f: any) => f.apiName === 'Contact__name');
+          if (nameFieldIndex === -1) {
+            console.log('[Schema] Adding missing Contact__name field');
+            const nameField = {
+              id: Math.random().toString(36).substr(2, 9),
+              apiName: 'Contact__name',
+              label: 'Name',
+              type: 'CompositeText',
+              maxLength: 255,
+              helpText: 'Full name of the contact',
+              custom: true,
+              subFields: [
+                { apiName: 'Contact__name_salutation', label: 'Salutation', type: 'Picklist' },
+                { apiName: 'Contact__name_firstName', label: 'First Name', type: 'Text' },
+                { apiName: 'Contact__name_lastName', label: 'Last Name', type: 'Text' }
+              ]
+            };
+            // Insert at the beginning of custom fields (after system fields)
+            const systemFieldCount = contactObj.fields.filter((f: any) => SYSTEM_FIELDS.some(sf => sf.apiName === f.apiName)).length;
+            contactObj.fields.splice(systemFieldCount, 0, nameField);
+            await this.saveSchema(schema);
+            return schema;
+          } else if (nameFieldIndex >= 0 && contactObj.fields[nameFieldIndex].type !== 'CompositeText') {
+            console.log('[Schema] Fixing Contact__name field - converting to CompositeText');
+            contactObj.fields[nameFieldIndex] = {
+              ...contactObj.fields[nameFieldIndex],
+              type: 'CompositeText',
+              readOnly: false,
+              helpText: 'Full name of the contact',
+              subFields: [
+                { apiName: 'Contact__name_salutation', label: 'Salutation', type: 'Picklist' },
+                { apiName: 'Contact__name_firstName', label: 'First Name', type: 'Text' },
+                { apiName: 'Contact__name_lastName', label: 'Last Name', type: 'Text' }
+              ]
+            };
+            await this.saveSchema(schema);
+            return schema;
+          }
+        }
+        
         // Auto-migrate: Mark all non-system fields as custom if not already marked
         let migratedSchema = this.ensureCustomFieldsMarked(schema);
         migratedSchema = this.ensureHomeObject(migratedSchema);
@@ -2807,10 +2851,14 @@ class LocalStorageSchemaService implements SchemaService {
           id: generateId(),
           apiName: 'Contact__name',
           label: 'Name',
-          type: 'Text',
-          readOnly: true,
+          type: 'CompositeText',
           maxLength: 255,
-          helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)'
+          helpText: 'Full name of the contact',
+          subFields: [
+            { apiName: 'Contact__name_salutation', label: 'Salutation', type: 'Picklist' },
+            { apiName: 'Contact__name_firstName', label: 'First Name', type: 'Text' },
+            { apiName: 'Contact__name_lastName', label: 'Last Name', type: 'Text' }
+          ]
         },
         {
           id: generateId(),

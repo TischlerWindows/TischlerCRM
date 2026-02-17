@@ -53,8 +53,24 @@ import {
   Database,
   FileText,
   Calendar,
-  Users
+  Users,
+  Lock
 } from 'lucide-react';
+
+// Core objects that cannot be deleted
+const CORE_OBJECTS = new Set([
+  'Property',
+  'Contact',
+  'Account',
+  'Product',
+  'Lead',
+  'Deal',
+  'Project',
+  'Service',
+  'Quote',
+  'Installation',
+  'Home',
+]);
 
 export default function ObjectManagerPage() {
   const router = useRouter();
@@ -114,8 +130,8 @@ export default function ObjectManagerPage() {
       setShowCreateDialog(false);
       setCreateForm({ label: '', apiName: '', description: '' });
       
-      // Navigate to the new object
-      router.push(`/object-manager/${apiName}`);
+      // Navigate to the new object's records list page (like properties)
+      router.push(`/objects/${apiName}`);
     } catch (err) {
       console.error('Failed to create object:', err);
     }
@@ -125,6 +141,29 @@ export default function ObjectManagerPage() {
     if (confirm(`Are you sure you want to delete the ${objectApi} object? This action cannot be undone.`)) {
       try {
         await deleteObject(objectApi);
+        
+        // Remove object from navigation tabs
+        const savedTabsStr = localStorage.getItem('tabConfiguration');
+        if (savedTabsStr) {
+          try {
+            const savedTabs = JSON.parse(savedTabsStr);
+            // Filter out tabs that match this object (both /objects/slug and direct routes)
+            const updatedTabs = savedTabs.filter((tab: { name: string; href: string }) => {
+              const lowerApiName = objectApi.toLowerCase();
+              return tab.href !== `/objects/${lowerApiName}` && 
+                     tab.href !== `/${lowerApiName}`;
+            });
+            localStorage.setItem('tabConfiguration', JSON.stringify(updatedTabs));
+          } catch (e) {
+            console.error('Error updating tab configuration:', e);
+          }
+        }
+        
+        // Remove custom records storage for this object
+        localStorage.removeItem(`custom_records_${objectApi.toLowerCase()}`);
+        localStorage.removeItem(`${objectApi.toLowerCase()}VisibleColumns`);
+        localStorage.removeItem(`${objectApi.toLowerCase()}SelectedLayoutId`);
+        
       } catch (err) {
         console.error('Failed to delete object:', err);
       }
@@ -446,13 +485,20 @@ export default function ObjectManagerPage() {
                             <Copy className="h-4 w-4 mr-2" />
                             Clone
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteObject(object.apiName)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {CORE_OBJECTS.has(object.apiName) ? (
+                            <div className="flex items-center px-2 py-1.5 text-sm text-gray-400 bg-gray-50">
+                              <Lock className="h-4 w-4 mr-2" />
+                              Cannot delete - contact admin
+                            </div>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteObject(object.apiName)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

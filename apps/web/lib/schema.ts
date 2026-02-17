@@ -7,7 +7,7 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address";
+  | "Time" | "URL" | "Address" | "CompositeText";
 
 export interface FieldDef {
   id: string;
@@ -55,6 +55,11 @@ export interface FieldDef {
     displayFormat: string;
     startingNumber: number;
   };
+  subFields?: Array<{
+    apiName: string;
+    label: string;
+    type: string;
+  }>;
 }
 
 export interface ValidationRule {

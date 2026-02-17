@@ -31,7 +31,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
 import { applyFilters, describeCondition } from '@/lib/filter-utils';
-import { cn, formatFieldValue } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 
 interface Contact {
@@ -98,7 +98,7 @@ export default function ContactsPage() {
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
-  const { schema } = useSchemaStore();
+  const { schema, loadSchema } = useSchemaStore();
   const pathname = usePathname();
   const router = useRouter();
   
@@ -138,7 +138,7 @@ export default function ContactsPage() {
     }
 
     // Generate columns from schema fields
-    return contactObject.fields.map((field, index) => {
+    const columns = contactObject.fields.map((field, index) => {
       // Strip the Contact__ prefix for display
       const cleanApiName = field.apiName.replace('Contact__', '');
       
@@ -152,7 +152,25 @@ export default function ContactsPage() {
         defaultVisible
       };
     });
+    
+    return columns;
   }, [contactObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('contactSelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
+
+  useEffect(() => {
+    loadSchema();
+  }, [loadSchema]);
 
   useEffect(() => {
     const savedTabsStr = localStorage.getItem('tabConfiguration');
@@ -189,6 +207,7 @@ export default function ContactsPage() {
     const storedContacts = localStorage.getItem('contacts');
     if (storedContacts) {
       const parsedContacts = JSON.parse(storedContacts);
+      console.log('[Contacts] Raw stored contacts:', parsedContacts);
       const migratedContacts = parsedContacts.map((contact: any) => {
         const migrated = { ...contact };
         migrated.firstName = contact['Contact__firstName'] || contact.firstName || '';
@@ -197,8 +216,11 @@ export default function ContactsPage() {
         migrated.phone = contact['Contact__phone'] || contact.phone || '';
         migrated.company = contact['Contact__company'] || contact.company || '';
         migrated.title = contact['Contact__title'] || contact.title || '';
+        // Handle composite name field
+        migrated.name = contact['Contact__name'] || contact.name || null;
         return migrated as Contact;
       });
+      console.log('[Contacts] Migrated contacts:', migratedContacts);
       setContacts(migratedContacts);
       localStorage.setItem('contacts', JSON.stringify(migratedContacts));
     }
@@ -271,12 +293,23 @@ export default function ContactsPage() {
 
   const formatColumnValue = (contact: Contact, columnId: string) => {
     const value = contact[columnId];
+    console.log(`[Table] formatColumnValue for ${columnId}:`, value, 'typeof:', typeof value);
     if (value === null || value === undefined) return '-';
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
       let fieldType = undefined;
       if (columnId === 'address') fieldType = 'Address';
-      return formatFieldValue(value, fieldType);
+      if (columnId === 'name') fieldType = 'CompositeText';
+      const formatted = formatFieldValue(value, fieldType);
+      console.log(`[Table] formatFieldValue returned:`, formatted);
+      return formatted;
     }
     return String(value);
   };
@@ -416,6 +449,7 @@ export default function ContactsPage() {
     const newContact: Contact = {
       id: newContactId,
       contactNumber,
+      pageLayoutId: selectedLayoutId || undefined,
       lastActivity: today,
       createdBy: 'Development User',
       createdAt: today,
@@ -722,7 +756,7 @@ export default function ContactsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredContacts.map((contact) => (
-                  <tr key={contact.id} className="hover:bg-gray-50">
+                  <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contacts/${contact.id}`)}>
                     <td className="px-6 py-4 w-12">
                       <input
                         type="checkbox"
@@ -739,6 +773,10 @@ export default function ContactsPage() {
                           {column.id === 'contactNumber' ? (
                             <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                               {contact.contactNumber}
+                            </Link>
+                          ) : column.id === 'name' ? (
+                            <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {formatColumnValue(contact, column.id)}
                             </Link>
                           ) : column.id === 'firstName' || column.id === 'lastName' ? (
                             column.id === 'firstName' && isColumnVisible('lastName') ? (
@@ -762,7 +800,7 @@ export default function ContactsPage() {
                         </td>
                       );
                     })}
-                    <td className="px-6 py-4 text-sm relative">
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => setOpenDropdown(openDropdown === contact.id ? null : contact.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -772,6 +810,16 @@ export default function ContactsPage() {
                       {openDropdown === contact.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/contacts/${contact.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
                             <button
                               onClick={() => {
                                 handleDeleteContact(contact.id);
@@ -786,7 +834,7 @@ export default function ContactsPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleToggleFavorite(contact.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -839,7 +887,7 @@ export default function ContactsPage() {
             </div>
             <div className="p-6 space-y-3">
               {pageLayouts.map((layout) => (
-                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left">
+                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); localStorage.setItem('contactSelectedLayoutId', layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left">
                   <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Users className="w-5 h-5 text-indigo-600" />
                   </div>
