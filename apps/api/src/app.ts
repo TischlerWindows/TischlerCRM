@@ -1,5 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import serveStatic from '@fastify/static';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
@@ -15,6 +18,16 @@ export function buildApp() {
   const app = Fastify({ logger: true });
   app.register(cors, { origin: true });
 
+  // Serve Next.js static files (if built)
+  const nextStaticPath = path.join(__dirname, '../../web/.next/static');
+  if (fs.existsSync(nextStaticPath)) {
+    app.register(serveStatic, {
+      root: nextStaticPath,
+      prefix: '/_next/static/',
+    });
+  }
+
+  // Health check endpoint for Railway
   app.get('/health', async () => ({ ok: true }));
 
   // Auth: signup

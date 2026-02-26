@@ -3,7 +3,12 @@
   "compilerOptions": {
     "outDir": "dist",
     "types": ["node"],
-    "module": "ESNext"
+    "module": "ESNext",
+    "strict": false,
+    "noUncheckedIndexedAccess": false,
+    "noEmitOnError": false,
+    "declaration": false,
+    "sourceMap": false
   },
   "include": ["src/**/*.ts"]
 }
