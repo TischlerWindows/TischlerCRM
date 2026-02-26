@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Service {
   id: string;
@@ -183,6 +184,38 @@ export default function ServicePage() {
     setIsLoaded(true);
   }, []);
 
+  const fetchServices = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Service');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        serviceNumber: record.serviceNumber || '',
+        serviceName: record.serviceName || '',
+        accountName: record.accountName || '',
+        projectNumber: record.projectNumber || '',
+        serviceType: record.serviceType || '',
+        status: record.status || 'Scheduled',
+        scheduledDate: record.scheduledDate || '',
+        assignedTechnician: record.assignedTechnician || '',
+        priority: record.priority || 'Medium',
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setServices(flattenedRecords as Service[]);
+    } catch (error) {
+      console.error('Failed to fetch services from API, falling back to localStorage:', error);
+      const storedServices = localStorage.getItem('services');
+      if (storedServices) {
+        setServices(JSON.parse(storedServices));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('servicesVisibleColumns');
@@ -195,67 +228,8 @@ export default function ServicePage() {
       setVisibleColumns(defaultColumns);
     }
 
-    // Load services from localStorage or use mock data
-    const storedServices = localStorage.getItem('services');
-    if (storedServices) {
-      setServices(JSON.parse(storedServices));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          serviceNumber: 'SRV-001',
-          serviceName: 'Annual Window Maintenance',
-          accountName: 'Smith Residence',
-          projectNumber: 'PRJ-001',
-          serviceType: 'Maintenance',
-          status: 'Scheduled',
-          scheduledDate: '2024-12-10',
-          assignedTechnician: 'John Doe',
-          priority: 'Medium',
-          createdBy: 'Development User',
-          createdAt: '2024-11-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-20'
-        },
-        {
-          id: '2',
-          serviceNumber: 'SRV-002',
-          serviceName: 'Door Lock Repair',
-          accountName: 'Garcia Property',
-          projectNumber: 'PRJ-002',
-          serviceType: 'Repair',
-          status: 'In Progress',
-          scheduledDate: '2024-12-05',
-          assignedTechnician: 'Jane Smith',
-          priority: 'High',
-          createdBy: 'Development User',
-          createdAt: '2024-11-22',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-12-01'
-        },
-        {
-          id: '3',
-          serviceNumber: 'SRV-003',
-          serviceName: 'Window Seal Inspection',
-          accountName: 'Chen Family Home',
-          projectNumber: 'PRJ-003',
-          serviceType: 'Inspection',
-          status: 'Completed',
-          scheduledDate: '2024-11-28',
-          assignedTechnician: 'John Doe',
-          priority: 'Low',
-          createdBy: 'Development User',
-          createdAt: '2024-11-18',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-29'
-        }
-      ];
-      setServices(mockData);
-      localStorage.setItem('services', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    fetchServices();
+  }, [fetchServices]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -399,78 +373,138 @@ export default function ServicePage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Service__serviceName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Service__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Service__serviceName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Service__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique service number
-    const existingNumbers = services
-      .map(s => s.serviceNumber)
-      .filter(num => num.startsWith('SRV-'))
-      .map(num => parseInt(num.replace('SRV-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newServiceId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newService: Service = {
-      id: newServiceId,
-      serviceNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      serviceName: normalizedData.serviceName || '',
-      accountName: normalizedData.accountName || '',
-      projectNumber: normalizedData.projectNumber || '',
-      serviceType: normalizedData.serviceType || 'Maintenance',
-      status: normalizedData.status || 'Scheduled',
-      scheduledDate: normalizedData.scheduledDate || today,
-      assignedTechnician: normalizedData.assignedTechnician || '',
-      priority: normalizedData.priority || 'Medium',
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || ''
-    };
+      // Generate unique service number
+      const existingNumbers = services
+        .map(s => s.serviceNumber)
+        .filter(num => num.startsWith('SRV-'))
+        .map(num => parseInt(num.replace('SRV-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        serviceNumber,
+        ...normalizedData,
+        serviceName: normalizedData.serviceName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        serviceType: normalizedData.serviceType || 'Maintenance',
+        status: normalizedData.status || 'Scheduled',
+        scheduledDate: normalizedData.scheduledDate || today,
+        assignedTechnician: normalizedData.assignedTechnician || '',
+        priority: normalizedData.priority || 'Medium'
+      };
 
-    const updatedServices = [newService, ...services];
-    setServices(updatedServices);
-    localStorage.setItem('services', JSON.stringify(updatedServices));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('serviceLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newServiceId] = selectedLayoutId;
-      localStorage.setItem('serviceLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created service's detail page
-    router.push(`/service/${newServiceId}`);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Service', recordData, selectedLayoutId);
+      
+      const newService: Service = {
+        id: result.id,
+        serviceNumber,
+        ...normalizedData,
+        serviceName: normalizedData.serviceName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        serviceType: normalizedData.serviceType || 'Maintenance',
+        status: normalizedData.status || 'Scheduled',
+        scheduledDate: normalizedData.scheduledDate || today,
+        assignedTechnician: normalizedData.assignedTechnician || '',
+        priority: normalizedData.priority || 'Medium',
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
 
-  const handleDeleteService = (id: string) => {
-    if (confirm('Are you sure you want to delete this service?')) {
-      const updatedServices = services.filter(s => s.id !== id);
+      const updatedServices = [newService, ...services];
       setServices(updatedServices);
       localStorage.setItem('services', JSON.stringify(updatedServices));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/service/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create service:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Service__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = services
+        .map(s => s.serviceNumber)
+        .filter(num => num.startsWith('SRV-'))
+        .map(num => parseInt(num.replace('SRV-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const newServiceId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const newService: Service = {
+        id: newServiceId,
+        serviceNumber,
+        pageLayoutId: selectedLayoutId || undefined,
+        ...normalizedData,
+        serviceName: normalizedData.serviceName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        serviceType: normalizedData.serviceType || 'Maintenance',
+        status: normalizedData.status || 'Scheduled',
+        scheduledDate: normalizedData.scheduledDate || today,
+        assignedTechnician: normalizedData.assignedTechnician || '',
+        priority: normalizedData.priority || 'Medium',
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
+
+      const updatedServices = [newService, ...services];
+      setServices(updatedServices);
+      localStorage.setItem('services', JSON.stringify(updatedServices));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/service/${newServiceId}`);
+    }
+  };
+
+  const handleDeleteService = async (id: string) => {
+    if (confirm('Are you sure you want to delete this service?')) {
+      try {
+        await recordsService.deleteRecord('Service', id);
+        const updatedServices = services.filter(s => s.id !== id);
+        setServices(updatedServices);
+        localStorage.setItem('services', JSON.stringify(updatedServices));
+      } catch (error) {
+        console.error('Failed to delete service from API, trying locally:', error);
+        const updatedServices = services.filter(s => s.id !== id);
+        setServices(updatedServices);
+        localStorage.setItem('services', JSON.stringify(updatedServices));
+      }
     }
   };
 

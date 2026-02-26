@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -33,6 +33,7 @@ import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters'
 import { applyFilters, describeCondition } from '@/lib/filter-utils';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Contact {
   id: string;
@@ -203,28 +204,38 @@ export default function ContactsPage() {
     setIsLoaded(true);
   }, []);
 
-  useEffect(() => {
-    const storedContacts = localStorage.getItem('contacts');
-    if (storedContacts) {
-      const parsedContacts = JSON.parse(storedContacts);
-      console.log('[Contacts] Raw stored contacts:', parsedContacts);
-      const migratedContacts = parsedContacts.map((contact: any) => {
-        const migrated = { ...contact };
-        migrated.firstName = contact['Contact__firstName'] || contact.firstName || '';
-        migrated.lastName = contact['Contact__lastName'] || contact.lastName || '';
-        migrated.email = contact['Contact__email'] || contact.email || '';
-        migrated.phone = contact['Contact__phone'] || contact.phone || '';
-        migrated.company = contact['Contact__company'] || contact.company || '';
-        migrated.title = contact['Contact__title'] || contact.title || '';
-        // Handle composite name field
-        migrated.name = contact['Contact__name'] || contact.name || null;
-        return migrated as Contact;
-      });
-      console.log('[Contacts] Migrated contacts:', migratedContacts);
-      setContacts(migratedContacts);
-      localStorage.setItem('contacts', JSON.stringify(migratedContacts));
+  // Fetch contacts from API
+  const fetchContacts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Contact');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        contactNumber: record.contactNumber || '',
+        firstName: record.firstName || '',
+        lastName: record.lastName || '',
+        email: record.email || '',
+        phone: record.phone || '',
+        company: record.company || '',
+        title: record.title || '',
+        status: record.status || 'Active',
+        lastActivity: record.updatedAt || new Date().toISOString(),
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+        isFavorite: record.isFavorite || false,
+      }));
+      setContacts(flattenedRecords as Contact[]);
+    } catch (error) {
+      console.error('Failed to fetch contacts from API, falling back to localStorage:', error);
+      const storedContacts = localStorage.getItem('contacts');
+      if (storedContacts) {
+        setContacts(JSON.parse(storedContacts));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -234,7 +245,10 @@ export default function ContactsPage() {
     } else {
       setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
     }
-  }, []);
+
+    // Fetch contacts from API
+    fetchContacts();
+  }, [fetchContacts]);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)
@@ -439,56 +453,78 @@ export default function ContactsPage() {
     });
   }, [contacts, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = async (data: Record<string, any>) => {
     const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C-')).map(num => parseInt(num.replace('C-', ''), 10)).filter(num => !isNaN(num));
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
-    const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
-    const newContactId = String(Date.now());
-    
-    const newContact: Contact = {
-      id: newContactId,
+
+    const recordData = {
       contactNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      lastActivity: today,
-      createdBy: 'Development User',
-      createdAt: today,
-      lastModifiedBy: 'Development User',
-      lastModifiedAt: today,
-      ...data,
       firstName: data['Contact__firstName'] || data.firstName || '',
       lastName: data['Contact__lastName'] || data.lastName || '',
       email: data['Contact__email'] || data.email || '',
       phone: data['Contact__phone'] || data.phone || '',
       company: data['Contact__company'] || data.company || '',
       title: data['Contact__title'] || data.title || '',
-      status: data.status || 'Active'
+      status: data.status || 'Active',
+      ...data,
     };
 
-    const updatedContacts = [newContact, ...contacts];
-    setContacts(updatedContacts);
-    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('contactLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newContactId] = selectedLayoutId;
-      localStorage.setItem('contactLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created contact's detail page
-    router.push(`/contacts/${newContactId}`);
-  };
+    try {
+      const createdRecord = await recordsService.createRecord('Contact', { data: recordData });
+      
+      if (!createdRecord) {
+        throw new Error('Failed to create record - null response');
+      }
 
-  const handleDeleteContact = (id: string) => {
-    if (confirm('Are you sure you want to delete this contact?')) {
-      const updatedContacts = contacts.filter(c => c.id !== id);
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      await fetchContacts();
+      router.push(`/contacts/${createdRecord.id}`);
+    } catch (error) {
+      console.error('Failed to create record via API, falling back to localStorage:', error);
+      const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
+      const newContactId = String(Date.now());
+      
+      const newContact: Contact = {
+        id: newContactId,
+        contactNumber,
+        pageLayoutId: selectedLayoutId || undefined,
+        lastActivity: today,
+        createdBy: 'Development User',
+        createdAt: today,
+        lastModifiedBy: 'Development User',
+        lastModifiedAt: today,
+        ...data,
+        firstName: data['Contact__firstName'] || data.firstName || '',
+        lastName: data['Contact__lastName'] || data.lastName || '',
+        email: data['Contact__email'] || data.email || '',
+        phone: data['Contact__phone'] || data.phone || '',
+        company: data['Contact__company'] || data.company || '',
+        title: data['Contact__title'] || data.title || '',
+        status: data.status || 'Active'
+      };
+
+      const updatedContacts = [newContact, ...contacts];
       setContacts(updatedContacts);
       localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/contacts/${newContactId}`);
+    }
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    if (confirm('Are you sure you want to delete this contact?')) {
+      try {
+        await recordsService.deleteRecord('Contact', id);
+        await fetchContacts();
+      } catch (error) {
+        console.error('Failed to delete contact:', error);
+        const updatedContacts = contacts.filter(c => c.id !== id);
+        setContacts(updatedContacts);
+        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+      }
     }
   };
 

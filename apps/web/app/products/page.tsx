@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -33,6 +33,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Product {
   id: string;
@@ -207,6 +208,38 @@ export default function ProductsPage() {
     setIsLoaded(true);
   }, []);
 
+  const fetchProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Product');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
+        productCode: record.productCode || '',
+        productName: record.productName || '',
+        category: record.category || '',
+        unitPrice: record.unitPrice || 0,
+        unitOfMeasure: record.unitOfMeasure || '',
+        inStock: record.inStock || false,
+        stockQuantity: record.stockQuantity || 0,
+        supplier: record.supplier || '',
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setProducts(flattenedRecords as Product[]);
+    } catch (error) {
+      console.error('Failed to fetch products from API, falling back to localStorage:', error);
+      const storedProducts = localStorage.getItem('products');
+      if (storedProducts) {
+        setProducts(JSON.parse(storedProducts));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [schema]);
+
   useEffect(() => {
     // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('productsVisibleColumns');
@@ -219,51 +252,8 @@ export default function ProductsPage() {
       setVisibleColumns(defaultColumns);
     }
 
-    // Load products from localStorage or use mock data
-    const storedProducts = localStorage.getItem('products');
-    if (storedProducts) {
-      setProducts(JSON.parse(storedProducts));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
-          productCode: 'PROD-001',
-          productName: 'Double-Hung Window 32x48',
-          category: 'Windows',
-          unitPrice: 450.00,
-          unitOfMeasure: 'Each',
-          inStock: true,
-          stockQuantity: 25,
-          supplier: 'Premier Glass Co',
-          createdBy: 'Development User',
-          createdAt: '2024-01-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-10'
-        },
-        {
-          id: '2',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
-          productCode: 'PROD-002',
-          productName: 'Energy-Efficient Doors',
-          category: 'Doors',
-          unitPrice: 850.00,
-          unitOfMeasure: 'Each',
-          inStock: true,
-          stockQuantity: 12,
-          supplier: 'DuraDoor Manufacturing',
-          createdBy: 'Development User',
-          createdAt: '2024-02-10',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-12'
-        }
-      ];
-      setProducts(mockData);
-      localStorage.setItem('products', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -440,86 +430,154 @@ export default function ProductsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
-    
-    // Map schema field names (e.g., Product__productName) to simple property names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Product__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
+      
+      // Map schema field names (e.g., Product__productName) to simple property names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Product__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-      console.log(`  ${key} -> ${cleanKey}:`, value);
-    });
-    
-    console.log('📝 Normalized data:', normalizedData);
-    
-    const existingNumbers = products
-      .map(p => p.productCode)
-      .filter(code => code.startsWith('PROD-'))
-      .map(code => parseInt(code.replace('PROD-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newProductId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'System';
-    
-    // Get default record type
-    const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
-    
-    const newProduct: Product = {
-      id: newProductId,
-      recordTypeId: defaultRecordType?.id,
-      pageLayoutId: layoutId, // Store the layout ID used to create this record
-      productCode,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || '',
-      ...normalizedData, // Include all fields from the form
-      // Override with defaults only if not provided
-      productName: normalizedData.productName || '',
-      category: normalizedData.category || '',
-      unitPrice: normalizedData.unitPrice || 0,
-      unitOfMeasure: normalizedData.unitOfMeasure || '',
-      inStock: normalizedData.inStock ?? false,
-      stockQuantity: normalizedData.stockQuantity || 0,
-      supplier: normalizedData.supplier || '',
-    };
-    
-    console.log('💾 New product object:', newProduct);
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+        console.log(`  ${key} -> ${cleanKey}:`, value);
+      });
+      
+      console.log('📝 Normalized data:', normalizedData);
+      
+      const existingNumbers = products
+        .map(p => p.productCode)
+        .filter(code => code.startsWith('PROD-'))
+        .map(code => parseInt(code.replace('PROD-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'System';
+      const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
+      
+      const recordData = {
+        productCode,
+        productName: normalizedData.productName || '',
+        category: normalizedData.category || '',
+        unitPrice: normalizedData.unitPrice || 0,
+        unitOfMeasure: normalizedData.unitOfMeasure || '',
+        inStock: normalizedData.inStock ?? false,
+        stockQuantity: normalizedData.stockQuantity || 0,
+        supplier: normalizedData.supplier || '',
+        ...normalizedData
+      };
 
-    const updatedProducts = [newProduct, ...products];
-    setProducts(updatedProducts);
-    localStorage.setItem('products', JSON.stringify(updatedProducts));
-    
-    console.log('✅ New product saved:', newProduct);
-    console.log('📍 Redirecting to:', `/products/${newProductId}`);
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    
-    // Redirect to the newly created product's detail page after a small delay to ensure data is persisted
-    setTimeout(() => {
-      console.log('🔄 Pushing route to:', `/products/${newProductId}`);
-      console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('products') || '[]').map((p: any) => p.id));
-      router.push(`/products/${newProductId}`);
-    }, 200);
-  };
+      const result = await recordsService.createRecord('Product', recordData, layoutId);
+      
+      const newProduct: Product = {
+        id: result.id,
+        recordTypeId: defaultRecordType?.id,
+        productCode,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today,
+        ...normalizedData,
+        productName: normalizedData.productName || '',
+        category: normalizedData.category || '',
+        unitPrice: normalizedData.unitPrice || 0,
+        unitOfMeasure: normalizedData.unitOfMeasure || '',
+        inStock: normalizedData.inStock ?? false,
+        stockQuantity: normalizedData.stockQuantity || 0,
+        supplier: normalizedData.supplier || '',
+      };
+      
+      console.log('💾 New product object:', newProduct);
 
-  const handleDeleteProduct = (id: string) => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      const updatedProducts = products.filter(p => p.id !== id);
+      const updatedProducts = [newProduct, ...products];
       setProducts(updatedProducts);
       localStorage.setItem('products', JSON.stringify(updatedProducts));
+      
+      console.log('✅ New product saved:', newProduct);
+      console.log('📍 Redirecting to:', `/products/${result.id}`);
+      
+      setShowDynamicForm(false);
+      
+      setTimeout(() => {
+        console.log('🔄 Pushing route to:', `/products/${result.id}`);
+        console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('products') || '[]').map((p: any) => p.id));
+        router.push(`/products/${result.id}`);
+      }, 200);
+    } catch (error) {
+      console.error('Failed to create product:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Product__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = products
+        .map(p => p.productCode)
+        .filter(code => code.startsWith('PROD-'))
+        .map(code => parseInt(code.replace('PROD-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const newProductId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'System';
+      const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
+      
+      const newProduct: Product = {
+        id: newProductId,
+        recordTypeId: defaultRecordType?.id,
+        pageLayoutId: layoutId,
+        productCode,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today,
+        ...normalizedData,
+        productName: normalizedData.productName || '',
+        category: normalizedData.category || '',
+        unitPrice: normalizedData.unitPrice || 0,
+        unitOfMeasure: normalizedData.unitOfMeasure || '',
+        inStock: normalizedData.inStock ?? false,
+        stockQuantity: normalizedData.stockQuantity || 0,
+        supplier: normalizedData.supplier || '',
+      };
+
+      const updatedProducts = [newProduct, ...products];
+      setProducts(updatedProducts);
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      
+      setShowDynamicForm(false);
+      
+      setTimeout(() => {
+        router.push(`/products/${newProductId}`);
+      }, 200);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm('Are you sure you want to delete this product?')) {
+      try {
+        await recordsService.deleteRecord('Product', id);
+        const updatedProducts = products.filter(p => p.id !== id);
+        setProducts(updatedProducts);
+        localStorage.setItem('products', JSON.stringify(updatedProducts));
+      } catch (error) {
+        console.error('Failed to delete product from API, trying locally:', error);
+        const updatedProducts = products.filter(p => p.id !== id);
+        setProducts(updatedProducts);
+        localStorage.setItem('products', JSON.stringify(updatedProducts));
+      }
     }
   };
 

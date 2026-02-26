@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -33,6 +33,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Account {
   id: string;
@@ -216,6 +217,44 @@ export default function AccountsPage() {
     setIsLoaded(true);
   }, []);
 
+  // Fetch accounts from API
+  const fetchAccounts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Account');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        recordTypeId: schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0]?.id,
+        accountNumber: record.accountNumber || '',
+        accountName: record.name || '',
+        accountType: record.type || '',
+        status: record.status || 'Active',
+        website: record.website || '',
+        primaryEmail: record.email || '',
+        secondaryEmail: '',
+        primaryPhone: record.phone || '',
+        secondaryPhone: '',
+        accountNotes: '',
+        shippingAddress: '',
+        billingAddress: '',
+        accountOwner: record.createdBy || 'System',
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setAccounts(flattenedRecords as Account[]);
+    } catch (error) {
+      console.error('Failed to fetch accounts from API, falling back to localStorage:', error);
+      const storedAccounts = localStorage.getItem('accounts');
+      if (storedAccounts) {
+        setAccounts(JSON.parse(storedAccounts));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [schema]);
+
   useEffect(() => {
     // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('accountsVisibleColumns');
@@ -228,61 +267,9 @@ export default function AccountsPage() {
       setVisibleColumns(defaultColumns);
     }
 
-    // Load accounts from localStorage or use mock data
-    const storedAccounts = localStorage.getItem('accounts');
-    if (storedAccounts) {
-      setAccounts(JSON.parse(storedAccounts));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0]?.id,
-          accountNumber: 'A-001',
-          accountName: 'Architect Associates Inc.',
-          accountType: 'Architect Firm',
-          status: 'Active' as const,
-          website: 'https://architectassociates.com',
-          primaryEmail: 'info@architectassociates.com',
-          secondaryEmail: 'contact@architectassociates.com',
-          primaryPhone: '(416) 555-0100',
-          secondaryPhone: '(416) 555-0101',
-          accountNotes: 'Long-standing partner. Prefers modern design projects.',
-          shippingAddress: '123 Design Avenue, Toronto, ON M5V 3A3',
-          billingAddress: '123 Design Avenue, Toronto, ON M5V 3A3',
-          accountOwner: 'Development User',
-          createdBy: 'Development User',
-          createdAt: '2024-01-15',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-10'
-        },
-        {
-          id: '2',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0]?.id,
-          accountNumber: 'A-002',
-          accountName: 'Smith Residence',
-          accountType: 'Client/Homeowner',
-          status: 'Active' as const,
-          website: '',
-          primaryEmail: 'john.smith@email.com',
-          secondaryEmail: '',
-          primaryPhone: '(416) 555-0200',
-          secondaryPhone: '',
-          accountNotes: 'Interested in energy-efficient windows.',
-          shippingAddress: '456 Oak Street, Mississauga, ON L5B 2K5',
-          billingAddress: '456 Oak Street, Mississauga, ON L5B 2K5',
-          accountOwner: 'Development User',
-          createdBy: 'Development User',
-          createdAt: '2024-02-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-12'
-        }
-      ];
-      setAccounts(mockData);
-      localStorage.setItem('accounts', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    // Fetch accounts from API
+    fetchAccounts();
+  }, [fetchAccounts]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -444,23 +431,18 @@ export default function AccountsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
     
-    // Map schema field names (e.g., Account__accountName) to simple property names
     const normalizeFieldName = (fieldName: string): string => {
       return fieldName.replace('Account__', '');
     };
 
-    // Create normalized data object with simple field names
     const normalizedData: Record<string, any> = {};
     Object.entries(data).forEach(([key, value]) => {
       const cleanKey = normalizeFieldName(key);
       normalizedData[cleanKey] = value;
-      console.log(`  ${key} -> ${cleanKey}:`, value);
     });
-    
-    console.log('📝 Normalized data:', normalizedData);
     
     const existingNumbers = accounts
       .map(a => a.accountNumber)
@@ -469,66 +451,80 @@ export default function AccountsPage() {
       .filter(num => !isNaN(num));
     
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const accountNumber = `A-${String(nextNumber).padStart(3, '0')}`;
+    const accountNumber = `A-${String(maxNumber + 1).padStart(3, '0')}`;
     
-    const today = new Date().toISOString().split('T')[0];
-    const newAccountId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'System';
-    
-    // Get default record type
-    const defaultRecordType = schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0];
-    
-    const newAccount: Account = {
-      id: newAccountId,
-      recordTypeId: defaultRecordType?.id,
-      pageLayoutId: layoutId, // Store the layout ID used to create this record
+    const recordData = {
       accountNumber,
+      name: normalizedData.accountName || '',
+      type: normalizedData.accountType || '',
       status: normalizedData.status || 'Active',
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || '',
-      ...normalizedData, // Include all fields from the form
-      // Override with defaults only if not provided
-      accountName: normalizedData.accountName || '',
-      accountType: normalizedData.accountType || '',
+      email: normalizedData.primaryEmail || '',
+      phone: normalizedData.primaryPhone || '',
       website: normalizedData.website || '',
-      primaryEmail: normalizedData.primaryEmail || '',
-      secondaryEmail: normalizedData.secondaryEmail || '',
-      primaryPhone: normalizedData.primaryPhone || '',
-      secondaryPhone: normalizedData.secondaryPhone || '',
-      accountNotes: normalizedData.accountNotes || '',
-      shippingAddress: normalizedData.shippingAddress || '',
-      billingAddress: normalizedData.billingAddress || '',
-      accountOwner: normalizedData.accountOwner || '',
+      ...normalizedData,
     };
-    
-    console.log('💾 New account object:', newAccount);
 
-    const updatedAccounts = [newAccount, ...accounts];
-    setAccounts(updatedAccounts);
-    localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
-    
-    console.log('✅ New account saved:', newAccount);
-    console.log('📍 Redirecting to:', `/accounts/${newAccountId}`);
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    
-    // Redirect to the newly created account's detail page after a small delay to ensure data is persisted
-    setTimeout(() => {
-      console.log('🔄 Pushing route to:', `/accounts/${newAccountId}`);
-      console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('accounts') || '[]').map((a: any) => a.id));
-      router.push(`/accounts/${newAccountId}`);
-    }, 200);
-  };
+    try {
+      const createdRecord = await recordsService.createRecord('Account', { data: recordData });
+      
+      if (!createdRecord) {
+        throw new Error('Failed to create record - null response');
+      }
 
-  const handleDeleteAccount = (id: string) => {
-    if (confirm('Are you sure you want to delete this account?')) {
-      const updatedAccounts = accounts.filter(a => a.id !== id);
+      setShowDynamicForm(false);
+      await fetchAccounts();
+      router.push(`/accounts/${createdRecord.id}`);
+    } catch (error) {
+      console.error('Failed to create record via API, falling back to localStorage:', error);
+      
+      const today = new Date().toISOString().split('T')[0];
+      const newAccountId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'System';
+      const defaultRecordType = schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0];
+      
+      const newAccount: Account = {
+        id: newAccountId,
+        recordTypeId: defaultRecordType?.id,
+        pageLayoutId: layoutId,
+        accountNumber,
+        status: normalizedData.status || 'Active',
+        createdBy: currentUserName,
+        createdAt: today || '',
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today || '',
+        ...normalizedData,
+        accountName: normalizedData.accountName || '',
+        accountType: normalizedData.accountType || '',
+        website: normalizedData.website || '',
+        primaryEmail: normalizedData.primaryEmail || '',
+        secondaryEmail: normalizedData.secondaryEmail || '',
+        primaryPhone: normalizedData.primaryPhone || '',
+        secondaryPhone: normalizedData.secondaryPhone || '',
+        accountNotes: normalizedData.accountNotes || '',
+        shippingAddress: normalizedData.shippingAddress || '',
+        billingAddress: normalizedData.billingAddress || '',
+        accountOwner: normalizedData.accountOwner || '',
+      };
+
+      const updatedAccounts = [newAccount, ...accounts];
       setAccounts(updatedAccounts);
       localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
+      setShowDynamicForm(false);
+      router.push(`/accounts/${newAccountId}`);
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    if (confirm('Are you sure you want to delete this account?')) {
+      try {
+        await recordsService.deleteRecord('Account', id);
+        await fetchAccounts();
+      } catch (error) {
+        console.error('Failed to delete account:', error);
+        const updatedAccounts = accounts.filter(a => a.id !== id);
+        setAccounts(updatedAccounts);
+        localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
+      }
     }
   };
 

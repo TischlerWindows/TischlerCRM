@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Installation {
   id: string;
@@ -160,68 +161,41 @@ export default function InstallationsPage() {
     setIsLoaded(true);
   }, []);
 
-  useEffect(() => {
-    // Load installations from localStorage or use mock data
-    const storedInstallations = localStorage.getItem('installations');
-    if (storedInstallations) {
-      setInstallations(JSON.parse(storedInstallations));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          installationNumber: 'INST-001',
-          installationName: 'Window Installation - Main St',
-          accountName: 'Smith Residence',
-          projectNumber: 'PRJ-001',
-          status: 'In Progress',
-          startDate: '2024-11-25',
-          completionDate: '2024-12-05',
-          leadInstaller: 'John Doe',
-          teamSize: 3,
-          createdBy: 'Development User',
-          createdAt: '2024-11-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-28'
-        },
-        {
-          id: '2',
-          installationNumber: 'INST-002',
-          installationName: 'Door Installation - Oak Ave',
-          accountName: 'Garcia Property',
-          projectNumber: 'PRJ-002',
-          status: 'Scheduled',
-          startDate: '2024-12-08',
-          completionDate: '2024-12-10',
-          leadInstaller: 'Jane Smith',
-          teamSize: 2,
-          createdBy: 'Development User',
-          createdAt: '2024-11-22',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-22'
-        },
-        {
-          id: '3',
-          installationNumber: 'INST-003',
-          installationName: 'Full Home Windows - Pine Rd',
-          accountName: 'Chen Family Home',
-          projectNumber: 'PRJ-003',
-          status: 'Completed',
-          startDate: '2024-11-15',
-          completionDate: '2024-11-22',
-          leadInstaller: 'John Doe',
-          teamSize: 4,
-          createdBy: 'Development User',
-          createdAt: '2024-11-10',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-23'
-        }
-      ];
-      setInstallations(mockData);
-      localStorage.setItem('installations', JSON.stringify(mockData));
+  const fetchInstallations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Installation');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        installationNumber: record.installationNumber || '',
+        installationName: record.installationName || '',
+        accountName: record.accountName || '',
+        projectNumber: record.projectNumber || '',
+        status: record.status || 'Scheduled',
+        startDate: record.startDate || '',
+        completionDate: record.completionDate || '',
+        leadInstaller: record.leadInstaller || '',
+        teamSize: record.teamSize || 0,
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setInstallations(flattenedRecords as Installation[]);
+    } catch (error) {
+      console.error('Failed to fetch installations from API, falling back to localStorage:', error);
+      const storedInstallations = localStorage.getItem('installations');
+      if (storedInstallations) {
+        setInstallations(JSON.parse(storedInstallations));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchInstallations();
+  }, [fetchInstallations]);
 
   useEffect(() => {
     const savedColumns = localStorage.getItem('installationsVisibleColumns');
@@ -378,78 +352,138 @@ export default function InstallationsPage() {
     localStorage.setItem('installationsVisibleColumns', JSON.stringify(defaultColumns));
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Installation__installationName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Installation__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Installation__installationName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Installation__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique installation number
-    const existingNumbers = installations
-      .map(i => i.installationNumber)
-      .filter(num => num.startsWith('INST-'))
-      .map(num => parseInt(num.replace('INST-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const installationNumber = `INST-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newInstallationId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newInstallation: Installation = {
-      id: newInstallationId,
-      installationNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      installationName: normalizedData.installationName || '',
-      accountName: normalizedData.accountName || '',
-      projectNumber: normalizedData.projectNumber || '',
-      status: normalizedData.status || 'Scheduled',
-      startDate: normalizedData.startDate || today,
-      completionDate: normalizedData.completionDate || today,
-      leadInstaller: normalizedData.leadInstaller || '',
-      teamSize: normalizedData.teamSize || 2,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || ''
-    };
+      // Generate unique installation number
+      const existingNumbers = installations
+        .map(i => i.installationNumber)
+        .filter(num => num.startsWith('INST-'))
+        .map(num => parseInt(num.replace('INST-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const installationNumber = `INST-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        installationNumber,
+        ...normalizedData,
+        installationName: normalizedData.installationName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        status: normalizedData.status || 'Scheduled',
+        startDate: normalizedData.startDate || today,
+        completionDate: normalizedData.completionDate || today,
+        leadInstaller: normalizedData.leadInstaller || '',
+        teamSize: normalizedData.teamSize || 2
+      };
 
-    const updatedInstallations = [newInstallation, ...installations];
-    setInstallations(updatedInstallations);
-    localStorage.setItem('installations', JSON.stringify(updatedInstallations));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('installationLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newInstallationId] = selectedLayoutId;
-      localStorage.setItem('installationLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created installation's detail page
-    router.push(`/installations/${newInstallationId}`);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Installation', recordData, selectedLayoutId);
+      
+      const newInstallation: Installation = {
+        id: result.id,
+        installationNumber,
+        ...normalizedData,
+        installationName: normalizedData.installationName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        status: normalizedData.status || 'Scheduled',
+        startDate: normalizedData.startDate || today,
+        completionDate: normalizedData.completionDate || today,
+        leadInstaller: normalizedData.leadInstaller || '',
+        teamSize: normalizedData.teamSize || 2,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
 
-  const handleDeleteInstallation = (id: string) => {
-    if (confirm('Are you sure you want to delete this installation?')) {
-      const updatedInstallations = installations.filter(i => i.id !== id);
+      const updatedInstallations = [newInstallation, ...installations];
       setInstallations(updatedInstallations);
       localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/installations/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create installation:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Installation__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = installations
+        .map(i => i.installationNumber)
+        .filter(num => num.startsWith('INST-'))
+        .map(num => parseInt(num.replace('INST-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const installationNumber = `INST-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const newInstallationId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const newInstallation: Installation = {
+        id: newInstallationId,
+        installationNumber,
+        pageLayoutId: selectedLayoutId || undefined,
+        ...normalizedData,
+        installationName: normalizedData.installationName || '',
+        accountName: normalizedData.accountName || '',
+        projectNumber: normalizedData.projectNumber || '',
+        status: normalizedData.status || 'Scheduled',
+        startDate: normalizedData.startDate || today,
+        completionDate: normalizedData.completionDate || today,
+        leadInstaller: normalizedData.leadInstaller || '',
+        teamSize: normalizedData.teamSize || 2,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
+
+      const updatedInstallations = [newInstallation, ...installations];
+      setInstallations(updatedInstallations);
+      localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/installations/${newInstallationId}`);
+    }
+  };
+
+  const handleDeleteInstallation = async (id: string) => {
+    if (confirm('Are you sure you want to delete this installation?')) {
+      try {
+        await recordsService.deleteRecord('Installation', id);
+        const updatedInstallations = installations.filter(i => i.id !== id);
+        setInstallations(updatedInstallations);
+        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+      } catch (error) {
+        console.error('Failed to delete installation from API, trying locally:', error);
+        const updatedInstallations = installations.filter(i => i.id !== id);
+        setInstallations(updatedInstallations);
+        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+      }
     }
   };
 

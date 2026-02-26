@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Lead {
   id: string;
@@ -198,8 +199,38 @@ export default function LeadsPage() {
     setIsLoaded(true);
   }, []);
 
+  const fetchLeads = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Lead');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        leadNumber: record.leadNumber || '',
+        contactName: record.firstName || '',
+        propertyAddress: record.address || '',
+        source: record.leadSource || '',
+        stage: record.stage || 'New',
+        assignedTo: '',
+        estimatedValue: 0,
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+        notes: '',
+      }));
+      setLeads(flattenedRecords as Lead[]);
+    } catch (error) {
+      console.error('Failed to fetch leads from API, falling back to localStorage:', error);
+      const storedLeads = localStorage.getItem('leads');
+      if (storedLeads) {
+        setLeads(JSON.parse(storedLeads));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('leadsVisibleColumns');
     if (storedColumns) {
       setVisibleColumns(JSON.parse(storedColumns));
@@ -209,64 +240,8 @@ export default function LeadsPage() {
         .map(col => col.id);
       setVisibleColumns(defaultColumns);
     }
-
-    // Load leads from localStorage or use mock data
-    const storedLeads = localStorage.getItem('leads');
-    if (storedLeads) {
-      setLeads(JSON.parse(storedLeads));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          leadNumber: 'LEAD-001',
-          contactName: 'John Smith',
-          propertyAddress: '123 Main Street, Springfield',
-          source: 'Website',
-          stage: 'Qualified',
-          assignedTo: 'Sarah Johnson',
-          estimatedValue: 15000,
-          createdBy: 'Development User',
-          createdAt: '2024-11-10',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-20',
-          notes: 'Interested in window replacement for entire home'
-        },
-        {
-          id: '2',
-          leadNumber: 'LEAD-002',
-          contactName: 'Maria Garcia',
-          propertyAddress: '456 Oak Avenue, Riverside',
-          source: 'Referral',
-          stage: 'Initial Contact',
-          assignedTo: 'Mike Wilson',
-          estimatedValue: 8500,
-          createdBy: 'Development User',
-          createdAt: '2024-11-11',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-11'
-        },
-        {
-          id: '3',
-          leadNumber: 'LEAD-003',
-          contactName: 'Robert Chen',
-          propertyAddress: '789 Pine Road, Lakeside',
-          source: 'Cold Call',
-          stage: 'Needs Assessment',
-          assignedTo: 'Sarah Johnson',
-          estimatedValue: 22000,
-          createdBy: 'Development User',
-          createdAt: '2024-11-15',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-28',
-          notes: 'Looking for full door and window renovation'
-        }
-      ];
-      setLeads(mockData);
-      localStorage.setItem('leads', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    fetchLeads();
+  }, [fetchLeads]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -438,79 +413,141 @@ export default function LeadsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Lead__contactName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Lead__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Lead__contactName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Lead__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique lead number
-    const existingNumbers = leads
-      .map(l => l.leadNumber)
-      .filter(num => num.startsWith('LEAD-'))
-      .map(num => parseInt(num.replace('LEAD-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const leadNumber = `LEAD-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newLeadId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newLead: Lead = {
-      id: newLeadId,
-      leadNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      contactName: normalizedData.contactName || '',
-      propertyAddress: normalizedData.propertyAddress || '',
-      source: normalizedData.source || 'Website',
-      stage: normalizedData.stage || 'Initial Contact',
-      assignedTo: normalizedData.assignedTo || '',
-      estimatedValue: normalizedData.estimatedValue || 0,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || '',
-      notes: normalizedData.notes || ''
-    };
+      // Generate unique lead number
+      const existingNumbers = leads
+        .map(l => l.leadNumber)
+        .filter(num => num.startsWith('LEAD-'))
+        .map(num => parseInt(num.replace('LEAD-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const leadNumber = `LEAD-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        leadNumber,
+        ...normalizedData,
+        firstName: normalizedData.contactName || "",
+        address: normalizedData.propertyAddress || "",
+        leadSource: normalizedData.source || 'Website',
+        stage: normalizedData.stage || 'Initial Contact',
+        assignedTo: normalizedData.assignedTo || '',
+        estimatedValue: normalizedData.estimatedValue || 0,
+        notes: normalizedData.notes || ''
+      };
 
-    const updatedLeads = [newLead, ...leads];
-    setLeads(updatedLeads);
-    localStorage.setItem('leads', JSON.stringify(updatedLeads));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('leadLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newLeadId] = selectedLayoutId;
-      localStorage.setItem('leadLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Wait for localStorage to sync before redirecting
-    setTimeout(() => {
-      router.push(`/leads/${newLeadId}`);
-    }, 200);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Lead', recordData, selectedLayoutId);
+      
+      const newLead: Lead = {
+        id: result.id,
+        leadNumber,
+        ...normalizedData,
+        contactName: normalizedData.contactName || '',
+        propertyAddress: normalizedData.propertyAddress || '',
+        source: normalizedData.source || 'Website',
+        stage: normalizedData.stage || 'Initial Contact',
+        assignedTo: normalizedData.assignedTo || '',
+        estimatedValue: normalizedData.estimatedValue || 0,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today,
+        notes: normalizedData.notes || ''
+      };
 
-  const handleDeleteLead = (id: string) => {
-    if (confirm('Are you sure you want to delete this lead?')) {
-      const updatedLeads = leads.filter(l => l.id !== id);
+      const updatedLeads = [newLead, ...leads];
       setLeads(updatedLeads);
       localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      
+      setTimeout(() => {
+        router.push(`/leads/${result.id}`);
+      }, 200);
+    } catch (error) {
+      console.error('Failed to create lead:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Lead__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = leads
+        .map(l => l.leadNumber)
+        .filter(num => num.startsWith('LEAD-'))
+        .map(num => parseInt(num.replace('LEAD-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const leadNumber = `LEAD-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const newLeadId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const newLead: Lead = {
+        id: newLeadId,
+        leadNumber,
+        pageLayoutId: selectedLayoutId || undefined,
+        ...normalizedData,
+        contactName: normalizedData.contactName || '',
+        propertyAddress: normalizedData.propertyAddress || '',
+        source: normalizedData.source || 'Website',
+        stage: normalizedData.stage || 'Initial Contact',
+        assignedTo: normalizedData.assignedTo || '',
+        estimatedValue: normalizedData.estimatedValue || 0,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today,
+        notes: normalizedData.notes || ''
+      };
+
+      const updatedLeads = [newLead, ...leads];
+      setLeads(updatedLeads);
+      localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      
+      setTimeout(() => {
+        router.push(`/leads/${newLeadId}`);
+      }, 200);
+    }
+  };
+
+  const handleDeleteLead = async (id: string) => {
+    if (confirm('Are you sure you want to delete this lead?')) {
+      try {
+        await recordsService.deleteRecord('Lead', id);
+        const updatedLeads = leads.filter(l => l.id !== id);
+        setLeads(updatedLeads);
+        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      } catch (error) {
+        console.error('Failed to delete lead from API, trying locally:', error);
+        const updatedLeads = leads.filter(l => l.id !== id);
+        setLeads(updatedLeads);
+        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      }
     }
   };
 

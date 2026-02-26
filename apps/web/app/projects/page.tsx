@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Project {
   id: string;
@@ -187,49 +188,6 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
-    // Load projects from localStorage or use mock data
-    const storedProjects = localStorage.getItem('projects');
-    if (storedProjects) {
-      setProjects(JSON.parse(storedProjects));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          projectNumber: 'PRJ-001',
-          projectName: 'Window Installation - Main St',
-          status: 'In Progress',
-          startDate: '2024-11-15',
-          expectedCompletion: '2024-12-20',
-          assignedTeam: 'Installation Team A',
-          budget: 25000,
-          createdBy: 'Development User',
-          createdAt: '2024-11-01',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-15'
-        },
-        {
-          id: '2',
-          projectNumber: 'PRJ-002',
-          projectName: 'Kitchen Window Replacement',
-          status: 'Planning',
-          startDate: '2024-12-01',
-          expectedCompletion: '2024-12-15',
-          assignedTeam: 'Installation Team B',
-          budget: 12000,
-          createdBy: 'Development User',
-          createdAt: '2024-11-08',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-08'
-        }
-      ];
-      setProjects(mockData);
-      localStorage.setItem('projects', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
     const savedColumns = localStorage.getItem('projectsVisibleColumns');
     if (savedColumns) {
       setVisibleColumns(JSON.parse(savedColumns));
@@ -237,6 +195,40 @@ export default function ProjectsPage() {
       setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
     }
   }, []);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Project');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        projectNumber: record.projectNumber || '',
+        projectName: record.projectName || '',
+        status: record.status || 'Planning',
+        startDate: record.startDate || '',
+        expectedCompletion: record.expectedCompletion || '',
+        assignedTeam: record.assignedTeam || '',
+        budget: record.budget || 0,
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setProjects(flattenedRecords as Project[]);
+    } catch (error) {
+      console.error('Failed to fetch projects from API, falling back to localStorage:', error);
+      const storedProjects = localStorage.getItem('projects');
+      if (storedProjects) {
+        setProjects(JSON.parse(storedProjects));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   const toggleColumnVisibility = (columnId: string) => {
     const newVisibleColumns = visibleColumns.includes(columnId)
@@ -382,76 +374,130 @@ export default function ProjectsPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Project__projectName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Project__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Project__projectName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Project__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique project number
-    const existingNumbers = projects
-      .map(p => p.projectNumber)
-      .filter(num => num.startsWith('PRJ-'))
-      .map(num => parseInt(num.replace('PRJ-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const projectNumber = `PRJ-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newProjectId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newProject: Project = {
-      id: newProjectId,
-      projectNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      projectName: normalizedData.projectName || '',
-      status: normalizedData.status || 'Planning',
-      startDate: normalizedData.startDate || today,
-      expectedCompletion: normalizedData.expectedCompletion || '',
-      assignedTeam: normalizedData.assignedTeam || '',
-      budget: normalizedData.budget || 0,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || ''
-    };
+      // Generate unique project number
+      const existingNumbers = projects
+        .map(p => p.projectNumber)
+        .filter(num => num.startsWith('PRJ-'))
+        .map(num => parseInt(num.replace('PRJ-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const projectNumber = `PRJ-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        projectNumber,
+        ...normalizedData,
+        projectName: normalizedData.projectName || '',
+        status: normalizedData.status || 'Planning',
+        startDate: normalizedData.startDate || today,
+        expectedCompletion: normalizedData.expectedCompletion || '',
+        assignedTeam: normalizedData.assignedTeam || '',
+        budget: normalizedData.budget || 0
+      };
 
-    const updatedProjects = [newProject, ...projects];
-    setProjects(updatedProjects);
-    localStorage.setItem('projects', JSON.stringify(updatedProjects));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('projectLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newProjectId] = selectedLayoutId;
-      localStorage.setItem('projectLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created project's detail page
-    router.push(`/projects/${newProjectId}`);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Project', recordData, selectedLayoutId);
+      
+      const newProject: Project = {
+        id: result.id,
+        projectNumber,
+        ...normalizedData,
+        projectName: normalizedData.projectName || '',
+        status: normalizedData.status || 'Planning',
+        startDate: normalizedData.startDate || today,
+        expectedCompletion: normalizedData.expectedCompletion || '',
+        assignedTeam: normalizedData.assignedTeam || '',
+        budget: normalizedData.budget || 0,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
 
-  const handleDeleteProject = (id: string) => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      const updatedProjects = projects.filter(p => p.id !== id);
+      const updatedProjects = [newProject, ...projects];
       setProjects(updatedProjects);
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/projects/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Project__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = projects
+        .map(p => p.projectNumber)
+        .filter(num => num.startsWith('PRJ-'))
+        .map(num => parseInt(num.replace('PRJ-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const projectNumber = `PRJ-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      const newProjectId = String(Date.now());
+      
+      const newProject: Project = {
+        id: newProjectId,
+        projectNumber,
+        ...normalizedData,
+        projectName: normalizedData.projectName || '',
+        status: normalizedData.status || 'Planning',
+        startDate: normalizedData.startDate || today,
+        expectedCompletion: normalizedData.expectedCompletion || '',
+        assignedTeam: normalizedData.assignedTeam || '',
+        budget: normalizedData.budget || 0,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
+
+      const updatedProjects = [newProject, ...projects];
+      setProjects(updatedProjects);
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/projects/${newProjectId}`);
+    }
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (confirm('Are you sure you want to delete this project?')) {
+      try {
+        await recordsService.deleteRecord('Project', id);
+        const updatedProjects = projects.filter(p => p.id !== id);
+        setProjects(updatedProjects);
+        localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      } catch (error) {
+        console.error('Failed to delete project from API, trying locally:', error);
+        const updatedProjects = projects.filter(p => p.id !== id);
+        setProjects(updatedProjects);
+        localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      }
     }
   };
 

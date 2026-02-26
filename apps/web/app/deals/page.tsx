@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Deal {
   id: string;
@@ -189,8 +190,38 @@ export default function DealsPage() {
     setIsLoaded(true);
   }, []);
 
+  const fetchDeals = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Deal');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        dealNumber: record.dealNumber || '',
+        dealName: record.dealName || '',
+        accountName: record.accountName || '',
+        stage: record.stage || 'New',
+        value: record.amount || 0,
+        closeDate: record.closeDate || '',
+        assignedTo: record.assignedTo || '',
+        probability: record.probability || 0,
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setDeals(flattenedRecords as Deal[]);
+    } catch (error) {
+      console.error('Failed to fetch deals from API, falling back to localStorage:', error);
+      const storedDeals = localStorage.getItem('deals');
+      if (storedDeals) {
+        setDeals(JSON.parse(storedDeals));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('dealsVisibleColumns');
     if (storedColumns) {
       setVisibleColumns(JSON.parse(storedColumns));
@@ -200,65 +231,8 @@ export default function DealsPage() {
         .map(col => col.id);
       setVisibleColumns(defaultColumns);
     }
-
-    // Load deals from localStorage or use mock data
-    const storedDeals = localStorage.getItem('deals');
-    if (storedDeals) {
-      setDeals(JSON.parse(storedDeals));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          dealNumber: 'DEAL-001',
-          dealName: 'Complete Window Replacement',
-          accountName: 'Smith Residence',
-          stage: 'Negotiation',
-          value: 25000,
-          closeDate: '2024-12-15',
-          assignedTo: 'Sarah Johnson',
-          probability: 75,
-          createdBy: 'Development User',
-          createdAt: '2024-11-01',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-20'
-        },
-        {
-          id: '2',
-          dealNumber: 'DEAL-002',
-          dealName: 'Front Door Installation',
-          accountName: 'Garcia Property',
-          stage: 'Proposal',
-          value: 8500,
-          closeDate: '2024-11-30',
-          assignedTo: 'Mike Wilson',
-          probability: 60,
-          createdBy: 'Development User',
-          createdAt: '2024-11-05',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-05'
-        },
-        {
-          id: '3',
-          dealNumber: 'DEAL-003',
-          dealName: 'Kitchen & Bathroom Windows',
-          accountName: 'Chen Family Home',
-          stage: 'Contract Review',
-          value: 18500,
-          closeDate: '2024-12-10',
-          assignedTo: 'Sarah Johnson',
-          probability: 85,
-          createdBy: 'Development User',
-          createdAt: '2024-11-08',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-25'
-        }
-      ];
-      setDeals(mockData);
-      localStorage.setItem('deals', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    fetchDeals();
+  }, [fetchDeals]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -422,77 +396,133 @@ export default function DealsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Deal__dealName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Deal__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Deal__dealName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Deal__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique deal number
-    const existingNumbers = deals
-      .map(d => d.dealNumber)
-      .filter(num => num.startsWith('DEAL-'))
-      .map(num => parseInt(num.replace('DEAL-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const newDealId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newDeal: Deal = {
-      id: newDealId,
-      dealNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      dealName: normalizedData.dealName || '',
-      accountName: normalizedData.accountName || '',
-      stage: normalizedData.stage || 'Proposal',
-      value: normalizedData.value || 0,
-      closeDate: normalizedData.closeDate || today,
-      assignedTo: normalizedData.assignedTo || '',
-      probability: normalizedData.probability || 50,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || ''
-    };
+      // Generate unique deal number
+      const existingNumbers = deals
+        .map(d => d.dealNumber)
+        .filter(num => num.startsWith('DEAL-'))
+        .map(num => parseInt(num.replace('DEAL-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        dealNumber,
+        ...normalizedData,
+        dealName: normalizedData.dealName || '',
+        accountName: normalizedData.accountName || '',
+        stage: normalizedData.stage || 'Proposal',
+        amount: normalizedData.amount || normalizedData.value || 0,
+        closeDate: normalizedData.closeDate || today,
+        assignedTo: normalizedData.assignedTo || '',
+        probability: normalizedData.probability || 50
+      };
 
-    const updatedDeals = [newDeal, ...deals];
-    setDeals(updatedDeals);
-    localStorage.setItem('deals', JSON.stringify(updatedDeals));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('dealLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newDealId] = selectedLayoutId;
-      localStorage.setItem('dealLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created deal's detail page
-    router.push(`/deals/${newDealId}`);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Deal', recordData, selectedLayoutId);
+      
+      const newDeal: Deal = {
+        id: result.id,
+        dealNumber,
+        ...normalizedData,
+        dealName: normalizedData.dealName || '',
+        accountName: normalizedData.accountName || '',
+        stage: normalizedData.stage || 'Proposal',
+        value: normalizedData.amount || normalizedData.value || 0,
+        closeDate: normalizedData.closeDate || today,
+        assignedTo: normalizedData.assignedTo || '',
+        probability: normalizedData.probability || 50,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
 
-  const handleDeleteDeal = (id: string) => {
-    if (confirm('Are you sure you want to delete this deal?')) {
-      const updatedDeals = deals.filter(d => d.id !== id);
+      const updatedDeals = [newDeal, ...deals];
       setDeals(updatedDeals);
       localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/deals/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create deal:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Deal__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = deals
+        .map(d => d.dealNumber)
+        .filter(num => num.startsWith('DEAL-'))
+        .map(num => parseInt(num.replace('DEAL-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      const newDealId = String(Date.now());
+      
+      const newDeal: Deal = {
+        id: newDealId,
+        dealNumber,
+        ...normalizedData,
+        dealName: normalizedData.dealName || '',
+        accountName: normalizedData.accountName || '',
+        stage: normalizedData.stage || 'Proposal',
+        value: normalizedData.value || 0,
+        closeDate: normalizedData.closeDate || today,
+        assignedTo: normalizedData.assignedTo || '',
+        probability: normalizedData.probability || 50,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
+
+      const updatedDeals = [newDeal, ...deals];
+      setDeals(updatedDeals);
+      localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/deals/${newDealId}`);
+    }
+  };
+
+  const handleDeleteDeal = async (id: string) => {
+    if (confirm('Are you sure you want to delete this deal?')) {
+      try {
+        await recordsService.deleteRecord('Deal', id);
+        const updatedDeals = deals.filter(d => d.id !== id);
+        setDeals(updatedDeals);
+        localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      } catch (error) {
+        console.error('Failed to delete deal from API, trying locally:', error);
+        const updatedDeals = deals.filter(d => d.id !== id);
+        setDeals(updatedDeals);
+        localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      }
     }
   };
 

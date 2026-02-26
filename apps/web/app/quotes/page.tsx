@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -32,6 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Quote {
   id: string;
@@ -158,62 +159,39 @@ export default function QuotesPage() {
     setIsLoaded(true);
   }, []);
 
-  useEffect(() => {
-    // Load quotes from localStorage or use mock data
-    const storedQuotes = localStorage.getItem('quotes');
-    if (storedQuotes) {
-      setQuotes(JSON.parse(storedQuotes));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          quoteNumber: 'QTE-001',
-          quoteName: 'Window Replacement Quote',
-          accountName: 'Smith Residence',
-          dealNumber: 'DEAL-001',
-          status: 'Sent',
-          totalAmount: 25000,
-          validUntil: '2024-12-31',
-          createdBy: 'Development User',
-          createdAt: '2024-11-15',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-15'
-        },
-        {
-          id: '2',
-          quoteNumber: 'QTE-002',
-          quoteName: 'Door Installation Quote',
-          accountName: 'Garcia Property',
-          dealNumber: 'DEAL-002',
-          status: 'Draft',
-          totalAmount: 8500,
-          validUntil: '2024-12-20',
-          createdBy: 'Development User',
-          createdAt: '2024-11-18',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-25'
-        },
-        {
-          id: '3',
-          quoteNumber: 'QTE-003',
-          quoteName: 'Full Home Window Upgrade',
-          accountName: 'Chen Family Home',
-          dealNumber: 'DEAL-003',
-          status: 'Accepted',
-          totalAmount: 42000,
-          validUntil: '2024-12-25',
-          createdBy: 'Development User',
-          createdAt: '2024-11-10',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-28'
-        }
-      ];
-      setQuotes(mockData);
-      localStorage.setItem('quotes', JSON.stringify(mockData));
+  const fetchQuotes = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Quote');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        quoteNumber: record.quoteNumber || '',
+        quoteName: record.quoteName || '',
+        accountName: record.accountName || '',
+        dealNumber: record.dealNumber || '',
+        status: record.status || 'Draft',
+        totalAmount: record.totalAmount || 0,
+        validUntil: record.validUntil || '',
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+      }));
+      setQuotes(flattenedRecords as Quote[]);
+    } catch (error) {
+      console.error('Failed to fetch quotes from API, falling back to localStorage:', error);
+      const storedQuotes = localStorage.getItem('quotes');
+      if (storedQuotes) {
+        setQuotes(JSON.parse(storedQuotes));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    fetchQuotes();
+  }, [fetchQuotes]);
 
   useEffect(() => {
     const savedColumns = localStorage.getItem('quotesVisibleColumns');
@@ -371,79 +349,138 @@ export default function QuotesPage() {
     localStorage.setItem('quotesVisibleColumns', JSON.stringify(defaultColumns));
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
-    // Map schema field names (e.g., Quote__quoteName) to simple field names
-    const normalizeFieldName = (fieldName: string): string => {
-      return fieldName.replace('Quote__', '');
-    };
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    try {
+      // Map schema field names (e.g., Quote__quoteName) to simple field names
+      const normalizeFieldName = (fieldName: string): string => {
+        return fieldName.replace('Quote__', '');
+      };
 
-    // Create normalized data object with simple field names
-    const normalizedData: Record<string, any> = {};
-    Object.entries(data).forEach(([key, value]) => {
-      const cleanKey = normalizeFieldName(key);
-      normalizedData[cleanKey] = value;
-    });
+      // Create normalized data object with simple field names
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        const cleanKey = normalizeFieldName(key);
+        normalizedData[cleanKey] = value;
+      });
 
-    // Generate unique quote number
-    const existingNumbers = quotes
-      .map(q => q.quoteNumber)
-      .filter(num => num.startsWith('QTE-'))
-      .map(num => parseInt(num.replace('QTE-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + 30);
-    const validUntilStr = validUntil.toISOString().split('T')[0];
-    const newQuoteId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'Development User';
-    
-    const newQuote: Quote = {
-      id: newQuoteId,
-      quoteNumber,
-      pageLayoutId: selectedLayoutId || undefined,
-      ...normalizedData,
-      quoteName: normalizedData.quoteName || '',
-      accountName: normalizedData.accountName || '',
-      dealNumber: normalizedData.dealNumber || '',
-      status: normalizedData.status || 'Draft',
-      totalAmount: normalizedData.totalAmount || 0,
-      validUntil: normalizedData.validUntil || validUntilStr,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || ''
-    };
+      // Generate unique quote number
+      const existingNumbers = quotes
+        .map(q => q.quoteNumber)
+        .filter(num => num.startsWith('QTE-'))
+        .map(num => parseInt(num.replace('QTE-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+      const validUntilStr = validUntil.toISOString().split('T')[0];
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const recordData = {
+        quoteNumber,
+        ...normalizedData,
+        quoteName: normalizedData.quoteName || '',
+        accountName: normalizedData.accountName || '',
+        dealNumber: normalizedData.dealNumber || '',
+        status: normalizedData.status || 'Draft',
+        totalAmount: normalizedData.totalAmount || 0,
+        validUntil: normalizedData.validUntil || validUntilStr
+      };
 
-    const updatedQuotes = [newQuote, ...quotes];
-    setQuotes(updatedQuotes);
-    localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
-    
-    // Save the layout association for this record
-    const layoutAssociations = JSON.parse(localStorage.getItem('quoteLayoutAssociations') || '{}');
-    if (selectedLayoutId) {
-      layoutAssociations[newQuoteId] = selectedLayoutId;
-      localStorage.setItem('quoteLayoutAssociations', JSON.stringify(layoutAssociations));
-    }
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    setSelectedLayoutId(null);
-    
-    // Redirect to the newly created quote's detail page
-    router.push(`/quotes/${newQuoteId}`);
-    console.log('Dynamic form submitted:', data);
-  };
+      const result = await recordsService.createRecord('Quote', recordData, selectedLayoutId);
+      
+      const newQuote: Quote = {
+        id: result.id,
+        quoteNumber,
+        ...normalizedData,
+        quoteName: normalizedData.quoteName || '',
+        accountName: normalizedData.accountName || '',
+        dealNumber: normalizedData.dealNumber || '',
+        status: normalizedData.status || 'Draft',
+        totalAmount: normalizedData.totalAmount || 0,
+        validUntil: normalizedData.validUntil || validUntilStr,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
 
-  const handleDeleteQuote = (id: string) => {
-    if (confirm('Are you sure you want to delete this quote?')) {
-      const updatedQuotes = quotes.filter(q => q.id !== id);
+      const updatedQuotes = [newQuote, ...quotes];
       setQuotes(updatedQuotes);
       localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/quotes/${result.id}`);
+    } catch (error) {
+      console.error('Failed to create quote:', error);
+      // Fallback: create locally
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Quote__', '');
+      const normalizedData: Record<string, any> = {};
+      Object.entries(data).forEach(([key, value]) => {
+        normalizedData[normalizeFieldName(key)] = value;
+      });
+      
+      const existingNumbers = quotes
+        .map(q => q.quoteNumber)
+        .filter(num => num.startsWith('QTE-'))
+        .map(num => parseInt(num.replace('QTE-', ''), 10))
+        .filter(num => !isNaN(num));
+      
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      const nextNumber = maxNumber + 1;
+      const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
+      const today = new Date().toISOString().split('T')[0];
+      const validUntil = new Date();
+      validUntil.setDate(validUntil.getDate() + 30);
+      const validUntilStr = validUntil.toISOString().split('T')[0];
+      const newQuoteId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'Development User';
+      
+      const newQuote: Quote = {
+        id: newQuoteId,
+        quoteNumber,
+        pageLayoutId: selectedLayoutId || undefined,
+        ...normalizedData,
+        quoteName: normalizedData.quoteName || '',
+        accountName: normalizedData.accountName || '',
+        dealNumber: normalizedData.dealNumber || '',
+        status: normalizedData.status || 'Draft',
+        totalAmount: normalizedData.totalAmount || 0,
+        validUntil: normalizedData.validUntil || validUntilStr,
+        createdBy: currentUserName,
+        createdAt: today,
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today
+      };
+
+      const updatedQuotes = [newQuote, ...quotes];
+      setQuotes(updatedQuotes);
+      localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+      
+      setShowDynamicForm(false);
+      setSelectedLayoutId(null);
+      router.push(`/quotes/${newQuoteId}`);
+    }
+  };
+
+  const handleDeleteQuote = async (id: string) => {
+    if (confirm('Are you sure you want to delete this quote?')) {
+      try {
+        await recordsService.deleteRecord('Quote', id);
+        const updatedQuotes = quotes.filter(q => q.id !== id);
+        setQuotes(updatedQuotes);
+        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+      } catch (error) {
+        console.error('Failed to delete quote from API, trying locally:', error);
+        const updatedQuotes = quotes.filter(q => q.id !== id);
+        setQuotes(updatedQuotes);
+        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+      }
     }
   };
 
