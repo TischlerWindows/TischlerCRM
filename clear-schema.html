@@ -1,0 +1,27 @@
+﻿<!DOCTYPE html>
+<html>
+<head><title>Clear Schema</title></head>
+<body>
+<h1>Clear TCES Schema Cache</h1>
+<button onclick='clearAll()'>Clear All Schema Data</button>
+<div id='result'></div>
+<script>
+function clearAll() {
+  const keys = ['tces-object-manager-schema', 'schema-store', 'tces-object-manager-versions'];
+  keys.forEach(key => {
+    localStorage.removeItem(key);
+    console.log('Removed:', key);
+  });
+  document.getElementById('result').innerHTML = '<p style="color: green;">All schema data cleared! Redirecting to contacts in 2 seconds...</p>';
+  setTimeout(() => {
+    window.location.href = '/contacts';
+  }, 2000);
+}
+
+// Auto-clear on page load
+window.addEventListener('load', () => {
+  clearAll();
+});
+</script>
+</body>
+</html>

@@ -21,7 +21,7 @@ export interface SchemaStore {
   loadSchema: () => Promise<void>;
   saveSchema: () => Promise<void>;
   createObject: (objectDef: Omit<ObjectDef, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
-  updateObject: (objectApi: string, updates: Partial<ObjectDef>) => void;
+  updateObject: (objectApi: string, updates: Partial<ObjectDef>) => Promise<void>;
   deleteObject: (objectApi: string) => Promise<void>;
   
   // Field operations
@@ -56,6 +56,9 @@ export interface SchemaStore {
   exportSchema: (objectApi?: string) => string;
   importSchema: (jsonData: string, merge?: boolean) => Promise<void>;
   
+  // Schema reset
+  resetSchema: () => Promise<void>;
+  
   // UI state management
   setSelectedObject: (objectApi: string | null) => void;
   setSelectedField: (fieldId: string | null) => void;
@@ -66,6 +69,85 @@ export interface SchemaStore {
 
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9);
+}
+
+const RELATIONSHIP_EXCLUSIONS = new Set(['Home']);
+
+function hasRelationshipField(fields: FieldDef[], targetApi: string): boolean {
+  return fields.some((field) => {
+    const relatedObject = (field as any).relatedObject as string | undefined;
+    return (
+      (field.type === 'Lookup' || field.type === 'ExternalLookup') &&
+      ((field.lookupObject && field.lookupObject === targetApi) || (relatedObject && relatedObject === targetApi))
+    ) || field.apiName === `${targetApi}Id`;
+  });
+}
+
+function createRelationshipField(target: ObjectDef): FieldDef {
+  return {
+    id: generateId(),
+    apiName: `${target.apiName}Id`,
+    label: target.label,
+    type: 'Lookup',
+    lookupObject: target.apiName,
+    relationshipName: target.pluralLabel || target.label,
+    custom: false,
+    helpText: `Lookup to ${target.label}`
+  };
+}
+
+function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
+  if (!objectDef.pageLayouts || objectDef.pageLayouts.length === 0) return objectDef;
+
+  const lookupFields = objectDef.fields.filter(
+    (field) => field.type === 'Lookup' || field.type === 'ExternalLookup'
+  );
+
+  const pageLayouts = objectDef.pageLayouts.map((layout) => {
+    if (!layout.tabs.length || !layout.tabs[0] || !layout.tabs[0].sections.length || !layout.tabs[0].sections[0]) {
+      return layout;
+    }
+
+    const tab = layout.tabs[0];
+    const section = tab.sections[0];
+    const existingFieldApi = new Set(section.fields.map((f) => f.apiName));
+    const missingLookups = lookupFields.filter((field) => !existingFieldApi.has(field.apiName));
+
+    if (missingLookups.length === 0) return layout;
+
+    const nextFields = section.fields.slice();
+    const nextOrderStart = nextFields.length;
+
+    missingLookups.forEach((field, index) => {
+      nextFields.push({
+        apiName: field.apiName,
+        column: index % section.columns,
+        order: nextOrderStart + index
+      });
+    });
+
+    return {
+      ...layout,
+      tabs: [
+        {
+          ...tab,
+          sections: [
+            {
+              ...section,
+              fields: nextFields
+            },
+            ...tab.sections.slice(1)
+          ]
+        },
+        ...layout.tabs.slice(1)
+      ]
+    };
+  });
+
+  return {
+    ...objectDef,
+    pageLayouts
+  };
 }
 
 export const useSchemaStore = create<SchemaStore>()(
@@ -129,17 +211,54 @@ export const useSchemaStore = create<SchemaStore>()(
           updatedAt: new Date().toISOString()
         };
 
+        const shouldRelateNewObject = !RELATIONSHIP_EXCLUSIONS.has(newObject.apiName);
+        const relatedObjects = schema.objects.filter((obj) => !RELATIONSHIP_EXCLUSIONS.has(obj.apiName));
+
+        const newObjectWithRelations: ObjectDef = shouldRelateNewObject
+          ? {
+              ...newObject,
+              fields: relatedObjects.reduce((fields, target) => {
+                if (target.apiName === newObject.apiName) return fields;
+                if (hasRelationshipField(fields, target.apiName)) return fields;
+                return [...fields, createRelationshipField(target)];
+              }, newObject.fields || [])
+            }
+          : newObject;
+
+        const newObjectWithLayouts = addLookupFieldsToLayouts(newObjectWithRelations);
+
+        const updatedExisting = schema.objects.map((obj) => {
+          if (RELATIONSHIP_EXCLUSIONS.has(obj.apiName) || !shouldRelateNewObject) {
+            return obj;
+          }
+          if (hasRelationshipField(obj.fields, newObject.apiName)) {
+            return obj;
+          }
+          const updatedObject = {
+            ...obj,
+            fields: [...obj.fields, createRelationshipField(newObject)],
+            updatedAt: new Date().toISOString()
+          };
+          return addLookupFieldsToLayouts(updatedObject);
+        });
+
         const updatedSchema = {
           ...schema,
-          objects: [...schema.objects, newObject]
+          objects: [...updatedExisting, newObjectWithLayouts],
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
         };
 
         set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
+        
         return newObject.id;
       },
 
       // Update existing object
-      updateObject: (objectApi, updates) => {
+      updateObject: async (objectApi, updates) => {
         const { schema } = get();
         if (!schema) return;
 
@@ -149,12 +268,17 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+        
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
       },
 
       // Delete object
@@ -163,12 +287,17 @@ export const useSchemaStore = create<SchemaStore>()(
         if (!schema) return;
 
         const updatedObjects = schema.objects.filter(obj => obj.apiName !== objectApi);
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+        
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service storage
+        await schemaService.saveSchema(updatedSchema);
       },
 
       // Add field to object
@@ -189,12 +318,16 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service
+        schemaService.saveSchema(updatedSchema);
 
         return fieldId;
       },
@@ -209,23 +342,27 @@ export const useSchemaStore = create<SchemaStore>()(
             ? {
                 ...obj,
                 fields: obj.fields.map(field =>
-                  field.id === fieldId ? { ...field, ...updates } : field
+                  (field.id === fieldId || field.apiName === fieldId) ? { ...field, ...updates } : field
                 ),
                 updatedAt: new Date().toISOString()
               }
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Persist to schema service
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete field
-      deleteField: (objectApi, fieldId) => {
+      deleteField: (objectApi, fieldIdOrApiName) => {
         const { schema } = get();
         if (!schema) return;
 
@@ -233,18 +370,24 @@ export const useSchemaStore = create<SchemaStore>()(
           obj.apiName === objectApi 
             ? {
                 ...obj,
-                fields: obj.fields.filter(field => field.id !== fieldId),
+                fields: obj.fields.filter(field => 
+                  field.id !== fieldIdOrApiName && field.apiName !== fieldIdOrApiName
+                ),
                 updatedAt: new Date().toISOString()
               }
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        
+        // Explicitly save to localStorage to ensure persistence
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Reorder fields
@@ -320,12 +463,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete record type
@@ -343,12 +488,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Add page layout
@@ -369,12 +516,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
 
         return layoutId;
       },
@@ -396,12 +545,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete page layout
@@ -419,12 +570,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Add validation rule
@@ -445,12 +598,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
 
         return ruleId;
       },
@@ -472,12 +627,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Delete validation rule
@@ -495,12 +652,14 @@ export const useSchemaStore = create<SchemaStore>()(
             : obj
         );
 
-        set({
-          schema: {
-            ...schema,
-            objects: updatedObjects
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Update permissions
@@ -512,12 +671,14 @@ export const useSchemaStore = create<SchemaStore>()(
           ? schema.permissionSets.map(ps => ps.id === permissionSet.id ? permissionSet : ps)
           : [...schema.permissionSets, permissionSet];
 
-        set({
-          schema: {
-            ...schema,
-            permissionSets: updatedPermissionSets
-          }
-        });
+        const updatedSchema = {
+          ...schema,
+          permissionSets: updatedPermissionSets,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
       },
 
       // Get version history
@@ -570,6 +731,20 @@ export const useSchemaStore = create<SchemaStore>()(
           }
         } catch (error) {
           set({ error: 'Invalid JSON format' });
+        }
+      },
+
+      // Reset schema to defaults and clear cache
+      resetSchema: async () => {
+        set({ loading: true, error: null });
+        try {
+          const freshSchema = await schemaService.resetSchema();
+          set({ schema: freshSchema, loading: false });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to reset schema',
+            loading: false 
+          });
         }
       },
 

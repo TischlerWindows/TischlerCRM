@@ -1,25 +1,49 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
+
+// Password hashing function matching auth.ts
+function hashPassword(password: string): string {
+  const ITERATIONS = 310_000;
+  const KEYLEN = 32;
+  const DIGEST = 'sha256';
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.pbkdf2Sync(password, salt, ITERATIONS, KEYLEN, DIGEST).toString('hex');
+  return `pbkdf2$${ITERATIONS}$${DIGEST}$${salt}$${derived}`;
+}
 
 async function main() {
   console.log('🌱 Seeding database...');
 
   // Create admin user
-  const hashedPassword = await bcrypt.hash('admin123', 10);
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@crm.local' },
     update: {},
     create: {
       email: 'admin@crm.local',
-      passwordHash: hashedPassword,
+      passwordHash: hashPassword('admin123'),
       name: 'Admin User',
       role: 'ADMIN',
     },
   });
 
   console.log('✅ Created admin user:', adminUser.email);
+
+  // Create demo user for testing
+  const demoUser = await prisma.user.upsert({
+    where: { email: 'test@example.com' },
+    update: {},
+    create: {
+      email: 'test@example.com',
+      passwordHash: hashPassword('password123'),
+      name: 'Test User',
+      role: 'USER',
+    },
+  });
+
+  console.log('✅ Created demo user:', demoUser.email);
 
   // Create Property object
   const propertyObject = await prisma.customObject.upsert({

@@ -36,19 +36,19 @@ export function TasksPanel({ tasks, onToggleComplete, onAddTask, loading }: Task
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex border-b border-gray-200 dark:border-gray-700">
+      <div className="flex border-b border-gray-200 dark:border-gray-700 bg-[#293241]">
         <button
           onClick={() => setActiveTab('today')}
           className={cn(
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors text-white',
             activeTab === 'today'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              ? 'border-white'
+              : 'border-transparent hover:text-white'
           )}
         >
           Today
           {todayCount > 0 && (
-            <span className="ml-2 px-2 py-0.5 text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full">
+            <span className="ml-2 px-2 py-0.5 text-xs bg-white/20 text-white rounded-full">
               {todayCount}
             </span>
           )}
@@ -56,15 +56,15 @@ export function TasksPanel({ tasks, onToggleComplete, onAddTask, loading }: Task
         <button
           onClick={() => setActiveTab('upcoming')}
           className={cn(
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors text-white',
             activeTab === 'upcoming'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              ? 'border-white'
+              : 'border-transparent hover:text-white'
           )}
         >
           Upcoming
           {upcomingCount > 0 && (
-            <span className="ml-2 px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full">
+            <span className="ml-2 px-2 py-0.5 text-xs bg-white/20 text-white rounded-full">
               {upcomingCount}
             </span>
           )}
@@ -72,15 +72,15 @@ export function TasksPanel({ tasks, onToggleComplete, onAddTask, loading }: Task
         <button
           onClick={() => setActiveTab('overdue')}
           className={cn(
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors',
+            'px-4 py-2 text-sm font-medium border-b-2 transition-colors text-white',
             activeTab === 'overdue'
-              ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400'
-              : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              ? 'border-white'
+              : 'border-transparent hover:text-white'
           )}
         >
           Overdue
           {overdueCount > 0 && (
-            <span className="ml-2 px-2 py-0.5 text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full">
+            <span className="ml-2 px-2 py-0.5 text-xs bg-white/20 text-white rounded-full">
               {overdueCount}
             </span>
           )}

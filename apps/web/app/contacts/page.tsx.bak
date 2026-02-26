@@ -1,0 +1,746 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { 
+  Users, 
+  Plus, 
+  Search, 
+  AlertCircle,
+  Layout
+} from 'lucide-react';
+import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import { useSchemaStore } from '@/lib/schema-store';
+import PageHeader from '@/components/page-header';
+
+interface Contact {
+  id: string;
+  contactNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  company: string;
+  title: string;
+  status: 'Active' | 'Inactive';
+  lastActivity: string;
+  createdBy: string;
+  createdAt: string;
+  lastModifiedBy: string;
+  lastModifiedAt: string;
+  [key: string]: any; // Allow dynamic fields
+}
+
+export default function ContactsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
+  const [showDynamicForm, setShowDynamicForm] = useState(false);
+  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const router = useRouter();
+  const { schema } = useSchemaStore();
+  
+  // Check if Contact object exists with page layouts
+  const contactObject = schema?.objects.find(obj => obj.apiName === 'Contact');
+  const pageLayouts = contactObject?.pageLayouts || [];
+  const hasPageLayout = pageLayouts.length > 0;
+
+  useEffect(() => {
+    // Load contacts from localStorage
+    const storedContacts = localStorage.getItem('contacts');
+    if (storedContacts) {
+      const parsedContacts = JSON.parse(storedContacts);
+      console.log('Loaded contacts from localStorage:', parsedContacts);
+      
+      // Migrate old contacts to ensure they have all required fields
+      const migratedContacts = parsedContacts.map((contact: any) => {
+        const migrated = { ...contact };
+        const allKeys = Object.keys(contact);
+        console.log(`Contact ${contact.contactNumber} keys:`, allKeys);
+        
+        // Map Contact__ prefixed fields to standard fields for display
+        if (!migrated.firstName || migrated.firstName === '') {
+          migrated.firstName = contact['Contact__firstName'] || contact.firstName || '';
+        }
+        
+        if (!migrated.lastName || migrated.lastName === '') {
+          migrated.lastName = contact['Contact__lastName'] || contact.lastName || '';
+        }
+        
+        if (!migrated.email || migrated.email === '') {
+          migrated.email = contact['Contact__email'] || contact.email || contact.primaryEmail || '';
+        }
+        
+        if (!migrated.phone || migrated.phone === '') {
+          migrated.phone = contact['Contact__phone'] || contact.phone || contact.primaryPhone || '';
+        }
+        
+        if (!migrated.company || migrated.company === '') {
+          migrated.company = contact['Contact__company'] || contact.company || contact.account || '';
+        }
+        
+        if (!migrated.title || migrated.title === '') {
+          migrated.title = contact['Contact__title'] || contact.title || '';
+        }
+        
+        return migrated as Contact;
+      });
+      
+      console.log('Migrated contacts:', migratedContacts);
+      setContacts(migratedContacts);
+      
+      // Save migrated data back to localStorage
+      localStorage.setItem('contacts', JSON.stringify(migratedContacts));
+    }
+    setLoading(false);
+  }, []);
+
+  const filteredContacts = contacts.filter(contact =>
+    contact.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.company?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleDynamicFormSubmit = (data: Record<string, any>) => {
+    console.log('=== FORM DATA RECEIVED ===');
+    console.log('Raw form data:', data);
+    console.log('Available keys:', Object.keys(data));
+    console.log('========================');
+    
+    // Generate unique contact number by finding the highest existing number
+    const existingNumbers = contacts
+      .map(c => c.contactNumber)
+      .filter(num => num && num.startsWith('C-'))
+      .map(num => parseInt(num.replace('C-', ''), 10))
+      .filter(num => !isNaN(num));
+    
+    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+    const nextNumber = maxNumber + 1;
+    const contactNumber = `C-${String(nextNumber).padStart(3, '0')}`;
+    
+    const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
+    
+    // Map Contact__ prefixed fields from the form to standard field names
+    const firstNameValue = data['Contact__firstName'] || data.firstName || '';
+    const lastNameValue = data['Contact__lastName'] || data.lastName || '';
+    const emailValue = data['Contact__email'] || data.email || data.primaryEmail || '';
+    const phoneValue = data['Contact__phone'] || data.phone || data.primaryPhone || '';
+    const companyValue = data['Contact__company'] || data.company || data.account || '';
+    const titleValue = data['Contact__title'] || data.title || '';
+    
+    // Create contact with all form data preserved AND normalized display fields
+    const newContact: Contact = {
+      id: String(Date.now()),
+      contactNumber,
+      lastActivity: today,
+      createdBy: 'Development User',
+      createdAt: today,
+      lastModifiedBy: 'Development User',
+      lastModifiedAt: today,
+      // Spread all form data - this preserves all original fields
+      ...data,
+      // Normalize these fields for consistent display in the table
+      firstName: firstNameValue,
+      lastName: lastNameValue,
+      email: emailValue,
+      phone: phoneValue,
+      company: companyValue,
+      title: titleValue,
+      status: data.status || data.Status || 'Active'
+    };
+
+    console.log('=== CONTACT CREATED ===');
+    console.log('New contact:', newContact);
+    console.log('========================');
+
+    const updatedContacts = [newContact, ...contacts];
+    setContacts(updatedContacts);
+    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+  };
+
+  const handleDeleteContact = (id: string) => {
+    if (confirm('Are you sure you want to delete this contact?')) {
+      const updatedContacts = contacts.filter(c => c.id !== id);
+      setContacts(updatedContacts);
+      localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+    }
+  };
+
+
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-gray-600">Loading contacts...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <PageHeader 
+        title="Contacts" 
+        icon={Users} 
+        subtitle="Manage contact information and relationships"
+      />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Actions */}
+        <div className="mb-8 flex justify-end">
+          <button
+            onClick={() => {
+              if (!hasPageLayout) {
+                setShowNoLayoutsDialog(true);
+              } else if (pageLayouts.length === 1 && pageLayouts[0]) {
+                setSelectedLayoutId(pageLayouts[0].id);
+                setShowDynamicForm(true);
+              } else {
+                setShowLayoutSelector(true);
+              }
+            }}
+            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            New Contact
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search contacts by number, name, email, or company..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        {/* Contacts List */}
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Contact Records</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact #</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredContacts.map((contact) => (
+                  <tr key={contact.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-indigo-600">
+                      <Link href={`/contacts/${contact.id}`} className="hover:text-indigo-800">
+                        {contact.contactNumber}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {contact.firstName} {contact.lastName}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.email}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.phone}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.company}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.title}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        contact.status === 'Active' 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {contact.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <button 
+                        onClick={() => handleDeleteContact(contact.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {filteredContacts.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No contacts found</h3>
+            <p className="text-gray-600">
+              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first contact.'}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* No Page Layouts Dialog */}
+      {showNoLayoutsDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">No Page Layouts Created</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-start gap-3 mb-4">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-gray-700">
+                  <p className="mb-3">
+                    To create new contacts, you need to configure a page layout in the Page Editor first.
+                  </p>
+                  <p className="font-medium text-gray-900">
+                    This allows you to:
+                  </p>
+                  <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
+                    <li>Customize which fields appear</li>
+                    <li>Organize fields into sections</li>
+                    <li>Create multiple layout options</li>
+                    <li>Control field validation</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowNoLayoutsDialog(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <Link
+                href="/object-manager/Contact"
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                onClick={() => setShowNoLayoutsDialog(false)}
+              >
+                <Layout className="w-4 h-4 mr-2" />
+                Go to Page Editor
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Layout Selector Dialog */}
+      {showLayoutSelector && pageLayouts.length > 1 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Choose which form layout to use for creating a new contact
+              </p>
+            </div>
+            <div className="p-6 space-y-3">
+              {pageLayouts.map((layout) => (
+                <button
+                  key={layout.id}
+                  onClick={() => {
+                    setSelectedLayoutId(layout.id);
+                    setShowLayoutSelector(false);
+                    setShowDynamicForm(true);
+                  }}
+                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900">{layout.name}</div>
+                    <div className="text-sm text-gray-500 mt-1">
+                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
+                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="p-6 border-t border-gray-200 flex justify-end">
+              <button
+                onClick={() => setShowLayoutSelector(false)}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic Form Dialog */}
+      {hasPageLayout && selectedLayoutId && (
+        <DynamicFormDialog
+          open={showDynamicForm}
+          onOpenChange={(open) => {
+            setShowDynamicForm(open);
+            if (!open) setSelectedLayoutId(null);
+          }}
+          objectApiName="Contact"
+          layoutType="create"
+          layoutId={selectedLayoutId}
+          onSubmit={handleDynamicFormSubmit}
+          title="New Contact"
+        />
+      )}
+    </div>
+  );
+}
+              
+              {/* Contact Information Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Contact Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Salutation</em></strong></label>
+                    <select
+                      value={formData.salutation}
+                      onChange={(e) => setFormData({...formData, salutation: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="Mr.">Mr.</option>
+                      <option value="Ms.">Ms.</option>
+                      <option value="Mrs.">Mrs.</option>
+                      <option value="Dr.">Dr.</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>First Name</em></strong></label>
+                    <input
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Last Name</em></strong></label>
+                    <input
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Account</em></strong></label>
+                    <input
+                      type="text"
+                      value={formData.account}
+                      onChange={(e) => setFormData({...formData, account: e.target.value})}
+                      placeholder="Search accounts..."
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Type</em></strong></label>
+                    <select
+                      value={formData.contactType}
+                      onChange={(e) => setFormData({...formData, contactType: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    >
+                      <option value="">Select type</option>
+                      <option value="Architect">Architect</option>
+                      <option value="Associate">Associate</option>
+                      <option value="CEO">CEO</option>
+                      <option value="Client/Homeowner">Client/Homeowner</option>
+                      <option value="Designer">Designer</option>
+                      <option value="Engineer">Engineer</option>
+                      <option value="Property Manager">Property Manager</option>
+                      <option value="Project Manager">Project Manager</option>
+                      <option value="President">President</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Title</em></strong></label>
+                    <select
+                      value={formData.title}
+                      onChange={(e) => setFormData({...formData, title: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="">Select title</option>
+                      <option value="Senior Architect">Senior Architect</option>
+                      <option value="Junior Architect">Junior Architect</option>
+                      <option value="Executive Assistant">Executive Assistant</option>
+                      <option value="Senior Project Manager">Senior Project Manager</option>
+                      <option value="Project Coordinator">Project Coordinator</option>
+                      <option value="Design Director">Design Director</option>
+                      <option value="Operations Manager">Operations Manager</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Reports To</em></strong></label>
+                    <input
+                      type="text"
+                      value={formData.reportsTo}
+                      onChange={(e) => setFormData({...formData, reportsTo: e.target.value})}
+                      placeholder="Search contacts..."
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Status</em></strong></label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({...formData, status: e.target.value as 'Active' | 'Inactive'})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Email</em></strong></label>
+                    <input
+                      type="email"
+                      value={formData.primaryEmail}
+                      onChange={(e) => setFormData({...formData, primaryEmail: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Email</em></strong></label>
+                    <input
+                      type="email"
+                      value={formData.secondaryEmail}
+                      onChange={(e) => setFormData({...formData, secondaryEmail: e.target.value})}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Phone</em></strong></label>
+                    <input
+                      type="tel"
+                      value={formData.primaryPhone}
+                      onChange={(e) => setFormData({...formData, primaryPhone: e.target.value})}
+                      placeholder="(416) 555-0123"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Phone</em></strong></label>
+                    <input
+                      type="tel"
+                      value={formData.secondaryPhone}
+                      onChange={(e) => setFormData({...formData, secondaryPhone: e.target.value})}
+                      placeholder="(416) 555-0456"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Fax</em></strong></label>
+                    <input
+                      type="tel"
+                      value={formData.fax}
+                      onChange={(e) => setFormData({...formData, fax: e.target.value})}
+                      placeholder="(416) 555-0789"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Address Information Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Address Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Primary Address</em></strong></label>
+                    <textarea
+                      value={formData.primaryAddress}
+                      onChange={(e) => setFormData({...formData, primaryAddress: e.target.value})}
+                      placeholder="Used for mailing..."
+                      rows={3}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Secondary Address</em></strong></label>
+                    <textarea
+                      value={formData.secondaryAddress}
+                      onChange={(e) => setFormData({...formData, secondaryAddress: e.target.value})}
+                      placeholder="Used as needed..."
+                      rows={3}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>PO Box</em></strong></label>
+                    <textarea
+                      value={formData.poBox}
+                      onChange={(e) => setFormData({...formData, poBox: e.target.value})}
+                      placeholder="Used as needed..."
+                      rows={2}
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Associated Properties Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Associated Properties</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700"><strong><em>Properties</em></strong></label>
+                  <input
+                    type="text"
+                    value={formData.associatedProperties}
+                    onChange={(e) => setFormData({...formData, associatedProperties: e.target.value})}
+                    placeholder="Search and select property records..."
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              {/* Notes Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">Notes</h4>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Notes</em></strong></label>
+                  <textarea
+                    value={formData.contactNotes}
+                    onChange={(e) => setFormData({...formData, contactNotes: e.target.value})}
+                    placeholder="Records any pertinent information regarding contact..."
+                    rows={4}
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                  />
+                </div>
+              </div>
+
+              {/* System Information Section */}
+              <div>
+                <h4 className="text-md font-semibold text-gray-900 mb-4">System Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500"><strong><em>Created By</em></strong></label>
+                    <input
+                      type="text"
+                      value="Current User"
+                      disabled
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500"><strong><em>Last Modified By</em></strong></label>
+                    <input
+                      type="text"
+                      value="Auto-generated"
+                      disabled
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700"><strong><em>Contact Owner</em></strong></label>
+                    <input
+                      type="text"
+                      value={formData.contactOwner}
+                      onChange={(e) => setFormData({...formData, contactOwner: e.target.value})}
+                      placeholder="Search users..."
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button type="submit" className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-teal-700">
+                  {editingContact ? 'Update Contact' : 'Add Contact'}
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleCancel}
+                  className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Contacts List */}
+        <div className="bg-white shadow rounded-lg">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Contact Records</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {contacts.map((contact) => (
+                  <tr key={contact.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-teal-600">
+                      {contact.salutation} {contact.firstName} {contact.lastName}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.account}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.contactType}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.title}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.primaryEmail}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{contact.primaryPhone}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        contact.status === 'Active' 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {contact.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm">
+                      <button 
+                        onClick={() => handleEdit(contact)}
+                        className="text-teal-600 hover:text-teal-900 mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(contact.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}

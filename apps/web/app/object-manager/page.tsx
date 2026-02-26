@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSchemaStore } from '@/lib/schema-store';
 import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from '@/lib/schema';
 import { 
@@ -52,8 +53,24 @@ import {
   Database,
   FileText,
   Calendar,
-  Users
+  Users,
+  Lock
 } from 'lucide-react';
+
+// Core objects that cannot be deleted
+const CORE_OBJECTS = new Set([
+  'Property',
+  'Contact',
+  'Account',
+  'Product',
+  'Lead',
+  'Deal',
+  'Project',
+  'Service',
+  'Quote',
+  'Installation',
+  'Home',
+]);
 
 export default function ObjectManagerPage() {
   const router = useRouter();
@@ -66,6 +83,7 @@ export default function ObjectManagerPage() {
     deleteObject,
     exportSchema,
     importSchema,
+    resetSchema,
     clearError 
   } = useSchemaStore();
 
@@ -112,8 +130,8 @@ export default function ObjectManagerPage() {
       setShowCreateDialog(false);
       setCreateForm({ label: '', apiName: '', description: '' });
       
-      // Navigate to the new object
-      router.push(`/object-manager/${apiName}`);
+      // Navigate to the new object's records list page (like properties)
+      router.push(`/objects/${apiName}`);
     } catch (err) {
       console.error('Failed to create object:', err);
     }
@@ -123,6 +141,29 @@ export default function ObjectManagerPage() {
     if (confirm(`Are you sure you want to delete the ${objectApi} object? This action cannot be undone.`)) {
       try {
         await deleteObject(objectApi);
+        
+        // Remove object from navigation tabs
+        const savedTabsStr = localStorage.getItem('tabConfiguration');
+        if (savedTabsStr) {
+          try {
+            const savedTabs = JSON.parse(savedTabsStr);
+            // Filter out tabs that match this object (both /objects/slug and direct routes)
+            const updatedTabs = savedTabs.filter((tab: { name: string; href: string }) => {
+              const lowerApiName = objectApi.toLowerCase();
+              return tab.href !== `/objects/${lowerApiName}` && 
+                     tab.href !== `/${lowerApiName}`;
+            });
+            localStorage.setItem('tabConfiguration', JSON.stringify(updatedTabs));
+          } catch (e) {
+            console.error('Error updating tab configuration:', e);
+          }
+        }
+        
+        // Remove custom records storage for this object
+        localStorage.removeItem(`custom_records_${objectApi.toLowerCase()}`);
+        localStorage.removeItem(`${objectApi.toLowerCase()}VisibleColumns`);
+        localStorage.removeItem(`${objectApi.toLowerCase()}SelectedLayoutId`);
+        
       } catch (err) {
         console.error('Failed to delete object:', err);
       }
@@ -163,6 +204,18 @@ export default function ObjectManagerPage() {
     }
   };
 
+  const handleResetSchema = async () => {
+    if (!confirm('Are you sure? This will clear the cache and reload the schema with all new fields. Any unsaved changes will be lost.')) {
+      return;
+    }
+
+    try {
+      await resetSchema();
+    } catch (err) {
+      console.error('Failed to reset schema:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -177,12 +230,18 @@ export default function ObjectManagerPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow">
+      <div className="bg-[#9f9fa2] shadow border-b border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <Link href="/" className="text-xl font-bold text-indigo-600 hover:text-indigo-700">
-                TCES
+              <Link href="/" className="flex items-center">
+                <Image
+                  src="/tces-logo.png"
+                  alt="TCES"
+                  width={32}
+                  height={32}
+                  priority
+                />
               </Link>
               <span className="text-gray-300">|</span>
               <span className="text-2xl font-bold text-gray-900">Object Manager</span>
@@ -287,17 +346,6 @@ export default function ObjectManagerPage() {
           </div>
           
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (confirm('This will reset all objects to the default set. Are you sure?')) {
-                  localStorage.clear();
-                  location.reload();
-                }
-              }}
-            >
-              Reset to Defaults
-            </Button>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
                 <Button>
@@ -396,14 +444,14 @@ export default function ObjectManagerPage() {
                     <TableCell className="font-mono text-sm text-gray-600">
                       {object.apiName}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.fields.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.fields.length}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.recordTypes.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.recordTypes.length}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{object.validationRules.length}</Badge>
+                    <TableCell className="text-sm text-gray-700">
+                      {object.validationRules.length}
                     </TableCell>
                     <TableCell className="text-sm text-gray-500">
                       {new Date(object.updatedAt).toLocaleDateString()}
@@ -437,13 +485,20 @@ export default function ObjectManagerPage() {
                             <Copy className="h-4 w-4 mr-2" />
                             Clone
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteObject(object.apiName)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {CORE_OBJECTS.has(object.apiName) ? (
+                            <div className="flex items-center px-2 py-1.5 text-sm text-gray-400 bg-gray-50">
+                              <Lock className="h-4 w-4 mr-2" />
+                              Cannot delete - contact admin
+                            </div>
+                          ) : (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteObject(object.apiName)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

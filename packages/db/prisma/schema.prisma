@@ -27,6 +27,27 @@ model User {
   modifiedLayouts     PageLayout[]    @relation("ModifiedLayouts")
   createdRecords      Record[]        @relation("CreatedRecords")
   modifiedRecords     Record[]        @relation("ModifiedRecords")
+  createdReports      Report[]        @relation("CreatedReports")
+  modifiedReports     Report[]        @relation("ModifiedReports")
+  createdFolders      ReportFolder[]  @relation("CreatedFolders")
+  modifiedFolders     ReportFolder[]  @relation("ModifiedFolders")
+  createdDashboards   Dashboard[]     @relation("CreatedDashboards")
+  modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
+  loginEvents         LoginEvent[]
+}
+
+model LoginEvent {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  accountId  String?
+  ip         String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([createdAt])
 }
 
 // ============================================
@@ -158,6 +179,7 @@ model PageLayout {
   updatedAt       DateTime @updatedAt
 
   tabs            LayoutTab[]
+  records         Record[]
 
   @@index([objectId])
   @@index([layoutType])
@@ -214,6 +236,10 @@ model Record {
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   
+  // Page layout used to create/edit this record
+  pageLayout      PageLayout? @relation(fields: [pageLayoutId], references: [id], onDelete: SetNull)
+  pageLayoutId    String?
+  
   // Store all field values as JSON
   data            Json     @default("{}")
   
@@ -226,6 +252,131 @@ model Record {
   updatedAt       DateTime @updatedAt
 
   @@index([objectId])
+  @@index([pageLayoutId])
   @@index([createdAt])
   @@index([updatedAt])
+}
+
+// ============================================
+// Reports & Analytics
+// ============================================
+
+model Report {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  objectType      String   // properties, contacts, accounts, etc.
+  format          String   // tabular, summary, matrix
+  
+  // Report configuration
+  fields          Json     // Array of field names to display
+  filters         Json     // Array of filter objects
+  groupBy         String?  // Field to group by (for summary/matrix)
+  sortBy          String?  // Field to sort by
+  sortOrder       String?  // asc or desc
+  
+  // Permissions and sharing
+  isStandard      Boolean  @default(false)
+  isPrivate       Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  isFavorite      Boolean  @default(false)
+  
+  // Folder organization
+  folderId        String?
+  folder          ReportFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedReports", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedReports", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([objectType])
+  @@index([format])
+  @@index([createdById])
+  @@index([folderId])
+  @@index([isPrivate])
+  @@index([isFavorite])
+}
+
+model ReportFolder {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  parentId        String?
+  parent          ReportFolder? @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children        ReportFolder[] @relation("FolderHierarchy")
+  
+  // Permissions
+  isPrivate       Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedFolders", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedFolders", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  reports         Report[]
+
+  @@index([createdById])
+  @@index([parentId])
+}
+
+// ============================================
+// Dashboards
+// ============================================
+
+model Dashboard {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  
+  // Permissions and sharing
+  isPrivate       Boolean  @default(false)
+  isFavorite      Boolean  @default(false)
+  sharedWith      Json?    // Array of user emails/IDs
+  
+  // Audit fields
+  createdBy       User     @relation("CreatedDashboards", fields: [createdById], references: [id])
+  createdById     String
+  modifiedBy      User     @relation("ModifiedDashboards", fields: [modifiedById], references: [id])
+  modifiedById    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  widgets         DashboardWidget[]
+
+  @@index([createdById])
+  @@index([isFavorite])
+  @@index([isPrivate])
+}
+
+model DashboardWidget {
+  id              String   @id @default(uuid())
+  dashboard       Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  dashboardId     String
+  
+  type            String   // 'vertical-bar', 'horizontal-bar', 'line', 'donut', 'metric', etc.
+  title           String
+  reportId        String?  // Optional reference to a Report
+  dataSource      String   // Object type (e.g., 'accounts', 'contacts')
+  
+  // Widget configuration stored as JSON
+  config          Json     @default("{}")
+  
+  // Position and size (grid coordinates)
+  positionX       Int      @default(0)
+  positionY       Int      @default(0)
+  width           Int      @default(4)
+  height          Int      @default(2)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([dashboardId])
 }

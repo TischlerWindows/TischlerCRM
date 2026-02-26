@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
   MapPin, 
@@ -15,14 +15,34 @@ import {
   Calendar,
   FolderOpen,
   AlertCircle,
-  Layout
+  Layout,
+  Filter,
+  Settings,
+  X,
+  Clock,
+  User,
+  Star,
+  List,
+  ChevronUp,
+  ChevronDown,
+  HelpCircle,
+  Cog,
+  Edit3,
+  GripVertical
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { useAuth } from '@/lib/auth-context';
 import PageHeader from '@/components/page-header';
+import UniversalSearch from '@/components/universal-search';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Property {
   id: string;
+  recordTypeId?: string;
+  pageLayoutId?: string;
   propertyNumber: string;
   address: string;
   city: string;
@@ -37,9 +57,56 @@ interface Property {
   lastModifiedBy: string;
   lastModifiedAt: string;
   sharepointFolder?: string;
+  isFavorite?: boolean;
 }
 
+// Available columns that can be filtered
+const AVAILABLE_COLUMNS = [
+  { id: 'propertyNumber', label: 'Property #', defaultVisible: true },
+  { id: 'address', label: 'Address', defaultVisible: true },
+  { id: 'city', label: 'City', defaultVisible: true },
+  { id: 'state', label: 'State', defaultVisible: true },
+  { id: 'zipCode', label: 'Zip Code', defaultVisible: false },
+  { id: 'status', label: 'Status', defaultVisible: true },
+  { id: 'contacts', label: 'Contacts', defaultVisible: false },
+  { id: 'accounts', label: 'Accounts', defaultVisible: false },
+  { id: 'lastActivity', label: 'Last Activity', defaultVisible: true },
+  { id: 'createdBy', label: 'Created By', defaultVisible: false },
+  { id: 'createdAt', label: 'Created At', defaultVisible: false },
+  { id: 'lastModifiedBy', label: 'Modified By', defaultVisible: false },
+  { id: 'lastModifiedAt', label: 'Modified At', defaultVisible: false },
+  { id: 'sharepointFolder', label: 'SharePoint Folder', defaultVisible: false },
+];
+
+// Default tabs configuration
+const informationModules = [
+  { name: 'Properties', href: '/properties' },
+  { name: 'Contacts', href: '/contacts' },
+  { name: 'Accounts', href: '/accounts' },
+  { name: 'Products', href: '/products' },
+];
+
+const pipelineModules = [
+  { name: 'Leads', href: '/leads' },
+  { name: 'Deals', href: '/deals' },
+  { name: 'Projects', href: '/projects' },
+  { name: 'Service', href: '/service' },
+];
+
+const financialModules = [
+  { name: 'Quotes', href: '/quotes' },
+  { name: 'Installations', href: '/installations' },
+];
+
+const analyticsModules = [
+  { name: 'Dashboards', href: '/dashboard' },
+  { name: 'Reports', href: '/reports' },
+];
+
+const defaultTabs = DEFAULT_TAB_ORDER;
+
 export default function PropertiesPage() {
+  const { user } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,13 +114,82 @@ export default function PropertiesPage() {
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [showAddColumn, setShowAddColumn] = useState(false);
+  const [columnSearchTerm, setColumnSearchTerm] = useState('');
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
+  const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const router = useRouter();
+  const pathname = usePathname();
   const { schema } = useSchemaStore();
+  
+  // Tab navigation state
+  const [editMode, setEditMode] = useState(false);
+  const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [showAddTab, setShowAddTab] = useState(false);
+  const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
   
   // Check if Property object exists with page layouts
   const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
   const pageLayouts = propertyObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
+
+  // Dynamically generate available columns from schema
+  const AVAILABLE_COLUMNS = useMemo(() => {
+    if (!propertyObject?.fields) {
+      // Fallback to hard-coded columns if schema not loaded
+      return [
+        { id: 'propertyNumber', label: 'Property #', defaultVisible: true },
+        { id: 'address', label: 'Address', defaultVisible: true },
+        { id: 'city', label: 'City', defaultVisible: true },
+        { id: 'state', label: 'State', defaultVisible: true },
+        { id: 'zipCode', label: 'Zip Code', defaultVisible: false },
+        { id: 'status', label: 'Status', defaultVisible: true },
+        { id: 'contacts', label: 'Contacts', defaultVisible: false },
+        { id: 'accounts', label: 'Accounts', defaultVisible: false },
+        { id: 'lastActivity', label: 'Last Activity', defaultVisible: true },
+        { id: 'createdBy', label: 'Created By', defaultVisible: false },
+        { id: 'createdAt', label: 'Created At', defaultVisible: false },
+        { id: 'lastModifiedBy', label: 'Modified By', defaultVisible: false },
+        { id: 'lastModifiedAt', label: 'Modified At', defaultVisible: false },
+        { id: 'sharepointFolder', label: 'SharePoint Folder', defaultVisible: false },
+      ];
+    }
+
+    // Generate columns from schema fields
+    return propertyObject.fields.map((field, index) => {
+      // Strip the Property__ prefix for display
+      const cleanApiName = field.apiName.replace('Property__', '');
+      
+      // Determine if field should be visible by default (first 5 non-system fields)
+      const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
+      const defaultVisible = !isSystemField && index < 10;
+      
+      return {
+        id: cleanApiName,
+        label: field.label,
+        defaultVisible
+      };
+    });
+  }, [propertyObject]);
+
+  // Load and persist layout selection
+  useEffect(() => {
+    if (hasPageLayout && !selectedLayoutId) {
+      const savedLayoutId = localStorage.getItem('propertySelectedLayoutId');
+      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+        setSelectedLayoutId(savedLayoutId);
+      } else if (pageLayouts.length > 0) {
+        setSelectedLayoutId(pageLayouts[0].id);
+      }
+    }
+  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
   useEffect(() => {
@@ -62,82 +198,275 @@ export default function PropertiesPage() {
     console.log('✅ Has Page Layout:', hasPageLayout);
   }, [propertyObject, pageLayouts, hasPageLayout]);
 
+  // Load saved tab configuration
   useEffect(() => {
-    // Load properties from localStorage or use mock data
-    const storedProperties = localStorage.getItem('properties');
-    if (storedProperties) {
-      setProperties(JSON.parse(storedProperties));
+    const savedTabsStr = localStorage.getItem('tabConfiguration');
+    if (savedTabsStr) {
+      try {
+        const savedTabs = JSON.parse(savedTabsStr);
+        setTabs(savedTabs);
+      } catch (e) {
+        console.error('Error loading tab configuration:', e);
+        setTabs(defaultTabs);
+      }
     } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          propertyNumber: 'P-001',
-          address: '123 Main Street',
-          city: 'Toronto',
-          state: 'ON',
-          zipCode: 'M5V 3A3',
-          status: 'Active' as const,
-          contacts: ['John Smith', 'Mary Johnson'],
-          accounts: ['ABC Corporation'],
-          lastActivity: '2024-11-10',
-          createdBy: 'Development User',
-          createdAt: '2024-01-15',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-10',
-          sharepointFolder: 'P-001'
-        },
-        {
-          id: '2',
-          propertyNumber: 'P-002',
-          address: '456 Oak Avenue',
-          city: 'Mississauga',
-          state: 'ON',
-          zipCode: 'L5B 2K5',
-          status: 'Active' as const,
-          contacts: ['Sarah Williams'],
-          accounts: ['XYZ Enterprises'],
-          lastActivity: '2024-11-12',
-          createdBy: 'Development User',
-          createdAt: '2024-02-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-12',
-          sharepointFolder: 'P-002'
-        },
-        {
-          id: '3',
-          propertyNumber: 'P-003',
-          address: '789 Pine Road',
-          city: 'Brampton',
-          state: 'ON',
-          zipCode: 'L6Y 1M4',
-          status: 'Inactive' as const,
-          contacts: [],
-          accounts: [],
-          lastActivity: '2024-03-15',
-          createdBy: 'Development User',
-          createdAt: '2024-01-10',
-          lastModifiedBy: 'System',
-          lastModifiedAt: '2024-11-10',
-          sharepointFolder: 'P-003'
-        }
-      ];
-      setProperties(mockData);
-      localStorage.setItem('properties', JSON.stringify(mockData));
+      setTabs(defaultTabs);
     }
-    setLoading(false);
+    
+    // Load available objects from object-manager
+    const storedObjects = localStorage.getItem('customObjects');
+    if (storedObjects) {
+      try {
+        const objects = JSON.parse(storedObjects);
+        const objectTabs = objects.map((obj: any) => ({
+          name: obj.label,
+          href: `/${obj.apiName.toLowerCase()}`
+        }));
+        setAvailableObjects(objectTabs);
+      } catch (e) {
+        console.error('Error loading custom objects:', e);
+      }
+    }
+    
+    setIsLoaded(true);
   }, []);
 
-  const filteredProperties = properties.filter(property =>
-    property.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    property.city.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Fetch properties from API
+  const fetchProperties = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Property');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
+        propertyNumber: record.propertyNumber || '',
+        address: record.address || '',
+        city: record.city || '',
+        state: record.state || '',
+        zipCode: record.zipCode || '',
+        status: record.status || 'Active',
+        contacts: record.contacts || [],
+        accounts: record.accounts || [],
+        lastActivity: record.updatedAt || new Date().toISOString(),
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+        sharepointFolder: record.sharepointFolder || '',
+        isFavorite: record.isFavorite || false,
+      }));
+      setProperties(flattenedRecords as Property[]);
+    } catch (error) {
+      console.error('Failed to fetch properties from API, falling back to localStorage:', error);
+      // Fallback to localStorage if API fails
+      const storedProperties = localStorage.getItem('properties');
+      if (storedProperties) {
+        setProperties(JSON.parse(storedProperties));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [schema]);
+
+  useEffect(() => {
+    // Load visible columns from localStorage or use defaults
+    const storedColumns = localStorage.getItem('propertiesVisibleColumns');
+    if (storedColumns) {
+      setVisibleColumns(JSON.parse(storedColumns));
+    } else {
+      const defaultColumns = AVAILABLE_COLUMNS
+        .filter(col => col.defaultVisible)
+        .map(col => col.id);
+      setVisibleColumns(defaultColumns);
+    }
+
+    // Fetch properties from API
+    fetchProperties();
+  }, [fetchProperties]);
+
+  const handleSort = (columnId: string) => {
+    if (sortColumn === columnId) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(columnId);
+      setSortDirection('asc');
+    }
+  };
+
+  const filteredProperties = properties.filter(property => {
+    const addressString = typeof property.address === 'object' 
+      ? formatFieldValue(property.address, 'Address')
+      : property.address;
+    
+    const matchesSearch = property.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      addressString.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      property.city.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const currentUser = 'Development User';
+    let matchesSidebar = true;
+    
+    switch (sidebarFilter) {
+      case 'recent':
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        matchesSidebar = new Date(property.lastModifiedAt) >= thirtyDaysAgo;
+        break;
+      case 'created-by-me':
+        matchesSidebar = property.createdBy === currentUser;
+        break;
+      case 'favorites':
+        matchesSidebar = (property as any).isFavorite === true;
+        break;
+      case 'all':
+      default:
+        matchesSidebar = true;
+        break;
+    }
+    
+    return matchesSearch && matchesSidebar;
+  }).sort((a, b) => {
+    if (!sortColumn) return 0;
+    
+    const aValue = (a as any)[sortColumn];
+    const bValue = (b as any)[sortColumn];
+    
+    // Handle arrays
+    if (Array.isArray(aValue) && Array.isArray(bValue)) {
+      const aStr = aValue.join(', ').toLowerCase();
+      const bStr = bValue.join(', ').toLowerCase();
+      return sortDirection === 'asc' 
+        ? aStr.localeCompare(bStr)
+        : bStr.localeCompare(aStr);
+    }
+    
+    // Handle null/undefined
+    if (aValue == null && bValue == null) return 0;
+    if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
+    if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
+    
+    // Handle dates
+    if (sortColumn.includes('At') || sortColumn === 'lastActivity') {
+      const aDate = new Date(aValue).getTime();
+      const bDate = new Date(bValue).getTime();
+      return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+    }
+    
+    // Handle strings and numbers
+    const aStr = String(aValue).toLowerCase();
+    const bStr = String(bValue).toLowerCase();
+    
+    return sortDirection === 'asc' 
+      ? aStr.localeCompare(bStr, undefined, { numeric: true })
+      : bStr.localeCompare(aStr, undefined, { numeric: true });
+  });
+
+  const toggleColumnVisibility = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.includes(columnId)
+      ? visibleColumns.filter(id => id !== columnId)
+      : [...visibleColumns, columnId];
+    
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+  };
+
+  const handleColumnDragStart = (index: number) => {
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null || draggedColumnIndex === index) return;
+
+    const newColumns = [...visibleColumns];
+    const draggedColumn = newColumns[draggedColumnIndex];
+    if (!draggedColumn) return;
+    
+    newColumns.splice(draggedColumnIndex, 1);
+    newColumns.splice(index, 0, draggedColumn);
+
+    setVisibleColumns(newColumns);
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(visibleColumns));
+  };
+
+  const handleAddColumn = (columnId: string) => {
+    if (!visibleColumns.includes(columnId)) {
+      const newVisibleColumns = [...visibleColumns, columnId];
+      setVisibleColumns(newVisibleColumns);
+      localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+    }
+    setShowAddColumn(false);
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
+    setVisibleColumns(newVisibleColumns);
+    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+  };
+
+  const handleResetColumns = () => {
+    const defaultColumns = AVAILABLE_COLUMNS
+      .filter(col => col.defaultVisible)
+      .map(col => col.id);
+    setVisibleColumns(defaultColumns);
+    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(defaultColumns));
+  };
+
+  const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
+
+  const formatColumnValue = (property: Property, columnId: string) => {
+    const value = (property as any)[columnId];
+    
+    if (value === null || value === undefined) {
+      return 'N/A';
+    }
+    
+    // Check if this is a lookup field and resolve the display name
+    const lookupObjectType = inferLookupObjectType(columnId);
+    if (lookupObjectType && typeof value === 'string') {
+      return resolveLookupDisplayName(value, lookupObjectType);
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.join(', ') : 'None';
+    }
+    
+    // Use formatFieldValue to handle objects like Address and Geolocation
+    if (typeof value === 'object') {
+      // Determine field type based on column ID
+      let fieldType = undefined;
+      if (columnId === 'address') fieldType = 'Address';
+      return formatFieldValue(value, fieldType);
+    }
+    
+    return String(value);
+  };
 
 
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
+    
+    // Map schema field names (e.g., Property__city) to simple property names
+    const normalizeFieldName = (fieldName: string): string => {
+      return fieldName.replace('Property__', '');
+    };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>) => {
-    // Generate unique property number by finding the highest existing number
+    // Create normalized data object with simple field names
+    const normalizedData: Record<string, any> = {};
+    Object.entries(data).forEach(([key, value]) => {
+      const cleanKey = normalizeFieldName(key);
+      normalizedData[cleanKey] = value;
+      console.log(`  ${key} -> ${cleanKey}:`, value);
+    });
+    
+    console.log('📝 Normalized data:', normalizedData);
+    console.log('📍 Address field value:', normalizedData.address, 'Type:', typeof normalizedData.address);
     const existingNumbers = properties
       .map(p => p.propertyNumber)
       .filter(num => num.startsWith('P-'))
@@ -149,38 +478,147 @@ export default function PropertiesPage() {
     const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
+    const currentUserName = user?.name || user?.email || 'System';
     
-    const newProperty: Property = {
-      id: String(Date.now()),
+    // Get default record type
+    const defaultRecordType = schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0];
+
+    // Prepare the record data for the API
+    const recordData = {
       propertyNumber,
-      address: data.address || '',
-      city: data.city || '',
-      state: data.state || '',
-      zipCode: data.zipCode || '',
-      status: data.status || 'Active',
-      contacts: data.contacts || [],
-      accounts: data.accounts || [],
-      lastActivity: today || '',
-      createdBy: 'Development User',
-      createdAt: today || '',
-      lastModifiedBy: 'Development User',
-      lastModifiedAt: today || '',
+      status: normalizedData.status || 'Active',
+      contacts: normalizedData.contacts || [],
+      accounts: normalizedData.accounts || [],
       sharepointFolder: propertyNumber,
-      ...data // Include any other fields from the form
+      address: normalizedData.address !== undefined ? normalizedData.address : '',
+      city: normalizedData.city || '',
+      state: normalizedData.state || '',
+      zipCode: normalizedData.zipCode || '',
+      ...normalizedData,
     };
 
-    const updatedProperties = [newProperty, ...properties];
-    setProperties(updatedProperties);
-    localStorage.setItem('properties', JSON.stringify(updatedProperties));
-    console.log('Dynamic form submitted:', data);
-  };
-
-  const handleDeleteProperty = (id: string) => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      const updatedProperties = properties.filter(p => p.id !== id);
+    try {
+      // Create record via API
+      const createdRecord = await recordsService.createRecord('Property', { data: recordData });
+      console.log('✅ Record created via API:', createdRecord);
+      
+      if (!createdRecord) {
+        throw new Error('Failed to create record - null response');
+      }
+      
+      // Close the form and reset state
+      setShowDynamicForm(false);
+      
+      // Refresh the list
+      await fetchProperties();
+      
+      // Redirect to the newly created property's detail page
+      router.push(`/properties/${createdRecord.id}`);
+    } catch (error) {
+      console.error('Failed to create record via API, falling back to localStorage:', error);
+      
+      // Fallback to localStorage if API fails
+      const newPropertyId = String(Date.now());
+      const newProperty: Property = {
+        id: newPropertyId,
+        recordTypeId: defaultRecordType?.id,
+        pageLayoutId: layoutId,
+        propertyNumber,
+        status: normalizedData.status || 'Active',
+        contacts: normalizedData.contacts || [],
+        accounts: normalizedData.accounts || [],
+        lastActivity: today || '',
+        createdBy: currentUserName,
+        createdAt: today || '',
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today || '',
+        sharepointFolder: propertyNumber,
+        ...normalizedData,
+        address: normalizedData.address !== undefined ? normalizedData.address : '',
+        city: normalizedData.city || '',
+        state: normalizedData.state || '',
+        zipCode: normalizedData.zipCode || '',
+      };
+      
+      const updatedProperties = [newProperty, ...properties];
       setProperties(updatedProperties);
       localStorage.setItem('properties', JSON.stringify(updatedProperties));
+      
+      setShowDynamicForm(false);
+      router.push(`/properties/${newPropertyId}`);
     }
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+    if (confirm('Are you sure you want to delete this property?')) {
+      try {
+        await recordsService.deleteRecord('Property', id);
+        // Refresh the list after deletion
+        fetchProperties();
+      } catch (error) {
+        console.error('Failed to delete property:', error);
+        // Fallback to local deletion if API fails
+        const updatedProperties = properties.filter(p => p.id !== id);
+        setProperties(updatedProperties);
+        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+      }
+    }
+  };
+
+  const handleToggleFavorite = (id: string) => {
+    const updatedProperties = properties.map(p => 
+      p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
+    );
+    setProperties(updatedProperties);
+    localStorage.setItem('properties', JSON.stringify(updatedProperties));
+    setOpenDropdown(null);
+  };
+
+  // Tab management functions
+  const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
+    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+  };
+
+  const handleResetToDefault = () => {
+    setTabs(defaultTabs);
+    saveTabConfiguration(defaultTabs);
+  };
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newTabs = [...tabs];
+    const draggedTab = newTabs[draggedIndex];
+    if (!draggedTab) return;
+    
+    newTabs.splice(draggedIndex, 1);
+    newTabs.splice(index, 0, draggedTab);
+    
+    setTabs(newTabs);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    saveTabConfiguration(tabs);
+  };
+
+  const handleAddTab = (tab: { name: string; href: string }) => {
+    const newTabs = [...tabs, tab];
+    setTabs(newTabs);
+    saveTabConfiguration(newTabs);
+    setShowAddTab(false);
+  };
+
+  const handleRemoveTab = (index: number) => {
+    const newTabs = tabs.filter((_, i) => i !== index);
+    setTabs(newTabs);
+    saveTabConfiguration(newTabs);
   };
 
   if (loading) {
@@ -192,32 +630,104 @@ export default function PropertiesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <PageHeader 
-        title="Properties" 
-        icon={MapPin} 
-        subtitle="Manage property records and locations"
-      />
+    <div className="flex flex-1 overflow-hidden bg-gray-50">
+        {/* Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+          <div className="space-y-6">
+            {/* Page Header in Sidebar */}
+            <div className="pb-6 border-b border-gray-200">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-indigo-600" />
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Properties</h1>
+              </div>
+              <p className="text-sm text-gray-600 ml-13">Manage property records and locations</p>
+            </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Properties</h3>
+              <nav className="space-y-1">
+                <button
+                  onClick={() => setSidebarFilter('recent')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'recent'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  Recent
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('created-by-me')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'created-by-me'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  Created by Me
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('all')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'all'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <List className="w-4 h-4" />
+                  All Properties
+                </button>
+                <button
+                  onClick={() => setSidebarFilter('favorites')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
+                    sidebarFilter === 'favorites'
+                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Star className="w-4 h-4" />
+                  All Favorites
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+      <div className="px-6 py-6">
         {/* Actions */}
-        <div className="mb-8 flex justify-end">
-          <button
-              onClick={() => {
-                if (!hasPageLayout) {
-                  setShowNoLayoutsDialog(true);
-                } else if (pageLayouts.length === 1 && pageLayouts[0]) {
-                  setSelectedLayoutId(pageLayouts[0].id);
-                  setShowDynamicForm(true);
-                } else {
-                  setShowLayoutSelector(true);
-                }
-              }}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        <div className="mb-6 flex justify-between items-center">
+          <h3 className="text-lg font-medium text-gray-900">Property Records</h3>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowFilterSettings(true)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <Plus className="w-5 h-5 mr-2" />
-              New Property
+              <Settings className="w-5 h-5 mr-2" />
+              Configure Columns
             </button>
+            <button
+                onClick={() => {
+                  if (!hasPageLayout) {
+                    setShowNoLayoutsDialog(true);
+                  } else if (pageLayouts.length === 1) {
+                    setSelectedLayoutId(pageLayouts[0].id);
+                    setShowDynamicForm(true);
+                  } else {
+                    setShowLayoutSelector(true);
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                New Property
+              </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -235,50 +745,105 @@ export default function PropertiesPage() {
         </div>
 
         {/* Properties List */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Property Records</h3>
-          </div>
+        <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">State</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Activity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  {visibleColumns.map(columnId => {
+                    const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                    if (!column) return null;
+                    return (
+                      <th 
+                        key={column.id} 
+                        className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        onClick={() => handleSort(column.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{column.label}</span>
+                          {sortColumn === column.id && (
+                            sortDirection === 'asc' 
+                              ? <ChevronUp className="w-4 h-4" />
+                              : <ChevronDown className="w-4 h-4" />
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
+                  <th className="px-6 py-3"></th>
+                  <th className="px-6 py-3"></th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProperties.map((property) => (
-                  <tr key={property.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-medium text-indigo-600">
-                      <Link href={`/properties/${property.id}`} className="hover:text-indigo-800">
-                        {property.propertyNumber}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{property.address}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{property.city}</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{property.state}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        property.status === 'Active' 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {property.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{property.lastActivity}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <button 
-                        onClick={() => handleDeleteProperty(property.id)}
-                        className="text-red-600 hover:text-red-900"
+                  <tr key={property.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/properties/${property.id}`)}>
+                    {visibleColumns.map(columnId => {
+                      const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
+                      if (!column) return null;
+                      return (
+                        <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
+                          {column.id === 'propertyNumber' ? (
+                            <Link href={`/properties/${property.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                              {property.propertyNumber}
+                            </Link>
+                          ) : column.id === 'address' ? (
+                            <Link href={`/properties/${property.id}`} className="text-indigo-600 hover:text-indigo-800 hover:underline">
+                              {formatColumnValue(property, column.id)}
+                            </Link>
+                          ) : column.id === 'status' ? (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              property.status === 'Active' 
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {property.status}
+                            </span>
+                          ) : (
+                            formatColumnValue(property, column.id)
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => setOpenDropdown(openDropdown === property.id ? null : property.id)}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
-                        Delete
+                        <MoreVertical className="w-5 h-5 text-gray-600" />
+                      </button>
+                      {openDropdown === property.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                router.push(`/properties/${property.id}`);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                            >
+                              <Edit className="w-4 h-4" />
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                handleDeleteProperty(property.id);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleToggleFavorite(property.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <Star className={`w-5 h-5 ${property.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                       </button>
                     </td>
                   </tr>
@@ -350,7 +915,7 @@ export default function PropertiesPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
+              <h2 className="text-xl font-bold text-gray-900">Select a Page Layout</h2>
               <p className="text-sm text-gray-600 mt-1">
                 Choose which form layout to use for creating a new property
               </p>
@@ -361,6 +926,7 @@ export default function PropertiesPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
+                    localStorage.setItem('propertySelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}
@@ -372,8 +938,8 @@ export default function PropertiesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
-                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs?.length || 0} {(layout.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} • {' '}
+                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.sections?.length || 0), 0) || 0} sections
                     </div>
                   </div>
                 </button>
@@ -406,6 +972,135 @@ export default function PropertiesPage() {
           title="New Property"
         />
       )}
+
+      {/* Column Configuration Dialog */}
+      {showFilterSettings && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowFilterSettings(false)}>
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h2 className="text-xl font-semibold text-gray-900">Configure Table Columns</h2>
+              <p className="text-sm text-gray-600 mt-1">Customize which columns appear in your table. Drag to reorder, click to remove.</p>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-gray-700 uppercase">Visible Columns ({visibleColumns.length})</h3>
+                <button 
+                  onClick={() => setShowAddColumn(true)} 
+                  className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Add More Columns
+                </button>
+              </div>
+              
+              <div className="space-y-2">
+                {visibleColumns.map((columnId, index) => {
+                  const column = AVAILABLE_COLUMNS.find(c => c.id === columnId);
+                  if (!column) return null;
+                  
+                  return (
+                    <div
+                      key={columnId}
+                      draggable
+                      onDragStart={() => handleColumnDragStart(index)}
+                      onDragOver={(e) => handleColumnDragOver(e, index)}
+                      onDragEnd={handleColumnDragEnd}
+                      className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 cursor-move group"
+                    >
+                      <GripVertical className="w-5 h-5 text-gray-400" />
+                      <span className="flex-1 text-sm font-medium text-gray-900">{column.label}</span>
+                      <button
+                        onClick={() => handleRemoveColumn(columnId)}
+                        className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100"
+                        title="Remove"
+                      >
+                        <X className="w-4 h-4 text-gray-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <button 
+                onClick={handleResetColumns} 
+                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                Reset Columns to Default
+              </button>
+            </div>
+            
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => setShowFilterSettings(false)}
+                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Column Modal */}
+      {showAddColumn && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
+          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
+            </div>
+            <div className="px-6 py-4">
+              <input
+                type="text"
+                placeholder="Search fields..."
+                value={columnSearchTerm}
+                onChange={(e) => setColumnSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+              />
+              <div className="max-h-80 overflow-y-auto">
+                <div className="space-y-2">
+                  {AVAILABLE_COLUMNS
+                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
+                    .map((column) => (
+                      <button
+                        key={column.id}
+                        onClick={() => {
+                          handleAddColumn(column.id);
+                          setColumnSearchTerm('');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
+                      >
+                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
+                      </button>
+                    ))}
+                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
+                    <p className="text-gray-500 text-sm py-8 text-center">
+                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 px-6 py-4">
+              <button
+                onClick={() => {
+                  setShowAddColumn(false);
+                  setColumnSearchTerm('');
+                }}
+                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   );
 }

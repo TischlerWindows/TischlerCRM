@@ -23,6 +23,7 @@ import {
 import { useSchemaStore } from '@/lib/schema-store';
 import { cn } from '@/lib/utils';
 import PageEditor from './page-editor';
+import HomeLayoutEditor from './home-layout-editor';
 import FieldsRelationships from './fields-relationships';
 
 const SIDEBAR_SECTIONS = [
@@ -65,6 +66,13 @@ const SIDEBAR_SECTIONS = [
     description: 'Visual page editor',
     category: 'Layouts & UI',
     featured: true
+  },
+  { 
+    id: 'home-layout', 
+    label: 'Home Layout Editor', 
+    icon: Layout,
+    description: 'Homepage layout for reports and widgets',
+    category: 'Layouts & UI'
   },
   { 
     id: 'compact-layouts', 
@@ -134,6 +142,9 @@ export default function ObjectDetailPage() {
   }, [objectApi, setSelectedObject]);
 
   const object = schema?.objects.find(obj => obj.apiName === objectApi);
+  const sidebarSections = objectApi === 'Home'
+    ? SIDEBAR_SECTIONS.filter(section => section.id !== 'page-editor')
+    : SIDEBAR_SECTIONS.filter(section => section.id !== 'home-layout');
 
   if (loading) {
     return (
@@ -211,7 +222,7 @@ export default function ObjectDetailPage() {
           {!sidebarCollapsed && (
             <>
               {['Data Model', 'Layouts & UI', 'Automation', 'Security & Access'].map((category) => {
-                const categoryItems = SIDEBAR_SECTIONS.filter(s => s.category === category);
+                const categoryItems = sidebarSections.filter(s => s.category === category);
                 if (categoryItems.length === 0) return null;
                 
                 return (
@@ -250,7 +261,7 @@ export default function ObjectDetailPage() {
           
           {sidebarCollapsed && (
             <>
-              {SIDEBAR_SECTIONS.map((section) => {
+              {sidebarSections.map((section) => {
                 const Icon = section.icon;
                 const isActive = activeSection === section.id;
                 
@@ -283,14 +294,14 @@ export default function ObjectDetailPage() {
         )}
       >
         {/* Header Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="bg-[#9f9fa2] border-b border-black px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                {SIDEBAR_SECTIONS.find(s => s.id === activeSection)?.label}
+                {sidebarSections.find(s => s.id === activeSection)?.label}
               </h1>
               <p className="text-sm text-gray-600 mt-1">
-                {SIDEBAR_SECTIONS.find(s => s.id === activeSection)?.description}
+                {sidebarSections.find(s => s.id === activeSection)?.description}
               </p>
             </div>
             {activeSection !== 'details' && (
@@ -356,26 +367,34 @@ export default function ObjectDetailPage() {
           )}
 
           {activeSection === 'fields' && (
-            <FieldsRelationships objectApiName={objectApi} />
+            <div className="px-6 py-6">
+              <FieldsRelationships objectApiName={objectApi} />
+            </div>
           )}
 
-          {activeSection === 'page-editor' && (
+          {activeSection === 'page-editor' && objectApi !== 'Home' && (
             <div className="h-[calc(100vh-200px)]">
               <PageEditor objectApiName={objectApi} />
             </div>
           )}
 
-          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && (
+          {activeSection === 'home-layout' && objectApi === 'Home' && (
+            <div className="h-[calc(100vh-200px)]">
+              <HomeLayoutEditor />
+            </div>
+          )}
+
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   {(() => {
-                    const Icon = SIDEBAR_SECTIONS.find(s => s.id === activeSection)?.icon || Database;
+                    const Icon = sidebarSections.find(s => s.id === activeSection)?.icon || Database;
                     return <Icon className="w-8 h-8 text-gray-400" />;
                   })()}
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {SIDEBAR_SECTIONS.find(s => s.id === activeSection)?.label}
+                  {sidebarSections.find(s => s.id === activeSection)?.label}
                 </h3>
                 <p className="text-gray-600 mb-6">
                   This section is under construction. It will allow you to{' '}

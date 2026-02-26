@@ -28,13 +28,13 @@ import {
   List,
   FileText,
   Lock,
+  Eye,
   Clock,
   Globe,
   X,
   Save,
   AlertCircle,
 } from 'lucide-react';
-
 interface FieldsRelationshipsProps {
   objectApiName: string;
 }
@@ -88,6 +88,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   const [editingField, setEditingField] = useState<FieldDef | null>(null);
   const [selectedType, setSelectedType] = useState<FieldType | null>(null);
   const [showTypeSelector, setShowTypeSelector] = useState(true);
+  const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
   
   const [formData, setFormData] = useState({
     label: '',
@@ -108,7 +109,26 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   });
 
   const object = schema?.objects.find(o => o.apiName === objectApiName);
-  const fields = object?.fields || [];
+  let fields = object?.fields || [];
+
+  // Add hardcoded Name field for Contact objects
+  if (objectApiName === 'Contact') {
+    const nameField = {
+      id: 'hardcoded-name-field',
+      apiName: 'Contact__name',
+      label: 'Name',
+      type: 'Text' as FieldType,
+      readOnly: true,
+      custom: false,
+      required: false,
+      maxLength: 255,
+      helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)'
+    };
+    // Add at the beginning if not already present
+    if (!fields.find(f => f.apiName === 'Contact__name')) {
+      fields = [nameField, ...fields];
+    }
+  }
 
   const filteredFields = fields.filter(field =>
     field.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -227,30 +247,31 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   };
 
   return (
-    <div className="max-w-7xl">
-      {/* Header Actions */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              type="text"
-              placeholder="Search fields..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+    <div className="w-full overflow-x-auto">
+      <div className="min-w-max">
+        {/* Header Actions */}
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                type="text"
+                placeholder="Search fields..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
+          <Button onClick={handleCreateField} className="ml-4">
+            <Plus className="w-4 h-4 mr-2" />
+            New Field
+          </Button>
         </div>
-        <Button onClick={handleCreateField} className="ml-4">
-          <Plus className="w-4 h-4 mr-2" />
-          New Field
-        </Button>
-      </div>
 
-      {/* Fields Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+        {/* Fields Table */}
+        <div className="bg-white rounded-lg border border-gray-200">
+          <table className="w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -317,7 +338,13 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       </button>
                       <button
                         onClick={() => handleDeleteField(field.apiName)}
-                        className="text-red-600 hover:text-red-900"
+                        disabled={!field.custom}
+                        className={`${
+                          field.custom
+                            ? 'text-red-600 hover:text-red-900 cursor-pointer'
+                            : 'text-gray-300 cursor-not-allowed'
+                        }`}
+                        title={field.custom ? 'Delete field' : 'System fields cannot be deleted'}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -506,7 +533,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   </div>
 
-                  {/* Type-Specific Fields */}
+                  {/* type-specific-fields */}
                   {(selectedType === 'Text' || selectedType === 'TextArea' || selectedType === 'EncryptedText') && (
                     <div>
                       <Label htmlFor="maxLength">Maximum Length</Label>
@@ -651,6 +678,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

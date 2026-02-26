@@ -19,6 +19,13 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: { objectId: object.id },
       include: {
+        pageLayout: {
+          select: {
+            id: true,
+            name: true,
+            layoutType: true,
+          },
+        },
         createdBy: {
           select: {
             id: true,
@@ -60,6 +67,13 @@ export async function recordRoutes(app: FastifyInstance) {
         objectId: object.id,
       },
       include: {
+        pageLayout: {
+          select: {
+            id: true,
+            name: true,
+            layoutType: true,
+          },
+        },
         createdBy: {
           select: {
             id: true,
@@ -87,7 +101,7 @@ export async function recordRoutes(app: FastifyInstance) {
   // Create new record
   app.post('/objects/:apiName/records', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const data = req.body as Record<string, any>;
+    const { data, pageLayoutId } = req.body as { data: Record<string, any>; pageLayoutId?: string };
 
     const userId = (req as any).user.sub;
 
@@ -115,11 +129,28 @@ export async function recordRoutes(app: FastifyInstance) {
       });
     }
 
-    // Create record with data as JSON
+    // If pageLayoutId is provided, verify it belongs to this object
+    if (pageLayoutId) {
+      const layout = await prisma.pageLayout.findFirst({
+        where: {
+          id: pageLayoutId,
+          objectId: object.id,
+        },
+      });
+
+      if (!layout) {
+        return reply.code(400).send({
+          error: 'Invalid page layout for this object',
+        });
+      }
+    }
+
+    // Create record with data as JSON and pageLayoutId
     const record = await prisma.record.create({
       data: {
         objectId: object.id,
         data: data,
+        pageLayoutId: pageLayoutId || null,
         createdById: userId,
         modifiedById: userId,
       },

@@ -7,13 +7,14 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address";
+  | "Time" | "URL" | "Address" | "CompositeText";
 
 export interface FieldDef {
   id: string;
   apiName: string;
   label: string;
   type: FieldType;
+  custom?: boolean;        // true for custom fields, false/undefined for system fields
   required?: boolean;
   unique?: boolean;
   readOnly?: boolean;
@@ -54,6 +55,11 @@ export interface FieldDef {
     displayFormat: string;
     startingNumber: number;
   };
+  subFields?: Array<{
+    apiName: string;
+    label: string;
+    type: string;
+  }>;
 }
 
 export interface ValidationRule {
