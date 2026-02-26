@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -37,6 +37,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { recordsService } from '@/lib/records-service';
 
 interface Property {
   id: string;
@@ -230,6 +231,43 @@ export default function PropertiesPage() {
     setIsLoaded(true);
   }, []);
 
+  // Fetch properties from API
+  const fetchProperties = useCallback(async () => {
+    try {
+      setLoading(true);
+      const records = await recordsService.getRecords('Property');
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
+        propertyNumber: record.propertyNumber || '',
+        address: record.address || '',
+        city: record.city || '',
+        state: record.state || '',
+        zipCode: record.zipCode || '',
+        status: record.status || 'Active',
+        contacts: record.contacts || [],
+        accounts: record.accounts || [],
+        lastActivity: record.updatedAt || new Date().toISOString(),
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+        sharepointFolder: record.sharepointFolder || '',
+        isFavorite: record.isFavorite || false,
+      }));
+      setProperties(flattenedRecords as Property[]);
+    } catch (error) {
+      console.error('Failed to fetch properties from API, falling back to localStorage:', error);
+      // Fallback to localStorage if API fails
+      const storedProperties = localStorage.getItem('properties');
+      if (storedProperties) {
+        setProperties(JSON.parse(storedProperties));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [schema]);
+
   useEffect(() => {
     // Load visible columns from localStorage or use defaults
     const storedColumns = localStorage.getItem('propertiesVisibleColumns');
@@ -242,73 +280,9 @@ export default function PropertiesPage() {
       setVisibleColumns(defaultColumns);
     }
 
-    // Load properties from localStorage or use mock data
-    const storedProperties = localStorage.getItem('properties');
-    if (storedProperties) {
-      setProperties(JSON.parse(storedProperties));
-    } else {
-      // Initial mock data
-      const mockData = [
-        {
-          id: '1',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
-          propertyNumber: 'P-001',
-          address: '123 Main Street',
-          city: 'Toronto',
-          state: 'ON',
-          zipCode: 'M5V 3A3',
-          status: 'Active' as const,
-          contacts: ['John Smith', 'Mary Johnson'],
-          accounts: ['ABC Corporation'],
-          lastActivity: '2024-11-10',
-          createdBy: 'Development User',
-          createdAt: '2024-01-15',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-10',
-          sharepointFolder: 'P-001'
-        },
-        {
-          id: '2',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
-          propertyNumber: 'P-002',
-          address: '456 Oak Avenue',
-          city: 'Mississauga',
-          state: 'ON',
-          zipCode: 'L5B 2K5',
-          status: 'Active' as const,
-          contacts: ['Sarah Williams'],
-          accounts: ['XYZ Enterprises'],
-          lastActivity: '2024-11-12',
-          createdBy: 'Development User',
-          createdAt: '2024-02-20',
-          lastModifiedBy: 'Development User',
-          lastModifiedAt: '2024-11-12',
-          sharepointFolder: 'P-002'
-        },
-        {
-          id: '3',
-          recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
-          propertyNumber: 'P-003',
-          address: '789 Pine Road',
-          city: 'Brampton',
-          state: 'ON',
-          zipCode: 'L6Y 1M4',
-          status: 'Inactive' as const,
-          contacts: [],
-          accounts: [],
-          lastActivity: '2024-03-15',
-          createdBy: 'Development User',
-          createdAt: '2024-01-10',
-          lastModifiedBy: 'System',
-          lastModifiedAt: '2024-11-10',
-          sharepointFolder: 'P-003'
-        }
-      ];
-      setProperties(mockData);
-      localStorage.setItem('properties', JSON.stringify(mockData));
-    }
-    setLoading(false);
-  }, []);
+    // Fetch properties from API
+    fetchProperties();
+  }, [fetchProperties]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -475,8 +449,7 @@ export default function PropertiesPage() {
   };
 
 
-
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
     
     // Map schema field names (e.g., Property__city) to simple property names
@@ -505,59 +478,90 @@ export default function PropertiesPage() {
     const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
     
     const today = new Date().toISOString().split('T')[0];
-    const newPropertyId = String(Date.now());
     const currentUserName = user?.name || user?.email || 'System';
     
     // Get default record type
     const defaultRecordType = schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0];
-    
-    const newProperty: Property = {
-      id: newPropertyId,
-      recordTypeId: defaultRecordType?.id,
-      pageLayoutId: layoutId, // Store the layout ID used to create this record
+
+    // Prepare the record data for the API
+    const recordData = {
       propertyNumber,
       status: normalizedData.status || 'Active',
       contacts: normalizedData.contacts || [],
       accounts: normalizedData.accounts || [],
-      lastActivity: today || '',
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || '',
       sharepointFolder: propertyNumber,
-      ...normalizedData, // Include all fields from the form (preserves Address objects)
-      // Override with defaults only if not provided
       address: normalizedData.address !== undefined ? normalizedData.address : '',
       city: normalizedData.city || '',
       state: normalizedData.state || '',
       zipCode: normalizedData.zipCode || '',
+      ...normalizedData,
     };
-    
-    console.log('💾 New property object:', newProperty);
 
-    const updatedProperties = [newProperty, ...properties];
-    setProperties(updatedProperties);
-    localStorage.setItem('properties', JSON.stringify(updatedProperties));
-    
-    console.log('✅ New property saved:', newProperty);
-    console.log('📍 Redirecting to:', `/properties/${newPropertyId}`);
-    
-    // Close the form and reset state
-    setShowDynamicForm(false);
-    
-    // Redirect to the newly created property's detail page after a small delay to ensure data is persisted
-    setTimeout(() => {
-      console.log('🔄 Pushing route to:', `/properties/${newPropertyId}`);
-      console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('properties') || '[]').map((p: any) => p.id));
-      router.push(`/properties/${newPropertyId}`);
-    }, 200);
-  };
-
-  const handleDeleteProperty = (id: string) => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      const updatedProperties = properties.filter(p => p.id !== id);
+    try {
+      // Create record via API
+      const createdRecord = await recordsService.createRecord('Property', { data: recordData });
+      console.log('✅ Record created via API:', createdRecord);
+      
+      if (!createdRecord) {
+        throw new Error('Failed to create record - null response');
+      }
+      
+      // Close the form and reset state
+      setShowDynamicForm(false);
+      
+      // Refresh the list
+      await fetchProperties();
+      
+      // Redirect to the newly created property's detail page
+      router.push(`/properties/${createdRecord.id}`);
+    } catch (error) {
+      console.error('Failed to create record via API, falling back to localStorage:', error);
+      
+      // Fallback to localStorage if API fails
+      const newPropertyId = String(Date.now());
+      const newProperty: Property = {
+        id: newPropertyId,
+        recordTypeId: defaultRecordType?.id,
+        pageLayoutId: layoutId,
+        propertyNumber,
+        status: normalizedData.status || 'Active',
+        contacts: normalizedData.contacts || [],
+        accounts: normalizedData.accounts || [],
+        lastActivity: today || '',
+        createdBy: currentUserName,
+        createdAt: today || '',
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today || '',
+        sharepointFolder: propertyNumber,
+        ...normalizedData,
+        address: normalizedData.address !== undefined ? normalizedData.address : '',
+        city: normalizedData.city || '',
+        state: normalizedData.state || '',
+        zipCode: normalizedData.zipCode || '',
+      };
+      
+      const updatedProperties = [newProperty, ...properties];
       setProperties(updatedProperties);
       localStorage.setItem('properties', JSON.stringify(updatedProperties));
+      
+      setShowDynamicForm(false);
+      router.push(`/properties/${newPropertyId}`);
+    }
+  };
+
+  const handleDeleteProperty = async (id: string) => {
+    if (confirm('Are you sure you want to delete this property?')) {
+      try {
+        await recordsService.deleteRecord('Property', id);
+        // Refresh the list after deletion
+        fetchProperties();
+      } catch (error) {
+        console.error('Failed to delete property:', error);
+        // Fallback to local deletion if API fails
+        const updatedProperties = properties.filter(p => p.id !== id);
+        setProperties(updatedProperties);
+        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+      }
     }
   };
 

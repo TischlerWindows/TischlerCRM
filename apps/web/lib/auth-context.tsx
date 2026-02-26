@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiClient } from './api-client';
 
 interface User {
   id: string;
@@ -53,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (tokenFromCookie && userFromSession) {
         setToken(tokenFromCookie);
+        // Sync token to API client
+        apiClient.setToken(tokenFromCookie);
         if (userFromSession) {
           try {
             setUser(JSON.parse(userFromSession));
@@ -74,17 +77,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('user');
     // Clear auth cookie
     document.cookie = 'auth-token=; Max-Age=0; path=/;';
+    // Clear API client token
+    apiClient.setToken(null);
     setToken(null);
     setUser(null);
   };
 
-  const setAuth = (token: string, user: User) => {
-    console.log('AuthProvider: setAuth called with', { token, user });
-    setToken(token);
-    setUser(user);
+  const setAuth = (newToken: string, newUser: User) => {
+    console.log('AuthProvider: setAuth called with', { token: newToken, user: newUser });
+    setToken(newToken);
+    setUser(newUser);
+    // Sync token to API client
+    apiClient.setToken(newToken);
     // Also set cookie as backup
-    document.cookie = `auth-token=${encodeURIComponent(token)}; path=/`;
-    sessionStorage.setItem('user', JSON.stringify(user));
+    document.cookie = `auth-token=${encodeURIComponent(newToken)}; path=/`;
+    sessionStorage.setItem('user', JSON.stringify(newUser));
   };
 
   const value: AuthContextType = {
