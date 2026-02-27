@@ -14,6 +14,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
+import { recordsService } from '@/lib/records-service';
 
 interface Deal {
   id: string;
@@ -167,15 +168,33 @@ export default function DealDetailPage() {
   // Get Deal object from schema
   const dealObject = schema?.objects.find(obj => obj.apiName === 'Deal');
 
-  // Load deal from localStorage
+  // Load deal from API (with localStorage fallback)
   useEffect(() => {
-    const storedDeals = localStorage.getItem('deals');
-    if (storedDeals && params?.id) {
-      const deals: Deal[] = JSON.parse(storedDeals);
-      const foundDeal = deals.find(d => d.id === params.id as string);
-      setDeal(foundDeal || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Deal', params?.id as string);
+        if (record) {
+          setDeal(recordsService.flattenRecord(record) as Deal);
+        } else {
+          setDeal(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch deal from API, trying localStorage:', error);
+        const stored = localStorage.getItem('deals');
+        if (stored) {
+          const items: Deal[] = JSON.parse(stored);
+          const found = items.find(d => d.id === params?.id);
+          setDeal(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   const pageLayout = getLayoutForRecord(deal, dealObject);
@@ -188,36 +207,26 @@ export default function DealDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (deal) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedDeal: Deal = {
-        ...deal,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedDeals = localStorage.getItem('deals');
-      if (storedDeals) {
-        const deals: Deal[] = JSON.parse(storedDeals);
-        const updatedDeals = deals.map(d => 
-          d.id === deal.id ? updatedDeal : d
-        );
-        localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      try {
+        const updated = await recordsService.updateRecord('Deal', deal.id, { data });
+        if (updated) {
+          setDeal(recordsService.flattenRecord(updated) as Deal);
+        }
+      } catch (error) {
+        console.error('Failed to update deal via API:', error);
+        setDeal({ ...deal, ...data });
       }
-      
-      setDeal(updatedDeal);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this deal?')) {
-      const storedDeals = localStorage.getItem('deals');
-      if (storedDeals && deal) {
-        const deals: Deal[] = JSON.parse(storedDeals);
-        const updatedDeals = deals.filter(d => d.id !== deal.id);
-        localStorage.setItem('deals', JSON.stringify(updatedDeals));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this deal?') && deal) {
+      try {
+        await recordsService.deleteRecord('Deal', deal.id);
+      } catch (error) {
+        console.error('Failed to delete deal via API:', error);
       }
       router.push('/deals');
     }

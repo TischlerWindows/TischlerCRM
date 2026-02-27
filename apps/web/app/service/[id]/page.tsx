@@ -13,6 +13,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Service {
@@ -167,15 +168,33 @@ export default function ServiceDetailPage() {
   // Get Service object from schema
   const serviceObject = schema?.objects.find(obj => obj.apiName === 'Service');
 
-  // Load service from localStorage
+  // Load service from API (with localStorage fallback)
   useEffect(() => {
-    const storedServices = localStorage.getItem('services');
-    if (storedServices && params?.id) {
-      const services: Service[] = JSON.parse(storedServices);
-      const foundService = services.find(s => s.id === params.id as string);
-      setService(foundService || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Service', params?.id as string);
+        if (record) {
+          setService(recordsService.flattenRecord(record) as Service);
+        } else {
+          setService(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch service from API, trying localStorage:', error);
+        const stored = localStorage.getItem('services');
+        if (stored) {
+          const items: Service[] = JSON.parse(stored);
+          const found = items.find(s => s.id === params?.id);
+          setService(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   const pageLayout = getLayoutForRecord(service, serviceObject);
@@ -188,36 +207,26 @@ export default function ServiceDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (service) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedService: Service = {
-        ...service,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedServices = localStorage.getItem('services');
-      if (storedServices) {
-        const services: Service[] = JSON.parse(storedServices);
-        const updatedServices = services.map(s => 
-          s.id === service.id ? updatedService : s
-        );
-        localStorage.setItem('services', JSON.stringify(updatedServices));
+      try {
+        const updated = await recordsService.updateRecord('Service', service.id, { data });
+        if (updated) {
+          setService(recordsService.flattenRecord(updated) as Service);
+        }
+      } catch (error) {
+        console.error('Failed to update service via API:', error);
+        setService({ ...service, ...data });
       }
-      
-      setService(updatedService);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this service?')) {
-      const storedServices = localStorage.getItem('services');
-      if (storedServices && service) {
-        const services: Service[] = JSON.parse(storedServices);
-        const updatedServices = services.filter(s => s.id !== service.id);
-        localStorage.setItem('services', JSON.stringify(updatedServices));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this service?') && service) {
+      try {
+        await recordsService.deleteRecord('Service', service.id);
+      } catch (error) {
+        console.error('Failed to delete service via API:', error);
       }
       router.push('/service');
     }

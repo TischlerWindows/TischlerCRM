@@ -196,7 +196,7 @@ class ApiClient {
 
   async updateRecord(objectApiName: string, recordId: string, data: Record<string, any>) {
     return this.request<any>(`/objects/${objectApiName}/records/${recordId}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify({ data }),
     });
   }

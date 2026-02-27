@@ -13,6 +13,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Product {
@@ -167,15 +168,33 @@ export default function ProductDetailPage() {
   // Get Product object from schema
   const productObject = schema?.objects.find(obj => obj.apiName === 'Product');
 
-  // Load product from localStorage
+  // Load product from API (with localStorage fallback)
   useEffect(() => {
-    const storedProducts = localStorage.getItem('products');
-    if (storedProducts && params?.id) {
-      const products: Product[] = JSON.parse(storedProducts);
-      const foundProduct = products.find(p => p.id === params.id as string);
-      setProduct(foundProduct || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Product', params?.id as string);
+        if (record) {
+          setProduct(recordsService.flattenRecord(record) as Product);
+        } else {
+          setProduct(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch product from API, trying localStorage:', error);
+        const stored = localStorage.getItem('products');
+        if (stored) {
+          const items: Product[] = JSON.parse(stored);
+          const found = items.find(p => p.id === params?.id);
+          setProduct(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   // Get the layout based on product's pageLayoutId or recordTypeId
@@ -234,36 +253,26 @@ export default function ProductDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (product) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedProduct: Product = {
-        ...product,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedProducts = localStorage.getItem('products');
-      if (storedProducts) {
-        const products: Product[] = JSON.parse(storedProducts);
-        const updatedProducts = products.map(p => 
-          p.id === product.id ? updatedProduct : p
-        );
-        localStorage.setItem('products', JSON.stringify(updatedProducts));
+      try {
+        const updated = await recordsService.updateRecord('Product', product.id, { data });
+        if (updated) {
+          setProduct(recordsService.flattenRecord(updated) as Product);
+        }
+      } catch (error) {
+        console.error('Failed to update product via API:', error);
+        setProduct({ ...product, ...data });
       }
-      
-      setProduct(updatedProduct);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this product?')) {
-      const storedProducts = localStorage.getItem('products');
-      if (storedProducts && product) {
-        const products: Product[] = JSON.parse(storedProducts);
-        const updatedProducts = products.filter(p => p.id !== product.id);
-        localStorage.setItem('products', JSON.stringify(updatedProducts));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this product?') && product) {
+      try {
+        await recordsService.deleteRecord('Product', product.id);
+      } catch (error) {
+        console.error('Failed to delete product via API:', error);
       }
       router.push('/products');
     }

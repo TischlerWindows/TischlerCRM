@@ -13,6 +13,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Quote {
@@ -167,15 +168,33 @@ export default function QuoteDetailPage() {
   // Get Quote object from schema
   const quoteObject = schema?.objects.find(obj => obj.apiName === 'Quote');
 
-  // Load quote from localStorage
+  // Load quote from API (with localStorage fallback)
   useEffect(() => {
-    const storedQuotes = localStorage.getItem('quotes');
-    if (storedQuotes && params?.id) {
-      const quotes: Quote[] = JSON.parse(storedQuotes);
-      const foundQuote = quotes.find(q => q.id === params.id as string);
-      setQuote(foundQuote || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Quote', params?.id as string);
+        if (record) {
+          setQuote(recordsService.flattenRecord(record) as Quote);
+        } else {
+          setQuote(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch quote from API, trying localStorage:', error);
+        const stored = localStorage.getItem('quotes');
+        if (stored) {
+          const items: Quote[] = JSON.parse(stored);
+          const found = items.find(q => q.id === params?.id);
+          setQuote(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   const pageLayout = getLayoutForRecord(quote, quoteObject);
@@ -188,36 +207,26 @@ export default function QuoteDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (quote) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedQuote: Quote = {
-        ...quote,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedQuotes = localStorage.getItem('quotes');
-      if (storedQuotes) {
-        const quotes: Quote[] = JSON.parse(storedQuotes);
-        const updatedQuotes = quotes.map(q => 
-          q.id === quote.id ? updatedQuote : q
-        );
-        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+      try {
+        const updated = await recordsService.updateRecord('Quote', quote.id, { data });
+        if (updated) {
+          setQuote(recordsService.flattenRecord(updated) as Quote);
+        }
+      } catch (error) {
+        console.error('Failed to update quote via API:', error);
+        setQuote({ ...quote, ...data });
       }
-      
-      setQuote(updatedQuote);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this quote?')) {
-      const storedQuotes = localStorage.getItem('quotes');
-      if (storedQuotes && quote) {
-        const quotes: Quote[] = JSON.parse(storedQuotes);
-        const updatedQuotes = quotes.filter(q => q.id !== quote.id);
-        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this quote?') && quote) {
+      try {
+        await recordsService.deleteRecord('Quote', quote.id);
+      } catch (error) {
+        console.error('Failed to delete quote via API:', error);
       }
       router.push('/quotes');
     }

@@ -14,6 +14,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
+import { recordsService } from '@/lib/records-service';
 
 interface Property {
   id: string;
@@ -35,15 +36,33 @@ export default function PropertyDetailPage() {
   // Get Property object from schema
   const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
 
-  // Load property from localStorage
+  // Load property from API (with localStorage fallback)
   useEffect(() => {
-    const storedProperties = localStorage.getItem('properties');
-    if (storedProperties && params?.id) {
-      const properties: Property[] = JSON.parse(storedProperties);
-      const foundProperty = properties.find(p => p.id === params.id as string);
-      setProperty(foundProperty || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Property', params?.id as string);
+        if (record) {
+          setProperty(recordsService.flattenRecord(record) as Property);
+        } else {
+          setProperty(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch property from API, trying localStorage:', error);
+        const stored = localStorage.getItem('properties');
+        if (stored) {
+          const items: Property[] = JSON.parse(stored);
+          const found = items.find(p => p.id === params?.id);
+          setProperty(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   // Get the page layout for this property
@@ -220,36 +239,27 @@ export default function PropertyDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (property) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedProperty: Property = {
-        ...property,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-      
-      const storedProperties = localStorage.getItem('properties');
-      if (storedProperties) {
-        const properties: Property[] = JSON.parse(storedProperties);
-        const updatedProperties = properties.map(p => 
-          p.id === property.id ? updatedProperty : p
-        );
-        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+      try {
+        const updated = await recordsService.updateRecord('Property', property.id, { data });
+        if (updated) {
+          setProperty(recordsService.flattenRecord(updated) as Property);
+        }
+      } catch (error) {
+        console.error('Failed to update property via API:', error);
+        // Fallback: update local state only
+        setProperty({ ...property, ...data });
       }
-      
-      setProperty(updatedProperty);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this property?')) {
-      const storedProperties = localStorage.getItem('properties');
-      if (storedProperties && property) {
-        const properties: Property[] = JSON.parse(storedProperties);
-        const updatedProperties = properties.filter(p => p.id !== property.id);
-        localStorage.setItem('properties', JSON.stringify(updatedProperties));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this property?') && property) {
+      try {
+        await recordsService.deleteRecord('Property', property.id);
+      } catch (error) {
+        console.error('Failed to delete property via API:', error);
       }
       router.push('/properties');
     }

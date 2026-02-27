@@ -13,6 +13,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Installation {
@@ -167,15 +168,33 @@ export default function InstallationDetailPage() {
   // Get Installation object from schema
   const installationObject = schema?.objects.find(obj => obj.apiName === 'Installation');
 
-  // Load installation from localStorage
+  // Load installation from API (with localStorage fallback)
   useEffect(() => {
-    const storedInstallations = localStorage.getItem('installations');
-    if (storedInstallations && params?.id) {
-      const installations: Installation[] = JSON.parse(storedInstallations);
-      const foundInstallation = installations.find(i => i.id === params.id as string);
-      setInstallation(foundInstallation || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Installation', params?.id as string);
+        if (record) {
+          setInstallation(recordsService.flattenRecord(record) as Installation);
+        } else {
+          setInstallation(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch installation from API, trying localStorage:', error);
+        const stored = localStorage.getItem('installations');
+        if (stored) {
+          const items: Installation[] = JSON.parse(stored);
+          const found = items.find(i => i.id === params?.id);
+          setInstallation(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   const pageLayout = getLayoutForRecord(installation, installationObject);
@@ -188,36 +207,26 @@ export default function InstallationDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (installation) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedInstallation: Installation = {
-        ...installation,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedInstallations = localStorage.getItem('installations');
-      if (storedInstallations) {
-        const installations: Installation[] = JSON.parse(storedInstallations);
-        const updatedInstallations = installations.map(i => 
-          i.id === installation.id ? updatedInstallation : i
-        );
-        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+      try {
+        const updated = await recordsService.updateRecord('Installation', installation.id, { data });
+        if (updated) {
+          setInstallation(recordsService.flattenRecord(updated) as Installation);
+        }
+      } catch (error) {
+        console.error('Failed to update installation via API:', error);
+        setInstallation({ ...installation, ...data });
       }
-      
-      setInstallation(updatedInstallation);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this installation?')) {
-      const storedInstallations = localStorage.getItem('installations');
-      if (storedInstallations && installation) {
-        const installations: Installation[] = JSON.parse(storedInstallations);
-        const updatedInstallations = installations.filter(i => i.id !== installation.id);
-        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this installation?') && installation) {
+      try {
+        await recordsService.deleteRecord('Installation', installation.id);
+      } catch (error) {
+        console.error('Failed to delete installation via API:', error);
       }
       router.push('/installations');
     }

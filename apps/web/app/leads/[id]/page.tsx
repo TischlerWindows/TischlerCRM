@@ -14,6 +14,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
+import { recordsService } from '@/lib/records-service';
 
 interface Lead {
   id: string;
@@ -35,15 +36,33 @@ export default function LeadDetailPage() {
   // Get Lead object from schema
   const leadObject = schema?.objects.find(obj => obj.apiName === 'Lead');
 
-  // Load lead from localStorage
+  // Load lead from API (with localStorage fallback)
   useEffect(() => {
-    const storedLeads = localStorage.getItem('leads');
-    if (storedLeads && params?.id) {
-      const leads: Lead[] = JSON.parse(storedLeads);
-      const foundLead = leads.find(l => l.id === params.id as string);
-      setLead(foundLead || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Lead', params?.id as string);
+        if (record) {
+          setLead(recordsService.flattenRecord(record) as Lead);
+        } else {
+          setLead(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch lead from API, trying localStorage:', error);
+        const stored = localStorage.getItem('leads');
+        if (stored) {
+          const items: Lead[] = JSON.parse(stored);
+          const found = items.find(l => l.id === params?.id);
+          setLead(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   // Get the page layout for this lead
@@ -218,36 +237,26 @@ export default function LeadDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (lead) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedLead: Lead = {
-        ...lead,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedLeads = localStorage.getItem('leads');
-      if (storedLeads) {
-        const leads: Lead[] = JSON.parse(storedLeads);
-        const updatedLeads = leads.map(l => 
-          l.id === lead.id ? updatedLead : l
-        );
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+      try {
+        const updated = await recordsService.updateRecord('Lead', lead.id, { data });
+        if (updated) {
+          setLead(recordsService.flattenRecord(updated) as Lead);
+        }
+      } catch (error) {
+        console.error('Failed to update lead via API:', error);
+        setLead({ ...lead, ...data });
       }
-      
-      setLead(updatedLead);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this lead?')) {
-      const storedLeads = localStorage.getItem('leads');
-      if (storedLeads && lead) {
-        const leads: Lead[] = JSON.parse(storedLeads);
-        const updatedLeads = leads.filter(l => l.id !== lead.id);
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this lead?') && lead) {
+      try {
+        await recordsService.deleteRecord('Lead', lead.id);
+      } catch (error) {
+        console.error('Failed to delete lead via API:', error);
       }
       router.push('/leads');
     }

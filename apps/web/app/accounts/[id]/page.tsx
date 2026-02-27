@@ -14,6 +14,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
+import { recordsService } from '@/lib/records-service';
 
 interface Account {
   id: string;
@@ -35,15 +36,33 @@ export default function AccountDetailPage() {
   // Get Account object from schema
   const accountObject = schema?.objects.find(obj => obj.apiName === 'Account');
 
-  // Load account from localStorage
+  // Load account from API (with localStorage fallback)
   useEffect(() => {
-    const storedAccounts = localStorage.getItem('accounts');
-    if (storedAccounts && params?.id) {
-      const accounts: Account[] = JSON.parse(storedAccounts);
-      const foundAccount = accounts.find(a => a.id === params.id as string);
-      setAccount(foundAccount || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Account', params?.id as string);
+        if (record) {
+          setAccount(recordsService.flattenRecord(record) as Account);
+        } else {
+          setAccount(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch account from API, trying localStorage:', error);
+        const stored = localStorage.getItem('accounts');
+        if (stored) {
+          const items: Account[] = JSON.parse(stored);
+          const found = items.find(a => a.id === params?.id);
+          setAccount(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   // Get the page layout for this account
@@ -220,36 +239,26 @@ export default function AccountDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (account) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedAccount: Account = {
-        ...account,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-      
-      const storedAccounts = localStorage.getItem('accounts');
-      if (storedAccounts) {
-        const accounts: Account[] = JSON.parse(storedAccounts);
-        const updatedAccounts = accounts.map(a => 
-          a.id === account.id ? updatedAccount : a
-        );
-        localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
+      try {
+        const updated = await recordsService.updateRecord('Account', account.id, { data });
+        if (updated) {
+          setAccount(recordsService.flattenRecord(updated) as Account);
+        }
+      } catch (error) {
+        console.error('Failed to update account via API:', error);
+        setAccount({ ...account, ...data });
       }
-      
-      setAccount(updatedAccount);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this account?')) {
-      const storedAccounts = localStorage.getItem('accounts');
-      if (storedAccounts && account) {
-        const accounts: Account[] = JSON.parse(storedAccounts);
-        const updatedAccounts = accounts.filter(a => a.id !== account.id);
-        localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this account?') && account) {
+      try {
+        await recordsService.deleteRecord('Account', account.id);
+      } catch (error) {
+        console.error('Failed to delete account via API:', error);
       }
       router.push('/accounts');
     }

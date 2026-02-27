@@ -13,6 +13,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
 interface Project {
@@ -167,15 +168,33 @@ export default function ProjectDetailPage() {
   // Get Project object from schema
   const projectObject = schema?.objects.find(obj => obj.apiName === 'Project');
 
-  // Load project from localStorage
+  // Load project from API (with localStorage fallback)
   useEffect(() => {
-    const storedProjects = localStorage.getItem('projects');
-    if (storedProjects && params?.id) {
-      const projects: Project[] = JSON.parse(storedProjects);
-      const foundProject = projects.find(p => p.id === params.id as string);
-      setProject(foundProject || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Project', params?.id as string);
+        if (record) {
+          setProject(recordsService.flattenRecord(record) as Project);
+        } else {
+          setProject(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch project from API, trying localStorage:', error);
+        const stored = localStorage.getItem('projects');
+        if (stored) {
+          const items: Project[] = JSON.parse(stored);
+          const found = items.find(p => p.id === params?.id);
+          setProject(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   const pageLayout = getLayoutForRecord(project, projectObject);
@@ -188,36 +207,26 @@ export default function ProjectDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (project) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedProject: Project = {
-        ...project,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0]
-      };
-      
-      const storedProjects = localStorage.getItem('projects');
-      if (storedProjects) {
-        const projects: Project[] = JSON.parse(storedProjects);
-        const updatedProjects = projects.map(p => 
-          p.id === project.id ? updatedProject : p
-        );
-        localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      try {
+        const updated = await recordsService.updateRecord('Project', project.id, { data });
+        if (updated) {
+          setProject(recordsService.flattenRecord(updated) as Project);
+        }
+      } catch (error) {
+        console.error('Failed to update project via API:', error);
+        setProject({ ...project, ...data });
       }
-      
-      setProject(updatedProject);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this project?')) {
-      const storedProjects = localStorage.getItem('projects');
-      if (storedProjects && project) {
-        const projects: Project[] = JSON.parse(storedProjects);
-        const updatedProjects = projects.filter(p => p.id !== project.id);
-        localStorage.setItem('projects', JSON.stringify(updatedProjects));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this project?') && project) {
+      try {
+        await recordsService.deleteRecord('Project', project.id);
+      } catch (error) {
+        console.error('Failed to delete project via API:', error);
       }
       router.push('/projects');
     }

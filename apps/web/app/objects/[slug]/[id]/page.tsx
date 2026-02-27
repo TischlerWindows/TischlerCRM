@@ -12,6 +12,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { recordsService } from '@/lib/records-service';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
 
@@ -51,20 +52,41 @@ export default function CustomObjectDetailPage() {
     }
   }, [schema, loadSchema]);
 
-  // Load record from localStorage
+  // Load record from API with localStorage fallback
   useEffect(() => {
-    const storedRecords = localStorage.getItem(storageKey);
-    if (storedRecords && recordId) {
+    const loadRecord = async () => {
       try {
-        const records: CustomRecord[] = JSON.parse(storedRecords);
-        const foundRecord = records.find(r => r.id === recordId);
-        setRecord(foundRecord || null);
-      } catch {
-        setRecord(null);
+        const apiName = objectDef?.apiName || slug;
+        const result = await recordsService.getRecord(apiName, recordId);
+        if (result) {
+          setRecord(recordsService.flattenRecord(result) as CustomRecord);
+        } else {
+          setRecord(null);
+        }
+      } catch (error) {
+        console.error('Failed to load record from API, trying localStorage:', error);
+        try {
+          const storedRecords = localStorage.getItem(storageKey);
+          if (storedRecords) {
+            const records: CustomRecord[] = JSON.parse(storedRecords);
+            const foundRecord = records.find(r => r.id === recordId);
+            setRecord(foundRecord || null);
+          } else {
+            setRecord(null);
+          }
+        } catch {
+          setRecord(null);
+        }
+      } finally {
+        setLoading(false);
       }
+    };
+    if (recordId) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [recordId, storageKey]);
+  }, [recordId, storageKey, slug, objectDef]);
 
   // Get the page layout for this record
   const getLayoutForRecord = (): PageLayout | null => {
@@ -262,46 +284,29 @@ export default function CustomObjectDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (record && objectDef) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedRecord: CustomRecord = {
-        ...record,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-      
-      const storedRecords = localStorage.getItem(storageKey);
-      if (storedRecords) {
-        try {
-          const records: CustomRecord[] = JSON.parse(storedRecords);
-          const updatedRecords = records.map(r => 
-            r.id === record.id ? updatedRecord : r
-          );
-          localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
-        } catch {
-          // Ignore parse errors
-        }
+      try {
+        const apiName = objectDef.apiName || slug;
+        await recordsService.updateRecord(apiName, record.id, { data });
+        setRecord({ ...record, ...data });
+      } catch (error) {
+        console.error('Failed to update record via API:', error);
+        alert('Failed to update record. Please try again.');
       }
-      
-      setRecord(updatedRecord);
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (confirm('Are you sure you want to delete this record?')) {
-      const storedRecords = localStorage.getItem(storageKey);
-      if (storedRecords && record) {
-        try {
-          const records: CustomRecord[] = JSON.parse(storedRecords);
-          const updatedRecords = records.filter(r => r.id !== record.id);
-          localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
-        } catch {
-          // Ignore parse errors
-        }
+      try {
+        const apiName = objectDef?.apiName || slug;
+        await recordsService.deleteRecord(apiName, record!.id);
+        router.push(`/objects/${slug}`);
+      } catch (error) {
+        console.error('Failed to delete record via API:', error);
+        alert('Failed to delete record. Please try again.');
       }
-      router.push(`/objects/${slug}`);
     }
   };
 

@@ -17,6 +17,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef } from '@/lib/schema';
+import { recordsService } from '@/lib/records-service';
 
 interface Contact {
   id: string;
@@ -38,15 +39,33 @@ export default function ContactDetailPage() {
   // Get Contact object from schema
   const contactObject = schema?.objects.find(obj => obj.apiName === 'Contact');
 
-  // Load contact from localStorage
+  // Load contact from API (with localStorage fallback)
   useEffect(() => {
-    const storedContacts = localStorage.getItem('contacts');
-    if (storedContacts && params?.id) {
-      const contacts: Contact[] = JSON.parse(storedContacts);
-      const foundContact = contacts.find(c => c.id === params.id as string);
-      setContact(foundContact || null);
+    const loadRecord = async () => {
+      try {
+        const record = await recordsService.getRecord('Contact', params?.id as string);
+        if (record) {
+          setContact(recordsService.flattenRecord(record) as Contact);
+        } else {
+          setContact(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch contact from API, trying localStorage:', error);
+        const stored = localStorage.getItem('contacts');
+        if (stored) {
+          const items: Contact[] = JSON.parse(stored);
+          const found = items.find(c => c.id === params?.id);
+          setContact(found || null);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    if (params?.id) {
+      loadRecord();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, [params?.id]);
 
   // Get the page layout for this contact
@@ -221,36 +240,26 @@ export default function ContactDetailPage() {
     setShowEditForm(true);
   };
 
-  const handleEditSubmit = (data: Record<string, any>) => {
+  const handleEditSubmit = async (data: Record<string, any>) => {
     if (contact) {
-      const currentUserName = user?.name || user?.email || 'System';
-      const updatedContact: Contact = {
-        ...contact,
-        ...data,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-      
-      const storedContacts = localStorage.getItem('contacts');
-      if (storedContacts) {
-        const contacts: Contact[] = JSON.parse(storedContacts);
-        const updatedContacts = contacts.map(c => 
-          c.id === contact.id ? updatedContact : c
-        );
-        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+      try {
+        const updated = await recordsService.updateRecord('Contact', contact.id, { data });
+        if (updated) {
+          setContact(recordsService.flattenRecord(updated) as Contact);
+        }
+      } catch (error) {
+        console.error('Failed to update contact via API:', error);
+        setContact({ ...contact, ...data });
       }
-      
-      setContact(updatedContact);
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this contact?')) {
-      const storedContacts = localStorage.getItem('contacts');
-      if (storedContacts && contact) {
-        const contacts: Contact[] = JSON.parse(storedContacts);
-        const updatedContacts = contacts.filter(c => c.id !== contact.id);
-        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this contact?') && contact) {
+      try {
+        await recordsService.deleteRecord('Contact', contact.id);
+      } catch (error) {
+        console.error('Failed to delete contact via API:', error);
       }
       router.push('/contacts');
     }
