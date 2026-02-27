@@ -9,6 +9,7 @@
   "scripts": {
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:push": "dotenv -e ../../.env -- prisma db push",
+    "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
