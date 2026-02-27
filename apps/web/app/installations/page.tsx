@@ -393,7 +393,7 @@ export default function InstallationsPage() {
         teamSize: normalizedData.teamSize || 2
       };
 
-      const result = await recordsService.createRecord('Installation', recordData, selectedLayoutId);
+      const result = await recordsService.createRecord('Installation', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       const newInstallation: Installation = {
         id: result.id,

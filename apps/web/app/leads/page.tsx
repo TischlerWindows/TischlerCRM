@@ -453,7 +453,7 @@ export default function LeadsPage() {
         notes: normalizedData.notes || ''
       };
 
-      const result = await recordsService.createRecord('Lead', recordData, selectedLayoutId);
+      const result = await recordsService.createRecord('Lead', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       const newLead: Lead = {
         id: result.id,

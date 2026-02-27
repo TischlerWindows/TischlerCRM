@@ -414,7 +414,7 @@ export default function ServicePage() {
         priority: normalizedData.priority || 'Medium'
       };
 
-      const result = await recordsService.createRecord('Service', recordData, selectedLayoutId);
+      const result = await recordsService.createRecord('Service', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       const newService: Service = {
         id: result.id,

@@ -24,6 +24,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { recordsService } from '@/lib/records-service';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 
 interface CustomRecord {
@@ -123,18 +124,34 @@ export default function CustomObjectRecordsPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId, slug]);
 
-  // Load records from localStorage
+  // Load records from API with localStorage fallback
   useEffect(() => {
-    const savedRecords = localStorage.getItem(storageKey);
-    if (savedRecords) {
+    const loadRecords = async () => {
       try {
-        setRecords(JSON.parse(savedRecords));
-      } catch {
-        setRecords([]);
+        const apiName = objectDef?.apiName || slug;
+        const apiRecords = await recordsService.getRecords(apiName);
+        if (apiRecords && apiRecords.length > 0) {
+          const flatRecords = apiRecords.map(r => recordsService.flattenRecord(r) as CustomRecord);
+          setRecords(flatRecords);
+        } else {
+          // Try localStorage fallback
+          const savedRecords = localStorage.getItem(storageKey);
+          if (savedRecords) {
+            try { setRecords(JSON.parse(savedRecords)); } catch { setRecords([]); }
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load records from API:', error);
+        const savedRecords = localStorage.getItem(storageKey);
+        if (savedRecords) {
+          try { setRecords(JSON.parse(savedRecords)); } catch { setRecords([]); }
+        }
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
-  }, [storageKey]);
+    };
+    loadRecords();
+  }, [storageKey, slug, objectDef]);
 
   // Load visible columns from localStorage
   useEffect(() => {
@@ -202,7 +219,7 @@ export default function CustomObjectRecordsPage() {
     return String(value);
   };
 
-  const handleDynamicFormSubmit = (data: Record<string, any>, layoutId?: string) => {
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const prefix = objectDef ? `${objectDef.apiName}__` : '';
     
     // Normalize field names by removing object prefix
@@ -212,40 +229,54 @@ export default function CustomObjectRecordsPage() {
       normalizedData[cleanKey] = value;
     });
     
-    const today = new Date().toISOString().split('T')[0];
-    const newRecordId = String(Date.now());
-    const currentUserName = user?.name || user?.email || 'System';
-    
-    const defaultRecordType = objectDef?.recordTypes?.[0];
-    
-    const newRecord: CustomRecord = {
-      id: newRecordId,
-      recordTypeId: defaultRecordType?.id,
-      pageLayoutId: layoutId,
-      createdBy: currentUserName,
-      createdAt: today || '',
-      lastModifiedBy: currentUserName,
-      lastModifiedAt: today || '',
-      ...normalizedData,
-    };
-
-    const updatedRecords = [newRecord, ...records];
-    setRecords(updatedRecords);
-    localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
-    
-    setShowDynamicForm(false);
-    
-    // Redirect to the newly created record's detail page
-    setTimeout(() => {
-      router.push(`/objects/${slug}/${newRecordId}`);
-    }, 200);
-  };
-
-  const handleDeleteRecord = (id: string) => {
-    if (confirm('Are you sure you want to delete this record?')) {
-      const updatedRecords = records.filter(r => r.id !== id);
+    try {
+      const apiName = objectDef?.apiName || slug;
+      const result = await recordsService.createRecord(apiName, { data: normalizedData, pageLayoutId: layoutId || undefined });
+      if (result) {
+        const flatRecord = recordsService.flattenRecord(result) as CustomRecord;
+        const updatedRecords = [flatRecord, ...records];
+        setRecords(updatedRecords);
+        setShowDynamicForm(false);
+        setTimeout(() => {
+          router.push(`/objects/${slug}/${result.id}`);
+        }, 200);
+      }
+    } catch (error) {
+      console.error('Failed to create record via API, falling back to localStorage:', error);
+      const today = new Date().toISOString().split('T')[0];
+      const newRecordId = String(Date.now());
+      const currentUserName = user?.name || user?.email || 'System';
+      const defaultRecordType = objectDef?.recordTypes?.[0];
+      const newRecord: CustomRecord = {
+        id: newRecordId,
+        recordTypeId: defaultRecordType?.id,
+        pageLayoutId: layoutId,
+        createdBy: currentUserName,
+        createdAt: today || '',
+        lastModifiedBy: currentUserName,
+        lastModifiedAt: today || '',
+        ...normalizedData,
+      };
+      const updatedRecords = [newRecord, ...records];
       setRecords(updatedRecords);
       localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
+      setShowDynamicForm(false);
+      setTimeout(() => {
+        router.push(`/objects/${slug}/${newRecordId}`);
+      }, 200);
+    }
+  };
+
+  const handleDeleteRecord = async (id: string) => {
+    if (confirm('Are you sure you want to delete this record?')) {
+      try {
+        const apiName = objectDef?.apiName || slug;
+        await recordsService.deleteRecord(apiName, id);
+      } catch (error) {
+        console.error('Failed to delete via API:', error);
+      }
+      const updatedRecords = records.filter(r => r.id !== id);
+      setRecords(updatedRecords);
     }
   };
 

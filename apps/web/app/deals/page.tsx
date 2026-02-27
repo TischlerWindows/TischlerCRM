@@ -436,7 +436,7 @@ export default function DealsPage() {
         probability: normalizedData.probability || 50
       };
 
-      const result = await recordsService.createRecord('Deal', recordData, selectedLayoutId);
+      const result = await recordsService.createRecord('Deal', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       const newDeal: Deal = {
         id: result.id,

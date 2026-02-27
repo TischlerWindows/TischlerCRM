@@ -413,7 +413,7 @@ export default function ProjectsPage() {
         budget: normalizedData.budget || 0
       };
 
-      const result = await recordsService.createRecord('Project', recordData, selectedLayoutId);
+      const result = await recordsService.createRecord('Project', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       const newProject: Project = {
         id: result.id,

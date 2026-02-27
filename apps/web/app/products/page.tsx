@@ -475,7 +475,7 @@ export default function ProductsPage() {
         ...normalizedData
       };
 
-      const result = await recordsService.createRecord('Product', recordData, layoutId);
+      const result = await recordsService.createRecord('Product', { data: recordData, pageLayoutId: layoutId || undefined });
       
       const newProduct: Product = {
         id: result.id,
