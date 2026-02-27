@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const apiBase = 'http://localhost:4000';
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

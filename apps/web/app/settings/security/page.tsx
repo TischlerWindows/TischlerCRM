@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ShieldCheck, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 
@@ -33,10 +33,7 @@ export default function SecuritySettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const apiBase = useMemo(() => {
-    if (typeof window === 'undefined') return 'http://localhost:4000';
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-  }, []);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     let cancelled = false;
