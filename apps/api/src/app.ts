@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import serveStatic from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
@@ -13,6 +15,9 @@ import { layoutRoutes } from './routes/layouts';
 import { recordRoutes } from './routes/records';
 import { reportRoutes } from './routes/reports';
 import { dashboardRoutes } from './routes/dashboards';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export function buildApp() {
   const app = Fastify({ logger: true });
