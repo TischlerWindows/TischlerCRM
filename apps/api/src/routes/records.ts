@@ -178,7 +178,8 @@ export async function recordRoutes(app: FastifyInstance) {
   // Update record
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId } = req.params as { apiName: string; recordId: string };
-    const data = req.body as Record<string, any>;
+    const body = req.body as Record<string, any>;
+    const updateData = body.data || body;
 
     const userId = (req as any).user.sub;
 
@@ -209,7 +210,7 @@ export async function recordRoutes(app: FastifyInstance) {
     // Merge existing data with new data
     const mergedData = {
       ...(existingRecord.data as Record<string, any>),
-      ...data,
+      ...updateData,
     };
 
     const record = await prisma.record.update({
