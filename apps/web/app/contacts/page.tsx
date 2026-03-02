@@ -805,13 +805,7 @@ export default function ContactsPage() {
                               if (parts.length === 0) return <span className="text-gray-400">-</span>;
                               return (
                                 <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                                  <span className="flex flex-wrap gap-1">
-                                    {parts.map((p, i) => (
-                                      <span key={i} className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded text-xs" title={p.label}>
-                                        {p.value}
-                                      </span>
-                                    ))}
-                                  </span>
+                                  {parts.map(p => p.value).join(' ')}
                                 </Link>
                               );
                             })()
