@@ -103,7 +103,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const { apiName } = req.params as { apiName: string };
     const { data, pageLayoutId } = req.body as { data: Record<string, any>; pageLayoutId?: string };
 
-    req.log.info({ apiName, pageLayoutId, dataKeys: Object.keys(data || {}) }, 'CREATE RECORD request');
+    req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, 'CREATE RECORD request');
 
     const userId = (req as any).user.sub;
 
@@ -120,60 +120,9 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    // If pageLayoutId is provided, fetch the layout and its fields
-    let layoutFieldIds: Set<string> | null = null;
-    if (pageLayoutId) {
-      const layout = await prisma.pageLayout.findFirst({
-        where: {
-          id: pageLayoutId,
-          objectId: object.id,
-        },
-        include: {
-          tabs: {
-            include: {
-              sections: {
-                include: {
-                  fields: true,
-                },
-              },
-            },
-          },
-        },
-      });
-
-      if (!layout) {
-        // Layout not found — log warning and proceed without layout-scoped validation
-        req.log.warn({ pageLayoutId, objectId: object.id }, 'Page layout not found, skipping layout-scoped validation');
-      } else {
-        // Collect all field IDs that are on this layout
-        layoutFieldIds = new Set<string>();
-        for (const tab of layout.tabs) {
-          for (const section of tab.sections) {
-            for (const layoutField of section.fields) {
-              layoutFieldIds.add(layoutField.fieldId);
-            }
-          }
-        }
-        req.log.info({ layoutFieldCount: layoutFieldIds.size, layoutFieldIds: Array.from(layoutFieldIds) }, 'Layout fields collected');
-      }
-    }
-
-    // Validate required fields — only check fields that are on the selected page layout
-    const requiredFields = object.fields.filter((f) => {
-      if (!f.required) return false;
-      // If a layout was provided, only require fields that are on the layout
-      if (layoutFieldIds) return layoutFieldIds.has(f.id);
-      return true;
-    });
+    // Validate required fields — only reject if value is undefined or null
+    const requiredFields = object.fields.filter((f) => f.required);
     const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
-
-    req.log.info({ 
-      totalRequired: object.fields.filter(f => f.required).length,
-      filteredRequired: requiredFields.length,
-      requiredFieldNames: requiredFields.map(f => f.apiName),
-      missingFieldNames: missingFields.map(f => f.apiName),
-      hasLayoutFilter: !!layoutFieldIds
-    }, 'Required field validation');
 
     if (missingFields.length > 0) {
       return reply.code(400).send({
