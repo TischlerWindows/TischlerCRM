@@ -422,8 +422,6 @@ export default function InstallationsPage() {
       router.push(`/installations/${result.id}`);
     } catch (error) {
       console.error('Failed to create installation:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create installation: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

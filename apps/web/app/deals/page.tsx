@@ -464,8 +464,6 @@ export default function DealsPage() {
       router.push(`/deals/${result.id}`);
     } catch (error) {
       console.error('Failed to create deal:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create deal: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

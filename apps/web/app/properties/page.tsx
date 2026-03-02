@@ -512,8 +512,6 @@ export default function PropertiesPage() {
       router.push(`/properties/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create property:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create property: ${msg}`);
       setShowDynamicForm(false);
     }
   };

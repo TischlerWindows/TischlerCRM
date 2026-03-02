@@ -484,8 +484,6 @@ export default function LeadsPage() {
       }, 200);
     } catch (error) {
       console.error('Failed to create lead:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create lead: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

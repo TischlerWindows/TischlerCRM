@@ -318,14 +318,27 @@ export default function DynamicForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // Ensure all required fields on the object have at least an empty-string value,
-      // even if they are not on the current page layout. This prevents the API from
-      // rejecting records due to missing fields the user was never asked to fill in.
+      // Ensure all required fields on the object have a non-empty default,
+      // even if they are not on the current page layout. This prevents the API
+      // from rejecting records due to fields the user was never asked to fill in.
       const completeData: Record<string, any> = { ...formData };
       if (object) {
         for (const field of object.fields) {
-          if (field.required && completeData[field.apiName] === undefined) {
-            completeData[field.apiName] = '';
+          if (field.required && !completeData[field.apiName]) {
+            // Use type-aware defaults that pass all validation rules
+            switch (field.type) {
+              case 'Number':
+              case 'Currency':
+              case 'Percent':
+                completeData[field.apiName] = 0;
+                break;
+              case 'Checkbox':
+                completeData[field.apiName] = false;
+                break;
+              default:
+                completeData[field.apiName] = 'N/A';
+                break;
+            }
           }
         }
       }

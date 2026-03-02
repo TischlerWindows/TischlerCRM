@@ -440,8 +440,6 @@ export default function ProjectsPage() {
       router.push(`/projects/${result.id}`);
     } catch (error) {
       console.error('Failed to create project:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create project: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

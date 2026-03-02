@@ -443,8 +443,6 @@ export default function ServicePage() {
       router.push(`/service/${result.id}`);
     } catch (error) {
       console.error('Failed to create service:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create service: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

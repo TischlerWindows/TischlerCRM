@@ -418,8 +418,6 @@ export default function QuotesPage() {
       router.push(`/quotes/${result.id}`);
     } catch (error) {
       console.error('Failed to create quote:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create quote: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }

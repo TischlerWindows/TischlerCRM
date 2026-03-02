@@ -513,8 +513,6 @@ export default function ProductsPage() {
       }, 200);
     } catch (error) {
       console.error('Failed to create product:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create product: ${msg}`);
       setShowDynamicForm(false);
     }
   };

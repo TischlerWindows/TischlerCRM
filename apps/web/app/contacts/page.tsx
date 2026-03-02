@@ -483,8 +483,6 @@ export default function ContactsPage() {
       router.push(`/contacts/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create contact:', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to create contact: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
     }
