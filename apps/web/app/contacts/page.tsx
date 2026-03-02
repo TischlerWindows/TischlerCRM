@@ -38,6 +38,7 @@ import { recordsService } from '@/lib/records-service';
 interface Contact {
   id: string;
   contactNumber: string;
+  name: Record<string, any> | null;
   firstName: string;
   lastName: string;
   email: string;
@@ -209,23 +210,29 @@ export default function ContactsPage() {
     try {
       setLoading(true);
       const records = await recordsService.getRecords('Contact');
-      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
-        contactNumber: record.contactNumber || '',
-        firstName: record.firstName || '',
-        lastName: record.lastName || '',
-        email: record.email || '',
-        phone: record.phone || '',
-        company: record.company || '',
-        title: record.title || '',
-        status: record.status || 'Active',
-        lastActivity: record.updatedAt || new Date().toISOString(),
-        createdBy: record.createdBy || 'System',
-        createdAt: record.createdAt || new Date().toISOString(),
-        lastModifiedBy: record.modifiedBy || 'System',
-        lastModifiedAt: record.updatedAt || new Date().toISOString(),
-        isFavorite: record.isFavorite || false,
-      }));
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => {
+        // Helper: get a value trying both prefixed and unprefixed keys
+        const get = (key: string) => record[`Contact__${key}`] ?? record[key];
+
+        return {
+          id: record.id,
+          contactNumber: get('contactNumber') || '',
+          name: get('name') || null,
+          firstName: get('firstName') || '',
+          lastName: get('lastName') || '',
+          email: get('email') || '',
+          phone: get('phone') || '',
+          company: get('company') || '',
+          title: get('title') || '',
+          status: get('status') || 'Active',
+          lastActivity: record.updatedAt || new Date().toISOString(),
+          createdBy: record.createdBy || 'System',
+          createdAt: record.createdAt || new Date().toISOString(),
+          lastModifiedBy: record.modifiedBy || 'System',
+          lastModifiedAt: record.updatedAt || new Date().toISOString(),
+          isFavorite: record.isFavorite || false,
+        };
+      });
       setContacts(flattenedRecords as Contact[]);
     } catch (error) {
       console.error('Failed to fetch contacts from API, falling back to localStorage:', error);
@@ -784,9 +791,30 @@ export default function ContactsPage() {
                               {contact.contactNumber}
                             </Link>
                           ) : column.id === 'name' ? (
-                            <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
-                              {formatColumnValue(contact, column.id)}
-                            </Link>
+                            (() => {
+                              const nameVal = contact.name;
+                              if (!nameVal || typeof nameVal !== 'object') return <span className="text-gray-400">-</span>;
+                              // Extract sub-field values (try prefixed and unprefixed keys)
+                              const parts = Object.entries(nameVal as Record<string, any>)
+                                .filter(([, v]) => v && String(v).trim())
+                                .map(([k, v]) => {
+                                  // Derive a short label from the key
+                                  const label = k.replace(/^Contact__name_/, '').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+                                  return { label, value: String(v) };
+                                });
+                              if (parts.length === 0) return <span className="text-gray-400">-</span>;
+                              return (
+                                <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                                  <span className="flex flex-wrap gap-1">
+                                    {parts.map((p, i) => (
+                                      <span key={i} className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded text-xs" title={p.label}>
+                                        {p.value}
+                                      </span>
+                                    ))}
+                                  </span>
+                                </Link>
+                              );
+                            })()
                           ) : column.id === 'firstName' ? (
                             contact.firstName
                           ) : column.id === 'lastName' ? (
