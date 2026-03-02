@@ -16,7 +16,7 @@ interface DynamicFormDialogProps {
   layoutType: 'create' | 'edit';
   layoutId?: string;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>, layoutId?: string) => void;
+  onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
   title?: string;
 }
 
@@ -30,9 +30,8 @@ export default function DynamicFormDialog({
   onSubmit,
   title,
 }: DynamicFormDialogProps) {
-  const handleSubmit = (data: Record<string, any>, layoutId?: string) => {
-    onSubmit(data, layoutId);
-    onOpenChange(false);
+  const handleSubmit = async (data: Record<string, any>, layoutId?: string) => {
+    await onSubmit(data, layoutId);
   };
 
   const handleCancel = () => {

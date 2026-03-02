@@ -483,8 +483,6 @@ export default function ContactsPage() {
       router.push(`/contacts/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create contact:', error);
-      setShowDynamicForm(false);
-      setSelectedLayoutId(null);
     }
   };
 

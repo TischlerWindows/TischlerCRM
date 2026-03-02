@@ -512,7 +512,6 @@ export default function PropertiesPage() {
       router.push(`/properties/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create property:', error);
-      setShowDynamicForm(false);
     }
   };
 

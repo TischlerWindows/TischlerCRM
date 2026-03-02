@@ -476,7 +476,6 @@ export default function AccountsPage() {
       router.push(`/accounts/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create account:', error);
-      setShowDynamicForm(false);
     }
   };
 

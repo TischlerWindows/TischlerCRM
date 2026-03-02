@@ -33,7 +33,7 @@ interface DynamicFormProps {
   layoutType: 'create' | 'edit';
   layoutId?: string;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>, layoutId?: string) => void;
+  onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
   onCancel?: () => void;
 }
 
@@ -48,6 +48,8 @@ export default function DynamicForm({
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(recordData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<string>('');
   const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
@@ -315,7 +317,7 @@ export default function DynamicForm({
     return !hasErrors;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
       // Ensure all required fields on the object have a non-empty default,
@@ -342,7 +344,16 @@ export default function DynamicForm({
           }
         }
       }
-      onSubmit(completeData, layoutId);
+      setSubmitError(null);
+      setIsSubmitting(true);
+      try {
+        await onSubmit(completeData, layoutId);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Failed to save record';
+        setSubmitError(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -863,15 +874,22 @@ export default function DynamicForm({
           })}
       </div>
 
+      {/* Error banner */}
+      {submitError && (
+        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
         )}
-        <Button type="submit">
-          {layoutType === 'create' ? 'Create' : 'Save'}
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Saving...' : layoutType === 'create' ? 'Create' : 'Save'}
         </Button>
       </div>
     </form>

@@ -440,8 +440,6 @@ export default function ProjectsPage() {
       router.push(`/projects/${result.id}`);
     } catch (error) {
       console.error('Failed to create project:', error);
-      setShowDynamicForm(false);
-      setSelectedLayoutId(null);
     }
   };
 
