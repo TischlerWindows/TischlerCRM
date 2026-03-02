@@ -740,6 +740,7 @@ async function recordRoutes(app2) {
   app2.post("/objects/:apiName/records", async (req, reply) => {
     const { apiName } = req.params;
     const { data, pageLayoutId } = req.body;
+    req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, "CREATE RECORD request");
     const userId = req.user.sub;
     const object = await prisma5.customObject.findUnique({
       where: { apiName },
@@ -753,25 +754,12 @@ async function recordRoutes(app2) {
       return reply.code(404).send({ error: "Object not found" });
     }
     const requiredFields = object.fields.filter((f) => f.required);
-    const missingFields = requiredFields.filter((f) => !data[f.apiName]);
+    const missingFields = requiredFields.filter((f) => data[f.apiName] === void 0 || data[f.apiName] === null);
     if (missingFields.length > 0) {
       return reply.code(400).send({
         error: "Missing required fields",
         fields: missingFields.map((f) => f.apiName)
       });
-    }
-    if (pageLayoutId) {
-      const layout = await prisma5.pageLayout.findFirst({
-        where: {
-          id: pageLayoutId,
-          objectId: object.id
-        }
-      });
-      if (!layout) {
-        return reply.code(400).send({
-          error: "Invalid page layout for this object"
-        });
-      }
     }
     const record = await prisma5.record.create({
       data: {
@@ -802,7 +790,8 @@ async function recordRoutes(app2) {
   });
   app2.put("/objects/:apiName/records/:recordId", async (req, reply) => {
     const { apiName, recordId } = req.params;
-    const data = req.body;
+    const body = req.body;
+    const updateData = body.data || body;
     const userId = req.user.sub;
     const object = await prisma5.customObject.findUnique({
       where: { apiName },
@@ -826,7 +815,7 @@ async function recordRoutes(app2) {
     }
     const mergedData = {
       ...existingRecord.data,
-      ...data
+      ...updateData
     };
     const record = await prisma5.record.update({
       where: { id: recordId },
@@ -1641,7 +1630,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-02-v4" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z6.object({
       name: z6.string().min(1),
