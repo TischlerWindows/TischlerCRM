@@ -102,9 +102,22 @@ class RecordsService {
    * This flattens it for easier use in tables
    */
   flattenRecord(record: RecordData): Record<string, any> {
+    // Strip object prefixes from data keys (e.g., "Property__address" → "address")
+    // so list pages can access values via simple unprefixed column ids.
+    const stripped: Record<string, any> = {};
+    if (record.data && typeof record.data === 'object') {
+      for (const [key, value] of Object.entries(record.data)) {
+        const cleanKey = key.replace(/^[A-Za-z]+__/, '');
+        // Keep both: unprefixed takes priority but preserve original too
+        if (!(cleanKey in stripped)) {
+          stripped[cleanKey] = value;
+        }
+      }
+    }
+
     return {
       id: record.id,
-      ...record.data,
+      ...stripped,
       createdBy: record.createdBy?.name || record.createdBy?.email || 'Unknown',
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',
       createdAt: record.createdAt,

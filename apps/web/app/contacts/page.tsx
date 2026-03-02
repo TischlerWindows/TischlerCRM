@@ -210,29 +210,24 @@ export default function ContactsPage() {
     try {
       setLoading(true);
       const records = await recordsService.getRecords('Contact');
-      const flattenedRecords = recordsService.flattenRecords(records).map(record => {
-        // Helper: get a value trying both prefixed and unprefixed keys
-        const get = (key: string) => record[`Contact__${key}`] ?? record[key];
-
-        return {
-          id: record.id,
-          contactNumber: get('contactNumber') || '',
-          name: get('name') || null,
-          firstName: get('firstName') || '',
-          lastName: get('lastName') || '',
-          email: get('email') || '',
-          phone: get('phone') || '',
-          company: get('company') || '',
-          title: get('title') || '',
-          status: get('status') || 'Active',
-          lastActivity: record.updatedAt || new Date().toISOString(),
-          createdBy: record.createdBy || 'System',
-          createdAt: record.createdAt || new Date().toISOString(),
-          lastModifiedBy: record.modifiedBy || 'System',
-          lastModifiedAt: record.updatedAt || new Date().toISOString(),
-          isFavorite: record.isFavorite || false,
-        };
-      });
+      const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
+        id: record.id,
+        contactNumber: record.contactNumber || '',
+        name: record.name || null,
+        firstName: record.firstName || '',
+        lastName: record.lastName || '',
+        email: record.email || '',
+        phone: record.phone || '',
+        company: record.company || '',
+        title: record.title || '',
+        status: record.status || 'Active',
+        lastActivity: record.updatedAt || new Date().toISOString(),
+        createdBy: record.createdBy || 'System',
+        createdAt: record.createdAt || new Date().toISOString(),
+        lastModifiedBy: record.modifiedBy || 'System',
+        lastModifiedAt: record.updatedAt || new Date().toISOString(),
+        isFavorite: record.isFavorite || false,
+      }));
       setContacts(flattenedRecords as Contact[]);
     } catch (error) {
       console.error('Failed to fetch contacts from API, falling back to localStorage:', error);
