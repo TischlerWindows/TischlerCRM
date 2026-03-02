@@ -425,8 +425,8 @@ export default function DealsPage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        dealNumber,
         ...normalizedData,
+        dealNumber,
         dealName: normalizedData.dealName || '',
         accountName: normalizedData.accountName || '',
         stage: normalizedData.stage || 'Proposal',

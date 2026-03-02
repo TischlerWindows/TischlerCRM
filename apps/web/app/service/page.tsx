@@ -402,8 +402,8 @@ export default function ServicePage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        serviceNumber,
         ...normalizedData,
+        serviceNumber,
         serviceName: normalizedData.serviceName || '',
         accountName: normalizedData.accountName || '',
         projectNumber: normalizedData.projectNumber || '',

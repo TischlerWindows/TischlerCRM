@@ -459,6 +459,7 @@ export default function ContactsPage() {
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
 
     const recordData = {
+      ...data,
       contactNumber,
       firstName: data['Contact__firstName'] || data.firstName || '',
       lastName: data['Contact__lastName'] || data.lastName || '',
@@ -467,7 +468,6 @@ export default function ContactsPage() {
       company: data['Contact__company'] || data.company || '',
       title: data['Contact__title'] || data.title || '',
       status: data.status || 'Active',
-      ...data,
     };
 
     try {

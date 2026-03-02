@@ -464,6 +464,7 @@ export default function ProductsPage() {
       const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
       
       const recordData = {
+        ...normalizedData,
         productCode,
         productName: normalizedData.productName || '',
         category: normalizedData.category || '',
@@ -472,7 +473,6 @@ export default function ProductsPage() {
         inStock: normalizedData.inStock ?? false,
         stockQuantity: normalizedData.stockQuantity || 0,
         supplier: normalizedData.supplier || '',
-        ...normalizedData
       };
 
       const result = await recordsService.createRecord('Product', { data: recordData, pageLayoutId: layoutId || undefined });

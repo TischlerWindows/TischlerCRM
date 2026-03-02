@@ -381,8 +381,8 @@ export default function QuotesPage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        quoteNumber,
         ...normalizedData,
+        quoteNumber,
         quoteName: normalizedData.quoteName || '',
         accountName: normalizedData.accountName || '',
         dealNumber: normalizedData.dealNumber || '',

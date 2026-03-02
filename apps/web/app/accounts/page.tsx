@@ -454,6 +454,7 @@ export default function AccountsPage() {
     const accountNumber = `A-${String(maxNumber + 1).padStart(3, '0')}`;
     
     const recordData = {
+      ...normalizedData,
       accountNumber,
       name: normalizedData.accountName || '',
       type: normalizedData.accountType || '',
@@ -461,7 +462,6 @@ export default function AccountsPage() {
       email: normalizedData.primaryEmail || '',
       phone: normalizedData.primaryPhone || '',
       website: normalizedData.website || '',
-      ...normalizedData,
     };
 
     try {

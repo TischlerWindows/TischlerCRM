@@ -381,8 +381,8 @@ export default function InstallationsPage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        installationNumber,
         ...normalizedData,
+        installationNumber,
         installationName: normalizedData.installationName || '',
         accountName: normalizedData.accountName || '',
         projectNumber: normalizedData.projectNumber || '',

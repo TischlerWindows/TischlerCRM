@@ -442,8 +442,8 @@ export default function LeadsPage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        leadNumber,
         ...normalizedData,
+        leadNumber,
         firstName: normalizedData.contactName || "",
         address: normalizedData.propertyAddress || "",
         leadSource: normalizedData.source || 'Website',

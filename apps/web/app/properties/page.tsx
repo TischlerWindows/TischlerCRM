@@ -485,6 +485,7 @@ export default function PropertiesPage() {
 
     // Prepare the record data for the API
     const recordData = {
+      ...normalizedData,
       propertyNumber,
       status: normalizedData.status || 'Active',
       contacts: normalizedData.contacts || [],
@@ -494,7 +495,6 @@ export default function PropertiesPage() {
       city: normalizedData.city || '',
       state: normalizedData.state || '',
       zipCode: normalizedData.zipCode || '',
-      ...normalizedData,
     };
 
     try {

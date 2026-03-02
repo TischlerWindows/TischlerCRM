@@ -403,8 +403,8 @@ export default function ProjectsPage() {
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
-        projectNumber,
         ...normalizedData,
+        projectNumber,
         projectName: normalizedData.projectName || '',
         status: normalizedData.status || 'Planning',
         startDate: normalizedData.startDate || today,
