@@ -131,12 +131,11 @@ export async function recordRoutes(app: FastifyInstance) {
       });
     }
 
-    // Create record with data as JSON and pageLayoutId
+    // Create record with data as JSON
     const record = await prisma.record.create({
       data: {
         objectId: object.id,
         data: data,
-        pageLayoutId: pageLayoutId || null,
         createdById: userId,
         modifiedById: userId,
       },
