@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ShieldCheck, AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 interface LoginEvent {
   id: string;
@@ -18,22 +19,11 @@ interface LoginEvent {
   };
 }
 
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return (
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken') ||
-    localStorage.getItem('jwt')
-  );
-}
-
 export default function SecuritySettingsPage() {
   const [events, setEvents] = useState<LoginEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     let cancelled = false;
@@ -41,14 +31,16 @@ export default function SecuritySettingsPage() {
       setLoading(true);
       setError(null);
       try {
-        const token = getAuthToken();
-        const res = await fetch(`${apiBase}/security/login-events`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        const token = apiClient.getToken() || localStorage.getItem('auth_token');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (token) {
+          (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await fetch(`${apiBase}/security/login-events`, { headers });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          const msg = body?.error || `Request failed (${res.status})`;
-          throw new Error(msg);
+          throw new Error(body?.error || `Request failed (${res.status})`);
         }
         const data = (await res.json()) as LoginEvent[];
         if (!cancelled) setEvents(data);
@@ -62,7 +54,7 @@ export default function SecuritySettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [apiBase, refreshKey]);
+  }, [refreshKey]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,9 +102,6 @@ export default function SecuritySettingsPage() {
                 <div>
                   <div className="font-medium">Unable to load login history</div>
                   <div className="mt-1">{error}</div>
-                  {!getAuthToken() && (
-                    <div className="mt-2 text-amber-800">No auth token found in local storage.</div>
-                  )}
                 </div>
               </div>
             </div>
