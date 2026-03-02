@@ -453,7 +453,7 @@ export default function ContactsPage() {
     });
   }, [contacts, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
 
-  const handleDynamicFormSubmit = async (data: Record<string, any>) => {
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C-')).map(num => parseInt(num.replace('C-', ''), 10)).filter(num => !isNaN(num));
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
@@ -471,7 +471,7 @@ export default function ContactsPage() {
     };
 
     try {
-      const createdRecord = await recordsService.createRecord('Contact', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
+      const createdRecord = await recordsService.createRecord('Contact', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
       
       if (!createdRecord) {
         throw new Error('Failed to create record - null response');

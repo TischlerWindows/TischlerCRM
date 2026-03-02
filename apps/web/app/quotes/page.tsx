@@ -391,7 +391,7 @@ export default function QuotesPage() {
         validUntil: normalizedData.validUntil || validUntilStr
       };
 
-      const result = await recordsService.createRecord('Quote', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
+      const result = await recordsService.createRecord('Quote', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
       
       const newQuote: Quote = {
         id: result.id,

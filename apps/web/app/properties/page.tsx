@@ -483,7 +483,7 @@ export default function PropertiesPage() {
     // Get default record type
     const defaultRecordType = schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0];
 
-    // Prepare the record data for the API
+    // Prepare the record data for the API — only include fields explicitly filled in + auto-generated
     const recordData = {
       ...normalizedData,
       propertyNumber,
@@ -491,15 +491,11 @@ export default function PropertiesPage() {
       contacts: normalizedData.contacts || [],
       accounts: normalizedData.accounts || [],
       sharepointFolder: propertyNumber,
-      address: normalizedData.address !== undefined ? normalizedData.address : '',
-      city: normalizedData.city || '',
-      state: normalizedData.state || '',
-      zipCode: normalizedData.zipCode || '',
     };
 
     try {
       // Create record via API
-      const createdRecord = await recordsService.createRecord('Property', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
+      const createdRecord = await recordsService.createRecord('Property', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
       console.log('✅ Record created via API:', createdRecord);
       
       if (!createdRecord) {
