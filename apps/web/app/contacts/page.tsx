@@ -471,7 +471,7 @@ export default function ContactsPage() {
     };
 
     try {
-      const createdRecord = await recordsService.createRecord('Contact', { data: recordData });
+      const createdRecord = await recordsService.createRecord('Contact', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       if (!createdRecord) {
         throw new Error('Failed to create record - null response');

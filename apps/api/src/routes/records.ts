@@ -118,23 +118,24 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    // Validate required fields (only reject undefined/null, allow empty strings, 0, false)
-    const requiredFields = object.fields.filter((f) => f.required);
-    const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
-
-    if (missingFields.length > 0) {
-      return reply.code(400).send({
-        error: 'Missing required fields',
-        fields: missingFields.map((f) => f.apiName),
-      });
-    }
-
-    // If pageLayoutId is provided, verify it belongs to this object
+    // If pageLayoutId is provided, fetch the layout and its fields
+    let layoutFieldIds: Set<string> | null = null;
     if (pageLayoutId) {
       const layout = await prisma.pageLayout.findFirst({
         where: {
           id: pageLayoutId,
           objectId: object.id,
+        },
+        include: {
+          tabs: {
+            include: {
+              sections: {
+                include: {
+                  fields: true,
+                },
+              },
+            },
+          },
         },
       });
 
@@ -143,6 +144,32 @@ export async function recordRoutes(app: FastifyInstance) {
           error: 'Invalid page layout for this object',
         });
       }
+
+      // Collect all field IDs that are on this layout
+      layoutFieldIds = new Set<string>();
+      for (const tab of layout.tabs) {
+        for (const section of tab.sections) {
+          for (const layoutField of section.fields) {
+            layoutFieldIds.add(layoutField.fieldId);
+          }
+        }
+      }
+    }
+
+    // Validate required fields — only check fields that are on the selected page layout
+    const requiredFields = object.fields.filter((f) => {
+      if (!f.required) return false;
+      // If a layout was provided, only require fields that are on the layout
+      if (layoutFieldIds) return layoutFieldIds.has(f.id);
+      return true;
+    });
+    const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
+
+    if (missingFields.length > 0) {
+      return reply.code(400).send({
+        error: 'Missing required fields',
+        fields: missingFields.map((f) => f.apiName),
+      });
     }
 
     // Create record with data as JSON and pageLayoutId

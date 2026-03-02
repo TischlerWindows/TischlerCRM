@@ -499,7 +499,7 @@ export default function PropertiesPage() {
 
     try {
       // Create record via API
-      const createdRecord = await recordsService.createRecord('Property', { data: recordData });
+      const createdRecord = await recordsService.createRecord('Property', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       console.log('✅ Record created via API:', createdRecord);
       
       if (!createdRecord) {

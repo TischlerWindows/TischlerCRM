@@ -465,7 +465,7 @@ export default function AccountsPage() {
     };
 
     try {
-      const createdRecord = await recordsService.createRecord('Account', { data: recordData });
+      const createdRecord = await recordsService.createRecord('Account', { data: recordData, pageLayoutId: selectedLayoutId || undefined });
       
       if (!createdRecord) {
         throw new Error('Failed to create record - null response');
