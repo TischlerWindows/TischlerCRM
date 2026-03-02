@@ -422,52 +422,10 @@ export default function InstallationsPage() {
       router.push(`/installations/${result.id}`);
     } catch (error) {
       console.error('Failed to create installation:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Installation__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = installations
-        .map(i => i.installationNumber)
-        .filter(num => num.startsWith('INST-'))
-        .map(num => parseInt(num.replace('INST-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const installationNumber = `INST-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const newInstallationId = String(Date.now());
-      const currentUserName = user?.name || user?.email || 'Development User';
-      
-      const newInstallation: Installation = {
-        id: newInstallationId,
-        installationNumber,
-        pageLayoutId: selectedLayoutId || undefined,
-        ...normalizedData,
-        installationName: normalizedData.installationName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        status: normalizedData.status || 'Scheduled',
-        startDate: normalizedData.startDate || today,
-        completionDate: normalizedData.completionDate || today,
-        leadInstaller: normalizedData.leadInstaller || '',
-        teamSize: normalizedData.teamSize || 2,
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today
-      };
-
-      const updatedInstallations = [newInstallation, ...installations];
-      setInstallations(updatedInstallations);
-      localStorage.setItem('installations', JSON.stringify(updatedInstallations));
-      
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create installation: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/installations/${newInstallationId}`);
     }
   };
 

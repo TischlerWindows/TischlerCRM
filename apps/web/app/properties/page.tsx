@@ -515,37 +515,10 @@ export default function PropertiesPage() {
       // Redirect to the newly created property's detail page
       router.push(`/properties/${createdRecord.id}`);
     } catch (error) {
-      console.error('Failed to create record via API, falling back to localStorage:', error);
-      
-      // Fallback to localStorage if API fails
-      const newPropertyId = String(Date.now());
-      const newProperty: Property = {
-        id: newPropertyId,
-        recordTypeId: defaultRecordType?.id,
-        pageLayoutId: layoutId,
-        propertyNumber,
-        status: normalizedData.status || 'Active',
-        contacts: normalizedData.contacts || [],
-        accounts: normalizedData.accounts || [],
-        lastActivity: today || '',
-        createdBy: currentUserName,
-        createdAt: today || '',
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today || '',
-        sharepointFolder: propertyNumber,
-        ...normalizedData,
-        address: normalizedData.address !== undefined ? normalizedData.address : '',
-        city: normalizedData.city || '',
-        state: normalizedData.state || '',
-        zipCode: normalizedData.zipCode || '',
-      };
-      
-      const updatedProperties = [newProperty, ...properties];
-      setProperties(updatedProperties);
-      localStorage.setItem('properties', JSON.stringify(updatedProperties));
-      
+      console.error('Failed to create property:', error);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create property: ${msg}`);
       setShowDynamicForm(false);
-      router.push(`/properties/${newPropertyId}`);
     }
   };
 

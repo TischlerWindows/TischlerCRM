@@ -418,53 +418,10 @@ export default function QuotesPage() {
       router.push(`/quotes/${result.id}`);
     } catch (error) {
       console.error('Failed to create quote:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Quote__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = quotes
-        .map(q => q.quoteNumber)
-        .filter(num => num.startsWith('QTE-'))
-        .map(num => parseInt(num.replace('QTE-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const validUntil = new Date();
-      validUntil.setDate(validUntil.getDate() + 30);
-      const validUntilStr = validUntil.toISOString().split('T')[0];
-      const newQuoteId = String(Date.now());
-      const currentUserName = user?.name || user?.email || 'Development User';
-      
-      const newQuote: Quote = {
-        id: newQuoteId,
-        quoteNumber,
-        pageLayoutId: selectedLayoutId || undefined,
-        ...normalizedData,
-        quoteName: normalizedData.quoteName || '',
-        accountName: normalizedData.accountName || '',
-        dealNumber: normalizedData.dealNumber || '',
-        status: normalizedData.status || 'Draft',
-        totalAmount: normalizedData.totalAmount || 0,
-        validUntil: normalizedData.validUntil || validUntilStr,
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today
-      };
-
-      const updatedQuotes = [newQuote, ...quotes];
-      setQuotes(updatedQuotes);
-      localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
-      
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create quote: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/quotes/${newQuoteId}`);
     }
   };
 

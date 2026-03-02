@@ -513,55 +513,9 @@ export default function ProductsPage() {
       }, 200);
     } catch (error) {
       console.error('Failed to create product:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Product__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = products
-        .map(p => p.productCode)
-        .filter(code => code.startsWith('PROD-'))
-        .map(code => parseInt(code.replace('PROD-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const newProductId = String(Date.now());
-      const currentUserName = user?.name || user?.email || 'System';
-      const defaultRecordType = schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0];
-      
-      const newProduct: Product = {
-        id: newProductId,
-        recordTypeId: defaultRecordType?.id,
-        pageLayoutId: layoutId,
-        productCode,
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today,
-        ...normalizedData,
-        productName: normalizedData.productName || '',
-        category: normalizedData.category || '',
-        unitPrice: normalizedData.unitPrice || 0,
-        unitOfMeasure: normalizedData.unitOfMeasure || '',
-        inStock: normalizedData.inStock ?? false,
-        stockQuantity: normalizedData.stockQuantity || 0,
-        supplier: normalizedData.supplier || '',
-      };
-
-      const updatedProducts = [newProduct, ...products];
-      setProducts(updatedProducts);
-      localStorage.setItem('products', JSON.stringify(updatedProducts));
-      
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create product: ${msg}`);
       setShowDynamicForm(false);
-      
-      setTimeout(() => {
-        router.push(`/products/${newProductId}`);
-      }, 200);
     }
   };
 

@@ -475,42 +475,10 @@ export default function AccountsPage() {
       await fetchAccounts();
       router.push(`/accounts/${createdRecord.id}`);
     } catch (error) {
-      console.error('Failed to create record via API, falling back to localStorage:', error);
-      
-      const today = new Date().toISOString().split('T')[0];
-      const newAccountId = String(Date.now());
-      const currentUserName = user?.name || user?.email || 'System';
-      const defaultRecordType = schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0];
-      
-      const newAccount: Account = {
-        id: newAccountId,
-        recordTypeId: defaultRecordType?.id,
-        pageLayoutId: layoutId,
-        accountNumber,
-        status: normalizedData.status || 'Active',
-        createdBy: currentUserName,
-        createdAt: today || '',
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today || '',
-        ...normalizedData,
-        accountName: normalizedData.accountName || '',
-        accountType: normalizedData.accountType || '',
-        website: normalizedData.website || '',
-        primaryEmail: normalizedData.primaryEmail || '',
-        secondaryEmail: normalizedData.secondaryEmail || '',
-        primaryPhone: normalizedData.primaryPhone || '',
-        secondaryPhone: normalizedData.secondaryPhone || '',
-        accountNotes: normalizedData.accountNotes || '',
-        shippingAddress: normalizedData.shippingAddress || '',
-        billingAddress: normalizedData.billingAddress || '',
-        accountOwner: normalizedData.accountOwner || '',
-      };
-
-      const updatedAccounts = [newAccount, ...accounts];
-      setAccounts(updatedAccounts);
-      localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
+      console.error('Failed to create account:', error);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create account: ${msg}`);
       setShowDynamicForm(false);
-      router.push(`/accounts/${newAccountId}`);
     }
   };
 

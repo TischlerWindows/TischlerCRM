@@ -443,52 +443,10 @@ export default function ServicePage() {
       router.push(`/service/${result.id}`);
     } catch (error) {
       console.error('Failed to create service:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Service__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = services
-        .map(s => s.serviceNumber)
-        .filter(num => num.startsWith('SRV-'))
-        .map(num => parseInt(num.replace('SRV-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const newServiceId = String(Date.now());
-      const currentUserName = user?.name || user?.email || 'Development User';
-      
-      const newService: Service = {
-        id: newServiceId,
-        serviceNumber,
-        pageLayoutId: selectedLayoutId || undefined,
-        ...normalizedData,
-        serviceName: normalizedData.serviceName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        serviceType: normalizedData.serviceType || 'Maintenance',
-        status: normalizedData.status || 'Scheduled',
-        scheduledDate: normalizedData.scheduledDate || today,
-        assignedTechnician: normalizedData.assignedTechnician || '',
-        priority: normalizedData.priority || 'Medium',
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today
-      };
-
-      const updatedServices = [newService, ...services];
-      setServices(updatedServices);
-      localStorage.setItem('services', JSON.stringify(updatedServices));
-      
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create service: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/service/${newServiceId}`);
     }
   };
 

@@ -464,49 +464,10 @@ export default function DealsPage() {
       router.push(`/deals/${result.id}`);
     } catch (error) {
       console.error('Failed to create deal:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Deal__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = deals
-        .map(d => d.dealNumber)
-        .filter(num => num.startsWith('DEAL-'))
-        .map(num => parseInt(num.replace('DEAL-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const currentUserName = user?.name || user?.email || 'Development User';
-      const newDealId = String(Date.now());
-      
-      const newDeal: Deal = {
-        id: newDealId,
-        dealNumber,
-        ...normalizedData,
-        dealName: normalizedData.dealName || '',
-        accountName: normalizedData.accountName || '',
-        stage: normalizedData.stage || 'Proposal',
-        value: normalizedData.value || 0,
-        closeDate: normalizedData.closeDate || today,
-        assignedTo: normalizedData.assignedTo || '',
-        probability: normalizedData.probability || 50,
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today
-      };
-
-      const updatedDeals = [newDeal, ...deals];
-      setDeals(updatedDeals);
-      localStorage.setItem('deals', JSON.stringify(updatedDeals));
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create deal: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/deals/${newDealId}`);
     }
   };
 

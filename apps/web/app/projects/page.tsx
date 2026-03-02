@@ -440,48 +440,10 @@ export default function ProjectsPage() {
       router.push(`/projects/${result.id}`);
     } catch (error) {
       console.error('Failed to create project:', error);
-      // Fallback: create locally
-      const normalizeFieldName = (fieldName: string): string => fieldName.replace('Project__', '');
-      const normalizedData: Record<string, any> = {};
-      Object.entries(data).forEach(([key, value]) => {
-        normalizedData[normalizeFieldName(key)] = value;
-      });
-      
-      const existingNumbers = projects
-        .map(p => p.projectNumber)
-        .filter(num => num.startsWith('PRJ-'))
-        .map(num => parseInt(num.replace('PRJ-', ''), 10))
-        .filter(num => !isNaN(num));
-      
-      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-      const nextNumber = maxNumber + 1;
-      const projectNumber = `PRJ-${String(nextNumber).padStart(3, '0')}`;
-      const today = new Date().toISOString().split('T')[0];
-      const currentUserName = user?.name || user?.email || 'Development User';
-      const newProjectId = String(Date.now());
-      
-      const newProject: Project = {
-        id: newProjectId,
-        projectNumber,
-        ...normalizedData,
-        projectName: normalizedData.projectName || '',
-        status: normalizedData.status || 'Planning',
-        startDate: normalizedData.startDate || today,
-        expectedCompletion: normalizedData.expectedCompletion || '',
-        assignedTeam: normalizedData.assignedTeam || '',
-        budget: normalizedData.budget || 0,
-        createdBy: currentUserName,
-        createdAt: today,
-        lastModifiedBy: currentUserName,
-        lastModifiedAt: today
-      };
-
-      const updatedProjects = [newProject, ...projects];
-      setProjects(updatedProjects);
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create project: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/projects/${newProjectId}`);
     }
   };
 

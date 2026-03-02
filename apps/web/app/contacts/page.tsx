@@ -482,35 +482,11 @@ export default function ContactsPage() {
       await fetchContacts();
       router.push(`/contacts/${createdRecord.id}`);
     } catch (error) {
-      console.error('Failed to create record via API, falling back to localStorage:', error);
-      const today = new Date().toISOString().split('T')[0] || new Date().toLocaleDateString('en-CA');
-      const newContactId = String(Date.now());
-      
-      const newContact: Contact = {
-        id: newContactId,
-        contactNumber,
-        pageLayoutId: selectedLayoutId || undefined,
-        lastActivity: today,
-        createdBy: 'Development User',
-        createdAt: today,
-        lastModifiedBy: 'Development User',
-        lastModifiedAt: today,
-        ...data,
-        firstName: data['Contact__firstName'] || data.firstName || '',
-        lastName: data['Contact__lastName'] || data.lastName || '',
-        email: data['Contact__email'] || data.email || '',
-        phone: data['Contact__phone'] || data.phone || '',
-        company: data['Contact__company'] || data.company || '',
-        title: data['Contact__title'] || data.title || '',
-        status: data.status || 'Active'
-      };
-
-      const updatedContacts = [newContact, ...contacts];
-      setContacts(updatedContacts);
-      localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+      console.error('Failed to create contact:', error);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to create contact: ${msg}`);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/contacts/${newContactId}`);
     }
   };
 

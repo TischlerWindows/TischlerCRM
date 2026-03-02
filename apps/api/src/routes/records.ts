@@ -118,9 +118,9 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    // Validate required fields
+    // Validate required fields (only reject undefined/null, allow empty strings, 0, false)
     const requiredFields = object.fields.filter((f) => f.required);
-    const missingFields = requiredFields.filter((f) => !data[f.apiName]);
+    const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
 
     if (missingFields.length > 0) {
       return reply.code(400).send({
