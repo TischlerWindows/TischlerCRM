@@ -787,14 +787,10 @@ export default function ContactsPage() {
                             <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
                               {formatColumnValue(contact, column.id)}
                             </Link>
-                          ) : column.id === 'firstName' || column.id === 'lastName' ? (
-                            column.id === 'firstName' && isColumnVisible('lastName') ? (
-                              `${contact.firstName} ${contact.lastName}`
-                            ) : column.id === 'lastName' && !isColumnVisible('firstName') ? (
-                              contact.lastName
-                            ) : column.id === 'firstName' ? (
-                              contact.firstName
-                            ) : null
+                          ) : column.id === 'firstName' ? (
+                            contact.firstName
+                          ) : column.id === 'lastName' ? (
+                            contact.lastName
                           ) : column.id === 'status' ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               contact.status === 'Active' 
