@@ -484,6 +484,7 @@ export default function LeadsPage() {
       }, 200);
     } catch (error) {
       console.error('Failed to create lead:', error);
+      throw error;
     }
   };
 

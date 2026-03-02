@@ -464,6 +464,7 @@ export default function DealsPage() {
       router.push(`/deals/${result.id}`);
     } catch (error) {
       console.error('Failed to create deal:', error);
+      throw error;
     }
   };
 

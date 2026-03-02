@@ -422,6 +422,7 @@ export default function InstallationsPage() {
       router.push(`/installations/${result.id}`);
     } catch (error) {
       console.error('Failed to create installation:', error);
+      throw error;
     }
   };
 

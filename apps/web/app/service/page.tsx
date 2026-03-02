@@ -443,6 +443,7 @@ export default function ServicePage() {
       router.push(`/service/${result.id}`);
     } catch (error) {
       console.error('Failed to create service:', error);
+      throw error;
     }
   };
 

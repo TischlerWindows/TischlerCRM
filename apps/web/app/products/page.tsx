@@ -513,6 +513,7 @@ export default function ProductsPage() {
       }, 200);
     } catch (error) {
       console.error('Failed to create product:', error);
+      throw error;
     }
   };
 
