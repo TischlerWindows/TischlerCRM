@@ -103,6 +103,8 @@ export async function recordRoutes(app: FastifyInstance) {
     const { apiName } = req.params as { apiName: string };
     const { data, pageLayoutId } = req.body as { data: Record<string, any>; pageLayoutId?: string };
 
+    req.log.info({ apiName, pageLayoutId, dataKeys: Object.keys(data || {}) }, 'CREATE RECORD request');
+
     const userId = (req as any).user.sub;
 
     const object = await prisma.customObject.findUnique({
@@ -154,6 +156,7 @@ export async function recordRoutes(app: FastifyInstance) {
           }
         }
       }
+      req.log.info({ layoutFieldCount: layoutFieldIds.size, layoutFieldIds: Array.from(layoutFieldIds) }, 'Layout fields collected');
     }
 
     // Validate required fields — only check fields that are on the selected page layout
@@ -164,6 +167,14 @@ export async function recordRoutes(app: FastifyInstance) {
       return true;
     });
     const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
+
+    req.log.info({ 
+      totalRequired: object.fields.filter(f => f.required).length,
+      filteredRequired: requiredFields.length,
+      requiredFieldNames: requiredFields.map(f => f.apiName),
+      missingFieldNames: missingFields.map(f => f.apiName),
+      hasLayoutFilter: !!layoutFieldIds
+    }, 'Required field validation');
 
     if (missingFields.length > 0) {
       return reply.code(400).send({

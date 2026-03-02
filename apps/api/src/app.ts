@@ -33,7 +33,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-02-v3' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
