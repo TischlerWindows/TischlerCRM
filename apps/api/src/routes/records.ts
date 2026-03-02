@@ -142,21 +142,20 @@ export async function recordRoutes(app: FastifyInstance) {
       });
 
       if (!layout) {
-        return reply.code(400).send({
-          error: 'Invalid page layout for this object',
-        });
-      }
-
-      // Collect all field IDs that are on this layout
-      layoutFieldIds = new Set<string>();
-      for (const tab of layout.tabs) {
-        for (const section of tab.sections) {
-          for (const layoutField of section.fields) {
-            layoutFieldIds.add(layoutField.fieldId);
+        // Layout not found — log warning and proceed without layout-scoped validation
+        req.log.warn({ pageLayoutId, objectId: object.id }, 'Page layout not found, skipping layout-scoped validation');
+      } else {
+        // Collect all field IDs that are on this layout
+        layoutFieldIds = new Set<string>();
+        for (const tab of layout.tabs) {
+          for (const section of tab.sections) {
+            for (const layoutField of section.fields) {
+              layoutFieldIds.add(layoutField.fieldId);
+            }
           }
         }
+        req.log.info({ layoutFieldCount: layoutFieldIds.size, layoutFieldIds: Array.from(layoutFieldIds) }, 'Layout fields collected');
       }
-      req.log.info({ layoutFieldCount: layoutFieldIds.size, layoutFieldIds: Array.from(layoutFieldIds) }, 'Layout fields collected');
     }
 
     // Validate required fields — only check fields that are on the selected page layout
