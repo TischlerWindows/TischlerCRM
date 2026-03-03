@@ -319,6 +319,10 @@ export default function DynamicForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    submitForm();
+  };
+
+  const submitForm = async () => {
     if (validateForm()) {
       // Ensure all required fields on the object have a non-empty default,
       // even if they are not on the current page layout. This prevents the API
@@ -353,6 +357,31 @@ export default function DynamicForm({
         setSubmitError(msg);
       } finally {
         setIsSubmitting(false);
+      }
+    }
+  };
+
+  // Pressing Enter in an input moves to the next field instead of submitting
+  const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+    if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      const tagName = target.tagName.toLowerCase();
+      // Allow Enter in textareas (for multi-line input)
+      if (tagName === 'textarea') return;
+      // Only intercept for inputs, selects
+      if (tagName === 'input' || tagName === 'select') {
+        e.preventDefault();
+        const form = e.currentTarget;
+        const focusable = Array.from(
+          form.querySelectorAll<HTMLElement>(
+            'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled])'
+          )
+        );
+        const currentIndex = focusable.indexOf(target);
+        const nextField = focusable[currentIndex + 1];
+        if (currentIndex >= 0 && nextField) {
+          nextField.focus();
+        }
       }
     }
   };
@@ -791,7 +820,7 @@ export default function DynamicForm({
   if (!currentTab) return null;
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full">
+    <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
       {/* Tabs - Only show if there are multiple tabs */}
       {layout.tabs.length > 1 && (
         <div className="flex gap-2 border-b px-6 pt-4 bg-white">
