@@ -770,7 +770,7 @@ async function recordRoutes(app2) {
     const record = await prisma5.record.create({
       data: {
         objectId: object.id,
-        data,
+        data: { ...data, ...pageLayoutId ? { _pageLayoutId: pageLayoutId } : {} },
         ...isValidUuid ? { pageLayoutId } : {},
         createdById: userId,
         modifiedById: userId

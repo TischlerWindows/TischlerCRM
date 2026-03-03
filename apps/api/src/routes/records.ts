@@ -139,13 +139,14 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     // Create record with data as JSON
-    // Only set pageLayoutId if it looks like a valid UUID (exists in DB).
-    // Frontend may send localStorage-generated IDs that don't exist in the PageLayout table.
+    // Store pageLayoutId inside the data JSON blob as _pageLayoutId so it
+    // survives regardless of format (localStorage IDs are NOT UUIDs).
+    // Also set the FK column when the value happens to be a valid UUID.
     const isValidUuid = pageLayoutId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageLayoutId);
     const record = await prisma.record.create({
       data: {
         objectId: object.id,
-        data: data,
+        data: { ...data, ...(pageLayoutId ? { _pageLayoutId: pageLayoutId } : {}) },
         ...(isValidUuid ? { pageLayoutId } : {}),
         createdById: userId,
         modifiedById: userId,

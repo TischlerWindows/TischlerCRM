@@ -117,6 +117,11 @@ class RecordsService {
       }
     }
 
+    // Prefer the DB FK column, then fall back to _pageLayoutId stored in data blob
+    const resolvedPageLayoutId = record.pageLayoutId
+      || (record.data as Record<string, any>)?._pageLayoutId
+      || stripped._pageLayoutId;
+
     return {
       id: record.id,
       ...stripped,
@@ -124,7 +129,7 @@ class RecordsService {
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      pageLayoutId: record.pageLayoutId,
+      pageLayoutId: resolvedPageLayoutId,
     };
   }
 
