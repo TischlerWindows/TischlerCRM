@@ -1875,7 +1875,7 @@ function buildApp() {
         }
       });
       const env = loadEnv();
-      const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+      const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
       return reply.code(201).send({
         token,
         user: { id: user.id, email: user.email, name: user.name, role: user.role }
@@ -1896,7 +1896,7 @@ function buildApp() {
     const user = await authenticate(parsed.data.email, parsed.data.password);
     if (!user) return reply.code(401).send({ error: "Invalid credentials" });
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
     const forwardedFor = req.headers["x-forwarded-for"];
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const ip = (forwardedIp ? forwardedIp.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";

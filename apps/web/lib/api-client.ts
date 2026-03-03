@@ -57,6 +57,16 @@ class ApiClient {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       let errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
+
+      // On 401 (expired/invalid token), clear stale credentials and redirect
+      // to login so the user can re-authenticate instead of seeing empty pages.
+      if (response.status === 401 && typeof window !== 'undefined') {
+        this.setToken(null);
+        sessionStorage.removeItem('user');
+        document.cookie = 'auth-token=; Max-Age=0; path=/;';
+        window.location.href = '/login';
+      }
+
       if (errorData.fields && Array.isArray(errorData.fields)) {
         errorMessage += ': ' + errorData.fields.join(', ');
       }
