@@ -766,11 +766,12 @@ async function recordRoutes(app2) {
         fields: missingFields.map((f) => f.apiName)
       });
     }
+    const isValidUuid = pageLayoutId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageLayoutId);
     const record = await prisma5.record.create({
       data: {
         objectId: object.id,
         data,
-        pageLayoutId: pageLayoutId || null,
+        ...isValidUuid ? { pageLayoutId } : {},
         createdById: userId,
         modifiedById: userId
       },
