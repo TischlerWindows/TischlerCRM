@@ -145,7 +145,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     setHomeDashboards(dashboards.map((d: any) => ({ id: d.id, name: d.name })));
   }, [objectApiName]);
 
-  const availableFields = useMemo(() => {
+  // All fields (unfiltered) — used by getFieldDef to resolve layout field definitions
+  const allFields = useMemo(() => {
     let baseFields: FieldDef[] = objectApiName === 'Home'
       ? [
           ...homeReports.map((report) => ({
@@ -181,16 +182,21 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       baseFields = [nameField, ...baseFields];
     }
 
+    return baseFields;
+  }, [objectApiName, object.fields, homeReports, homeDashboards]);
+
+  // Filtered fields for the available-fields sidebar (search only affects this list)
+  const availableFields = useMemo(() => {
     if (!fieldSearchTerm.trim()) {
-      return baseFields;
+      return allFields;
     }
 
     const searchLower = fieldSearchTerm.toLowerCase();
-    return baseFields.filter((field) =>
+    return allFields.filter((field) =>
       field.label.toLowerCase().includes(searchLower) ||
       field.apiName.toLowerCase().includes(searchLower)
     );
-  }, [objectApiName, object.fields, homeReports, homeDashboards, fieldSearchTerm]);
+  }, [allFields, fieldSearchTerm]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const activeId = event.active.id.toString();
@@ -636,7 +642,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
 
   const getFieldDef = (apiName: string): FieldDef | undefined => {
-    return availableFields.find((f) => f.apiName === apiName);
+    return allFields.find((f) => f.apiName === apiName);
   };
 
   const DraggableField = ({ field }: { field: FieldDef }) => {
