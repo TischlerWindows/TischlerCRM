@@ -469,11 +469,18 @@ export default function ContactsPage() {
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
 
+    // Extract name parts from composite Name field if present
+    const nameObj = data['Contact__name'];
+    const compositeSalutation = nameObj?.Contact__name_salutation || nameObj?.salutation;
+    const compositeFirst = nameObj?.Contact__name_firstName || nameObj?.firstName;
+    const compositeLast = nameObj?.Contact__name_lastName || nameObj?.lastName;
+
     const recordData = {
       ...data,
       contactNumber,
-      firstName: data['Contact__firstName'] || data.firstName || '',
-      lastName: data['Contact__lastName'] || data.lastName || '',
+      firstName: data['Contact__firstName'] || data.firstName || compositeFirst || '',
+      lastName: data['Contact__lastName'] || data.lastName || compositeLast || '',
+      salutation: data['Contact__salutation'] || data.salutation || compositeSalutation || '',
       email: data['Contact__email'] || data.email || '',
       phone: data['Contact__phone'] || data.phone || '',
       company: data['Contact__company'] || data.company || '',

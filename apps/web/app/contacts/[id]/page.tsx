@@ -336,8 +336,21 @@ export default function ContactDetailPage() {
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">{contact.contactNumber}</h1>
                   <p className="text-gray-600">
-                    {contact.firstName} {contact.lastName}
-                    {contact.primaryEmail && <> ({contact.primaryEmail})</>}
+                    {(() => {
+                      // Try composite name object first
+                      const nameObj = contact['Contact__name'] || contact.name;
+                      if (nameObj && typeof nameObj === 'object') {
+                        const parts = [
+                          nameObj.salutation || nameObj.Contact__name_salutation,
+                          nameObj.firstName || nameObj.Contact__name_firstName,
+                          nameObj.lastName || nameObj.Contact__name_lastName,
+                        ].filter(Boolean);
+                        if (parts.length > 0) return parts.join(' ');
+                      }
+                      // Fall back to individual fields
+                      return [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+                    })()}
+                    {(contact.primaryEmail || contact.email) && <> ({contact.primaryEmail || contact.email})</>}
                   </p>
                 </div>
               </div>
@@ -399,7 +412,31 @@ export default function ContactDetailPage() {
                                 {rowFields.map((layoutField) => {
                                   if (!layoutField) return null;
                                   const fieldDef = getFieldDef(layoutField.apiName);
-                                  const value = contact[layoutField.apiName] || contact[layoutField.apiName.replace(/^[^_]+__/, '')];
+                                  let value = contact[layoutField.apiName] || contact[layoutField.apiName.replace(/^[^_]+__/, '')];
+
+                                  // For CompositeText fields (like Name), if the composite
+                                  // value is missing, build it from individual sub-fields
+                                  // or top-level firstName/lastName on the record.
+                                  if (!value && fieldDef?.type === 'CompositeText' && fieldDef.subFields) {
+                                    const constructed: Record<string, any> = {};
+                                    for (const sf of fieldDef.subFields) {
+                                      const sfVal = contact[sf.apiName] || contact[sf.apiName.replace(/^[A-Za-z]+__/, '')];
+                                      if (sfVal) constructed[sf.apiName] = sfVal;
+                                    }
+                                    // Also try common unprefixed names
+                                    if (!constructed.Contact__name_firstName && contact.firstName) {
+                                      constructed.Contact__name_firstName = contact.firstName;
+                                    }
+                                    if (!constructed.Contact__name_lastName && contact.lastName) {
+                                      constructed.Contact__name_lastName = contact.lastName;
+                                    }
+                                    if (!constructed.Contact__name_salutation && contact.salutation) {
+                                      constructed.Contact__name_salutation = contact.salutation;
+                                    }
+                                    if (Object.keys(constructed).length > 0) {
+                                      value = constructed;
+                                    }
+                                  }
                                   
                                   if (!fieldDef) return null;
 
