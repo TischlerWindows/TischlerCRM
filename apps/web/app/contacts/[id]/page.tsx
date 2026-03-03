@@ -7,10 +7,7 @@ import {
   Users, 
   ArrowLeft, 
   Edit, 
-  Trash2,
-  Calendar,
-  User,
-  Clock
+  Trash2
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -132,7 +129,6 @@ export default function ContactDetailPage() {
       const relatedRecord = records.find((r: any) => String(r.id) === String(value));
       
       if (relatedRecord) {
-        // Handle each object type with appropriate display fields
         switch (lookupObject) {
           case 'Contact': {
             const name = relatedRecord.name;
@@ -169,7 +165,9 @@ export default function ContactDetailPage() {
             return relatedRecord.name || relatedRecord.label || String(value);
         }
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Ignore parse errors
+    }
 
     return String(value);
   };
@@ -180,11 +178,12 @@ export default function ContactDetailPage() {
 
     const fieldType = fieldDef?.type;
 
-    // Handle Lookup fields
+    // Handle Lookup fields - show the related record's name, not the ID
     if (fieldType === 'Lookup' && fieldDef) {
       const displayName = getLookupDisplayName(fieldDef, value);
       const lookupObject = fieldDef.lookupObject;
       
+      // Make it a link if we know the object type
       if (lookupObject) {
         const routeMap: Record<string, string> = {
           'Contact': 'contacts',
@@ -192,9 +191,9 @@ export default function ContactDetailPage() {
           'Property': 'properties',
           'Lead': 'leads',
           'Deal': 'deals',
-          'Project': 'projects',
           'Product': 'products',
           'Quote': 'quotes',
+          'Project': 'projects',
           'Service': 'service',
           'Installation': 'installations'
         };

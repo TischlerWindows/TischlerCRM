@@ -164,11 +164,20 @@ export default function ContactsPage() {
       const savedLayoutId = localStorage.getItem('contactSelectedLayoutId');
       if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
         setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
+      } else {
+        // Prefer the layout assigned to the default record type
+        const defaultRecordType = contactObject?.defaultRecordTypeId
+          ? contactObject.recordTypes?.find(rt => rt.id === contactObject.defaultRecordTypeId)
+          : contactObject?.recordTypes?.[0];
+        const rtLayoutId = defaultRecordType?.pageLayoutId;
+        if (rtLayoutId && pageLayouts.find(l => l.id === rtLayoutId)) {
+          setSelectedLayoutId(rtLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
       }
     }
-  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
+  }, [hasPageLayout, pageLayouts, selectedLayoutId, contactObject]);
 
   useEffect(() => {
     loadSchema();
