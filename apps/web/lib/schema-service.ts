@@ -861,78 +861,36 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   private ensureContactTemplateLayout(schema: OrgSchema): OrgSchema {
+    // Remove the hard-coded "Contact - Default Template" layout.
+    // Users create their own layouts via the Page Editor.
     const contact = schema.objects.find((obj) => obj.apiName === 'Contact');
     if (!contact) return schema;
 
-    const hasLayout = contact.pageLayouts?.some((layout) => layout.name === 'Contact - Default Template');
-    if (hasLayout) {
-      // Layout already exists — don't modify anything.
-      // Users may have customized layouts/record-type assignments in the Page Editor.
+    const defaultTemplate = contact.pageLayouts?.find((layout) => layout.name === 'Contact - Default Template');
+    if (!defaultTemplate) {
+      // Already removed or never existed — nothing to do.
       return schema;
     }
 
-    const fieldMap = new Map(contact.fields.map((field) => [field.label, field.apiName]));
-    const missing = new Set<string>();
+    const filteredLayouts = (contact.pageLayouts || []).filter(
+      (layout) => layout.name !== 'Contact - Default Template'
+    );
 
-    const sections = CONTACT_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const apiName = fieldMap.get(label) || contact.fields.find((f) => f.apiName === label)?.apiName;
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
-      return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
-      };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Contact fields for default template:', Array.from(missing));
-    }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Contact - Default Template',
-      layoutType: 'edit',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = contact.recordTypes.map((recordType, index) => {
-      if (contact.defaultRecordTypeId && recordType.id === contact.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
+    // If any record type was pointing at the removed layout, clear it
+    // so the UI falls back to the first remaining layout (user's custom one).
+    const updatedRecordTypes = contact.recordTypes.map((rt) => {
+      if (rt.pageLayoutId === defaultTemplate.id) {
+        const fallback = filteredLayouts.length > 0 ? filteredLayouts[0].id : undefined;
+        return { ...rt, pageLayoutId: fallback };
       }
-      if (!contact.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
+      return rt;
     });
 
     const updatedObjects = schema.objects.map((obj) =>
       obj.apiName === 'Contact'
         ? {
             ...obj,
-            pageLayouts: [...(obj.pageLayouts || []), layout],
+            pageLayouts: filteredLayouts,
             recordTypes: updatedRecordTypes,
             updatedAt: new Date().toISOString()
           }
@@ -3189,16 +3147,9 @@ class LocalStorageSchemaService implements SchemaService {
         }
       ];
 
-    const contactLayout = buildLayoutFromLabels(
-      'Contact - Default Template',
-      'edit',
-      contactFields,
-      CONTACT_LAYOUT_SECTIONS
-    );
-
-    const contactRecordType = createDefaultRecordType('Contact', contactLayout.id);
+    const contactRecordType = createDefaultRecordType('Contact', undefined as any);
     
-    // Create Contact object with custom layout
+    // Create Contact object — no hard-coded layout; user creates layouts via Page Editor
     objects.push({
       id: generateId(),
       apiName: 'Contact',
@@ -3209,7 +3160,7 @@ class LocalStorageSchemaService implements SchemaService {
       updatedAt: now,
       fields: [...SYSTEM_FIELDS, ...contactFields.map(f => ({ ...f, custom: true }))],
       recordTypes: [contactRecordType],
-      pageLayouts: [contactLayout],
+      pageLayouts: [],
       validationRules: [],
       defaultRecordTypeId: contactRecordType.id
     });
