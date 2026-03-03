@@ -527,13 +527,25 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       updatedLayouts = [...existingLayouts, pageLayout];
     }
 
-    console.log('Saving layout for object:', objectApiName);
-    console.log('Current layouts:', existingLayouts);
-    console.log('New layout:', pageLayout);
-    console.log('Updated layouts:', updatedLayouts);
+    // Also update the default record type to use this layout, so detail pages
+    // pick up the user's saved layout instead of the old default template.
+    const existingRecordTypes = object.recordTypes || [];
+    const updatedRecordTypes = existingRecordTypes.length > 0
+      ? existingRecordTypes.map((rt, idx) => {
+          // Update the default record type (or the first one if no default is set)
+          if (
+            (object.defaultRecordTypeId && rt.id === object.defaultRecordTypeId) ||
+            (!object.defaultRecordTypeId && idx === 0)
+          ) {
+            return { ...rt, pageLayoutId: pageLayout.id };
+          }
+          return rt;
+        })
+      : existingRecordTypes;
 
     updateObject(objectApiName, {
       pageLayouts: updatedLayouts,
+      recordTypes: updatedRecordTypes,
     });
 
     // Immediately persist to localStorage

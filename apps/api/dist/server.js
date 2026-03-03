@@ -770,6 +770,7 @@ async function recordRoutes(app2) {
       data: {
         objectId: object.id,
         data,
+        pageLayoutId: pageLayoutId || null,
         createdById: userId,
         modifiedById: userId
       },

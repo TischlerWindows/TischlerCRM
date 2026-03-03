@@ -98,57 +98,9 @@ function createRelationshipField(target: ObjectDef): FieldDef {
 }
 
 function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
-  if (!objectDef.pageLayouts || objectDef.pageLayouts.length === 0) return objectDef;
-
-  const lookupFields = objectDef.fields.filter(
-    (field) => field.type === 'Lookup' || field.type === 'ExternalLookup'
-  );
-
-  const pageLayouts = objectDef.pageLayouts.map((layout) => {
-    if (!layout.tabs.length || !layout.tabs[0] || !layout.tabs[0].sections.length || !layout.tabs[0].sections[0]) {
-      return layout;
-    }
-
-    const tab = layout.tabs[0];
-    const section = tab.sections[0];
-    const existingFieldApi = new Set(section.fields.map((f) => f.apiName));
-    const missingLookups = lookupFields.filter((field) => !existingFieldApi.has(field.apiName));
-
-    if (missingLookups.length === 0) return layout;
-
-    const nextFields = section.fields.slice();
-    const nextOrderStart = nextFields.length;
-
-    missingLookups.forEach((field, index) => {
-      nextFields.push({
-        apiName: field.apiName,
-        column: index % section.columns,
-        order: nextOrderStart + index
-      });
-    });
-
-    return {
-      ...layout,
-      tabs: [
-        {
-          ...tab,
-          sections: [
-            {
-              ...section,
-              fields: nextFields
-            },
-            ...tab.sections.slice(1)
-          ]
-        },
-        ...layout.tabs.slice(1)
-      ]
-    };
-  });
-
-  return {
-    ...objectDef,
-    pageLayouts
-  };
+  // No longer inject lookup fields into layouts automatically.
+  // Layouts should only contain fields the user explicitly placed via the Page Editor.
+  return objectDef;
 }
 
 export const useSchemaStore = create<SchemaStore>()(

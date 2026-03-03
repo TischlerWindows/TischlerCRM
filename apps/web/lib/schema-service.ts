@@ -777,10 +777,12 @@ class LocalStorageSchemaService implements SchemaService {
     if (!property) return schema;
 
     const hasLayout = property.pageLayouts?.some((layout) => layout.name === 'Property - Wood Template');
-    // Always rebuild the layout to ensure it has correct Property fields
-    // (not Opportunity or Deal fields that may have been stored incorrectly)
-    const propertyFields = property.fields;
-    const fieldCount = propertyFields.filter(f => f.apiName?.startsWith('Property__')).length;
+
+    // If the layout already exists, leave it alone — don't rebuild or override
+    // record type assignments. Users may have customized layouts in the Page Editor.
+    if (hasLayout) {
+      return schema;
+    }
 
     const fieldMap = new Map(property.fields.map((field) => [field.label, field.apiName]));
     const missing = new Set<string>();
@@ -839,15 +841,12 @@ class LocalStorageSchemaService implements SchemaService {
       return recordType;
     });
 
-    // Always replace the old layout with the rebuilt one to fix any corruption
+    // Only add the layout when it doesn't already exist
     const updatedObjects = schema.objects.map((obj) =>
       obj.apiName === 'Property'
         ? {
             ...obj,
-            pageLayouts: [
-              layout,
-              ...(obj.pageLayouts || []).filter((l) => l.name !== 'Property - Wood Template')
-            ],
+            pageLayouts: [...(obj.pageLayouts || []), layout],
             recordTypes: updatedRecordTypes,
             updatedAt: new Date().toISOString()
           }
@@ -867,27 +866,9 @@ class LocalStorageSchemaService implements SchemaService {
 
     const hasLayout = contact.pageLayouts?.some((layout) => layout.name === 'Contact - Default Template');
     if (hasLayout) {
-      const updatedObjects = schema.objects.map((obj) => {
-        if (obj.apiName !== 'Contact') return obj;
-        const updatedLayouts = (obj.pageLayouts || []).map((layout) => {
-          if (layout.name !== 'Contact - Default Template') return layout;
-          const tabs = layout.tabs.map((tab) => ({
-            ...tab,
-            sections: tab.sections.map((section) => ({
-              ...section,
-              label: this.normalizeSectionLabel(section.label)
-            }))
-          }));
-          return { ...layout, tabs };
-        });
-        return { ...obj, pageLayouts: updatedLayouts, updatedAt: new Date().toISOString() };
-      });
-
-      return {
-        ...schema,
-        objects: updatedObjects,
-        updatedAt: new Date().toISOString()
-      };
+      // Layout already exists — don't modify anything.
+      // Users may have customized layouts/record-type assignments in the Page Editor.
+      return schema;
     }
 
     const fieldMap = new Map(contact.fields.map((field) => [field.label, field.apiName]));
@@ -1109,27 +1090,16 @@ class LocalStorageSchemaService implements SchemaService {
       if (obj.apiName !== 'Account') return obj;
 
       if (hasLayout) {
-        const updatedLayouts = (obj.pageLayouts || []).map((existingLayout) => {
-          if (existingLayout.name !== 'Account - Default Template') return existingLayout;
-          const normalized = {
-            ...existingLayout,
-            tabs: existingLayout.tabs.map((tab: any) => ({
-              ...tab,
-              sections: tab.sections.map((section: any) => ({
-                ...section,
-                label: this.normalizeSectionLabel(section.label)
-              }))
-            }))
+        // Layout already exists — only ensure required fields are on the object,
+        // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
+        if (requiredFields.length > 0) {
+          return {
+            ...obj,
+            fields: mergedFields,
+            updatedAt: new Date().toISOString()
           };
-          return ensureAddressFieldsInLayout(normalized);
-        });
-
-        return {
-          ...obj,
-          fields: mergedFields,
-          pageLayouts: updatedLayouts,
-          updatedAt: new Date().toISOString()
-        };
+        }
+        return obj;
       }
 
       return {
@@ -1209,33 +1179,24 @@ class LocalStorageSchemaService implements SchemaService {
     };
 
     if (hasLayout) {
-      return {
-        ...schema,
-        objects: schema.objects.map((obj) =>
-          obj.apiName === 'Product'
-            ? {
-                ...obj,
-                fields: mergedFields,
-                pageLayouts: (obj.pageLayouts || []).map((layout) =>
-                  layout.name === 'Product - Default Template'
-                    ? ensureDescriptionFieldInLayout({
-                        ...layout,
-                        tabs: layout.tabs.map((tab) => ({
-                          ...tab,
-                          sections: tab.sections.map((section) => ({
-                            ...section,
-                            label: this.normalizeSectionLabel(section.label)
-                          }))
-                        }))
-                      })
-                    : layout
-                ),
-                updatedAt: new Date().toISOString()
-              }
-            : obj
-        ),
-        updatedAt: new Date().toISOString()
-      };
+      // Layout already exists — only ensure required fields are on the object,
+      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
+      if (requiredFields.length > 0) {
+        return {
+          ...schema,
+          objects: schema.objects.map((obj) =>
+            obj.apiName === 'Product'
+              ? {
+                  ...obj,
+                  fields: mergedFields,
+                  updatedAt: new Date().toISOString()
+                }
+              : obj
+          ),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return schema;
     }
 
     const fieldMap = new Map(mergedFields.map((field) => [field.label, field.apiName]));
@@ -1586,24 +1547,24 @@ class LocalStorageSchemaService implements SchemaService {
     };
 
     if (hasLayout) {
-      return {
-        ...schema,
-        objects: schema.objects.map((obj) =>
-          obj.apiName === 'Lead'
-            ? {
-                ...obj,
-                fields: mergedFields,
-                pageLayouts: (obj.pageLayouts || []).map((layout) =>
-                  layout.name === 'Lead - Default Template'
-                    ? applyTemplateToLayout(layout)
-                    : layout
-                ),
-                updatedAt: new Date().toISOString()
-              }
-            : obj
-        ),
-        updatedAt: new Date().toISOString()
-      };
+      // Layout already exists — only ensure required fields are on the object,
+      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
+      if (requiredFields.length > 0) {
+        return {
+          ...schema,
+          objects: schema.objects.map((obj) =>
+            obj.apiName === 'Lead'
+              ? {
+                  ...obj,
+                  fields: mergedFields,
+                  updatedAt: new Date().toISOString()
+                }
+              : obj
+          ),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return schema;
     }
 
     const missing = new Set<string>();
@@ -2385,24 +2346,24 @@ class LocalStorageSchemaService implements SchemaService {
     };
 
     if (hasLayout) {
-      return {
-        ...schema,
-        objects: schema.objects.map((obj) =>
-          obj.apiName === 'Deal'
-            ? {
-                ...obj,
-                fields: mergedFields,
-                pageLayouts: (obj.pageLayouts || []).map((layout) =>
-                  layout.name === 'Deal - Default Template'
-                    ? applyTemplateToLayout(layout)
-                    : layout
-                ),
-                updatedAt: new Date().toISOString()
-              }
-            : obj
-        ),
-        updatedAt: new Date().toISOString()
-      };
+      // Layout already exists — only ensure required fields are on the object,
+      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
+      if (requiredFields.length > 0) {
+        return {
+          ...schema,
+          objects: schema.objects.map((obj) =>
+            obj.apiName === 'Deal'
+              ? {
+                  ...obj,
+                  fields: mergedFields,
+                  updatedAt: new Date().toISOString()
+                }
+              : obj
+          ),
+          updatedAt: new Date().toISOString()
+        };
+      }
+      return schema;
     }
 
     const missing = new Set<string>();

@@ -317,11 +317,6 @@ export default function DynamicForm({
     return !hasErrors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    submitForm();
-  };
-
   const submitForm = async () => {
     if (validateForm()) {
       // Ensure all required fields on the object have a non-empty default,
@@ -820,7 +815,7 @@ export default function DynamicForm({
   if (!currentTab) return null;
 
   return (
-    <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
+    <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
       {/* Tabs - Only show if there are multiple tabs */}
       {layout.tabs.length > 1 && (
         <div className="flex gap-2 border-b px-6 pt-4 bg-white">
@@ -917,7 +912,7 @@ export default function DynamicForm({
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="button" onClick={submitForm} disabled={isSubmitting}>
           {isSubmitting ? 'Saving...' : layoutType === 'create' ? 'Create' : 'Save'}
         </Button>
       </div>

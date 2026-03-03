@@ -143,6 +143,7 @@ export async function recordRoutes(app: FastifyInstance) {
       data: {
         objectId: object.id,
         data: data,
+        pageLayoutId: pageLayoutId || null,
         createdById: userId,
         modifiedById: userId,
       },
