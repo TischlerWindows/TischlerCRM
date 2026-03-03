@@ -246,9 +246,11 @@ export default function AccountDetailPage() {
         if (updated) {
           setAccount(recordsService.flattenRecord(updated) as Account);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update account via API:', error);
         setAccount({ ...account, ...data });
+        setShowEditForm(false);
       }
     }
   };

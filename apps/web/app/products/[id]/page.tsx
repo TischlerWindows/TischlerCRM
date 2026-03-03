@@ -260,9 +260,11 @@ export default function ProductDetailPage() {
         if (updated) {
           setProduct(recordsService.flattenRecord(updated) as Product);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update product via API:', error);
         setProduct({ ...product, ...data });
+        setShowEditForm(false);
       }
     }
   };

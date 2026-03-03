@@ -107,8 +107,10 @@ class RecordsService {
     const stripped: Record<string, any> = {};
     if (record.data && typeof record.data === 'object') {
       for (const [key, value] of Object.entries(record.data)) {
+        // Keep original prefixed key so edit forms can match by apiName
+        stripped[key] = value;
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
-        // Keep both: unprefixed takes priority but preserve original too
+        // Also add stripped key for display convenience
         if (!(cleanKey in stripped)) {
           stripped[cleanKey] = value;
         }

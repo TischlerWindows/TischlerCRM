@@ -244,9 +244,11 @@ export default function LeadDetailPage() {
         if (updated) {
           setLead(recordsService.flattenRecord(updated) as Lead);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update lead via API:', error);
         setLead({ ...lead, ...data });
+        setShowEditForm(false);
       }
     }
   };

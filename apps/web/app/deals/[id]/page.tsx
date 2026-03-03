@@ -214,9 +214,11 @@ export default function DealDetailPage() {
         if (updated) {
           setDeal(recordsService.flattenRecord(updated) as Deal);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update deal via API:', error);
         setDeal({ ...deal, ...data });
+        setShowEditForm(false);
       }
     }
   };

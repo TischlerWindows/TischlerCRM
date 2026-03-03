@@ -246,10 +246,12 @@ export default function PropertyDetailPage() {
         if (updated) {
           setProperty(recordsService.flattenRecord(updated) as Property);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update property via API:', error);
         // Fallback: update local state only
         setProperty({ ...property, ...data });
+        setShowEditForm(false);
       }
     }
   };

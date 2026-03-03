@@ -209,6 +209,19 @@ export default function ContactDetailPage() {
       return displayName;
     }
 
+    // Handle CompositeText fields (e.g., Name with salutation, firstName, lastName)
+    if (fieldType === 'CompositeText' && typeof value === 'object') {
+      const nameKeys = Object.keys(value);
+      const salutation = value.salutation || value.Contact__name_salutation ||
+        (nameKeys.find(k => k.toLowerCase().includes('salutation')) && value[nameKeys.find(k => k.toLowerCase().includes('salutation'))!]);
+      const firstName = value.firstName || value.Contact__name_firstName ||
+        (nameKeys.find(k => k.toLowerCase().includes('firstname')) && value[nameKeys.find(k => k.toLowerCase().includes('firstname'))!]);
+      const lastName = value.lastName || value.Contact__name_lastName ||
+        (nameKeys.find(k => k.toLowerCase().includes('lastname')) && value[nameKeys.find(k => k.toLowerCase().includes('lastname'))!]);
+      const nameParts = [salutation, firstName, lastName].filter(Boolean);
+      return nameParts.length > 0 ? nameParts.join(' ') : '-';
+    }
+
     // Handle email links
     if (fieldType === 'Email') {
       return (
@@ -246,9 +259,11 @@ export default function ContactDetailPage() {
         if (updated) {
           setContact(recordsService.flattenRecord(updated) as Contact);
         }
+        setShowEditForm(false);
       } catch (error) {
         console.error('Failed to update contact via API:', error);
         setContact({ ...contact, ...data });
+        setShowEditForm(false);
       }
     }
   };
