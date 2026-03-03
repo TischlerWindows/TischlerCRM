@@ -25,6 +25,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 
 interface CustomRecord {
@@ -231,6 +232,20 @@ export default function CustomObjectRecordsPage() {
     
     try {
       const apiName = objectDef?.apiName || slug;
+
+      // Ensure the custom object exists in the database before creating records
+      if (objectDef) {
+        try {
+          await apiClient.createObject({
+            apiName: objectDef.apiName,
+            label: objectDef.label,
+            pluralLabel: objectDef.pluralLabel || objectDef.label,
+          });
+        } catch {
+          // Object may already exist — that's fine
+        }
+      }
+
       const result = await recordsService.createRecord(apiName, { data: normalizedData, pageLayoutId: layoutId || undefined });
       if (result) {
         const flatRecord = recordsService.flattenRecord(result) as CustomRecord;

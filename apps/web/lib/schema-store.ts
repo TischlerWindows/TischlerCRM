@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout, PermissionSet } from './schema';
 import { schemaService } from './schema-service';
+import { apiClient } from './api-client';
 
 export interface SchemaStore {
   // Current schema state
@@ -254,6 +255,20 @@ export const useSchemaStore = create<SchemaStore>()(
         // Persist to schema service storage
         await schemaService.saveSchema(updatedSchema);
         
+        // Also create the object in the backend database so records can be stored via API
+        try {
+          await apiClient.createObject({
+            apiName: newObject.apiName,
+            label: objectData.label || newObject.apiName,
+            pluralLabel: objectData.pluralLabel || objectData.label || newObject.apiName,
+            description: objectData.description,
+          });
+          console.log(`[Schema] Object "${newObject.apiName}" created in database`);
+        } catch (err) {
+          // Object may already exist in DB (e.g., seeded objects) — that's OK
+          console.warn(`[Schema] Could not create object "${newObject.apiName}" in database (may already exist):`, err);
+        }
+        
         return newObject.id;
       },
 
@@ -328,6 +343,28 @@ export const useSchemaStore = create<SchemaStore>()(
         
         // Persist to schema service
         schemaService.saveSchema(updatedSchema);
+
+        // Also sync field to backend database (fire-and-forget)
+        const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(fieldData.apiName);
+        if (!isSystemField) {
+          apiClient.createField(objectApi, {
+            apiName: fieldData.apiName,
+            label: fieldData.label,
+            type: fieldData.type || 'Text',
+            required: fieldData.required || false,
+            unique: fieldData.unique || false,
+            readOnly: fieldData.readOnly || false,
+            description: fieldData.helpText,
+            maxLength: fieldData.maxLength,
+            minLength: fieldData.minLength,
+            picklistValues: fieldData.picklistValues,
+            defaultValue: fieldData.defaultValue,
+          }).then(() => {
+            console.log(`[Schema] Field "${fieldData.apiName}" synced to database`);
+          }).catch((err: any) => {
+            console.warn(`[Schema] Could not sync field "${fieldData.apiName}" to database:`, err);
+          });
+        }
 
         return fieldId;
       },

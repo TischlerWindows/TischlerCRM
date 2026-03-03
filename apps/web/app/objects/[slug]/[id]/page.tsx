@@ -60,9 +60,19 @@ export default function CustomObjectDetailPage() {
         const result = await recordsService.getRecord(apiName, recordId);
         if (result) {
           setRecord(recordsService.flattenRecord(result) as CustomRecord);
-        } else {
-          setRecord(null);
+          return;
         }
+        // API returned null (record not found in DB) — try localStorage fallback
+        const storedRecords = localStorage.getItem(storageKey);
+        if (storedRecords) {
+          const records: CustomRecord[] = JSON.parse(storedRecords);
+          const foundRecord = records.find(r => r.id === recordId);
+          if (foundRecord) {
+            setRecord(foundRecord);
+            return;
+          }
+        }
+        setRecord(null);
       } catch (error) {
         console.error('Failed to load record from API, trying localStorage:', error);
         try {

@@ -754,7 +754,12 @@ async function recordRoutes(app2) {
       return reply.code(404).send({ error: "Object not found" });
     }
     const requiredFields = object.fields.filter((f) => f.required);
-    const missingFields = requiredFields.filter((f) => data[f.apiName] === void 0 || data[f.apiName] === null);
+    const missingFields = requiredFields.filter((f) => {
+      const prefixed = data[f.apiName];
+      const unprefixedKey = f.apiName.replace(/^[A-Za-z]+__/, "");
+      const unprefixed = data[unprefixedKey];
+      return (prefixed === void 0 || prefixed === null) && (unprefixed === void 0 || unprefixed === null);
+    });
     if (missingFields.length > 0) {
       return reply.code(400).send({
         error: "Missing required fields",

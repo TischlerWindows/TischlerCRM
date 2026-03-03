@@ -121,8 +121,15 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     // Validate required fields — only reject if value is undefined or null
+    // Support both prefixed (e.g., "TestObject__name") and unprefixed ("name") keys in data
     const requiredFields = object.fields.filter((f) => f.required);
-    const missingFields = requiredFields.filter((f) => data[f.apiName] === undefined || data[f.apiName] === null);
+    const missingFields = requiredFields.filter((f) => {
+      const prefixed = data[f.apiName];
+      // Also check unprefixed: strip "ObjectName__" prefix from field apiName
+      const unprefixedKey = f.apiName.replace(/^[A-Za-z]+__/, '');
+      const unprefixed = data[unprefixedKey];
+      return (prefixed === undefined || prefixed === null) && (unprefixed === undefined || unprefixed === null);
+    });
 
     if (missingFields.length > 0) {
       return reply.code(400).send({
