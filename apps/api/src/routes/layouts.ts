@@ -36,8 +36,8 @@ export async function layoutRoutes(app: FastifyInstance) {
   app.get('/objects/:apiName/layouts', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
       include: {
         pageLayouts: {
           where: { isActive: true },
@@ -109,8 +109,8 @@ export async function layoutRoutes(app: FastifyInstance) {
 
     const userId = (req as any).user.sub;
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
       include: {
         fields: true,
       },

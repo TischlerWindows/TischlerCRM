@@ -157,8 +157,8 @@ async function objectRoutes(app2) {
   });
   app2.get("/objects/:apiName", async (req, reply) => {
     const { apiName } = req.params;
-    const object = await prisma2.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma2.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         fields: {
           where: { isActive: true },
@@ -275,8 +275,8 @@ var updateFieldSchema = createFieldSchema.omit({ objectApiName: true }).partial(
 async function fieldRoutes(app2) {
   app2.get("/objects/:apiName/fields", async (req, reply) => {
     const { apiName } = req.params;
-    const object = await prisma3.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma3.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         fields: {
           where: { isActive: true },
@@ -304,8 +304,8 @@ async function fieldRoutes(app2) {
       return reply.code(400).send(parsed.error.flatten());
     }
     const userId = req.user.sub;
-    const object = await prisma3.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma3.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -345,8 +345,8 @@ async function fieldRoutes(app2) {
       return reply.code(400).send(parsed.error.flatten());
     }
     const userId = req.user.sub;
-    const object = await prisma3.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma3.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -375,8 +375,8 @@ async function fieldRoutes(app2) {
   app2.delete("/objects/:apiName/fields/:fieldApiName", async (req, reply) => {
     const { apiName, fieldApiName } = req.params;
     const userId = req.user.sub;
-    const object = await prisma3.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma3.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -427,8 +427,8 @@ var updateLayoutSchema = createLayoutSchema.omit({ objectApiName: true }).partia
 async function layoutRoutes(app2) {
   app2.get("/objects/:apiName/layouts", async (req, reply) => {
     const { apiName } = req.params;
-    const object = await prisma4.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma4.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         pageLayouts: {
           where: { isActive: true },
@@ -488,8 +488,8 @@ async function layoutRoutes(app2) {
       return reply.code(400).send(parsed.error.flatten());
     }
     const userId = req.user.sub;
-    const object = await prisma4.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma4.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         fields: true
       }
@@ -658,8 +658,8 @@ async function recordRoutes(app2) {
   app2.get("/objects/:apiName/records", async (req, reply) => {
     const { apiName } = req.params;
     const { limit = 50, offset = 0 } = req.query;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -697,8 +697,8 @@ async function recordRoutes(app2) {
   });
   app2.get("/objects/:apiName/records/:recordId", async (req, reply) => {
     const { apiName, recordId } = req.params;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -742,8 +742,8 @@ async function recordRoutes(app2) {
     const { data, pageLayoutId } = req.body;
     req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, "CREATE RECORD request");
     const userId = req.user.sub;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         fields: {
           where: { isActive: true }
@@ -792,8 +792,8 @@ async function recordRoutes(app2) {
     const body = req.body;
     const updateData = body.data || body;
     const userId = req.user.sub;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
         fields: {
           where: { isActive: true }
@@ -843,8 +843,8 @@ async function recordRoutes(app2) {
   });
   app2.delete("/objects/:apiName/records/:recordId", async (req, reply) => {
     const { apiName, recordId } = req.params;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });
@@ -866,8 +866,8 @@ async function recordRoutes(app2) {
   app2.get("/objects/:apiName/records/search", async (req, reply) => {
     const { apiName } = req.params;
     const { q } = req.query;
-    const object = await prisma5.customObject.findUnique({
-      where: { apiName }
+    const object = await prisma5.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
     if (!object) {
       return reply.code(404).send({ error: "Object not found" });

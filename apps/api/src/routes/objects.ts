@@ -57,8 +57,8 @@ export async function objectRoutes(app: FastifyInstance) {
   // Get single object by apiName
   app.get('/objects/:apiName', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
       include: {
         fields: {
           where: { isActive: true },

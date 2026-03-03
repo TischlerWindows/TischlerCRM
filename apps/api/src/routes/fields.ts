@@ -29,8 +29,8 @@ export async function fieldRoutes(app: FastifyInstance) {
   app.get('/objects/:apiName/fields', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
       include: {
         fields: {
           where: { isActive: true },
@@ -65,8 +65,8 @@ export async function fieldRoutes(app: FastifyInstance) {
 
     const userId = (req as any).user.sub;
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
     });
 
     if (!object) {
@@ -114,8 +114,8 @@ export async function fieldRoutes(app: FastifyInstance) {
 
     const userId = (req as any).user.sub;
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
     });
 
     if (!object) {
@@ -152,8 +152,8 @@ export async function fieldRoutes(app: FastifyInstance) {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
     const userId = (req as any).user.sub;
 
-    const object = await prisma.customObject.findUnique({
-      where: { apiName },
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
     });
 
     if (!object) {
