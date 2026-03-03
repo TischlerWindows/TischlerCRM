@@ -11,7 +11,7 @@ import path2 from "path";
 import fs from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { dirname } from "path";
-import { prisma as prisma8 } from "@crm/db/client";
+import { prisma as prisma9 } from "@crm/db/client";
 import { z as z6 } from "zod";
 
 // src/auth.ts
@@ -1621,6 +1621,223 @@ async function dashboardRoutes(app2) {
   );
 }
 
+// src/routes/backup.ts
+import { prisma as prisma8 } from "@crm/db/client";
+async function backupRoutes(app2) {
+  async function exportAllData() {
+    const [
+      users,
+      objects,
+      fields,
+      relationships,
+      layouts,
+      layoutTabs,
+      layoutSections,
+      layoutFields,
+      records,
+      reports,
+      dashboards,
+      loginEvents
+    ] = await Promise.all([
+      prisma8.user.findMany(),
+      prisma8.customObject.findMany(),
+      prisma8.customField.findMany(),
+      prisma8.relationship.findMany(),
+      prisma8.pageLayout.findMany(),
+      prisma8.layoutTab.findMany(),
+      prisma8.layoutSection.findMany(),
+      prisma8.layoutField.findMany(),
+      prisma8.record.findMany(),
+      prisma8.report.findMany(),
+      prisma8.dashboard.findMany(),
+      prisma8.loginEvent.findMany()
+    ]);
+    const tables = {
+      users,
+      objects,
+      fields,
+      relationships,
+      layouts,
+      layoutTabs,
+      layoutSections,
+      layoutFields,
+      records,
+      reports,
+      dashboards,
+      loginEvents
+    };
+    const counts = {};
+    for (const [key, arr] of Object.entries(tables)) {
+      counts[key] = arr.length;
+    }
+    return { tables, counts };
+  }
+  async function ensureBackupTable() {
+    await prisma8.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BackupSnapshot" (
+        "id"          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "name"        TEXT NOT NULL,
+        "data"        JSONB NOT NULL DEFAULT '{}',
+        "sizeMB"      TEXT NOT NULL DEFAULT '0',
+        "tables"      JSONB NOT NULL DEFAULT '{}',
+        "status"      TEXT NOT NULL DEFAULT 'completed',
+        "createdById" TEXT NOT NULL,
+        "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  }
+  app2.post("/admin/backup", async (req, reply) => {
+    const userId = req.user.sub;
+    try {
+      await ensureBackupTable();
+      const { tables, counts } = await exportAllData();
+      const jsonStr = JSON.stringify(tables);
+      const sizeMB = (Buffer.byteLength(jsonStr, "utf8") / 1024 / 1024).toFixed(2);
+      const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      const name = `backup-${timestamp}`;
+      await prisma8.$executeRawUnsafe(
+        `INSERT INTO "BackupSnapshot" ("id", "name", "data", "sizeMB", "tables", "status", "createdById", "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2::jsonb, $3, $4::jsonb, 'completed', $5, NOW())`,
+        name,
+        jsonStr,
+        sizeMB,
+        JSON.stringify(counts),
+        userId
+      );
+      await prisma8.$executeRawUnsafe(`
+        DELETE FROM "BackupSnapshot"
+        WHERE "id" NOT IN (
+          SELECT "id" FROM "BackupSnapshot"
+          ORDER BY "createdAt" DESC
+          LIMIT 30
+        )
+      `);
+      reply.send({
+        success: true,
+        name,
+        sizeMB,
+        tables: counts
+      });
+    } catch (error) {
+      req.log.error(error, "Backup failed");
+      reply.code(500).send({ error: error.message });
+    }
+  });
+  app2.get("/admin/backups", async (req, reply) => {
+    try {
+      await ensureBackupTable();
+      const backups = await prisma8.$queryRawUnsafe(`
+        SELECT "id", "name", "sizeMB", "tables", "status", "createdById", "createdAt"
+        FROM "BackupSnapshot"
+        ORDER BY "createdAt" DESC
+        LIMIT 50
+      `);
+      reply.send({ backups });
+    } catch (error) {
+      req.log.error(error, "Failed to list backups");
+      reply.code(500).send({ error: error.message });
+    }
+  });
+  app2.get("/admin/backups/:backupId", async (req, reply) => {
+    const { backupId } = req.params;
+    try {
+      await ensureBackupTable();
+      const rows = await prisma8.$queryRawUnsafe(
+        `SELECT "id", "name", "data", "sizeMB", "tables", "status", "createdAt"
+         FROM "BackupSnapshot" WHERE "id" = $1 LIMIT 1`,
+        backupId
+      );
+      if (!rows.length) {
+        return reply.code(404).send({ error: "Backup not found" });
+      }
+      const backup = rows[0];
+      reply.header("Content-Type", "application/json").header("Content-Disposition", `attachment; filename="${backup.name}.json"`).send(backup.data);
+    } catch (error) {
+      req.log.error(error, "Failed to download backup");
+      reply.code(500).send({ error: error.message });
+    }
+  });
+  app2.delete("/admin/backups/:backupId", async (req, reply) => {
+    const { backupId } = req.params;
+    try {
+      await ensureBackupTable();
+      const result = await prisma8.$executeRawUnsafe(
+        `DELETE FROM "BackupSnapshot" WHERE "id" = $1`,
+        backupId
+      );
+      if (result === 0) {
+        return reply.code(404).send({ error: "Backup not found" });
+      }
+      reply.send({ success: true });
+    } catch (error) {
+      req.log.error(error, "Failed to delete backup");
+      reply.code(500).send({ error: error.message });
+    }
+  });
+  app2.post("/admin/backups/:backupId/restore", async (req, reply) => {
+    const { backupId } = req.params;
+    try {
+      await ensureBackupTable();
+      const rows = await prisma8.$queryRawUnsafe(
+        `SELECT "data" FROM "BackupSnapshot" WHERE "id" = $1 LIMIT 1`,
+        backupId
+      );
+      if (!rows.length) {
+        return reply.code(404).send({ error: "Backup not found" });
+      }
+      const data = typeof rows[0].data === "string" ? JSON.parse(rows[0].data) : rows[0].data;
+      await prisma8.$transaction([
+        prisma8.loginEvent.deleteMany(),
+        prisma8.record.deleteMany(),
+        prisma8.layoutField.deleteMany(),
+        prisma8.layoutSection.deleteMany(),
+        prisma8.layoutTab.deleteMany(),
+        prisma8.pageLayout.deleteMany(),
+        prisma8.relationship.deleteMany(),
+        prisma8.customField.deleteMany(),
+        prisma8.customObject.deleteMany(),
+        prisma8.dashboard.deleteMany(),
+        prisma8.report.deleteMany()
+        // Note: Users are NOT deleted — we keep current users intact
+      ]);
+      if (data.objects?.length) {
+        await prisma8.customObject.createMany({ data: data.objects, skipDuplicates: true });
+      }
+      if (data.fields?.length) {
+        await prisma8.customField.createMany({ data: data.fields, skipDuplicates: true });
+      }
+      if (data.relationships?.length) {
+        await prisma8.relationship.createMany({ data: data.relationships, skipDuplicates: true });
+      }
+      if (data.layouts?.length) {
+        await prisma8.pageLayout.createMany({ data: data.layouts, skipDuplicates: true });
+      }
+      if (data.layoutTabs?.length) {
+        await prisma8.layoutTab.createMany({ data: data.layoutTabs, skipDuplicates: true });
+      }
+      if (data.layoutSections?.length) {
+        await prisma8.layoutSection.createMany({ data: data.layoutSections, skipDuplicates: true });
+      }
+      if (data.layoutFields?.length) {
+        await prisma8.layoutField.createMany({ data: data.layoutFields, skipDuplicates: true });
+      }
+      if (data.records?.length) {
+        await prisma8.record.createMany({ data: data.records, skipDuplicates: true });
+      }
+      if (data.reports?.length) {
+        await prisma8.report.createMany({ data: data.reports, skipDuplicates: true });
+      }
+      if (data.dashboards?.length) {
+        await prisma8.dashboard.createMany({ data: data.dashboards, skipDuplicates: true });
+      }
+      reply.send({ success: true, message: `Database restored from backup` });
+    } catch (error) {
+      req.log.error(error, "Restore failed");
+      reply.code(500).send({ error: error.message });
+    }
+  });
+}
+
 // src/app.ts
 var __filename = fileURLToPath2(import.meta.url);
 var __dirname2 = dirname(__filename);
@@ -1643,11 +1860,11 @@ function buildApp() {
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma8.user.findUnique({ where: { email: parsed.data.email } });
+    const existing = await prisma9.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     try {
       const passwordHash = hashPassword(parsed.data.password);
-      const user = await prisma8.user.create({
+      const user = await prisma9.user.create({
         data: {
           email: parsed.data.email,
           name: parsed.data.name,
@@ -1682,7 +1899,7 @@ function buildApp() {
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const ip = (forwardedIp ? forwardedIp.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";
     const userAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
-    await prisma8.loginEvent.create({
+    await prisma9.loginEvent.create({
       data: {
         userId: user.id,
         accountId: parsed.data.accountId ?? null,
@@ -1699,7 +1916,7 @@ function buildApp() {
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const events = await prisma8.loginEvent.findMany({
+    const events = await prisma9.loginEvent.findMany({
       where: parsed.data.accountId ? { accountId: parsed.data.accountId } : void 0,
       take: parsed.data.take ?? 100,
       orderBy: { createdAt: "desc" },
@@ -1723,14 +1940,14 @@ function buildApp() {
     req.user = payload;
   });
   app2.get("/accounts", async (req, reply) => {
-    const accounts = await prisma8.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
+    const accounts = await prisma9.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
     reply.send(accounts);
   });
   const accountSchema = z6.object({ name: z6.string().min(1), domain: z6.string().optional().nullable(), ownerId: z6.string().uuid() });
   app2.post("/accounts", async (req, reply) => {
     const parsed = accountSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const created = await prisma8.account.create({ data: parsed.data });
+    const created = await prisma9.account.create({ data: parsed.data });
     reply.code(201).send(created);
   });
   const accountUpdate = accountSchema.partial();
@@ -1738,12 +1955,12 @@ function buildApp() {
     const id = req.params.id;
     const parsed = accountUpdate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const updated = await prisma8.account.update({ where: { id }, data: parsed.data });
+    const updated = await prisma9.account.update({ where: { id }, data: parsed.data });
     reply.send(updated);
   });
   app2.delete("/accounts/:id", async (req, reply) => {
     const id = req.params.id;
-    await prisma8.account.delete({ where: { id } });
+    await prisma9.account.delete({ where: { id } });
     reply.code(204).send();
   });
   app2.register(objectRoutes);
@@ -1752,6 +1969,7 @@ function buildApp() {
   app2.register(recordRoutes);
   app2.register(reportRoutes);
   app2.register(dashboardRoutes);
+  app2.register(backupRoutes);
   return app2;
 }
 

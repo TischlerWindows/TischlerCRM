@@ -24,6 +24,7 @@ const setupSections = [
     items: [
       { name: 'Users', href: '/settings/users' },
       { name: 'Data', href: '/settings/data' },
+      { name: 'Backups', href: '/settings/backups' },
       { name: 'Email', href: '/settings/email' },
       { name: 'Objects and Fields', href: '/object-manager' },
       { name: 'Events', href: '/settings/events' },

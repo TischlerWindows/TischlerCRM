@@ -272,6 +272,31 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+  // Backups
+  async createBackup() {
+    return this.request<any>('/admin/backup', { method: 'POST' });
+  }
+
+  async getBackups() {
+    return this.request<{ backups: any[] }>('/admin/backups');
+  }
+
+  async downloadBackup(backupId: string) {
+    const url = `${this.baseUrl}/admin/backups/${backupId}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+    return res.json();
+  }
+
+  async deleteBackup(backupId: string) {
+    return this.request<void>(`/admin/backups/${backupId}`, { method: 'DELETE' });
+  }
+
+  async restoreBackup(backupId: string) {
+    return this.request<any>(`/admin/backups/${backupId}/restore`, { method: 'POST' });
+  }
 }
 
 // Export singleton instance
