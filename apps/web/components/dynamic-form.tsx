@@ -47,26 +47,46 @@ export default function DynamicForm({
 }: DynamicFormProps) {
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
-    // Initialize form data from recordData, constructing composite values
-    // from individual sub-fields if the composite key is missing.
+    // Initialize form data from recordData.
+    // Records may store data with UNPREFIXED keys (e.g. "address") because
+    // create handlers strip the object prefix (e.g. "Property__address" → "address").
+    // The form renders fields via their prefixed apiName from the schema, so we
+    // must ensure BOTH key variants exist in formData for lookups to succeed.
     const data = { ...recordData };
     const obj = schema?.objects.find((o) => o.apiName === objectApiName);
-    if (obj && layoutType === 'edit') {
+    if (obj) {
+      // Mirror every field value so both prefixed and unprefixed keys are present
       for (const field of obj.fields) {
-        if (field.type === 'CompositeText' && field.subFields && !data[field.apiName]) {
-          const composite: Record<string, any> = {};
-          for (const sf of field.subFields) {
-            const val = data[sf.apiName] || data[sf.apiName.replace(/^[A-Za-z]+__/, '')];
-            if (val) composite[sf.apiName] = val;
+        const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+        if (stripped !== field.apiName) {
+          if (data[stripped] !== undefined && data[field.apiName] === undefined) {
+            data[field.apiName] = data[stripped];
           }
-          // Also try common unprefixed keys for Contact Name
-          if (field.apiName === 'Contact__name') {
-            if (!composite.Contact__name_firstName && data.firstName) composite.Contact__name_firstName = data.firstName;
-            if (!composite.Contact__name_lastName && data.lastName) composite.Contact__name_lastName = data.lastName;
-            if (!composite.Contact__name_salutation && data.salutation) composite.Contact__name_salutation = data.salutation;
+          if (data[field.apiName] !== undefined && data[stripped] === undefined) {
+            data[stripped] = data[field.apiName];
           }
-          if (Object.keys(composite).length > 0) {
-            data[field.apiName] = composite;
+        }
+      }
+
+      // Construct composite values from individual sub-fields if the
+      // composite key is missing (e.g. Contact Name from first/last).
+      if (layoutType === 'edit') {
+        for (const field of obj.fields) {
+          if (field.type === 'CompositeText' && field.subFields && !data[field.apiName]) {
+            const composite: Record<string, any> = {};
+            for (const sf of field.subFields) {
+              const val = data[sf.apiName] || data[sf.apiName.replace(/^[A-Za-z]+__/, '')];
+              if (val) composite[sf.apiName] = val;
+            }
+            // Also try common unprefixed keys for Contact Name
+            if (field.apiName === 'Contact__name') {
+              if (!composite.Contact__name_firstName && data.firstName) composite.Contact__name_firstName = data.firstName;
+              if (!composite.Contact__name_lastName && data.lastName) composite.Contact__name_lastName = data.lastName;
+              if (!composite.Contact__name_salutation && data.salutation) composite.Contact__name_salutation = data.salutation;
+            }
+            if (Object.keys(composite).length > 0) {
+              data[field.apiName] = composite;
+            }
           }
         }
       }
