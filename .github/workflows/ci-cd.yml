@@ -1,10 +1,9 @@
 name: CI/CD Pipeline
 
+# Disabled — Railway handles deployments directly.
+# Run manually from Actions tab if needed.
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   build:

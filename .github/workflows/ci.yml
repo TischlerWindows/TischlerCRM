@@ -1,10 +1,9 @@
 name: CI
 
+# Disabled — Railway handles deployments directly.
+# Run manually from Actions tab if needed.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-test:
