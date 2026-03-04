@@ -273,23 +273,25 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     const activeId = active.id.toString();
     const overId = over.id.toString();
 
-    // Case 0: Dropping into an empty column
-    if (overId.includes('-col-') && activeId.startsWith('field-')) {
-      const fieldApiName = activeId.replace('field-', '');
+    // Case 0: Dropping into a column drop zone (empty area)
+    if (overId.includes('-col-')) {
       const colMatch = overId.match(/^(.+)-col-(\d+)$/);
+      if (!colMatch) return;
       
-      if (colMatch) {
-        const targetSectionId = colMatch[1];
-        const targetColumn = parseInt(colMatch[2]);
-        
-        // Find the highest order in this column
-        const columnFields = fields.filter(
-          (f) => f.sectionId === targetSectionId && f.column === targetColumn
-        );
-        const maxOrder = columnFields.length > 0 
-          ? Math.max(...columnFields.map(f => f.order)) 
-          : -1;
-        
+      const targetSectionId = colMatch[1];
+      const targetColumn = parseInt(colMatch[2]);
+      
+      // Find the highest order in this column
+      const columnFields = fields.filter(
+        (f) => f.sectionId === targetSectionId && f.column === targetColumn
+      );
+      const maxOrder = columnFields.length > 0 
+        ? Math.max(...columnFields.map(f => f.order)) 
+        : -1;
+
+      if (activeId.startsWith('field-')) {
+        // Dragging a new field from palette
+        const fieldApiName = activeId.replace('field-', '');
         const newField: CanvasField = {
           id: `placed-${Date.now()}-${fieldApiName}`,
           fieldApiName,
@@ -298,6 +300,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           order: maxOrder + 1,
         };
         setFields([...fields, newField]);
+      } else if (activeId.startsWith('placed-')) {
+        // Moving an existing placed field to this column
+        setFields(fields.map((f) =>
+          f.id === activeId
+            ? { ...f, sectionId: targetSectionId, column: targetColumn, order: maxOrder + 1 }
+            : f
+        ));
       }
       return;
     }
@@ -362,24 +371,20 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       return;
     }
 
-    // Case 2: Reordering a placed field within same section and column
+    // Case 2: Reordering / moving a placed field (within or across columns/sections)
     if (activeId.startsWith('placed-')) {
       const activeField = fields.find((f) => f.id === activeId);
       if (!activeField) return;
 
-      // Only allow reordering within same section and column
-      if (activeField.sectionId !== overField.sectionId || activeField.column !== overField.column) {
-        return;
-      }
+      const targetSectionId = overField.sectionId;
+      const targetColumn = overField.column;
 
+      // Get fields in the TARGET column (excluding the field being moved)
       const columnFields = fields
-        .filter((f) => f.sectionId === activeField.sectionId && f.column === activeField.column)
+        .filter((f) => f.sectionId === targetSectionId && f.column === targetColumn && f.id !== activeId)
         .sort((a, b) => a.order - b.order);
       
-      const activeIndexInColumn = columnFields.findIndex((f) => f.id === activeId);
       const overIndexInColumn = columnFields.findIndex((f) => f.id === overId);
-      
-      if (activeIndexInColumn === -1 || overIndexInColumn === -1) return;
       
       let newOrder = overField.order;
       
@@ -400,7 +405,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       }
       
       const updatedFields = fields.map((f) => 
-        f.id === activeId ? { ...f, order: newOrder } : f
+        f.id === activeId
+          ? { ...f, sectionId: targetSectionId, column: targetColumn, order: newOrder }
+          : f
       );
       
       setFields(updatedFields);
