@@ -10,6 +10,15 @@ module.exports = {
       colors: {
         primary: '#f5f5f4',
         secondary: '#9f9fa2',
+        brand: {
+          red: '#da291c',
+          navy: '#151f6d',
+          'navy-light': '#1e2a7a',
+          'navy-dark': '#0f1754',
+          gray: '#9f9fa2',
+          light: '#f5f5f4',
+          dark: '#293241',
+        },
       },
       animation: {
         'in': 'in 0.2s ease-out',

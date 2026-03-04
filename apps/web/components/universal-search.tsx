@@ -53,7 +53,7 @@ const typeConfig = {
   },
 };
 
-export default function UniversalSearch({ inputClassName }: { inputClassName?: string }) {
+export default function UniversalSearch({ inputClassName, iconClassName }: { inputClassName?: string; iconClassName?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -341,7 +341,7 @@ export default function UniversalSearch({ inputClassName }: { inputClassName?: s
   return (
     <div ref={searchRef} className="relative flex-1 max-w-2xl">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", iconClassName)} />
         <input
           ref={inputRef}
           type="text"
@@ -355,7 +355,7 @@ export default function UniversalSearch({ inputClassName }: { inputClassName?: s
           onKeyDown={handleKeyDown}
           placeholder="Search properties, accounts, contacts, leads, deals, projects..."
           className={cn(
-            'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:text-white text-sm',
+            'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 bg-white dark:bg-gray-800 dark:text-white text-sm',
             inputClassName
           )}
           aria-label="Universal search"

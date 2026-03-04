@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'TCES',
-  description: 'tishcler crm prototype'
+  title: 'Tischler CRM',
+  description: 'Tischler und Sohn CRM — Custom Windows & Doors',
 };
 
 import type { ReactNode } from 'react';
