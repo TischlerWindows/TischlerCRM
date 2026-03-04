@@ -110,7 +110,8 @@ export default function DynamicForm({
   // If layoutId is provided, use it; otherwise fall back to finding by layoutType
   const layout = layoutId
     ? object?.pageLayouts?.find((l) => l.id === layoutId)
-    : object?.pageLayouts?.find((l) => l.layoutType === layoutType);
+    : object?.pageLayouts?.find((l) => l.layoutType === layoutType)
+      || object?.pageLayouts?.[0]; // fall back to first available layout
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab && layout.tabs[0]) {
@@ -749,35 +750,34 @@ export default function DynamicForm({
                 }, 150);
               }}
             />
-            {isLookupActive && filteredRecords.length > 0 && (
+            {isLookupActive && (
               <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                {filteredRecords.slice(0, 20).map((record) => {
-                  const label = getRecordLabel(record);
-                  const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
-                  return (
-                    <button
-                      key={record.id}
-                      type="button"
-                      onClick={() => {
-                        handleFieldChange(fieldDef.apiName, record.id);
-                        setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: displayLabel }));
-                        setActiveLookupField(null);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
-                    >
-                      <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
-                      <div className="text-xs text-gray-500">{record.id}</div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            {isLookupActive && filteredRecords.length === 0 && lookupQuery && (
-              <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
-                <div className="px-3 py-2 text-xs text-gray-500">No matches found.</div>
+                {filteredRecords.length > 0 ? (
+                  filteredRecords.slice(0, 20).map((record) => {
+                    const label = getRecordLabel(record);
+                    const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
+                    return (
+                      <button
+                        key={record.id}
+                        type="button"
+                        onClick={() => {
+                          handleFieldChange(fieldDef.apiName, record.id);
+                          setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: displayLabel }));
+                          setActiveLookupField(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
+                        <div className="text-xs text-gray-500">{record.id}</div>
+                      </button>
+                    );
+                  })
+                ) : lookupQuery ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">No matches found.</div>
+                ) : null}
                 {targetApi && (() => {
                   const targetObj = schema?.objects.find((o) => o.apiName === targetApi);
-                  const label = targetObj?.label || targetApi;
+                  const createLabel = targetObj?.label || targetApi;
                   return (
                     <button
                       type="button"
@@ -788,7 +788,7 @@ export default function DynamicForm({
                       }}
                       className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
                     >
-                      + Create new {label}
+                      + Create new {createLabel}
                     </button>
                   );
                 })()}
