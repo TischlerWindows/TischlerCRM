@@ -27,6 +27,7 @@ import {
   CheckSquare,
   List,
   Link as LinkIcon,
+  Layout,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -105,6 +106,7 @@ export default function DynamicForm({
   // Inline record creation from lookup fields
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null); // object apiName to create
   const [inlineCreateForField, setInlineCreateForField] = useState<string | null>(null); // which lookup field triggered it
+  const [inlineCreateLayoutId, setInlineCreateLayoutId] = useState<string | null>(null); // selected layout for inline create
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
   // If layoutId is provided, use it; otherwise fall back to finding by layoutType
@@ -987,9 +989,60 @@ export default function DynamicForm({
       </div>
     </form>
 
-      {/* Inline record creation dialog for lookup fields */}
-      {inlineCreateTarget && (
-        <Dialog open={true} onOpenChange={(open) => { if (!open) { setInlineCreateTarget(null); setInlineCreateForField(null); } }}>
+      {/* Inline record creation — layout selector step */}
+      {inlineCreateTarget && !inlineCreateLayoutId && (() => {
+        const targetObj = schema?.objects.find((o) => o.apiName === inlineCreateTarget);
+        const targetLayouts = targetObj?.pageLayouts || [];
+        // If only one layout (or none), skip selector and go straight to form
+        if (targetLayouts.length <= 1) {
+          const autoLayoutId = targetLayouts[0]?.id || null;
+          // Use a microtask to avoid setting state during render
+          queueMicrotask(() => setInlineCreateLayoutId(autoLayoutId));
+          return null;
+        }
+        return (
+          <Dialog open={true} onOpenChange={(open) => { if (!open) { setInlineCreateTarget(null); setInlineCreateForField(null); } }}>
+            <DialogContent className="max-w-md p-0">
+              <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                <DialogTitle>Select a Page Layout</DialogTitle>
+                <p className="text-sm text-gray-600 mt-1">
+                  Choose which form layout to use for creating a new {targetObj?.label || inlineCreateTarget}
+                </p>
+              </DialogHeader>
+              <div className="p-6 space-y-3">
+                {targetLayouts.map((tl) => (
+                  <button
+                    key={tl.id}
+                    type="button"
+                    onClick={() => setInlineCreateLayoutId(tl.id)}
+                    className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
+                  >
+                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Layout className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900">{tl.name}</div>
+                      <div className="text-sm text-gray-500 mt-1">
+                        {tl.tabs?.length || 0} {(tl.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} •{' '}
+                        {tl.tabs?.reduce((acc: number, tab: any) => acc + (tab.sections?.length || 0), 0) || 0} sections
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="p-6 border-t border-gray-200 flex justify-end">
+                <Button type="button" variant="outline" onClick={() => { setInlineCreateTarget(null); setInlineCreateForField(null); }}>
+                  Cancel
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* Inline record creation — form step */}
+      {inlineCreateTarget && inlineCreateLayoutId && (
+        <Dialog open={true} onOpenChange={(open) => { if (!open) { setInlineCreateTarget(null); setInlineCreateForField(null); setInlineCreateLayoutId(null); } }}>
           <DialogContent className="max-w-4xl max-h-[90vh] p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle>
@@ -1000,11 +1053,12 @@ export default function DynamicForm({
               <DynamicForm
                 objectApiName={inlineCreateTarget!}
                 layoutType="create"
+                layoutId={inlineCreateLayoutId}
                 onSubmit={async (data, inlineLayoutId) => {
                   try {
                     const created = await recordsService.createRecord(inlineCreateTarget!, {
                       data,
-                      pageLayoutId: inlineLayoutId,
+                      pageLayoutId: inlineLayoutId || inlineCreateLayoutId,
                     });
                     if (created && inlineCreateForField) {
                       handleFieldChange(inlineCreateForField, created.id);
@@ -1018,8 +1072,9 @@ export default function DynamicForm({
                   }
                   setInlineCreateTarget(null);
                   setInlineCreateForField(null);
+                  setInlineCreateLayoutId(null);
                 }}
-                onCancel={() => { setInlineCreateTarget(null); setInlineCreateForField(null); }}
+                onCancel={() => { setInlineCreateTarget(null); setInlineCreateForField(null); setInlineCreateLayoutId(null); }}
               />
             </div>
           </DialogContent>
