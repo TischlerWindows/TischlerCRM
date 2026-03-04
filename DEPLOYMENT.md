@@ -30,37 +30,6 @@ This is a modern full-stack CRM built with:
 └─────────────────────────────────────────┘
 ```
 
-## Quick Start (Development)
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm 9.0.0+
-- PostgreSQL 13+
-
-### Setup
-
-```bash
-# Install dependencies
-pnpm install
-
-# Configure environment variables
-cp .env.example .env.local
-
-# Setup database
-pnpm exec tsx apps/api/seed-full.ts
-
-# Start development servers
-pnpm dev
-```
-
-**Access:**
-- Frontend: http://localhost:3000
-- API: http://localhost:4000
-- Credentials: 
-  - Admin: `admin@crm.local` / `admin123`
-  - Demo: `test@example.com` / `password123`
-
 ## Production Deployment - Railway
 
 ### Option 1: Auto-Deploy via GitHub
@@ -141,7 +110,7 @@ PORT=4000
 - [ ] All tests passing
 - [ ] Code reviewed and merged to `main`
 - [ ] Environment variables documented
-- [ ] Database migrations tested locally
+- [ ] Database migrations tested against Railway staging
 - [ ] API endpoints tested with Postman/curl
 
 ### Deployment
