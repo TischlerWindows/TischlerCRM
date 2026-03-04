@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSchemaStore } from '@/lib/schema-store';
 import { PageLayout, FieldDef, FieldType, ObjectDef } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,7 @@ export default function DynamicForm({
   onSubmit,
   onCancel,
 }: DynamicFormProps) {
+  const router = useRouter();
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
     // Initialize form data from recordData.
@@ -768,8 +770,28 @@ export default function DynamicForm({
               </div>
             )}
             {isLookupActive && filteredRecords.length === 0 && lookupQuery && (
-              <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-500 shadow-lg">
-                No matches found.
+              <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
+                <div className="px-3 py-2 text-xs text-gray-500">No matches found.</div>
+                {targetApi && (() => {
+                  const routeMap: Record<string, string> = {
+                    Contact: '/contacts', Account: '/accounts', Property: '/properties',
+                    Lead: '/leads', Deal: '/deals', Product: '/products',
+                    Project: '/projects', Quote: '/quotes', Service: '/service',
+                    Installation: '/installations',
+                  };
+                  const targetObj = schema?.objects.find((o) => o.apiName === targetApi);
+                  const label = targetObj?.label || targetApi;
+                  const route = routeMap[targetApi] || `/objects/${targetApi.toLowerCase()}`;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => router.push(route)}
+                      className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
+                    >
+                      + Create new {label}
+                    </button>
+                  );
+                })()}
               </div>
             )}
           </div>
