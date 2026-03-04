@@ -1,14 +1,15 @@
 ﻿'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSchemaStore } from '@/lib/schema-store';
 import { PageLayout, FieldDef, FieldType, ObjectDef } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility } from '@/lib/field-visibility';
+import { recordsService } from '@/lib/records-service';
 import {
   ChevronDown,
   ChevronRight,
@@ -46,7 +47,6 @@ export default function DynamicForm({
   onSubmit,
   onCancel,
 }: DynamicFormProps) {
-  const router = useRouter();
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
     // Initialize form data from recordData.
@@ -102,6 +102,9 @@ export default function DynamicForm({
   const [activeTab, setActiveTab] = useState<string>('');
   const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
   const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
+  // Inline record creation from lookup fields
+  const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null); // object apiName to create
+  const [inlineCreateForField, setInlineCreateForField] = useState<string | null>(null); // which lookup field triggered it
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
   // If layoutId is provided, use it; otherwise fall back to finding by layoutType
@@ -773,19 +776,16 @@ export default function DynamicForm({
               <div className="absolute z-20 mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg">
                 <div className="px-3 py-2 text-xs text-gray-500">No matches found.</div>
                 {targetApi && (() => {
-                  const routeMap: Record<string, string> = {
-                    Contact: '/contacts', Account: '/accounts', Property: '/properties',
-                    Lead: '/leads', Deal: '/deals', Product: '/products',
-                    Project: '/projects', Quote: '/quotes', Service: '/service',
-                    Installation: '/installations',
-                  };
                   const targetObj = schema?.objects.find((o) => o.apiName === targetApi);
                   const label = targetObj?.label || targetApi;
-                  const route = routeMap[targetApi] || `/objects/${targetApi.toLowerCase()}`;
                   return (
                     <button
                       type="button"
-                      onClick={() => router.push(route)}
+                      onClick={() => {
+                        setInlineCreateTarget(targetApi);
+                        setInlineCreateForField(fieldDef.apiName);
+                        setActiveLookupField(null);
+                      }}
                       className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
                     >
                       + Create new {label}
@@ -883,6 +883,7 @@ export default function DynamicForm({
   if (!currentTab) return null;
 
   return (
+    <>
     <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
       {/* Tabs - Only show if there are multiple tabs */}
       {layout.tabs.length > 1 && (
@@ -985,5 +986,45 @@ export default function DynamicForm({
         </Button>
       </div>
     </form>
+
+      {/* Inline record creation dialog for lookup fields */}
+      {inlineCreateTarget && (
+        <Dialog open={true} onOpenChange={(open) => { if (!open) { setInlineCreateTarget(null); setInlineCreateForField(null); } }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <DialogTitle>
+                Create New {schema?.objects.find((o) => o.apiName === inlineCreateTarget)?.label || inlineCreateTarget}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="overflow-hidden" style={{ height: 'calc(90vh - 80px)' }}>
+              <DynamicForm
+                objectApiName={inlineCreateTarget!}
+                layoutType="create"
+                onSubmit={async (data, inlineLayoutId) => {
+                  try {
+                    const created = await recordsService.createRecord(inlineCreateTarget!, {
+                      data,
+                      pageLayoutId: inlineLayoutId,
+                    });
+                    if (created && inlineCreateForField) {
+                      handleFieldChange(inlineCreateForField, created.id);
+                      const flat = recordsService.flattenRecord(created);
+                      const label = getRecordLabel(flat);
+                      setLookupQueries((prev) => ({ ...prev, [inlineCreateForField!]: typeof label === 'string' ? label : String(label) }));
+                    }
+                  } catch (err) {
+                    console.error('Inline create failed:', err);
+                    throw err;
+                  }
+                  setInlineCreateTarget(null);
+                  setInlineCreateForField(null);
+                }}
+                onCancel={() => { setInlineCreateTarget(null); setInlineCreateForField(null); }}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
