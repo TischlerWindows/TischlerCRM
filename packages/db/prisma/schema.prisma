@@ -34,6 +34,7 @@ model User {
   createdDashboards   Dashboard[]     @relation("CreatedDashboards")
   modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
   loginEvents         LoginEvent[]
+  preferences         UserPreference[]
 }
 
 model LoginEvent {
@@ -379,4 +380,27 @@ model DashboardWidget {
   updatedAt       DateTime @updatedAt
 
   @@index([dashboardId])
+}
+
+// ============================================
+// Settings & User Preferences
+// ============================================
+
+model Setting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
 }

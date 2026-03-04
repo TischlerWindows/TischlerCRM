@@ -34,6 +34,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Account {
   id: string;
@@ -168,12 +169,14 @@ export default function AccountsPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('accountSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('accountSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -184,38 +187,30 @@ export default function AccountsPage() {
     console.log('✅ Has Page Layout:', hasPageLayout);
   }, [accountObject, pageLayouts, hasPageLayout]);
 
-  // Load saved tab configuration
+  // Load saved tab configuration and custom objects from API
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
-        console.error('Error loading tab configuration:', e);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    // Load available objects from object-manager
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        }));
+      
+      // Load available objects from schema store
+      if (schema?.objects) {
+        const objectTabs = schema.objects
+          .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Deal', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
+          .map((obj: any) => ({
+            name: obj.label,
+            href: `/${obj.apiName.toLowerCase()}`
+          }));
         setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
       }
-    }
-    
-    setIsLoaded(true);
-  }, []);
+      
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   // Fetch accounts from API
   const fetchAccounts = useCallback(async () => {
@@ -245,27 +240,25 @@ export default function AccountsPage() {
       }));
       setAccounts(flattenedRecords as Account[]);
     } catch (error) {
-      console.error('Failed to fetch accounts from API, falling back to localStorage:', error);
-      const storedAccounts = localStorage.getItem('accounts');
-      if (storedAccounts) {
-        setAccounts(JSON.parse(storedAccounts));
-      }
+      console.error('Failed to fetch accounts from API:', error);
     } finally {
       setLoading(false);
     }
   }, [schema]);
 
   useEffect(() => {
-    // Load visible columns from localStorage or use defaults
-    const storedColumns = localStorage.getItem('accountsVisibleColumns');
-    if (storedColumns) {
-      setVisibleColumns(JSON.parse(storedColumns));
-    } else {
-      const defaultColumns = AVAILABLE_COLUMNS
-        .filter(col => col.defaultVisible)
-        .map(col => col.id);
-      setVisibleColumns(defaultColumns);
-    }
+    // Load visible columns from preferences or use defaults
+    (async () => {
+      const storedColumns = await getPreference<string[]>('accountsVisibleColumns');
+      if (storedColumns) {
+        setVisibleColumns(storedColumns);
+      } else {
+        const defaultColumns = AVAILABLE_COLUMNS
+          .filter(col => col.defaultVisible)
+          .map(col => col.id);
+        setVisibleColumns(defaultColumns);
+      }
+    })();
 
     // Fetch accounts from API
     fetchAccounts();
@@ -351,7 +344,7 @@ export default function AccountsPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('accountsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('accountsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -375,14 +368,14 @@ export default function AccountsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('accountsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('accountsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('accountsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('accountsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -390,7 +383,7 @@ export default function AccountsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('accountsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('accountsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -398,7 +391,7 @@ export default function AccountsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('accountsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('accountsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -489,7 +482,6 @@ export default function AccountsPage() {
         console.error('Failed to delete account:', error);
         const updatedAccounts = accounts.filter(a => a.id !== id);
         setAccounts(updatedAccounts);
-        localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
       }
     }
   };
@@ -499,13 +491,12 @@ export default function AccountsPage() {
       a.id === id ? { ...a, isFavorite: !a.isFavorite } : a
     );
     setAccounts(updatedAccounts);
-    localStorage.setItem('accounts', JSON.stringify(updatedAccounts));
     setOpenDropdown(null);
   };
 
   // Tab management functions
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -855,7 +846,7 @@ export default function AccountsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('accountSelectedLayoutId', layout.id);
+                    setPreference('accountSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

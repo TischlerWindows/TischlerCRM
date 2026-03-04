@@ -26,6 +26,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useSchemaStore } from '@/lib/schema-store';
 import { FieldDef, PageLayout, PageTab, PageSection, FieldType, ConditionExpr } from '@/lib/schema';
+import { getSetting } from '@/lib/preferences';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -136,13 +137,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   useEffect(() => {
     if (objectApiName !== 'Home') return;
 
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
-    setHomeReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
+    (async () => {
+      const customReports = await getSetting<any[]>('customReports') || [];
+      setHomeReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
 
-    const savedDashboards = localStorage.getItem('dashboards');
-    const dashboards = savedDashboards ? JSON.parse(savedDashboards) : [];
-    setHomeDashboards(dashboards.map((d: any) => ({ id: d.id, name: d.name })));
+      const dashboards = await getSetting<any[]>('dashboards') || [];
+      setHomeDashboards(dashboards.map((d: any) => ({ id: d.id, name: d.name })));
+    })();
   }, [objectApiName]);
 
   // All fields (unfiltered) — used by getFieldDef to resolve layout field definitions
@@ -555,9 +556,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       recordTypes: updatedRecordTypes,
     });
 
-    // Immediately persist to localStorage
+    // Immediately persist via schema store
     await saveSchema();
-    console.log('Schema saved to localStorage');
+    console.log('Schema saved via API');
     const updatedObject = schema?.objects.find((o) => o.apiName === objectApiName);
     console.log('After update - object layouts:', updatedObject?.pageLayouts);
     alert(`Layout "${layoutName}" saved successfully!`);

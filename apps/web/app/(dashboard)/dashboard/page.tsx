@@ -43,11 +43,13 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { aggregateChartData, aggregateStackedChartData, getAvailableFields } from '@/lib/chart-data-utils';
+import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords } from '@/lib/chart-data-utils';
+import { recordsService } from '@/lib/records-service';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface DashboardWidget {
   id: string;
@@ -112,154 +114,6 @@ const FIELD_OPTIONS: Record<string, string[]> = {
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
-// Helper function to generate contextual data from localStorage or fallback to mock data
-const generateMockDataForObject = (objectType: string, xField: string, yField: string) => {
-  // Try to load real data from localStorage first
-  let records: any[] = [];
-  
-  // Try multiple naming conventions for localStorage keys
-  const possibleKeys = [
-    objectType,                          // e.g., "Property"
-    objectType.toLowerCase(),            // e.g., "property"
-    objectType.toLowerCase() + 's',      // e.g., "properties"
-    objectType + 's',                    // e.g., "Propertys" (unlikely but possible)
-  ];
-  
-  try {
-    for (const key of possibleKeys) {
-      const storedData = localStorage.getItem(key);
-      if (storedData) {
-        records = JSON.parse(storedData);
-        console.log(`📂 Loaded ${records.length} records from localStorage['${key}'] for ${objectType}`);
-        break;
-      }
-    }
-  } catch (e) {
-    console.error('Error loading from localStorage:', e);
-  }
-  
-  // Fallback to mock data if no real data exists
-  if (records.length === 0) {
-    console.log(`⚠️ No real data found for ${objectType}, using mock data`);
-    const mockDataMap: Record<string, any[]> = {
-      Property: [
-        { address: '123 Main St', propertyType: 'Residential', status: 'Available', squareFeet: 2500, bedrooms: 3, bathrooms: 2, price: 450000 },
-        { address: '456 Oak Ave', propertyType: 'Commercial', status: 'Sold', squareFeet: 5000, bedrooms: 0, bathrooms: 3, price: 850000 },
-        { address: '789 Pine Rd', propertyType: 'Residential', status: 'Pending', squareFeet: 1800, bedrooms: 2, bathrooms: 1, price: 320000 },
-        { address: '321 Elm Blvd', propertyType: 'Industrial', status: 'Available', squareFeet: 10000, bedrooms: 0, bathrooms: 2, price: 1200000 },
-        { address: '654 Maple Dr', propertyType: 'Residential', status: 'Available', squareFeet: 3200, bedrooms: 4, bathrooms: 3, price: 575000 },
-        { address: '987 Cedar Ln', propertyType: 'Commercial', status: 'Available', squareFeet: 7500, bedrooms: 0, bathrooms: 4, price: 950000 },
-      ],
-      properties: [ // Fallback for old naming convention
-        { address: '123 Main St', propertyType: 'Residential', status: 'Available', squareFeet: 2500, bedrooms: 3, bathrooms: 2, price: 450000 },
-        { address: '456 Oak Ave', propertyType: 'Commercial', status: 'Sold', squareFeet: 5000, bedrooms: 0, bathrooms: 3, price: 850000 },
-        { address: '789 Pine Rd', propertyType: 'Residential', status: 'Pending', squareFeet: 1800, bedrooms: 2, bathrooms: 1, price: 320000 },
-        { address: '321 Elm Blvd', propertyType: 'Industrial', status: 'Available', squareFeet: 10000, bedrooms: 0, bathrooms: 2, price: 1200000 },
-        { address: '654 Maple Dr', propertyType: 'Residential', status: 'Available', squareFeet: 3200, bedrooms: 4, bathrooms: 3, price: 575000 },
-        { address: '987 Cedar Ln', propertyType: 'Commercial', status: 'Available', squareFeet: 7500, bedrooms: 0, bathrooms: 4, price: 950000 },
-      ],
-      Contact: [
-        { name: 'John Smith', role: 'Manager', accountName: 'Acme Corp', email: 'john@acme.com' },
-        { name: 'Jane Doe', role: 'Developer', accountName: 'Tech Inc', email: 'jane@tech.com' },
-        { name: 'Bob Johnson', role: 'Manager', accountName: 'Global Ltd', email: 'bob@global.com' },
-        { name: 'Alice Brown', role: 'Sales', accountName: 'Acme Corp', email: 'alice@acme.com' },
-        { name: 'Charlie Wilson', role: 'Developer', accountName: 'Startup Co', email: 'charlie@startup.com' },
-      ],
-      contacts: [ // Fallback for old naming convention
-        { name: 'John Smith', role: 'Manager', accountName: 'Acme Corp', email: 'john@acme.com' },
-        { name: 'Jane Doe', role: 'Developer', accountName: 'Tech Inc', email: 'jane@tech.com' },
-        { name: 'Bob Johnson', role: 'Manager', accountName: 'Global Ltd', email: 'bob@global.com' },
-        { name: 'Alice Brown', role: 'Sales', accountName: 'Acme Corp', email: 'alice@acme.com' },
-        { name: 'Charlie Wilson', role: 'Developer', accountName: 'Startup Co', email: 'charlie@startup.com' },
-      ],
-      Deal: [
-        { dealName: 'Q1 Contract', stage: 'Prospecting', value: 50000, probability: 20, closeDate: '2024-03-15' },
-        { dealName: 'Enterprise Sale', stage: 'Qualification', value: 75000, probability: 40, closeDate: '2024-04-20' },
-        { dealName: 'Partner Deal', stage: 'Proposal', value: 120000, probability: 60, closeDate: '2024-05-10' },
-        { dealName: 'Upsell Opportunity', stage: 'Negotiation', value: 90000, probability: 80, closeDate: '2024-06-05' },
-        { dealName: 'New Account', stage: 'Closed Won', value: 150000, probability: 100, closeDate: '2024-02-28' },
-      ],
-      deals: [ // Fallback for old naming convention
-        { dealName: 'Q1 Contract', stage: 'Prospecting', value: 50000, probability: 20, closeDate: '2024-03-15' },
-        { dealName: 'Enterprise Sale', stage: 'Qualification', value: 75000, probability: 40, closeDate: '2024-04-20' },
-        { dealName: 'Partner Deal', stage: 'Proposal', value: 120000, probability: 60, closeDate: '2024-05-10' },
-        { dealName: 'Upsell Opportunity', stage: 'Negotiation', value: 90000, probability: 80, closeDate: '2024-06-05' },
-        { dealName: 'New Account', stage: 'Closed Won', value: 150000, probability: 100, closeDate: '2024-02-28' },
-      ],
-      Lead: [
-        { leadName: 'Marketing Campaign', stage: 'New', estimatedValue: 25000, source: 'Website', owner: 'John' },
-        { leadName: 'Referral Lead', stage: 'Contacted', estimatedValue: 30000, source: 'Referral', owner: 'Jane' },
-        { leadName: 'Trade Show', stage: 'Qualified', estimatedValue: 45000, source: 'Website', owner: 'Bob' },
-        { leadName: 'Cold Outreach', stage: 'New', estimatedValue: 20000, source: 'Cold Call', owner: 'Alice' },
-        { leadName: 'Partner Referral', stage: 'Qualified', estimatedValue: 60000, source: 'Referral', owner: 'Charlie' },
-      ],
-      leads: [ // Fallback for old naming convention
-        { leadName: 'Marketing Campaign', stage: 'New', estimatedValue: 25000, source: 'Website', owner: 'John' },
-        { leadName: 'Referral Lead', stage: 'Contacted', estimatedValue: 30000, source: 'Referral', owner: 'Jane' },
-        { leadName: 'Trade Show', stage: 'Qualified', estimatedValue: 45000, source: 'Website', owner: 'Bob' },
-        { leadName: 'Cold Outreach', stage: 'New', estimatedValue: 20000, source: 'Cold Call', owner: 'Alice' },
-        { leadName: 'Partner Referral', stage: 'Qualified', estimatedValue: 60000, source: 'Referral', owner: 'Charlie' },
-      ],
-      Project: [
-        { projectName: 'Website Redesign', status: 'Planning', budget: 100000, team: 'Marketing' },
-        { projectName: 'CRM Integration', status: 'In Progress', budget: 250000, team: 'Engineering' },
-        { projectName: 'Mobile App', status: 'Completed', budget: 180000, team: 'Product' },
-        { projectName: 'API Platform', status: 'In Progress', budget: 320000, team: 'Engineering' },
-      ],
-      projects: [ // Fallback for old naming convention
-        { projectName: 'Website Redesign', status: 'Planning', budget: 100000, team: 'Marketing' },
-        { projectName: 'CRM Integration', status: 'In Progress', budget: 250000, team: 'Engineering' },
-        { projectName: 'Mobile App', status: 'Completed', budget: 180000, team: 'Product' },
-        { projectName: 'API Platform', status: 'In Progress', budget: 320000, team: 'Engineering' },
-      ],
-    };
-    
-    records = mockDataMap[objectType] || mockDataMap[objectType.toLowerCase()] || mockDataMap[objectType.toLowerCase() + 's'] || [];
-  }
-  
-  if (records.length === 0) return [];
-  
-  // Strip object prefix from field names (e.g., "Property__address" -> "address")
-  const stripPrefix = (fieldName: string, objectType: string) => {
-    const prefix = `${objectType}__`;
-    if (fieldName.startsWith(prefix)) {
-      return fieldName.substring(prefix.length);
-    }
-    return fieldName;
-  };
-  
-  const cleanXField = stripPrefix(xField, objectType);
-  const cleanYField = stripPrefix(yField, objectType);
-  
-  console.log(`🔧 Field mapping: ${xField} -> ${cleanXField}, ${yField} -> ${cleanYField}`);
-  
-  // Group by X field and aggregate Y field  
-  const groups: Record<string, number[]> = {};
-  records.forEach((record: any) => {
-    const xValue = String(record[cleanXField] || 'Unknown');
-    
-    // Try to parse Y field as number, if it fails (string field), count it as 1
-    const yRawValue = record[cleanYField];
-    const yValue = typeof yRawValue === 'number' ? yRawValue : (parseFloat(yRawValue) || 1);
-    
-    if (!groups[xValue]) {
-      groups[xValue] = [];
-    }
-    groups[xValue].push(yValue);
-  });
-  
-  // Calculate sum for each group
-  const chartData = Object.entries(groups).map(([label, values]) => ({
-    label,
-    value: Math.round(values.reduce((sum, val) => sum + val, 0))
-  }));
-  
-  // Sort by value descending
-  chartData.sort((a, b) => b.value - a.value);
-  
-  return chartData.slice(0, 8);
-};
-
 export default function DashboardPage() {
   const pathname = usePathname();
   const [editMode, setEditMode] = useState(false);
@@ -310,33 +164,33 @@ export default function DashboardPage() {
   const [resizingWidget, setResizingWidget] = useState<{ id: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
+    (async () => {
       try {
-        const savedTabs = JSON.parse(savedTabsStr);
-        setTabs(savedTabs);
+        const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+        if (savedTabs) {
+          setTabs(savedTabs);
+        } else {
+          setTabs(defaultTabs);
+        }
       } catch (e) {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
 
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
       try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        }));
-        setAvailableObjects(objectTabs);
+        const objects = await getSetting<any[]>('customObjects');
+        if (objects) {
+          const objectTabs = objects.map((obj: any) => ({
+            name: obj.label,
+            href: `/${obj.apiName.toLowerCase()}`
+          }));
+          setAvailableObjects(objectTabs);
+        }
       } catch (e) {
         console.error('Error loading custom objects:', e);
       }
-    }
 
-    setIsLoaded(true);
+      setIsLoaded(true);
+    })();
   }, []);
 
   // Generate preview data based on widget config
@@ -353,7 +207,7 @@ export default function DashboardPage() {
         console.log('✅ Fetching stacked data for:', { objectType: selectedReport.objectType, xAxis: widgetConfig.xAxis, yAxis: widgetConfig.yAxis, stackBy: widgetConfig.stackBy });
         
         try {
-          // Use the stacked aggregation utility to get real data from localStorage
+          // Use the stacked aggregation utility to get real data from records cache
           const { data, stackKeys } = aggregateStackedChartData({
             objectType: selectedReport.objectType,
             xAxisField: widgetConfig.xAxis,
@@ -384,7 +238,7 @@ export default function DashboardPage() {
         console.log('✅ Fetching real data for:', { objectType: selectedReport.objectType, xAxis: widgetConfig.xAxis, yAxis: widgetConfig.yAxis });
         
         try {
-          // Use the aggregation utility to get real data from localStorage
+          // Use the aggregation utility to get real data from records cache
           const aggregatedData = aggregateChartData({
             objectType: selectedReport.objectType,
             xAxisField: widgetConfig.xAxis,
@@ -506,7 +360,7 @@ export default function DashboardPage() {
     const handleMouseUp = () => {
       setResizingWidget(null);
       if (selectedDashboard) {
-        localStorage.setItem('dashboards', JSON.stringify(dashboards));
+        setSetting('dashboards', dashboards);
       }
     };
 
@@ -520,33 +374,22 @@ export default function DashboardPage() {
   }, [resizingWidget, selectedDashboard, dashboards]);
 
   useEffect(() => {
-    // Load saved reports for widget data sources
-    const loadReports = () => {
-      const savedReports = localStorage.getItem('customReports');
-      if (savedReports) {
-        try {
-          const reports = JSON.parse(savedReports);
-          setAvailableReports(reports || []);
-        } catch (e) {
-          console.error('Error loading reports:', e);
-          setAvailableReports([]);
-        }
-      } else {
+    (async () => {
+      // Load saved reports for widget data sources
+      try {
+        const reports = await getSetting<any[]>('customReports');
+        setAvailableReports(reports || []);
+      } catch (e) {
+        console.error('Error loading reports:', e);
         setAvailableReports([]);
       }
-    };
 
-    loadReports();
-
-    // Load dashboards from localStorage
-    const savedDashboards = localStorage.getItem('dashboards');
-    if (savedDashboards) {
-      const parsed = JSON.parse(savedDashboards);
-      setDashboards(parsed);
-      if (parsed.length > 0) {
-        setSelectedDashboard(parsed[0]);
-      }
-    } else {
+      // Load dashboards from settings
+      const savedDashboards = await getSetting<any[]>('dashboards');
+      if (savedDashboards && savedDashboards.length > 0) {
+        setDashboards(savedDashboards);
+        setSelectedDashboard(savedDashboards[0]);
+      } else {
       // Create default dashboard
       const defaultDashboard: Dashboard = {
         id: '1',
@@ -632,10 +475,26 @@ export default function DashboardPage() {
       };
       setDashboards([defaultDashboard]);
       setSelectedDashboard(defaultDashboard);
-      localStorage.setItem('dashboards', JSON.stringify([defaultDashboard]));
+      setSetting('dashboards', [defaultDashboard]);
     }
     setLoading(false);
+    })();
   }, []);
+
+  // Load records from API into chart data cache for all report object types
+  useEffect(() => {
+    if (availableReports.length === 0) return;
+    const objectTypes = Array.from(new Set(availableReports.map((r: any) => r.objectType).filter(Boolean)));
+    objectTypes.forEach(async (objectType) => {
+      try {
+        const records = await recordsService.getRecords(objectType);
+        const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+        setCachedRecords(objectType, flatRecords);
+      } catch (e) {
+        console.error(`Failed to load records for ${objectType}:`, e);
+      }
+    });
+  }, [availableReports]);
 
   const handleCreateDashboard = (name: string, description: string) => {
     const newDashboard: Dashboard = {
@@ -650,7 +509,7 @@ export default function DashboardPage() {
     const updated = [...dashboards, newDashboard];
     setDashboards(updated);
     setSelectedDashboard(newDashboard);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
     setShowNewDashboard(false);
   };
 
@@ -661,21 +520,18 @@ export default function DashboardPage() {
       if (selectedDashboard?.id === id) {
         setSelectedDashboard(updated[0] || null);
       }
-      localStorage.setItem('dashboards', JSON.stringify(updated));
+      setSetting('dashboards', updated);
     }
   };
 
-  const handleSelectWidgetType = (type: string) => {
+  const handleSelectWidgetType = async (type: string) => {
     // Reload reports to ensure we have the latest
-    const savedReports = localStorage.getItem('customReports');
-    let reports = [];
-    if (savedReports) {
-      try {
-        reports = JSON.parse(savedReports);
-        setAvailableReports(reports || []);
-      } catch (e) {
-        console.error('Error loading reports:', e);
-      }
+    let reports: any[] = [];
+    try {
+      reports = (await getSetting<any[]>('customReports')) || [];
+      setAvailableReports(reports);
+    } catch (e) {
+      console.error('Error loading reports:', e);
     }
 
     setSelectedWidgetType(type);
@@ -743,7 +599,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
     setShowWidgetConfig(false);
     setSelectedWidgetType(null);
   };
@@ -760,7 +616,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
   };
 
   const handleRefreshWidget = (widget: DashboardWidget) => {
@@ -824,7 +680,7 @@ export default function DashboardPage() {
         const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
         setDashboards(updated);
         setSelectedDashboard(updatedDashboard);
-        localStorage.setItem('dashboards', JSON.stringify(updated));
+        setSetting('dashboards', updated);
 
         console.log(`✨ Refreshed stacked widget: ${widget.title} with ${data.length} data points and ${stackKeys.length} stacks`);
       } else {
@@ -858,7 +714,7 @@ export default function DashboardPage() {
         const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
         setDashboards(updated);
         setSelectedDashboard(updatedDashboard);
-        localStorage.setItem('dashboards', JSON.stringify(updated));
+        setSetting('dashboards', updated);
 
         console.log(`✨ Refreshed widget: ${widget.title} with ${aggregatedData.length} data points`);
       }
@@ -944,14 +800,14 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
     setShowWidgetConfig(false);
     setSelectedWidgetType(null);
     setEditingWidget(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
     setTabs(newTabs);
   };
 
@@ -1590,7 +1446,7 @@ export default function DashboardPage() {
       d.id === id ? { ...d, isFavorite: !d.isFavorite } : d
     );
     setDashboards(updated);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
   };
 
   const handleDuplicateDashboard = (dashboard: Dashboard) => {
@@ -1605,7 +1461,7 @@ export default function DashboardPage() {
     
     const updated = [...dashboards, newDashboard];
     setDashboards(updated);
-    localStorage.setItem('dashboards', JSON.stringify(updated));
+    setSetting('dashboards', updated);
   };
 
   const filteredDashboards = dashboards

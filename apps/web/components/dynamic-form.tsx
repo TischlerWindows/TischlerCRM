@@ -107,6 +107,7 @@ export default function DynamicForm({
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null); // object apiName to create
   const [inlineCreateForField, setInlineCreateForField] = useState<string | null>(null); // which lookup field triggered it
   const [inlineCreateLayoutId, setInlineCreateLayoutId] = useState<string | null>(null); // selected layout for inline create
+  const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
   // If layoutId is provided, use it; otherwise fall back to finding by layoutType
@@ -120,6 +121,37 @@ export default function DynamicForm({
       setActiveTab(layout.tabs[0].id);
     }
   }, [layout, activeTab]);
+
+  // Pre-load lookup records from API for all lookup fields in the layout
+  useEffect(() => {
+    if (!object || !layout) return;
+
+    const targetApis = new Set<string>();
+    layout.tabs.forEach(tab => {
+      tab.sections.forEach(section => {
+        section.fields.forEach(field => {
+          const fieldDef = object.fields.find(f => f.apiName === field.apiName);
+          if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup')) {
+            const relatedObject = (fieldDef as any).relatedObject as string | undefined;
+            const target = fieldDef.lookupObject || fieldDef.relationship?.targetObject || relatedObject;
+            if (target) targetApis.add(target);
+          }
+        });
+      });
+    });
+
+    if (targetApis.size === 0) return;
+
+    (async () => {
+      const entries = await Promise.all(
+        Array.from(targetApis).map(async (api) => {
+          const records = await recordsService.getRecords(api);
+          return [api, records.map(r => ({ id: r.id, ...r.data }))] as [string, any[]];
+        })
+      );
+      setLookupRecordsCache(Object.fromEntries(entries));
+    })();
+  }, [object, layout]);
 
   if (!object || !layout) {
     return (
@@ -141,24 +173,7 @@ export default function DynamicForm({
   };
 
   const getLookupRecords = (targetApi: string) => {
-    const targetObject = schema?.objects.find((o) => o.apiName === targetApi);
-    const base = targetApi.toLowerCase();
-    const pluralFromSchema = targetObject?.pluralLabel?.toLowerCase();
-    const plural = base.endsWith('y') ? `${base.slice(0, -1)}ies` : `${base}s`;
-    const keys = [targetApi, base, pluralFromSchema, plural].filter(Boolean) as string[];
-
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        try {
-          return JSON.parse(raw) as any[];
-        } catch {
-          return [];
-        }
-      }
-    }
-
-    return [] as any[];
+    return lookupRecordsCache[targetApi] || [];
   };
 
   const getRecordLabel = (record: any) => {

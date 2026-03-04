@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import PageHeader from '@/components/page-header';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getSetting, setSetting } from '@/lib/preferences';
+import { recordsService } from '@/lib/records-service';
 
 // Helper to format composite field values (Address, Name, etc.)
 const formatDisplayValue = (value: any): string => {
@@ -151,24 +153,7 @@ export default function ReportBuilderPage() {
       }
     }
     
-    // Fallback: Try to load from localStorage customObjects
-    try {
-      const storedObjects = localStorage.getItem('customObjects');
-      if (storedObjects) {
-        const customObjects = JSON.parse(storedObjects);
-        console.log('🔍 Custom objects in localStorage:', customObjects.map((obj: any) => obj.apiName));
-        const customObject = customObjects.find((obj: any) => obj.apiName === objectType);
-        if (customObject?.fields) {
-          const fields = customObject.fields.map((field: any) => field.apiName);
-          console.log(`✅ Loaded ${fields.length} fields from localStorage for ${objectType}:`, fields);
-          return fields;
-        }
-      }
-    } catch (e) {
-      console.error('Error loading from localStorage:', e);
-    }
-    
-    // Final fallback to hard-coded fields
+    // Fallback: schema not available yet, return hard-coded fields
     console.log(`⚠️ Using hard-coded fields for ${objectType}`);
     const fallback = OBJECT_TYPES.find(t => t.value === objectType);
     return fallback?.fields || [];
@@ -180,9 +165,8 @@ export default function ReportBuilderPage() {
     const editId = params.get('edit');
     
     if (editId) {
-      const existingReports = localStorage.getItem('customReports');
-      if (existingReports) {
-        const reports = JSON.parse(existingReports);
+      (async () => {
+        const reports = await getSetting<any[]>('customReports') || [];
         const reportToEdit = reports.find((r: any) => r.id === editId);
         
         if (reportToEdit) {
@@ -214,7 +198,7 @@ export default function ReportBuilderPage() {
             setGroups([{ id: '1', field: reportToEdit.groupBy }]);
           }
         }
-      }
+      })();
     }
   }, []);
 
@@ -244,54 +228,37 @@ export default function ReportBuilderPage() {
     };
   }, [isResizing]);
 
-  // Load real data from localStorage when columns or groups change
+  // Load real data from records service when columns or groups change
   useEffect(() => {
     if (objectType && columns.length > 0 && columns.every(c => c.field)) {
-      // Try to load real data from localStorage with multiple naming conventions
-      const possibleKeys = [
-        objectType,                          // e.g., "Property"
-        objectType.toLowerCase(),            // e.g., "property"
-        objectType.toLowerCase() + 's',      // e.g., "propertys"
-        // Handle proper pluralization
-        objectType.toLowerCase().endsWith('y') 
-          ? objectType.toLowerCase().slice(0, -1) + 'ies'  // "Property" -> "properties"
-          : objectType.toLowerCase() + 's',
-      ];
-      
-      let records: any[] = [];
-      
-      for (const key of possibleKeys) {
-        const rawData = localStorage.getItem(key);
-        if (rawData) {
-          try {
-            const allRecords = JSON.parse(rawData);
-            console.log(`📂 Preview: Loaded ${allRecords.length} records from localStorage['${key}']`);
-            
-            // Strip object prefix from field names when accessing data
-            const stripPrefix = (fieldName: string, objectType: string) => {
-              const prefix = `${objectType}__`;
-              if (fieldName.startsWith(prefix)) {
-                return fieldName.substring(prefix.length);
-              }
-              return fieldName;
-            };
-            
-            // Map records to use clean field names
-            records = allRecords.slice(0, 10).map((record: any) => {
-              const cleanRecord: any = {};
-              columns.forEach(col => {
-                const cleanField = stripPrefix(col.field, objectType);
-                cleanRecord[col.field] = record[cleanField] || record[col.field];
-              });
-              return cleanRecord;
+      (async () => {
+        let records: any[] = [];
+        
+        try {
+          const allRecords = await recordsService.getRecords(objectType, { limit: 10 });
+          console.log(`📂 Preview: Loaded ${allRecords.length} records from API for ${objectType}`);
+          
+          // Strip object prefix from field names when accessing data
+          const stripPrefix = (fieldName: string, objectType: string) => {
+            const prefix = `${objectType}__`;
+            if (fieldName.startsWith(prefix)) {
+              return fieldName.substring(prefix.length);
+            }
+            return fieldName;
+          };
+          
+          // Map records to use clean field names
+          records = allRecords.slice(0, 10).map((record: any) => {
+            const cleanRecord: any = {};
+            columns.forEach(col => {
+              const cleanField = stripPrefix(col.field, objectType);
+              cleanRecord[col.field] = record[cleanField] || record[col.field];
             });
-            
-            break;
-          } catch (e) {
-            console.error('Error parsing data:', e);
-          }
+            return cleanRecord;
+          });
+        } catch (e) {
+          console.error('Error loading records from API:', e);
         }
-      }
       
       // If no real data exists, generate sample data
       if (records.length === 0) {
@@ -337,6 +304,7 @@ export default function ReportBuilderPage() {
       }
       
       setPreviewData(records);
+      })();
     } else {
       setPreviewData([]);
     }
@@ -364,15 +332,14 @@ export default function ReportBuilderPage() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!reportName || !objectType || columns.length === 0) {
       alert('Please fill in required fields: Report Name, Object Type, and at least one column');
       return;
     }
 
     const today = new Date().toISOString().split('T')[0] || '';
-    const existingReports = localStorage.getItem('customReports');
-    const reports = existingReports ? JSON.parse(existingReports) : [];
+    const reports = await getSetting<any[]>('customReports') || [];
     
     if (reportId) {
       // Update existing report
@@ -413,11 +380,11 @@ export default function ReportBuilderPage() {
       reports.push(newReport);
     }
     
-    localStorage.setItem('customReports', JSON.stringify(reports));
+    await setSetting('customReports', reports);
     router.push('/reports');
   };
 
-  const handleRunReport = () => {
+  const handleRunReport = async () => {
     if (!objectType || columns.length === 0) {
       alert('Please select an object type and at least one column');
       return;
@@ -437,7 +404,7 @@ export default function ReportBuilderPage() {
       sortOrder: sortBy ? sortOrder : undefined,
     };
     
-    localStorage.setItem('tempReport', JSON.stringify(tempReport));
+    await setSetting('tempReport', tempReport);
     router.push('/reports/view/temp');
   };
 

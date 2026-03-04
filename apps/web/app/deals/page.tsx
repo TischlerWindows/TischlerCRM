@@ -33,6 +33,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Deal {
   id: string;
@@ -148,12 +149,14 @@ export default function DealsPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('dealSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('dealSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -165,30 +168,25 @@ export default function DealsPage() {
   }, [dealObject, pageLayouts, hasPageLayout]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        setTabs(JSON.parse(savedTabsStr));
-      } catch (e) {
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
+        setTabs(savedTabs);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
+
+      if (schema?.objects) {
+        const objects = schema.objects;
         setAvailableObjects(objects.map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
         })));
-      } catch (e) {}
-    }
-    
-    setIsLoaded(true);
-  }, []);
+      }
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   const fetchDeals = useCallback(async () => {
     try {
@@ -211,27 +209,25 @@ export default function DealsPage() {
       }));
       setDeals(flattenedRecords as Deal[]);
     } catch (error) {
-      console.error('Failed to fetch deals from API, falling back to localStorage:', error);
-      const storedDeals = localStorage.getItem('deals');
-      if (storedDeals) {
-        setDeals(JSON.parse(storedDeals));
-      }
+      console.error('Failed to fetch deals from API:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const storedColumns = localStorage.getItem('dealsVisibleColumns');
-    if (storedColumns) {
-      setVisibleColumns(JSON.parse(storedColumns));
-    } else {
-      const defaultColumns = AVAILABLE_COLUMNS
-        .filter(col => col.defaultVisible)
-        .map(col => col.id);
-      setVisibleColumns(defaultColumns);
-    }
-    fetchDeals();
+    (async () => {
+      const storedColumns = await getPreference<string[]>('dealsVisibleColumns');
+      if (storedColumns) {
+        setVisibleColumns(storedColumns);
+      } else {
+        const defaultColumns = AVAILABLE_COLUMNS
+          .filter(col => col.defaultVisible)
+          .map(col => col.id);
+        setVisibleColumns(defaultColumns);
+      }
+      fetchDeals();
+    })();
   }, [fetchDeals]);
 
   const handleSort = (columnId: string) => {
@@ -311,7 +307,7 @@ export default function DealsPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('dealsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('dealsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -335,14 +331,14 @@ export default function DealsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('dealsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('dealsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('dealsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('dealsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -350,7 +346,7 @@ export default function DealsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('dealsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('dealsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -358,7 +354,7 @@ export default function DealsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('dealsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('dealsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -457,7 +453,6 @@ export default function DealsPage() {
 
       const updatedDeals = [newDeal, ...deals];
       setDeals(updatedDeals);
-      localStorage.setItem('deals', JSON.stringify(updatedDeals));
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
@@ -474,12 +469,10 @@ export default function DealsPage() {
         await recordsService.deleteRecord('Deal', id);
         const updatedDeals = deals.filter(d => d.id !== id);
         setDeals(updatedDeals);
-        localStorage.setItem('deals', JSON.stringify(updatedDeals));
       } catch (error) {
         console.error('Failed to delete deal from API, trying locally:', error);
         const updatedDeals = deals.filter(d => d.id !== id);
         setDeals(updatedDeals);
-        localStorage.setItem('deals', JSON.stringify(updatedDeals));
       }
     }
   };
@@ -489,12 +482,11 @@ export default function DealsPage() {
       d.id === id ? { ...d, isFavorite: !d.isFavorite } : d
     );
     setDeals(updatedDeals);
-    localStorage.setItem('deals', JSON.stringify(updatedDeals));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -836,7 +828,7 @@ export default function DealsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('dealSelectedLayoutId', layout.id);
+                    setPreference('dealSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

@@ -34,6 +34,7 @@ import { applyFilters, describeCondition } from '@/lib/filter-utils';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Contact {
   id: string;
@@ -160,23 +161,25 @@ export default function ContactsPage() {
 
   // Load and persist layout selection
   useEffect(() => {
-    if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('contactSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else {
-        // Prefer the layout assigned to the default record type
-        const defaultRecordType = contactObject?.defaultRecordTypeId
-          ? contactObject.recordTypes?.find(rt => rt.id === contactObject.defaultRecordTypeId)
-          : contactObject?.recordTypes?.[0];
-        const rtLayoutId = defaultRecordType?.pageLayoutId;
-        if (rtLayoutId && pageLayouts.find(l => l.id === rtLayoutId)) {
-          setSelectedLayoutId(rtLayoutId);
-        } else if (pageLayouts.length > 0) {
-          setSelectedLayoutId(pageLayouts[0].id);
+    (async () => {
+      if (hasPageLayout && !selectedLayoutId) {
+        const savedLayoutId = await getPreference<string>('contactSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else {
+          // Prefer the layout assigned to the default record type
+          const defaultRecordType = contactObject?.defaultRecordTypeId
+            ? contactObject.recordTypes?.find(rt => rt.id === contactObject.defaultRecordTypeId)
+            : contactObject?.recordTypes?.[0];
+          const rtLayoutId = defaultRecordType?.pageLayoutId;
+          if (rtLayoutId && pageLayouts.find(l => l.id === rtLayoutId)) {
+            setSelectedLayoutId(rtLayoutId);
+          } else if (pageLayouts.length > 0) {
+            setSelectedLayoutId(pageLayouts[0].id);
+          }
         }
       }
-    }
+    })();
   }, [hasPageLayout, pageLayouts, selectedLayoutId, contactObject]);
 
   useEffect(() => {
@@ -184,35 +187,27 @@ export default function ContactsPage() {
   }, [loadSchema]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
-        console.error('Error loading tab configuration:', e);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        }));
+
+      if (schema?.objects) {
+        const objectTabs = schema.objects
+          .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Deal', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
+          .map((obj: any) => ({
+            name: obj.label,
+            href: `/${obj.apiName.toLowerCase()}`
+          }));
         setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
       }
-    }
-    
-    setIsLoaded(true);
-  }, []);
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   // Fetch contacts from API
   const fetchContacts = useCallback(async () => {
@@ -239,23 +234,21 @@ export default function ContactsPage() {
       }));
       setContacts(flattenedRecords as Contact[]);
     } catch (error) {
-      console.error('Failed to fetch contacts from API, falling back to localStorage:', error);
-      const storedContacts = localStorage.getItem('contacts');
-      if (storedContacts) {
-        setContacts(JSON.parse(storedContacts));
-      }
+      console.error('Failed to fetch contacts from API:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const savedColumns = localStorage.getItem('contactsVisibleColumns');
-    if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns));
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
-    }
+    (async () => {
+      const savedColumns = await getPreference<string[]>('contactsVisibleColumns');
+      if (savedColumns) {
+        setVisibleColumns(savedColumns);
+      } else {
+        setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
+      }
+    })();
 
     // Fetch contacts from API
     fetchContacts();
@@ -266,7 +259,7 @@ export default function ContactsPage() {
       ? visibleColumns.filter(id => id !== columnId)
       : [...visibleColumns, columnId];
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('contactsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -288,14 +281,14 @@ export default function ContactsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('contactsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('contactsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('contactsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -303,7 +296,7 @@ export default function ContactsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('contactsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('contactsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -311,7 +304,7 @@ export default function ContactsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('contactsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('contactsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -378,7 +371,6 @@ export default function ContactsPage() {
     if (confirm(`Delete ${selectedContacts.size} selected contacts?`)) {
       const updatedContacts = contacts.filter(c => !selectedContacts.has(c.id));
       setContacts(updatedContacts);
-      localStorage.setItem('contacts', JSON.stringify(updatedContacts));
       setSelectedContacts(new Set());
     }
   };
@@ -388,7 +380,6 @@ export default function ContactsPage() {
       selectedContacts.has(c.id) ? { ...c, isFavorite: true } : c
     );
     setContacts(updatedContacts);
-    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
     setSelectedContacts(new Set());
   };
 
@@ -514,7 +505,6 @@ export default function ContactsPage() {
         console.error('Failed to delete contact:', error);
         const updatedContacts = contacts.filter(c => c.id !== id);
         setContacts(updatedContacts);
-        localStorage.setItem('contacts', JSON.stringify(updatedContacts));
       }
     }
   };
@@ -524,12 +514,11 @@ export default function ContactsPage() {
       c.id === id ? { ...c, isFavorite: !c.isFavorite } : c
     );
     setContacts(updatedContacts);
-    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -925,7 +914,7 @@ export default function ContactsPage() {
             </div>
             <div className="p-6 space-y-3">
               {pageLayouts.map((layout) => (
-                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); localStorage.setItem('contactSelectedLayoutId', layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left">
+                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); setPreference('contactSelectedLayoutId', layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left">
                   <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
                     <Users className="w-5 h-5 text-brand-navy" />
                   </div>

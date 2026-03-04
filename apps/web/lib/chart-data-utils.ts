@@ -3,6 +3,25 @@
  * Handles data aggregation and transformation for dashboard charts
  */
 
+// In-memory records cache (populated by dashboard from API)
+const recordsCache: Record<string, any[]> = {};
+
+/**
+ * Set records in cache for a given object type (called after API fetch)
+ */
+export function setCachedRecords(objectType: string, records: any[]): void {
+  const key = getPluralObjectKey(objectType);
+  recordsCache[key] = records;
+}
+
+/**
+ * Get records from cache
+ */
+export function getCachedRecords(objectType: string): any[] {
+  const key = getPluralObjectKey(objectType);
+  return recordsCache[key] || [];
+}
+
 export interface ChartDataPoint {
   label: string;
   value: number;
@@ -35,7 +54,7 @@ export function stripFieldPrefix(fieldName: string): string {
 }
 
 /**
- * Get the plural form of an object type for localStorage key
+ * Get the plural form of an object type for cache/storage key
  * e.g., "Property" → "properties"
  */
 export function getPluralObjectKey(objectType: string): string {
@@ -98,24 +117,12 @@ function formatDisplayValue(value: any): string {
  * Groups records by X-axis field and aggregates Y-axis values
  */
 export function aggregateChartData(config: AggregationConfig): ChartDataPoint[] {
-  // Get records from localStorage
+  // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const recordsJson = localStorage.getItem(storageKey);
+  const records = recordsCache[storageKey] || [];
   
-  if (!recordsJson) {
+  if (records.length === 0) {
     console.warn(`No records found for ${storageKey}`);
-    return [];
-  }
-
-  let records: any[];
-  try {
-    records = JSON.parse(recordsJson);
-  } catch (e) {
-    console.error(`Failed to parse ${storageKey}:`, e);
-    return [];
-  }
-
-  if (!Array.isArray(records) || records.length === 0) {
     return [];
   }
 
@@ -323,24 +330,12 @@ export function getAvailableFields(objectType: string): string[] {
  * Groups records by X-axis field, then by stack field, and aggregates Y-axis values
  */
 export function aggregateStackedChartData(config: AggregationConfig): { data: StackedChartDataPoint[]; stackKeys: string[] } {
-  // Get records from localStorage
+  // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const recordsJson = localStorage.getItem(storageKey);
+  const records = recordsCache[storageKey] || [];
   
-  if (!recordsJson || !config.stackByField) {
+  if (records.length === 0 || !config.stackByField) {
     console.warn(`No records found for ${storageKey} or stackByField not provided`);
-    return { data: [], stackKeys: [] };
-  }
-
-  let records: any[];
-  try {
-    records = JSON.parse(recordsJson);
-  } catch (e) {
-    console.error(`Failed to parse ${storageKey}:`, e);
-    return { data: [], stackKeys: [] };
-  }
-
-  if (!Array.isArray(records) || records.length === 0) {
     return { data: [], stackKeys: [] };
   }
 

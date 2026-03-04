@@ -33,6 +33,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Project {
   id: string;
@@ -145,12 +146,14 @@ export default function ProjectsPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('projectSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('projectSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -162,38 +165,37 @@ export default function ProjectsPage() {
   }, [projectObject, pageLayouts, hasPageLayout]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        setTabs(JSON.parse(savedTabsStr));
-      } catch (e) {
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
+        setTabs(savedTabs);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        setAvailableObjects(objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        })));
-      } catch (e) {}
-    }
-    
-    setIsLoaded(true);
-  }, []);
+
+      if (schema?.objects) {
+        const customObjs = schema.objects
+          .filter((obj: any) => !['Project', 'Contact', 'Account', 'Lead', 'Deal', 'Quote', 'Installation', 'Service', 'Product', 'Property'].includes(obj.apiName))
+          .map((obj: any) => ({
+            name: obj.label,
+            href: `/${obj.apiName.toLowerCase()}`
+          }));
+        setAvailableObjects(customObjs);
+      }
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   useEffect(() => {
-    const savedColumns = localStorage.getItem('projectsVisibleColumns');
-    if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns));
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
-    }
+    (async () => {
+      const savedColumns = await getPreference<string[]>('projectsVisibleColumns');
+      if (savedColumns) {
+        setVisibleColumns(savedColumns);
+      } else {
+        setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
+      }
+    })();
   }, []);
 
   const fetchProjects = useCallback(async () => {
@@ -216,11 +218,7 @@ export default function ProjectsPage() {
       }));
       setProjects(flattenedRecords as Project[]);
     } catch (error) {
-      console.error('Failed to fetch projects from API, falling back to localStorage:', error);
-      const storedProjects = localStorage.getItem('projects');
-      if (storedProjects) {
-        setProjects(JSON.parse(storedProjects));
-      }
+      console.error('Failed to fetch projects from API:', error);
     } finally {
       setLoading(false);
     }
@@ -235,7 +233,7 @@ export default function ProjectsPage() {
       ? visibleColumns.filter(id => id !== columnId)
       : [...visibleColumns, columnId];
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('projectsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('projectsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -257,14 +255,14 @@ export default function ProjectsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('projectsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('projectsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('projectsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('projectsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -272,7 +270,7 @@ export default function ProjectsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('projectsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('projectsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -280,7 +278,7 @@ export default function ProjectsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('projectsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('projectsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -433,7 +431,6 @@ export default function ProjectsPage() {
 
       const updatedProjects = [newProject, ...projects];
       setProjects(updatedProjects);
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
@@ -450,12 +447,10 @@ export default function ProjectsPage() {
         await recordsService.deleteRecord('Project', id);
         const updatedProjects = projects.filter(p => p.id !== id);
         setProjects(updatedProjects);
-        localStorage.setItem('projects', JSON.stringify(updatedProjects));
       } catch (error) {
         console.error('Failed to delete project from API, trying locally:', error);
         const updatedProjects = projects.filter(p => p.id !== id);
         setProjects(updatedProjects);
-        localStorage.setItem('projects', JSON.stringify(updatedProjects));
       }
     }
   };
@@ -465,12 +460,11 @@ export default function ProjectsPage() {
       p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
     );
     setProjects(updatedProjects);
-    localStorage.setItem('projects', JSON.stringify(updatedProjects));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -819,7 +813,7 @@ export default function ProjectsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('projectSelectedLayoutId', layout.id);
+                    setPreference('projectSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

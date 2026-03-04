@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Filter, X, Plus, Save, Trash2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPreference, setPreference } from '@/lib/preferences';
 
 export interface FilterCondition {
   id: string;
@@ -82,16 +83,18 @@ export default function AdvancedFilters({
   const [presetName, setPresetName] = useState('');
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
 
-  // Load presets from localStorage
+  // Load presets from API
   useEffect(() => {
-    const stored = localStorage.getItem(`${storageKey}_filter_presets`);
-    if (stored) {
+    (async () => {
       try {
-        setPresets(JSON.parse(stored));
+        const stored = await getPreference<FilterPreset[]>(`${storageKey}_filter_presets`);
+        if (stored) {
+          setPresets(stored);
+        }
       } catch (e) {
         console.error('Error loading filter presets:', e);
       }
-    }
+    })();
   }, [storageKey]);
 
   const addCondition = () => {
@@ -136,7 +139,7 @@ export default function AdvancedFilters({
 
     const updatedPresets = [...presets, newPreset];
     setPresets(updatedPresets);
-    localStorage.setItem(`${storageKey}_filter_presets`, JSON.stringify(updatedPresets));
+    setPreference(`${storageKey}_filter_presets`, updatedPresets);
     setPresetName('');
     setShowSavePreset(false);
     setSelectedPreset(newPreset.id);
@@ -151,7 +154,7 @@ export default function AdvancedFilters({
   const deletePreset = (presetId: string) => {
     const updatedPresets = presets.filter(p => p.id !== presetId);
     setPresets(updatedPresets);
-    localStorage.setItem(`${storageKey}_filter_presets`, JSON.stringify(updatedPresets));
+    setPreference(`${storageKey}_filter_presets`, updatedPresets);
     if (selectedPreset === presetId) {
       setSelectedPreset(null);
     }

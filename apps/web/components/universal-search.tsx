@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Users, Building2, Lightbulb, Target, Briefcase, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { recordsService } from '@/lib/records-service';
 
 interface SearchResult {
   id: string;
@@ -63,7 +64,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
   const router = useRouter();
 
   // Search across all record types
-  const performSearch = (query: string) => {
+  const performSearch = async (query: string) => {
     if (!query.trim()) {
       setResults([]);
       return;
@@ -72,203 +73,196 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
     const lowerQuery = query.toLowerCase();
     const allResults: SearchResult[] = [];
 
+    // Fetch all record types in parallel from API
+    const [rawProperties, rawAccounts, rawContacts, rawLeads, rawDeals, rawProjects] = await Promise.all([
+      recordsService.getRecords('Property'),
+      recordsService.getRecords('Account'),
+      recordsService.getRecords('Contact'),
+      recordsService.getRecords('Lead'),
+      recordsService.getRecords('Deal'),
+      recordsService.getRecords('Project'),
+    ]);
+
+    const properties = rawProperties.map(r => ({ id: r.id, ...r.data }));
+    const accounts = rawAccounts.map(r => ({ id: r.id, ...r.data }));
+    const contacts = rawContacts.map(r => ({ id: r.id, ...r.data }));
+    const leads = rawLeads.map(r => ({ id: r.id, ...r.data }));
+    const deals = rawDeals.map(r => ({ id: r.id, ...r.data }));
+    const projects = rawProjects.map(r => ({ id: r.id, ...r.data }));
+
     // Search Properties
-    const storedProperties = localStorage.getItem('properties');
-    if (storedProperties) {
-      const properties = JSON.parse(storedProperties);
-      properties.forEach((property: any) => {
-        const matchedFields: string[] = [];
-        const searchableFields = {
-          propertyNumber: property.propertyNumber,
-          address: property.address,
-          city: property.city,
-          state: property.state,
-          zipCode: property.zipCode,
-          status: property.status,
-        };
+    properties.forEach((property: any) => {
+      const matchedFields: string[] = [];
+      const searchableFields = {
+        propertyNumber: property.propertyNumber,
+        address: property.address,
+        city: property.city,
+        state: property.state,
+        zipCode: property.zipCode,
+        status: property.status,
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: property.id,
-            type: 'property',
-            title: property.propertyNumber,
-            subtitle: `${property.address}, ${property.city}, ${property.state}`,
-            url: `/properties/${property.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: property.id,
+          type: 'property',
+          title: property.propertyNumber,
+          subtitle: `${property.address}, ${property.city}, ${property.state}`,
+          url: `/properties/${property.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     // Search Accounts
-    const storedAccounts = localStorage.getItem('accounts');
-    if (storedAccounts) {
-      const accounts = JSON.parse(storedAccounts);
-      accounts.forEach((account: any) => {
-        const matchedFields: string[] = [];
-        const searchableFields = {
-          name: account.name,
-          domain: account.domain,
-          industry: account.industry,
-          type: account.type,
-        };
+    accounts.forEach((account: any) => {
+      const matchedFields: string[] = [];
+      const searchableFields = {
+        name: account.name,
+        domain: account.domain,
+        industry: account.industry,
+        type: account.type,
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: account.id,
-            type: 'account',
-            title: account.name,
-            subtitle: account.domain || account.industry || 'Account',
-            url: `/accounts/${account.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: account.id,
+          type: 'account',
+          title: account.name,
+          subtitle: account.domain || account.industry || 'Account',
+          url: `/accounts/${account.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     // Search Contacts
-    const storedContacts = localStorage.getItem('contacts');
-    if (storedContacts) {
-      const contacts = JSON.parse(storedContacts);
-      contacts.forEach((contact: any) => {
-        const matchedFields: string[] = [];
-        const fullName = `${contact.firstName} ${contact.lastName}`;
-        const searchableFields = {
-          name: fullName,
-          email: contact.email,
-          phone: contact.phone,
-          title: contact.title,
-          company: contact.company,
-        };
+    contacts.forEach((contact: any) => {
+      const matchedFields: string[] = [];
+      const fullName = `${contact.firstName} ${contact.lastName}`;
+      const searchableFields = {
+        name: fullName,
+        email: contact.email,
+        phone: contact.phone,
+        title: contact.title,
+        company: contact.company,
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: contact.id,
-            type: 'contact',
-            title: fullName,
-            subtitle: contact.email || contact.title || 'Contact',
-            url: `/contacts/${contact.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: contact.id,
+          type: 'contact',
+          title: fullName,
+          subtitle: contact.email || contact.title || 'Contact',
+          url: `/contacts/${contact.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     // Search Leads
-    const storedLeads = localStorage.getItem('leads');
-    if (storedLeads) {
-      const leads = JSON.parse(storedLeads);
-      leads.forEach((lead: any) => {
-        const matchedFields: string[] = [];
-        const fullName = `${lead.firstName} ${lead.lastName}`;
-        const searchableFields = {
-          name: fullName,
-          email: lead.email,
-          company: lead.company,
-          status: lead.status,
-          source: lead.source,
-        };
+    leads.forEach((lead: any) => {
+      const matchedFields: string[] = [];
+      const fullName = `${lead.firstName} ${lead.lastName}`;
+      const searchableFields = {
+        name: fullName,
+        email: lead.email,
+        company: lead.company,
+        status: lead.status,
+        source: lead.source,
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: lead.id,
-            type: 'lead',
-            title: fullName,
-            subtitle: lead.company || lead.email || 'Lead',
-            url: `/leads/${lead.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: lead.id,
+          type: 'lead',
+          title: fullName,
+          subtitle: lead.company || lead.email || 'Lead',
+          url: `/leads/${lead.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     // Search Deals
-    const storedDeals = localStorage.getItem('deals');
-    if (storedDeals) {
-      const deals = JSON.parse(storedDeals);
-      deals.forEach((deal: any) => {
-        const matchedFields: string[] = [];
-        const searchableFields = {
-          name: deal.name,
-          accountName: deal.accountName,
-          stage: deal.stage,
-          amount: deal.amount?.toString(),
-        };
+    deals.forEach((deal: any) => {
+      const matchedFields: string[] = [];
+      const searchableFields = {
+        name: deal.name,
+        accountName: deal.accountName,
+        stage: deal.stage,
+        amount: deal.amount?.toString(),
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: deal.id,
-            type: 'deal',
-            title: deal.name,
-            subtitle: `${deal.accountName} - ${deal.stage}`,
-            url: `/deals/${deal.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: deal.id,
+          type: 'deal',
+          title: deal.name,
+          subtitle: `${deal.accountName} - ${deal.stage}`,
+          url: `/deals/${deal.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     // Search Projects
-    const storedProjects = localStorage.getItem('projects');
-    if (storedProjects) {
-      const projects = JSON.parse(storedProjects);
-      projects.forEach((project: any) => {
-        const matchedFields: string[] = [];
-        const searchableFields = {
-          name: project.name,
-          status: project.status,
-          client: project.client,
-          type: project.type,
-        };
+    projects.forEach((project: any) => {
+      const matchedFields: string[] = [];
+      const searchableFields = {
+        name: project.name,
+        status: project.status,
+        client: project.client,
+        type: project.type,
+      };
 
-        Object.entries(searchableFields).forEach(([field, value]) => {
-          if (value && String(value).toLowerCase().includes(lowerQuery)) {
-            matchedFields.push(field);
-          }
-        });
-
-        if (matchedFields.length > 0) {
-          allResults.push({
-            id: project.id,
-            type: 'project',
-            title: project.name,
-            subtitle: project.client || project.status || 'Project',
-            url: `/projects/${project.id}`,
-            matchedFields,
-          });
+      Object.entries(searchableFields).forEach(([field, value]) => {
+        if (value && String(value).toLowerCase().includes(lowerQuery)) {
+          matchedFields.push(field);
         }
       });
-    }
+
+      if (matchedFields.length > 0) {
+        allResults.push({
+          id: project.id,
+          type: 'project',
+          title: project.name,
+          subtitle: project.client || project.status || 'Project',
+          url: `/projects/${project.id}`,
+          matchedFields,
+        });
+      }
+    });
 
     setResults(allResults);
   };

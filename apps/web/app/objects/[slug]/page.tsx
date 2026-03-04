@@ -27,6 +27,7 @@ import { useAuth } from '@/lib/auth-context';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface CustomRecord {
   id: string;
@@ -116,16 +117,18 @@ export default function CustomObjectRecordsPage() {
   // Load saved layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem(`${slug}SelectedLayoutId`);
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0 && pageLayouts[0]) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>(`${slug}SelectedLayoutId`);
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0 && pageLayouts[0]) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId, slug]);
 
-  // Load records from API with localStorage fallback
+  // Load records from API
   useEffect(() => {
     const loadRecords = async () => {
       try {
@@ -134,19 +137,9 @@ export default function CustomObjectRecordsPage() {
         if (apiRecords && apiRecords.length > 0) {
           const flatRecords = apiRecords.map(r => recordsService.flattenRecord(r) as CustomRecord);
           setRecords(flatRecords);
-        } else {
-          // Try localStorage fallback
-          const savedRecords = localStorage.getItem(storageKey);
-          if (savedRecords) {
-            try { setRecords(JSON.parse(savedRecords)); } catch { setRecords([]); }
-          }
         }
       } catch (error) {
         console.error('Failed to load records from API:', error);
-        const savedRecords = localStorage.getItem(storageKey);
-        if (savedRecords) {
-          try { setRecords(JSON.parse(savedRecords)); } catch { setRecords([]); }
-        }
       } finally {
         setLoading(false);
       }
@@ -154,24 +147,22 @@ export default function CustomObjectRecordsPage() {
     loadRecords();
   }, [storageKey, slug, objectDef]);
 
-  // Load visible columns from localStorage
+  // Load visible columns from preferences
   useEffect(() => {
-    const savedColumns = localStorage.getItem(`${slug}VisibleColumns`);
-    if (savedColumns) {
-      try {
-        setVisibleColumns(JSON.parse(savedColumns));
-      } catch {
+    (async () => {
+      const savedColumns = await getPreference<string[]>(`${slug}VisibleColumns`);
+      if (savedColumns && Array.isArray(savedColumns)) {
+        setVisibleColumns(savedColumns);
+      } else {
         setVisibleColumns(AVAILABLE_COLUMNS.filter(c => c.defaultVisible).map(c => c.id));
       }
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(c => c.defaultVisible).map(c => c.id));
-    }
+    })();
   }, [AVAILABLE_COLUMNS, slug]);
 
-  // Save visible columns to localStorage
+  // Save visible columns to preferences
   useEffect(() => {
     if (visibleColumns.length > 0) {
-      localStorage.setItem(`${slug}VisibleColumns`, JSON.stringify(visibleColumns));
+      setPreference(`${slug}VisibleColumns`, visibleColumns);
     }
   }, [visibleColumns, slug]);
 
@@ -191,7 +182,7 @@ export default function CustomObjectRecordsPage() {
 
   const handleLayoutSelect = (layoutId: string) => {
     setSelectedLayoutId(layoutId);
-    localStorage.setItem(`${slug}SelectedLayoutId`, layoutId);
+    setPreference(`${slug}SelectedLayoutId`, layoutId);
     setShowLayoutSelector(false);
     setShowDynamicForm(true);
   };
@@ -274,7 +265,6 @@ export default function CustomObjectRecordsPage() {
       };
       const updatedRecords = [newRecord, ...records];
       setRecords(updatedRecords);
-      localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
       setShowDynamicForm(false);
       setTimeout(() => {
         router.push(`/objects/${slug}/${newRecordId}`);
@@ -300,7 +290,6 @@ export default function CustomObjectRecordsPage() {
       r.id === id ? { ...r, isFavorite: !r.isFavorite } : r
     );
     setRecords(updatedRecords);
-    localStorage.setItem(storageKey, JSON.stringify(updatedRecords));
     setOpenDropdown(null);
   };
 
@@ -377,14 +366,14 @@ export default function CustomObjectRecordsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem(`${slug}VisibleColumns`, JSON.stringify(visibleColumns));
+    setPreference(`${slug}VisibleColumns`, visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem(`${slug}VisibleColumns`, JSON.stringify(newVisibleColumns));
+      setPreference(`${slug}VisibleColumns`, newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -392,7 +381,7 @@ export default function CustomObjectRecordsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem(`${slug}VisibleColumns`, JSON.stringify(newVisibleColumns));
+    setPreference(`${slug}VisibleColumns`, newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -400,7 +389,7 @@ export default function CustomObjectRecordsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem(`${slug}VisibleColumns`, JSON.stringify(defaultColumns));
+    setPreference(`${slug}VisibleColumns`, defaultColumns);
   };
 
   // Show loading state

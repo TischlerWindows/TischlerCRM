@@ -22,6 +22,7 @@ import {
   Printer
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getSetting, setSetting } from '@/lib/preferences';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -583,12 +584,14 @@ export default function SummaryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Load summaries from localStorage
-    const storedSummaries = localStorage.getItem('summaries');
-    if (storedSummaries) {
-      setSummaries(JSON.parse(storedSummaries));
-    }
-    setLoading(false);
+    (async () => {
+      // Load summaries from API
+      const storedSummaries = await getSetting<any[]>('summaries');
+      if (storedSummaries) {
+        setSummaries(storedSummaries);
+      }
+      setLoading(false);
+    })();
   }, []);
 
   const handleSort = (columnId: string) => {
@@ -761,7 +764,7 @@ export default function SummaryPage() {
     if (confirm('Are you sure you want to delete this summary?')) {
       const updatedSummaries = summaries.filter(s => s.id !== id);
       setSummaries(updatedSummaries);
-      localStorage.setItem('summaries', JSON.stringify(updatedSummaries));
+      setSetting('summaries', updatedSummaries);
     }
   };
 
@@ -770,7 +773,7 @@ export default function SummaryPage() {
       s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
     );
     setSummaries(updatedSummaries);
-    localStorage.setItem('summaries', JSON.stringify(updatedSummaries));
+    setSetting('summaries', updatedSummaries);
     setOpenDropdown(null);
   };
 
@@ -806,7 +809,7 @@ export default function SummaryPage() {
     }
     
     setSummaries(updatedSummaries);
-    localStorage.setItem('summaries', JSON.stringify(updatedSummaries));
+    setSetting('summaries', updatedSummaries);
     setShowNewSummary(false);
     setEditingSummary(null);
   };

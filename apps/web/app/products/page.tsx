@@ -34,6 +34,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Product {
   id: string;
@@ -159,12 +160,14 @@ export default function ProductsPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('productSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('productSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -177,36 +180,25 @@ export default function ProductsPage() {
 
   // Load saved tab configuration
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
-        console.error('Error loading tab configuration:', e);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    // Load available objects from object-manager
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        }));
-        setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
-      }
-    }
-    
-    setIsLoaded(true);
-  }, []);
+
+      // Load available objects from schema store
+      const objects = schema?.objects || [];
+      const objectTabs = objects.map((obj: any) => ({
+        name: obj.label,
+        href: `/${obj.apiName.toLowerCase()}`
+      }));
+      setAvailableObjects(objectTabs);
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -230,27 +222,25 @@ export default function ProductsPage() {
       }));
       setProducts(flattenedRecords as Product[]);
     } catch (error) {
-      console.error('Failed to fetch products from API, falling back to localStorage:', error);
-      const storedProducts = localStorage.getItem('products');
-      if (storedProducts) {
-        setProducts(JSON.parse(storedProducts));
-      }
+      console.error('Failed to fetch products from API:', error);
     } finally {
       setLoading(false);
     }
   }, [schema]);
 
   useEffect(() => {
-    // Load visible columns from localStorage or use defaults
-    const storedColumns = localStorage.getItem('productsVisibleColumns');
-    if (storedColumns) {
-      setVisibleColumns(JSON.parse(storedColumns));
-    } else {
-      const defaultColumns = AVAILABLE_COLUMNS
-        .filter(col => col.defaultVisible)
-        .map(col => col.id);
-      setVisibleColumns(defaultColumns);
-    }
+    // Load visible columns from preferences or use defaults
+    (async () => {
+      const storedColumns = await getPreference<string[]>('productsVisibleColumns');
+      if (storedColumns) {
+        setVisibleColumns(storedColumns);
+      } else {
+        const defaultColumns = AVAILABLE_COLUMNS
+          .filter(col => col.defaultVisible)
+          .map(col => col.id);
+        setVisibleColumns(defaultColumns);
+      }
+    })();
 
     fetchProducts();
   }, [fetchProducts]);
@@ -346,7 +336,7 @@ export default function ProductsPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('productsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -370,14 +360,14 @@ export default function ProductsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('productsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('productsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('productsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -385,7 +375,7 @@ export default function ProductsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('productsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('productsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -393,7 +383,7 @@ export default function ProductsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('productsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('productsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -499,7 +489,6 @@ export default function ProductsPage() {
 
       const updatedProducts = [newProduct, ...products];
       setProducts(updatedProducts);
-      localStorage.setItem('products', JSON.stringify(updatedProducts));
       
       console.log('✅ New product saved:', newProduct);
       console.log('📍 Redirecting to:', `/products/${result.id}`);
@@ -508,7 +497,6 @@ export default function ProductsPage() {
       
       setTimeout(() => {
         console.log('🔄 Pushing route to:', `/products/${result.id}`);
-        console.log('✅ Data in localStorage:', JSON.parse(localStorage.getItem('products') || '[]').map((p: any) => p.id));
         router.push(`/products/${result.id}`);
       }, 200);
     } catch (error) {
@@ -523,12 +511,10 @@ export default function ProductsPage() {
         await recordsService.deleteRecord('Product', id);
         const updatedProducts = products.filter(p => p.id !== id);
         setProducts(updatedProducts);
-        localStorage.setItem('products', JSON.stringify(updatedProducts));
       } catch (error) {
         console.error('Failed to delete product from API, trying locally:', error);
         const updatedProducts = products.filter(p => p.id !== id);
         setProducts(updatedProducts);
-        localStorage.setItem('products', JSON.stringify(updatedProducts));
       }
     }
   };
@@ -538,13 +524,12 @@ export default function ProductsPage() {
       p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
     );
     setProducts(updatedProducts);
-    localStorage.setItem('products', JSON.stringify(updatedProducts));
     setOpenDropdown(null);
   };
 
   // Tab management functions
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -888,7 +873,7 @@ export default function ProductsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('productSelectedLayoutId', layout.id);
+                    setPreference('productSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

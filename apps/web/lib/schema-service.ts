@@ -1,4 +1,5 @@
 import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from './schema';
+import { apiClient } from './api-client';
 
 const STORAGE_KEY = 'tces-object-manager-schema';
 const VERSIONS_KEY = 'tces-object-manager-versions';
@@ -406,32 +407,14 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   async loadSchema(): Promise<OrgSchema> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    const stored = localStorage.getItem(STORAGE_KEY);
-    // Force regeneration if Property layout is corrupted (has 100+ fields instead of ~10)
-    const forceRegen = stored ? (() => {
-      try {
-        const schema = JSON.parse(stored);
-        const prop = schema.objects?.find((o: any) => o.apiName === 'Property');
-        const layout = prop?.pageLayouts?.[0];
-        if (layout) {
-          const fieldCount = layout.tabs?.[0]?.sections?.reduce((sum: number, s: any) => sum + (s.fields?.length || 0), 0) || 0;
-          console.log(`[Schema] Property layout field count: ${fieldCount}`);
-          return fieldCount > 50; // If > 50 fields, it's corrupted
-        }
-      } catch (e) {}
-      return false;
-    })() : false;
-    
-    if (stored && !forceRegen) {
-      try {
-        const schema = JSON.parse(stored);
+    // Try to load from API first
+    try {
+      const result = await apiClient.getSetting(STORAGE_KEY);
+      if (result && result.value) {
+        const schema = result.value as OrgSchema;
         
-        // Check if Contact object has Name field - if not, add it
-        // Also fix if it exists but is not CompositeText with proper subFields
-        const contactObj = schema.objects?.find((o: any) => o.apiName === 'Contact');
+        // Run the same migrations/fixes as before
+        const contactObj = (schema as any).objects?.find((o: any) => o.apiName === 'Contact');
         if (contactObj) {
           const nameFieldIndex = contactObj.fields?.findIndex((f: any) => f.apiName === 'Contact__name');
           if (nameFieldIndex === -1) {
@@ -450,7 +433,6 @@ class LocalStorageSchemaService implements SchemaService {
                 { apiName: 'Contact__name_lastName', label: 'Last Name', type: 'Text' }
               ]
             };
-            // Insert at the beginning of custom fields (after system fields)
             const systemFieldCount = contactObj.fields.filter((f: any) => SYSTEM_FIELDS.some(sf => sf.apiName === f.apiName)).length;
             contactObj.fields.splice(systemFieldCount, 0, nameField);
             await this.saveSchema(schema);
@@ -473,7 +455,6 @@ class LocalStorageSchemaService implements SchemaService {
           }
         }
         
-        // Auto-migrate: Mark all non-system fields as custom if not already marked
         let migratedSchema = this.ensureCustomFieldsMarked(schema);
         migratedSchema = this.ensureHomeObject(migratedSchema);
         migratedSchema = this.ensureRelationshipFields(migratedSchema);
@@ -484,25 +465,41 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
         migratedSchema = this.ensureDealTemplateLayout(migratedSchema);
         if (migratedSchema !== schema) {
-          // Schema was modified, save it back
           await this.saveSchema(migratedSchema);
           return migratedSchema;
         }
         
         return schema;
-      } catch (error) {
-        console.error('Failed to parse stored schema:', error);
       }
-    } else if (forceRegen) {
-      console.warn('[Schema] Property layout corrupted, regenerating fresh schema');
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem('propertyLayoutAssociations');
-      // Also clear Zustand persist cache
-      localStorage.removeItem('schema-store');
+    } catch (err) {
+      console.warn('[Schema] Could not load from API, trying localStorage migration:', err);
+    }
+
+    // Migration: try reading from localStorage and push to API
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          const schema = JSON.parse(stored);
+          console.log('[Schema] Migrating localStorage schema to API...');
+          // Save to API
+          await this.saveSchema(schema);
+          // Clear localStorage
+          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(VERSIONS_KEY);
+          localStorage.removeItem('schema-store');
+          localStorage.removeItem('propertyLayoutAssociations');
+          return schema;
+        } catch (error) {
+          console.error('Failed to migrate localStorage schema:', error);
+        }
+      }
     }
     
-    // Return default schema with sample data
-    return this.createSampleData();
+    // No schema anywhere — create default and save to API
+    const defaultSchema = this.createSampleData();
+    await this.saveSchema(defaultSchema);
+    return defaultSchema;
   }
 
   private ensureCustomFieldsMarked(schema: OrgSchema): OrgSchema {
@@ -2397,29 +2394,28 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   async saveSchema(schema: OrgSchema): Promise<void> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
     try {
-      // Save current schema
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(schema));
+      // Save to API (primary storage)
+      await apiClient.setSetting(STORAGE_KEY, schema);
       
-      // Save to version history
+      // Save to version history on API
       await this.saveToVersionHistory(schema);
     } catch (error) {
+      console.error('Failed to save schema to API:', error);
       throw new Error('Failed to save schema: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 
   async getVersionHistory(): Promise<OrgSchema[]> {
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const stored = localStorage.getItem(VERSIONS_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch (error) {
-        console.error('Failed to parse version history:', error);
+    try {
+      const result = await apiClient.getSetting(VERSIONS_KEY);
+      if (result && result.value) {
+        return result.value as OrgSchema[];
+      }
+    } catch (error) {
+      // 404 means no versions yet
+      if (!(error instanceof Error && error.message.includes('404'))) {
+        console.error('Failed to load version history:', error);
       }
     }
     return [];
@@ -2510,7 +2506,7 @@ class LocalStorageSchemaService implements SchemaService {
     // Keep only last 10 versions
     const updatedVersions = [schema, ...versions.slice(0, 9)];
     
-    localStorage.setItem(VERSIONS_KEY, JSON.stringify(updatedVersions));
+    await apiClient.setSetting(VERSIONS_KEY, updatedVersions);
   }
 
   createSampleData(): OrgSchema {
@@ -3905,14 +3901,26 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   async resetSchema(): Promise<OrgSchema> {
-    // Clear cached schema from localStorage
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(VERSIONS_KEY);
+    // Clear cached schema from API
+    try {
+      await apiClient.deleteSetting(STORAGE_KEY);
+      await apiClient.deleteSetting(VERSIONS_KEY);
+    } catch {
+      // Settings may not exist yet
+    }
+    
+    // Also clear any remaining localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(VERSIONS_KEY);
+      localStorage.removeItem('schema-store');
+      localStorage.removeItem('propertyLayoutAssociations');
+    }
     
     // Create fresh schema with all new fields
     const freshSchema = this.createSampleData();
     
-    // Save to localStorage
+    // Save to API
     await this.saveSchema(freshSchema);
     
     return freshSchema;

@@ -1,59 +1,59 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { recordsService } from '@/lib/records-service';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Storage key mapping for lookup objects
-const LOOKUP_STORAGE_KEYS: Record<string, string> = {
-  'Contact': 'contacts',
-  'Account': 'accounts',
-  'Property': 'properties',
-  'Lead': 'leads',
-  'Deal': 'deals',
-  'User': 'users',
-  'Product': 'products',
-  'Quote': 'quotes',
-  'Project': 'projects',
-  'Installation': 'installations',
-  'Service': 'service'
-};
-
-// Cache for lookup records to avoid repeated localStorage reads
+// Cache for lookup records to avoid repeated API calls
 let lookupCache: Record<string, any[]> = {};
+let lookupLoadingPromises: Record<string, Promise<any[]>> = {};
 let lastCacheClear = Date.now();
-const CACHE_TTL = 5000; // 5 seconds
+const CACHE_TTL = 30000; // 30 seconds
 
-function getLookupRecordsFromStorage(objectType: string): any[] {
+async function getLookupRecords(objectType: string): Promise<any[]> {
   // Clear cache periodically
   if (Date.now() - lastCacheClear > CACHE_TTL) {
     lookupCache = {};
+    lookupLoadingPromises = {};
     lastCacheClear = Date.now();
   }
-  
+
   if (lookupCache[objectType]) {
     return lookupCache[objectType];
   }
-  
-  const storageKey = LOOKUP_STORAGE_KEYS[objectType];
-  if (!storageKey) return [];
-  
-  try {
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      const records = JSON.parse(stored);
-      lookupCache[objectType] = records;
-      return records;
-    }
-  } catch {
-    // Ignore parse errors
+
+  if (lookupLoadingPromises[objectType]) {
+    return lookupLoadingPromises[objectType];
   }
-  return [];
+
+  lookupLoadingPromises[objectType] = recordsService.getRecords(objectType).then(records => {
+    const flattened = records.map(r => ({ id: r.id, ...r.data }));
+    lookupCache[objectType] = flattened;
+    delete lookupLoadingPromises[objectType];
+    return flattened;
+  }).catch(() => {
+    delete lookupLoadingPromises[objectType];
+    return [];
+  });
+
+  return lookupLoadingPromises[objectType];
+}
+
+/**
+ * Pre-load lookup records for an object type (call in useEffect)
+ * Returns a promise that resolves when the cache is populated.
+ */
+export async function preloadLookupRecords(objectType: string): Promise<void> {
+  await getLookupRecords(objectType);
 }
 
 /**
  * Get display name for a lookup field value (resolves ID to name)
+ * Synchronous — reads from the in-memory cache. If cache is not yet populated,
+ * kicks off background fetch and returns the raw value. Re-render after cache
+ * populates will show the resolved name.
  * @param value The lookup field value (typically an ID)
  * @param objectType The target object type (e.g., 'Account', 'Contact')
  * @returns The display name or the original value if not found
@@ -72,7 +72,13 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
     return stringValue;
   }
   
-  const records = getLookupRecordsFromStorage(objectType);
+  // Read from cache synchronously; kick off background fetch if not cached
+  const records = lookupCache[objectType];
+  if (!records) {
+    // Start loading in background — next render will have the data
+    getLookupRecords(objectType);
+    return stringValue;
+  }
   const record = records.find((r: any) => String(r.id) === stringValue);
   
   if (record) {

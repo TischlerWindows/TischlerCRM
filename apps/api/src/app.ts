@@ -16,6 +16,8 @@ import { recordRoutes } from './routes/records';
 import { reportRoutes } from './routes/reports';
 import { dashboardRoutes } from './routes/dashboards';
 import { backupRoutes } from './routes/backup';
+import { settingRoutes } from './routes/settings';
+import { preferenceRoutes } from './routes/preferences';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -173,6 +175,8 @@ export function buildApp() {
   app.register(reportRoutes);
   app.register(dashboardRoutes);
   app.register(backupRoutes);
+  app.register(settingRoutes);
+  app.register(preferenceRoutes);
 
   return app;
 }

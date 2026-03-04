@@ -33,6 +33,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Installation {
   id: string;
@@ -119,12 +120,14 @@ export default function InstallationsPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('installationSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('installationSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -136,30 +139,25 @@ export default function InstallationsPage() {
   }, [installationObject, pageLayouts, hasPageLayout]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        setTabs(JSON.parse(savedTabsStr));
-      } catch (e) {
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
+        setTabs(savedTabs);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
+
+      if (schema?.objects) {
+        const objects = schema.objects;
         setAvailableObjects(objects.map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
         })));
-      } catch (e) {}
-    }
-    
-    setIsLoaded(true);
-  }, []);
+      }
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   const fetchInstallations = useCallback(async () => {
     try {
@@ -183,11 +181,7 @@ export default function InstallationsPage() {
       }));
       setInstallations(flattenedRecords as Installation[]);
     } catch (error) {
-      console.error('Failed to fetch installations from API, falling back to localStorage:', error);
-      const storedInstallations = localStorage.getItem('installations');
-      if (storedInstallations) {
-        setInstallations(JSON.parse(storedInstallations));
-      }
+      console.error('Failed to fetch installations from API:', error);
     } finally {
       setLoading(false);
     }
@@ -198,12 +192,14 @@ export default function InstallationsPage() {
   }, [fetchInstallations]);
 
   useEffect(() => {
-    const savedColumns = localStorage.getItem('installationsVisibleColumns');
-    if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns));
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
-    }
+    (async () => {
+      const savedColumns = await getPreference<string[]>('installationsVisibleColumns');
+      if (savedColumns) {
+        setVisibleColumns(savedColumns);
+      } else {
+        setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
+      }
+    })();
   }, []);
 
   const toggleColumnVisibility = (columnId: string) => {
@@ -211,7 +207,7 @@ export default function InstallationsPage() {
       ? visibleColumns.filter(id => id !== columnId)
       : [...visibleColumns, columnId];
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('installationsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('installationsVisibleColumns', newVisibleColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -326,14 +322,14 @@ export default function InstallationsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('installationsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('installationsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('installationsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('installationsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -341,7 +337,7 @@ export default function InstallationsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('installationsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('installationsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -349,7 +345,7 @@ export default function InstallationsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('installationsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('installationsVisibleColumns', defaultColumns);
   };
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
@@ -415,7 +411,6 @@ export default function InstallationsPage() {
 
       const updatedInstallations = [newInstallation, ...installations];
       setInstallations(updatedInstallations);
-      localStorage.setItem('installations', JSON.stringify(updatedInstallations));
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
@@ -432,12 +427,10 @@ export default function InstallationsPage() {
         await recordsService.deleteRecord('Installation', id);
         const updatedInstallations = installations.filter(i => i.id !== id);
         setInstallations(updatedInstallations);
-        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
       } catch (error) {
         console.error('Failed to delete installation from API, trying locally:', error);
         const updatedInstallations = installations.filter(i => i.id !== id);
         setInstallations(updatedInstallations);
-        localStorage.setItem('installations', JSON.stringify(updatedInstallations));
       }
     }
   };
@@ -447,12 +440,11 @@ export default function InstallationsPage() {
       i.id === id ? { ...i, isFavorite: !i.isFavorite } : i
     );
     setInstallations(updatedInstallations);
-    localStorage.setItem('installations', JSON.stringify(updatedInstallations));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -787,7 +779,7 @@ export default function InstallationsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('installationSelectedLayoutId', layout.id);
+                    setPreference('installationSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

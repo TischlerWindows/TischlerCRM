@@ -33,6 +33,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Quote {
   id: string;
@@ -122,42 +123,43 @@ export default function QuotesPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      // Try to restore from localStorage
-      const savedLayoutId = localStorage.getItem('quoteSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        // Default to first layout if nothing saved
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      // Try to restore from preferences
+      (async () => {
+        const savedLayoutId = await getPreference<string>('quoteSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          // Default to first layout if nothing saved
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        setTabs(JSON.parse(savedTabsStr));
-      } catch (e) {
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs && Array.isArray(savedTabs)) {
+        setTabs(savedTabs);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        setAvailableObjects(objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        })));
-      } catch (e) {}
-    }
-    
-    setIsLoaded(true);
-  }, []);
+      
+      // Get custom objects from schema store (already loaded)
+      if (schema?.objects) {
+        const builtInApiNames = new Set(['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation', 'Home']);
+        const customObjs = schema.objects
+          .filter(obj => !builtInApiNames.has(obj.apiName))
+          .map(obj => ({
+            name: obj.pluralLabel || obj.label,
+            href: `/objects/${obj.apiName.toLowerCase()}`
+          }));
+        setAvailableObjects(customObjs);
+      }
+      
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   const fetchQuotes = useCallback(async () => {
     try {
@@ -179,11 +181,8 @@ export default function QuotesPage() {
       }));
       setQuotes(flattenedRecords as Quote[]);
     } catch (error) {
-      console.error('Failed to fetch quotes from API, falling back to localStorage:', error);
-      const storedQuotes = localStorage.getItem('quotes');
-      if (storedQuotes) {
-        setQuotes(JSON.parse(storedQuotes));
-      }
+      console.error('Failed to fetch quotes from API, falling back to empty list:', error);
+      setQuotes([]);
     } finally {
       setLoading(false);
     }
@@ -194,12 +193,14 @@ export default function QuotesPage() {
   }, [fetchQuotes]);
 
   useEffect(() => {
-    const savedColumns = localStorage.getItem('quotesVisibleColumns');
-    if (savedColumns) {
-      setVisibleColumns(JSON.parse(savedColumns));
-    } else {
-      setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
-    }
+    (async () => {
+      const savedColumns = await getPreference<string[]>('quotesVisibleColumns');
+      if (savedColumns && Array.isArray(savedColumns)) {
+        setVisibleColumns(savedColumns);
+      } else {
+        setVisibleColumns(AVAILABLE_COLUMNS.filter(col => col.defaultVisible).map(col => col.id));
+      }
+    })();
   }, []);
 
   const toggleColumnVisibility = (columnId: string) => {
@@ -207,7 +208,7 @@ export default function QuotesPage() {
       ? visibleColumns.filter(id => id !== columnId)
       : [...visibleColumns, columnId];
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('quotesVisibleColumns', newVisibleColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -323,14 +324,14 @@ export default function QuotesPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('quotesVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('quotesVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -338,7 +339,7 @@ export default function QuotesPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('quotesVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -346,7 +347,7 @@ export default function QuotesPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('quotesVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('quotesVisibleColumns', defaultColumns);
   };
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
@@ -411,7 +412,6 @@ export default function QuotesPage() {
 
       const updatedQuotes = [newQuote, ...quotes];
       setQuotes(updatedQuotes);
-      localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
@@ -428,12 +428,10 @@ export default function QuotesPage() {
         await recordsService.deleteRecord('Quote', id);
         const updatedQuotes = quotes.filter(q => q.id !== id);
         setQuotes(updatedQuotes);
-        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
       } catch (error) {
-        console.error('Failed to delete quote from API, trying locally:', error);
+        console.error('Failed to delete quote from API:', error);
         const updatedQuotes = quotes.filter(q => q.id !== id);
         setQuotes(updatedQuotes);
-        localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
       }
     }
   };
@@ -443,12 +441,11 @@ export default function QuotesPage() {
       q.id === id ? { ...q, isFavorite: !q.isFavorite } : q
     );
     setQuotes(updatedQuotes);
-    localStorage.setItem('quotes', JSON.stringify(updatedQuotes));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -785,7 +782,7 @@ export default function QuotesPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('quoteSelectedLayoutId', layout.id);
+                    setPreference('quoteSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

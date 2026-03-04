@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Save, X, Search } from 'lucide-react';
+import { recordsService } from '@/lib/records-service';
 
 interface ContactForm {
   // Contact Information
@@ -90,33 +91,18 @@ export default function NewContactPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    // Get existing contacts
-    const storedContacts = localStorage.getItem('contacts');
-    const contacts = storedContacts ? JSON.parse(storedContacts) : [];
-
-    // Generate contact number
-    const existingNumbers = contacts
-      .map((c: any) => c.contactNumber)
-      .filter((num: string) => num?.startsWith('C-'))
-      .map((num: string) => parseInt(num.replace('C-', ''), 10))
-      .filter((num: number) => !isNaN(num));
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
-
+  const handleSave = async () => {
     const today = new Date().toISOString().split('T')[0];
 
-    // Create new contact
-    const newContact = {
-      id: String(Date.now()),
-      contactNumber,
+    // Create new contact via API
+    const recordData = {
       firstName: formData.firstName,
       lastName: formData.lastName,
       company: formData.accountName,
       email: formData.email,
       secondaryEmail: formData.secondaryEmail,
       phone: formData.mobilePhone,
-      title: '', // Not in this form
+      title: '',
       status: formData.active ? 'Active' : 'Inactive',
       contactType: formData.contactType,
       reportsTo: formData.reportsTo,
@@ -129,17 +115,13 @@ export default function NewContactPage() {
       mailingZipPostalCode: formData.mailingZipPostalCode,
       poBox: formData.poBox,
       generalNotes: formData.generalNotes,
-      createdBy: formData.createdBy,
-      contactOwner: formData.contactOwner,
-      lastModifiedBy: formData.lastModifiedBy,
-      createdAt: today,
-      lastModifiedAt: today,
-      lastActivity: today
     };
 
-    // Save to localStorage
-    const updatedContacts = [newContact, ...contacts];
-    localStorage.setItem('contacts', JSON.stringify(updatedContacts));
+    try {
+      await recordsService.createRecord('Contact', { data: recordData });
+    } catch (err) {
+      console.error('Failed to create contact via API:', err);
+    }
 
     // Navigate back to contacts list
     router.push('/contacts');
@@ -149,11 +131,11 @@ export default function NewContactPage() {
     router.push('/contacts');
   };
 
-  const handleReportsToSearch = () => {
-    // Load contacts for searching
-    const storedContacts = localStorage.getItem('contacts');
-    if (storedContacts) {
-      const contacts = JSON.parse(storedContacts);
+  const handleReportsToSearch = async () => {
+    // Load contacts for searching via API
+    try {
+      const records = await recordsService.getRecords('Contact');
+      const contacts = recordsService.flattenRecords(records);
       const filtered = contacts
         .filter((c: any) => 
           `${c.firstName} ${c.lastName}`.toLowerCase().includes(reportsToSearchTerm.toLowerCase())
@@ -164,6 +146,8 @@ export default function NewContactPage() {
         }))
         .slice(0, 10);
       setAvailableContacts(filtered);
+    } catch (err) {
+      console.error('Failed to fetch contacts for search:', err);
     }
   };
 

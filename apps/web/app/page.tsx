@@ -17,6 +17,8 @@ import {
   Line,
 } from 'recharts';
 import { useAuth } from '@/lib/auth-context';
+import { getPreference, getSetting } from '@/lib/preferences';
+import { recordsService } from '@/lib/records-service';
 
 type HomePanel = {
   id: string;
@@ -80,48 +82,50 @@ export default function HomePage() {
   const [reports, setReports] = useState<ReportConfig[]>([]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
 
+  const [reportRecordsCache, setReportRecordsCache] = useState<Record<string, any[]>>({});
+
   useEffect(() => {
-    const storedLayout = localStorage.getItem(HOME_LAYOUT_KEY);
-    if (storedLayout) {
-      try {
-        const raw = JSON.parse(storedLayout);
-        if (raw?.panels && typeof raw.columns === 'number') {
-          const migratedPanels = raw.panels.map((panel: any, index: number) => ({
-            ...panel,
-            row: panel.row ?? Math.floor(index / Math.max(raw.columns, 1)),
-            column: panel.column ?? index % Math.max(raw.columns, 1),
-          }));
-          setHomeLayout({ ...raw, panels: migratedPanels } as HomeLayout);
-        } else if (raw?.rows) {
-          const panels = raw.rows
-            .sort((a: any, b: any) => a.order - b.order)
-            .flatMap((row: any) =>
-              row.panels
-                .sort((a: any, b: any) => a.order - b.order)
-                .map((panel: any) => ({
-                  ...panel,
-                  row: row.order ?? 0,
-                  column: panel.column ?? 0,
-                }))
-            );
-          setHomeLayout({
-            columns: Math.min(Math.max(raw.rows[0]?.columns ?? 2, 1), 4),
-            panels,
-            updatedAt: new Date().toISOString(),
-          });
+    (async () => {
+      const storedLayout = await getPreference<any>('homeLayout');
+      if (storedLayout) {
+        try {
+          const raw = storedLayout;
+          if (raw?.panels && typeof raw.columns === 'number') {
+            const migratedPanels = raw.panels.map((panel: any, index: number) => ({
+              ...panel,
+              row: panel.row ?? Math.floor(index / Math.max(raw.columns, 1)),
+              column: panel.column ?? index % Math.max(raw.columns, 1),
+            }));
+            setHomeLayout({ ...raw, panels: migratedPanels } as HomeLayout);
+          } else if (raw?.rows) {
+            const panels = raw.rows
+              .sort((a: any, b: any) => a.order - b.order)
+              .flatMap((row: any) =>
+                row.panels
+                  .sort((a: any, b: any) => a.order - b.order)
+                  .map((panel: any) => ({
+                    ...panel,
+                    row: row.order ?? 0,
+                    column: panel.column ?? 0,
+                  }))
+              );
+            setHomeLayout({
+              columns: Math.min(Math.max(raw.rows[0]?.columns ?? 2, 1), 4),
+              panels,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          setHomeLayout(null);
         }
-      } catch (e) {
-        setHomeLayout(null);
       }
-    }
 
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
-    setReports(customReports);
+      const customReports = await getSetting<any[]>('customReports') || [];
+      setReports(customReports);
 
-    const savedDashboards = localStorage.getItem('dashboards');
-    const saved = savedDashboards ? JSON.parse(savedDashboards) : [];
-    setDashboards(saved);
+      const saved = await getSetting<any[]>('dashboards') || [];
+      setDashboards(saved);
+    })();
   }, []);
 
   const reportMap = useMemo(() => new Map(reports.map((r) => [r.id, r])), [reports]);
@@ -135,28 +139,25 @@ export default function HomePage() {
     return new Map(entries);
   }, [dashboards]);
 
-  const loadReportRecords = (report: ReportConfig) => {
-    const possibleKeys = [
-      report.objectType,
-      report.objectType.toLowerCase(),
-      `${report.objectType.toLowerCase()}s`,
-      report.objectType.toLowerCase().endsWith('y')
-        ? `${report.objectType.toLowerCase().slice(0, -1)}ies`
-        : `${report.objectType.toLowerCase()}s`,
-    ];
-
-    for (const key of possibleKeys) {
-      const raw = localStorage.getItem(key);
-      if (raw) {
+  // Pre-load report records for all reports when reports change
+  useEffect(() => {
+    if (reports.length === 0) return;
+    (async () => {
+      const cache: Record<string, any[]> = {};
+      for (const report of reports) {
         try {
-          return JSON.parse(raw) as any[];
-        } catch (e) {
-          return [];
+          const records = await recordsService.getRecords(report.objectType);
+          cache[report.id] = recordsService.flattenRecords(records);
+        } catch {
+          cache[report.id] = [];
         }
       }
-    }
+      setReportRecordsCache(cache);
+    })();
+  }, [reports]);
 
-    return [];
+  const loadReportRecords = (report: ReportConfig) => {
+    return reportRecordsCache[report.id] || [];
   };
 
   const renderReportPanel = (panel: HomePanel) => {

@@ -33,6 +33,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Lead {
   id: string;
@@ -143,14 +144,16 @@ export default function LeadsPage() {
 
   // Load and persist layout selection
   useEffect(() => {
-    if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('leadSelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
+    (async () => {
+      if (hasPageLayout && !selectedLayoutId) {
+        const savedLayoutId = await getPreference<string>('leadSelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
       }
-    }
+    })();
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Debug logging
@@ -168,36 +171,28 @@ export default function LeadsPage() {
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
-        console.error('Error loading tab configuration:', e);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
+      setIsLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (schema?.objects) {
+      const objectTabs = schema.objects
+        .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Deal', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
+        .map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
         }));
-        setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
-      }
+      setAvailableObjects(objectTabs);
     }
-    
-    setIsLoaded(true);
-  }, []);
+  }, [schema]);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -220,27 +215,25 @@ export default function LeadsPage() {
       }));
       setLeads(flattenedRecords as Lead[]);
     } catch (error) {
-      console.error('Failed to fetch leads from API, falling back to localStorage:', error);
-      const storedLeads = localStorage.getItem('leads');
-      if (storedLeads) {
-        setLeads(JSON.parse(storedLeads));
-      }
+      console.error('Failed to fetch leads from API:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const storedColumns = localStorage.getItem('leadsVisibleColumns');
-    if (storedColumns) {
-      setVisibleColumns(JSON.parse(storedColumns));
-    } else {
-      const defaultColumns = AVAILABLE_COLUMNS
-        .filter(col => col.defaultVisible)
-        .map(col => col.id);
-      setVisibleColumns(defaultColumns);
-    }
-    fetchLeads();
+    (async () => {
+      const storedColumns = await getPreference<string[]>('leadsVisibleColumns');
+      if (storedColumns) {
+        setVisibleColumns(storedColumns);
+      } else {
+        const defaultColumns = AVAILABLE_COLUMNS
+          .filter(col => col.defaultVisible)
+          .map(col => col.id);
+        setVisibleColumns(defaultColumns);
+      }
+      fetchLeads();
+    })();
   }, [fetchLeads]);
 
   const handleSort = (columnId: string) => {
@@ -330,7 +323,7 @@ export default function LeadsPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('leadsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('leadsVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -354,14 +347,14 @@ export default function LeadsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('leadsVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('leadsVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('leadsVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('leadsVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -369,7 +362,7 @@ export default function LeadsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('leadsVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('leadsVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -377,7 +370,7 @@ export default function LeadsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('leadsVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('leadsVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -474,7 +467,6 @@ export default function LeadsPage() {
 
       const updatedLeads = [newLead, ...leads];
       setLeads(updatedLeads);
-      localStorage.setItem('leads', JSON.stringify(updatedLeads));
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
@@ -494,12 +486,10 @@ export default function LeadsPage() {
         await recordsService.deleteRecord('Lead', id);
         const updatedLeads = leads.filter(l => l.id !== id);
         setLeads(updatedLeads);
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
       } catch (error) {
         console.error('Failed to delete lead from API, trying locally:', error);
         const updatedLeads = leads.filter(l => l.id !== id);
         setLeads(updatedLeads);
-        localStorage.setItem('leads', JSON.stringify(updatedLeads));
       }
     }
   };
@@ -509,12 +499,11 @@ export default function LeadsPage() {
       l.id === id ? { ...l, isFavorite: !l.isFavorite } : l
     );
     setLeads(updatedLeads);
-    localStorage.setItem('leads', JSON.stringify(updatedLeads));
     setOpenDropdown(null);
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -862,7 +851,7 @@ export default function LeadsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('leadSelectedLayoutId', layout.id);
+                    setPreference('leadSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

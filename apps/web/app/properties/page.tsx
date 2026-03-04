@@ -38,6 +38,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface Property {
   id: string;
@@ -182,12 +183,14 @@ export default function PropertiesPage() {
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
-      const savedLayoutId = localStorage.getItem('propertySelectedLayoutId');
-      if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-        setSelectedLayoutId(savedLayoutId);
-      } else if (pageLayouts.length > 0) {
-        setSelectedLayoutId(pageLayouts[0].id);
-      }
+      (async () => {
+        const savedLayoutId = await getPreference<string>('propertySelectedLayoutId');
+        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
+          setSelectedLayoutId(savedLayoutId);
+        } else if (pageLayouts.length > 0) {
+          setSelectedLayoutId(pageLayouts[0].id);
+        }
+      })();
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
@@ -200,36 +203,28 @@ export default function PropertiesPage() {
 
   // Load saved tab configuration
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
-        console.error('Error loading tab configuration:', e);
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
-    
-    // Load available objects from object-manager
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
-          name: obj.label,
-          href: `/${obj.apiName.toLowerCase()}`
-        }));
+
+      // Load available objects from schema store
+      if (schema?.objects) {
+        const objectTabs = schema.objects
+          .filter((obj: any) => obj.isCustom)
+          .map((obj: any) => ({
+            name: obj.label,
+            href: `/${obj.apiName.toLowerCase()}`
+          }));
         setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
       }
-    }
-    
-    setIsLoaded(true);
-  }, []);
+
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   // Fetch properties from API
   const fetchProperties = useCallback(async () => {
@@ -257,28 +252,25 @@ export default function PropertiesPage() {
       }));
       setProperties(flattenedRecords as Property[]);
     } catch (error) {
-      console.error('Failed to fetch properties from API, falling back to localStorage:', error);
-      // Fallback to localStorage if API fails
-      const storedProperties = localStorage.getItem('properties');
-      if (storedProperties) {
-        setProperties(JSON.parse(storedProperties));
-      }
+      console.error('Failed to fetch properties from API:', error);
     } finally {
       setLoading(false);
     }
   }, [schema]);
 
   useEffect(() => {
-    // Load visible columns from localStorage or use defaults
-    const storedColumns = localStorage.getItem('propertiesVisibleColumns');
-    if (storedColumns) {
-      setVisibleColumns(JSON.parse(storedColumns));
-    } else {
-      const defaultColumns = AVAILABLE_COLUMNS
-        .filter(col => col.defaultVisible)
-        .map(col => col.id);
-      setVisibleColumns(defaultColumns);
-    }
+    // Load visible columns from preferences or use defaults
+    (async () => {
+      const storedColumns = await getPreference<string[]>('propertiesVisibleColumns');
+      if (storedColumns) {
+        setVisibleColumns(storedColumns);
+      } else {
+        const defaultColumns = AVAILABLE_COLUMNS
+          .filter(col => col.defaultVisible)
+          .map(col => col.id);
+        setVisibleColumns(defaultColumns);
+      }
+    })();
 
     // Fetch properties from API
     fetchProperties();
@@ -368,7 +360,7 @@ export default function PropertiesPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('propertiesVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -392,14 +384,14 @@ export default function PropertiesPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(visibleColumns));
+    setPreference('propertiesVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+      setPreference('propertiesVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -407,7 +399,7 @@ export default function PropertiesPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(newVisibleColumns));
+    setPreference('propertiesVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -415,7 +407,7 @@ export default function PropertiesPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    localStorage.setItem('propertiesVisibleColumns', JSON.stringify(defaultColumns));
+    setPreference('propertiesVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
@@ -527,7 +519,6 @@ export default function PropertiesPage() {
         // Fallback to local deletion if API fails
         const updatedProperties = properties.filter(p => p.id !== id);
         setProperties(updatedProperties);
-        localStorage.setItem('properties', JSON.stringify(updatedProperties));
       }
     }
   };
@@ -537,13 +528,12 @@ export default function PropertiesPage() {
       p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
     );
     setProperties(updatedProperties);
-    localStorage.setItem('properties', JSON.stringify(updatedProperties));
     setOpenDropdown(null);
   };
 
   // Tab management functions
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -893,7 +883,7 @@ export default function PropertiesPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    localStorage.setItem('propertySelectedLayoutId', layout.id);
+                    setPreference('propertySelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}

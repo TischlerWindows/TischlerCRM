@@ -11,7 +11,7 @@ import path2 from "path";
 import fs from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { dirname } from "path";
-import { prisma as prisma9 } from "@crm/db/client";
+import { prisma as prisma11 } from "@crm/db/client";
 import { z as z6 } from "zod";
 
 // src/auth.ts
@@ -1840,6 +1840,115 @@ async function backupRoutes(app2) {
   });
 }
 
+// src/routes/settings.ts
+import { prisma as prisma9 } from "@crm/db/client";
+async function settingRoutes(app2) {
+  app2.get("/settings", async (_req, reply) => {
+    const settings = await prisma9.setting.findMany();
+    const result = {};
+    for (const s of settings) {
+      result[s.key] = s.value;
+    }
+    reply.send(result);
+  });
+  app2.get("/settings/:key", async (req, reply) => {
+    const { key } = req.params;
+    const setting = await prisma9.setting.findUnique({ where: { key } });
+    if (!setting) {
+      return reply.code(404).send({ error: "Setting not found" });
+    }
+    reply.send({ key: setting.key, value: setting.value });
+  });
+  app2.put("/settings/:key", async (req, reply) => {
+    const { key } = req.params;
+    const body = req.body;
+    const setting = await prisma9.setting.upsert({
+      where: { key },
+      create: { key, value: body.value },
+      update: { value: body.value }
+    });
+    reply.send({ key: setting.key, value: setting.value });
+  });
+  app2.delete("/settings/:key", async (req, reply) => {
+    const { key } = req.params;
+    try {
+      await prisma9.setting.delete({ where: { key } });
+      reply.code(204).send();
+    } catch {
+      reply.code(404).send({ error: "Setting not found" });
+    }
+  });
+}
+
+// src/routes/preferences.ts
+import { prisma as prisma10 } from "@crm/db/client";
+async function preferenceRoutes(app2) {
+  app2.get("/user/preferences", async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+    const prefs = await prisma10.userPreference.findMany({
+      where: { userId }
+    });
+    const result = {};
+    for (const p of prefs) {
+      result[p.key] = p.value;
+    }
+    reply.send(result);
+  });
+  app2.get("/user/preferences/:key", async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+    const { key } = req.params;
+    const pref = await prisma10.userPreference.findUnique({
+      where: { userId_key: { userId, key } }
+    });
+    if (!pref) {
+      return reply.code(404).send({ error: "Preference not found" });
+    }
+    reply.send({ key: pref.key, value: pref.value });
+  });
+  app2.put("/user/preferences/:key", async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+    const { key } = req.params;
+    const body = req.body;
+    const pref = await prisma10.userPreference.upsert({
+      where: { userId_key: { userId, key } },
+      create: { userId, key, value: body.value },
+      update: { value: body.value }
+    });
+    reply.send({ key: pref.key, value: pref.value });
+  });
+  app2.delete("/user/preferences/:key", async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+    const { key } = req.params;
+    try {
+      await prisma10.userPreference.delete({
+        where: { userId_key: { userId, key } }
+      });
+      reply.code(204).send();
+    } catch {
+      reply.code(404).send({ error: "Preference not found" });
+    }
+  });
+  app2.put("/user/preferences", async (req, reply) => {
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: "Unauthorized" });
+    const body = req.body;
+    const results = {};
+    for (const [key, value] of Object.entries(body)) {
+      const pref = await prisma10.userPreference.upsert({
+        where: { userId_key: { userId, key } },
+        create: { userId, key, value },
+        update: { value }
+      });
+      results[pref.key] = pref.value;
+    }
+    reply.send(results);
+  });
+}
+
 // src/app.ts
 var __filename = fileURLToPath2(import.meta.url);
 var __dirname2 = dirname(__filename);
@@ -1862,11 +1971,11 @@ function buildApp() {
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma9.user.findUnique({ where: { email: parsed.data.email } });
+    const existing = await prisma11.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     try {
       const passwordHash = hashPassword(parsed.data.password);
-      const user = await prisma9.user.create({
+      const user = await prisma11.user.create({
         data: {
           email: parsed.data.email,
           name: parsed.data.name,
@@ -1901,7 +2010,7 @@ function buildApp() {
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const ip = (forwardedIp ? forwardedIp.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";
     const userAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
-    await prisma9.loginEvent.create({
+    await prisma11.loginEvent.create({
       data: {
         userId: user.id,
         accountId: parsed.data.accountId ?? null,
@@ -1918,7 +2027,7 @@ function buildApp() {
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const events = await prisma9.loginEvent.findMany({
+    const events = await prisma11.loginEvent.findMany({
       where: parsed.data.accountId ? { accountId: parsed.data.accountId } : void 0,
       take: parsed.data.take ?? 100,
       orderBy: { createdAt: "desc" },
@@ -1942,14 +2051,14 @@ function buildApp() {
     req.user = payload;
   });
   app2.get("/accounts", async (req, reply) => {
-    const accounts = await prisma9.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
+    const accounts = await prisma11.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
     reply.send(accounts);
   });
   const accountSchema = z6.object({ name: z6.string().min(1), domain: z6.string().optional().nullable(), ownerId: z6.string().uuid() });
   app2.post("/accounts", async (req, reply) => {
     const parsed = accountSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const created = await prisma9.account.create({ data: parsed.data });
+    const created = await prisma11.account.create({ data: parsed.data });
     reply.code(201).send(created);
   });
   const accountUpdate = accountSchema.partial();
@@ -1957,12 +2066,12 @@ function buildApp() {
     const id = req.params.id;
     const parsed = accountUpdate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const updated = await prisma9.account.update({ where: { id }, data: parsed.data });
+    const updated = await prisma11.account.update({ where: { id }, data: parsed.data });
     reply.send(updated);
   });
   app2.delete("/accounts/:id", async (req, reply) => {
     const id = req.params.id;
-    await prisma9.account.delete({ where: { id } });
+    await prisma11.account.delete({ where: { id } });
     reply.code(204).send();
   });
   app2.register(objectRoutes);
@@ -1972,6 +2081,8 @@ function buildApp() {
   app2.register(reportRoutes);
   app2.register(dashboardRoutes);
   app2.register(backupRoutes);
+  app2.register(settingRoutes);
+  app2.register(preferenceRoutes);
   return app2;
 }
 

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout, PermissionSet } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
@@ -104,7 +103,6 @@ function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
 }
 
 export const useSchemaStore = create<SchemaStore>()(
-  persist(
     (set, get) => ({
       // Initial state
       schema: null,
@@ -375,7 +373,7 @@ export const useSchemaStore = create<SchemaStore>()(
 
         set({ schema: updatedSchema });
         
-        // Explicitly save to localStorage to ensure persistence
+        // Persist to schema service (API)
         schemaService.saveSchema(updatedSchema);
       },
 
@@ -743,13 +741,5 @@ export const useSchemaStore = create<SchemaStore>()(
       setSelectedLayout: (layoutId) => set({ selectedLayoutId: layoutId }),
       setError: (error) => set({ error }),
       clearError: () => set({ error: null })
-    }),
-    {
-      name: 'schema-store',
-      partialize: (state) => ({ 
-        schema: state.schema,
-        selectedObjectApi: state.selectedObjectApi 
-      }),
-    }
-  )
+    })
 );

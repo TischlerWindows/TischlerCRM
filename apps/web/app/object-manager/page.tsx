@@ -6,6 +6,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSchemaStore } from '@/lib/schema-store';
 import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from '@/lib/schema';
+import { getSetting, setSetting } from '@/lib/preferences';
+import { deletePreference } from '@/lib/preferences';
 import { 
   Card,
   CardContent,
@@ -143,26 +145,24 @@ export default function ObjectManagerPage() {
         await deleteObject(objectApi);
         
         // Remove object from navigation tabs
-        const savedTabsStr = localStorage.getItem('tabConfiguration');
-        if (savedTabsStr) {
+        const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+        if (savedTabs && Array.isArray(savedTabs)) {
           try {
-            const savedTabs = JSON.parse(savedTabsStr);
             // Filter out tabs that match this object (both /objects/slug and direct routes)
             const updatedTabs = savedTabs.filter((tab: { name: string; href: string }) => {
               const lowerApiName = objectApi.toLowerCase();
               return tab.href !== `/objects/${lowerApiName}` && 
                      tab.href !== `/${lowerApiName}`;
             });
-            localStorage.setItem('tabConfiguration', JSON.stringify(updatedTabs));
+            setSetting('tabConfiguration', updatedTabs);
           } catch (e) {
             console.error('Error updating tab configuration:', e);
           }
         }
         
-        // Remove custom records storage for this object
-        localStorage.removeItem(`custom_records_${objectApi.toLowerCase()}`);
-        localStorage.removeItem(`${objectApi.toLowerCase()}VisibleColumns`);
-        localStorage.removeItem(`${objectApi.toLowerCase()}SelectedLayoutId`);
+        // Clean up per-object preferences
+        deletePreference(`${objectApi.toLowerCase()}VisibleColumns`);
+        deletePreference(`${objectApi.toLowerCase()}SelectedLayoutId`);
         
       } catch (err) {
         console.error('Failed to delete object:', err);

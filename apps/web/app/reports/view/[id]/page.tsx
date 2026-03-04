@@ -12,6 +12,8 @@ import {
   Edit
 } from 'lucide-react';
 import PageHeader from '@/components/page-header';
+import { getSetting } from '@/lib/preferences';
+import { recordsService } from '@/lib/records-service';
 
 interface ReportData {
   id: string;
@@ -48,21 +50,20 @@ export default function ReportViewerPage() {
     loadReport();
   }, [reportId]);
 
-  const loadReport = () => {
+  const loadReport = async () => {
     setLoading(true);
     
     // Load report configuration
     let reportConfig: ReportData | null = null;
     
     if (reportId === 'temp') {
-      const tempReport = localStorage.getItem('tempReport');
+      const tempReport = await getSetting<ReportData>('tempReport');
       if (tempReport) {
-        reportConfig = JSON.parse(tempReport);
+        reportConfig = tempReport;
       }
     } else {
-      const customReports = localStorage.getItem('customReports');
-      if (customReports) {
-        const reports = JSON.parse(customReports);
+      const reports = await getSetting<ReportData[]>('customReports');
+      if (reports) {
         reportConfig = reports.find((r: ReportData) => r.id === reportId) || null;
       }
     }
@@ -78,29 +79,17 @@ export default function ReportViewerPage() {
     console.log('🔍 Looking for objectType:', reportConfig.objectType);
     console.log('🔍 Report fields:', reportConfig.fields);
     
-    // Load data from localStorage - try multiple naming conventions
-    const possibleKeys = [
-      reportConfig.objectType,                          // e.g., "Property"
-      reportConfig.objectType.toLowerCase(),            // e.g., "property"
-      reportConfig.objectType.toLowerCase() + 's',      // e.g., "propertys"
-      // Handle proper pluralization
-      reportConfig.objectType.toLowerCase().endsWith('y') 
-        ? reportConfig.objectType.toLowerCase().slice(0, -1) + 'ies'  // "Property" -> "properties"
-        : reportConfig.objectType.toLowerCase() + 's',
-    ];
-    
-    console.log('🔍 Trying localStorage keys:', possibleKeys);
-    
+    // Load data from records service
     let records: any[] = [];
     
-    for (const key of possibleKeys) {
-      const rawData = localStorage.getItem(key);
-      if (rawData) {
-        records = JSON.parse(rawData);
-        console.log(`📂 Loaded ${records.length} records from localStorage['${key}']`);
+    try {
+      records = await recordsService.getRecords(reportConfig.objectType);
+      console.log(`📂 Loaded ${records.length} records from API for ${reportConfig.objectType}`);
+      if (records.length > 0) {
         console.log('📋 First record sample:', records[0]);
-        break;
       }
+    } catch (e) {
+      console.error('Error loading records from API:', e);
     }
     
     // Generate mock data if no real data exists

@@ -307,6 +307,53 @@ class ApiClient {
   async restoreBackup(backupId: string) {
     return this.request<any>(`/admin/backups/${backupId}/restore`, { method: 'POST' });
   }
+
+  // Settings (org-level)
+  async getSettings() {
+    return this.request<Record<string, any>>('/settings');
+  }
+
+  async getSetting(key: string) {
+    return this.request<{ key: string; value: any }>(`/settings/${encodeURIComponent(key)}`);
+  }
+
+  async setSetting(key: string, value: any) {
+    return this.request<{ key: string; value: any }>(`/settings/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  async deleteSetting(key: string) {
+    return this.request<void>(`/settings/${encodeURIComponent(key)}`, { method: 'DELETE' });
+  }
+
+  // User preferences (per-user)
+  async getPreferences() {
+    return this.request<Record<string, any>>('/user/preferences');
+  }
+
+  async getPreference(key: string) {
+    return this.request<{ key: string; value: any }>(`/user/preferences/${encodeURIComponent(key)}`);
+  }
+
+  async setPreference(key: string, value: any) {
+    return this.request<{ key: string; value: any }>(`/user/preferences/${encodeURIComponent(key)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+    });
+  }
+
+  async setPreferences(prefs: Record<string, any>) {
+    return this.request<Record<string, any>>('/user/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
+    });
+  }
+
+  async deletePreference(key: string) {
+    return this.request<void>(`/user/preferences/${encodeURIComponent(key)}`, { method: 'DELETE' });
+  }
 }
 
 // Export singleton instance

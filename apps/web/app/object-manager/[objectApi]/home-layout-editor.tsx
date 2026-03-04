@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getPreference, setPreference, getSetting } from '@/lib/preferences';
 
 const STORAGE_KEY = 'homeLayout';
 
@@ -74,14 +75,14 @@ function migrateLayout(raw: any): HomeLayout {
   return { columns: 2, panels: [], updatedAt: new Date().toISOString() };
 }
 
-function loadLayout(): HomeLayout {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return migrateLayout(JSON.parse(stored));
-    } catch (e) {
-      return { columns: 2, panels: [], updatedAt: new Date().toISOString() };
+async function loadLayout(): Promise<HomeLayout> {
+  try {
+    const stored = await getPreference<any>(STORAGE_KEY);
+    if (stored) {
+      return migrateLayout(stored);
     }
+  } catch (e) {
+    // fall through to default
   }
   return { columns: 2, panels: [], updatedAt: new Date().toISOString() };
 }
@@ -112,21 +113,29 @@ export default function HomeLayoutEditor() {
   };
 
   useEffect(() => {
-    setLayout(loadLayout());
+    (async () => {
+      setLayout(await loadLayout());
 
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
-    setReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
+      try {
+        const customReports = (await getSetting<any[]>('customReports')) || [];
+        setReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
+      } catch (e) {
+        console.error('Error loading reports:', e);
+      }
 
-    const savedDashboards = localStorage.getItem('dashboards');
-    const dashboards: Dashboard[] = savedDashboards ? JSON.parse(savedDashboards) : [];
-    const flattenedWidgets = dashboards.flatMap((dashboard) =>
-      (dashboard.widgets || []).map((widget) => ({
-        id: widget.id,
-        title: `${dashboard.name}: ${widget.title || widget.type}`,
-      }))
-    );
-    setWidgets(flattenedWidgets);
+      try {
+        const dashboards: Dashboard[] = (await getSetting<Dashboard[]>('dashboards')) || [];
+        const flattenedWidgets = dashboards.flatMap((dashboard) =>
+          (dashboard.widgets || []).map((widget) => ({
+            id: widget.id,
+            title: `${dashboard.name}: ${widget.title || widget.type}`,
+          }))
+        );
+        setWidgets(flattenedWidgets);
+      } catch (e) {
+        console.error('Error loading dashboards:', e);
+      }
+    })();
   }, []);
 
   const panelsSorted = useMemo(() => {
@@ -140,7 +149,7 @@ export default function HomeLayoutEditor() {
   }, [panelsSorted]);
 
   const persistLayout = (next: HomeLayout) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setPreference(STORAGE_KEY, next);
     setLayout(next);
   };
 

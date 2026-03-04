@@ -10,6 +10,7 @@ import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { useAuth } from '@/lib/auth-context';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getSetting, setSetting } from '@/lib/preferences';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -53,62 +54,45 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   }, [schema, loadSchema]);
 
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
+      if (savedTabs && Array.isArray(savedTabs)) {
         setTabs(savedTabs);
-      } catch (e) {
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
 
-    if (schema?.objects) {
-      const excludedObjects = new Set(['Home']);
-      
-      const builtInRoutes: Record<string, string> = {
-        'Property': '/properties',
-        'Contact': '/contacts',
-        'Account': '/accounts',
-        'Product': '/products',
-        'Lead': '/leads',
-        'Deal': '/deals',
-        'Project': '/projects',
-        'Service': '/service',
-        'Quote': '/quotes',
-        'Installation': '/installations',
-      };
-      
-      const objectTabs = schema.objects
-        .filter(obj => !excludedObjects.has(obj.apiName))
-        .map(obj => ({
-          name: obj.pluralLabel || obj.label,
-          href: builtInRoutes[obj.apiName] || `/objects/${obj.apiName.toLowerCase()}`
-        }));
-      setAvailableObjects(objectTabs);
-    } else {
-      const storedObjects = localStorage.getItem('customObjects');
-      if (storedObjects) {
-        try {
-          const objects = JSON.parse(storedObjects);
-          const objectTabs = objects.map((obj: any) => ({
-            name: obj.label,
-            href: `/objects/${obj.apiName.toLowerCase()}`
+      if (schema?.objects) {
+        const excludedObjects = new Set(['Home']);
+        
+        const builtInRoutes: Record<string, string> = {
+          'Property': '/properties',
+          'Contact': '/contacts',
+          'Account': '/accounts',
+          'Product': '/products',
+          'Lead': '/leads',
+          'Deal': '/deals',
+          'Project': '/projects',
+          'Service': '/service',
+          'Quote': '/quotes',
+          'Installation': '/installations',
+        };
+        
+        const objectTabs = schema.objects
+          .filter(obj => !excludedObjects.has(obj.apiName))
+          .map(obj => ({
+            name: obj.pluralLabel || obj.label,
+            href: builtInRoutes[obj.apiName] || `/objects/${obj.apiName.toLowerCase()}`
           }));
-          setAvailableObjects(objectTabs);
-        } catch (e) {
-          console.error('Error loading custom objects:', e);
-        }
+        setAvailableObjects(objectTabs);
       }
-    }
 
-    setIsLoaded(true);
+      setIsLoaded(true);
+    })();
   }, [schema]);
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {

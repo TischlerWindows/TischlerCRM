@@ -1,0 +1,50 @@
+import { FastifyInstance } from 'fastify';
+import { prisma } from '@crm/db/client';
+import { z } from 'zod';
+
+export async function settingRoutes(app: FastifyInstance) {
+  // Get all settings
+  app.get('/settings', async (_req, reply) => {
+    const settings = await prisma.setting.findMany();
+    const result: Record<string, any> = {};
+    for (const s of settings) {
+      result[s.key] = s.value;
+    }
+    reply.send(result);
+  });
+
+  // Get a single setting by key
+  app.get('/settings/:key', async (req, reply) => {
+    const { key } = req.params as { key: string };
+    const setting = await prisma.setting.findUnique({ where: { key } });
+    if (!setting) {
+      return reply.code(404).send({ error: 'Setting not found' });
+    }
+    reply.send({ key: setting.key, value: setting.value });
+  });
+
+  // Set (upsert) a setting
+  app.put('/settings/:key', async (req, reply) => {
+    const { key } = req.params as { key: string };
+    const body = req.body as any;
+
+    const setting = await prisma.setting.upsert({
+      where: { key },
+      create: { key, value: body.value },
+      update: { value: body.value },
+    });
+
+    reply.send({ key: setting.key, value: setting.value });
+  });
+
+  // Delete a setting
+  app.delete('/settings/:key', async (req, reply) => {
+    const { key } = req.params as { key: string };
+    try {
+      await prisma.setting.delete({ where: { key } });
+      reply.code(204).send();
+    } catch {
+      reply.code(404).send({ error: 'Setting not found' });
+    }
+  });
+}

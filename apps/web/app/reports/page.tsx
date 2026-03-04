@@ -37,6 +37,8 @@ import {
 import UniversalSearch from '@/components/universal-search';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
+import { getSetting, setSetting } from '@/lib/preferences';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface SavedReport {
   id: string;
@@ -91,43 +93,35 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
+  const { schema } = useSchemaStore();
+
   useEffect(() => {
-    const savedTabsStr = localStorage.getItem('tabConfiguration');
-    if (savedTabsStr) {
-      try {
-        const savedTabs = JSON.parse(savedTabsStr);
+    (async () => {
+      const savedTabs = await getSetting<any[]>('tabConfiguration');
+      if (savedTabs) {
         setTabs(savedTabs);
-      } catch (e) {
+      } else {
         setTabs(defaultTabs);
       }
-    } else {
-      setTabs(defaultTabs);
-    }
 
-    const storedObjects = localStorage.getItem('customObjects');
-    if (storedObjects) {
-      try {
-        const objects = JSON.parse(storedObjects);
-        const objectTabs = objects.map((obj: any) => ({
+      if (schema?.objects) {
+        const objectTabs = schema.objects.map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
         }));
         setAvailableObjects(objectTabs);
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
       }
-    }
 
-    setIsLoaded(true);
-  }, []);
+      setIsLoaded(true);
+    })();
+  }, [schema]);
 
   useEffect(() => {
     loadReports();
   }, []);
 
-  const loadReports = () => {
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
+  const loadReports = async () => {
+    const customReports = await getSetting<any[]>('customReports') || [];
     const standardReports = getStandardReports();
     setReports([...standardReports, ...customReports]);
     setLoading(false);
@@ -147,7 +141,7 @@ export default function ReportsPage() {
   };
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
-    localStorage.setItem('tabConfiguration', JSON.stringify(newTabs));
+    setSetting('tabConfiguration', newTabs);
   };
 
   const handleResetToDefault = () => {
@@ -232,17 +226,16 @@ export default function ReportsPage() {
     return 0;
   });
 
-  const handleDeleteReport = (id: string) => {
+  const handleDeleteReport = async (id: string) => {
     if (!confirm('Are you sure you want to delete this report?')) return;
     
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
+    const customReports = await getSetting<any[]>('customReports') || [];
     const updatedReports = customReports.filter((r: SavedReport) => r.id !== id);
-    localStorage.setItem('customReports', JSON.stringify(updatedReports));
+    await setSetting('customReports', updatedReports);
     loadReports();
   };
 
-  const handleDuplicateReport = (report: SavedReport) => {
+  const handleDuplicateReport = async (report: SavedReport) => {
     const newReport = {
       ...report,
       id: `report-${Date.now()}`,
@@ -252,30 +245,27 @@ export default function ReportsPage() {
       lastModifiedAt: new Date().toISOString()
     };
     
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
+    const customReports = await getSetting<any[]>('customReports') || [];
     customReports.push(newReport);
-    localStorage.setItem('customReports', JSON.stringify(customReports));
+    await setSetting('customReports', customReports);
     loadReports();
   };
 
-  const handleTogglePrivate = (id: string) => {
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
+  const handleTogglePrivate = async (id: string) => {
+    const customReports = await getSetting<any[]>('customReports') || [];
     const updatedCustomReports = customReports.map((r: SavedReport) => 
       r.id === id ? { ...r, isPrivate: !r.isPrivate } : r
     );
-    localStorage.setItem('customReports', JSON.stringify(updatedCustomReports));
+    await setSetting('customReports', updatedCustomReports);
     loadReports();
   };
 
-  const handleToggleFavorite = (id: string) => {
-    const savedReports = localStorage.getItem('customReports');
-    const customReports = savedReports ? JSON.parse(savedReports) : [];
+  const handleToggleFavorite = async (id: string) => {
+    const customReports = await getSetting<any[]>('customReports') || [];
     const updatedCustomReports = customReports.map((r: SavedReport) => 
       r.id === id ? { ...r, isFavorite: !r.isFavorite } : r
     );
-    localStorage.setItem('customReports', JSON.stringify(updatedCustomReports));
+    await setSetting('customReports', updatedCustomReports);
     loadReports();
   };
 
