@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -143,7 +143,7 @@ export default function RecordDetailPage({
       const route = routeMap[fieldDef.lookupObject];
       if (route) {
         return (
-          <Link href={`/${route}/${value}`} className="text-indigo-600 hover:text-indigo-700">
+          <Link href={`/${route}/${value}`} className="text-brand-navy hover:text-brand-navy">
             {String(value)}
           </Link>
         );
@@ -173,7 +173,7 @@ export default function RecordDetailPage({
     // Email
     if (fieldType === 'Email') {
       return (
-        <a href={`mailto:${value}`} className="text-indigo-600 hover:text-indigo-700">
+        <a href={`mailto:${value}`} className="text-brand-navy hover:text-brand-navy">
           {value}
         </a>
       );
@@ -182,7 +182,7 @@ export default function RecordDetailPage({
     // Phone
     if (fieldType === 'Phone') {
       return (
-        <a href={`tel:${value}`} className="text-indigo-600 hover:text-indigo-700">
+        <a href={`tel:${value}`} className="text-brand-navy hover:text-brand-navy">
           {value}
         </a>
       );
@@ -191,7 +191,7 @@ export default function RecordDetailPage({
     // URL
     if (fieldType === 'URL') {
       return (
-        <a href={value} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700">
+        <a href={value} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:text-brand-navy">
           {value}
         </a>
       );
@@ -301,7 +301,7 @@ export default function RecordDetailPage({
           </p>
           <Link
             href={backRoute}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to {backLabel}

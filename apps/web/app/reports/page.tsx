@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -307,8 +307,8 @@ export default function ReportsPage() {
         <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-brand-navy" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
             </div>
@@ -322,7 +322,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('recent')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'recent'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -333,7 +333,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('createdByMe')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'createdByMe'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -344,7 +344,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('private')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'private'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -355,7 +355,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('public')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'public'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -366,7 +366,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('all')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'all'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -377,7 +377,7 @@ export default function ReportsPage() {
                 onClick={() => setSidebarFilter('favorites')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'favorites'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -398,7 +398,7 @@ export default function ReportsPage() {
                 <select
                   value={selectedObjectType}
                   onChange={(e) => setSelectedObjectType(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                 >
                   <option value="all">All Objects</option>
                   {OBJECT_TYPES.map(type => (
@@ -411,7 +411,7 @@ export default function ReportsPage() {
                 <select
                   value={selectedFormat}
                   onChange={(e) => setSelectedFormat(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                 >
                   <option value="all">All Formats</option>
                   <option value="tabular">📊 Tabular</option>
@@ -421,7 +421,7 @@ export default function ReportsPage() {
                 
                 <Link
                   href="/reports/builder"
-                  className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   New Report
@@ -438,7 +438,7 @@ export default function ReportsPage() {
                   placeholder="Search reports by name, description, or object type..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                 />
               </div>
             </div>
@@ -473,7 +473,7 @@ export default function ReportsPage() {
                         <td className="px-6 py-4 text-sm font-medium">
                           <Link 
                             href={`/reports/view/${report.id}`}
-                            className="text-indigo-600 hover:text-indigo-800 flex items-center gap-2"
+                            className="text-brand-navy hover:text-brand-dark flex items-center gap-2"
                           >
                             {getFormatIcon(report.format)}
                             {report.name}
@@ -506,7 +506,7 @@ export default function ReportsPage() {
                           <div className="flex items-center gap-3">
                             <Link
                               href={`/reports/view/${report.id}`}
-                              className="text-indigo-600 hover:text-indigo-800 font-medium"
+                              className="text-brand-navy hover:text-brand-dark font-medium"
                             >
                               Run
                             </Link>
@@ -590,11 +590,11 @@ export default function ReportsPage() {
                   </div>
                 ))}
               </div>
-              <button onClick={handleResetToDefault} className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">Reset Navigation to Default</button>
+              <button onClick={handleResetToDefault} className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1">Reset Navigation to Default</button>
             </div>
             <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
               <button onClick={() => setEditMode(false)} className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={() => setEditMode(false)} className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">Save</button>
+              <button onClick={() => setEditMode(false)} className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors">Save</button>
             </div>
           </div>
         </div>

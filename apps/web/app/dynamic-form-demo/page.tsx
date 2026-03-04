@@ -26,12 +26,12 @@ export default function DynamicFormDemo() {
   const opportunityCreateLayout = opportunityObject?.pageLayouts?.some(l => l.layoutType === 'create');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#f0f1fa] via-white to-brand-light p-8">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Sparkles className="w-12 h-12 text-indigo-600" />
+            <Sparkles className="w-12 h-12 text-brand-navy" />
             <h1 className="text-4xl font-bold text-gray-900">Dynamic Form Renderer</h1>
           </div>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -43,19 +43,19 @@ export default function DynamicFormDemo() {
         {/* Features Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <h3 className="font-semibold text-lg mb-2 text-indigo-600">Layout-Driven</h3>
+            <h3 className="font-semibold text-lg mb-2 text-brand-navy">Layout-Driven</h3>
             <p className="text-sm text-gray-600">
               Forms are generated from Page Editor configurations. Change the layout, and the form updates automatically.
             </p>
           </div>
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <h3 className="font-semibold text-lg mb-2 text-indigo-600">24 Field Types</h3>
+            <h3 className="font-semibold text-lg mb-2 text-brand-navy">24 Field Types</h3>
             <p className="text-sm text-gray-600">
               Supports all field types: Text, Number, Currency, Date, Picklist, Lookup, Address, Geolocation, and more.
             </p>
           </div>
           <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <h3 className="font-semibold text-lg mb-2 text-indigo-600">Smart Validation</h3>
+            <h3 className="font-semibold text-lg mb-2 text-brand-navy">Smart Validation</h3>
             <p className="text-sm text-gray-600">
               Built-in validation for required fields, email format, URL format, min/max values, and custom rules.
             </p>
@@ -70,7 +70,7 @@ export default function DynamicFormDemo() {
             {/* Contact Forms */}
             <div className="border-b pb-6">
               <div className="flex items-start gap-4 mb-4">
-                <Users className="w-6 h-6 text-indigo-600 mt-1" />
+                <Users className="w-6 h-6 text-brand-navy mt-1" />
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Contact Forms</h3>
                   <p className="text-sm text-gray-600 mb-4">
@@ -105,7 +105,7 @@ export default function DynamicFormDemo() {
             {/* Opportunity Forms */}
             <div>
               <div className="flex items-start gap-4">
-                <FileText className="w-6 h-6 text-indigo-600 mt-1" />
+                <FileText className="w-6 h-6 text-brand-navy mt-1" />
                 <div>
                   <h3 className="text-lg font-semibold mb-2">Opportunity Forms</h3>
                   <p className="text-sm text-gray-600 mb-4">

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -422,7 +422,7 @@ export default function CustomObjectRecordsPage() {
           <p className="text-gray-600 mb-6">The object &quot;{slug}&quot; does not exist.</p>
           <Link
             href="/object-manager"
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
           >
             Go to Object Manager
           </Link>
@@ -439,8 +439,8 @@ export default function CustomObjectRecordsPage() {
             {/* Page Header in Sidebar */}
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Database className="w-6 h-6 text-indigo-600" />
+                <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                  <Database className="w-6 h-6 text-brand-navy" />
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900">{objectDef.pluralLabel || objectDef.label}</h1>
               </div>
@@ -454,7 +454,7 @@ export default function CustomObjectRecordsPage() {
                   onClick={() => setSidebarFilter('recent')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'recent'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -465,7 +465,7 @@ export default function CustomObjectRecordsPage() {
                   onClick={() => setSidebarFilter('created-by-me')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'created-by-me'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -476,7 +476,7 @@ export default function CustomObjectRecordsPage() {
                   onClick={() => setSidebarFilter('all')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'all'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -487,7 +487,7 @@ export default function CustomObjectRecordsPage() {
                   onClick={() => setSidebarFilter('favorites')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'favorites'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -515,7 +515,7 @@ export default function CustomObjectRecordsPage() {
             </button>
             <button
                 onClick={handleNewRecord}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 New {objectDef.label}
@@ -532,7 +532,7 @@ export default function CustomObjectRecordsPage() {
               placeholder={`Search ${objectDef.label.toLowerCase()} records...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
             />
           </div>
         </div>
@@ -576,7 +576,7 @@ export default function CustomObjectRecordsPage() {
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {index === 0 ? (
-                            <Link href={`/objects/${slug}/${record.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/objects/${slug}/${record.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {getFieldValue(record, column.id)}
                             </Link>
                           ) : (
@@ -600,7 +600,7 @@ export default function CustomObjectRecordsPage() {
                                 router.push(`/objects/${slug}/${record.id}`);
                                 setOpenDropdown(null);
                               }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
                             >
                               <Edit className="w-4 h-4" />
                               Edit
@@ -680,7 +680,7 @@ export default function CustomObjectRecordsPage() {
               </button>
               <Link
                 href={`/object-manager/${objectDef.apiName}`}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                 onClick={() => setShowNoLayoutsDialog(false)}
               >
                 Go to Page Editor
@@ -706,7 +706,7 @@ export default function CustomObjectRecordsPage() {
                   <button
                     key={layout.id}
                     onClick={() => handleLayoutSelect(layout.id)}
-                    className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-indigo-300 transition-colors"
+                    className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-[#b8bfe8] transition-colors"
                   >
                     <div className="font-medium text-gray-900">{layout.name}</div>
                   </button>
@@ -775,7 +775,7 @@ export default function CustomObjectRecordsPage() {
               
               <button 
                 onClick={handleResetColumns} 
-                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1"
               >
                 Reset Columns to Default
               </button>
@@ -790,7 +790,7 @@ export default function CustomObjectRecordsPage() {
               </button>
               <button
                 onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors"
               >
                 Save
               </button>
@@ -812,7 +812,7 @@ export default function CustomObjectRecordsPage() {
                 placeholder="Search fields..."
                 value={columnSearchTerm}
                 onChange={(e) => setColumnSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 mb-4"
               />
               <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-2">

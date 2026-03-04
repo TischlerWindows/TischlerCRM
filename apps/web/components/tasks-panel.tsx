@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Check, Plus } from 'lucide-react';
@@ -108,8 +108,8 @@ export function TasksPanel({ tasks, onToggleComplete, onAddTask, loading }: Task
                 className={cn(
                   'mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0',
                   task.completed
-                    ? 'bg-indigo-600 border-indigo-600'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-indigo-600 dark:hover:border-indigo-500'
+                    ? 'bg-brand-navy border-brand-navy'
+                    : 'border-gray-300 dark:border-gray-600 hover:border-brand-navy dark:hover:border-brand-navy'
                 )}
                 aria-label={task.completed ? 'Mark as incomplete' : 'Mark as complete'}
               >
@@ -167,12 +167,12 @@ export function TasksPanel({ tasks, onToggleComplete, onAddTask, loading }: Task
                 }
               }}
               placeholder="Task title..."
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white"
               autoFocus
             />
             <button
               onClick={handleAddTask}
-              className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium"
+              className="px-3 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors text-sm font-medium"
             >
               Add
             </button>

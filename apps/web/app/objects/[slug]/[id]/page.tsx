@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
@@ -30,7 +30,7 @@ export default function CustomObjectDetailPage() {
           <p className="text-gray-600 mb-6">The object &quot;{slug}&quot; does not exist.</p>
           <Link
             href="/object-manager"
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
           >
             Go to Object Manager
           </Link>

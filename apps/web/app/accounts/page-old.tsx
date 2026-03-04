@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -585,8 +585,8 @@ export default function AccountsPage() {
         <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="pb-6 border-b border-gray-200 mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-brand-navy" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
             </div>
@@ -600,7 +600,7 @@ export default function AccountsPage() {
                 onClick={() => setSidebarFilter('recent')}
                 className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'recent'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -611,7 +611,7 @@ export default function AccountsPage() {
                 onClick={() => setSidebarFilter('created-by-me')}
                 className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'created-by-me'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -622,7 +622,7 @@ export default function AccountsPage() {
                 onClick={() => setSidebarFilter('all')}
                 className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'all'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -633,7 +633,7 @@ export default function AccountsPage() {
                 onClick={() => setSidebarFilter('favorites')}
                 className={`w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'favorites'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -660,7 +660,7 @@ export default function AccountsPage() {
             </button>
             <button
               onClick={() => { if (!accountObject?.pageLayouts || accountObject.pageLayouts.length === 0) { setShowNoLayoutsDialog(true); } else if (accountObject.pageLayouts.length === 1 && accountObject.pageLayouts[0]) { setSelectedLayoutId(accountObject.pageLayouts[0].id); setShowDynamicForm(true); } else { setShowLayoutSelector(true); } }}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
             >
               <Plus className="w-5 h-5 mr-2" />
               Add New Account
@@ -677,7 +677,7 @@ export default function AccountsPage() {
               placeholder="Search accounts by name, number, or type..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
             />
           </div>
         </div>
@@ -909,7 +909,7 @@ export default function AccountsPage() {
               </div>
 
               <div className="flex space-x-3 pt-4">
-                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+                <button type="submit" className="bg-brand-navy text-white px-4 py-2 rounded-md hover:bg-brand-navy-dark">
                   {editingAccount ? 'Update Account' : 'Add Account'}
                 </button>
                 <button 
@@ -963,7 +963,7 @@ export default function AccountsPage() {
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'accountName' ? (
-                          <Link href={`/accounts/${account.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                          <Link href={`/accounts/${account.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {account.accountName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -1089,7 +1089,7 @@ export default function AccountsPage() {
                 
                 <button 
                   onClick={handleResetColumns} 
-                  className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                  className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1"
                 >
                   Reset Columns to Default
                 </button>
@@ -1104,7 +1104,7 @@ export default function AccountsPage() {
                 </button>
                 <button
                   onClick={() => setShowFilterSettings(false)}
-                  className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                  className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors"
                 >
                   Save
                 </button>
@@ -1126,7 +1126,7 @@ export default function AccountsPage() {
                   placeholder="Search fields..."
                   value={columnSearchTerm}
                   onChange={(e) => setColumnSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 mb-4"
                 />
                 <div className="max-h-80 overflow-y-auto">
                   <div className="space-y-2">
@@ -1191,7 +1191,7 @@ export default function AccountsPage() {
                         setShowLayoutSelector(false);
                         setShowDynamicForm(true);
                       }}
-                      className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
+                      className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left"
                     >
                       <div>
                         <h4 className="font-medium text-gray-900">{layout.name}</h4>
@@ -1216,7 +1216,7 @@ export default function AccountsPage() {
                   Please create a page layout for Account records before creating new records.
                 </p>
                 <Link href="/object-manager/Account/page-editor">
-                  <button className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                  <button className="w-full px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">
                     Go to Page Editor
                   </button>
                 </Link>

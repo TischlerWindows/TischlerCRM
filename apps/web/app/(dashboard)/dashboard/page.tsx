@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -1019,7 +1019,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1066,7 +1066,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1084,7 +1084,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500 rounded-tl cursor-se-resize hover:bg-indigo-600 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Drag to resize"
               />
             )}
@@ -1114,7 +1114,7 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" fill={widget.config.barColor || '#4f46e5'} radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="value" fill={widget.config.barColor || '#151f6d'} radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1144,7 +1144,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1162,7 +1162,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500 rounded-tl cursor-se-resize hover:bg-indigo-600 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Drag to resize"
               />
             )}
@@ -1177,7 +1177,7 @@ export default function DashboardPage() {
                     <div className="text-xs text-gray-600 w-20 text-right truncate">{item.label}</div>
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
-                        className="bg-indigo-500 rounded-full h-full transition-all hover:bg-indigo-600"
+                        className="bg-brand-navy rounded-full h-full transition-all hover:bg-brand-navy-light"
                         style={{ width: `${widthPercent}%`, minWidth: '2px' }}
                         title={`${item.label}: ${item.value}`}
                       />
@@ -1192,7 +1192,7 @@ export default function DashboardPage() {
 
       case 'stacked-horizontal-bar':
         const stackKeys = widget.config.stackKeys || [];
-        const colors = ['#4f46e5', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#f97316', '#84cc16'];
+        const colors = ['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
         
         return (
           <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
@@ -1211,7 +1211,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1229,7 +1229,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500 rounded-tl cursor-se-resize hover:bg-indigo-600 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="Drag to resize"
               />
             )}
@@ -1326,7 +1326,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1347,11 +1347,11 @@ export default function DashboardPage() {
                 <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end">
                   <div className="relative h-full w-full flex items-end justify-center">
                     <div
-                      className="bg-indigo-100 w-full rounded-t"
+                      className="bg-[#e8eaf6] w-full rounded-t"
                       style={{ height: `${(item.value / Math.max(...widget.config.data.map((d: any) => d.value))) * 100}%` }}
                     />
                     {idx > 0 && (
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-indigo-500" />
+                      <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-navy" />
                     )}
                   </div>
                   <div className="text-xs text-gray-600 mt-2">{item.label}</div>
@@ -1379,7 +1379,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1402,7 +1402,7 @@ export default function DashboardPage() {
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b'];
+                    const colors = ['#151f6d', '#da291c', '#9f9fa2', '#293241'];
                     const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
                     
                     acc.push({
@@ -1429,7 +1429,7 @@ export default function DashboardPage() {
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b'][idx % 4] }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#151f6d', '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                     <span className="text-gray-700">{item.label}</span>
                     <span className="text-gray-500 ml-auto">{item.value}%</span>
                   </div>
@@ -1457,7 +1457,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1474,7 +1474,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
-              <Gauge className="w-24 h-24 text-indigo-600" />
+              <Gauge className="w-24 h-24 text-brand-navy" />
               <div className="text-2xl font-bold text-gray-900 mt-4">75%</div>
               <div className="text-sm text-gray-600">Goal Achievement</div>
             </div>
@@ -1499,7 +1499,7 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
@@ -1670,8 +1670,8 @@ export default function DashboardPage() {
         <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <LayoutDashboard className="w-6 h-6 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <LayoutDashboard className="w-6 h-6 text-brand-navy" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Dashboards</h1>
             </div>
@@ -1689,7 +1689,7 @@ export default function DashboardPage() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'recent' && !selectedDashboard
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1704,7 +1704,7 @@ export default function DashboardPage() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'createdByMe' && !selectedDashboard
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1719,7 +1719,7 @@ export default function DashboardPage() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'all' && !selectedDashboard
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1734,7 +1734,7 @@ export default function DashboardPage() {
                 }}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'favorites' && !selectedDashboard
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1757,7 +1757,7 @@ export default function DashboardPage() {
           
           <button
             onClick={() => setShowNewDashboard(true)}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
           >
             <Plus className="w-5 h-5 mr-2" />
             New Dashboard
@@ -1773,7 +1773,7 @@ export default function DashboardPage() {
               placeholder="Search dashboards by name or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
             />
           </div>
         </div>
@@ -1828,7 +1828,7 @@ export default function DashboardPage() {
                           <p className="text-gray-600">No dashboards found</p>
                           <button
                             onClick={() => setShowNewDashboard(true)}
-                            className="mt-4 text-indigo-600 hover:text-indigo-800 font-medium"
+                            className="mt-4 text-brand-navy hover:text-brand-dark font-medium"
                           >
                             Create your first dashboard
                           </button>
@@ -1846,7 +1846,7 @@ export default function DashboardPage() {
                                   setSelectedDashboard(dashboard);
                                   setViewMode('grid');
                                 }}
-                                className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                                className="text-sm font-medium text-brand-navy hover:text-brand-dark"
                               >
                                 {dashboard.name}
                               </Link>
@@ -1923,7 +1923,7 @@ export default function DashboardPage() {
                       onClick={() => setDashEditMode(!dashEditMode)}
                       className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
                         dashEditMode 
-                          ? 'bg-indigo-600 text-white hover:bg-indigo-700' 
+                          ? 'bg-brand-navy text-white hover:bg-brand-navy-dark' 
                           : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
                       }`}
                     >
@@ -1933,7 +1933,7 @@ export default function DashboardPage() {
                     {dashEditMode && (
                       <button
                         onClick={() => setShowWidgetSelector(true)}
-                        className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                        className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                       >
                         <Plus className="w-5 h-5 mr-2" />
                         Add Widget
@@ -1956,7 +1956,7 @@ export default function DashboardPage() {
                         setEditMode(true);
                         setShowWidgetSelector(true);
                       }}
-                      className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                     >
                       <Plus className="w-5 h-5 mr-2" />
                       Add Your First Widget
@@ -1998,7 +1998,7 @@ export default function DashboardPage() {
                     type="text"
                     name="name"
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     placeholder="Sales Dashboard"
                   />
                 </div>
@@ -2007,7 +2007,7 @@ export default function DashboardPage() {
                   <textarea
                     name="description"
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     placeholder="Track sales performance and key metrics"
                   />
                 </div>
@@ -2021,7 +2021,7 @@ export default function DashboardPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                    className="px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                   >
                     Create Dashboard
                   </button>
@@ -2045,9 +2045,9 @@ export default function DashboardPage() {
                 <button
                   key={type.id}
                   onClick={() => handleSelectWidgetType(type.id)}
-                  className="flex flex-col items-center gap-3 p-6 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors"
+                  className="flex flex-col items-center gap-3 p-6 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors"
                 >
-                  <type.icon className="w-8 h-8 text-indigo-600" />
+                  <type.icon className="w-8 h-8 text-brand-navy" />
                   <span className="text-sm font-medium text-gray-900">{type.label}</span>
                 </button>
               ))}
@@ -2092,7 +2092,7 @@ export default function DashboardPage() {
                         yAxis: '' 
                       });
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                   >
                     {availableReports.map(report => (
                       <option key={report.id} value={report.id}>
@@ -2119,7 +2119,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.xAxis}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="">Select field...</option>
                       {(() => {
@@ -2144,7 +2144,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.yAxis}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="">Select field...</option>
                       {(() => {
@@ -2173,7 +2173,7 @@ export default function DashboardPage() {
                       <select
                         value={widgetConfig.stackBy}
                         onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       >
                         <option value="">Select field...</option>
                         {(() => {
@@ -2202,7 +2202,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.displayUnits}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, displayUnits: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="actual">Actual</option>
                       <option value="shortened">Shortened Number (K, M, B)</option>
@@ -2217,7 +2217,7 @@ export default function DashboardPage() {
                       id="showValues"
                       checked={widgetConfig.showValues}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, showValues: e.target.checked })}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
                     />
                     <label htmlFor="showValues" className="text-sm font-medium text-gray-700">Show Values on Chart</label>
                   </div>
@@ -2228,7 +2228,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.aggregationType || 'sum'}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, aggregationType: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="sum">Sum</option>
                       <option value="count">Count</option>
@@ -2245,7 +2245,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.sortLegend}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, sortLegend: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="asc">Ascending</option>
                       <option value="desc">Descending</option>
@@ -2265,7 +2265,7 @@ export default function DashboardPage() {
                           value="automatic"
                           checked={widgetConfig.yAxisRange === 'automatic'}
                           onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisRange: e.target.value })}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
                         />
                         <label htmlFor="rangeAutomatic" className="text-sm text-gray-700">Automatic</label>
                       </div>
@@ -2277,7 +2277,7 @@ export default function DashboardPage() {
                           value="custom"
                           checked={widgetConfig.yAxisRange === 'custom'}
                           onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisRange: e.target.value })}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
                         />
                         <label htmlFor="rangeCustom" className="text-sm text-gray-700">Custom</label>
                       </div>
@@ -2289,7 +2289,7 @@ export default function DashboardPage() {
                               type="number"
                               value={widgetConfig.yAxisMin}
                               onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisMin: parseFloat(e.target.value) })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
                             />
                           </div>
                           <div>
@@ -2298,7 +2298,7 @@ export default function DashboardPage() {
                               type="number"
                               value={widgetConfig.yAxisMax}
                               onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisMax: parseFloat(e.target.value) })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
                             />
                           </div>
                         </div>
@@ -2318,7 +2318,7 @@ export default function DashboardPage() {
                           value="automatic"
                           checked={widgetConfig.decimalPlaces === 'automatic'}
                           onChange={(e) => setWidgetConfig({ ...widgetConfig, decimalPlaces: e.target.value })}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
                         />
                         <label htmlFor="decimalAutomatic" className="text-sm text-gray-700">Automatic</label>
                       </div>
@@ -2330,7 +2330,7 @@ export default function DashboardPage() {
                           value="custom"
                           checked={widgetConfig.decimalPlaces === 'custom'}
                           onChange={(e) => setWidgetConfig({ ...widgetConfig, decimalPlaces: e.target.value })}
-                          className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
                         />
                         <label htmlFor="decimalCustom" className="text-sm text-gray-700">Custom</label>
                       </div>
@@ -2342,7 +2342,7 @@ export default function DashboardPage() {
                             max="10"
                             value={widgetConfig.customDecimals}
                             onChange={(e) => setWidgetConfig({ ...widgetConfig, customDecimals: parseInt(e.target.value) })}
-                            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
                           />
                         </div>
                       )}
@@ -2355,7 +2355,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.sortBy}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, sortBy: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="">None</option>
                       {availableReports
@@ -2374,7 +2374,7 @@ export default function DashboardPage() {
                     <select
                       value={widgetConfig.legendPosition}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, legendPosition: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                     >
                       <option value="top">Top</option>
                       <option value="right">Right</option>
@@ -2397,7 +2397,7 @@ export default function DashboardPage() {
                       type="text"
                       value={widgetConfig.title}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, title: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       placeholder="Widget title"
                     />
                   </div>
@@ -2408,7 +2408,7 @@ export default function DashboardPage() {
                       type="text"
                       value={widgetConfig.subtitle}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, subtitle: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       placeholder="Optional subtitle"
                     />
                   </div>
@@ -2419,7 +2419,7 @@ export default function DashboardPage() {
                       type="text"
                       value={widgetConfig.footer}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, footer: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       placeholder="Optional footer text"
                     />
                   </div>
@@ -2430,7 +2430,7 @@ export default function DashboardPage() {
                       type="text"
                       value={widgetConfig.customLink}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, customLink: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       placeholder="https://..."
                     />
                   </div>
@@ -2443,7 +2443,7 @@ export default function DashboardPage() {
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Live Preview</h3>
                 
                 {/* Debug Info */}
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-xs">
+                <div className="mb-4 p-3 bg-[#f0f1fa] border border-[#d4d8f0] rounded text-xs">
                   <div><strong>Widget Type:</strong> {selectedWidgetType || 'None'}</div>
                   <div><strong>X-Axis:</strong> {widgetConfig.xAxis || 'Not set'}</div>
                   <div><strong>Y-Axis:</strong> {widgetConfig.yAxis || 'Not set'}</div>
@@ -2522,7 +2522,7 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={editingWidget ? handleUpdateWidget : handleSaveWidget}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                className="px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
               >
                 {editingWidget ? 'Update Widget' : 'Add Widget'}
               </button>

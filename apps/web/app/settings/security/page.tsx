@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -65,8 +65,8 @@ export default function SecuritySettingsPage() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5 text-brand-navy" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Security</h1>

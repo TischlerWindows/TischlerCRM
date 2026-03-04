@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
@@ -16,7 +16,7 @@ type SortDirection = 'asc' | 'desc';
 
 const stageColors: Record<OpportunityStage, string> = {
   'Qualification': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-  'Proposal': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  'Proposal': 'bg-[#e8eaf6] text-brand-dark dark:bg-blue-900/30 dark:text-blue-300',
   'Negotiation': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   'Closed Won': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',

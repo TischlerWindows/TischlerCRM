@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Users, Building2, Lightbulb, Target, Briefcase, X } from 'lucide-react';
@@ -18,14 +18,14 @@ const typeConfig = {
   property: {
     icon: MapPin,
     label: 'Property',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
   account: {
     icon: Building2,
     label: 'Account',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
   contact: {
     icon: Users,
@@ -48,8 +48,8 @@ const typeConfig = {
   project: {
     icon: Briefcase,
     label: 'Project',
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
 };
 
@@ -396,7 +396,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
                     className={cn(
                       'w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors',
                       isSelected
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'bg-[#f0f1fa] dark:bg-brand-navy-dark/20'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     )}
                   >

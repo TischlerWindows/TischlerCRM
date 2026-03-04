@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -674,7 +674,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         style={style}
         {...listeners}
         {...attributes}
-        className="p-2 border rounded bg-white cursor-grab active:cursor-grabbing hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+        className="p-2 border rounded bg-white cursor-grab active:cursor-grabbing hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors"
       >
         <div className="flex items-center gap-2">
           <GripVertical className="w-3 h-3 text-gray-400 flex-shrink-0" />

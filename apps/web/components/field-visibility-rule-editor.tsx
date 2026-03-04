@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { ConditionExpr, FieldDef } from '@/lib/schema';
@@ -115,7 +115,7 @@ export default function FieldVisibilityRuleEditor({
                       setFieldSearchTerm(f.label);
                       setShowFieldDropdown(false);
                     }}
-                    className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-xs border-b last:border-b-0"
+                    className="px-3 py-2 hover:bg-[#f0f1fa] cursor-pointer text-xs border-b last:border-b-0"
                   >
                     <div className="font-medium">{f.label}</div>
                     <div className="text-gray-500 text-xs">{f.apiName}</div>
@@ -230,7 +230,7 @@ export default function FieldVisibilityRuleEditor({
                             setValueSearchTerm(value);
                             setShowValueDropdown(false);
                           }}
-                          className="px-3 py-2 hover:bg-indigo-50 cursor-pointer text-xs border-b last:border-b-0"
+                          className="px-3 py-2 hover:bg-[#f0f1fa] cursor-pointer text-xs border-b last:border-b-0"
                         >
                           {value}
                         </div>
@@ -277,7 +277,7 @@ export default function FieldVisibilityRuleEditor({
             onSave(finalConditions);
           }}
           size="sm" 
-          className="flex-1 border-2 border-indigo-600"
+          className="flex-1 border-2 border-brand-navy"
         >
           Save Visibility Rules
         </Button>

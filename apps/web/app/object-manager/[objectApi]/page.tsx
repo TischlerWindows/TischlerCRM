@@ -163,7 +163,7 @@ export default function ObjectDetailPage() {
           <p className="text-gray-600 mb-4">The object "{objectApi}" does not exist.</p>
           <Link 
             href="/object-manager"
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
           >
             <ChevronLeft className="w-4 h-4 mr-2" />
             Back to Object Manager
@@ -183,19 +183,19 @@ export default function ObjectDetailPage() {
         )}
       >
         {/* Header */}
-        <div className="h-16 border-b border-gray-200 flex items-center justify-between px-4">
+        <div className="h-[48px] bg-brand-navy flex items-center justify-between px-3 flex-shrink-0">
           {!sidebarCollapsed && (
-            <Link href="/object-manager" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
-              <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Object Manager</span>
+            <Link href="/object-manager" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+              <span className="text-xs font-semibold">Object Manager</span>
             </Link>
           )}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-1 hover:bg-gray-100 rounded"
+            className="p-1.5 hover:bg-white/10 rounded transition-colors ml-auto"
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <Settings className="w-5 h-5 text-gray-600" />
+            <Settings className="w-4 h-4 text-white/80" />
           </button>
         </div>
 
@@ -203,8 +203,8 @@ export default function ObjectDetailPage() {
         {!sidebarCollapsed && (
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <Database className="w-5 h-5 text-brand-navy" />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-bold text-gray-900 truncate">{object.label}</h2>
@@ -241,12 +241,12 @@ export default function ObjectDetailPage() {
                           className={cn(
                             'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 text-left',
                             isActive
-                              ? 'bg-indigo-50 text-indigo-600'
+                              ? 'bg-[#f0f1fa] text-brand-navy'
                               : 'text-gray-700 hover:bg-gray-100',
                             section.featured && !isActive && 'font-medium'
                           )}
                         >
-                          <Icon className={cn('w-5 h-5 flex-shrink-0', section.featured && 'text-indigo-600')} />
+                          <Icon className={cn('w-5 h-5 flex-shrink-0', section.featured && 'text-brand-navy')} />
                           <div className="flex-1 min-w-0">
                             <span className="text-sm truncate">{section.label}</span>
                           </div>
@@ -272,7 +272,7 @@ export default function ObjectDetailPage() {
                     className={cn(
                       'w-full flex items-center justify-center p-2.5 rounded-lg transition-colors mb-1',
                       isActive
-                        ? 'bg-indigo-50 text-indigo-600'
+                        ? 'bg-[#f0f1fa] text-brand-navy'
                         : 'text-gray-700 hover:bg-gray-100'
                     )}
                     title={section.label}
@@ -294,19 +294,19 @@ export default function ObjectDetailPage() {
         )}
       >
         {/* Header Bar */}
-        <div className="bg-[#9f9fa2] border-b border-black px-6 py-4">
+        <div className="bg-white border-b border-gray-200 px-6 py-3">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-base font-bold text-brand-dark">
                 {sidebarSections.find(s => s.id === activeSection)?.label}
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-xs text-brand-dark/50 mt-0.5">
                 {sidebarSections.find(s => s.id === activeSection)?.description}
               </p>
             </div>
             {activeSection !== 'details' && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-brand-dark/50">
                   {object.fields.length} fields • {object.pageLayouts.length} layouts
                 </span>
               </div>
@@ -400,8 +400,8 @@ export default function ObjectDetailPage() {
                   This section is under construction. It will allow you to{' '}
                   {SIDEBAR_SECTIONS.find(s => s.id === activeSection)?.description?.toLowerCase()}.
                 </p>
-                <div className="inline-flex items-center gap-2 text-sm text-indigo-600">
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" />
+                <div className="inline-flex items-center gap-2 text-sm text-brand-navy">
+                  <div className="w-2 h-2 bg-brand-navy rounded-full animate-pulse" />
                   Coming soon
                 </div>
               </div>
