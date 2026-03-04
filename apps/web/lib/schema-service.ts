@@ -482,23 +482,31 @@ class LocalStorageSchemaService implements SchemaService {
         try {
           const schema = JSON.parse(stored);
           console.log('[Schema] Migrating localStorage schema to API...');
-          // Save to API
-          await this.saveSchema(schema);
-          // Clear localStorage
-          localStorage.removeItem(STORAGE_KEY);
-          localStorage.removeItem(VERSIONS_KEY);
-          localStorage.removeItem('schema-store');
-          localStorage.removeItem('propertyLayoutAssociations');
+          // Try to save to API (best-effort)
+          try {
+            await this.saveSchema(schema);
+            // Only clear localStorage after successful API save
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(VERSIONS_KEY);
+            localStorage.removeItem('schema-store');
+            localStorage.removeItem('propertyLayoutAssociations');
+          } catch (saveErr) {
+            console.warn('[Schema] Could not save to API yet, using localStorage schema:', saveErr);
+          }
           return schema;
         } catch (error) {
-          console.error('Failed to migrate localStorage schema:', error);
+          console.error('Failed to parse localStorage schema:', error);
         }
       }
     }
     
     // No schema anywhere — create default and save to API
     const defaultSchema = this.createSampleData();
-    await this.saveSchema(defaultSchema);
+    try {
+      await this.saveSchema(defaultSchema);
+    } catch (saveErr) {
+      console.warn('[Schema] Could not save default schema to API:', saveErr);
+    }
     return defaultSchema;
   }
 

@@ -50,6 +50,7 @@ import UniversalSearch from '@/components/universal-search';
 import { cn } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface DashboardWidget {
   id: string;
@@ -116,6 +117,7 @@ const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function DashboardPage() {
   const pathname = usePathname();
+  const { schema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -176,22 +178,33 @@ export default function DashboardPage() {
         setTabs(defaultTabs);
       }
 
-      try {
-        const objects = await getSetting<any[]>('customObjects');
-        if (objects) {
-          const objectTabs = objects.map((obj: any) => ({
-            name: obj.label,
-            href: `/${obj.apiName.toLowerCase()}`
+      // Load available objects from schema store
+      if (schema?.objects) {
+        const builtInRoutes: Record<string, string> = {
+          'Property': '/properties',
+          'Contact': '/contacts',
+          'Account': '/accounts',
+          'Product': '/products',
+          'Lead': '/leads',
+          'Deal': '/deals',
+          'Project': '/projects',
+          'Service': '/service',
+          'Quote': '/quotes',
+          'Installation': '/installations',
+        };
+        const excludedObjects = new Set(['Home']);
+        const objectTabs = schema.objects
+          .filter(obj => !excludedObjects.has(obj.apiName))
+          .map(obj => ({
+            name: obj.pluralLabel || obj.label,
+            href: builtInRoutes[obj.apiName] || `/objects/${obj.apiName.toLowerCase()}`
           }));
-          setAvailableObjects(objectTabs);
-        }
-      } catch (e) {
-        console.error('Error loading custom objects:', e);
+        setAvailableObjects(objectTabs);
       }
 
       setIsLoaded(true);
     })();
-  }, []);
+  }, [schema]);
 
   // Generate preview data based on widget config
   const previewData = useMemo(() => {
