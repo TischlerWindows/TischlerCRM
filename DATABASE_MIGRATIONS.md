@@ -4,13 +4,6 @@
 
 Prisma migrations allow you to safely version and deploy database schema changes. This guide covers deploying migrations to cloud databases.
 
-## Local Migration Status
-
-✅ **Already Applied Locally:**
-- All migrations from `packages/db/prisma/migrations/` have been applied
-- Schema is synced to local PostgreSQL database
-- Latest migration: `add_dashboards`
-
 ## Cloud Database Migration
 
 ### Before Running Migrations
@@ -135,23 +128,6 @@ Migrations that have been applied:
 
 ## Migration Commands Reference
 
-### Local Development
-
-```bash
-# View migration status
-cd packages/db
-pnpm prisma migrate status
-
-# Create new migration from schema changes
-pnpm prisma migrate dev --name my_feature
-
-# Reset database (WARNING: deletes all data)
-pnpm prisma migrate reset
-
-# Resolve migration conflicts
-pnpm prisma migrate resolve --rolled-back migration_name
-```
-
 ### Production Deployment
 
 ```bash
@@ -249,23 +225,6 @@ jobs:
 
 ## Best Practices
 
-### Before Creating Migrations
-
-1. **Test locally first:**
-   ```bash
-   pnpm prisma migrate dev --name my_feature
-   ```
-
-2. **Review migration SQL:**
-   ```bash
-   cat packages/db/prisma/migrations/my_feature/migration.sql
-   ```
-
-3. **Verify with data:**
-   ```bash
-   pnpm prisma db seed  # Populate test data
-   ```
-
 ### During Deployment
 
 1. **Always run migrations before starting app**
@@ -325,12 +284,11 @@ jobs:
 
 ## Next Steps
 
-1. ✅ Migrations created and tested locally
-2. Set up cloud PostgreSQL database
-3. Configure DATABASE_URL in deployment platform
-4. Add migration step to build/deploy process
-5. Deploy and verify migrations applied
-6. Monitor production database for issues
+1. Set up cloud PostgreSQL database (Railway)
+2. Configure DATABASE_URL in deployment platform
+3. Add migration step to build/deploy process
+4. Deploy and verify migrations applied
+5. Monitor production database for issues
 
 ## See Also
 

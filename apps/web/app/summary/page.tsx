@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -308,7 +308,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
               key={option}
               onClick={() => handleSelectOption(option)}
               className={`px-2 py-1 text-xs cursor-pointer whitespace-normal break-words ${
-                index === highlightedIndex ? 'bg-indigo-100 text-indigo-900' : 'hover:bg-blue-50'
+                index === highlightedIndex ? 'bg-[#e8eaf6] text-brand-dark' : 'hover:bg-[#f0f1fa]'
               }`}
             >
               {option}
@@ -433,7 +433,7 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
       onKeyDown={handleKeyDown}
       maxLength={400}
       rows={1}
-      className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none overflow-hidden"
+      className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy resize-none overflow-hidden"
       style={{ height: 'auto', minHeight: '24px' }}
       onInput={(e) => {
         const target = e.target as HTMLTextAreaElement;
@@ -1646,8 +1646,8 @@ export default function SummaryPage() {
           {/* Page Header in Sidebar */}
           <div className="pb-6 border-b border-gray-200">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
+              <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <FileSpreadsheet className="w-6 h-6 text-brand-navy" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Summary</h1>
             </div>
@@ -1661,7 +1661,7 @@ export default function SummaryPage() {
                 onClick={() => setSidebarFilter('recent')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'recent'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1672,7 +1672,7 @@ export default function SummaryPage() {
                 onClick={() => setSidebarFilter('created-by-me')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'created-by-me'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1683,7 +1683,7 @@ export default function SummaryPage() {
                 onClick={() => setSidebarFilter('all')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'all'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1694,7 +1694,7 @@ export default function SummaryPage() {
                 onClick={() => setSidebarFilter('favorites')}
                 className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                   sidebarFilter === 'favorites'
-                    ? 'bg-indigo-50 text-indigo-600 font-medium'
+                    ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
@@ -1715,7 +1715,7 @@ export default function SummaryPage() {
             <div className="flex gap-3">
               <button
                 onClick={createNewSummary}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 New Summary
@@ -1732,7 +1732,7 @@ export default function SummaryPage() {
                 placeholder="Search summaries by job name, salesman, job type, or estimator..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:border-transparent"
               />
             </div>
           </div>
@@ -1807,7 +1807,7 @@ export default function SummaryPage() {
                               setEditingSummary(summary);
                               setShowNewSummary(true);
                             }}
-                            className="text-indigo-600 hover:text-indigo-800 font-medium"
+                            className="text-brand-navy hover:text-brand-dark font-medium"
                           >
                             {summary.name || 'Untitled Summary'}
                           </button>
@@ -1942,7 +1942,7 @@ export default function SummaryPage() {
                     value={editingSummary.name}
                     onChange={(e) => setEditingSummary({ ...editingSummary, name: e.target.value })}
                     maxLength={400}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                     placeholder="Enter job name"
                   />
                 </div>
@@ -1951,7 +1951,7 @@ export default function SummaryPage() {
                   <select
                     value={editingSummary.salesman}
                     onChange={(e) => setEditingSummary({ ...editingSummary, salesman: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   >
                     <option value="">Select salesman</option>
                     <option value="Andy">Andy</option>
@@ -1967,7 +1967,7 @@ export default function SummaryPage() {
                     value={editingSummary.opportunityNumber}
                     onChange={(e) => setEditingSummary({ ...editingSummary, opportunityNumber: e.target.value })}
                     maxLength={100}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                     placeholder="Enter opportunity #"
                   />
                 </div>
@@ -1976,7 +1976,7 @@ export default function SummaryPage() {
                   <select
                     value={editingSummary.jobType}
                     onChange={(e) => setEditingSummary({ ...editingSummary, jobType: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   >
                     <option value="">Select job type</option>
                     <option value="Premium">Premium</option>
@@ -1989,7 +1989,7 @@ export default function SummaryPage() {
                   <select
                     value={editingSummary.estimator}
                     onChange={(e) => setEditingSummary({ ...editingSummary, estimator: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   >
                     <option value="">Select estimator</option>
                     <option value="Julian">Julian</option>
@@ -2006,7 +2006,7 @@ export default function SummaryPage() {
                     type="date"
                     value={editingSummary.date}
                     onChange={(e) => setEditingSummary({ ...editingSummary, date: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   />
                 </div>
               </div>
@@ -2021,7 +2021,7 @@ export default function SummaryPage() {
                         type="checkbox"
                         checked={showType3}
                         onChange={(e) => setShowType3(e.target.checked)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
                       />
                       Type 3
                     </label>
@@ -2030,13 +2030,13 @@ export default function SummaryPage() {
                         type="checkbox"
                         checked={showType4}
                         onChange={(e) => setShowType4(e.target.checked)}
-                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
                       />
                       Type 4
                     </label>
                     <button
                       onClick={handleAddRow}
-                      className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Row
@@ -2087,10 +2087,10 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300 w-24">Per Position</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300 w-24">Per Unit</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300 w-24">Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300 w-24">Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300 w-24">Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-blue-600 bg-blue-50 border-l border-blue-300 w-24">Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-blue-600 bg-blue-50 border-r border-blue-300 w-24">Per Position</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8] w-24">Per Unit</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8] w-24">Per Position</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300 w-24">Per Unit</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300 w-24">Per Position</th>
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400 w-20" style={{minWidth: '80px'}}></th>
                       </tr>
@@ -2257,7 +2257,7 @@ export default function SummaryPage() {
                     </label>
                     <button
                       onClick={handleAddDoorRow}
-                      className="inline-flex items-center px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Row
@@ -2308,10 +2308,10 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300 w-24">Per Position</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300 w-24">Per Unit</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300 w-24">Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-l border-purple-300 w-24">Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-purple-600 bg-purple-50 border-r border-purple-300 w-24">Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-blue-600 bg-blue-50 border-l border-blue-300 w-24">Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-blue-600 bg-blue-50 border-r border-blue-300 w-24">Per Position</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8] w-24">Per Unit</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8] w-24">Per Position</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300 w-24">Per Unit</th>
+                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300 w-24">Per Position</th>
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400 w-20" style={{minWidth: '80px'}}></th>
                       </tr>
@@ -2467,7 +2467,7 @@ export default function SummaryPage() {
               </button>
               <button
                 onClick={handleSaveSummary}
-                className="inline-flex items-center px-6 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-6 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Summary

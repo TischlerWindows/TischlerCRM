@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Calendar, Video, Phone, Clock } from 'lucide-react';
@@ -31,7 +31,7 @@ export function CalendarMini({ events, loading }: CalendarMiniProps) {
   const getEventColor = (type: CalendarEvent['type']) => {
     switch (type) {
       case 'meeting':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        return 'bg-[#e8eaf6] text-brand-navy dark:bg-blue-900/30 dark:text-blue-300';
       case 'call':
         return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
       case 'deadline':
@@ -125,7 +125,7 @@ export function CalendarMini({ events, loading }: CalendarMiniProps) {
                         Close
                       </button>
                       <button
-                        className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors"
+                        className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-navy hover:bg-brand-navy-dark rounded transition-colors"
                       >
                         View Details
                       </button>

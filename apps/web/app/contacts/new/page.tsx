@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -201,7 +201,7 @@ export default function NewContactPage() {
               </button>
               <button
                 onClick={handleSave}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Save className="w-4 h-4 mr-2" />
                 Save Contact
@@ -228,7 +228,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleChange('firstName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Enter first name"
                 />
               </div>
@@ -241,7 +241,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleChange('lastName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Enter last name"
                 />
               </div>
@@ -254,7 +254,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.accountName}
                   onChange={(e) => handleChange('accountName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Enter account name"
                 />
               </div>
@@ -267,7 +267,7 @@ export default function NewContactPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="email@example.com"
                 />
               </div>
@@ -280,7 +280,7 @@ export default function NewContactPage() {
                   type="email"
                   value={formData.secondaryEmail}
                   onChange={(e) => handleChange('secondaryEmail', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="secondary@example.com"
                 />
               </div>
@@ -293,7 +293,7 @@ export default function NewContactPage() {
                   type="tel"
                   value={formData.mobilePhone}
                   onChange={(e) => handleChange('mobilePhone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -305,7 +305,7 @@ export default function NewContactPage() {
                 <select
                   value={formData.contactType}
                   onChange={(e) => handleChange('contactType', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                 >
                   <option value="">Select type...</option>
                   {CONTACT_TYPES.map(type => (
@@ -331,7 +331,7 @@ export default function NewContactPage() {
                       }
                     }}
                     onFocus={() => setShowReportsToSearch(true)}
-                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                     placeholder="Search for contact..."
                   />
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -360,7 +360,7 @@ export default function NewContactPage() {
                   type="tel"
                   value={formData.fax}
                   onChange={(e) => handleChange('fax', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -373,7 +373,7 @@ export default function NewContactPage() {
                   type="tel"
                   value={formData.otherPhone}
                   onChange={(e) => handleChange('otherPhone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="(555) 123-4567"
                 />
               </div>
@@ -384,7 +384,7 @@ export default function NewContactPage() {
                   id="active"
                   checked={formData.active}
                   onChange={(e) => handleChange('active', e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
                 />
                 <label htmlFor="active" className="ml-2 text-sm font-medium text-gray-700">
                   Active
@@ -407,7 +407,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.addressSearch}
                   onChange={(e) => handleChange('addressSearch', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Search for address..."
                 />
               </div>
@@ -419,7 +419,7 @@ export default function NewContactPage() {
                 <select
                   value={formData.mailingCountry}
                   onChange={(e) => handleChange('mailingCountry', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                 >
                   {COUNTRIES.map(country => (
                     <option key={country} value={country}>{country}</option>
@@ -435,7 +435,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.poBox}
                   onChange={(e) => handleChange('poBox', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="PO Box number"
                 />
               </div>
@@ -448,7 +448,7 @@ export default function NewContactPage() {
                   value={formData.mailingStreet}
                   onChange={(e) => handleChange('mailingStreet', e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Street address"
                 />
               </div>
@@ -461,7 +461,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.mailingCity}
                   onChange={(e) => handleChange('mailingCity', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="City"
                 />
               </div>
@@ -474,7 +474,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.mailingStateProvince}
                   onChange={(e) => handleChange('mailingStateProvince', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="State or Province"
                 />
               </div>
@@ -487,7 +487,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.mailingZipPostalCode}
                   onChange={(e) => handleChange('mailingZipPostalCode', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                   placeholder="Zip or Postal Code"
                 />
               </div>
@@ -507,7 +507,7 @@ export default function NewContactPage() {
                 value={formData.generalNotes}
                 onChange={(e) => handleChange('generalNotes', e.target.value)}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                 placeholder="Add notes about this contact..."
               />
             </div>
@@ -539,7 +539,7 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.contactOwner}
                   onChange={(e) => handleChange('contactOwner', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                 />
               </div>
 

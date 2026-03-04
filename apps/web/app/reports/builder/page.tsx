@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -447,7 +447,7 @@ export default function ReportBuilderPage() {
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex justify-between items-center">
         <Link
           href="/reports"
-          className="inline-flex items-center text-indigo-600 hover:text-indigo-800"
+          className="inline-flex items-center text-brand-navy hover:text-brand-dark"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Reports
@@ -471,14 +471,14 @@ export default function ReportBuilderPage() {
           </button>
           <button
             onClick={handleRunReport}
-            className="inline-flex items-center px-4 py-2 border border-indigo-600 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors"
+            className="inline-flex items-center px-4 py-2 border border-brand-navy text-brand-navy rounded-lg hover:bg-[#f0f1fa] transition-colors"
           >
             <Play className="w-4 h-4 mr-2" />
             Run Report
           </button>
           <button
             onClick={handleSave}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
           >
             <Save className="w-4 h-4 mr-2" />
             Save Report
@@ -513,7 +513,7 @@ export default function ReportBuilderPage() {
                     value={reportName}
                     onChange={(e) => setReportName(e.target.value)}
                     placeholder="e.g., Monthly Sales Report"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                   />
                 </div>
                 
@@ -530,7 +530,7 @@ export default function ReportBuilderPage() {
                       setGroups([]);
                       setSortBy('');
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                   >
                     <option value="">Select an object...</option>
                     {OBJECT_TYPES.map(type => (
@@ -546,7 +546,7 @@ export default function ReportBuilderPage() {
                   <select
                     value={format}
                     onChange={(e) => setFormat(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                   >
                     <option value="tabular">Tabular</option>
                     <option value="summary">Summary</option>
@@ -570,7 +570,7 @@ export default function ReportBuilderPage() {
               <div className="px-6 pb-6">
                 <button
                   onClick={addFilter}
-                  className="w-full mb-4 px-3 py-2 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 text-sm font-medium"
+                  className="w-full mb-4 px-3 py-2 border border-brand-navy text-brand-navy rounded-md hover:bg-[#f0f1fa] text-sm font-medium"
                 >
                   + Add Filter
                 </button>
@@ -580,7 +580,7 @@ export default function ReportBuilderPage() {
                       <select
                         value={filter.field}
                         onChange={(e) => updateFilter(index, 'field', e.target.value)}
-                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40"
                       >
                         <option value="">Field...</option>
                         {availableFields.map(field => (
@@ -591,7 +591,7 @@ export default function ReportBuilderPage() {
                       <select
                         value={filter.operator}
                         onChange={(e) => updateFilter(index, 'operator', e.target.value)}
-                        className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                        className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40"
                       >
                         {OPERATORS.map(op => (
                           <option key={op.value} value={op.value}>{op.label}</option>
@@ -603,7 +603,7 @@ export default function ReportBuilderPage() {
                         value={filter.value}
                         onChange={(e) => updateFilter(index, 'value', e.target.value)}
                         placeholder="Value..."
-                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40"
                       />
                       
                       <button
@@ -641,7 +641,7 @@ export default function ReportBuilderPage() {
                             g.id === group.id ? { ...g, field: e.target.value } : g
                           ));
                         }}
-                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 capitalize"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-brand-navy/40 capitalize"
                       >
                         <option value="">Select field...</option>
                         {availableFields.map(field => (
@@ -662,7 +662,7 @@ export default function ReportBuilderPage() {
                       const newId = String(Date.now());
                       setGroups([...groups, { id: newId, field: '' }]);
                     }}
-                    className="w-full mt-3 px-3 py-2 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 text-sm font-medium"
+                    className="w-full mt-3 px-3 py-2 border border-brand-navy text-brand-navy rounded-md hover:bg-[#f0f1fa] text-sm font-medium"
                   >
                     + Add Group
                   </button>
@@ -690,7 +690,7 @@ export default function ReportBuilderPage() {
                       value={columnSearch}
                       onChange={(e) => setColumnSearch(e.target.value)}
                       placeholder="Search columns..."
-                      className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500"
+                      className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-brand-navy/40"
                     />
                   </div>
                 </div>
@@ -707,7 +707,7 @@ export default function ReportBuilderPage() {
                               c.id === col.id ? { ...c, field: e.target.value, label: e.target.value } : c
                             ));
                           }}
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 capitalize"
+                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-brand-navy/40 capitalize"
                         >
                           <option value="">Select field...</option>
                           {availableFields
@@ -724,7 +724,7 @@ export default function ReportBuilderPage() {
                               c.id === col.id ? { ...c, label: e.target.value } : c
                             ));
                           }}
-                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-indigo-500"
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-brand-navy/40"
                           placeholder="Custom label (optional)"
                         />
                       </div>
@@ -742,7 +742,7 @@ export default function ReportBuilderPage() {
                       const newId = String(Date.now());
                       setColumns([...columns, { id: newId, field: '', label: '' }]);
                     }}
-                    className="w-full mt-3 px-3 py-2 border border-indigo-600 text-indigo-600 rounded-md hover:bg-indigo-50 text-sm font-medium"
+                    className="w-full mt-3 px-3 py-2 border border-brand-navy text-brand-navy rounded-md hover:bg-[#f0f1fa] text-sm font-medium"
                   >
                     + Add Column
                   </button>
@@ -755,7 +755,7 @@ export default function ReportBuilderPage() {
         {/* Resize Handle */}
         <div
           onMouseDown={() => setIsResizing(true)}
-          className="w-1 bg-gray-300 hover:bg-indigo-500 cursor-col-resize flex-shrink-0 relative group"
+          className="w-1 bg-gray-300 hover:bg-[#f0f1fa]0 cursor-col-resize flex-shrink-0 relative group"
         >
           <div className="absolute inset-y-0 -left-1 -right-1" />
         </div>
@@ -801,8 +801,8 @@ export default function ReportBuilderPage() {
                             
                             return Object.entries(groupedRows).map(([groupValue, rows]) => (
                               <React.Fragment key={groupValue}>
-                                <tr className="bg-indigo-50">
-                                  <td colSpan={columns.length} className="px-6 py-2 text-sm font-semibold text-indigo-900">
+                                <tr className="bg-[#f0f1fa]">
+                                  <td colSpan={columns.length} className="px-6 py-2 text-sm font-semibold text-brand-dark">
                                     {groupValue} ({rows.length} records)
                                   </td>
                                 </tr>

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -477,7 +477,7 @@ export default function DynamicForm({
               checked={value || false}
               onChange={(e) => handleFieldChange(fieldDef.apiName, e.target.checked)}
               disabled={isReadOnly}
-              className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+              className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
             />
             <Label htmlFor={fieldDef.apiName} className="text-sm font-normal">
               {fieldDef.label}
@@ -510,7 +510,7 @@ export default function DynamicForm({
       case 'Picklist':
         const picklistOptions = fieldDef.picklistValues || [];
         inputElement = (
-          <select {...commonProps} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+          <select {...commonProps} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent">
             <option value="">-- Select --</option>
             {picklistOptions.map((option) => (
               <option key={option} value={option}>
@@ -542,7 +542,7 @@ export default function DynamicForm({
                     handleFieldChange(fieldDef.apiName, newValues.join(';'));
                   }}
                   disabled={isReadOnly}
-                  className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
                 />
                 <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
                   {option}
@@ -794,7 +794,7 @@ export default function DynamicForm({
                         })
                       }
                       disabled={isReadOnly}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                     >
                       <option value="">-- Select --</option>
                       {fieldDef.apiName === 'Contact__name' && subField.apiName === 'Contact__name_salutation' && (
@@ -873,7 +873,7 @@ export default function DynamicForm({
               className={cn(
                 'px-4 py-2 font-medium transition-colors border-b-2 -mb-px',
                 activeTab === tab.id
-                  ? 'border-indigo-500 text-indigo-600'
+                  ? 'border-brand-navy text-brand-navy'
                   : 'border-transparent text-gray-600 hover:text-gray-900'
               )}
             >

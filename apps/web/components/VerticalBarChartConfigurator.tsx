@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useMemo } from 'react';
 import {
@@ -64,9 +64,9 @@ interface VerticalBarChartConfiguratorProps {
 const COLOR_SCHEMES = {
   blue: ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'],
   green: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5'],
-  purple: ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'],
+  navy: ['#151f6d', '#1e2a7a', '#2d3d99', '#4d5fc7', '#8890e0'],
   orange: ['#f97316', '#fb923c', '#fdba74', '#fed7aa', '#ffedd5'],
-  multi: ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899']
+  multi: ['#151f6d', '#da291c', '#10b981', '#f59e0b', '#9f9fa2']
 };
 
 // ============================================================================
@@ -290,7 +290,7 @@ export default function VerticalBarChartConfigurator({
             type="text"
             value={config.chartTitle}
             onChange={(e) => updateConfig({ chartTitle: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
           />
         </div>
 
@@ -300,7 +300,7 @@ export default function VerticalBarChartConfigurator({
           <select
             value={config.groupByField}
             onChange={(e) => updateConfig({ groupByField: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
           >
             {groupableFields.map(field => (
               <option key={field} value={field}>{field}</option>
@@ -314,7 +314,7 @@ export default function VerticalBarChartConfigurator({
           <select
             value={config.metricField}
             onChange={(e) => updateConfig({ metricField: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
           >
             {numericFields.map(field => (
               <option key={field} value={field}>{field}</option>
@@ -328,7 +328,7 @@ export default function VerticalBarChartConfigurator({
           <select
             value={config.aggregateFunction}
             onChange={(e) => updateConfig({ aggregateFunction: e.target.value as AggregateFunction })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
           >
             <option value="sum">Sum</option>
             <option value="count">Count</option>
@@ -344,7 +344,7 @@ export default function VerticalBarChartConfigurator({
           <select
             value={config.dateRange}
             onChange={(e) => updateConfig({ dateRange: e.target.value as DateRange })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
           >
             <option value="all">All Time</option>
             <option value="thisMonth">This Month</option>
@@ -366,7 +366,7 @@ export default function VerticalBarChartConfigurator({
                 type="date"
                 value={config.customStartDate || ''}
                 onChange={(e) => updateConfig({ customStartDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               />
             </div>
             <div>
@@ -375,7 +375,7 @@ export default function VerticalBarChartConfigurator({
                 type="date"
                 value={config.customEndDate || ''}
                 onChange={(e) => updateConfig({ customEndDate: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               />
             </div>
           </div>
@@ -391,7 +391,7 @@ export default function VerticalBarChartConfigurator({
               <select
                 value={config.filterStage || ''}
                 onChange={(e) => updateConfig({ filterStage: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               >
                 <option value="">All Stages</option>
                 {uniqueStages.map(stage => (
@@ -405,7 +405,7 @@ export default function VerticalBarChartConfigurator({
               <select
                 value={config.filterRecordType || ''}
                 onChange={(e) => updateConfig({ filterRecordType: e.target.value || undefined })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               >
                 <option value="">All Types</option>
                 {uniqueRecordTypes.map(type => (
@@ -426,7 +426,7 @@ export default function VerticalBarChartConfigurator({
               <select
                 value={config.sortBy}
                 onChange={(e) => updateConfig({ sortBy: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               >
                 <option value="label">Label (A-Z)</option>
                 <option value="value-asc">Value (Low to High)</option>
@@ -442,7 +442,7 @@ export default function VerticalBarChartConfigurator({
                 max="50"
                 value={config.maxBars}
                 onChange={(e) => updateConfig({ maxBars: parseInt(e.target.value) || 10 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               />
             </div>
 
@@ -451,7 +451,7 @@ export default function VerticalBarChartConfigurator({
               <select
                 value={config.colorScheme}
                 onChange={(e) => updateConfig({ colorScheme: e.target.value as any })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
               >
                 <option value="blue">Blue</option>
                 <option value="green">Green</option>
@@ -467,7 +467,7 @@ export default function VerticalBarChartConfigurator({
                 id="showValues"
                 checked={config.showValues}
                 onChange={(e) => updateConfig({ showValues: e.target.checked })}
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-brand-navy rounded focus:ring-brand-navy/40"
               />
               <label htmlFor="showValues" className="text-sm text-gray-700">Show Values on Bars</label>
             </div>
@@ -478,7 +478,7 @@ export default function VerticalBarChartConfigurator({
                 id="showLegend"
                 checked={config.showLegend}
                 onChange={(e) => updateConfig({ showLegend: e.target.checked })}
-                className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                className="w-4 h-4 text-brand-navy rounded focus:ring-brand-navy/40"
               />
               <label htmlFor="showLegend" className="text-sm text-gray-700">Show Legend</label>
             </div>
@@ -496,7 +496,7 @@ export default function VerticalBarChartConfigurator({
                 type="text"
                 value={config.xAxisLabel}
                 onChange={(e) => updateConfig({ xAxisLabel: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                 placeholder="Optional"
               />
             </div>
@@ -507,7 +507,7 @@ export default function VerticalBarChartConfigurator({
                 type="text"
                 value={config.yAxisLabel}
                 onChange={(e) => updateConfig({ yAxisLabel: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                 placeholder="Optional"
               />
             </div>
@@ -519,7 +519,7 @@ export default function VerticalBarChartConfigurator({
           <div className="border-t border-gray-200 pt-4">
             <button
               onClick={() => onSave(config)}
-              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+              className="w-full px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark font-medium"
             >
               Save Configuration
             </button>

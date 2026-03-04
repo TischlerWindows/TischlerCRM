@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
@@ -589,8 +589,8 @@ export default function ContactsPage() {
           <div className="space-y-6">
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
-                  <Users className="w-6 h-6 text-indigo-600" />
+                <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-brand-navy" />
                 </div>
                 <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
               </div>
@@ -604,7 +604,7 @@ export default function ContactsPage() {
                   onClick={() => setSidebarFilter('recent')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'recent'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -615,7 +615,7 @@ export default function ContactsPage() {
                   onClick={() => setSidebarFilter('created-by-me')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'created-by-me'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -626,7 +626,7 @@ export default function ContactsPage() {
                   onClick={() => setSidebarFilter('all')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'all'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -637,7 +637,7 @@ export default function ContactsPage() {
                   onClick={() => setSidebarFilter('favorites')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'favorites'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -696,7 +696,7 @@ export default function ContactsPage() {
                   setShowLayoutSelector(true);
                 }
               }}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
             >
               <Plus className="w-5 h-5 mr-2" />
               New Contact
@@ -706,7 +706,7 @@ export default function ContactsPage() {
         <div className="mb-6 flex gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+            <input type="text" placeholder="Search contacts..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent" />
           </div>
           <AdvancedFilters
             fields={AVAILABLE_COLUMNS.map(col => ({ 
@@ -723,14 +723,14 @@ export default function ContactsPage() {
           <div className="mb-4 flex flex-wrap gap-2">
             <span className="text-sm text-gray-600">Active Filters:</span>
             {filterConditions.map((condition, index) => (
-              <div key={condition.id} className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm">
+              <div key={condition.id} className="inline-flex items-center gap-2 px-3 py-1 bg-[#e8eaf6] text-brand-navy rounded-full text-sm">
                 {index > 0 && condition.logicOperator && (
                   <span className="font-semibold">{condition.logicOperator}</span>
                 )}
                 <span>{describeCondition(condition, AVAILABLE_COLUMNS)}</span>
                 <button
                   onClick={() => setFilterConditions(filterConditions.filter(c => c.id !== condition.id))}
-                  className="text-indigo-600 hover:text-indigo-800"
+                  className="text-brand-navy hover:text-brand-dark"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -754,7 +754,7 @@ export default function ContactsPage() {
                       type="checkbox"
                       checked={selectedContacts.size === filteredContacts.length && filteredContacts.length > 0}
                       onChange={toggleSelectAll}
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
                     />
                   </th>
                   {visibleColumns.map(columnId => {
@@ -789,7 +789,7 @@ export default function ContactsPage() {
                         type="checkbox"
                         checked={selectedContacts.has(contact.id)}
                         onChange={() => toggleSelectContact(contact.id)}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                        className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
                       />
                     </td>
                     {visibleColumns.map(columnId => {
@@ -798,7 +798,7 @@ export default function ContactsPage() {
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'contactNumber' ? (
-                            <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/contacts/${contact.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {contact.contactNumber}
                             </Link>
                           ) : column.id === 'name' ? (
@@ -815,7 +815,7 @@ export default function ContactsPage() {
                                 });
                               if (parts.length === 0) return <span className="text-gray-400">-</span>;
                               return (
-                                <Link href={`/contacts/${contact.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                                <Link href={`/contacts/${contact.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                                   {parts.map(p => p.value).join(' ')}
                                 </Link>
                               );
@@ -853,7 +853,7 @@ export default function ContactsPage() {
                                 router.push(`/contacts/${contact.id}`);
                                 setOpenDropdown(null);
                               }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
                             >
                               <Edit className="w-4 h-4" />
                               Edit
@@ -910,7 +910,7 @@ export default function ContactsPage() {
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button onClick={() => setShowNoLayoutsDialog(false)} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-              <Link href="/object-manager/Contact" className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" onClick={() => setShowNoLayoutsDialog(false)}>
+              <Link href="/object-manager/Contact" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark" onClick={() => setShowNoLayoutsDialog(false)}>
                 <Layout className="w-4 h-4 mr-2" />Go to Page Editor
               </Link>
             </div>
@@ -925,9 +925,9 @@ export default function ContactsPage() {
             </div>
             <div className="p-6 space-y-3">
               {pageLayouts.map((layout) => (
-                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); localStorage.setItem('contactSelectedLayoutId', layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left">
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Users className="w-5 h-5 text-indigo-600" />
+                <button key={layout.id} onClick={() => { setSelectedLayoutId(layout.id); localStorage.setItem('contactSelectedLayoutId', layout.id); setShowLayoutSelector(false); setShowDynamicForm(true); }} className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left">
+                  <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-brand-navy" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
@@ -976,7 +976,7 @@ export default function ContactsPage() {
                       onDragStart={() => handleColumnDragStart(index)}
                       onDragOver={(e) => { e.preventDefault(); handleColumnDragOver(index); }}
                       onDragEnd={handleColumnDragEnd}
-                      className={`group flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg cursor-move hover:border-indigo-300 hover:bg-indigo-50 transition-all ${
+                      className={`group flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-lg cursor-move hover:border-[#b8bfe8] hover:bg-[#f0f1fa] transition-all ${
                         draggedColumnIndex === index ? 'opacity-50' : ''
                       }`}
                     >
@@ -996,7 +996,7 @@ export default function ContactsPage() {
               
               <button 
                 onClick={() => setShowAddColumn(true)}
-                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-brand-navy hover:text-brand-navy transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add More Columns
@@ -1004,7 +1004,7 @@ export default function ContactsPage() {
               
               <button 
                 onClick={handleResetColumns} 
-                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1"
               >
                 Reset Columns to Default
               </button>
@@ -1019,7 +1019,7 @@ export default function ContactsPage() {
               </button>
               <button
                 onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors"
               >
                 Save
               </button>
@@ -1041,7 +1041,7 @@ export default function ContactsPage() {
                 placeholder="Search fields..."
                 value={columnSearchTerm}
                 onChange={(e) => setColumnSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 mb-4"
               />
               <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-2">

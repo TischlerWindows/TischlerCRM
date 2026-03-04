@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -505,7 +505,7 @@ export default function QuotesPage() {
           <div className="space-y-6">
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center"><FileText className="w-6 h-6 text-indigo-600" /></div>
+                <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center"><FileText className="w-6 h-6 text-brand-navy" /></div>
                 <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
               </div>
               <p className="text-sm text-gray-600 ml-13">Generate and manage price quotes for deals</p>
@@ -518,7 +518,7 @@ export default function QuotesPage() {
                   onClick={() => setSidebarFilter('recent')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'recent'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -529,7 +529,7 @@ export default function QuotesPage() {
                   onClick={() => setSidebarFilter('created-by-me')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'created-by-me'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -540,7 +540,7 @@ export default function QuotesPage() {
                   onClick={() => setSidebarFilter('all')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'all'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -551,7 +551,7 @@ export default function QuotesPage() {
                   onClick={() => setSidebarFilter('favorites')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
                     sidebarFilter === 'favorites'
-                      ? 'bg-indigo-50 text-indigo-600 font-medium'
+                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
@@ -588,7 +588,7 @@ export default function QuotesPage() {
                     setShowLayoutSelector(true);
                   }
                 }}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
                 New Quote
@@ -605,7 +605,7 @@ export default function QuotesPage() {
               placeholder="Search quotes by number, name, account, or status..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
             />
           </div>
         </div>
@@ -642,11 +642,11 @@ export default function QuotesPage() {
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'quoteNumber' ? (
-                            <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                            <Link href={`/quotes/${quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {quote.quoteNumber}
                           </Link>
                         ) : column.id === 'quoteName' ? (
-                          <Link href={`/quotes/${quote.id}`} className="font-medium text-indigo-600 hover:text-indigo-800">
+                          <Link href={`/quotes/${quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {quote.quoteName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -678,7 +678,7 @@ export default function QuotesPage() {
                                 router.push(`/quotes/${quote.id}`);
                                 setOpenDropdown(null);
                               }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50"
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
                             >
                               <Edit className="w-4 h-4" />
                               Edit
@@ -758,7 +758,7 @@ export default function QuotesPage() {
               </button>
               <Link
                 href="/object-manager/Quote"
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                 onClick={() => setShowNoLayoutsDialog(false)}
               >
                 <Layout className="w-4 h-4 mr-2" />
@@ -789,10 +789,10 @@ export default function QuotesPage() {
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}
-                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
+                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left"
                 >
-                  <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-indigo-600" />
+                  <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-brand-navy" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
@@ -882,7 +882,7 @@ export default function QuotesPage() {
               
               <button 
                 onClick={handleResetColumns} 
-                className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1"
               >
                 Reset Columns to Default
               </button>
@@ -897,7 +897,7 @@ export default function QuotesPage() {
               </button>
               <button
                 onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors"
               >
                 Save
               </button>
@@ -919,7 +919,7 @@ export default function QuotesPage() {
                 placeholder="Search fields..."
                 value={columnSearchTerm}
                 onChange={(e) => setColumnSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 mb-4"
               />
               <div className="max-h-80 overflow-y-auto">
                 <div className="space-y-2">

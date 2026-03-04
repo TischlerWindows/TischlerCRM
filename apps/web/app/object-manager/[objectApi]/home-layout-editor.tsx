@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
@@ -458,7 +458,7 @@ export default function HomeLayoutEditor() {
                         onDragStart={(e) => handlePanelDragStart(panel.id, e)}
                         onDragEnd={handlePanelDragEnd}
                         className={`flex-1 rounded-lg border border-gray-200 bg-gray-50 p-3 cursor-move ${
-                          draggedPanelId === panel.id ? 'ring-2 ring-indigo-300' : ''
+                          draggedPanelId === panel.id ? 'ring-2 ring-brand-navy/30' : ''
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">

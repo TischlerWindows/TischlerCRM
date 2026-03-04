@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, FormEvent } from 'react';
 import { X } from 'lucide-react';
@@ -133,7 +133,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
               className={cn(
-                'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white transition-colors',
+                'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white transition-colors',
                 errors.name
                   ? 'border-red-500 focus:ring-red-500'
                   : 'border-gray-300 dark:border-gray-600'
@@ -156,7 +156,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
               value={formData.accountName}
               onChange={(e) => handleChange('accountName', e.target.value)}
               className={cn(
-                'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white transition-colors',
+                'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white transition-colors',
                 errors.accountName
                   ? 'border-red-500 focus:ring-red-500'
                   : 'border-gray-300 dark:border-gray-600'
@@ -178,7 +178,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
                 id="opp-stage"
                 value={formData.stage}
                 onChange={(e) => handleChange('stage', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white"
               >
                 {stages.map((stage) => (
                   <option key={stage} value={stage}>
@@ -202,7 +202,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
                   value={formData.amount || ''}
                   onChange={(e) => handleChange('amount', parseFloat(e.target.value) || 0)}
                   className={cn(
-                    'w-full pl-7 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white',
+                    'w-full pl-7 pr-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white',
                     errors.amount
                       ? 'border-red-500 focus:ring-red-500'
                       : 'border-gray-300 dark:border-gray-600'
@@ -228,7 +228,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
                 value={formData.closeDate}
                 onChange={(e) => handleChange('closeDate', e.target.value)}
                 className={cn(
-                  'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white dark:[color-scheme:dark]',
+                  'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white dark:[color-scheme:dark]',
                   errors.closeDate
                     ? 'border-red-500 focus:ring-red-500'
                     : 'border-gray-300 dark:border-gray-600'
@@ -247,7 +247,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
                 id="opp-owner"
                 value={formData.ownerName}
                 onChange={(e) => handleChange('ownerName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white"
               >
                 {owners.map((owner) => (
                   <option key={owner} value={owner}>
@@ -268,7 +268,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:text-white resize-none"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white resize-none"
               placeholder="Additional details about this opportunity..."
             />
           </div>
@@ -284,7 +284,7 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+              className="flex-1 px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors font-medium"
             >
               Create Opportunity
             </button>

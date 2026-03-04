@@ -220,7 +220,7 @@ export default function ObjectManagerPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Database className="h-8 w-8 animate-spin mx-auto mb-4 text-indigo-600" />
+          <Database className="h-8 w-8 animate-spin mx-auto mb-4 text-brand-navy" />
           <p className="text-gray-600">Loading Object Manager...</p>
         </div>
       </div>
@@ -230,21 +230,26 @@ export default function ObjectManagerPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-[#9f9fa2] shadow border-b border-black">
+      <div className="bg-brand-navy shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
-              <Link href="/" className="flex items-center">
-                <Image
-                  src="/tces-logo.png"
-                  alt="TCES"
-                  width={32}
-                  height={32}
-                  priority
-                />
+          <div className="flex justify-between items-center h-[48px]">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-2.5 group">
+                <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <Image
+                    src="/tces-logo.png"
+                    alt="Tischler"
+                    width={32}
+                    height={32}
+                    priority
+                    className="object-contain"
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
+                </div>
+                <span className="text-white/80 text-sm font-semibold group-hover:text-white transition-colors hidden sm:inline">Tischler CRM</span>
               </Link>
-              <span className="text-gray-300">|</span>
-              <span className="text-2xl font-bold text-gray-900">Object Manager</span>
+              <span className="text-white/30">|</span>
+              <span className="text-base font-semibold text-white">Object Manager</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="outline" onClick={handleExportAll}>
@@ -436,7 +441,7 @@ export default function ObjectManagerPage() {
                     <TableCell className="font-medium">
                       <Link
                         href={`/object-manager/${object.apiName}`}
-                        className="text-indigo-600 hover:text-indigo-800"
+                        className="text-brand-navy hover:text-brand-dark"
                       >
                         {object.label}
                       </Link>

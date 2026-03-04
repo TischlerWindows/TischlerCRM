@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { forwardRef } from 'react';
 
@@ -11,7 +11,7 @@ const Select = forwardRef<HTMLSelectElement, React.HTMLAttributes<HTMLSelectElem
     return (
       <select
         ref={ref}
-        className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/40"
         {...(props as any)}
       >
         {props.children}
@@ -26,7 +26,7 @@ const SelectTrigger = forwardRef<HTMLButtonElement, React.HTMLAttributes<HTMLBut
     return (
       <button
         ref={ref}
-        className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500 text-left flex items-center justify-between"
+        className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/40 text-left flex items-center justify-between"
         {...(props as any)}
       >
         {children}

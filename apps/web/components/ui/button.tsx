@@ -8,12 +8,12 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const buttonVariants = {
   variant: {
-    default: "bg-primary text-primary-foreground hover:bg-primary/90",
-    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-    ghost: "hover:bg-accent hover:text-accent-foreground",
-    link: "text-primary underline-offset-4 hover:underline"
+    default: "bg-brand-navy text-white hover:bg-brand-navy-dark",
+    destructive: "bg-brand-red text-white hover:bg-red-700",
+    outline: "border border-gray-300 bg-white hover:bg-brand-light hover:text-brand-navy text-brand-dark",
+    secondary: "bg-[#e8eaf6] text-brand-navy hover:bg-[#d4d8f0]",
+    ghost: "hover:bg-[#f0f1fa] hover:text-brand-navy text-brand-dark",
+    link: "text-brand-navy underline-offset-4 hover:underline hover:text-brand-red"
   },
   size: {
     default: "h-10 px-4 py-2",

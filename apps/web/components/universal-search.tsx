@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Users, Building2, Lightbulb, Target, Briefcase, X } from 'lucide-react';
@@ -18,14 +18,14 @@ const typeConfig = {
   property: {
     icon: MapPin,
     label: 'Property',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
   account: {
     icon: Building2,
     label: 'Account',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
   contact: {
     icon: Users,
@@ -48,12 +48,12 @@ const typeConfig = {
   project: {
     icon: Briefcase,
     label: 'Project',
-    color: 'text-indigo-600',
-    bgColor: 'bg-indigo-50',
+    color: 'text-brand-navy',
+    bgColor: 'bg-[#f0f1fa]',
   },
 };
 
-export default function UniversalSearch({ inputClassName }: { inputClassName?: string }) {
+export default function UniversalSearch({ inputClassName, iconClassName }: { inputClassName?: string; iconClassName?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -341,7 +341,7 @@ export default function UniversalSearch({ inputClassName }: { inputClassName?: s
   return (
     <div ref={searchRef} className="relative flex-1 max-w-2xl">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", iconClassName)} />
         <input
           ref={inputRef}
           type="text"
@@ -355,7 +355,7 @@ export default function UniversalSearch({ inputClassName }: { inputClassName?: s
           onKeyDown={handleKeyDown}
           placeholder="Search properties, accounts, contacts, leads, deals, projects..."
           className={cn(
-            'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-800 dark:text-white text-sm',
+            'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 bg-white dark:bg-gray-800 dark:text-white text-sm',
             inputClassName
           )}
           aria-label="Universal search"
@@ -396,7 +396,7 @@ export default function UniversalSearch({ inputClassName }: { inputClassName?: s
                     className={cn(
                       'w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors',
                       isSelected
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20'
+                        ? 'bg-[#f0f1fa] dark:bg-brand-navy-dark/20'
                         : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     )}
                   >

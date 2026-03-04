@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { HelpCircle, Cog, Edit3, GripVertical, X, LogOut } from 'lucide-react';
+import { HelpCircle, Cog, Edit3, GripVertical, X, LogOut, ChevronDown, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
@@ -44,11 +44,9 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     pathname?.startsWith('/dashboard') ||
     pathname?.includes('demo');
 
-  // Check if we should show the headbar (exclude only object-manager pages and auth pages)
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   useEffect(() => {
-    // Load schema if not already loaded
     if (!schema) {
       loadSchema();
     }
@@ -67,12 +65,9 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       setTabs(defaultTabs);
     }
 
-    // Load available objects from schema
     if (schema?.objects) {
-      // Exclude system objects like 'Home'
       const excludedObjects = new Set(['Home']);
       
-      // Built-in objects that have dedicated routes
       const builtInRoutes: Record<string, string> = {
         'Property': '/properties',
         'Contact': '/contacts',
@@ -90,19 +85,16 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
         .filter(obj => !excludedObjects.has(obj.apiName))
         .map(obj => ({
           name: obj.pluralLabel || obj.label,
-          // Use built-in route if available, otherwise use /objects/[slug]
           href: builtInRoutes[obj.apiName] || `/objects/${obj.apiName.toLowerCase()}`
         }));
       setAvailableObjects(objectTabs);
     } else {
-      // Fallback to old customObjects storage
       const storedObjects = localStorage.getItem('customObjects');
       if (storedObjects) {
         try {
           const objects = JSON.parse(storedObjects);
           const objectTabs = objects.map((obj: any) => ({
             name: obj.label,
-            // Custom objects always use /objects/[slug]
             href: `/objects/${obj.apiName.toLowerCase()}`
           }));
           setAvailableObjects(objectTabs);
@@ -165,84 +157,118 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
-      {/* Top Navigation Bar */}
-      <div className="bg-[#9f9fa2] border-b border-black px-6 py-3 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-8">
-          <Link href="/" className="flex items-center">
-            <Image
-              src="/tces-logo.png"
-              alt="TCES"
-              width={40}
-              height={40}
-              priority
-            />
+    <div className="h-screen flex flex-col bg-brand-light overflow-hidden">
+      {/* Global Header — Salesforce-style navy bar */}
+      <header className="bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
+        {/* Left: Logo + App Name */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <Link href="/" className="flex items-center gap-2.5 group" title="Home">
+            <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+              <Image
+                src="/tces-logo.png"
+                alt="Tischler"
+                width={32}
+                height={32}
+                priority
+                className="object-contain"
+                style={{ maxWidth: '100%', height: 'auto' }}
+              />
+            </div>
+            <span className="text-white/90 text-sm font-semibold tracking-wide hidden sm:inline group-hover:text-white transition-colors">
+              Tischler CRM
+            </span>
           </Link>
         </div>
-        <div className="flex-1 max-w-2xl mx-8">
-          <UniversalSearch inputClassName={allowPageScroll ? 'bg-white' : ''} />
+
+        {/* Center: Search */}
+        <div className="flex-1 max-w-xl mx-4">
+          <UniversalSearch
+            inputClassName="!bg-white/10 !border-white/20 !text-white !placeholder-white/50 focus:!bg-white/20 focus:!border-white/40 focus:!ring-white/30"
+            iconClassName="!text-white/50"
+          />
         </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 hover:bg-black/5 rounded-lg transition-colors">
-            <HelpCircle className="w-5 h-5 text-[#151f6d]" />
+
+        {/* Right: Utilities */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            className="p-2 rounded-md hover:bg-white/10 transition-colors"
+            title="Notifications"
+          >
+            <Bell className="w-[18px] h-[18px] text-white/80" />
+          </button>
+          <button
+            className="p-2 rounded-md hover:bg-white/10 transition-colors"
+            title="Help"
+          >
+            <HelpCircle className="w-[18px] h-[18px] text-white/80" />
           </button>
           <Link
             href="/settings"
-            className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+            className="p-2 rounded-md hover:bg-white/10 transition-colors"
             aria-label="Settings"
           >
-            <Cog className="w-5 h-5 text-[#151f6d]" />
+            <Cog className="w-[18px] h-[18px] text-white/80" />
           </Link>
+
+          {/* User Menu */}
           {user && (
-            <>
-              <div className="text-sm text-gray-600 px-3 py-1">
-                {user.name || user.email}
+            <div className="flex items-center ml-2 pl-2 border-l border-white/20">
+              <div className="w-7 h-7 rounded-full bg-brand-red flex items-center justify-center text-white text-xs font-bold mr-2">
+                {(user.name || user.email || '?').charAt(0).toUpperCase()}
               </div>
+              <span className="text-white/90 text-xs font-medium mr-1 hidden md:inline max-w-[120px] truncate">
+                {user.name || user.email}
+              </span>
               <button
                 onClick={() => {
                   logout();
                   router.push('/login');
                 }}
-                className="p-2 hover:bg-black/5 rounded-lg transition-colors"
+                className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
                 title="Logout"
               >
-                <LogOut className="w-5 h-5 text-[#151f6d]" />
+                <LogOut className="w-4 h-4 text-white/80" />
               </button>
-            </>
+            </div>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Tab Navigation Row */}
+      {/* Tab Navigation Row — Salesforce-style app launcher tabs */}
       {isLoaded && (
-        <div className="bg-[#f5f5f4] border-b border-black px-6 flex items-center justify-between sticky top-[60px] z-40">
-          <div className="flex items-center gap-1 overflow-x-auto flex-1">
+        <nav className="bg-white border-b border-gray-200 px-4 flex items-center justify-between sticky top-[48px] z-40 h-[40px]">
+          <div className="flex items-center gap-0 overflow-x-auto flex-1 h-full scrollbar-hide">
             {tabs.map((item) => {
-              const isActive = pathname === item.href;
+              const isActive = pathname === item.href || 
+                (item.href !== '/' && pathname?.startsWith(item.href));
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors text-[#151f6d]',
+                    'relative px-4 h-full inline-flex items-center text-[13px] font-medium whitespace-nowrap transition-colors',
                     isActive
-                      ? 'border-[#151f6d]'
-                      : 'border-transparent hover:text-[#da291c] hover:border-[#da291c]'
+                      ? 'text-brand-navy'
+                      : 'text-brand-dark/70 hover:text-brand-navy'
                   )}
                 >
                   {item.name}
+                  {/* Active indicator — brand red bottom bar */}
+                  {isActive && (
+                    <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-brand-red rounded-t-full" />
+                  )}
                 </Link>
               );
             })}
           </div>
           <button
             onClick={() => setEditMode(true)}
-            className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            className="ml-2 p-1.5 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
             title="Edit Navigation"
           >
-            <Edit3 className="w-4 h-4 text-gray-600" />
+            <Edit3 className="w-3.5 h-3.5 text-brand-dark/50" />
           </button>
-        </div>
+        </nav>
       )}
 
       {/* Content */}
@@ -253,30 +279,30 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       {/* Edit Navigation Modal */}
       {editMode && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setEditMode(false)}>
-          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-6 py-4">
-              <h2 className="text-xl font-semibold text-gray-900">Edit Tischler App App Navigation Items</h2>
-              <p className="text-sm text-gray-600 mt-1">Personalize your nav bar for this app. Reorder items, and rename or remove items you've added.</p>
+              <h2 className="text-lg font-semibold text-brand-dark">Edit Navigation Items</h2>
+              <p className="text-sm text-brand-dark/60 mt-1">Reorder, add, or remove navigation tabs.</p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-medium text-gray-700 uppercase">Navigation Items ({tabs.length})</h3>
-                <button onClick={() => setShowAddTab(true)} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Add More Items</button>
+                <h3 className="text-xs font-semibold text-brand-dark/60 uppercase tracking-wider">Items ({tabs.length})</h3>
+                <button onClick={() => setShowAddTab(true)} className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-brand-dark/80">Add More Items</button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {tabs.map((item, index) => (
-                  <div key={item.name} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} className="flex items-center gap-3 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 cursor-move group">
-                    <GripVertical className="w-5 h-5 text-gray-400" />
-                    <span className="flex-1 text-sm font-medium text-gray-900">{item.name}</span>
-                    <button onClick={() => handleRemoveTab(index)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove"><X className="w-4 h-4 text-gray-500" /></button>
+                  <div key={item.name} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 cursor-move group transition-colors">
+                    <GripVertical className="w-4 h-4 text-gray-400" />
+                    <span className="flex-1 text-sm font-medium text-brand-dark">{item.name}</span>
+                    <button onClick={() => handleRemoveTab(index)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove"><X className="w-3.5 h-3.5 text-gray-500" /></button>
                   </div>
                 ))}
               </div>
-              <button onClick={handleResetToDefault} className="mt-6 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1">Reset Navigation to Default</button>
+              <button onClick={handleResetToDefault} className="mt-4 text-xs font-medium text-brand-navy hover:text-brand-red transition-colors">Reset to Default</button>
             </div>
-            <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-              <button onClick={() => setEditMode(false)} className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={() => setEditMode(false)} className="px-6 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">Save</button>
+            <div className="border-t border-gray-200 px-6 py-3 flex justify-end gap-2">
+              <button onClick={() => setEditMode(false)} className="px-4 py-2 text-sm font-medium border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-brand-dark/80">Cancel</button>
+              <button onClick={() => setEditMode(false)} className="px-4 py-2 text-sm font-medium bg-brand-navy text-white rounded-md hover:bg-brand-navy-light transition-colors">Save</button>
             </div>
           </div>
         </div>
@@ -285,36 +311,34 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       {/* Add Tab Modal */}
       {showAddTab && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddTab(false)}>
-          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg w-full max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Navigation Items</h3>
+              <h3 className="text-lg font-semibold text-brand-dark">Add Navigation Items</h3>
             </div>
             <div className="px-6 py-4 max-h-96 overflow-y-auto">
-              <div className="space-y-2">
-                {/* Show default tabs that aren't already in the nav */}
+              <div className="space-y-1.5">
                 {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).map((item) => (
-                  <button key={item.href} onClick={() => handleAddTab(item)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
-                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                  <button key={item.href} onClick={() => handleAddTab(item)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand-light rounded-md border border-gray-200 transition-colors text-left">
+                    <span className="text-sm font-medium text-brand-dark">{item.name}</span>
                   </button>
                 ))}
-                {/* Show schema objects that aren't in tabs AND aren't in defaultTabs */}
                 {availableObjects
                   .filter(obj => !tabs.some(t => t.href === obj.href))
                   .filter(obj => !defaultTabs.some(dt => dt.href === obj.href))
                   .map((obj) => (
-                  <button key={obj.href} onClick={() => handleAddTab(obj)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left">
-                    <span className="text-sm font-medium text-gray-900">{obj.name}</span>
-                    <span className="text-xs text-gray-400 ml-auto">Custom Object</span>
+                  <button key={obj.href} onClick={() => handleAddTab(obj)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand-light rounded-md border border-gray-200 transition-colors text-left">
+                    <span className="text-sm font-medium text-brand-dark">{obj.name}</span>
+                    <span className="text-[10px] text-brand-gray ml-auto px-1.5 py-0.5 bg-gray-100 rounded">Custom</span>
                   </button>
                 ))}
                 {defaultTabs.filter(dt => !tabs.some(t => t.href === dt.href)).length === 0 && 
                  availableObjects.filter(obj => !tabs.some(t => t.href === obj.href) && !defaultTabs.some(dt => dt.href === obj.href)).length === 0 && (
-                  <p className="text-gray-500 text-sm py-8 text-center">All available items are already added to navigation.</p>
+                  <p className="text-brand-dark/50 text-sm py-8 text-center">All available items are already added.</p>
                 )}
               </div>
             </div>
-            <div className="border-t border-gray-200 px-6 py-4">
-              <button onClick={() => setShowAddTab(false)} className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors">Close</button>
+            <div className="border-t border-gray-200 px-6 py-3">
+              <button onClick={() => setShowAddTab(false)} className="w-full px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-colors text-brand-dark/70">Close</button>
             </div>
           </div>
         </div>

@@ -1,24 +1,6 @@
 # Environment Variables Checklist
 
-## Local Development Setup ✓
-
-### Web App (`apps/web/.env.local`)
-```
-NEXT_PUBLIC_API_URL=http://localhost:4000
-```
-
-### API (`apps/api/.env`)
-```
-APP_ENV=development
-DATABASE_URL=postgresql://crm:crm@localhost:5432/crm?schema=public
-JWT_SECRET=dev-secret-key-change-in-production
-```
-
-**Status:** ✅ Already configured for local development
-
----
-
-## Production Setup (Before Deploying)
+## Production Setup
 
 ### Step 1: Generate Strong JWT Secret
 

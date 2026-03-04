@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { X, Edit } from 'lucide-react';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
@@ -13,7 +13,7 @@ interface OpportunityDrawerProps {
 
 const stageColors: Record<OpportunityStage, string> = {
   'Qualification': 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300',
-  'Proposal': 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+  'Proposal': 'bg-[#e8eaf6] text-brand-dark dark:bg-blue-900/30 dark:text-blue-300',
   'Negotiation': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
   'Closed Won': 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
   'Closed Lost': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
@@ -145,7 +145,7 @@ export function OpportunityDrawer({ opportunity, isOpen, onClose, onEdit }: Oppo
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => onEdit(opportunity)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors font-medium"
               >
                 <Edit className="w-4 h-4" />
                 Edit Opportunity

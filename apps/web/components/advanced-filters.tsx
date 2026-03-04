@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { Filter, X, Plus, Save, Trash2, ChevronDown } from 'lucide-react';
@@ -177,14 +177,14 @@ export default function AdvancedFilters({
         className={cn(
           'inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors',
           activeFilterCount > 0
-            ? 'bg-indigo-50 border-indigo-300 text-indigo-700 hover:bg-indigo-100'
+            ? 'bg-[#f0f1fa] border-[#b8bfe8] text-brand-navy hover:bg-[#e8eaf6]'
             : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
         )}
       >
         <Filter className="w-4 h-4" />
         <span>Filters</span>
         {activeFilterCount > 0 && (
-          <span className="bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full">
+          <span className="bg-brand-navy text-white text-xs px-2 py-0.5 rounded-full">
             {activeFilterCount}
           </span>
         )}
@@ -223,7 +223,7 @@ export default function AdvancedFilters({
                       className={cn(
                         'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors',
                         selectedPreset === preset.id
-                          ? 'bg-indigo-100 text-indigo-700 border border-indigo-300'
+                          ? 'bg-[#e8eaf6] text-brand-navy border border-[#b8bfe8]'
                           : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                       )}
                     >
@@ -269,7 +269,7 @@ export default function AdvancedFilters({
                               logicOperator: e.target.value as 'AND' | 'OR',
                             })
                           }
-                          className="px-2 py-1 border border-gray-300 rounded text-sm font-medium text-indigo-600 bg-indigo-50"
+                          className="px-2 py-1 border border-gray-300 rounded text-sm font-medium text-brand-navy bg-[#f0f1fa]"
                         >
                           <option value="AND">AND</option>
                           <option value="OR">OR</option>
@@ -291,7 +291,7 @@ export default function AdvancedFilters({
                               value: '',
                             })
                           }
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                         >
                           {fields.map(field => (
                             <option key={field.id} value={field.id}>
@@ -306,7 +306,7 @@ export default function AdvancedFilters({
                           onChange={(e) =>
                             updateCondition(condition.id, { operator: e.target.value })
                           }
-                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                         >
                           {getOperators(condition.field).map(op => (
                             <option key={op.value} value={op.value}>
@@ -324,7 +324,7 @@ export default function AdvancedFilters({
                               updateCondition(condition.id, { value: e.target.value })
                             }
                             placeholder="Enter value..."
-                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
                           />
                         )}
                       </div>
@@ -345,7 +345,7 @@ export default function AdvancedFilters({
               {/* Add Condition Button */}
               <button
                 onClick={addCondition}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-brand-navy hover:text-brand-navy hover:bg-[#f0f1fa] transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Add Condition
@@ -378,7 +378,7 @@ export default function AdvancedFilters({
                     <button
                       onClick={savePreset}
                       disabled={!presetName.trim()}
-                      className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-2 bg-brand-navy text-white rounded-lg text-sm hover:bg-brand-navy-dark disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Save
                     </button>
@@ -405,7 +405,7 @@ export default function AdvancedFilters({
                 <button
                   onClick={applyFilters}
                   disabled={conditions.length === 0}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-brand-navy text-white rounded-lg text-sm hover:bg-brand-navy-dark disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Apply Filters
                 </button>

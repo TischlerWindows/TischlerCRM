@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -151,8 +151,8 @@ export default function BackupsPage() {
           </Link>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <HardDrive className="w-6 h-6 text-indigo-600" />
+              <div className="w-12 h-12 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
+                <HardDrive className="w-6 h-6 text-brand-navy" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Database Backups</h1>
@@ -173,7 +173,7 @@ export default function BackupsPage() {
               <button
                 onClick={handleCreateBackup}
                 disabled={creating}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark text-sm font-medium disabled:opacity-50"
               >
                 {creating ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -217,12 +217,12 @@ export default function BackupsPage() {
         )}
 
         {/* Info Card */}
-        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="mb-6 bg-[#f0f1fa] border border-[#d4d8f0] rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Database className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-800">
+            <Database className="w-5 h-5 text-brand-navy mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-brand-dark">
               <p className="font-medium mb-1">How backups work</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
+              <ul className="list-disc list-inside space-y-1 text-brand-navy">
                 <li>Each backup is a full snapshot of your database (objects, records, fields, layouts, reports, dashboards)</li>
                 <li>Backups are stored securely in your database — up to 30 are retained automatically</li>
                 <li>You can download any backup as a JSON file for offline storage</li>
@@ -235,7 +235,7 @@ export default function BackupsPage() {
         {/* Backups Table */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+            <Loader2 className="w-8 h-8 text-brand-navy animate-spin" />
           </div>
         ) : backups.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
@@ -247,7 +247,7 @@ export default function BackupsPage() {
             <button
               onClick={handleCreateBackup}
               disabled={creating}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark text-sm font-medium disabled:opacity-50"
             >
               {creating ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

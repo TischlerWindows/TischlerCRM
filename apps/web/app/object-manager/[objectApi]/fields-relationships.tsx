@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -332,7 +332,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleEditField(field)}
-                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        className="text-brand-navy hover:text-brand-dark mr-4"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
@@ -399,7 +399,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <button
                           key={type.value}
                           onClick={() => handleTypeSelect(type.value)}
-                          className="w-full flex items-start p-4 hover:bg-indigo-50 transition-all text-left border-b border-gray-200 last:border-b-0"
+                          className="w-full flex items-start p-4 hover:bg-[#f0f1fa] transition-all text-left border-b border-gray-200 last:border-b-0"
                         >
                           <div className="flex-1">
                             <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
@@ -418,7 +418,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <button
                           key={type.value}
                           onClick={() => handleTypeSelect(type.value)}
-                          className="w-full flex items-start p-4 hover:bg-indigo-50 transition-all text-left border-b border-gray-200 last:border-b-0"
+                          className="w-full flex items-start p-4 hover:bg-[#f0f1fa] transition-all text-left border-b border-gray-200 last:border-b-0"
                         >
                           <div className="flex-1">
                             <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
@@ -437,7 +437,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <button
                           key={type.value}
                           onClick={() => handleTypeSelect(type.value)}
-                          className="w-full flex items-start p-4 hover:bg-indigo-50 transition-all text-left border-b border-gray-200 last:border-b-0"
+                          className="w-full flex items-start p-4 hover:bg-[#f0f1fa] transition-all text-left border-b border-gray-200 last:border-b-0"
                         >
                           <div className="flex-1">
                             <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
@@ -451,17 +451,17 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
               ) : (
                 <div className="space-y-6">
                   {/* Selected Type Badge */}
-                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-[#f0f1fa] border border-[#d4d8f0] rounded-lg">
                     <div className="flex items-center">
                       <div className="text-sm text-gray-600 mr-2">Field Type:</div>
-                      <span className="font-semibold text-indigo-900">
+                      <span className="font-semibold text-brand-dark">
                         {FIELD_TYPES.find(t => t.value === selectedType)?.label}
                       </span>
                     </div>
                     {!editingField && (
                       <button
                         onClick={() => setShowTypeSelector(true)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                        className="text-sm text-brand-navy hover:text-brand-dark font-medium"
                       >
                         Change Type
                       </button>
@@ -512,7 +512,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           id="required"
                           checked={formData.required}
                           onChange={(e) => setFormData({ ...formData, required: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                          className="h-4 w-4 text-brand-navy border-gray-300 rounded"
                         />
                         <Label htmlFor="required" className="ml-2 mb-0">
                           Required field
@@ -524,7 +524,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           id="unique"
                           checked={formData.unique}
                           onChange={(e) => setFormData({ ...formData, unique: e.target.checked })}
-                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                          className="h-4 w-4 text-brand-navy border-gray-300 rounded"
                         />
                         <Label htmlFor="unique" className="ml-2 mb-0">
                           Unique values only

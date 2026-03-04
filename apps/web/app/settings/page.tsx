@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -108,7 +108,7 @@ export default function SettingsPage() {
               className={cn(
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
                 activeTab === 'setup'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-navy text-brand-navy'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               )}
             >
@@ -119,7 +119,7 @@ export default function SettingsPage() {
               className={cn(
                 'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
                 activeTab === 'object-manager'
-                  ? 'border-indigo-600 text-indigo-600'
+                  ? 'border-brand-navy text-brand-navy'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               )}
             >
@@ -146,7 +146,7 @@ export default function SettingsPage() {
                       <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900">
                         {item.name}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-indigo-600" />
+                      <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-brand-navy" />
                     </Link>
                   ))}
                 </div>
@@ -156,14 +156,14 @@ export default function SettingsPage() {
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-8">
             <div className="text-center">
-              <Database className="w-16 h-16 text-indigo-600 mx-auto mb-4" />
+              <Database className="w-16 h-16 text-brand-navy mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Object Manager</h2>
               <p className="text-gray-600 mb-6">
                 Manage your custom objects and their configurations
               </p>
               <Link
                 href="/object-manager"
-                className="inline-flex items-center px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-6 py-3 bg-brand-navy text-white font-medium rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Database className="w-5 h-5 mr-2" />
                 Open Object Manager

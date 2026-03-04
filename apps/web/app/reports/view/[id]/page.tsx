@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -347,7 +347,7 @@ export default function ReportViewerPage() {
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Report Not Found</h2>
           <p className="text-gray-600 mb-4">The report you're looking for doesn't exist.</p>
-          <Link href="/reports" className="text-indigo-600 hover:text-indigo-800">
+          <Link href="/reports" className="text-brand-navy hover:text-brand-dark">
             Back to Reports
           </Link>
         </div>
@@ -368,7 +368,7 @@ export default function ReportViewerPage() {
         <div className="mb-6 flex justify-between items-center">
           <Link
             href="/reports"
-            className="inline-flex items-center text-indigo-600 hover:text-indigo-800"
+            className="inline-flex items-center text-brand-navy hover:text-brand-dark"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Reports
@@ -392,7 +392,7 @@ export default function ReportViewerPage() {
             {reportId !== 'temp' && (
               <Link
                 href={`/reports/builder?edit=${reportId}`}
-                className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Report
@@ -473,7 +473,7 @@ export default function ReportViewerPage() {
               
               return (
                 <div key={groupValue} className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="bg-indigo-50 px-6 py-4 border-b border-indigo-100">
+                  <div className="bg-[#f0f1fa] px-6 py-4 border-b border-[#e8eaf6]">
                     <div className="flex justify-between items-center">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {groupValue} ({groupRecords.length} records)
