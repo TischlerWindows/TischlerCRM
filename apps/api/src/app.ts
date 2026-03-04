@@ -23,7 +23,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export function buildApp() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 }); // 10MB body limit for large schema payloads
   app.register(cors, { origin: true });
 
   // Serve Next.js static files (if built)

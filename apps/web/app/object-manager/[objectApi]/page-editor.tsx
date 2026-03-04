@@ -86,7 +86,7 @@ interface CanvasTab {
 }
 
 export default function PageEditor({ objectApiName }: PageEditorProps) {
-  const { schema, updateObject, saveSchema } = useSchemaStore();
+  const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
   const [viewMode, setViewMode] = useState<'list' | 'editor'>('list');
@@ -551,18 +551,17 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         })
       : existingRecordTypes;
 
-    updateObject(objectApiName, {
-      pageLayouts: updatedLayouts,
-      recordTypes: updatedRecordTypes,
-    });
-
-    // Immediately persist via schema store
-    await saveSchema();
-    console.log('Schema saved via API');
-    const updatedObject = schema?.objects.find((o) => o.apiName === objectApiName);
-    console.log('After update - object layouts:', updatedObject?.pageLayouts);
-    alert(`Layout "${layoutName}" saved successfully!`);
-    setViewMode('list');
+    try {
+      await updateObject(objectApiName, {
+        pageLayouts: updatedLayouts,
+        recordTypes: updatedRecordTypes,
+      });
+      alert(`Layout "${layoutName}" saved successfully!`);
+      setViewMode('list');
+    } catch (err) {
+      console.error('Failed to save layout:', err);
+      alert('Failed to save layout. Please try again.');
+    }
   };
 
   const handleSaveVisibilityRules = async (conditions: any[]) => {
@@ -583,13 +582,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         : f
     );
 
-    updateObject(objectApiName, { fields: updatedFields });
-    
-    // Force schema save to persist changes immediately
-    await saveSchema();
-    console.log('Visibility rules saved for field:', fieldDef.apiName);
-    
-    setShowVisibilityEditor(false);
+    try {
+      await updateObject(objectApiName, { fields: updatedFields });
+      setShowVisibilityEditor(false);
+    } catch (err) {
+      console.error('Failed to save visibility rules:', err);
+      alert('Failed to save visibility rules. Please try again.');
+    }
   };
 
   const loadLayout = (layoutId: string) => {
@@ -959,14 +958,19 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     setViewMode('editor');
   };
 
-  const deleteLayout = (layoutId: string) => {
+  const deleteLayout = async (layoutId: string) => {
     if (!object) return;
     if (!confirm('Are you sure you want to delete this page layout?')) return;
 
     const updatedLayouts = (object.pageLayouts || []).filter((l) => l.id !== layoutId);
-    updateObject(objectApiName, {
-      pageLayouts: updatedLayouts,
-    });
+    try {
+      await updateObject(objectApiName, {
+        pageLayouts: updatedLayouts,
+      });
+    } catch (err) {
+      console.error('Failed to delete layout:', err);
+      alert('Failed to delete layout. Please try again.');
+    }
   };
 
   if (viewMode === 'list') {

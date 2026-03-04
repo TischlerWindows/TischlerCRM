@@ -1953,7 +1953,7 @@ async function preferenceRoutes(app2) {
 var __filename = fileURLToPath2(import.meta.url);
 var __dirname2 = dirname(__filename);
 function buildApp() {
-  const app2 = Fastify({ logger: true });
+  const app2 = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
   app2.register(cors, { origin: true });
   const nextStaticPath = path2.join(__dirname2, "../../web/.next/static");
   if (fs.existsSync(nextStaticPath)) {
