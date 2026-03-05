@@ -465,6 +465,9 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
         migratedSchema = this.ensureDealTemplateLayout(migratedSchema);
 
+        // Universal: ensure every object has at least one layout with populated fields
+        migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
+
         // Ensure all default objects exist — if the schema was saved when some
         // objects were missing (e.g. partial save), merge them back in
         const defaultSchema = this.createSampleData();
@@ -790,6 +793,108 @@ class LocalStorageSchemaService implements SchemaService {
     };
   }
 
+  /**
+   * Universal fallback: for every object (except Home), if it has no page layout
+   * with populated fields, auto-generate a layout from the object's custom fields.
+   * This ensures every object is usable in the dynamic form without needing a
+   * specific ensure*TemplateLayout method.
+   */
+  private ensureAllObjectsHavePopulatedLayout(schema: OrgSchema): OrgSchema {
+    const excludedObjects = new Set(['Home']);
+    let changed = false;
+
+    const objects = schema.objects.map((obj) => {
+      if (excludedObjects.has(obj.apiName)) return obj;
+
+      // Check if any layout already has populated fields
+      const hasPopulatedLayout = (obj.pageLayouts || []).some((layout) =>
+        layout.tabs?.some((tab) =>
+          tab.sections?.some((section) =>
+            section.fields && section.fields.length > 0
+          )
+        )
+      );
+
+      if (hasPopulatedLayout) return obj;
+
+      // No populated layout — auto-generate one from the object's custom fields
+      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no populated layout found)`);
+
+      const systemFieldApiNames = new Set(SYSTEM_FIELDS.map((f) => f.apiName));
+      const customFields = obj.fields.filter(
+        (f) => !systemFieldApiNames.has(f.apiName) && f.type !== 'AutoNumber' && f.type !== 'Formula' && f.type !== 'RollupSummary'
+      );
+
+      // Also include AutoNumber/Formula/RollupSummary as read-only fields at end
+      const readOnlyFields = obj.fields.filter(
+        (f) => !systemFieldApiNames.has(f.apiName) && (f.type === 'AutoNumber' || f.type === 'Formula' || f.type === 'RollupSummary')
+      );
+
+      const allLayoutFields = [...customFields, ...readOnlyFields];
+
+      if (allLayoutFields.length === 0) return obj;
+
+      const layoutId = generateId();
+      const layout = {
+        id: layoutId,
+        name: `${obj.apiName} - Default Template`,
+        layoutType: 'edit' as const,
+        tabs: [
+          {
+            id: generateId(),
+            label: 'Details',
+            order: 0,
+            sections: [
+              {
+                id: generateId(),
+                label: `${obj.label} Information`,
+                columns: 2 as 1 | 2 | 3,
+                order: 0,
+                fields: allLayoutFields.map((f, index) => ({
+                  apiName: f.apiName,
+                  column: index % 2,
+                  order: index
+                }))
+              }
+            ]
+          }
+        ]
+      };
+
+      // Update record types to point to the new layout
+      const updatedRecordTypes = obj.recordTypes.map((rt, index) => {
+        if (obj.defaultRecordTypeId && rt.id === obj.defaultRecordTypeId) {
+          return { ...rt, pageLayoutId: layoutId };
+        }
+        if (!obj.defaultRecordTypeId && index === 0) {
+          return { ...rt, pageLayoutId: layoutId };
+        }
+        return rt;
+      });
+
+      // Replace empty layouts or add if none exist
+      const existingPopulated = (obj.pageLayouts || []).filter((l) =>
+        l.tabs?.some((t) => t.sections?.some((s) => s.fields && s.fields.length > 0))
+      );
+
+      changed = true;
+      return {
+        ...obj,
+        pageLayouts: [...existingPopulated, layout],
+        recordTypes: updatedRecordTypes,
+        updatedAt: new Date().toISOString()
+      };
+    });
+
+    if (!changed) return schema;
+
+    return {
+      ...schema,
+      objects,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
     const property = schema.objects.find((obj) => obj.apiName === 'Property');
     if (!property) return schema;
@@ -879,47 +984,11 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   private ensureContactTemplateLayout(schema: OrgSchema): OrgSchema {
-    // Remove the hard-coded "Contact - Default Template" layout.
-    // Users create their own layouts via the Page Editor.
-    const contact = schema.objects.find((obj) => obj.apiName === 'Contact');
-    if (!contact) return schema;
-
-    const defaultTemplate = contact.pageLayouts?.find((layout) => layout.name === 'Contact - Default Template');
-    if (!defaultTemplate) {
-      // Already removed or never existed — nothing to do.
-      return schema;
-    }
-
-    const filteredLayouts = (contact.pageLayouts || []).filter(
-      (layout) => layout.name !== 'Contact - Default Template'
-    );
-
-    // If any record type was pointing at the removed layout, clear it
-    // so the UI falls back to the first remaining layout (user's custom one).
-    const updatedRecordTypes = contact.recordTypes.map((rt) => {
-      if (rt.pageLayoutId === defaultTemplate.id) {
-        const fallback = filteredLayouts.length > 0 ? filteredLayouts[0].id : undefined;
-        return { ...rt, pageLayoutId: fallback };
-      }
-      return rt;
-    });
-
-    const updatedObjects = schema.objects.map((obj) =>
-      obj.apiName === 'Contact'
-        ? {
-            ...obj,
-            pageLayouts: filteredLayouts,
-            recordTypes: updatedRecordTypes,
-            updatedAt: new Date().toISOString()
-          }
-        : obj
-    );
-
-    return {
-      ...schema,
-      objects: updatedObjects,
-      updatedAt: new Date().toISOString()
-    };
+    // No-op: Contact layouts are now handled by the universal
+    // ensureAllObjectsHavePopulatedLayout method. Previously this
+    // method removed the "Contact - Default Template" but that
+    // conflicts with universal auto-generation.
+    return schema;
   }
 
   private ensureAccountTemplateLayout(schema: OrgSchema): OrgSchema {
@@ -2535,11 +2604,38 @@ class LocalStorageSchemaService implements SchemaService {
 
     // Helper to create basic object structure
     const createBasicObject = (apiName: string, label: string, pluralLabel: string, description: string, fields: any[]) => {
-      const layout = createDefaultPageLayout(apiName);
-      const recordType = createDefaultRecordType(apiName, layout.id);
-      
       // Mark all custom fields with custom: true
       const customFields = fields.map(field => ({ ...field, custom: true }));
+
+      // Build a layout that includes all fields (not just an empty one)
+      const layoutId = generateId();
+      const layout = {
+        id: layoutId,
+        name: `${apiName} Layout`,
+        layoutType: 'edit' as const,
+        tabs: [
+          {
+            id: generateId(),
+            label: 'Details',
+            order: 0,
+            sections: [
+              {
+                id: generateId(),
+                label: `${label} Information`,
+                columns: 2 as 1 | 2 | 3,
+                order: 0,
+                fields: customFields.map((f, index) => ({
+                  apiName: f.apiName,
+                  column: index % 2,
+                  order: index
+                }))
+              }
+            ]
+          }
+        ]
+      };
+
+      const recordType = createDefaultRecordType(apiName, layoutId);
       
       return {
         id: generateId(),
@@ -3163,23 +3259,14 @@ class LocalStorageSchemaService implements SchemaService {
         }
       ];
 
-    const contactRecordType = createDefaultRecordType('Contact', undefined as any);
-    
-    // Create Contact object — no hard-coded layout; user creates layouts via Page Editor
-    objects.push({
-      id: generateId(),
-      apiName: 'Contact',
-      label: 'Contact',
-      pluralLabel: 'Contacts',
-      description: 'People and their contact information',
-      createdAt: now,
-      updatedAt: now,
-      fields: [...SYSTEM_FIELDS, ...contactFields.map(f => ({ ...f, custom: true }))],
-      recordTypes: [contactRecordType],
-      pageLayouts: [],
-      validationRules: [],
-      defaultRecordTypeId: contactRecordType.id
-    });
+    // Create Contact object using createBasicObject so it gets a populated layout
+    objects.push(createBasicObject(
+      'Contact',
+      'Contact',
+      'Contacts',
+      'People and their contact information',
+      contactFields
+    ));
 
     // 3. Account
     objects.push(createBasicObject(
