@@ -464,7 +464,19 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureProductTemplateLayout(migratedSchema);
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
         migratedSchema = this.ensureDealTemplateLayout(migratedSchema);
-        if (migratedSchema !== schema) {
+
+        // Ensure all default objects exist — if the schema was saved when some
+        // objects were missing (e.g. partial save), merge them back in
+        const defaultSchema = this.createSampleData();
+        const existingApiNames = new Set(migratedSchema.objects.map(o => o.apiName));
+        for (const defaultObj of defaultSchema.objects) {
+          if (!existingApiNames.has(defaultObj.apiName)) {
+            console.log(`[Schema] Adding missing default object: ${defaultObj.apiName}`);
+            migratedSchema.objects.push(defaultObj);
+          }
+        }
+
+        if (migratedSchema !== schema || migratedSchema.objects.length !== schema.objects.length) {
           await this.saveSchema(migratedSchema);
           return migratedSchema;
         }
