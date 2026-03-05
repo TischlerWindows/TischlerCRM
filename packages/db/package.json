@@ -13,7 +13,7 @@
   "scripts": {
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:push": "dotenv -e ../../.env -- prisma db push",
-    "prebuild": "node prisma-generate.js",
+    "prebuild": "node prisma-generate.cjs",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
