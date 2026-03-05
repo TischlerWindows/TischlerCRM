@@ -60,11 +60,14 @@ class ApiClient {
 
       // On 401 (expired/invalid token), clear stale credentials and redirect
       // to login so the user can re-authenticate instead of seeing empty pages.
+      // Guard against redirect loop: don't redirect if we're already on /login.
       if (response.status === 401 && typeof window !== 'undefined') {
         this.setToken(null);
         sessionStorage.removeItem('user');
         document.cookie = 'auth-token=; Max-Age=0; path=/;';
-        window.location.href = '/login';
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+        }
       }
 
       if (errorData.fields && Array.isArray(errorData.fields)) {

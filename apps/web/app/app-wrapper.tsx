@@ -48,10 +48,10 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   useEffect(() => {
-    if (!schema) {
+    if (!schema && user) {
       loadSchema();
     }
-  }, [schema, loadSchema]);
+  }, [schema, loadSchema, user]);
 
   useEffect(() => {
     (async () => {
