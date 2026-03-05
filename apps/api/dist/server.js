@@ -1985,9 +1985,14 @@ function buildApp() {
   app2.get("/health", async () => {
     let dbOk = false;
     let dbError = null;
+    let tables = [];
     try {
       await prisma11.$queryRawUnsafe("SELECT 1");
       dbOk = true;
+      const result = await prisma11.$queryRawUnsafe(
+        "SELECT table_name::text FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
+      );
+      tables = result.map((r) => r.table_name);
     } catch (e) {
       dbError = e?.message || "Unknown DB error";
     }
@@ -1999,7 +2004,7 @@ function buildApp() {
     } catch (e) {
       settingError = e?.message || "Unknown error";
     }
-    return { ok: dbOk && settingOk, version: "2026-03-05-v2", db: dbOk, dbError, settingTable: settingOk, settingError };
+    return { ok: dbOk && settingOk, version: "2026-03-05-v3", db: dbOk, dbError, tables, settingTable: settingOk, settingError };
   });
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z6.object({
