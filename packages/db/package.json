@@ -13,7 +13,7 @@
   "scripts": {
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:push": "dotenv -e ../../.env -- prisma db push",
-    "prebuild": "DATABASE_URL=${DATABASE_URL:-postgresql://placeholder@localhost/placeholder} prisma generate",
+    "prebuild": "node prisma-generate.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
