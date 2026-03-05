@@ -531,8 +531,15 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         l.id === editingLayoutId ? pageLayout : l
       );
     } else {
-      // Add new layout
-      updatedLayouts = [...existingLayouts, pageLayout];
+      // Adding a new layout — remove any existing layouts that have
+      // zero fields (empty defaults created when the object was first made)
+      // so the user's real layout takes priority.
+      const nonEmptyLayouts = existingLayouts.filter((l) =>
+        l.tabs?.some((t) =>
+          t.sections?.some((s) => (s.fields?.length || 0) > 0)
+        )
+      );
+      updatedLayouts = [...nonEmptyLayouts, pageLayout];
     }
 
     // Also update the default record type to use this layout, so detail pages

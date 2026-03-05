@@ -111,11 +111,19 @@ export default function DynamicForm({
   const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
-  // If layoutId is provided, use it; otherwise fall back to finding by layoutType
-  const layout = layoutId
-    ? object?.pageLayouts?.find((l) => l.id === layoutId)
-    : object?.pageLayouts?.find((l) => l.layoutType === layoutType)
-      || object?.pageLayouts?.[0]; // fall back to first available layout
+  // If layoutId is provided, use it; otherwise fall back to finding by layoutType.
+  // When multiple layouts exist, prefer one that actually has fields on it.
+  const layout = (() => {
+    if (!object?.pageLayouts?.length) return undefined;
+    if (layoutId) return object.pageLayouts.find((l) => l.id === layoutId);
+
+    const hasFields = (l: any) =>
+      l.tabs?.some((t: any) => t.sections?.some((s: any) => (s.fields?.length || 0) > 0));
+
+    const byType = object.pageLayouts.filter((l) => l.layoutType === layoutType);
+    const withFields = byType.find(hasFields) || object.pageLayouts.find(hasFields);
+    return withFields || byType[0] || object.pageLayouts[0];
+  })();
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab && layout.tabs[0]) {

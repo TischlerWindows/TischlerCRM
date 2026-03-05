@@ -121,8 +121,15 @@ export default function CustomObjectRecordsPage() {
         const savedLayoutId = await getPreference<string>(`${slug}SelectedLayoutId`);
         if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
           setSelectedLayoutId(savedLayoutId);
-        } else if (pageLayouts.length > 0 && pageLayouts[0]) {
-          setSelectedLayoutId(pageLayouts[0].id);
+        } else {
+          // Prefer a layout that has fields over an empty default
+          const withFields = pageLayouts.find(l =>
+            l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
+          );
+          const best = withFields || pageLayouts[0];
+          if (best) {
+            setSelectedLayoutId(best.id);
+          }
         }
       })();
     }
@@ -171,11 +178,17 @@ export default function CustomObjectRecordsPage() {
       setShowNoLayoutsDialog(true);
       return;
     }
+
+    // Prefer a layout that actually has fields on it over an empty default
+    const layoutsWithFields = pageLayouts.filter(l =>
+      l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
+    );
+    const effectiveLayouts = layoutsWithFields.length > 0 ? layoutsWithFields : pageLayouts;
     
-    if (pageLayouts.length > 1) {
+    if (effectiveLayouts.length > 1) {
       setShowLayoutSelector(true);
-    } else if (pageLayouts[0]) {
-      setSelectedLayoutId(pageLayouts[0].id);
+    } else if (effectiveLayouts[0]) {
+      setSelectedLayoutId(effectiveLayouts[0].id);
       setShowDynamicForm(true);
     }
   };
