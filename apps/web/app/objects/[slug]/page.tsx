@@ -122,7 +122,18 @@ export default function CustomObjectRecordsPage() {
         if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
           setSelectedLayoutId(savedLayoutId);
         } else {
-          // Prefer a layout that has fields over an empty default
+          // 1. Use the layout assigned to the default record type (set by Page Editor)
+          const defaultRt = objectDef?.defaultRecordTypeId
+            ? objectDef.recordTypes?.find(r => r.id === objectDef.defaultRecordTypeId)
+            : objectDef?.recordTypes?.[0];
+          if (defaultRt?.pageLayoutId) {
+            const rtLayout = pageLayouts.find(l => l.id === defaultRt.pageLayoutId);
+            if (rtLayout) {
+              setSelectedLayoutId(rtLayout.id);
+              return;
+            }
+          }
+          // 2. Fallback: prefer a layout that has fields over an empty default
           const withFields = pageLayouts.find(l =>
             l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
           );
@@ -133,7 +144,7 @@ export default function CustomObjectRecordsPage() {
         }
       })();
     }
-  }, [hasPageLayout, pageLayouts, selectedLayoutId, slug]);
+  }, [hasPageLayout, pageLayouts, selectedLayoutId, slug, objectDef]);
 
   // Load records from API
   useEffect(() => {
@@ -179,14 +190,29 @@ export default function CustomObjectRecordsPage() {
       return;
     }
 
-    // Prefer a layout that actually has fields on it over an empty default
+    // Prefer the layout assigned to the default record type (set by Page Editor)
+    const defaultRt = objectDef?.defaultRecordTypeId
+      ? objectDef.recordTypes?.find(r => r.id === objectDef.defaultRecordTypeId)
+      : objectDef?.recordTypes?.[0];
+    const rtLayout = defaultRt?.pageLayoutId
+      ? pageLayouts.find(l => l.id === defaultRt.pageLayoutId)
+      : null;
+
+    // Filter to layouts that actually have fields
     const layoutsWithFields = pageLayouts.filter(l =>
       l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
     );
     const effectiveLayouts = layoutsWithFields.length > 0 ? layoutsWithFields : pageLayouts;
     
     if (effectiveLayouts.length > 1) {
+      // Pre-select the recordType-assigned layout if it has fields
+      if (rtLayout && layoutsWithFields.some(l => l.id === rtLayout.id)) {
+        setSelectedLayoutId(rtLayout.id);
+      }
       setShowLayoutSelector(true);
+    } else if (rtLayout) {
+      setSelectedLayoutId(rtLayout.id);
+      setShowDynamicForm(true);
     } else if (effectiveLayouts[0]) {
       setSelectedLayoutId(effectiveLayouts[0].id);
       setShowDynamicForm(true);
