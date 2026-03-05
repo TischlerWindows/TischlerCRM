@@ -7,15 +7,20 @@ export async function preferenceRoutes(app: FastifyInstance) {
     const userId = (req as any).user?.sub;
     if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const prefs = await prisma.userPreference.findMany({
-      where: { userId },
-    });
+    try {
+      const prefs = await prisma.userPreference.findMany({
+        where: { userId },
+      });
 
-    const result: Record<string, any> = {};
-    for (const p of prefs) {
-      result[p.key] = p.value;
+      const result: Record<string, any> = {};
+      for (const p of prefs) {
+        result[p.key] = p.value;
+      }
+      reply.send(result);
+    } catch (err: any) {
+      app.log.error(err, 'GET /user/preferences failed');
+      reply.code(500).send({ error: 'Failed to load preferences', detail: err?.message });
     }
-    reply.send(result);
   });
 
   // Get a single preference

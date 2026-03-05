@@ -36,7 +36,29 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-05-v1' }));
+  app.get('/health', async () => {
+    // Quick DB connectivity check
+    let dbOk = false;
+    let dbError: string | null = null;
+    try {
+      await prisma.$queryRawUnsafe('SELECT 1');
+      dbOk = true;
+    } catch (e: any) {
+      dbError = e?.message || 'Unknown DB error';
+    }
+    
+    // Check if Setting table accessible
+    let settingOk = false;
+    let settingError: string | null = null;
+    try {
+      await prisma.setting.count();
+      settingOk = true;
+    } catch (e: any) {
+      settingError = e?.message || 'Unknown error';
+    }
+    
+    return { ok: dbOk && settingOk, version: '2026-03-05-v2', db: dbOk, dbError, settingTable: settingOk, settingError };
+  });
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {

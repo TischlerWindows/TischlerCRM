@@ -5,36 +5,51 @@ import { z } from 'zod';
 export async function settingRoutes(app: FastifyInstance) {
   // Get all settings
   app.get('/settings', async (_req, reply) => {
-    const settings = await prisma.setting.findMany();
-    const result: Record<string, any> = {};
-    for (const s of settings) {
-      result[s.key] = s.value;
+    try {
+      const settings = await prisma.setting.findMany();
+      const result: Record<string, any> = {};
+      for (const s of settings) {
+        result[s.key] = s.value;
+      }
+      reply.send(result);
+    } catch (err: any) {
+      app.log.error(err, 'GET /settings failed');
+      reply.code(500).send({ error: 'Failed to load settings', detail: err?.message });
     }
-    reply.send(result);
   });
 
   // Get a single setting by key
   app.get('/settings/:key', async (req, reply) => {
-    const { key } = req.params as { key: string };
-    const setting = await prisma.setting.findUnique({ where: { key } });
-    if (!setting) {
-      return reply.code(404).send({ error: 'Setting not found' });
+    try {
+      const { key } = req.params as { key: string };
+      const setting = await prisma.setting.findUnique({ where: { key } });
+      if (!setting) {
+        return reply.code(404).send({ error: 'Setting not found' });
+      }
+      reply.send({ key: setting.key, value: setting.value });
+    } catch (err: any) {
+      app.log.error(err, 'GET /settings/:key failed');
+      reply.code(500).send({ error: 'Failed to load setting', detail: err?.message });
     }
-    reply.send({ key: setting.key, value: setting.value });
   });
 
   // Set (upsert) a setting
   app.put('/settings/:key', async (req, reply) => {
-    const { key } = req.params as { key: string };
-    const body = req.body as any;
+    try {
+      const { key } = req.params as { key: string };
+      const body = req.body as any;
 
-    const setting = await prisma.setting.upsert({
-      where: { key },
-      create: { key, value: body.value },
-      update: { value: body.value },
-    });
+      const setting = await prisma.setting.upsert({
+        where: { key },
+        create: { key, value: body.value },
+        update: { value: body.value },
+      });
 
-    reply.send({ key: setting.key, value: setting.value });
+      reply.send({ key: setting.key, value: setting.value });
+    } catch (err: any) {
+      app.log.error(err, 'PUT /settings/:key failed');
+      reply.code(500).send({ error: 'Failed to save setting', detail: err?.message });
+    }
   });
 
   // Delete a setting

@@ -1844,30 +1844,45 @@ async function backupRoutes(app2) {
 import { prisma as prisma9 } from "@crm/db/client";
 async function settingRoutes(app2) {
   app2.get("/settings", async (_req, reply) => {
-    const settings = await prisma9.setting.findMany();
-    const result = {};
-    for (const s of settings) {
-      result[s.key] = s.value;
+    try {
+      const settings = await prisma9.setting.findMany();
+      const result = {};
+      for (const s of settings) {
+        result[s.key] = s.value;
+      }
+      reply.send(result);
+    } catch (err) {
+      app2.log.error(err, "GET /settings failed");
+      reply.code(500).send({ error: "Failed to load settings", detail: err?.message });
     }
-    reply.send(result);
   });
   app2.get("/settings/:key", async (req, reply) => {
-    const { key } = req.params;
-    const setting = await prisma9.setting.findUnique({ where: { key } });
-    if (!setting) {
-      return reply.code(404).send({ error: "Setting not found" });
+    try {
+      const { key } = req.params;
+      const setting = await prisma9.setting.findUnique({ where: { key } });
+      if (!setting) {
+        return reply.code(404).send({ error: "Setting not found" });
+      }
+      reply.send({ key: setting.key, value: setting.value });
+    } catch (err) {
+      app2.log.error(err, "GET /settings/:key failed");
+      reply.code(500).send({ error: "Failed to load setting", detail: err?.message });
     }
-    reply.send({ key: setting.key, value: setting.value });
   });
   app2.put("/settings/:key", async (req, reply) => {
-    const { key } = req.params;
-    const body = req.body;
-    const setting = await prisma9.setting.upsert({
-      where: { key },
-      create: { key, value: body.value },
-      update: { value: body.value }
-    });
-    reply.send({ key: setting.key, value: setting.value });
+    try {
+      const { key } = req.params;
+      const body = req.body;
+      const setting = await prisma9.setting.upsert({
+        where: { key },
+        create: { key, value: body.value },
+        update: { value: body.value }
+      });
+      reply.send({ key: setting.key, value: setting.value });
+    } catch (err) {
+      app2.log.error(err, "PUT /settings/:key failed");
+      reply.code(500).send({ error: "Failed to save setting", detail: err?.message });
+    }
   });
   app2.delete("/settings/:key", async (req, reply) => {
     const { key } = req.params;
@@ -1886,14 +1901,19 @@ async function preferenceRoutes(app2) {
   app2.get("/user/preferences", async (req, reply) => {
     const userId = req.user?.sub;
     if (!userId) return reply.code(401).send({ error: "Unauthorized" });
-    const prefs = await prisma10.userPreference.findMany({
-      where: { userId }
-    });
-    const result = {};
-    for (const p of prefs) {
-      result[p.key] = p.value;
+    try {
+      const prefs = await prisma10.userPreference.findMany({
+        where: { userId }
+      });
+      const result = {};
+      for (const p of prefs) {
+        result[p.key] = p.value;
+      }
+      reply.send(result);
+    } catch (err) {
+      app2.log.error(err, "GET /user/preferences failed");
+      reply.code(500).send({ error: "Failed to load preferences", detail: err?.message });
     }
-    reply.send(result);
   });
   app2.get("/user/preferences/:key", async (req, reply) => {
     const userId = req.user?.sub;
@@ -1962,7 +1982,25 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-05-v1" }));
+  app2.get("/health", async () => {
+    let dbOk = false;
+    let dbError = null;
+    try {
+      await prisma11.$queryRawUnsafe("SELECT 1");
+      dbOk = true;
+    } catch (e) {
+      dbError = e?.message || "Unknown DB error";
+    }
+    let settingOk = false;
+    let settingError = null;
+    try {
+      await prisma11.setting.count();
+      settingOk = true;
+    } catch (e) {
+      settingError = e?.message || "Unknown error";
+    }
+    return { ok: dbOk && settingOk, version: "2026-03-05-v2", db: dbOk, dbError, settingTable: settingOk, settingError };
+  });
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z6.object({
       name: z6.string().min(1),
