@@ -1,0 +1,308 @@
+import { prisma } from '@crm/db/client';
+
+/**
+ * Core CRM object definitions that must always exist in the database.
+ * On API startup we upsert each one so the records routes never return 404
+ * for a known object type.
+ */
+const CORE_OBJECTS = [
+  {
+    apiName: 'Property',
+    label: 'Property',
+    pluralLabel: 'Properties',
+    description: 'Real estate properties',
+    fields: [
+      { apiName: 'propertyNumber', label: 'Property Number', type: 'Text', required: true, unique: true },
+      { apiName: 'address', label: 'Address', type: 'Text', required: true },
+      { apiName: 'city', label: 'City', type: 'Text', required: true },
+      { apiName: 'state', label: 'State/Province', type: 'Text', required: true },
+      { apiName: 'zipCode', label: 'Zip Code', type: 'Text' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', required: true, picklistValues: ['Active', 'Inactive', 'Pending'], defaultValue: 'Active' },
+    ],
+  },
+  {
+    apiName: 'Contact',
+    label: 'Contact',
+    pluralLabel: 'Contacts',
+    description: 'People and contacts',
+    fields: [
+      { apiName: 'firstName', label: 'First Name', type: 'Text', required: true },
+      { apiName: 'lastName', label: 'Last Name', type: 'Text', required: true },
+      { apiName: 'email', label: 'Email', type: 'Email' },
+      { apiName: 'phone', label: 'Phone', type: 'Phone' },
+      { apiName: 'title', label: 'Title', type: 'Text' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active' },
+    ],
+  },
+  {
+    apiName: 'Account',
+    label: 'Account',
+    pluralLabel: 'Accounts',
+    description: 'Business accounts and organizations',
+    fields: [
+      { apiName: 'accountNumber', label: 'Account Number', type: 'Text', required: true, unique: true },
+      { apiName: 'name', label: 'Account Name', type: 'Text', required: true },
+      { apiName: 'type', label: 'Type', type: 'Picklist', picklistValues: ['Customer', 'Prospect', 'Partner', 'Vendor'] },
+      { apiName: 'email', label: 'Email', type: 'Email' },
+      { apiName: 'phone', label: 'Phone', type: 'Phone' },
+      { apiName: 'website', label: 'Website', type: 'URL' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active' },
+    ],
+  },
+  {
+    apiName: 'Product',
+    label: 'Product',
+    pluralLabel: 'Products',
+    description: 'Products and services catalog',
+    fields: [
+      { apiName: 'productCode', label: 'Product Code', type: 'Text', required: true, unique: true },
+      { apiName: 'productName', label: 'Product Name', type: 'Text', required: true },
+      { apiName: 'description', label: 'Description', type: 'TextArea' },
+      { apiName: 'unitPrice', label: 'Unit Price', type: 'Currency' },
+      { apiName: 'productFamily', label: 'Product Family', type: 'Picklist', picklistValues: ['Hardware', 'Software', 'Service', 'Other'] },
+      { apiName: 'isActive', label: 'Active', type: 'Checkbox', defaultValue: 'true' },
+    ],
+  },
+  {
+    apiName: 'Lead',
+    label: 'Lead',
+    pluralLabel: 'Leads',
+    description: 'Sales leads',
+    fields: [
+      { apiName: 'leadNumber', label: 'Lead Number', type: 'Text', required: true, unique: true },
+      { apiName: 'firstName', label: 'First Name', type: 'Text' },
+      { apiName: 'lastName', label: 'Last Name', type: 'Text', required: true },
+      { apiName: 'company', label: 'Company', type: 'Text' },
+      { apiName: 'email', label: 'Email', type: 'Email' },
+      { apiName: 'phone', label: 'Phone', type: 'Phone' },
+      { apiName: 'leadSource', label: 'Lead Source', type: 'Picklist', picklistValues: ['Web', 'Phone', 'Referral', 'Partner', 'Other'] },
+      { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['New', 'Contacted', 'Qualified', 'Converted', 'Lost'], defaultValue: 'New' },
+    ],
+  },
+  {
+    apiName: 'Deal',
+    label: 'Deal',
+    pluralLabel: 'Deals',
+    description: 'Sales opportunities and deals',
+    fields: [
+      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', required: true, unique: true },
+      { apiName: 'dealName', label: 'Deal Name', type: 'Text', required: true },
+      { apiName: 'amount', label: 'Amount', type: 'Currency' },
+      { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
+      { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
+      { apiName: 'probability', label: 'Probability (%)', type: 'Percent' },
+    ],
+  },
+  {
+    apiName: 'Project',
+    label: 'Project',
+    pluralLabel: 'Projects',
+    description: 'Project management',
+    fields: [
+      { apiName: 'projectNumber', label: 'Project Number', type: 'Text', required: true, unique: true },
+      { apiName: 'projectName', label: 'Project Name', type: 'Text', required: true },
+      { apiName: 'description', label: 'Description', type: 'TextArea' },
+      { apiName: 'startDate', label: 'Start Date', type: 'Date' },
+      { apiName: 'endDate', label: 'End Date', type: 'Date' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'Planning' },
+    ],
+  },
+  {
+    apiName: 'Service',
+    label: 'Service',
+    pluralLabel: 'Services',
+    description: 'Service tickets and requests',
+    fields: [
+      { apiName: 'serviceNumber', label: 'Service Number', type: 'Text', required: true, unique: true },
+      { apiName: 'serviceName', label: 'Service Name', type: 'Text', required: true },
+      { apiName: 'description', label: 'Description', type: 'TextArea' },
+      { apiName: 'priority', label: 'Priority', type: 'Picklist', picklistValues: ['Low', 'Medium', 'High', 'Critical'], defaultValue: 'Medium' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['New', 'In Progress', 'Pending', 'Completed', 'Cancelled'], defaultValue: 'New' },
+    ],
+  },
+  {
+    apiName: 'Quote',
+    label: 'Quote',
+    pluralLabel: 'Quotes',
+    description: 'Sales quotes and proposals',
+    fields: [
+      { apiName: 'quoteNumber', label: 'Quote Number', type: 'Text', required: true, unique: true },
+      { apiName: 'quoteName', label: 'Quote Name', type: 'Text', required: true },
+      { apiName: 'totalAmount', label: 'Total Amount', type: 'Currency' },
+      { apiName: 'validUntil', label: 'Valid Until', type: 'Date' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Draft', 'Sent', 'Accepted', 'Rejected', 'Expired'], defaultValue: 'Draft' },
+    ],
+  },
+  {
+    apiName: 'Installation',
+    label: 'Installation',
+    pluralLabel: 'Installations',
+    description: 'Installation tracking',
+    fields: [
+      { apiName: 'installationNumber', label: 'Installation Number', type: 'Text', required: true, unique: true },
+      { apiName: 'installationName', label: 'Installation Name', type: 'Text', required: true },
+      { apiName: 'scheduledDate', label: 'Scheduled Date', type: 'Date' },
+      { apiName: 'completedDate', label: 'Completed Date', type: 'Date' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Scheduled' },
+    ],
+  },
+];
+
+/**
+ * Ensures every core CRM object (and its fields + default layout) exists in the
+ * database.  Uses upsert so it is safe to call on every startup.
+ *
+ * Requires at least one User row in the database to set as createdBy / modifiedBy.
+ */
+export async function ensureCoreObjects(): Promise<void> {
+  console.log('[ensure-core-objects] Checking core objects...');
+
+  // Grab any existing user to use as the creator/modifier
+  let systemUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
+
+  if (!systemUser) {
+    // If somehow no users exist yet, create a system user
+    const crypto = await import('crypto');
+    const ITERATIONS = 310_000;
+    const KEYLEN = 32;
+    const DIGEST = 'sha256';
+    const salt = crypto.randomBytes(16).toString('hex');
+    const derived = crypto.pbkdf2Sync('admin123', salt, ITERATIONS, KEYLEN, DIGEST).toString('hex');
+    const passwordHash = `pbkdf2$${ITERATIONS}$${DIGEST}$${salt}$${derived}`;
+
+    systemUser = await prisma.user.create({
+      data: {
+        email: 'admin@crm.local',
+        passwordHash,
+        name: 'System Admin',
+        role: 'ADMIN',
+      },
+    });
+    console.log('[ensure-core-objects] Created system admin user');
+  }
+
+  let created = 0;
+  let existed = 0;
+
+  for (const objDef of CORE_OBJECTS) {
+    const existing = await prisma.customObject.findFirst({
+      where: { apiName: { equals: objDef.apiName, mode: 'insensitive' } },
+    });
+
+    if (existing) {
+      existed++;
+      // Ensure fields exist even if the object already exists
+      await ensureFields(existing.id, objDef.fields, systemUser.id);
+      continue;
+    }
+
+    // Object doesn't exist — create it
+    const obj = await prisma.customObject.create({
+      data: {
+        apiName: objDef.apiName,
+        label: objDef.label,
+        pluralLabel: objDef.pluralLabel,
+        description: objDef.description,
+        createdById: systemUser.id,
+        modifiedById: systemUser.id,
+      },
+    });
+
+    // Create fields
+    await ensureFields(obj.id, objDef.fields, systemUser.id);
+
+    // Create default page layout
+    await createDefaultLayout(obj.id, systemUser.id);
+
+    created++;
+    console.log(`[ensure-core-objects] Created ${objDef.apiName} with ${objDef.fields.length} fields`);
+  }
+
+  console.log(
+    `[ensure-core-objects] Done — ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
+  );
+}
+
+interface FieldDef {
+  apiName: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  unique?: boolean;
+  picklistValues?: string[];
+  defaultValue?: string;
+}
+
+async function ensureFields(objectId: string, fields: FieldDef[], userId: string): Promise<void> {
+  for (const fieldDef of fields) {
+    const existing = await prisma.customField.findFirst({
+      where: { objectId, apiName: fieldDef.apiName },
+    });
+    if (existing) continue;
+
+    await prisma.customField.create({
+      data: {
+        objectId,
+        apiName: fieldDef.apiName,
+        label: fieldDef.label,
+        type: fieldDef.type,
+        required: fieldDef.required || false,
+        unique: fieldDef.unique || false,
+        picklistValues: fieldDef.picklistValues ? JSON.stringify(fieldDef.picklistValues) : null,
+        defaultValue: fieldDef.defaultValue || null,
+        createdById: userId,
+        modifiedById: userId,
+      },
+    });
+  }
+}
+
+async function createDefaultLayout(objectId: string, userId: string): Promise<void> {
+  const layoutExists = await prisma.pageLayout.findFirst({
+    where: { objectId, name: 'Default Layout' },
+  });
+  if (layoutExists) return;
+
+  const layout = await prisma.pageLayout.create({
+    data: {
+      objectId,
+      name: 'Default Layout',
+      layoutType: 'edit',
+      isDefault: true,
+      createdById: userId,
+      modifiedById: userId,
+    },
+  });
+
+  const tab = await prisma.layoutTab.create({
+    data: {
+      layoutId: layout.id,
+      label: 'Details',
+      order: 0,
+    },
+  });
+
+  const section = await prisma.layoutSection.create({
+    data: {
+      tabId: tab.id,
+      label: 'Information',
+      columns: 2,
+      order: 0,
+    },
+  });
+
+  const objFields = await prisma.customField.findMany({ where: { objectId } });
+  for (let i = 0; i < objFields.length; i++) {
+    const field = objFields[i];
+    if (field) {
+      await prisma.layoutField.create({
+        data: {
+          sectionId: section.id,
+          fieldId: field.id,
+          column: i % 2,
+          order: Math.floor(i / 2),
+        },
+      });
+    }
+  }
+}

@@ -9,11 +9,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import { buildApp } from './app';
+import { ensureCoreObjects } from './ensure-core-objects';
 
 const port = Number(process.env.PORT || 4000);
 const app = buildApp();
-app
-  .listen({ port, host: '0.0.0.0' })
+
+// Ensure all core CRM objects exist in the database before accepting traffic
+ensureCoreObjects()
+  .then(() => {
+    return app.listen({ port, host: '0.0.0.0' });
+  })
   .then(() => {
     app.log.info(`API listening on ${port}`);
   })
