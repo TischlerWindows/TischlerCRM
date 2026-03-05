@@ -469,19 +469,20 @@ class LocalStorageSchemaService implements SchemaService {
         // objects were missing (e.g. partial save), merge them back in
         const defaultSchema = this.createSampleData();
         const existingApiNames = new Set(migratedSchema.objects.map(o => o.apiName));
+        let addedMissingObjects = false;
         for (const defaultObj of defaultSchema.objects) {
           if (!existingApiNames.has(defaultObj.apiName)) {
             console.log(`[Schema] Adding missing default object: ${defaultObj.apiName}`);
             migratedSchema.objects.push(defaultObj);
+            addedMissingObjects = true;
           }
         }
 
-        if (migratedSchema !== schema || migratedSchema.objects.length !== schema.objects.length) {
+        if (migratedSchema !== schema || addedMissingObjects) {
           await this.saveSchema(migratedSchema);
-          return migratedSchema;
         }
         
-        return schema;
+        return migratedSchema;
       }
     } catch (err) {
       console.warn('[Schema] Could not load from API, trying localStorage migration:', err);
