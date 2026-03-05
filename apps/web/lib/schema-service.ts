@@ -806,31 +806,47 @@ class LocalStorageSchemaService implements SchemaService {
     const objects = schema.objects.map((obj) => {
       if (excludedObjects.has(obj.apiName)) return obj;
 
-      // Check if any layout already has populated fields
-      const hasPopulatedLayout = (obj.pageLayouts || []).some((layout) =>
+      // Collect the object's OWN custom fields (prefixed with ObjectName__)
+      const systemFieldApiNames = new Set(SYSTEM_FIELDS.map((f) => f.apiName));
+      const ownFieldApiNames = new Set(
+        obj.fields
+          .filter((f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`))
+          .map((f) => f.apiName)
+      );
+
+      // Check if any layout contains at least some of the object's OWN fields
+      // (not just relationship lookups like ContactId, AccountId, etc.)
+      const hasOwnFieldsInLayout = (obj.pageLayouts || []).some((layout) =>
         layout.tabs?.some((tab) =>
           tab.sections?.some((section) =>
-            section.fields && section.fields.length > 0
+            section.fields?.some((f) => ownFieldApiNames.has(f.apiName))
           )
         )
       );
 
-      if (hasPopulatedLayout) return obj;
+      if (hasOwnFieldsInLayout) return obj;
 
-      // No populated layout — auto-generate one from the object's custom fields
-      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no populated layout found)`);
+      // No layout with own fields — auto-generate one from the object's custom fields
+      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no layout has own fields)`);
 
-      const systemFieldApiNames = new Set(SYSTEM_FIELDS.map((f) => f.apiName));
       const customFields = obj.fields.filter(
-        (f) => !systemFieldApiNames.has(f.apiName) && f.type !== 'AutoNumber' && f.type !== 'Formula' && f.type !== 'RollupSummary'
+        (f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`) &&
+               f.type !== 'AutoNumber' && f.type !== 'Formula' && f.type !== 'RollupSummary'
       );
 
       // Also include AutoNumber/Formula/RollupSummary as read-only fields at end
       const readOnlyFields = obj.fields.filter(
-        (f) => !systemFieldApiNames.has(f.apiName) && (f.type === 'AutoNumber' || f.type === 'Formula' || f.type === 'RollupSummary')
+        (f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`) &&
+               (f.type === 'AutoNumber' || f.type === 'Formula' || f.type === 'RollupSummary')
       );
 
-      const allLayoutFields = [...customFields, ...readOnlyFields];
+      // Include relationship lookups too (fields without prefix, like ContactId)
+      const relationshipFields = obj.fields.filter(
+        (f) => !systemFieldApiNames.has(f.apiName) && !f.apiName.startsWith(`${obj.apiName}__`) &&
+               (f.type === 'Lookup' || f.type === 'ExternalLookup')
+      );
+
+      const allLayoutFields = [...customFields, ...readOnlyFields, ...relationshipFields];
 
       if (allLayoutFields.length === 0) return obj;
 
@@ -872,15 +888,17 @@ class LocalStorageSchemaService implements SchemaService {
         return rt;
       });
 
-      // Replace empty layouts or add if none exist
-      const existingPopulated = (obj.pageLayouts || []).filter((l) =>
-        l.tabs?.some((t) => t.sections?.some((s) => s.fields && s.fields.length > 0))
+      // Keep any existing layouts that have own fields; replace empty ones
+      const existingWithOwnFields = (obj.pageLayouts || []).filter((l) =>
+        l.tabs?.some((t) => t.sections?.some((s) =>
+          s.fields?.some((f) => ownFieldApiNames.has(f.apiName))
+        ))
       );
 
       changed = true;
       return {
         ...obj,
-        pageLayouts: [...existingPopulated, layout],
+        pageLayouts: [...existingWithOwnFields, layout],
         recordTypes: updatedRecordTypes,
         updatedAt: new Date().toISOString()
       };
