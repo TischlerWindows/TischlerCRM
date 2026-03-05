@@ -240,10 +240,16 @@ export const useSchemaStore = create<SchemaStore>()(
           updatedAt: new Date().toISOString()
         };
         
+        // Optimistic update — rollback on failure
         set({ schema: updatedSchema });
         
-        // Persist to schema service storage
-        await schemaService.saveSchema(updatedSchema);
+        try {
+          await schemaService.saveSchema(updatedSchema);
+        } catch (error) {
+          // Rollback to previous state
+          set({ schema });
+          throw error;
+        }
       },
 
       // Delete object

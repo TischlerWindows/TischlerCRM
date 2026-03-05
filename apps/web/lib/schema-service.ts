@@ -2402,15 +2402,14 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   async saveSchema(schema: OrgSchema): Promise<void> {
+    // Save to API (primary storage) — this MUST succeed
+    await apiClient.setSetting(STORAGE_KEY, schema);
+    
+    // Save to version history on API — best effort, don't block main save
     try {
-      // Save to API (primary storage)
-      await apiClient.setSetting(STORAGE_KEY, schema);
-      
-      // Save to version history on API
       await this.saveToVersionHistory(schema);
-    } catch (error) {
-      console.error('Failed to save schema to API:', error);
-      throw new Error('Failed to save schema: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } catch (versionError) {
+      console.warn('Version history save failed (non-fatal):', versionError);
     }
   }
 
@@ -2511,8 +2510,8 @@ class LocalStorageSchemaService implements SchemaService {
   private async saveToVersionHistory(schema: OrgSchema): Promise<void> {
     const versions = await this.getVersionHistory();
     
-    // Keep only last 10 versions
-    const updatedVersions = [schema, ...versions.slice(0, 9)];
+    // Keep only last 5 versions to avoid huge payloads
+    const updatedVersions = [schema, ...versions.slice(0, 4)];
     
     await apiClient.setSetting(VERSIONS_KEY, updatedVersions);
   }

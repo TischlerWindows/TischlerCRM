@@ -1962,7 +1962,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-02-v4" }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-05-v1" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z6.object({
       name: z6.string().min(1),
