@@ -15,6 +15,7 @@
     "prisma:push": "dotenv -e ../../.env -- prisma db push",
     "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.json",
+    "postbuild": "prisma db push --skip-generate || echo 'prisma db push skipped'",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

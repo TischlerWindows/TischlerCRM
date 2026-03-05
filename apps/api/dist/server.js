@@ -2004,7 +2004,7 @@ function buildApp() {
     } catch (e) {
       settingError = e?.message || "Unknown error";
     }
-    return { ok: dbOk && settingOk, version: "2026-03-05-v3", db: dbOk, dbError, tables, settingTable: settingOk, settingError };
+    return { ok: dbOk && settingOk, version: "2026-03-05-v3", db: dbOk, dbError, tables, settingTable: settingOk, settingError, dbHost: process.env.DATABASE_URL?.replace(/\/\/.*@/, "//***@") };
   });
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z6.object({

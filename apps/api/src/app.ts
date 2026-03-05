@@ -63,7 +63,7 @@ export function buildApp() {
       settingError = e?.message || 'Unknown error';
     }
     
-    return { ok: dbOk && settingOk, version: '2026-03-05-v3', db: dbOk, dbError, tables, settingTable: settingOk, settingError };
+    return { ok: dbOk && settingOk, version: '2026-03-05-v3', db: dbOk, dbError, tables, settingTable: settingOk, settingError, dbHost: process.env.DATABASE_URL?.replace(/\/\/.*@/, '//***@') };
   });
 
   // Auth: signup
