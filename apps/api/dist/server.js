@@ -2300,6 +2300,70 @@ async function ensureCoreObjects() {
   console.log(
     `[ensure-core-objects] Done \u2014 ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
   );
+  await syncSchemaObjectsToDb(systemUser.id);
+}
+async function syncSchemaObjectsToDb(userId) {
+  try {
+    const schemaSetting = await prisma12.setting.findUnique({ where: { key: "orgSchema" } });
+    if (!schemaSetting || !schemaSetting.value) return;
+    const schema = schemaSetting.value;
+    const objects = schema.objects || [];
+    let synced = 0;
+    for (const obj of objects) {
+      if (!obj.apiName || obj.apiName === "Home") continue;
+      const existing = await prisma12.customObject.findFirst({
+        where: { apiName: { equals: obj.apiName, mode: "insensitive" } }
+      });
+      if (existing) continue;
+      const validApiName = /^[A-Z][A-Za-z0-9_]*$/.test(obj.apiName) ? obj.apiName : obj.apiName.charAt(0).toUpperCase() + obj.apiName.slice(1);
+      try {
+        const dbObj = await prisma12.customObject.create({
+          data: {
+            apiName: validApiName,
+            label: obj.label || validApiName,
+            pluralLabel: obj.pluralLabel || obj.label || validApiName,
+            description: obj.description || null,
+            createdById: userId,
+            modifiedById: userId
+          }
+        });
+        const fields = obj.fields || [];
+        const systemFieldNames = /* @__PURE__ */ new Set(["Id", "CreatedDate", "LastModifiedDate", "CreatedById", "LastModifiedById"]);
+        const customFields = fields.filter(
+          (f) => !systemFieldNames.has(f.apiName) && f.type !== "Lookup" && f.type !== "ExternalLookup"
+        );
+        for (const fieldDef of customFields) {
+          try {
+            await prisma12.customField.create({
+              data: {
+                objectId: dbObj.id,
+                apiName: fieldDef.apiName,
+                label: fieldDef.label || fieldDef.apiName,
+                type: fieldDef.type || "Text",
+                required: fieldDef.required || false,
+                unique: fieldDef.unique || false,
+                picklistValues: fieldDef.picklistValues ? JSON.stringify(fieldDef.picklistValues) : null,
+                defaultValue: fieldDef.defaultValue || null,
+                createdById: userId,
+                modifiedById: userId
+              }
+            });
+          } catch {
+          }
+        }
+        await createDefaultLayout(dbObj.id, userId);
+        synced++;
+        console.log(`[ensure-core-objects] Synced schema object "${validApiName}" to DB with ${customFields.length} fields`);
+      } catch (err) {
+        console.warn(`[ensure-core-objects] Failed to sync schema object "${obj.apiName}":`, err);
+      }
+    }
+    if (synced > 0) {
+      console.log(`[ensure-core-objects] Synced ${synced} additional objects from schema settings`);
+    }
+  } catch (err) {
+    console.warn("[ensure-core-objects] Could not sync schema objects:", err);
+  }
 }
 async function ensureFields(objectId, fields, userId) {
   for (const fieldDef of fields) {

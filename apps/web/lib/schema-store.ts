@@ -214,6 +214,30 @@ export const useSchemaStore = create<SchemaStore>()(
             description: objectData.description,
           });
           console.log(`[Schema] Object "${newObject.apiName}" created in database`);
+
+          // Sync fields to the database so the records API can validate them
+          const fieldsToSync = (newObjectWithLayouts.fields || []).filter((f) => {
+            const isSystem = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(f.apiName);
+            const isLookup = f.type === 'Lookup' || f.type === 'ExternalLookup';
+            return !isSystem && !isLookup;
+          });
+          for (const field of fieldsToSync) {
+            try {
+              await apiClient.createField(newObject.apiName, {
+                apiName: field.apiName,
+                label: field.label,
+                type: field.type || 'Text',
+                required: field.required || false,
+                unique: field.unique || false,
+                readOnly: field.readOnly || false,
+                picklistValues: field.picklistValues,
+                defaultValue: field.defaultValue,
+              });
+            } catch {
+              // Field may already exist
+            }
+          }
+          console.log(`[Schema] Synced ${fieldsToSync.length} fields for "${newObject.apiName}" to database`);
         } catch (err) {
           // Object may already exist in DB (e.g., seeded objects) — that's OK
           console.warn(`[Schema] Could not create object "${newObject.apiName}" in database (may already exist):`, err);

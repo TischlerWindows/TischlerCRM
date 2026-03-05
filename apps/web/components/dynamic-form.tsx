@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import {
   ChevronDown,
   ChevronRight,
@@ -1071,6 +1072,41 @@ export default function DynamicForm({
                 layoutId={inlineCreateLayoutId}
                 onSubmit={async (data, inlineLayoutId) => {
                   try {
+                    // Ensure the custom object exists in the database before creating records
+                    const targetObj = schema?.objects.find((o) => o.apiName === inlineCreateTarget);
+                    if (targetObj) {
+                      try {
+                        await apiClient.createObject({
+                          apiName: targetObj.apiName,
+                          label: targetObj.label,
+                          pluralLabel: targetObj.pluralLabel || targetObj.label,
+                        });
+                      } catch {
+                        // Object may already exist — that's fine
+                      }
+
+                      // Also ensure fields exist in the DB for this object
+                      try {
+                        for (const field of targetObj.fields) {
+                          const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
+                          if (!isSystemField && field.type !== 'Lookup' && field.type !== 'ExternalLookup') {
+                            await apiClient.createField(targetObj.apiName, {
+                              apiName: field.apiName,
+                              label: field.label,
+                              type: field.type || 'Text',
+                              required: field.required || false,
+                              unique: field.unique || false,
+                              readOnly: field.readOnly || false,
+                              picklistValues: field.picklistValues,
+                              defaultValue: field.defaultValue,
+                            }).catch(() => {}); // field may already exist
+                          }
+                        }
+                      } catch {
+                        // Non-fatal — fields best effort sync
+                      }
+                    }
+
                     const created = await recordsService.createRecord(inlineCreateTarget!, {
                       data,
                       pageLayoutId: inlineLayoutId || inlineCreateLayoutId,

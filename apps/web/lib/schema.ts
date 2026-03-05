@@ -320,11 +320,13 @@ export function generateId(): string {
 }
 
 export function generateApiName(label: string): string {
-  return label
+  const raw = label
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .replace(/\s+/g, '_')
     .replace(/^(\d)/, '_$1') // prefix with _ if starts with number
     .substring(0, 40); // max 40 chars
+  // Capitalize first letter so the API regex /^[A-Z].../ passes
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 export function validateApiName(apiName: string): boolean {
@@ -343,15 +345,18 @@ export function createDefaultPageLayout(objectApiName: string): PageLayout {
   return {
     id: generateId(),
     name: `${objectApiName} Layout`,
+    layoutType: 'edit',
     tabs: [
       {
         id: generateId(),
         label: 'Details',
+        order: 0,
         sections: [
           {
             id: generateId(),
             label: 'Information',
             columns: 2,
+            order: 0,
             fields: []
           }
         ]

@@ -221,6 +221,98 @@ export async function ensureCoreObjects(): Promise<void> {
   console.log(
     `[ensure-core-objects] Done — ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
   );
+
+  // Also sync any user-created objects from the schema settings to the DB.
+  // The schema (stored in the Setting table under 'orgSchema') may contain
+  // objects that were created in the UI but whose apiClient.createObject call
+  // failed (e.g., first letter not capitalised, transient network error, etc.).
+  await syncSchemaObjectsToDb(systemUser.id);
+}
+
+/**
+ * Read the saved OrgSchema from the settings table and ensure every object
+ * defined in it also exists in the customObject + customField tables.
+ */
+async function syncSchemaObjectsToDb(userId: string): Promise<void> {
+  try {
+    const schemaSetting = await prisma.setting.findUnique({ where: { key: 'orgSchema' } });
+    if (!schemaSetting || !schemaSetting.value) return;
+
+    const schema = schemaSetting.value as any;
+    const objects: any[] = schema.objects || [];
+
+    let synced = 0;
+    for (const obj of objects) {
+      if (!obj.apiName || obj.apiName === 'Home') continue;
+
+      const existing = await prisma.customObject.findFirst({
+        where: { apiName: { equals: obj.apiName, mode: 'insensitive' } },
+      });
+
+      if (existing) continue;
+
+      // Validate apiName starts with uppercase (API requirement)
+      const validApiName = /^[A-Z][A-Za-z0-9_]*$/.test(obj.apiName)
+        ? obj.apiName
+        : obj.apiName.charAt(0).toUpperCase() + obj.apiName.slice(1);
+
+      try {
+        const dbObj = await prisma.customObject.create({
+          data: {
+            apiName: validApiName,
+            label: obj.label || validApiName,
+            pluralLabel: obj.pluralLabel || obj.label || validApiName,
+            description: obj.description || null,
+            createdById: userId,
+            modifiedById: userId,
+          },
+        });
+
+        // Sync fields from the schema
+        const fields: any[] = obj.fields || [];
+        const systemFieldNames = new Set(['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById']);
+        const customFields = fields.filter((f: any) =>
+          !systemFieldNames.has(f.apiName) &&
+          f.type !== 'Lookup' && f.type !== 'ExternalLookup'
+        );
+
+        for (const fieldDef of customFields) {
+          try {
+            await prisma.customField.create({
+              data: {
+                objectId: dbObj.id,
+                apiName: fieldDef.apiName,
+                label: fieldDef.label || fieldDef.apiName,
+                type: fieldDef.type || 'Text',
+                required: fieldDef.required || false,
+                unique: fieldDef.unique || false,
+                picklistValues: fieldDef.picklistValues ? JSON.stringify(fieldDef.picklistValues) : null,
+                defaultValue: fieldDef.defaultValue || null,
+                createdById: userId,
+                modifiedById: userId,
+              },
+            });
+          } catch {
+            // Skip fields that fail (e.g., duplicates)
+          }
+        }
+
+        // Create a default layout
+        await createDefaultLayout(dbObj.id, userId);
+
+        synced++;
+        console.log(`[ensure-core-objects] Synced schema object "${validApiName}" to DB with ${customFields.length} fields`);
+      } catch (err) {
+        console.warn(`[ensure-core-objects] Failed to sync schema object "${obj.apiName}":`, err);
+      }
+    }
+
+    if (synced > 0) {
+      console.log(`[ensure-core-objects] Synced ${synced} additional objects from schema settings`);
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not sync schema objects:', err);
+  }
 }
 
 interface FieldDef {

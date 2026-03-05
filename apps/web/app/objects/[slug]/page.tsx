@@ -235,6 +235,27 @@ export default function CustomObjectRecordsPage() {
         } catch {
           // Object may already exist — that's fine
         }
+
+        // Also ensure fields exist in the DB for this object
+        try {
+          for (const field of objectDef.fields) {
+            const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
+            if (!isSystemField && field.type !== 'Lookup' && field.type !== 'ExternalLookup') {
+              await apiClient.createField(objectDef.apiName, {
+                apiName: field.apiName,
+                label: field.label,
+                type: field.type || 'Text',
+                required: field.required || false,
+                unique: field.unique || false,
+                readOnly: field.readOnly || false,
+                picklistValues: field.picklistValues,
+                defaultValue: field.defaultValue,
+              }).catch(() => {}); // field may already exist
+            }
+          }
+        } catch {
+          // Non-fatal — fields best effort sync
+        }
       }
 
       const result = await recordsService.createRecord(apiName, { data: normalizedData, pageLayoutId: layoutId || undefined });
