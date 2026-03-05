@@ -36,35 +36,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => {
-    // Quick DB connectivity check
-    let dbOk = false;
-    let dbError: string | null = null;
-    let tables: string[] = [];
-    try {
-      await prisma.$queryRawUnsafe('SELECT 1');
-      dbOk = true;
-      // List actual tables
-      const result = await prisma.$queryRawUnsafe(
-        "SELECT table_name::text FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
-      ) as { table_name: string }[];
-      tables = result.map((r: any) => r.table_name);
-    } catch (e: any) {
-      dbError = e?.message || 'Unknown DB error';
-    }
-    
-    // Check if Setting table accessible via Prisma ORM
-    let settingOk = false;
-    let settingError: string | null = null;
-    try {
-      await prisma.setting.count();
-      settingOk = true;
-    } catch (e: any) {
-      settingError = e?.message || 'Unknown error';
-    }
-    
-    return { ok: dbOk && settingOk, version: '2026-03-05-v3', db: dbOk, dbError, tables, settingTable: settingOk, settingError, dbHost: process.env.DATABASE_URL?.replace(/\/\/.*@/, '//***@') };
-  });
+  app.get('/health', async () => ({ ok: true, version: '2026-03-05-v4' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
