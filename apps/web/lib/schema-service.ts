@@ -806,35 +806,39 @@ class LocalStorageSchemaService implements SchemaService {
     const objects = schema.objects.map((obj) => {
       if (excludedObjects.has(obj.apiName)) return obj;
 
-      // Collect the object's OWN custom fields (prefixed with ObjectName__)
       const systemFieldApiNames = new Set(SYSTEM_FIELDS.map((f) => f.apiName));
-      const ownFieldApiNames = new Set(
-        obj.fields
-          .filter((f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`))
-          .map((f) => f.apiName)
-      );
 
-      // Check if any layout contains at least some of the object's OWN fields
-      // (not just relationship lookups like ContactId, AccountId, etc.)
-      const hasOwnFieldsInLayout = (obj.pageLayouts || []).some((layout) =>
+      // Check if ANY layout has ANY fields at all (including relationship lookups).
+      // A user who explicitly saves a layout in the Page Editor — even one containing
+      // only relationship lookups — has made a deliberate choice that we must respect.
+      const hasAnyPopulatedLayout = (obj.pageLayouts || []).some((layout) =>
         layout.tabs?.some((tab) =>
           tab.sections?.some((section) =>
-            section.fields?.some((f) => ownFieldApiNames.has(f.apiName))
+            (section.fields?.length || 0) > 0
           )
         )
       );
 
-      if (hasOwnFieldsInLayout) return obj;
+      if (hasAnyPopulatedLayout) return obj;
 
-      // No layout with own fields — auto-generate one from the object's custom fields
-      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no layout has own fields)`);
+      // Also skip if the default record type already points to an existing layout
+      // (the user may have saved a layout via the Page Editor that set this assignment).
+      const defaultRt = obj.defaultRecordTypeId
+        ? obj.recordTypes?.find((rt) => rt.id === obj.defaultRecordTypeId)
+        : obj.recordTypes?.[0];
+      if (defaultRt?.pageLayoutId) {
+        const assignedLayout = (obj.pageLayouts || []).find((l) => l.id === defaultRt.pageLayoutId);
+        if (assignedLayout) return obj;
+      }
+
+      // No populated layout — auto-generate one from the object's fields
+      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no layout has fields)`);
 
       const customFields = obj.fields.filter(
         (f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`) &&
                f.type !== 'AutoNumber' && f.type !== 'Formula' && f.type !== 'RollupSummary'
       );
 
-      // Also include AutoNumber/Formula/RollupSummary as read-only fields at end
       const readOnlyFields = obj.fields.filter(
         (f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`) &&
                (f.type === 'AutoNumber' || f.type === 'Formula' || f.type === 'RollupSummary')
@@ -877,28 +881,29 @@ class LocalStorageSchemaService implements SchemaService {
         ]
       };
 
-      // Update record types to point to the new layout
+      // Only update record type assignment if it doesn't already point to an existing layout
       const updatedRecordTypes = obj.recordTypes.map((rt, index) => {
-        if (obj.defaultRecordTypeId && rt.id === obj.defaultRecordTypeId) {
-          return { ...rt, pageLayoutId: layoutId };
-        }
-        if (!obj.defaultRecordTypeId && index === 0) {
-          return { ...rt, pageLayoutId: layoutId };
-        }
-        return rt;
+        const isDefault = obj.defaultRecordTypeId
+          ? rt.id === obj.defaultRecordTypeId
+          : index === 0;
+        if (!isDefault) return rt;
+        // If the record type already points to an existing layout, leave it alone
+        const alreadyAssigned = rt.pageLayoutId && (obj.pageLayouts || []).some((l) => l.id === rt.pageLayoutId);
+        if (alreadyAssigned) return rt;
+        return { ...rt, pageLayoutId: layoutId };
       });
 
-      // Keep any existing layouts that have own fields; replace empty ones
-      const existingWithOwnFields = (obj.pageLayouts || []).filter((l) =>
+      // Keep any existing layouts that have any fields; replace only empty ones
+      const existingWithFields = (obj.pageLayouts || []).filter((l) =>
         l.tabs?.some((t) => t.sections?.some((s) =>
-          s.fields?.some((f) => ownFieldApiNames.has(f.apiName))
+          (s.fields?.length || 0) > 0
         ))
       );
 
       changed = true;
       return {
         ...obj,
-        pageLayouts: [...existingWithOwnFields, layout],
+        pageLayouts: [...existingWithFields, layout],
         recordTypes: updatedRecordTypes,
         updatedAt: new Date().toISOString()
       };
