@@ -2494,6 +2494,14 @@ async function usersAdminRoutes(app2) {
     await prisma15.user.update({ where: { id }, data: { passwordHash } });
     reply.send({ success: true });
   });
+  app2.delete("/admin/users/:id", async (req, reply) => {
+    const { id } = req.params;
+    const existing = await prisma15.user.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: "User not found" });
+    await prisma15.permissionSetAssignment.deleteMany({ where: { userId: id } });
+    await prisma15.user.delete({ where: { id } });
+    reply.code(204).send();
+  });
   app2.post("/admin/users/:id/freeze", async (req, reply) => {
     const { id } = req.params;
     const existing = await prisma15.user.findUnique({ where: { id } });

@@ -160,6 +160,17 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     reply.send({ success: true });
   });
 
+  // Delete user
+  app.delete('/admin/users/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const existing = await prisma.user.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: 'User not found' });
+    // Delete related permission set assignments first
+    await prisma.permissionSetAssignment.deleteMany({ where: { userId: id } });
+    await prisma.user.delete({ where: { id } });
+    reply.code(204).send();
+  });
+
   // Freeze / unfreeze user
   app.post('/admin/users/:id/freeze', async (req, reply) => {
     const { id } = req.params as { id: string };

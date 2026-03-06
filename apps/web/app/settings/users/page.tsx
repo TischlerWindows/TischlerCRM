@@ -7,13 +7,11 @@ import {
   Users,
   Plus,
   Search,
-  Shield,
   Building2,
-  ChevronRight,
-  MoreHorizontal,
   UserCheck,
   UserX,
   RefreshCw,
+  Trash2,
   X,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
@@ -34,11 +32,6 @@ interface UserRow {
   manager: { id: string; name: string; email: string } | null;
 }
 
-interface Profile {
-  id: string;
-  name: string;
-}
-
 interface Department {
   id: string;
   name: string;
@@ -51,12 +44,10 @@ interface Role {
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProfile, setFilterProfile] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
   const [filterActive, setFilterActive] = useState<'' | 'true' | 'false'>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -72,7 +63,6 @@ export default function UsersPage() {
   const [formPassword, setFormPassword] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formPhone, setFormPhone] = useState('');
-  const [formProfileId, setFormProfileId] = useState('');
   const [formDeptId, setFormDeptId] = useState('');
   const [formRoleId, setFormRoleId] = useState('');
 
@@ -80,14 +70,12 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const [usersData, profilesData, deptsData, rolesData] = await Promise.all([
+      const [usersData, deptsData, rolesData] = await Promise.all([
         apiClient.get<UserRow[]>('/admin/users'),
-        apiClient.get<Profile[]>('/profiles'),
         apiClient.get<Department[]>('/departments'),
         apiClient.get<Role[]>('/roles'),
       ]);
       setUsers(usersData);
-      setProfiles(profilesData);
       setDepartments(deptsData);
       setRoles(rolesData);
     } catch (err) {
@@ -110,7 +98,6 @@ export default function UsersPage() {
         u.title?.toLowerCase().includes(q);
       if (!match) return false;
     }
-    if (filterProfile && u.profile?.id !== filterProfile) return false;
     if (filterDepartment && u.department?.id !== filterDepartment) return false;
     if (filterActive === 'true' && !u.isActive) return false;
     if (filterActive === 'false' && u.isActive) return false;
@@ -155,7 +142,6 @@ export default function UsersPage() {
         name: formName || undefined,
         title: formTitle || null,
         phone: formPhone || null,
-        profileId: formProfileId || null,
         departmentId: formDeptId || null,
         roleId: formRoleId || null,
       });
@@ -180,13 +166,23 @@ export default function UsersPage() {
     }
   };
 
+  const handleDelete = async (user: UserRow) => {
+    if (!confirm(`Are you sure you want to permanently delete ${user.name || user.email}? This cannot be undone.`)) return;
+    try {
+      await apiClient.delete(`/admin/users/${user.id}`);
+      setSuccess(`User "${user.name || user.email}" deleted`);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
+    }
+  };
+
   const openEdit = (user: UserRow) => {
     setEditUser(user);
     setFormName(user.name || '');
     setFormEmail(user.email);
     setFormTitle(user.title || '');
     setFormPhone(user.phone || '');
-    setFormProfileId(user.profile?.id || '');
     setFormDeptId(user.department?.id || '');
     setFormRoleId(user.userRole?.id || '');
     setShowEditModal(user.id);
@@ -198,7 +194,6 @@ export default function UsersPage() {
     setFormPassword('');
     setFormTitle('');
     setFormPhone('');
-    setFormProfileId('');
     setFormDeptId('');
     setFormRoleId('');
   };
@@ -247,16 +242,6 @@ export default function UsersPage() {
             />
           </div>
           <select
-            value={filterProfile}
-            onChange={(e) => setFilterProfile(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
-            <option value="">All Profiles</option>
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-          <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -301,7 +286,6 @@ export default function UsersPage() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Profile</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
@@ -324,12 +308,6 @@ export default function UsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">{user.email}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-sm text-gray-700">
-                          <Shield className="w-3.5 h-3.5 text-brand-navy" />
-                          {user.profile?.name || '—'}
-                        </span>
-                      </td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 text-sm text-gray-700">
                           <Building2 className="w-3.5 h-3.5 text-gray-400" />
@@ -371,6 +349,13 @@ export default function UsersPage() {
                             }`}
                           >
                             {user.isActive ? 'Freeze' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user)}
+                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete user"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -417,14 +402,7 @@ export default function UsersPage() {
                   <input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Profile</label>
-                  <select value={formProfileId} onChange={(e) => setFormProfileId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Select Profile</option>
-                    {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <select value={formDeptId} onChange={(e) => setFormDeptId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -480,14 +458,7 @@ export default function UsersPage() {
                   <input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Profile</label>
-                  <select value={formProfileId} onChange={(e) => setFormProfileId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                    <option value="">Select Profile</option>
-                    {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <select value={formDeptId} onChange={(e) => setFormDeptId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
