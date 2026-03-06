@@ -18,6 +18,11 @@ import { dashboardRoutes } from './routes/dashboards';
 import { backupRoutes } from './routes/backup';
 import { settingRoutes } from './routes/settings';
 import { preferenceRoutes } from './routes/preferences';
+import { profileRoutes } from './routes/profiles';
+import { departmentRoutes } from './routes/departments';
+import { roleRoutes } from './routes/roles';
+import { permissionSetRoutes } from './routes/permission-sets';
+import { usersAdminRoutes } from './routes/users-admin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -177,6 +182,11 @@ export function buildApp() {
   app.register(backupRoutes);
   app.register(settingRoutes);
   app.register(preferenceRoutes);
+  app.register(profileRoutes);
+  app.register(departmentRoutes);
+  app.register(roleRoutes);
+  app.register(permissionSetRoutes);
+  app.register(usersAdminRoutes);
 
   return app;
 }

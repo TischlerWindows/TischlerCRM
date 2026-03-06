@@ -19,6 +19,26 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Profile, Department, Role assignments
+  profileId    String?
+  profile      Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  roleId       String?
+  userRole     Role?       @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  managerId    String?
+  manager      User?       @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports User[]    @relation("UserManager")
+
+  // Extended user fields
+  title        String?
+  phone        String?
+  mobilePhone  String?
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  timezone     String?  @default("America/New_York")
+  locale       String?  @default("en_US")
+
   createdObjects      CustomObject[]  @relation("CreatedObjects")
   modifiedObjects     CustomObject[]  @relation("ModifiedObjects")
   createdFields       CustomField[]   @relation("CreatedFields")
@@ -35,6 +55,87 @@ model User {
   modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
   loginEvents         LoginEvent[]
   preferences         UserPreference[]
+  permissionSetAssignments PermissionSetAssignment[]
+
+  @@index([profileId])
+  @@index([departmentId])
+  @@index([roleId])
+  @@index([managerId])
+  @@index([isActive])
+}
+
+// ============================================
+// Profiles, Departments, Roles & Permission Sets
+// ============================================
+
+model Profile {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  description     String?
+  isSystemProfile Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  permissions     Json     @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  users           User[]
+}
+
+model Department {
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  parentId    String?
+  parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Department[] @relation("DepartmentHierarchy")
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  users       User[]
+
+  @@index([parentId])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  parentId    String?
+  parent      Role?    @relation("RoleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    Role[]   @relation("RoleHierarchy")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+
+  @@index([parentId])
+}
+
+model PermissionSet {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  permissions Json     @default("{}")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments PermissionSetAssignment[]
+}
+
+model PermissionSetAssignment {
+  id              String        @id @default(uuid())
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  permissionSet   PermissionSet @relation(fields: [permissionSetId], references: [id], onDelete: Cascade)
+  permissionSetId String
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, permissionSetId])
+  @@index([userId])
+  @@index([permissionSetId])
 }
 
 model LoginEvent {
