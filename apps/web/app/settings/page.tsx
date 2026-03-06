@@ -23,7 +23,6 @@ const setupSections = [
     title: 'Administration',
     items: [
       { name: 'Users', href: '/settings/users' },
-      { name: 'Profiles', href: '/settings/profiles' },
       { name: 'Roles', href: '/settings/roles' },
       { name: 'Departments', href: '/settings/departments' },
       { name: 'Permission Sets', href: '/settings/permission-sets' },

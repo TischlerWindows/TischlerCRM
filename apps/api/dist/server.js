@@ -2005,7 +2005,9 @@ async function profileRoutes(app2) {
   });
   app2.post("/profiles", async (req, reply) => {
     const parsed = profileSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
+    const existing = await prisma11.profile.findUnique({ where: { name: parsed.data.name } });
+    if (existing) return reply.code(409).send({ error: `A profile named "${parsed.data.name}" already exists` });
     const profile = await prisma11.profile.create({
       data: {
         name: parsed.data.name,
@@ -2019,9 +2021,13 @@ async function profileRoutes(app2) {
   app2.put("/profiles/:id", async (req, reply) => {
     const { id } = req.params;
     const parsed = profileSchema.partial().safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
     const existing = await prisma11.profile.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "Profile not found" });
+    if (parsed.data.name && parsed.data.name !== existing.name) {
+      const dup = await prisma11.profile.findUnique({ where: { name: parsed.data.name } });
+      if (dup) return reply.code(409).send({ error: `A profile named "${parsed.data.name}" already exists` });
+    }
     const profile = await prisma11.profile.update({
       where: { id },
       data: parsed.data
