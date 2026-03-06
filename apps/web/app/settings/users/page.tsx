@@ -118,7 +118,6 @@ export default function UsersPage() {
         password: formPassword,
         title: formTitle || null,
         phone: formPhone || null,
-        profileId: formProfileId || null,
         departmentId: formDeptId || null,
         roleId: formRoleId || null,
       });
