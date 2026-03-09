@@ -14,6 +14,7 @@ import {
   Search,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface PermissionSetRow {
   id: string;
@@ -38,10 +39,15 @@ interface UserOption {
   email: string;
 }
 
-const OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
+const BUILTIN_OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
 const CRUD_ACTIONS = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
 
 export default function PermissionSetsPage() {
+  const { schema, loadSchema } = useSchemaStore();
+  const OBJECTS = schema
+    ? schema.objects.map(o => o.apiName)
+    : BUILTIN_OBJECTS;
+
   const [sets, setSets] = useState<PermissionSetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +69,7 @@ export default function PermissionSetsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      if (!schema) loadSchema();
       const data = await apiClient.get<PermissionSetRow[]>('/permission-sets');
       setSets(data);
     } catch (err) {

@@ -2533,7 +2533,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v6-dept-ceiling" }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v7-dynamic-perms" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z10.object({
       name: z10.string().min(1),
@@ -2695,8 +2695,9 @@ function buildApp() {
     }
     if (user.role === "ADMIN") {
       const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
-      const crmObjects = ["Property", "Contact", "Account", "Product", "Lead", "Deal", "Project", "Service", "Quote", "Installation"];
-      for (const obj of crmObjects) {
+      const customObjects = await prisma15.customObject.findMany({ select: { apiName: true } });
+      const allObjectNames = customObjects.map((o) => o.apiName);
+      for (const obj of allObjectNames) {
         objectPerms[obj] = Object.fromEntries(allActions.map((a) => [a, true]));
       }
       const allAppPerms = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];

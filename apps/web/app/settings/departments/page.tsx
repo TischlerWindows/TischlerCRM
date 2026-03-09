@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useSchemaStore } from '@/lib/schema-store';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface ObjectPerms {
@@ -42,7 +43,7 @@ interface DepartmentRow {
   _count: { users: number };
 }
 
-const CRM_OBJECTS = [
+const BUILTIN_CRM_OBJECTS = [
   'Property', 'Contact', 'Account', 'Product', 'Lead',
   'Deal', 'Project', 'Service', 'Quote', 'Installation',
 ];
@@ -64,15 +65,19 @@ const APP_PERMISSIONS = [
   { key: 'modifyAllData', label: 'Modify All Data' },
 ];
 
-const emptyPermissions = (): Permissions => ({
-  objectPermissions: Object.fromEntries(
-    CRM_OBJECTS.map((o) => [o, { read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false }])
-  ),
-  appPermissions: Object.fromEntries(APP_PERMISSIONS.map((p) => [p.key, false])),
-});
-
-// ── Page ───────────────────────────────────────────────────────────
 export default function DepartmentsPage() {
+  const { schema, loadSchema } = useSchemaStore();
+  const CRM_OBJECTS = schema
+    ? schema.objects.map(o => o.apiName)
+    : BUILTIN_CRM_OBJECTS;
+
+  const emptyPermissions = (): Permissions => ({
+    objectPermissions: Object.fromEntries(
+      CRM_OBJECTS.map((o) => [o, { read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false }])
+    ),
+    appPermissions: Object.fromEntries(APP_PERMISSIONS.map((p) => [p.key, false])),
+  });
+
   const [departments, setDepartments] = useState<DepartmentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +94,7 @@ export default function DepartmentsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      if (!schema) loadSchema();
       const data = await apiClient.get<DepartmentRow[]>('/departments');
       setDepartments(data);
     } catch (err) {

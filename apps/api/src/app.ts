@@ -40,7 +40,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v6-dept-ceiling' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v7-dynamic-perms' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
@@ -234,8 +234,10 @@ export function buildApp() {
     // ADMIN users always get full access
     if (user.role === 'ADMIN') {
       const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
-      const crmObjects = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
-      for (const obj of crmObjects) {
+      // Include all custom objects dynamically
+      const customObjects = await prisma.customObject.findMany({ select: { apiName: true } });
+      const allObjectNames = customObjects.map(o => o.apiName);
+      for (const obj of allObjectNames) {
         objectPerms[obj] = Object.fromEntries(allActions.map(a => [a, true]));
       }
       const allAppPerms = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];

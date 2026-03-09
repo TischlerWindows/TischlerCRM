@@ -15,6 +15,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface ProfileRow {
   id: string;
@@ -26,7 +27,7 @@ interface ProfileRow {
   _count: { users: number };
 }
 
-const OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
+const BUILTIN_OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
 const CRUD_ACTIONS = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
 const APP_PERMISSIONS = [
   { key: 'manageUsers', label: 'Manage Users' },
@@ -44,6 +45,11 @@ const APP_PERMISSIONS = [
 ];
 
 export default function ProfilesPage() {
+  const { schema, loadSchema } = useSchemaStore();
+  const OBJECTS = schema
+    ? schema.objects.map(o => o.apiName)
+    : BUILTIN_OBJECTS;
+
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +68,7 @@ export default function ProfilesPage() {
   const loadProfiles = useCallback(async () => {
     setLoading(true);
     try {
+      if (!schema) loadSchema();
       const data = await apiClient.get<ProfileRow[]>('/profiles');
       setProfiles(data);
     } catch (err) {

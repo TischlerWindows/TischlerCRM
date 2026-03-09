@@ -19,7 +19,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const { canAccess } = usePermissions();
+  const { canAccess, hasAppPermission } = usePermissions();
   const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -42,15 +42,37 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     '/installations': 'Installation',
   };
 
+  // Also map custom object tabs (href like /objects/myobject) dynamically
+  if (schema) {
+    for (const obj of schema.objects) {
+      const href = `/objects/${obj.apiName.toLowerCase()}`;
+      if (!hrefToObjectMap[href]) {
+        hrefToObjectMap[href] = obj.apiName;
+      }
+    }
+  }
+
+  // Map non-object tabs to app permissions
+  const hrefToAppPermMap: Record<string, string> = {
+    '/reports': 'manageReports',
+    '/dashboard': 'manageDashboards',
+  };
+
   // Filter tabs so users only see objects they have read access to
   const filteredTabs = useMemo(() => {
     return tabs.filter((tab) => {
+      // Check object-level permissions
       const objectApiName = hrefToObjectMap[tab.href];
-      // Non-object tabs (Summary, Reports, Dashboards, etc.) are always shown
-      if (!objectApiName) return true;
-      return canAccess(objectApiName, 'read');
+      if (objectApiName) return canAccess(objectApiName, 'read');
+
+      // Check app-level permissions for Reports/Dashboards
+      const appPerm = hrefToAppPermMap[tab.href];
+      if (appPerm) return hasAppPermission(appPerm as any);
+
+      // Non-object, non-restricted tabs (Summary, Settings, etc.) are always shown
+      return true;
     });
-  }, [tabs, canAccess]);
+  }, [tabs, canAccess, hasAppPermission, schema]);
   const allowPageScroll = pathname === '/' || 
     pathname?.includes('/[id]') || 
     pathname?.includes('/new') ||
