@@ -75,11 +75,22 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
+      console.log('[Permissions] Fetching /me/permissions...');
       const data = await apiClient.get<PermissionsData>('/me/permissions');
+      console.log('[Permissions] Loaded:', data?.role, 'objects:', Object.keys(data?.objectPermissions || {}));
       setPermissions(data);
     } catch (err) {
-      console.error('Failed to load permissions:', err);
-      setPermissions(null);
+      console.error('[Permissions] Failed to load:', err);
+      // Retry once after a short delay
+      try {
+        await new Promise(r => setTimeout(r, 1000));
+        const data = await apiClient.get<PermissionsData>('/me/permissions');
+        console.log('[Permissions] Retry succeeded:', data?.role);
+        setPermissions(data);
+      } catch (retryErr) {
+        console.error('[Permissions] Retry also failed:', retryErr);
+        setPermissions(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -97,25 +108,31 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const canAccess = useCallback(
     (objectApiName: string, action: keyof ObjectPermission): boolean => {
-      // While loading or if not authenticated, be permissive so UI doesn't flicker
-      if (!permissions) return true;
-      // ADMIN always has full access
-      if (permissions.role === 'ADMIN') return true;
+      // ADMIN users always have full access (fast path from auth context)
+      if (user?.role === 'ADMIN') return true;
+
+      // Still loading? Allow briefly so UI doesn't flash empty
+      if (loading) return true;
+
+      // Permissions failed to load (API error) — be RESTRICTIVE
+      if (!permissions) return false;
+
       const objPerms = permissions.objectPermissions[objectApiName];
       // If no permissions configured for this object, allow by default
       if (!objPerms) return true;
       return !!objPerms[action];
     },
-    [permissions],
+    [permissions, loading, user],
   );
 
   const hasAppPermission = useCallback(
     (perm: keyof AppPermissions): boolean => {
-      if (!permissions) return true;
-      if (permissions.role === 'ADMIN') return true;
+      if (user?.role === 'ADMIN') return true;
+      if (loading) return true;
+      if (!permissions) return false;
       return !!permissions.appPermissions?.[perm];
     },
-    [permissions],
+    [permissions, loading, user],
   );
 
   return (

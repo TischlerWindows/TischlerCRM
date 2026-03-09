@@ -2530,7 +2530,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-05-v4" }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v5-perms" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z10.object({
       name: z10.string().min(1),
