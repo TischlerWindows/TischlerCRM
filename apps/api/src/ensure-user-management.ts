@@ -197,27 +197,178 @@ const SEED_PROFILES = [
 ];
 
 const SEED_DEPARTMENTS = [
-  { name: 'Executive', description: 'Executive leadership team' },
-  { name: 'Sales', description: 'Sales and business development' },
-  { name: 'Marketing', description: 'Marketing and communications' },
-  { name: 'Operations', description: 'Operations and logistics' },
-  { name: 'Finance', description: 'Finance and accounting' },
-  { name: 'Engineering', description: 'Engineering and product development' },
-  { name: 'Customer Support', description: 'Customer support and success' },
-];
-
-const SEED_ROLES = [
-  { name: 'CEO', description: 'Chief Executive Officer', parentName: null },
-  { name: 'VP Sales', description: 'Vice President of Sales', parentName: 'CEO' },
-  { name: 'VP Operations', description: 'Vice President of Operations', parentName: 'CEO' },
-  { name: 'Sales Manager', description: 'Sales team manager', parentName: 'VP Sales' },
-  { name: 'Operations Manager', description: 'Operations team manager', parentName: 'VP Operations' },
-  { name: 'Sales Rep', description: 'Sales representative', parentName: 'Sales Manager' },
-  { name: 'Field Tech', description: 'Field technician', parentName: 'Operations Manager' },
+  {
+    name: 'Executive',
+    description: 'Executive leadership team',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Product: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Project: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Installation: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+      },
+      appPermissions: {
+        manageUsers: true, manageProfiles: true, manageDepartments: true,
+        exportData: true, importData: true, manageReports: true, manageDashboards: true,
+        viewSetup: true, customizeApplication: true, manageSharing: true,
+        viewAllData: true, modifyAllData: true,
+      },
+    },
+  },
+  {
+    name: 'Sales',
+    description: 'Sales and business development',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
+        Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
+        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
+        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true, manageDashboards: true,
+        viewSetup: false, customizeApplication: false, manageSharing: false,
+        viewAllData: false, modifyAllData: false,
+      },
+    },
+  },
+  {
+    name: 'Marketing',
+    description: 'Marketing and communications',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
+        Account: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Quote: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: true, manageReports: true, manageDashboards: true,
+        viewSetup: false, customizeApplication: false, manageSharing: false,
+        viewAllData: false, modifyAllData: false,
+      },
+    },
+  },
+  {
+    name: 'Operations',
+    description: 'Operations and logistics',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Contact: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
+        Account: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
+        Product: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Lead: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Project: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Quote: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Installation: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true, manageDashboards: true,
+        viewSetup: false, customizeApplication: false, manageSharing: false,
+        viewAllData: false, modifyAllData: false,
+      },
+    },
+  },
+  {
+    name: 'Finance',
+    description: 'Finance and accounting',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Contact: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Account: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Product: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Lead: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Deal: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Project: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Service: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Quote: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Installation: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true, manageDashboards: true,
+        viewSetup: false, customizeApplication: false, manageSharing: false,
+        viewAllData: true, modifyAllData: false,
+      },
+    },
+  },
+  {
+    name: 'Engineering',
+    description: 'Engineering and product development',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Contact: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Account: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Product: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Lead: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Project: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Quote: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Installation: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true, manageDashboards: true,
+        viewSetup: true, customizeApplication: true, manageSharing: false,
+        viewAllData: false, modifyAllData: false,
+      },
+    },
+  },
+  {
+    name: 'Customer Support',
+    description: 'Customer support and success',
+    permissions: {
+      objectPermissions: {
+        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Contact: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Account: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+        Product: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
+        Lead: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
+        Quote: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Installation: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
+      },
+      appPermissions: {
+        manageUsers: false, manageProfiles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true, manageDashboards: true,
+        viewSetup: false, customizeApplication: false, manageSharing: false,
+        viewAllData: false, modifyAllData: false,
+      },
+    },
+  },
 ];
 
 export async function ensureUserManagement() {
-  console.log('[UserMgmt] Ensuring profiles, departments, and roles...');
+  console.log('[UserMgmt] Ensuring profiles and departments...');
 
   // Seed Profiles
   for (const profile of SEED_PROFILES) {
@@ -228,32 +379,19 @@ export async function ensureUserManagement() {
     }
   }
 
-  // Seed Departments
+  // Seed Departments (with permissions)
   for (const dept of SEED_DEPARTMENTS) {
     const existing = await prisma.department.findUnique({ where: { name: dept.name } });
     if (!existing) {
       await prisma.department.create({ data: dept });
       console.log(`[UserMgmt] Created department: ${dept.name}`);
-    }
-  }
-
-  // Seed Roles (with hierarchy)
-  const roleMap = new Map<string, string>(); // name → id
-  for (const role of SEED_ROLES) {
-    const existing = await prisma.role.findUnique({ where: { name: role.name } });
-    if (existing) {
-      roleMap.set(role.name, existing.id);
     } else {
-      const parentId = role.parentName ? roleMap.get(role.parentName) || null : null;
-      const created = await prisma.role.create({
-        data: {
-          name: role.name,
-          description: role.description,
-          parentId,
-        },
-      });
-      roleMap.set(role.name, created.id);
-      console.log(`[UserMgmt] Created role: ${role.name}${parentId ? ` (under ${role.parentName})` : ''}`);
+      // Update permissions if they were empty
+      const existingPerms = existing.permissions as any;
+      if (!existingPerms || Object.keys(existingPerms).length === 0) {
+        await prisma.department.update({ where: { id: existing.id }, data: { permissions: dept.permissions } });
+        console.log(`[UserMgmt] Updated permissions for department: ${dept.name}`);
+      }
     }
   }
 

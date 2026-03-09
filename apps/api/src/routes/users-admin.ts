@@ -9,7 +9,6 @@ const createUserSchema = z.object({
   password: z.string().min(6),
   profileId: z.string().optional().nullable(),
   departmentId: z.string().optional().nullable(),
-  roleId: z.string().optional().nullable(),
   managerId: z.string().optional().nullable(),
   title: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
@@ -38,7 +37,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         createdAt: true,
         profile: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-        userRole: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true, email: true } },
       },
     });
@@ -66,11 +64,9 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         updatedAt: true,
         profileId: true,
         departmentId: true,
-        roleId: true,
         managerId: true,
         profile: { select: { id: true, name: true, permissions: true } },
         department: { select: { id: true, name: true } },
-        userRole: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true, email: true } },
         permissionSetAssignments: {
           include: {
@@ -98,7 +94,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         role: 'USER',
         profileId: parsed.data.profileId,
         departmentId: parsed.data.departmentId,
-        roleId: parsed.data.roleId,
         managerId: parsed.data.managerId,
         title: parsed.data.title,
         phone: parsed.data.phone,
@@ -115,7 +110,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         isActive: true,
         profile: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-        userRole: { select: { id: true, name: true } },
       },
     });
     reply.code(201).send(user);
@@ -140,7 +134,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         title: true,
         profile: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
-        userRole: { select: { id: true, name: true } },
       },
     });
     reply.send(user);

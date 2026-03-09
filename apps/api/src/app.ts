@@ -20,7 +20,6 @@ import { settingRoutes } from './routes/settings';
 import { preferenceRoutes } from './routes/preferences';
 import { profileRoutes } from './routes/profiles';
 import { departmentRoutes } from './routes/departments';
-import { roleRoutes } from './routes/roles';
 import { permissionSetRoutes } from './routes/permission-sets';
 import { usersAdminRoutes } from './routes/users-admin';
 
@@ -184,7 +183,6 @@ export function buildApp() {
   app.register(preferenceRoutes);
   app.register(profileRoutes);
   app.register(departmentRoutes);
-  app.register(roleRoutes);
   app.register(permissionSetRoutes);
   app.register(usersAdminRoutes);
 

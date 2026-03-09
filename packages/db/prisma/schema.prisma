@@ -19,13 +19,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Profile, Department, Role assignments
+  // Profile & Department assignments
   profileId    String?
   profile      Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  roleId       String?
-  userRole     Role?       @relation(fields: [roleId], references: [id], onDelete: SetNull)
   managerId    String?
   manager      User?       @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
   directReports User[]    @relation("UserManager")
@@ -59,7 +57,6 @@ model User {
 
   @@index([profileId])
   @@index([departmentId])
-  @@index([roleId])
   @@index([managerId])
   @@index([isActive])
 }
@@ -89,6 +86,7 @@ model Department {
   parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children    Department[] @relation("DepartmentHierarchy")
   isActive    Boolean      @default(true)
+  permissions Json         @default("{}")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -97,21 +95,7 @@ model Department {
   @@index([parentId])
 }
 
-model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  description String?
-  parentId    String?
-  parent      Role?    @relation("RoleHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
-  children    Role[]   @relation("RoleHierarchy")
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  users       User[]
-
-  @@index([parentId])
-}
 
 model PermissionSet {
   id          String   @id @default(uuid())

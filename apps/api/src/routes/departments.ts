@@ -7,6 +7,7 @@ const departmentSchema = z.object({
   description: z.string().optional().nullable(),
   parentId: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  permissions: z.any().optional(),
 });
 
 export async function departmentRoutes(app: FastifyInstance) {
@@ -20,7 +21,8 @@ export async function departmentRoutes(app: FastifyInstance) {
         _count: { select: { users: true } },
       },
     });
-    reply.send(departments);
+    // Include permissions field in response
+    reply.send(departments.map((d: any) => ({ ...d, permissions: d.permissions || {} })));
   });
 
   // Get single department with members
@@ -55,6 +57,7 @@ export async function departmentRoutes(app: FastifyInstance) {
         description: parsed.data.description,
         parentId: parsed.data.parentId,
         isActive: parsed.data.isActive ?? true,
+        permissions: parsed.data.permissions || {},
       },
       include: {
         parent: { select: { id: true, name: true } },
