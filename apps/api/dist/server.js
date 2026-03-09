@@ -2533,7 +2533,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v7-dynamic-perms" }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v8-summary-perms" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z10.object({
       name: z10.string().min(1),
@@ -2700,7 +2700,7 @@ function buildApp() {
       for (const obj of allObjectNames) {
         objectPerms[obj] = Object.fromEntries(allActions.map((a) => [a, true]));
       }
-      const allAppPerms = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
+      const allAppPerms = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
       for (const p of allAppPerms) {
         appPerms[p] = true;
       }

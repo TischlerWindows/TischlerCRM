@@ -23,6 +23,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
+import { usePermissions } from '@/lib/permissions-context';
+import { AlertCircle } from 'lucide-react';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -560,6 +562,7 @@ interface Summary {
 }
 
 export default function SummaryPage() {
+  const { hasAppPermission } = usePermissions();
   const [summaries, setSummaries] = useState<Summary[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -1473,6 +1476,19 @@ export default function SummaryPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-gray-600">Loading summaries...</div>
+      </div>
+    );
+  }
+
+  if (!hasAppPermission('viewSummary')) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Summary.</p>
+          <Link href="/" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Go to Home</Link>
+        </div>
       </div>
     );
   }

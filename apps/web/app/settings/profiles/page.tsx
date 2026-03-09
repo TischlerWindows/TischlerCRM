@@ -37,6 +37,7 @@ const APP_PERMISSIONS = [
   { key: 'importData', label: 'Import Data' },
   { key: 'manageReports', label: 'Manage Reports' },
   { key: 'manageDashboards', label: 'Manage Dashboards' },
+  { key: 'viewSummary', label: 'View Summary' },
   { key: 'viewSetup', label: 'View Setup' },
   { key: 'customizeApplication', label: 'Customize Application' },
   { key: 'manageSharing', label: 'Manage Sharing' },

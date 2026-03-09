@@ -23,6 +23,7 @@ export interface AppPermissions {
   importData: boolean;
   manageReports: boolean;
   manageDashboards: boolean;
+  viewSummary: boolean;
   viewSetup: boolean;
   customizeApplication: boolean;
   manageSharing: boolean;

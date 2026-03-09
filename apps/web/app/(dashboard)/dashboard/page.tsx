@@ -51,6 +51,8 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 import { useSchemaStore } from '@/lib/schema-store';
+import { usePermissions } from '@/lib/permissions-context';
+import { AlertCircle } from 'lucide-react';
 
 interface DashboardWidget {
   id: string;
@@ -116,6 +118,7 @@ const FIELD_OPTIONS: Record<string, string[]> = {
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function DashboardPage() {
+  const { hasAppPermission } = usePermissions();
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
@@ -1528,6 +1531,19 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-gray-600">Loading dashboards...</div>
+      </div>
+    );
+  }
+
+  if (!hasAppPermission('manageDashboards')) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Dashboards.</p>
+          <Link href="/" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Go to Home</Link>
+        </div>
       </div>
     );
   }

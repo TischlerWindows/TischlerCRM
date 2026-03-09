@@ -40,7 +40,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v7-dynamic-perms' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v8-summary-perms' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
@@ -240,7 +240,7 @@ export function buildApp() {
       for (const obj of allObjectNames) {
         objectPerms[obj] = Object.fromEntries(allActions.map(a => [a, true]));
       }
-      const allAppPerms = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
+      const allAppPerms = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSummary', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
       for (const p of allAppPerms) {
         appPerms[p] = true;
       }
