@@ -208,7 +208,7 @@ export default function ProjectsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Project');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         projectNumber: record.projectNumber || '',
         projectName: record.projectName || '',
         status: record.status || 'Planning',
@@ -300,7 +300,8 @@ export default function ProjectsPage() {
     
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
-      let fieldType = undefined;
+      const schemaField = projectObject?.fields?.find(f => f.apiName === `Project__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     if (columnId === 'budget') return `$${Number(value).toLocaleString()}`;

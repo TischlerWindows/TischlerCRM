@@ -237,7 +237,7 @@ export default function PropertiesPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Property');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
         propertyNumber: record.propertyNumber || '',
         address: record.address || '',
@@ -436,9 +436,11 @@ export default function PropertiesPage() {
     
     // Use formatFieldValue to handle objects like Address and Geolocation
     if (typeof value === 'object') {
-      // Determine field type based on column ID
-      let fieldType = undefined;
-      if (columnId === 'address') fieldType = 'Address';
+      const schemaField = propertyObject?.fields?.find(f => f.apiName === `Property__${columnId}` || f.apiName === columnId);
+      let fieldType = schemaField?.type;
+      if (!fieldType) {
+        if (columnId === 'address') fieldType = 'Address';
+      }
       return formatFieldValue(value, fieldType);
     }
     

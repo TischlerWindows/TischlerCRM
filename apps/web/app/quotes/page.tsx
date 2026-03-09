@@ -171,7 +171,7 @@ export default function QuotesPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Quote');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         quoteNumber: record.quoteNumber || '',
         quoteName: record.quoteName || '',
         accountName: record.accountName || '',
@@ -230,7 +230,8 @@ export default function QuotesPage() {
     
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
-      let fieldType = undefined;
+      const schemaField = quoteObject?.fields?.find(f => f.apiName === `Quote__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     if (columnId === 'totalAmount') return `$${Number(value).toLocaleString()}`;

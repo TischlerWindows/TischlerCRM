@@ -220,7 +220,7 @@ export default function ContactsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Contact');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         contactNumber: record.contactNumber || '',
         name: record.name || null,
         firstName: record.firstName || '',
@@ -327,12 +327,13 @@ export default function ContactsPage() {
     
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
-      let fieldType = undefined;
-      if (columnId === 'address') fieldType = 'Address';
-      if (columnId === 'name') fieldType = 'CompositeText';
-      const formatted = formatFieldValue(value, fieldType);
-      console.log(`[Table] formatFieldValue returned:`, formatted);
-      return formatted;
+      const schemaField = contactObject?.fields?.find(f => f.apiName === `Contact__${columnId}` || f.apiName === columnId);
+      let fieldType = schemaField?.type;
+      if (!fieldType) {
+        if (columnId === 'address') fieldType = 'Address';
+        if (columnId === 'name') fieldType = 'CompositeText';
+      }
+      return formatFieldValue(value, fieldType);
     }
     return String(value);
   };

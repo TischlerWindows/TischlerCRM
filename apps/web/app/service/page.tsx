@@ -192,7 +192,7 @@ export default function ServicePage() {
       setLoading(true);
       const records = await recordsService.getRecords('Service');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         serviceNumber: record.serviceNumber || '',
         serviceName: record.serviceName || '',
         accountName: record.accountName || '',
@@ -365,7 +365,8 @@ export default function ServicePage() {
     }
 
     if (typeof value === 'object') {
-      let fieldType = undefined;
+      const schemaField = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     

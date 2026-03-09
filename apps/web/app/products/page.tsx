@@ -210,7 +210,7 @@ export default function ProductsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Product');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
         productCode: record.productCode || '',
         productName: record.productName || '',
@@ -417,8 +417,8 @@ export default function ProductsPage() {
     
     // Use formatFieldValue to handle objects
     if (typeof value === 'object') {
-      // Determine field type based on column ID
-      let fieldType = undefined;
+      const schemaField = productObject?.fields?.find(f => f.apiName === `Product__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     

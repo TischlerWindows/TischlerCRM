@@ -198,7 +198,7 @@ export default function DealsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Deal');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         dealNumber: record.dealNumber || '',
         dealName: record.dealName || '',
         accountName: record.accountName || '',
@@ -382,7 +382,8 @@ export default function DealsPage() {
     }
 
     if (typeof value === 'object') {
-      let fieldType = undefined;
+      const schemaField = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     

@@ -169,7 +169,7 @@ export default function InstallationsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Installation');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         installationNumber: record.installationNumber || '',
         installationName: record.installationName || '',
         accountName: record.accountName || '',
@@ -229,7 +229,8 @@ export default function InstallationsPage() {
     
     if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
-      let fieldType = undefined;
+      const schemaField = installationObject?.fields?.find(f => f.apiName === `Installation__${columnId}` || f.apiName === columnId);
+      const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType);
     }
     return String(value);

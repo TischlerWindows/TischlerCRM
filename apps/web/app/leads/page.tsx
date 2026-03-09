@@ -204,19 +204,19 @@ export default function LeadsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Lead');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         leadNumber: record.leadNumber || '',
-        contactName: record.firstName || '',
+        contactName: record.contactName || record.firstName || '',
         propertyAddress: record.address || '',
         source: record.leadSource || '',
         stage: record.stage || 'New',
-        assignedTo: '',
-        estimatedValue: 0,
+        assignedTo: record.assignedTo || '',
+        estimatedValue: record.estimatedValue || 0,
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
-        notes: '',
+        notes: record.notes || '',
       }));
       setLeads(flattenedRecords as Lead[]);
     } catch (error) {
@@ -398,9 +398,13 @@ export default function LeadsPage() {
     }
     
     if (typeof value === 'object') {
-      let fieldType = undefined;
-      if (columnId === 'propertyAddress') fieldType = 'Address';
-      if (columnId === 'contactName' || columnId.toLowerCase().includes('name')) fieldType = 'Name';
+      // Look up field type from schema for proper formatting
+      const schemaField = leadObject?.fields?.find(f => f.apiName === `Lead__${columnId}` || f.apiName === columnId);
+      let fieldType = schemaField?.type;
+      if (!fieldType) {
+        if (columnId === 'propertyAddress') fieldType = 'Address';
+        if (columnId === 'contactName' || columnId.toLowerCase().includes('name')) fieldType = 'Name';
+      }
       return formatFieldValue(value, fieldType);
     }
     

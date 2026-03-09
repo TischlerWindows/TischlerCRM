@@ -223,7 +223,7 @@ export default function AccountsPage() {
       setLoading(true);
       const records = await recordsService.getRecords('Account');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
-        id: record.id,
+        ...record,
         recordTypeId: schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0]?.id,
         accountNumber: record.accountNumber || '',
         accountName: record.name || '',
@@ -231,12 +231,12 @@ export default function AccountsPage() {
         status: record.status || 'Active',
         website: record.website || '',
         primaryEmail: record.email || '',
-        secondaryEmail: '',
+        secondaryEmail: record.secondaryEmail || '',
         primaryPhone: record.phone || '',
-        secondaryPhone: '',
-        accountNotes: '',
-        shippingAddress: '',
-        billingAddress: '',
+        secondaryPhone: record.secondaryPhone || '',
+        accountNotes: record.accountNotes || '',
+        shippingAddress: record.shippingAddress || '',
+        billingAddress: record.billingAddress || '',
         accountOwner: record.createdBy || 'System',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
@@ -420,9 +420,11 @@ export default function AccountsPage() {
     
     // Use formatFieldValue to handle objects
     if (typeof value === 'object') {
-      // Determine field type based on column ID
-      let fieldType = undefined;
-      if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
+      const schemaField = accountObject?.fields?.find(f => f.apiName === `Account__${columnId}` || f.apiName === columnId);
+      let fieldType = schemaField?.type;
+      if (!fieldType) {
+        if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
+      }
       return formatFieldValue(value, fieldType);
     }
     
