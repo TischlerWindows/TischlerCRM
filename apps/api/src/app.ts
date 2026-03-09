@@ -142,6 +142,83 @@ export function buildApp() {
     (req as any).user = payload; // attach user payload
   });
 
+  // ── Current user's effective permissions ──
+  app.get('/me/permissions', async (req, reply) => {
+    const userId = (req as any).user.sub;
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        department: true,
+        profile: true,
+        permissionSetAssignments: {
+          include: { permissionSet: true },
+        },
+      },
+    });
+    if (!user) return reply.code(404).send({ error: 'User not found' });
+
+    // Start with department permissions as base
+    const deptPerms = (user.department?.permissions as any) || {};
+    const objectPerms: Record<string, Record<string, boolean>> = { ...(deptPerms.objectPermissions || {}) };
+    const appPerms: Record<string, boolean> = { ...(deptPerms.appPermissions || {}) };
+
+    // Merge profile permissions additively
+    const profPerms = (user.profile?.permissions as any) || {};
+    if (profPerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(profPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
+        if (!objectPerms[obj]) objectPerms[obj] = {};
+        for (const [action, granted] of Object.entries(perms)) {
+          if (granted) objectPerms[obj][action] = true;
+        }
+      }
+    }
+    if (profPerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(profPerms.appPermissions as Record<string, boolean>)) {
+        if (granted) appPerms[perm] = true;
+      }
+    }
+
+    // Merge permission sets additively
+    for (const assignment of user.permissionSetAssignments) {
+      const ps = (assignment.permissionSet.permissions as any) || {};
+      if (ps.objectPermissions) {
+        for (const [obj, perms] of Object.entries(ps.objectPermissions as Record<string, Record<string, boolean>>)) {
+          if (!objectPerms[obj]) objectPerms[obj] = {};
+          for (const [action, granted] of Object.entries(perms)) {
+            if (granted) objectPerms[obj][action] = true;
+          }
+        }
+      }
+      if (ps.appPermissions) {
+        for (const [perm, granted] of Object.entries(ps.appPermissions as Record<string, boolean>)) {
+          if (granted) appPerms[perm] = true;
+        }
+      }
+    }
+
+    // ADMIN users always get full access
+    if (user.role === 'ADMIN') {
+      const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
+      const crmObjects = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
+      for (const obj of crmObjects) {
+        objectPerms[obj] = Object.fromEntries(allActions.map(a => [a, true]));
+      }
+      const allAppPerms = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
+      for (const p of allAppPerms) {
+        appPerms[p] = true;
+      }
+    }
+
+    reply.send({
+      userId,
+      departmentName: user.department?.name || null,
+      profileName: user.profile?.name || null,
+      role: user.role,
+      objectPermissions: objectPerms,
+      appPermissions: appPerms,
+    });
+  });
+
   // Accounts CRUD (minimal)
   app.get('/accounts', async (req, reply) => {
     const accounts = await prisma.account.findMany({ take: 50, orderBy: { createdAt: 'desc' } });

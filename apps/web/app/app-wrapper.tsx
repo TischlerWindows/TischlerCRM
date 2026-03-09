@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
 
@@ -18,6 +19,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { canAccess } = usePermissions();
   const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -25,6 +27,30 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
+
+  // Map tab hrefs to CRM object apiNames for permission filtering
+  const hrefToObjectMap: Record<string, string> = {
+    '/properties': 'Property',
+    '/contacts': 'Contact',
+    '/accounts': 'Account',
+    '/products': 'Product',
+    '/leads': 'Lead',
+    '/deals': 'Deal',
+    '/projects': 'Project',
+    '/service': 'Service',
+    '/quotes': 'Quote',
+    '/installations': 'Installation',
+  };
+
+  // Filter tabs so users only see objects they have read access to
+  const filteredTabs = useMemo(() => {
+    return tabs.filter((tab) => {
+      const objectApiName = hrefToObjectMap[tab.href];
+      // Non-object tabs (Summary, Reports, Dashboards, etc.) are always shown
+      if (!objectApiName) return true;
+      return canAccess(objectApiName, 'read');
+    });
+  }, [tabs, canAccess]);
   const allowPageScroll = pathname === '/' || 
     pathname?.includes('/[id]') || 
     pathname?.includes('/new') ||
@@ -222,7 +248,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
       {isLoaded && (
         <nav className="bg-white border-b border-gray-200 px-4 flex items-center justify-between sticky top-[48px] z-40 h-[40px]">
           <div className="flex items-center gap-0 overflow-x-auto flex-1 h-full scrollbar-hide">
-            {tabs.map((item) => {
+            {filteredTabs.map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== '/' && pathname?.startsWith(item.href));
               return (

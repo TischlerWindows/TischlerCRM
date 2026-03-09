@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -97,6 +98,10 @@ export default function ProjectsPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateProject = canAccess('Project', 'create');
+  const canEditProject = canAccess('Project', 'edit');
+  const canDeleteProject = canAccess('Project', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -595,8 +600,7 @@ export default function ProjectsPage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>
-            <button
+            </button>            {canCreateProject && (            <button
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
@@ -612,6 +616,7 @@ export default function ProjectsPage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Project
               </button>
+              )}
           </div>
         </div>
 
@@ -701,6 +706,7 @@ export default function ProjectsPage() {
                       {openDropdown === project.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditProject && (
                             <button
                               onClick={() => {
                                 router.push(`/projects/${project.id}`);
@@ -711,6 +717,8 @@ export default function ProjectsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteProject && (
                             <button
                               onClick={() => {
                                 handleDeleteProject(project.id);
@@ -721,6 +729,7 @@ export default function ProjectsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

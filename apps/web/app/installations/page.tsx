@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -75,6 +76,10 @@ export default function InstallationsPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateInstallation = canAccess('Installation', 'create');
+  const canEditInstallation = canAccess('Installation', 'edit');
+  const canDeleteInstallation = canAccess('Installation', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -570,8 +575,7 @@ export default function InstallationsPage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>
-            <button
+            </button>            {canCreateInstallation && (            <button
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
@@ -587,6 +591,7 @@ export default function InstallationsPage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Installation
               </button>
+              )}
           </div>
         </div>
 
@@ -667,6 +672,7 @@ export default function InstallationsPage() {
                       {openDropdown === installation.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditInstallation && (
                             <button
                               onClick={() => {
                                 router.push(`/installations/${installation.id}`);
@@ -677,6 +683,8 @@ export default function InstallationsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteInstallation && (
                             <button
                               onClick={() => {
                                 handleDeleteInstallation(installation.id);
@@ -687,6 +695,7 @@ export default function InstallationsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

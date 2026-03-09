@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Edit, Trash2, Database } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue } from '@/lib/utils';
 import { PageLayout, FieldDef, ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
@@ -40,6 +41,10 @@ export default function RecordDetailPage({
   const params = useParams();
   const router = useRouter();
   const { schema } = useSchemaStore();
+  const { canAccess } = usePermissions();
+
+  const canEdit = canAccess(objectApiName, 'edit');
+  const canDelete = canAccess(objectApiName, 'delete');
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
@@ -341,6 +346,7 @@ export default function RecordDetailPage({
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {canEdit && (
               <button
                 onClick={handleEdit}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -348,6 +354,8 @@ export default function RecordDetailPage({
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
               </button>
+              )}
+              {canDelete && (
               <button
                 onClick={handleDelete}
                 className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
@@ -355,6 +363,7 @@ export default function RecordDetailPage({
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </button>
+              )}
             </div>
           </div>
         </div>

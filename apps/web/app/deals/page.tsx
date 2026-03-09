@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -98,6 +99,10 @@ export default function DealsPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateDeal = canAccess('Deal', 'create');
+  const canEditDeal = canAccess('Deal', 'edit');
+  const canDeleteDeal = canAccess('Deal', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -611,6 +616,7 @@ export default function DealsPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
+            {canCreateDeal && (
             <button
               onClick={() => {
                 if (!hasPageLayout) {
@@ -627,6 +633,7 @@ export default function DealsPage() {
               <Plus className="w-5 h-5 mr-2" />
               New Deal
             </button>
+            )}
           </div>
         </div>
 
@@ -716,6 +723,7 @@ export default function DealsPage() {
                       {openDropdown === deal.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditDeal && (
                             <button
                               onClick={() => {
                                 router.push(`/deals/${deal.id}`);
@@ -726,6 +734,8 @@ export default function DealsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteDeal && (
                             <button
                               onClick={() => {
                                 handleDeleteDeal(deal.id);
@@ -736,6 +746,7 @@ export default function DealsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

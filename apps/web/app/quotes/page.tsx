@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -73,6 +74,10 @@ export default function QuotesPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateQuote = canAccess('Quote', 'create');
+  const canEditQuote = canAccess('Quote', 'edit');
+  const canDeleteQuote = canAccess('Quote', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -573,8 +578,7 @@ export default function QuotesPage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>
-            <button
+            </button>            {canCreateQuote && (            <button
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
@@ -590,6 +594,7 @@ export default function QuotesPage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Quote
               </button>
+              )}
           </div>
         </div>
 
@@ -670,6 +675,7 @@ export default function QuotesPage() {
                       {openDropdown === quote.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditQuote && (
                             <button
                               onClick={() => {
                                 router.push(`/quotes/${quote.id}`);
@@ -680,6 +686,8 @@ export default function QuotesPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteQuote && (
                             <button
                               onClick={() => {
                                 handleDeleteQuote(quote.id);
@@ -690,6 +698,7 @@ export default function QuotesPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

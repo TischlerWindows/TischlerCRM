@@ -2,11 +2,58 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 
+// ── Permission helper ──────────────────────────────────────────────
+async function checkObjectPermission(
+  userId: string,
+  userRole: string,
+  objectApiName: string,
+  action: 'read' | 'create' | 'edit' | 'delete'
+): Promise<boolean> {
+  // ADMIN users always have full access
+  if (userRole === 'ADMIN') return true;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      department: true,
+      profile: true,
+      permissionSetAssignments: {
+        include: { permissionSet: true },
+      },
+    },
+  });
+  if (!user) return false;
+
+  // Check department permissions
+  const deptPerms = (user.department?.permissions as any)?.objectPermissions?.[objectApiName];
+  if (deptPerms?.[action]) return true;
+
+  // Check profile permissions
+  const profPerms = (user.profile?.permissions as any)?.objectPermissions?.[objectApiName];
+  if (profPerms?.[action]) return true;
+
+  // Check permission sets
+  for (const assignment of user.permissionSetAssignments) {
+    const psPerms = (assignment.permissionSet.permissions as any)?.objectPermissions?.[objectApiName];
+    if (psPerms?.[action]) return true;
+  }
+
+  // If user has no department, profile, or permission sets — no permissions configured yet, allow access
+  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
+
+  return false;
+}
+
 export async function recordRoutes(app: FastifyInstance) {
   // Get all records for an object
   app.get('/objects/:apiName/records', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
     const { limit = 50, offset = 0 } = req.query as { limit?: number; offset?: number };
+
+    const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -52,6 +99,11 @@ export async function recordRoutes(app: FastifyInstance) {
   // Get single record
   app.get('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId } = req.params as { apiName: string; recordId: string };
+
+    const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -106,6 +158,9 @@ export async function recordRoutes(app: FastifyInstance) {
     req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, 'CREATE RECORD request');
 
     const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records for this object' });
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -179,6 +234,9 @@ export async function recordRoutes(app: FastifyInstance) {
     const updateData = body.data || body;
 
     const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'edit');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to edit records for this object' });
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -241,6 +299,11 @@ export async function recordRoutes(app: FastifyInstance) {
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId } = req.params as { apiName: string; recordId: string };
 
+    const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'delete');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to delete records for this object' });
+
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
     });
@@ -271,6 +334,11 @@ export async function recordRoutes(app: FastifyInstance) {
   app.get('/objects/:apiName/records/search', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
     const { q } = req.query as { q?: string };
+
+    const userId = (req as any).user.sub;
+    const userRole = (req as any).user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },

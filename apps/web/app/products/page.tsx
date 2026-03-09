@@ -29,6 +29,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -119,6 +120,10 @@ export default function ProductsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { schema } = useSchemaStore();
+  const { canAccess } = usePermissions();
+  const canCreateProduct = canAccess('Product', 'create');
+  const canEditProduct = canAccess('Product', 'edit');
+  const canDeleteProduct = canAccess('Product', 'delete');
   
   // Tab navigation state
   const [editMode, setEditMode] = useState(false);
@@ -664,6 +669,7 @@ export default function ProductsPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
+            {canCreateProduct && (
             <button
                 onClick={() => {
                   if (!hasPageLayout) {
@@ -680,6 +686,7 @@ export default function ProductsPage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Product
               </button>
+              )}
           </div>
         </div>
 
@@ -761,6 +768,7 @@ export default function ProductsPage() {
                       {openDropdown === product.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditProduct && (
                             <button
                               onClick={() => {
                                 router.push(`/products/${product.id}`);
@@ -771,6 +779,8 @@ export default function ProductsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteProduct && (
                             <button
                               onClick={() => {
                                 handleDeleteProduct(product.id);
@@ -781,6 +791,7 @@ export default function ProductsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

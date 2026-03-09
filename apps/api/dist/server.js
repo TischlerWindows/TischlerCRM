@@ -654,10 +654,38 @@ async function layoutRoutes(app2) {
 
 // src/routes/records.ts
 import { prisma as prisma5 } from "@crm/db/client";
+async function checkObjectPermission(userId, userRole, objectApiName, action) {
+  if (userRole === "ADMIN") return true;
+  const user = await prisma5.user.findUnique({
+    where: { id: userId },
+    include: {
+      department: true,
+      profile: true,
+      permissionSetAssignments: {
+        include: { permissionSet: true }
+      }
+    }
+  });
+  if (!user) return false;
+  const deptPerms = user.department?.permissions?.objectPermissions?.[objectApiName];
+  if (deptPerms?.[action]) return true;
+  const profPerms = user.profile?.permissions?.objectPermissions?.[objectApiName];
+  if (profPerms?.[action]) return true;
+  for (const assignment of user.permissionSetAssignments) {
+    const psPerms = assignment.permissionSet.permissions?.objectPermissions?.[objectApiName];
+    if (psPerms?.[action]) return true;
+  }
+  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
+  return false;
+}
 async function recordRoutes(app2) {
   app2.get("/objects/:apiName/records", async (req, reply) => {
     const { apiName } = req.params;
     const { limit = 50, offset = 0 } = req.query;
+    const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "read");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to view this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
@@ -697,6 +725,10 @@ async function recordRoutes(app2) {
   });
   app2.get("/objects/:apiName/records/:recordId", async (req, reply) => {
     const { apiName, recordId } = req.params;
+    const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "read");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to view this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
@@ -742,6 +774,9 @@ async function recordRoutes(app2) {
     const { data, pageLayoutId } = req.body;
     req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, "CREATE RECORD request");
     const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "create");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to create records for this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
@@ -799,6 +834,9 @@ async function recordRoutes(app2) {
     const body = req.body;
     const updateData = body.data || body;
     const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "edit");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to edit records for this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } },
       include: {
@@ -850,6 +888,10 @@ async function recordRoutes(app2) {
   });
   app2.delete("/objects/:apiName/records/:recordId", async (req, reply) => {
     const { apiName, recordId } = req.params;
+    const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "delete");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to delete records for this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
@@ -873,6 +915,10 @@ async function recordRoutes(app2) {
   app2.get("/objects/:apiName/records/search", async (req, reply) => {
     const { apiName } = req.params;
     const { q } = req.query;
+    const userId = req.user.sub;
+    const userRole = req.user.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, "read");
+    if (!allowed) return reply.code(403).send({ error: "You do not have permission to view this object" });
     const object = await prisma5.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: "insensitive" } }
     });
@@ -2571,6 +2617,72 @@ function buildApp() {
     const payload = verifyJwt(token, env.JWT_SECRET);
     if (!payload) return reply.code(401).send({ error: "Invalid token" });
     req.user = payload;
+  });
+  app2.get("/me/permissions", async (req, reply) => {
+    const userId = req.user.sub;
+    const user = await prisma15.user.findUnique({
+      where: { id: userId },
+      include: {
+        department: true,
+        profile: true,
+        permissionSetAssignments: {
+          include: { permissionSet: true }
+        }
+      }
+    });
+    if (!user) return reply.code(404).send({ error: "User not found" });
+    const deptPerms = user.department?.permissions || {};
+    const objectPerms = { ...deptPerms.objectPermissions || {} };
+    const appPerms = { ...deptPerms.appPermissions || {} };
+    const profPerms = user.profile?.permissions || {};
+    if (profPerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(profPerms.objectPermissions)) {
+        if (!objectPerms[obj]) objectPerms[obj] = {};
+        for (const [action, granted] of Object.entries(perms)) {
+          if (granted) objectPerms[obj][action] = true;
+        }
+      }
+    }
+    if (profPerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(profPerms.appPermissions)) {
+        if (granted) appPerms[perm] = true;
+      }
+    }
+    for (const assignment of user.permissionSetAssignments) {
+      const ps = assignment.permissionSet.permissions || {};
+      if (ps.objectPermissions) {
+        for (const [obj, perms] of Object.entries(ps.objectPermissions)) {
+          if (!objectPerms[obj]) objectPerms[obj] = {};
+          for (const [action, granted] of Object.entries(perms)) {
+            if (granted) objectPerms[obj][action] = true;
+          }
+        }
+      }
+      if (ps.appPermissions) {
+        for (const [perm, granted] of Object.entries(ps.appPermissions)) {
+          if (granted) appPerms[perm] = true;
+        }
+      }
+    }
+    if (user.role === "ADMIN") {
+      const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
+      const crmObjects = ["Property", "Contact", "Account", "Product", "Lead", "Deal", "Project", "Service", "Quote", "Installation"];
+      for (const obj of crmObjects) {
+        objectPerms[obj] = Object.fromEntries(allActions.map((a) => [a, true]));
+      }
+      const allAppPerms = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
+      for (const p of allAppPerms) {
+        appPerms[p] = true;
+      }
+    }
+    reply.send({
+      userId,
+      departmentName: user.department?.name || null,
+      profileName: user.profile?.name || null,
+      role: user.role,
+      objectPermissions: objectPerms,
+      appPermissions: appPerms
+    });
   });
   app2.get("/accounts", async (req, reply) => {
     const accounts = await prisma15.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
@@ -102,6 +103,10 @@ export default function ContactsPage() {
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [showBulkActions, setShowBulkActions] = useState(false);
   const { schema, loadSchema } = useSchemaStore();
+  const { canAccess } = usePermissions();
+  const canCreateContact = canAccess('Contact', 'create');
+  const canEditContact = canAccess('Contact', 'edit');
+  const canDeleteContact = canAccess('Contact', 'delete');
   const pathname = usePathname();
   const router = useRouter();
   
@@ -657,6 +662,7 @@ export default function ContactsPage() {
                   <Star className="w-4 h-4 mr-2" />
                   Favorite
                 </button>
+                {canDeleteContact && (
                 <button
                   onClick={handleBulkDelete}
                   className="inline-flex items-center px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
@@ -665,6 +671,7 @@ export default function ContactsPage() {
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </button>
+                )}
               </div>
             )}
             <button
@@ -674,6 +681,7 @@ export default function ContactsPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
+            {canCreateContact && (
             <button
               onClick={() => {
                 if (!hasPageLayout) {
@@ -690,6 +698,7 @@ export default function ContactsPage() {
               <Plus className="w-5 h-5 mr-2" />
               New Contact
             </button>
+            )}
           </div>
         </div>
         <div className="mb-6 flex gap-3">
@@ -837,6 +846,7 @@ export default function ContactsPage() {
                       {openDropdown === contact.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditContact && (
                             <button
                               onClick={() => {
                                 router.push(`/contacts/${contact.id}`);
@@ -847,6 +857,8 @@ export default function ContactsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteContact && (
                             <button
                               onClick={() => {
                                 handleDeleteContact(contact.id);
@@ -857,6 +869,7 @@ export default function ContactsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

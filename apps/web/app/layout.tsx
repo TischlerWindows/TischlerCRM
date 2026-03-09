@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 import AppWrapper from './app-wrapper';
 import { AuthProvider } from '@/lib/auth-context';
+import { PermissionsProvider } from '@/lib/permissions-context';
 import { ProtectedRouteWrapper } from '@/lib/protected-route-wrapper';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -14,9 +15,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en">
       <body className="min-h-screen antialiased">
         <AuthProvider>
-          <ProtectedRouteWrapper>
-            <AppWrapper>{children}</AppWrapper>
-          </ProtectedRouteWrapper>
+          <PermissionsProvider>
+            <ProtectedRouteWrapper>
+              <AppWrapper>{children}</AppWrapper>
+            </ProtectedRouteWrapper>
+          </PermissionsProvider>
         </AuthProvider>
       </body>
     </html>

@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -99,6 +100,10 @@ export default function ServicePage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateService = canAccess('Service', 'create');
+  const canEditService = canAccess('Service', 'edit');
+  const canDeleteService = canAccess('Service', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -594,8 +599,7 @@ export default function ServicePage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>
-            <button
+            </button>            {canCreateService && (            <button
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
@@ -611,6 +615,7 @@ export default function ServicePage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Service
               </button>
+              )}
           </div>
         </div>
 
@@ -699,6 +704,7 @@ export default function ServicePage() {
                       {openDropdown === service.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditService && (
                             <button
                               onClick={() => {
                                 router.push(`/service/${service.id}`);
@@ -709,6 +715,8 @@ export default function ServicePage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteService && (
                             <button
                               onClick={() => {
                                 handleDeleteService(service.id);
@@ -719,6 +727,7 @@ export default function ServicePage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

@@ -33,6 +33,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -127,6 +128,10 @@ export default function PropertiesPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { schema } = useSchemaStore();
+  const { canAccess } = usePermissions();
+  const canCreateProperty = canAccess('Property', 'create');
+  const canEditProperty = canAccess('Property', 'edit');
+  const canDeleteProperty = canAccess('Property', 'delete');
   
   // Tab navigation state
   const [editMode, setEditMode] = useState(false);
@@ -668,6 +673,7 @@ export default function PropertiesPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
+            {canCreateProperty && (
             <button
                 onClick={() => {
                   if (!hasPageLayout) {
@@ -684,6 +690,7 @@ export default function PropertiesPage() {
                 <Plus className="w-5 h-5 mr-2" />
                 New Property
               </button>
+              )}
           </div>
         </div>
 
@@ -771,6 +778,7 @@ export default function PropertiesPage() {
                       {openDropdown === property.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditProperty && (
                             <button
                               onClick={() => {
                                 router.push(`/properties/${property.id}`);
@@ -781,6 +789,8 @@ export default function PropertiesPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteProperty && (
                             <button
                               onClick={() => {
                                 handleDeleteProperty(property.id);
@@ -791,6 +801,7 @@ export default function PropertiesPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}

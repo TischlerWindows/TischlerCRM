@@ -28,6 +28,7 @@ import {
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
@@ -99,6 +100,10 @@ export default function LeadsPage() {
   const pathname = usePathname();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
+  const { canAccess } = usePermissions();
+  const canCreateLead = canAccess('Lead', 'create');
+  const canEditLead = canAccess('Lead', 'edit');
+  const canDeleteLead = canAccess('Lead', 'delete');
   
   // Check if Lead object exists with page layouts
   const leadObject = schema?.objects.find(obj => obj.apiName === 'Lead');
@@ -634,6 +639,7 @@ export default function LeadsPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
+            {canCreateLead && (
             <button
               onClick={() => {
                 if (!hasPageLayout) {
@@ -650,6 +656,7 @@ export default function LeadsPage() {
               <Plus className="w-5 h-5 mr-2" />
               New Lead
             </button>
+            )}
           </div>
         </div>
 
@@ -739,6 +746,7 @@ export default function LeadsPage() {
                       {openDropdown === lead.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
+                            {canEditLead && (
                             <button
                               onClick={() => {
                                 router.push(`/leads/${lead.id}`);
@@ -749,6 +757,8 @@ export default function LeadsPage() {
                               <Edit className="w-4 h-4" />
                               Edit
                             </button>
+                            )}
+                            {canDeleteLead && (
                             <button
                               onClick={() => {
                                 handleDeleteLead(lead.id);
@@ -759,6 +769,7 @@ export default function LeadsPage() {
                               <Trash2 className="w-4 h-4" />
                               Delete
                             </button>
+                            )}
                           </div>
                         </div>
                       )}
