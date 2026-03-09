@@ -577,6 +577,19 @@ export default function ContactsPage() {
     );
   }
 
+  if (!canAccess('Contact', 'read')) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Contacts.</p>
+          <Link href="/" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Go to Home</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 overflow-hidden bg-gray-50">
         {/* Sidebar */}

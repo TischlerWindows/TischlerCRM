@@ -118,8 +118,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!permissions) return false;
 
       const objPerms = permissions.objectPermissions[objectApiName];
-      // If no permissions configured for this object, allow by default
-      if (!objPerms) return true;
+      // If no permissions configured for this object, DENY by default
+      // (admins are already handled above; for regular users, if no
+      // department/profile/permset mentions an object it stays locked)
+      if (!objPerms) return false;
       return !!objPerms[action];
     },
     [permissions, loading, user],
