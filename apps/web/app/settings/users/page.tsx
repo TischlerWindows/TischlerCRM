@@ -132,6 +132,9 @@ export default function UsersPage() {
         phone: formPhone || null,
         departmentId: formDeptId || null,
       });
+      if (formPassword) {
+        await apiClient.post(`/admin/users/${editUser.id}/reset-password`, { password: formPassword });
+      }
       setSuccess('User updated successfully');
       setShowEditModal(null);
       setEditUser(null);
@@ -171,6 +174,7 @@ export default function UsersPage() {
     setFormTitle(user.title || '');
     setFormPhone(user.phone || '');
     setFormDeptId(user.department?.id || '');
+    setFormPassword('');
     setShowEditModal(user.id);
   };
 
@@ -438,6 +442,11 @@ export default function UsersPage() {
                     <option value="">Select Dept</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
+              </div>
+              <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                  <input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Leave blank to keep current" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                  <p className="text-xs text-gray-400 mt-1">Min 6 characters. Leave blank to keep current password.</p>
               </div>
             </div>
             <div className="border-t px-6 py-3 flex justify-end gap-2">
