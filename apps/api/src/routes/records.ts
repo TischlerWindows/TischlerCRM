@@ -24,8 +24,17 @@ async function checkObjectPermission(
   });
   if (!user) return false;
 
-  // Check department permissions
+  // If user has no department, profile, or permission sets — no permissions configured yet, allow access
+  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
+
+  // Department restrictions are the CEILING
+  // If department explicitly sets this action to false, deny regardless of other sources
   const deptPerms = (user.department?.permissions as any)?.objectPermissions?.[objectApiName];
+  if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
+    return false; // department explicitly denied — cannot be overridden
+  }
+
+  // Check if any source grants the permission
   if (deptPerms?.[action]) return true;
 
   // Check profile permissions
@@ -37,9 +46,6 @@ async function checkObjectPermission(
     const psPerms = (assignment.permissionSet.permissions as any)?.objectPermissions?.[objectApiName];
     if (psPerms?.[action]) return true;
   }
-
-  // If user has no department, profile, or permission sets — no permissions configured yet, allow access
-  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
 
   return false;
 }

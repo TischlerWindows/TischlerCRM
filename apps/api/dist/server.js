@@ -667,7 +667,11 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
     }
   });
   if (!user) return false;
+  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
   const deptPerms = user.department?.permissions?.objectPermissions?.[objectApiName];
+  if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
+    return false;
+  }
   if (deptPerms?.[action]) return true;
   const profPerms = user.profile?.permissions?.objectPermissions?.[objectApiName];
   if (profPerms?.[action]) return true;
@@ -675,7 +679,6 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
     const psPerms = assignment.permissionSet.permissions?.objectPermissions?.[objectApiName];
     if (psPerms?.[action]) return true;
   }
-  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
   return false;
 }
 async function recordRoutes(app2) {
@@ -2530,7 +2533,7 @@ function buildApp() {
       prefix: "/_next/static/"
     });
   }
-  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v5-perms" }));
+  app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v6-dept-ceiling" }));
   app2.post("/auth/signup", async (req, reply) => {
     const schema = z10.object({
       name: z10.string().min(1),
@@ -2631,37 +2634,63 @@ function buildApp() {
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
-    const deptPerms = user.department?.permissions || {};
-    const objectPerms = { ...deptPerms.objectPermissions || {} };
-    const appPerms = { ...deptPerms.appPermissions || {} };
+    const deptRaw = user.department?.permissions || {};
+    const deptObjPerms = deptRaw.objectPermissions || {};
+    const deptAppPerms = deptRaw.appPermissions || {};
+    const grantedObjPerms = {};
+    const grantedAppPerms = {};
     const profPerms = user.profile?.permissions || {};
     if (profPerms.objectPermissions) {
       for (const [obj, perms] of Object.entries(profPerms.objectPermissions)) {
-        if (!objectPerms[obj]) objectPerms[obj] = {};
+        if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
         for (const [action, granted] of Object.entries(perms)) {
-          if (granted) objectPerms[obj][action] = true;
+          if (granted) grantedObjPerms[obj][action] = true;
         }
       }
     }
     if (profPerms.appPermissions) {
       for (const [perm, granted] of Object.entries(profPerms.appPermissions)) {
-        if (granted) appPerms[perm] = true;
+        if (granted) grantedAppPerms[perm] = true;
       }
     }
     for (const assignment of user.permissionSetAssignments) {
       const ps = assignment.permissionSet.permissions || {};
       if (ps.objectPermissions) {
         for (const [obj, perms] of Object.entries(ps.objectPermissions)) {
-          if (!objectPerms[obj]) objectPerms[obj] = {};
+          if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
           for (const [action, granted] of Object.entries(perms)) {
-            if (granted) objectPerms[obj][action] = true;
+            if (granted) grantedObjPerms[obj][action] = true;
           }
         }
       }
       if (ps.appPermissions) {
         for (const [perm, granted] of Object.entries(ps.appPermissions)) {
-          if (granted) appPerms[perm] = true;
+          if (granted) grantedAppPerms[perm] = true;
         }
+      }
+    }
+    const objectPerms = {};
+    const allObjKeys = /* @__PURE__ */ new Set([...Object.keys(deptObjPerms), ...Object.keys(grantedObjPerms)]);
+    for (const obj of allObjKeys) {
+      objectPerms[obj] = {};
+      const deptObj = deptObjPerms[obj] || {};
+      const grantedObj = grantedObjPerms[obj] || {};
+      const allActions = /* @__PURE__ */ new Set([...Object.keys(deptObj), ...Object.keys(grantedObj)]);
+      for (const action of allActions) {
+        if (user.department && obj in deptObjPerms && action in deptObj && !deptObj[action]) {
+          objectPerms[obj][action] = false;
+        } else {
+          objectPerms[obj][action] = !!(deptObj[action] || grantedObj[action]);
+        }
+      }
+    }
+    const appPerms = {};
+    const allAppKeys = /* @__PURE__ */ new Set([...Object.keys(deptAppPerms), ...Object.keys(grantedAppPerms)]);
+    for (const perm of allAppKeys) {
+      if (user.department && perm in deptAppPerms && !deptAppPerms[perm]) {
+        appPerms[perm] = false;
+      } else {
+        appPerms[perm] = !!(deptAppPerms[perm] || grantedAppPerms[perm]);
       }
     }
     if (user.role === "ADMIN") {

@@ -40,7 +40,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v5-perms' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v6-dept-ceiling' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
@@ -158,41 +158,76 @@ export function buildApp() {
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
     // Start with department permissions as base
-    const deptPerms = (user.department?.permissions as any) || {};
-    const objectPerms: Record<string, Record<string, boolean>> = { ...(deptPerms.objectPermissions || {}) };
-    const appPerms: Record<string, boolean> = { ...(deptPerms.appPermissions || {}) };
+    const deptRaw = (user.department?.permissions as any) || {};
+    const deptObjPerms: Record<string, Record<string, boolean>> = deptRaw.objectPermissions || {};
+    const deptAppPerms: Record<string, boolean> = deptRaw.appPermissions || {};
 
-    // Merge profile permissions additively
+    // Collect grants from profile and permission sets
+    const grantedObjPerms: Record<string, Record<string, boolean>> = {};
+    const grantedAppPerms: Record<string, boolean> = {};
+
+    // Profile grants
     const profPerms = (user.profile?.permissions as any) || {};
     if (profPerms.objectPermissions) {
       for (const [obj, perms] of Object.entries(profPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
-        if (!objectPerms[obj]) objectPerms[obj] = {};
+        if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
         for (const [action, granted] of Object.entries(perms)) {
-          if (granted) objectPerms[obj][action] = true;
+          if (granted) grantedObjPerms[obj][action] = true;
         }
       }
     }
     if (profPerms.appPermissions) {
       for (const [perm, granted] of Object.entries(profPerms.appPermissions as Record<string, boolean>)) {
-        if (granted) appPerms[perm] = true;
+        if (granted) grantedAppPerms[perm] = true;
       }
     }
 
-    // Merge permission sets additively
+    // Permission set grants
     for (const assignment of user.permissionSetAssignments) {
       const ps = (assignment.permissionSet.permissions as any) || {};
       if (ps.objectPermissions) {
         for (const [obj, perms] of Object.entries(ps.objectPermissions as Record<string, Record<string, boolean>>)) {
-          if (!objectPerms[obj]) objectPerms[obj] = {};
+          if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
           for (const [action, granted] of Object.entries(perms)) {
-            if (granted) objectPerms[obj][action] = true;
+            if (granted) grantedObjPerms[obj][action] = true;
           }
         }
       }
       if (ps.appPermissions) {
         for (const [perm, granted] of Object.entries(ps.appPermissions as Record<string, boolean>)) {
-          if (granted) appPerms[perm] = true;
+          if (granted) grantedAppPerms[perm] = true;
         }
+      }
+    }
+
+    // Merge: department restrictions are the CEILING.
+    // If department explicitly sets action=false, it cannot be overridden.
+    // Otherwise take the union of dept + profile + permsets grants.
+    const objectPerms: Record<string, Record<string, boolean>> = {};
+    const allObjKeys = new Set([...Object.keys(deptObjPerms), ...Object.keys(grantedObjPerms)]);
+    for (const obj of allObjKeys) {
+      objectPerms[obj] = {};
+      const deptObj = deptObjPerms[obj] || {};
+      const grantedObj = grantedObjPerms[obj] || {};
+      const allActions = new Set([...Object.keys(deptObj), ...Object.keys(grantedObj)]);
+      for (const action of allActions) {
+        // If department explicitly set this action to false, deny it
+        if (user.department && obj in deptObjPerms && action in deptObj && !deptObj[action]) {
+          objectPerms[obj][action] = false;
+        } else {
+          // Otherwise, grant if any source grants it
+          objectPerms[obj][action] = !!(deptObj[action] || grantedObj[action]);
+        }
+      }
+    }
+
+    const appPerms: Record<string, boolean> = {};
+    const allAppKeys = new Set([...Object.keys(deptAppPerms), ...Object.keys(grantedAppPerms)]);
+    for (const perm of allAppKeys) {
+      if (user.department && perm in deptAppPerms && !deptAppPerms[perm]) {
+        appPerms[perm] = false;
+      } else {
+        appPerms[perm] = !!(deptAppPerms[perm] || grantedAppPerms[perm]);
       }
     }
 
