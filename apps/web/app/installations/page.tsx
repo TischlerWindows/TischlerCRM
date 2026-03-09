@@ -171,14 +171,6 @@ export default function InstallationsPage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         installationNumber: record.installationNumber || '',
-        installationName: record.installationName || '',
-        accountName: record.accountName || '',
-        projectNumber: record.projectNumber || '',
-        status: record.status || 'Scheduled',
-        startDate: record.startDate || '',
-        completionDate: record.completionDate || '',
-        leadInstaller: record.leadInstaller || '',
-        teamSize: record.teamSize || 0,
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -246,10 +238,13 @@ export default function InstallationsPage() {
   };
 
   const filteredInstallations = installations.filter(installation => {
-    const matchesSearch = installation.installationNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      installation.installationName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      installation.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      installation.status.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(installation).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -385,14 +380,6 @@ export default function InstallationsPage() {
       const recordData = {
         ...normalizedData,
         installationNumber,
-        installationName: normalizedData.installationName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        status: normalizedData.status || 'Scheduled',
-        startDate: normalizedData.startDate || today,
-        completionDate: normalizedData.completionDate || today,
-        leadInstaller: normalizedData.leadInstaller || '',
-        teamSize: normalizedData.teamSize || 2
       };
 
       const result = await recordsService.createRecord('Installation', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -401,14 +388,6 @@ export default function InstallationsPage() {
         id: result.id,
         installationNumber,
         ...normalizedData,
-        installationName: normalizedData.installationName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        status: normalizedData.status || 'Scheduled',
-        startDate: normalizedData.startDate || today,
-        completionDate: normalizedData.completionDate || today,
-        leadInstaller: normalizedData.leadInstaller || '',
-        teamSize: normalizedData.teamSize || 2,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,

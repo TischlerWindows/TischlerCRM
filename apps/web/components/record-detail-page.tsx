@@ -260,7 +260,16 @@ export default function RecordDetailPage({
   const handleEditSubmit = async (data: Record<string, any>) => {
     if (!record) return;
     try {
-      const updated = await recordsService.updateRecord(objectApiName, record.id, { data });
+      // Strip object prefix from keys so the saved data matches the format
+      // used by the per-page create handlers (which also strip prefixes).
+      // This prevents duplicate keys (e.g. "status" + "Lead__status") from
+      // accumulating in the JSON data blob.
+      const normalizedData: Record<string, any> = {};
+      for (const [key, value] of Object.entries(data)) {
+        const cleanKey = key.replace(/^[A-Za-z]+__/, '');
+        normalizedData[cleanKey] = value;
+      }
+      const updated = await recordsService.updateRecord(objectApiName, record.id, { data: normalizedData });
       if (updated) {
         setRawRecord(updated);
         setRecord(recordsService.flattenRecord(updated));

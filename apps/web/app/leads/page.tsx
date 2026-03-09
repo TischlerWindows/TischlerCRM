@@ -40,17 +40,12 @@ interface Lead {
   id: string;
   leadNumber: string;
   contactName: string;
-  propertyAddress: string;
-  source: string;
-  stage: string;
-  assignedTo: string;
-  estimatedValue: number;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
   lastModifiedAt: string;
-  notes?: string;
   isFavorite?: boolean;
+  [key: string]: any; // Allow any schema-driven fields
 }
 
 const informationModules = [
@@ -207,16 +202,10 @@ export default function LeadsPage() {
         ...record,
         leadNumber: record.leadNumber || '',
         contactName: record.contactName || record.firstName || '',
-        propertyAddress: record.address || '',
-        source: record.leadSource || '',
-        stage: record.stage || 'New',
-        assignedTo: record.assignedTo || '',
-        estimatedValue: record.estimatedValue || 0,
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
-        notes: record.notes || '',
       }));
       setLeads(flattenedRecords as Lead[]);
     } catch (error) {
@@ -251,20 +240,16 @@ export default function LeadsPage() {
   };
 
   const filteredLeads = leads.filter(lead => {
-    // Format contactName for search - handle both string and object
-    const contactNameStr = typeof lead.contactName === 'object' 
-      ? formatFieldValue(lead.contactName, 'Name') 
-      : String(lead.contactName || '');
-    // Format propertyAddress for search - handle both string and object
-    const propertyAddressStr = typeof lead.propertyAddress === 'object'
-      ? formatFieldValue(lead.propertyAddress, 'Address')
-      : String(lead.propertyAddress || '');
-    
-    const matchesSearch = lead.leadNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contactNameStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      propertyAddressStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.stage.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.source.toLowerCase().includes(searchTerm.toLowerCase());
+    // Generic search across all visible string fields
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.entries(lead).some(([key, value]) => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') {
+        return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      }
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -446,13 +431,6 @@ export default function LeadsPage() {
       const recordData = {
         ...normalizedData,
         leadNumber,
-        firstName: normalizedData.contactName || "",
-        address: normalizedData.propertyAddress || "",
-        leadSource: normalizedData.source || 'Website',
-        stage: normalizedData.stage || 'Initial Contact',
-        assignedTo: normalizedData.assignedTo || '',
-        estimatedValue: normalizedData.estimatedValue || 0,
-        notes: normalizedData.notes || ''
       };
 
       const result = await recordsService.createRecord('Lead', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -462,16 +440,10 @@ export default function LeadsPage() {
         leadNumber,
         ...normalizedData,
         contactName: normalizedData.contactName || '',
-        propertyAddress: normalizedData.propertyAddress || '',
-        source: normalizedData.source || 'Website',
-        stage: normalizedData.stage || 'Initial Contact',
-        assignedTo: normalizedData.assignedTo || '',
-        estimatedValue: normalizedData.estimatedValue || 0,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,
         lastModifiedAt: today,
-        notes: normalizedData.notes || ''
       };
 
       const updatedLeads = [newLead, ...leads];

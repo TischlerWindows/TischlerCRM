@@ -200,13 +200,6 @@ export default function DealsPage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         dealNumber: record.dealNumber || '',
-        dealName: record.dealName || '',
-        accountName: record.accountName || '',
-        stage: record.stage || 'New',
-        value: record.amount || 0,
-        closeDate: record.closeDate || '',
-        assignedTo: record.assignedTo || '',
-        probability: record.probability || 0,
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -245,10 +238,13 @@ export default function DealsPage() {
   };
 
   const filteredDeals = deals.filter(deal => {
-    const matchesSearch = deal.dealNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.dealName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      deal.stage.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(deal).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -429,13 +425,6 @@ export default function DealsPage() {
       const recordData = {
         ...normalizedData,
         dealNumber,
-        dealName: normalizedData.dealName || '',
-        accountName: normalizedData.accountName || '',
-        stage: normalizedData.stage || 'Proposal',
-        amount: normalizedData.amount || normalizedData.value || 0,
-        closeDate: normalizedData.closeDate || today,
-        assignedTo: normalizedData.assignedTo || '',
-        probability: normalizedData.probability || 50
       };
 
       const result = await recordsService.createRecord('Deal', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -444,13 +433,6 @@ export default function DealsPage() {
         id: result.id,
         dealNumber,
         ...normalizedData,
-        dealName: normalizedData.dealName || '',
-        accountName: normalizedData.accountName || '',
-        stage: normalizedData.stage || 'Proposal',
-        value: normalizedData.amount || normalizedData.value || 0,
-        closeDate: normalizedData.closeDate || today,
-        assignedTo: normalizedData.assignedTo || '',
-        probability: normalizedData.probability || 50,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,

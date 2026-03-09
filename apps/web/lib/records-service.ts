@@ -104,14 +104,24 @@ class RecordsService {
   flattenRecord(record: RecordData): Record<string, any> {
     // Strip object prefixes from data keys (e.g., "Property__address" → "address")
     // so list pages can access values via simple unprefixed column ids.
+    //
+    // When both a prefixed key (e.g. "Lead__status") and an unprefixed key
+    // ("status") exist in the data, the PREFIXED value wins because it is the
+    // more specific / authoritative value (and likely the most recent edit).
     const stripped: Record<string, any> = {};
+    const prefixedCleanKeys = new Set<string>(); // track clean keys that came from a prefixed source
     if (record.data && typeof record.data === 'object') {
       for (const [key, value] of Object.entries(record.data)) {
         // Keep original prefixed key so edit forms can match by apiName
         stripped[key] = value;
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
-        // Also add stripped key for display convenience
-        if (!(cleanKey in stripped)) {
+        const hadPrefix = cleanKey !== key;
+        if (hadPrefix) {
+          // Prefixed keys always overwrite the stripped alias
+          stripped[cleanKey] = value;
+          prefixedCleanKeys.add(cleanKey);
+        } else if (!prefixedCleanKeys.has(cleanKey)) {
+          // Unprefixed key only sets the alias when no prefixed source claimed it
           stripped[cleanKey] = value;
         }
       }

@@ -238,22 +238,11 @@ export default function PropertiesPage() {
       const records = await recordsService.getRecords('Property');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
-        recordTypeId: schema?.objects.find(o => o.apiName === 'Property')?.recordTypes?.[0]?.id,
         propertyNumber: record.propertyNumber || '',
-        address: record.address || '',
-        city: record.city || '',
-        state: record.state || '',
-        zipCode: record.zipCode || '',
-        status: record.status || 'Active',
-        contacts: record.contacts || [],
-        accounts: record.accounts || [],
-        lastActivity: record.updatedAt || new Date().toISOString(),
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
-        sharepointFolder: record.sharepointFolder || '',
-        isFavorite: record.isFavorite || false,
       }));
       setProperties(flattenedRecords as Property[]);
     } catch (error) {
@@ -293,13 +282,13 @@ export default function PropertiesPage() {
   };
 
   const filteredProperties = properties.filter(property => {
-    const addressString = typeof property.address === 'object' 
-      ? formatFieldValue(property.address, 'Address')
-      : property.address;
-    
-    const matchesSearch = property.propertyNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      addressString.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.city.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(property).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
     
     const currentUser = 'Development User';
     let matchesSidebar = true;
@@ -486,10 +475,6 @@ export default function PropertiesPage() {
     const recordData = {
       ...normalizedData,
       propertyNumber,
-      status: normalizedData.status || 'Active',
-      contacts: normalizedData.contacts || [],
-      accounts: normalizedData.accounts || [],
-      sharepointFolder: propertyNumber,
     };
 
     try {

@@ -173,12 +173,6 @@ export default function QuotesPage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         quoteNumber: record.quoteNumber || '',
-        quoteName: record.quoteName || '',
-        accountName: record.accountName || '',
-        dealNumber: record.dealNumber || '',
-        status: record.status || 'Draft',
-        totalAmount: record.totalAmount || 0,
-        validUntil: record.validUntil || '',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -248,10 +242,13 @@ export default function QuotesPage() {
   };
 
   const filteredQuotes = quotes.filter(quote => {
-    const matchesSearch = quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.quoteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.status.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(quote).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -390,12 +387,6 @@ export default function QuotesPage() {
       const recordData = {
         ...normalizedData,
         quoteNumber,
-        quoteName: normalizedData.quoteName || '',
-        accountName: normalizedData.accountName || '',
-        dealNumber: normalizedData.dealNumber || '',
-        status: normalizedData.status || 'Draft',
-        totalAmount: normalizedData.totalAmount || 0,
-        validUntil: normalizedData.validUntil || validUntilStr
       };
 
       const result = await recordsService.createRecord('Quote', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -404,12 +395,6 @@ export default function QuotesPage() {
         id: result.id,
         quoteNumber,
         ...normalizedData,
-        quoteName: normalizedData.quoteName || '',
-        accountName: normalizedData.accountName || '',
-        dealNumber: normalizedData.dealNumber || '',
-        status: normalizedData.status || 'Draft',
-        totalAmount: normalizedData.totalAmount || 0,
-        validUntil: normalizedData.validUntil || validUntilStr,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,

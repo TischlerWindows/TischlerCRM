@@ -210,12 +210,6 @@ export default function ProjectsPage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         projectNumber: record.projectNumber || '',
-        projectName: record.projectName || '',
-        status: record.status || 'Planning',
-        startDate: record.startDate || '',
-        expectedCompletion: record.expectedCompletion || '',
-        assignedTeam: record.assignedTeam || '',
-        budget: record.budget || 0,
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -318,9 +312,13 @@ export default function ProjectsPage() {
   };
 
   const filteredProjects = projects.filter(project => {
-    const matchesSearch = project.projectNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      project.status.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(project).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -409,12 +407,6 @@ export default function ProjectsPage() {
       const recordData = {
         ...normalizedData,
         projectNumber,
-        projectName: normalizedData.projectName || '',
-        status: normalizedData.status || 'Planning',
-        startDate: normalizedData.startDate || today,
-        expectedCompletion: normalizedData.expectedCompletion || '',
-        assignedTeam: normalizedData.assignedTeam || '',
-        budget: normalizedData.budget || 0
       };
 
       const result = await recordsService.createRecord('Project', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -423,12 +415,6 @@ export default function ProjectsPage() {
         id: result.id,
         projectNumber,
         ...normalizedData,
-        projectName: normalizedData.projectName || '',
-        status: normalizedData.status || 'Planning',
-        startDate: normalizedData.startDate || today,
-        expectedCompletion: normalizedData.expectedCompletion || '',
-        assignedTeam: normalizedData.assignedTeam || '',
-        budget: normalizedData.budget || 0,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,

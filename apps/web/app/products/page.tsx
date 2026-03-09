@@ -211,15 +211,7 @@ export default function ProductsPage() {
       const records = await recordsService.getRecords('Product');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
-        recordTypeId: schema?.objects.find(o => o.apiName === 'Product')?.recordTypes?.[0]?.id,
         productCode: record.productCode || '',
-        productName: record.productName || '',
-        category: record.category || '',
-        unitPrice: record.unitPrice || 0,
-        unitOfMeasure: record.unitOfMeasure || '',
-        inStock: record.inStock || false,
-        stockQuantity: record.stockQuantity || 0,
-        supplier: record.supplier || '',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -262,9 +254,13 @@ export default function ProductsPage() {
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.productCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(product).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
     
     const currentUser = 'Development User';
     let matchesSidebar = true;
@@ -461,33 +457,18 @@ export default function ProductsPage() {
       const recordData = {
         ...normalizedData,
         productCode,
-        productName: normalizedData.productName || '',
-        category: normalizedData.category || '',
-        unitPrice: normalizedData.unitPrice || 0,
-        unitOfMeasure: normalizedData.unitOfMeasure || '',
-        inStock: normalizedData.inStock ?? false,
-        stockQuantity: normalizedData.stockQuantity || 0,
-        supplier: normalizedData.supplier || '',
       };
 
       const result = await recordsService.createRecord('Product', { data: recordData, pageLayoutId: layoutId || undefined });
       
       const newProduct: Product = {
         id: result.id,
-        recordTypeId: defaultRecordType?.id,
         productCode,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,
         lastModifiedAt: today,
         ...normalizedData,
-        productName: normalizedData.productName || '',
-        category: normalizedData.category || '',
-        unitPrice: normalizedData.unitPrice || 0,
-        unitOfMeasure: normalizedData.unitOfMeasure || '',
-        inStock: normalizedData.inStock ?? false,
-        stockQuantity: normalizedData.stockQuantity || 0,
-        supplier: normalizedData.supplier || '',
       };
       
       console.log('💾 New product object:', newProduct);

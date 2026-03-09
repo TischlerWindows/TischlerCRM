@@ -224,20 +224,7 @@ export default function AccountsPage() {
       const records = await recordsService.getRecords('Account');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
-        recordTypeId: schema?.objects.find(o => o.apiName === 'Account')?.recordTypes?.[0]?.id,
         accountNumber: record.accountNumber || '',
-        accountName: record.name || '',
-        accountType: record.type || '',
-        status: record.status || 'Active',
-        website: record.website || '',
-        primaryEmail: record.email || '',
-        secondaryEmail: record.secondaryEmail || '',
-        primaryPhone: record.phone || '',
-        secondaryPhone: record.secondaryPhone || '',
-        accountNotes: record.accountNotes || '',
-        shippingAddress: record.shippingAddress || '',
-        billingAddress: record.billingAddress || '',
-        accountOwner: record.createdBy || 'System',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -281,9 +268,13 @@ export default function AccountsPage() {
   };
 
   const filteredAccounts = accounts.filter(account => {
-    const matchesSearch = account.accountNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      account.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      account.accountType.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(account).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
     
     const currentUser = 'Development User';
     let matchesSidebar = true;
@@ -456,12 +447,6 @@ export default function AccountsPage() {
     const recordData = {
       ...normalizedData,
       accountNumber,
-      name: normalizedData.accountName || '',
-      type: normalizedData.accountType || '',
-      status: normalizedData.status || 'Active',
-      email: normalizedData.primaryEmail || '',
-      phone: normalizedData.primaryPhone || '',
-      website: normalizedData.website || '',
     };
 
     try {

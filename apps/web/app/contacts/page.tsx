@@ -222,20 +222,10 @@ export default function ContactsPage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         contactNumber: record.contactNumber || '',
-        name: record.name || null,
-        firstName: record.firstName || '',
-        lastName: record.lastName || '',
-        email: record.email || '',
-        phone: record.phone || '',
-        company: record.company || '',
-        title: record.title || '',
-        status: record.status || 'Active',
-        lastActivity: record.updatedAt || new Date().toISOString(),
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
-        isFavorite: record.isFavorite || false,
       }));
       setContacts(flattenedRecords as Contact[]);
     } catch (error) {
@@ -392,11 +382,13 @@ export default function ContactsPage() {
   const filteredContacts = useMemo(() => {
     // First apply search filter
     let result = contacts.filter(contact => {
-      const matchesSearch = contact.contactNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        contact.company?.toLowerCase().includes(searchTerm.toLowerCase());
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = !searchTerm || Object.values(contact).some(value => {
+        if (value === null || value === undefined) return false;
+        if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+        if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+        return String(value).toLowerCase().includes(searchLower);
+      });
       
       const currentUser = 'Development User';
       let matchesSidebar = true;
@@ -466,23 +458,15 @@ export default function ContactsPage() {
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
     const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
 
-    // Extract name parts from composite Name field if present
-    const nameObj = data['Contact__name'];
-    const compositeSalutation = nameObj?.Contact__name_salutation || nameObj?.salutation;
-    const compositeFirst = nameObj?.Contact__name_firstName || nameObj?.firstName;
-    const compositeLast = nameObj?.Contact__name_lastName || nameObj?.lastName;
+    // Normalize: strip object prefix from keys
+    const normalizedData: Record<string, any> = {};
+    Object.entries(data).forEach(([key, value]) => {
+      normalizedData[key.replace('Contact__', '')] = value;
+    });
 
     const recordData = {
-      ...data,
+      ...normalizedData,
       contactNumber,
-      firstName: data['Contact__firstName'] || data.firstName || compositeFirst || '',
-      lastName: data['Contact__lastName'] || data.lastName || compositeLast || '',
-      salutation: data['Contact__salutation'] || data.salutation || compositeSalutation || '',
-      email: data['Contact__email'] || data.email || '',
-      phone: data['Contact__phone'] || data.phone || '',
-      company: data['Contact__company'] || data.company || '',
-      title: data['Contact__title'] || data.title || '',
-      status: data.status || 'Active',
     };
 
     try {

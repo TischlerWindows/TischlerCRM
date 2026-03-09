@@ -194,14 +194,6 @@ export default function ServicePage() {
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
         serviceNumber: record.serviceNumber || '',
-        serviceName: record.serviceName || '',
-        accountName: record.accountName || '',
-        projectNumber: record.projectNumber || '',
-        serviceType: record.serviceType || '',
-        status: record.status || 'Scheduled',
-        scheduledDate: record.scheduledDate || '',
-        assignedTechnician: record.assignedTechnician || '',
-        priority: record.priority || 'Medium',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
@@ -240,11 +232,13 @@ export default function ServicePage() {
   };
 
   const filteredServices = services.filter(service => {
-    const matchesSearch = service.serviceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.serviceType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      service.status.toLowerCase().includes(searchTerm.toLowerCase());
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm || Object.values(service).some(value => {
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
+      if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
+      return String(value).toLowerCase().includes(searchLower);
+    });
 
     let matchesSidebar = true;
     const thirtyDaysAgo = new Date();
@@ -404,14 +398,6 @@ export default function ServicePage() {
       const recordData = {
         ...normalizedData,
         serviceNumber,
-        serviceName: normalizedData.serviceName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        serviceType: normalizedData.serviceType || 'Maintenance',
-        status: normalizedData.status || 'Scheduled',
-        scheduledDate: normalizedData.scheduledDate || today,
-        assignedTechnician: normalizedData.assignedTechnician || '',
-        priority: normalizedData.priority || 'Medium'
       };
 
       const result = await recordsService.createRecord('Service', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
@@ -420,14 +406,6 @@ export default function ServicePage() {
         id: result.id,
         serviceNumber,
         ...normalizedData,
-        serviceName: normalizedData.serviceName || '',
-        accountName: normalizedData.accountName || '',
-        projectNumber: normalizedData.projectNumber || '',
-        serviceType: normalizedData.serviceType || 'Maintenance',
-        status: normalizedData.status || 'Scheduled',
-        scheduledDate: normalizedData.scheduledDate || today,
-        assignedTechnician: normalizedData.assignedTechnician || '',
-        priority: normalizedData.priority || 'Medium',
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,
