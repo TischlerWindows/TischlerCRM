@@ -635,7 +635,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       <Textarea
                         id="picklistValues"
                         value={formData.picklistValues.join('\n')}
-                        onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
+                        onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n') })}
+                        onBlur={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
                         placeholder="Enter one value per line"
                         rows={5}
                       />
