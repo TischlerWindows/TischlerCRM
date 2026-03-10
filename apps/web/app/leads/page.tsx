@@ -126,13 +126,18 @@ export default function LeadsPage() {
     }
 
     // Generate columns from schema fields
-    return leadObject.fields.map((field, index) => {
+    const systemFieldApiNames = new Set(['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById']);
+    // Key business fields that should always be visible by default
+    const alwaysVisibleFields = new Set(['Lead__status', 'Lead__leadSource']);
+    let visibleCount = 0;
+    return leadObject.fields.map((field) => {
       // Strip the Lead__ prefix for display
       const cleanApiName = field.apiName.replace('Lead__', '');
       
-      // Determine if field should be visible by default (first 10 non-system fields)
-      const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
-      const defaultVisible = !isSystemField && index < 10;
+      const isSystemField = systemFieldApiNames.has(field.apiName);
+      // Show the first 10 non-system fields + any essential business fields
+      const defaultVisible = !isSystemField && (visibleCount < 10 || alwaysVisibleFields.has(field.apiName));
+      if (!isSystemField) visibleCount++;
       
       return {
         id: cleanApiName,

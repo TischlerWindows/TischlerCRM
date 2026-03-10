@@ -5,9 +5,46 @@ export type FieldType =
   | "Lookup" | "ExternalLookup"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone"
-  | "Picklist" | "MultiPicklist"
+  | "Picklist" | "MultiPicklist" | "MultiSelectPicklist"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText";
+
+/**
+ * Normalize field type strings from the database to canonical FieldType values.
+ * Handles case mismatches (e.g. "text" → "Text") and aliases
+ * (e.g. "MultiSelectPicklist" → "MultiPicklist").
+ */
+export function normalizeFieldType(raw: string): FieldType {
+  const CANONICAL: Record<string, FieldType> = {
+    autonumber: 'AutoNumber',
+    formula: 'Formula',
+    rollupsummary: 'RollupSummary',
+    lookup: 'Lookup',
+    externallookup: 'ExternalLookup',
+    checkbox: 'Checkbox',
+    currency: 'Currency',
+    date: 'Date',
+    datetime: 'DateTime',
+    email: 'Email',
+    geolocation: 'Geolocation',
+    number: 'Number',
+    percent: 'Percent',
+    phone: 'Phone',
+    picklist: 'Picklist',
+    multipicklist: 'MultiPicklist',
+    multiselectpicklist: 'MultiPicklist',
+    text: 'Text',
+    textarea: 'TextArea',
+    longtextarea: 'LongTextArea',
+    richtextarea: 'RichTextArea',
+    encryptedtext: 'EncryptedText',
+    time: 'Time',
+    url: 'URL',
+    address: 'Address',
+    compositetext: 'CompositeText',
+  };
+  return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
+}
 
 export interface FieldDef {
   id: string;

@@ -1,4 +1,4 @@
-import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, normalizeFieldType } from './schema';
 import { apiClient } from './api-client';
 
 const STORAGE_KEY = 'tces-object-manager-schema';
@@ -412,6 +412,15 @@ class LocalStorageSchemaService implements SchemaService {
       const result = await apiClient.getSetting(STORAGE_KEY);
       if (result && result.value) {
         const schema = result.value as OrgSchema;
+
+        // Normalise field types so DB variants (lowercase, aliases like
+        // "MultiSelectPicklist") map to canonical FieldType values used by
+        // the DynamicForm switch statement.
+        for (const obj of schema.objects) {
+          for (const field of obj.fields) {
+            (field as any).type = normalizeFieldType(field.type);
+          }
+        }
         
         // Run the same migrations/fixes as before
         const contactObj = (schema as any).objects?.find((o: any) => o.apiName === 'Contact');
@@ -1378,7 +1387,7 @@ class LocalStorageSchemaService implements SchemaService {
       id: generateId(),
       apiName: 'Lead__competitors',
       label: 'Competitors',
-      type: 'MultiSelectPicklist',
+      type: 'MultiPicklist',
       picklistValues: ['Reilly Architectural', 'Peetz Windows and Doors, Inc', 'Hartman Doors and Windows', 'Trade Wood Industries', 'Other']
     });
     ensureField({
@@ -1523,7 +1532,7 @@ class LocalStorageSchemaService implements SchemaService {
       id: generateId(),
       apiName: 'Lead__actions',
       label: 'Actions',
-      type: 'MultiSelectPicklist',
+      type: 'MultiPicklist',
       picklistValues: ['Call', 'Email', 'Schedule Meeting', 'Send Quote', 'Follow Up']
     });
     ensureField({

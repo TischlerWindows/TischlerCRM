@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
-import { PageLayout, FieldDef, FieldType, ObjectDef } from '@/lib/schema';
+import { PageLayout, FieldDef, FieldType, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -183,7 +183,11 @@ export default function DynamicForm({
   }
 
   const getFieldDef = (apiName: string): FieldDef | undefined => {
-    return object.fields.find((f) => f.apiName === apiName);
+    const raw = object.fields.find((f) => f.apiName === apiName);
+    if (!raw) return undefined;
+    // Normalise the type so DB variants like "text", "datetime",
+    // "MultiSelectPicklist" map to the canonical FieldType values.
+    return { ...raw, type: normalizeFieldType(raw.type) };
   };
 
   const getLookupTargetApi = (fieldDef: FieldDef): string | undefined => {
@@ -294,6 +298,7 @@ export default function DynamicForm({
       Checkbox: CheckSquare,
       Picklist: List,
       MultiPicklist: List,
+      MultiSelectPicklist: List,
       Address: MapPin,
       Geolocation: MapPin,
       Lookup: LinkIcon,
@@ -564,6 +569,7 @@ export default function DynamicForm({
         break;
 
       case 'MultiPicklist':
+      case 'MultiSelectPicklist':
         const multiPicklistOptions = fieldDef.picklistValues || [];
         const selectedValues = value ? value.split(';') : [];
         inputElement = (
