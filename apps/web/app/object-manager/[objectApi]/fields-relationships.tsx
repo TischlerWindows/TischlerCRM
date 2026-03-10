@@ -237,13 +237,15 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   };
 
   const handleLabelChange = (label: string) => {
-    // Auto-generate API name from label
-    const apiName = `${objectApiName}__${label.replace(/\s+/g, '_').toLowerCase()}`;
-    setFormData({
-      ...formData,
-      label,
-      apiName,
-    });
+    // Only auto-generate API name for NEW fields; when editing an
+    // existing field the apiName must stay stable so page layouts
+    // and existing records keep referencing the same key.
+    if (editingField) {
+      setFormData({ ...formData, label });
+    } else {
+      const apiName = `${objectApiName}__${label.replace(/\s+/g, '_').toLowerCase()}`;
+      setFormData({ ...formData, label, apiName });
+    }
   };
 
   return (

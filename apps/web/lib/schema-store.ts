@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout, PermissionSet } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
+import { recordsService } from './records-service';
 
 export interface SchemaStore {
   // Current schema state
@@ -354,17 +355,63 @@ export const useSchemaStore = create<SchemaStore>()(
         const { schema } = get();
         if (!schema) return;
 
-        const updatedObjects = schema.objects.map(obj =>
-          obj.apiName === objectApi 
-            ? {
-                ...obj,
-                fields: obj.fields.map(field =>
-                  (field.id === fieldId || field.apiName === fieldId) ? { ...field, ...updates } : field
-                ),
-                updatedAt: new Date().toISOString()
-              }
-            : obj
-        );
+        // Detect apiName change so we can cascade to layouts & records
+        const targetObj = schema.objects.find(o => o.apiName === objectApi);
+        const oldField = targetObj?.fields.find(f => f.id === fieldId || f.apiName === fieldId);
+        const oldApiName = oldField?.apiName;
+        const newApiName = updates.apiName;
+        const apiNameChanged = oldApiName && newApiName && oldApiName !== newApiName;
+
+        const updatedObjects = schema.objects.map(obj => {
+          if (obj.apiName !== objectApi) return obj;
+
+          // Update the field definition
+          const updatedFields = obj.fields.map(field =>
+            (field.id === fieldId || field.apiName === fieldId) ? { ...field, ...updates } : field
+          );
+
+          // Cascade apiName change + field property changes to page layouts
+          const updatedLayouts = (obj.pageLayouts || []).map(layout => ({
+            ...layout,
+            tabs: layout.tabs.map(tab => ({
+              ...tab,
+              sections: tab.sections.map(section => ({
+                ...section,
+                fields: section.fields.map(pf => {
+                  // Match by old apiName (rename) or current apiName (property update)
+                  const matchesOld = apiNameChanged && pf.apiName === oldApiName;
+                  const matchesCurrent = pf.apiName === (newApiName || fieldId);
+                  if (!matchesOld && !matchesCurrent) return pf;
+
+                  // Rebuild with the updated field def so embedded data stays fresh
+                  const freshField = updatedFields.find(f => f.apiName === (newApiName || fieldId));
+                  if (!freshField) {
+                    // At minimum, update the apiName reference
+                    return apiNameChanged ? { ...pf, apiName: newApiName! } : pf;
+                  }
+                  const { apiName: _a, ...rest } = freshField;
+                  return {
+                    ...rest,
+                    ...pf,
+                    apiName: freshField.apiName,
+                    label: freshField.label,
+                    type: freshField.type,
+                    required: freshField.required,
+                    picklistValues: freshField.picklistValues,
+                    defaultValue: freshField.defaultValue,
+                  };
+                }),
+              })),
+            })),
+          }));
+
+          return {
+            ...obj,
+            fields: updatedFields,
+            pageLayouts: updatedLayouts,
+            updatedAt: new Date().toISOString(),
+          };
+        });
 
         const updatedSchema = {
           ...schema,
@@ -376,6 +423,26 @@ export const useSchemaStore = create<SchemaStore>()(
         
         // Persist to schema service
         schemaService.saveSchema(updatedSchema);
+
+        // Cascade apiName rename to existing records
+        if (apiNameChanged) {
+          (async () => {
+            try {
+              const records = await recordsService.getRecords(objectApi);
+              for (const rec of records) {
+                const data = rec.data as Record<string, any> | undefined;
+                if (data && (oldApiName! in data)) {
+                  const newData = { ...data };
+                  newData[newApiName!] = newData[oldApiName!];
+                  delete newData[oldApiName!];
+                  await recordsService.updateRecord(objectApi, rec.id, { data: newData });
+                }
+              }
+            } catch (err) {
+              console.error('[Schema] Failed to cascade field rename to records:', err);
+            }
+          })();
+        }
       },
 
       // Delete field
