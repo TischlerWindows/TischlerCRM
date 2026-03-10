@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Database } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
@@ -50,6 +50,8 @@ export default function RecordDetailPage({
   const [record, setRecord] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditForm, setShowEditForm] = useState(false);
+  // Tracks which sections the user has manually toggled open/closed
+  const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
 
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase()
@@ -397,8 +399,6 @@ export default function RecordDetailPage({
                 {tab.sections.map((section, si) => {
                   // Column-based layout: group fields by column, sorted by
                   // order within each column (same approach as DynamicForm).
-                  // This avoids the row-based Math.floor() approach that could
-                  // silently overwrite fields sharing the same computed row+col.
                   const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
                   for (let c = 0; c < section.columns; c++) {
                     columnArrays[c] = section.fields
@@ -408,43 +408,81 @@ export default function RecordDetailPage({
                       .filter((entry) => entry.fieldDef != null);
                   }
 
+                  // Determine if every field in this section is empty
+                  const allFieldsEmpty = columnArrays.every((col) =>
+                    col.every(({ layoutField, fieldDef }) => {
+                      const v = getRecordValue(layoutField.apiName, fieldDef);
+                      return v === undefined || v === null || v === '' || v === 'N/A';
+                    })
+                  );
+
+                  const sectionKey = `${ti}-${si}`;
+                  // User toggles override; otherwise auto-collapse empty sections
+                  const isCollapsed = sectionToggles[sectionKey] !== undefined
+                    ? !sectionToggles[sectionKey]
+                    : allFieldsEmpty;
+
+                  const toggleSection = () => {
+                    setSectionToggles((prev) => ({
+                      ...prev,
+                      [sectionKey]: isCollapsed, // flip: if collapsed, expand → true
+                    }));
+                  };
+
                   return (
                     <div key={si} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
-                      <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
-                        <h3 className="font-medium text-gray-900">{section.label}</h3>
-                      </div>
-                      <div className="p-6">
-                        <div
-                          className={`grid gap-6 ${
-                            section.columns === 1
-                              ? 'grid-cols-1'
-                              : section.columns === 2
-                              ? 'grid-cols-1 md:grid-cols-2'
-                              : 'grid-cols-1 md:grid-cols-3'
-                          }`}
-                        >
-                          {columnArrays.map((colFields, colIdx) => (
-                            <div key={`col-${colIdx}`} className="flex flex-col gap-4">
-                              {colFields.map(({ layoutField, fieldDef }) => {
-                                const value = getRecordValue(layoutField.apiName, fieldDef);
-                                return (
-                                  <div key={layoutField.apiName}>
-                                    <dt className="text-sm font-medium text-gray-700">
-                                      {fieldDef.label}
-                                      {fieldDef.required && (
-                                        <span className="text-red-500 ml-1">*</span>
-                                      )}
-                                    </dt>
-                                    <dd className="mt-1 text-sm text-gray-900">
-                                      {renderValue(layoutField.apiName, value, fieldDef)}
-                                    </dd>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
+                      <button
+                        type="button"
+                        onClick={toggleSection}
+                        className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-medium text-gray-900">{section.label}</h3>
+                          {allFieldsEmpty && isCollapsed && (
+                            <span className="text-xs text-gray-400 font-normal">(no data)</span>
+                          )}
                         </div>
-                      </div>
+                        {isCollapsed ? (
+                          <ChevronRight className="h-4 w-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+
+                      {!isCollapsed && (
+                        <div className="p-6">
+                          <div
+                            className={`grid gap-6 ${
+                              section.columns === 1
+                                ? 'grid-cols-1'
+                                : section.columns === 2
+                                ? 'grid-cols-1 md:grid-cols-2'
+                                : 'grid-cols-1 md:grid-cols-3'
+                            }`}
+                          >
+                            {columnArrays.map((colFields, colIdx) => (
+                              <div key={`col-${colIdx}`} className="flex flex-col gap-4">
+                                {colFields.map(({ layoutField, fieldDef }) => {
+                                  const value = getRecordValue(layoutField.apiName, fieldDef);
+                                  return (
+                                    <div key={layoutField.apiName}>
+                                      <dt className="text-sm font-medium text-gray-700">
+                                        {fieldDef.label}
+                                        {fieldDef.required && (
+                                          <span className="text-red-500 ml-1">*</span>
+                                        )}
+                                      </dt>
+                                      <dd className="mt-1 text-sm text-gray-900">
+                                        {renderValue(layoutField.apiName, value, fieldDef)}
+                                      </dd>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
