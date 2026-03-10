@@ -8,7 +8,7 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue } from '@/lib/utils';
-import { PageLayout, FieldDef, ObjectDef } from '@/lib/schema';
+import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 
 interface RecordDetailPageProps {
@@ -103,8 +103,20 @@ export default function RecordDetailPage({
   const pageLayout = resolveLayout();
 
   // ── Helpers ──────────────────────────────────────────────────────────
-  const getFieldDef = (apiName: string): FieldDef | undefined =>
-    objectDef?.fields.find((f) => f.apiName === apiName);
+  const getFieldDef = (apiName: string, layoutField?: PageField): FieldDef | undefined => {
+    // Self-contained path: use enriched layout field data directly
+    if (layoutField && layoutField.type && layoutField.label) {
+      const { column, order, ...fieldProps } = layoutField;
+      return {
+        id: fieldProps.id || apiName,
+        ...fieldProps,
+        apiName,
+        type: normalizeFieldType(fieldProps.type!),
+      } as FieldDef;
+    }
+    // Fallback: cross-reference object fields
+    return objectDef?.fields.find((f) => f.apiName === apiName);
+  };
 
   /** Read a value from the flattened record, trying prefixed then stripped key. */
   const getRecordValue = (apiName: string, fieldDef?: FieldDef): any => {
@@ -383,13 +395,18 @@ export default function RecordDetailPage({
             {pageLayout.tabs.map((tab, ti) => (
               <div key={ti}>
                 {tab.sections.map((section, si) => {
-                  // Group fields into rows (order / columns)
-                  const rows: Record<number, Record<number, (typeof section.fields)[0]>> = {};
-                  section.fields.forEach((f) => {
-                    const row = Math.floor(f.order / section.columns);
-                    if (!rows[row]) rows[row] = {};
-                    rows[row][f.column] = f;
-                  });
+                  // Column-based layout: group fields by column, sorted by
+                  // order within each column (same approach as DynamicForm).
+                  // This avoids the row-based Math.floor() approach that could
+                  // silently overwrite fields sharing the same computed row+col.
+                  const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
+                  for (let c = 0; c < section.columns; c++) {
+                    columnArrays[c] = section.fields
+                      .filter((f) => f.column === c)
+                      .sort((a, b) => a.order - b.order)
+                      .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+                      .filter((entry) => entry.fieldDef != null);
+                  }
 
                   return (
                     <div key={si} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
@@ -397,50 +414,35 @@ export default function RecordDetailPage({
                         <h3 className="font-medium text-gray-900">{section.label}</h3>
                       </div>
                       <div className="p-6">
-                        <div className="space-y-6">
-                          {Object.keys(rows)
-                            .sort((a, b) => +a - +b)
-                            .map((rowKey) => {
-                              const rowData = rows[+rowKey];
-                              if (!rowData) return null;
-                              const cells = Object.keys(rowData)
-                                .sort((a, b) => +a - +b)
-                                .map((col) => rowData[+col])
-                                .filter((f): f is NonNullable<typeof f> => Boolean(f));
-
-                              return (
-                                <div
-                                  key={rowKey}
-                                  className={`grid gap-6 ${
-                                    section.columns === 1
-                                      ? 'grid-cols-1'
-                                      : section.columns === 2
-                                      ? 'grid-cols-1 md:grid-cols-2'
-                                      : 'grid-cols-1 md:grid-cols-3'
-                                  }`}
-                                >
-                                  {cells.map((layoutField) => {
-                                    const fieldDef = getFieldDef(layoutField.apiName);
-                                    if (!fieldDef) return null;
-                                    const value = getRecordValue(layoutField.apiName, fieldDef);
-
-                                    return (
-                                      <div key={layoutField.apiName}>
-                                        <dt className="text-sm font-medium text-gray-700">
-                                          {fieldDef.label}
-                                          {fieldDef.required && (
-                                            <span className="text-red-500 ml-1">*</span>
-                                          )}
-                                        </dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
-                                          {renderValue(layoutField.apiName, value, fieldDef)}
-                                        </dd>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
+                        <div
+                          className={`grid gap-6 ${
+                            section.columns === 1
+                              ? 'grid-cols-1'
+                              : section.columns === 2
+                              ? 'grid-cols-1 md:grid-cols-2'
+                              : 'grid-cols-1 md:grid-cols-3'
+                          }`}
+                        >
+                          {columnArrays.map((colFields, colIdx) => (
+                            <div key={`col-${colIdx}`} className="flex flex-col gap-4">
+                              {colFields.map(({ layoutField, fieldDef }) => {
+                                const value = getRecordValue(layoutField.apiName, fieldDef);
+                                return (
+                                  <div key={layoutField.apiName}>
+                                    <dt className="text-sm font-medium text-gray-700">
+                                      {fieldDef.label}
+                                      {fieldDef.required && (
+                                        <span className="text-red-500 ml-1">*</span>
+                                      )}
+                                    </dt>
+                                    <dd className="mt-1 text-sm text-gray-900">
+                                      {renderValue(layoutField.apiName, value, fieldDef)}
+                                    </dd>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
