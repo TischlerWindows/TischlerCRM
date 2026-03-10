@@ -139,7 +139,17 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
   const handleTypeSelect = (type: FieldType) => {
     setSelectedType(type);
-    setFormData({ ...formData, type });
+    // Reset type-specific data when changing types to avoid stale config
+    setFormData({
+      ...formData,
+      type,
+      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' ? formData.picklistValues : [],
+      lookupObject: type === 'Lookup' ? formData.lookupObject : '',
+      relationshipName: type === 'Lookup' ? formData.relationshipName : '',
+      formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
+      displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
+      maxLength: type === 'Text' || type === 'LongTextArea' || type === 'RichTextArea' ? formData.maxLength : 255,
+    });
     setShowTypeSelector(false);
   };
 
@@ -461,14 +471,12 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         {FIELD_TYPES.find(t => t.value === selectedType)?.label}
                       </span>
                     </div>
-                    {!editingField && (
-                      <button
-                        onClick={() => setShowTypeSelector(true)}
-                        className="text-sm text-brand-navy hover:text-brand-dark font-medium"
-                      >
-                        Change Type
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setShowTypeSelector(true)}
+                      className="text-sm text-brand-navy hover:text-brand-dark font-medium"
+                    >
+                      Change Type
+                    </button>
                   </div>
 
                   {/* Basic Information */}
