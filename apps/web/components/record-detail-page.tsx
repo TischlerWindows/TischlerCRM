@@ -416,17 +416,28 @@ export default function RecordDetailPage({
                     })
                   );
 
+                  // Completely hide sections that are admin-hidden or have no data
+                  if (section.showInRecord === false) return null;
+                  if (allFieldsEmpty) return null;
+
                   const sectionKey = `${ti}-${si}`;
-                  // User toggles override; otherwise auto-collapse empty sections
-                  const isCollapsed = sectionToggles[sectionKey] !== undefined
-                    ? !sectionToggles[sectionKey]
-                    : allFieldsEmpty;
+                  const isCollapsed = sectionToggles[sectionKey] === false;
 
                   const toggleSection = () => {
                     setSectionToggles((prev) => ({
                       ...prev,
-                      [sectionKey]: isCollapsed, // flip: if collapsed, expand → true
+                      [sectionKey]: !isCollapsed ? false : undefined!,
                     }));
+                    // Clean up undefined entries
+                    if (!isCollapsed) {
+                      setSectionToggles((prev) => ({ ...prev, [sectionKey]: false }));
+                    } else {
+                      setSectionToggles((prev) => {
+                        const next = { ...prev };
+                        delete next[sectionKey];
+                        return next;
+                      });
+                    }
                   };
 
                   return (
@@ -436,12 +447,7 @@ export default function RecordDetailPage({
                         onClick={toggleSection}
                         className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
                       >
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-gray-900">{section.label}</h3>
-                          {allFieldsEmpty && isCollapsed && (
-                            <span className="text-xs text-gray-400 font-normal">(no data)</span>
-                          )}
-                        </div>
+                        <h3 className="font-medium text-gray-900">{section.label}</h3>
                         {isCollapsed ? (
                           <ChevronRight className="h-4 w-4 text-gray-500" />
                         ) : (

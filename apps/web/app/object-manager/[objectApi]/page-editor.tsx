@@ -77,6 +77,7 @@ interface CanvasSection {
   order: number;
   collapsed: boolean;
   visibleIf?: ConditionExpr[];
+  showInRecord: boolean;
 }
 
 interface CanvasTab {
@@ -102,6 +103,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       columns: 2,
       order: 0,
       collapsed: false,
+      showInRecord: true,
     },
   ]);
   const [fields, setFields] = useState<CanvasField[]>([]);
@@ -433,6 +435,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       columns: 2,
       order: sections.filter((s) => s.tabId === activeTab).length,
       collapsed: false,
+      showInRecord: true,
     };
     setSections([...sections, newSection]);
   };
@@ -524,6 +527,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                 return { ...rest, ...base };
               }),
             visibleIf: section.visibleIf,
+            showInRecord: section.showInRecord,
           })),
       })),
     };
@@ -621,6 +625,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           columns: 2,
           order: 0,
           collapsed: false,
+          showInRecord: true,
         },
       ]);
       setFields([]);
@@ -652,6 +657,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           order: section.order,
           collapsed: false,
           visibleIf: section.visibleIf,
+          showInRecord: section.showInRecord !== false, // default true
         });
 
         section.fields.forEach((field) => {
@@ -1293,6 +1299,31 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                   </div>
                   <div className="space-y-2">
                   </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="showInRecord"
+                      checked={sections.find((s) => s.id === selectedElement.id)?.showInRecord ?? true}
+                      onChange={(e) => {
+                        setSections((prev) =>
+                          prev.map((s) =>
+                            s.id === selectedElement.id
+                              ? { ...s, showInRecord: e.target.checked }
+                              : s
+                          )
+                        );
+                      }}
+                      className="h-4 w-4 text-brand-navy border-gray-300 rounded"
+                    />
+                    <Label htmlFor="showInRecord" className="mb-0 text-sm">
+                      Show in Record View
+                    </Label>
+                  </div>
+                  {!sections.find((s) => s.id === selectedElement.id)?.showInRecord && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      This section will be hidden on the record detail page.
+                    </p>
+                  )}
                 </div>
               )}
 

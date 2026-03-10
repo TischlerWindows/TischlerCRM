@@ -137,6 +137,8 @@ export interface PageSection {
   order: number;
   fields: PageField[];
   visibleIf?: ConditionExpr[];
+  /** When false, the section is completely hidden on the record detail view */
+  showInRecord?: boolean;
 }
 
 /**
