@@ -172,6 +172,36 @@ export default function DynamicForm({
     })();
   }, [object, layout]);
 
+  // ── Debug: log layout resolution for Lead on every render ──
+  useEffect(() => {
+    if (objectApiName !== 'Lead') return;
+    const fieldNames = object?.fields.map((f: any) => f.apiName) || [];
+    console.group('[DynamicForm DEBUG] Lead render');
+    console.log('object found:', !!object, 'layout found:', !!layout);
+    console.log('layoutId prop:', layoutId);
+    console.log('layout id:', layout?.id, 'name:', layout?.name);
+    console.log('total object fields:', fieldNames.length);
+    if (layout) {
+      layout.tabs.forEach((tab: any, ti: number) => {
+        console.log(`  Tab ${ti}: id=${tab.id} label="${tab.label}"`);
+        tab.sections.forEach((sec: any, si: number) => {
+          const resolved = (sec.fields || []).map((f: any) => {
+            const found = object?.fields.find((fd: any) => fd.apiName === f.apiName);
+            return { apiName: f.apiName, col: f.column, order: f.order, resolved: !!found, type: found?.type };
+          });
+          const statusField = resolved.find((r: any) => r.apiName === 'Lead__status');
+          console.log(`    Section ${si}: "${sec.label}" fields=${resolved.length}`,
+            statusField ? `STATUS ✓ col=${statusField.col} order=${statusField.order}` : 'STATUS ✗');
+          const unresolved = resolved.filter((r: any) => !r.resolved);
+          if (unresolved.length) console.warn('      unresolved:', unresolved.map((u: any) => u.apiName));
+        });
+      });
+    }
+    console.log('activeTab:', activeTab);
+    console.log('Lead__status field def:', object?.fields.find((f: any) => f.apiName === 'Lead__status'));
+    console.groupEnd();
+  }, [object, layout, activeTab, objectApiName, layoutId]);
+
   if (!object || !layout) {
     return (
       <div className="p-6 text-center text-gray-500">
