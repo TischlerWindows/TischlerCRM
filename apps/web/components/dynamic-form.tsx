@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { PageLayout, FieldDef, FieldType, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
@@ -122,6 +122,7 @@ export default function DynamicForm({
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
+  const stepIndicatorRef = useRef<HTMLDivElement>(null);
   const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
   const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
   // Inline record creation from lookup fields
@@ -548,6 +549,19 @@ export default function DynamicForm({
   })();
 
   const isWizardMode = layoutType === 'create' && wizardSections.length > 1;
+
+  // Auto-scroll wizard step indicator to keep the active step visible
+  useEffect(() => {
+    if (!isWizardMode || !stepIndicatorRef.current) return;
+    const container = stepIndicatorRef.current;
+    const activeStep = container.querySelector('[data-active-step="true"]') as HTMLElement;
+    if (activeStep) {
+      const containerRect = container.getBoundingClientRect();
+      const stepRect = activeStep.getBoundingClientRect();
+      const scrollLeft = activeStep.offsetLeft - containerRect.width / 2 + stepRect.width / 2;
+      container.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'smooth' });
+    }
+  }, [currentStep, isWizardMode]);
 
   const handleNextStep = () => {
     if (currentStep < wizardSections.length - 1) {
@@ -1128,11 +1142,19 @@ export default function DynamicForm({
       {/* Wizard Step Indicator (create mode with multiple sections) */}
       {isWizardMode && (
         <div className="px-6 pt-5 pb-3 bg-white border-b">
-          <div className="flex items-center justify-between">
+          <div
+            ref={stepIndicatorRef}
+            className="flex items-center overflow-x-auto scrollbar-hide"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {wizardSections.map((ws, index) => (
               <React.Fragment key={ws.section.id}>
                 {/* Step circle + label */}
-                <div className="flex flex-col items-center" style={{ minWidth: 0, flex: '0 0 auto' }}>
+                <div
+                  className="flex flex-col items-center flex-shrink-0"
+                  style={{ width: 100 }}
+                  data-active-step={index === currentStep ? 'true' : undefined}
+                >
                   <div
                     className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
@@ -1145,7 +1167,7 @@ export default function DynamicForm({
                   </div>
                   <span
                     className={cn(
-                      'text-xs mt-1.5 text-center max-w-[100px] truncate',
+                      'text-xs mt-1.5 text-center w-full truncate px-1',
                       index === currentStep ? 'text-brand-navy font-semibold' : 'text-gray-500'
                     )}
                     title={ws.section.label}
@@ -1157,9 +1179,10 @@ export default function DynamicForm({
                 {index < wizardSections.length - 1 && (
                   <div
                     className={cn(
-                      'flex-1 h-0.5 mx-2 mt-[-16px]',
+                      'h-0.5 flex-shrink-0 mt-[-16px]',
                       index < currentStep ? 'bg-green-500' : 'bg-gray-200'
                     )}
+                    style={{ width: 24 }}
                   />
                 )}
               </React.Fragment>
