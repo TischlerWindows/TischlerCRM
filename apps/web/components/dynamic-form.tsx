@@ -72,6 +72,22 @@ export default function DynamicForm({
         }
       }
 
+      // For create mode, initialise fields with their schema-defined
+      // defaultValue so picklists start pre-selected (e.g. Status → "Not Contacted")
+      // instead of blank "-- Select --" which would auto-fill to "N/A" on save.
+      if (layoutType === 'create') {
+        for (const field of obj.fields) {
+          if (field.defaultValue !== undefined && data[field.apiName] === undefined) {
+            data[field.apiName] = field.defaultValue;
+            // Also mirror the stripped key
+            const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+            if (stripped !== field.apiName && data[stripped] === undefined) {
+              data[stripped] = field.defaultValue;
+            }
+          }
+        }
+      }
+
       // Construct composite values from individual sub-fields if the
       // composite key is missing (e.g. Contact Name from first/last).
       if (layoutType === 'edit') {
@@ -449,19 +465,24 @@ export default function DynamicForm({
       if (object) {
         for (const field of object.fields) {
           if (field.required && !completeData[field.apiName]) {
-            // Use type-aware defaults that pass all validation rules
-            switch (field.type) {
-              case 'Number':
-              case 'Currency':
-              case 'Percent':
-                completeData[field.apiName] = 0;
-                break;
-              case 'Checkbox':
-                completeData[field.apiName] = false;
-                break;
-              default:
-                completeData[field.apiName] = 'N/A';
-                break;
+            // Prefer the field's own defaultValue over generic fallbacks
+            if (field.defaultValue !== undefined) {
+              completeData[field.apiName] = field.defaultValue;
+            } else {
+              // Use type-aware defaults that pass all validation rules
+              switch (field.type) {
+                case 'Number':
+                case 'Currency':
+                case 'Percent':
+                  completeData[field.apiName] = 0;
+                  break;
+                case 'Checkbox':
+                  completeData[field.apiName] = false;
+                  break;
+                default:
+                  completeData[field.apiName] = 'N/A';
+                  break;
+              }
             }
           }
         }
