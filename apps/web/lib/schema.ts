@@ -7,7 +7,7 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address" | "CompositeText";
+  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -42,6 +42,7 @@ export function normalizeFieldType(raw: string): FieldType {
     url: 'URL',
     address: 'Address',
     compositetext: 'CompositeText',
+    autouser: 'AutoUser',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }

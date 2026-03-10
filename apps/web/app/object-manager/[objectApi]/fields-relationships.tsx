@@ -54,6 +54,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'AutoNumber', label: 'Auto Number', description: 'A system-generated sequence number that uses a display format you define. The number is automatically incremented for each new record.', category: 'System', icon: Hash },
   { value: 'Formula', label: 'Formula', description: 'A read-only field that derives its value from a formula expression you define. The formula field is updated when any of the source fields change.', category: 'System', icon: Calculator },
   { value: 'RollupSummary', label: 'Roll-Up Summary', description: 'A read-only field that displays the sum, minimum, or maximum value of a field in a related list or the record count of all records listed in a related list.', category: 'System', icon: TrendingUp },
+  { value: 'AutoUser', label: 'Auto User', description: 'Automatically captures the current user when a record is created. Displays the user name as a read-only value.', category: 'System', icon: Eye },
   
   // Relationship
   { value: 'Lookup', label: 'Lookup Relationship', description: 'Creates a relationship that links this object to another object. The relationship field allows users to click on a lookup icon to select a value from a popup list. The other object is the source of the values in the list.', category: 'Relationship', icon: LinkIcon },
