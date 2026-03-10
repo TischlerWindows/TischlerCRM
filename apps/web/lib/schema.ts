@@ -139,6 +139,8 @@ export interface PageSection {
   visibleIf?: ConditionExpr[];
   /** When false, the section is completely hidden on the record detail view */
   showInRecord?: boolean;
+  /** When false, the section is hidden in the create/edit form template */
+  showInTemplate?: boolean;
 }
 
 /**

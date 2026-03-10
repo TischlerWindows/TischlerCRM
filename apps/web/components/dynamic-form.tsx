@@ -539,7 +539,7 @@ export default function DynamicForm({
         .sort((a, b) => a.order - b.order)
         .forEach((section) => {
           const isVisible = evaluateVisibility(section.visibleIf, formData);
-          if (isVisible) {
+          if (isVisible && section.showInTemplate !== false) {
             allSections.push({ section, tabLabel: tab.label });
           }
         });
@@ -1211,6 +1211,7 @@ export default function DynamicForm({
             .map((section) => {
               const isSectionVisible = evaluateVisibility(section.visibleIf, formData);
               if (!isSectionVisible) return null;
+              if (section.showInTemplate === false) return null;
 
               const isCollapsed = collapsedSections.has(section.id);
 

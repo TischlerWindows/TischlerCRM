@@ -78,6 +78,7 @@ interface CanvasSection {
   collapsed: boolean;
   visibleIf?: ConditionExpr[];
   showInRecord: boolean;
+  showInTemplate: boolean;
 }
 
 interface CanvasTab {
@@ -104,6 +105,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       order: 0,
       collapsed: false,
       showInRecord: true,
+      showInTemplate: true,
     },
   ]);
   const [fields, setFields] = useState<CanvasField[]>([]);
@@ -436,6 +438,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       order: sections.filter((s) => s.tabId === activeTab).length,
       collapsed: false,
       showInRecord: true,
+      showInTemplate: true,
     };
     setSections([...sections, newSection]);
   };
@@ -528,6 +531,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               }),
             visibleIf: section.visibleIf,
             showInRecord: section.showInRecord,
+            showInTemplate: section.showInTemplate,
           })),
       })),
     };
@@ -626,6 +630,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           order: 0,
           collapsed: false,
           showInRecord: true,
+          showInTemplate: true,
         },
       ]);
       setFields([]);
@@ -657,7 +662,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           order: section.order,
           collapsed: false,
           visibleIf: section.visibleIf,
-          showInRecord: section.showInRecord !== false, // default true
+          showInRecord: section.showInRecord !== false,
+          showInTemplate: section.showInTemplate !== false,
         });
 
         section.fields.forEach((field) => {
@@ -1322,6 +1328,31 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                   {!sections.find((s) => s.id === selectedElement.id)?.showInRecord && (
                     <p className="text-xs text-amber-600 mt-1">
                       This section will be hidden on the record detail page.
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="showInTemplate"
+                      checked={sections.find((s) => s.id === selectedElement.id)?.showInTemplate ?? true}
+                      onChange={(e) => {
+                        setSections((prev) =>
+                          prev.map((s) =>
+                            s.id === selectedElement.id
+                              ? { ...s, showInTemplate: e.target.checked }
+                              : s
+                          )
+                        );
+                      }}
+                      className="h-4 w-4 text-brand-navy border-gray-300 rounded"
+                    />
+                    <Label htmlFor="showInTemplate" className="mb-0 text-sm">
+                      Show in Record Template
+                    </Label>
+                  </div>
+                  {!sections.find((s) => s.id === selectedElement.id)?.showInTemplate && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      This section will be hidden when creating/editing records.
                     </p>
                   )}
                 </div>
