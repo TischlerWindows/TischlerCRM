@@ -511,11 +511,18 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             order: section.order,
             fields: fields
               .filter((f) => f.sectionId === section.id)
-              .map((f) => ({
-                apiName: f.fieldApiName,
-                column: f.column,
-                order: f.order,
-              })),
+              .map((f) => {
+                // Embed full FieldDef so layouts are self-contained
+                const fieldDef = object.fields.find((fd) => fd.apiName === f.fieldApiName);
+                const base = {
+                  apiName: f.fieldApiName,
+                  column: f.column,
+                  order: f.order,
+                };
+                if (!fieldDef) return base;
+                const { apiName, ...rest } = fieldDef;
+                return { ...rest, ...base };
+              }),
             visibleIf: section.visibleIf,
           })),
       })),

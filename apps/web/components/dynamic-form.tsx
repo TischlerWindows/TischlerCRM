@@ -165,10 +165,16 @@ export default function DynamicForm({
     layout.tabs.forEach(tab => {
       tab.sections.forEach(section => {
         section.fields.forEach(field => {
-          const fieldDef = object.fields.find(f => f.apiName === field.apiName);
-          if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup')) {
-            const relatedObject = (fieldDef as any).relatedObject as string | undefined;
-            const target = fieldDef.lookupObject || fieldDef.relationship?.targetObject || relatedObject;
+          // Use embedded layout field data (self-contained) first, then fallback
+          const fieldType = field.type || object.fields.find(f => f.apiName === field.apiName)?.type;
+          if (fieldType === 'Lookup' || fieldType === 'ExternalLookup') {
+            const target = (field as any).lookupObject
+              || (field as any).relationship?.targetObject
+              || (field as any).relatedObject
+              || (() => {
+                const fd = object.fields.find(f => f.apiName === field.apiName);
+                return fd?.lookupObject || fd?.relationship?.targetObject || (fd as any)?.relatedObject;
+              })();
             if (target) targetApis.add(target);
           }
         });
@@ -188,36 +194,6 @@ export default function DynamicForm({
     })();
   }, [object, layout]);
 
-  // ── Debug: log layout resolution for Lead on every render ──
-  useEffect(() => {
-    if (objectApiName !== 'Lead') return;
-    const fieldNames = object?.fields.map((f: any) => f.apiName) || [];
-    console.group('[DynamicForm DEBUG] Lead render');
-    console.log('object found:', !!object, 'layout found:', !!layout);
-    console.log('layoutId prop:', layoutId);
-    console.log('layout id:', layout?.id, 'name:', layout?.name);
-    console.log('total object fields:', fieldNames.length);
-    if (layout) {
-      layout.tabs.forEach((tab: any, ti: number) => {
-        console.log(`  Tab ${ti}: id=${tab.id} label="${tab.label}"`);
-        tab.sections.forEach((sec: any, si: number) => {
-          const resolved = (sec.fields || []).map((f: any) => {
-            const found = object?.fields.find((fd: any) => fd.apiName === f.apiName);
-            return { apiName: f.apiName, col: f.column, order: f.order, resolved: !!found, type: found?.type };
-          });
-          const statusField = resolved.find((r: any) => r.apiName === 'Lead__status');
-          console.log(`    Section ${si}: "${sec.label}" fields=${resolved.length}`,
-            statusField ? `STATUS ✓ col=${statusField.col} order=${statusField.order}` : 'STATUS ✗');
-          const unresolved = resolved.filter((r: any) => !r.resolved);
-          if (unresolved.length) console.warn('      unresolved:', unresolved.map((u: any) => u.apiName));
-        });
-      });
-    }
-    console.log('activeTab:', activeTab);
-    console.log('Lead__status field def:', object?.fields.find((f: any) => f.apiName === 'Lead__status'));
-    console.groupEnd();
-  }, [object, layout, activeTab, objectApiName, layoutId]);
-
   if (!object || !layout) {
     return (
       <div className="p-6 text-center text-gray-500">
@@ -228,11 +204,23 @@ export default function DynamicForm({
     );
   }
 
-  const getFieldDef = (apiName: string): FieldDef | undefined => {
+  const getFieldDef = (apiName: string, pageField?: import('@/lib/schema').PageField): FieldDef | undefined => {
+    // Self-contained path: if the PageField carries embedded type & label
+    // (populated by enrichLayoutFieldDefs on schema load), build the
+    // FieldDef directly from it — no cross-referencing object.fields.
+    if (pageField && pageField.type && pageField.label) {
+      const { column, order, ...fieldProps } = pageField;
+      return {
+        id: fieldProps.id || apiName,
+        ...fieldProps,
+        apiName,
+        type: normalizeFieldType(fieldProps.type!),
+      } as FieldDef;
+    }
+
+    // Fallback: cross-reference object.fields (backward compatibility)
     const raw = object.fields.find((f) => f.apiName === apiName);
     if (!raw) return undefined;
-    // Normalise the type so DB variants like "text", "datetime",
-    // "MultiSelectPicklist" map to the canonical FieldType values.
     return { ...raw, type: normalizeFieldType(raw.type) };
   };
 
@@ -374,7 +362,7 @@ export default function DynamicForm({
     layout.tabs.forEach((tab) => {
       tab.sections.forEach((section) => {
         section.fields.forEach((field) => {
-          const fieldDef = getFieldDef(field.apiName);
+          const fieldDef = getFieldDef(field.apiName, field);
           if (!fieldDef) return;
 
           const value = formData[field.apiName];
@@ -1018,7 +1006,7 @@ export default function DynamicForm({
               columnArrays[i] = section.fields
                 .filter((f) => f.column === i)
                 .sort((a, b) => a.order - b.order)
-                .map((f) => getFieldDef(f.apiName))
+                .map((f) => getFieldDef(f.apiName, f))
                 .filter((f): f is FieldDef => f !== undefined);
             }
 

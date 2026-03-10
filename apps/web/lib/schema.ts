@@ -138,11 +138,19 @@ export interface PageSection {
   visibleIf?: ConditionExpr[];
 }
 
-export interface PageField {
+/**
+ * A field reference inside a page layout section.
+ *
+ * Self-contained: every rendering-relevant property from the parent
+ * FieldDef is embedded directly so DynamicForm never needs to cross-
+ * reference `object.fields` at render time.  The enrichment happens
+ * once during schema load (see `enrichLayoutFieldDefs` in schema-service).
+ */
+export type PageField = {
   apiName: string;
   column: number;
   order: number;
-}
+} & Partial<Omit<FieldDef, 'apiName'>>;
 
 export interface PageTab {
   id: string;

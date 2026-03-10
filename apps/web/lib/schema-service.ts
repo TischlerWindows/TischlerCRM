@@ -477,6 +477,10 @@ class LocalStorageSchemaService implements SchemaService {
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
 
+        // Self-contained layouts: embed full FieldDef into every PageField
+        // so DynamicForm never needs to cross-reference object.fields.
+        migratedSchema = this.enrichLayoutFieldDefs(migratedSchema);
+
         // Ensure all default objects exist — if the schema was saved when some
         // objects were missing (e.g. partial save), merge them back in
         const defaultSchema = this.createSampleData();
@@ -925,6 +929,36 @@ class LocalStorageSchemaService implements SchemaService {
       objects,
       updatedAt: new Date().toISOString()
     };
+  }
+
+  /**
+   * Enrich every PageField inside every layout with the full FieldDef
+   * properties from the parent object.  After this step, each PageField
+   * carries its own label, type, required flag, picklist values, etc.
+   * so DynamicForm can render without cross-referencing object.fields.
+   *
+   * Runs on every schema load (fast, in-memory only — not persisted)
+   * so field definition changes propagate automatically.
+   */
+  private enrichLayoutFieldDefs(schema: OrgSchema): OrgSchema {
+    for (const obj of schema.objects) {
+      const fieldMap = new Map(obj.fields.map(f => [f.apiName, f]));
+      for (const layout of obj.pageLayouts || []) {
+        for (const tab of layout.tabs || []) {
+          for (const section of tab.sections || []) {
+            section.fields = (section.fields || []).map(pf => {
+              const fieldDef = fieldMap.get(pf.apiName);
+              if (!fieldDef) return pf; // field not found — leave as-is
+              // Spread the full FieldDef, then overlay the layout-specific
+              // positioning (column, order) on top.
+              const { apiName, ...rest } = fieldDef;
+              return { ...rest, ...pf, type: normalizeFieldType(fieldDef.type) };
+            });
+          }
+        }
+      }
+    }
+    return schema;
   }
 
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
