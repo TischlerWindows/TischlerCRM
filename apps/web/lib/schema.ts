@@ -70,7 +70,7 @@ export interface FieldDef {
   helpText?: string;
   controllingField?: string; // for dependent picklists
   visibleIf?: ConditionExpr[]; // conditional visibility rules
-  picklistDependencies?: { [value: string]: ConditionExpr[] }; // per-value visibility for picklist options
+  picklistDependencies?: PicklistDependencyRule[]; // conditional visibility for picklist values
   formulaExpr?: string;        // for formula fields
   lookupObject?: string;       // target object for lookup fields
   relationshipName?: string;   // name to display for relationship
@@ -218,6 +218,12 @@ export type ConditionExpr = {
   left: string; 
   op: "==" | "!=" | ">" | "<" | ">=" | "<=" | "IN" | "INCLUDES" | "CONTAINS" | "STARTS_WITH"; 
   right: any;
+};
+
+/** A dependency rule for picklist values: when ALL conditions are met, show the listed values */
+export type PicklistDependencyRule = {
+  conditions: ConditionExpr[];
+  values: string[];
 };
 
 // Helper types for UI components

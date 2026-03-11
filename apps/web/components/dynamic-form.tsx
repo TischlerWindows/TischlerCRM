@@ -789,11 +789,20 @@ export default function DynamicForm({
 
     // Helper: filter picklist values by picklistDependencies
     const filterPicklistValues = (values: string[]) => {
-      if (!fieldDef.picklistDependencies) return values;
+      const rules = fieldDef.picklistDependencies;
+      if (!rules || rules.length === 0) return values;
+
+      // Collect all values that are governed by at least one rule
+      const governedValues = new Set<string>();
+      rules.forEach(r => r.values.forEach(v => governedValues.add(v)));
+
       return values.filter((val) => {
-        const conditions = fieldDef.picklistDependencies?.[val];
-        if (!conditions || conditions.length === 0) return true; // No rules = always show
-        return evaluateVisibility(conditions, formData, visibilityCtx);
+        // If no rule mentions this value, always show it
+        if (!governedValues.has(val)) return true;
+        // Show if ANY rule containing this value has all its conditions met
+        return rules.some(
+          (r) => r.values.includes(val) && evaluateVisibility(r.conditions, formData, visibilityCtx)
+        );
       });
     };
 

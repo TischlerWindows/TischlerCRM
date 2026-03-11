@@ -25,7 +25,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useSchemaStore } from '@/lib/schema-store';
-import { FieldDef, PageLayout, PageTab, PageSection, FieldType, ConditionExpr } from '@/lib/schema';
+import { FieldDef, PageLayout, PageTab, PageSection, FieldType, ConditionExpr, PicklistDependencyRule } from '@/lib/schema';
 import { getSetting } from '@/lib/preferences';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -657,7 +657,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     }
   };
 
-  const handleSavePicklistDependencies = async (dependencies: { [value: string]: ConditionExpr[] }) => {
+  const handleSavePicklistDependencies = async (depRules: PicklistDependencyRule[]) => {
     if (!selectedElement || selectedElement.type !== 'field' || !object) return;
 
     const field = fields.find((f) => f.id === selectedElement.id);
@@ -666,15 +666,12 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
     if (!fieldDef) return;
 
-    // Clean up: remove entries with empty condition arrays
-    const cleaned: { [value: string]: ConditionExpr[] } = {};
-    for (const [val, conds] of Object.entries(dependencies)) {
-      if (conds.length > 0) cleaned[val] = conds;
-    }
+    // Clean: keep only rules with conditions AND values
+    const cleaned = depRules.filter(r => r.conditions.length > 0 && r.values.length > 0);
 
     const updatedFields = object.fields.map((f) =>
       f.apiName === fieldDef.apiName
-        ? { ...f, picklistDependencies: Object.keys(cleaned).length > 0 ? cleaned : undefined }
+        ? { ...f, picklistDependencies: cleaned.length > 0 ? cleaned : undefined }
         : f
     );
 
@@ -1043,6 +1040,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           columns: section.columns,
           order: section.order,
           collapsed: false,
+          visibleIf: section.visibleIf,
+          showInRecord: section.showInRecord !== false,
+          showInTemplate: section.showInTemplate !== false,
         });
 
         section.fields.forEach((field) => {
@@ -1582,16 +1582,16 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                               onClick={() => setShowPicklistDependencyEditor(true)}
                             >
                               <List className="h-4 w-4 mr-2" />
-                              {fieldDef.picklistDependencies && Object.keys(fieldDef.picklistDependencies).length > 0
+                              {fieldDef.picklistDependencies && fieldDef.picklistDependencies.length > 0
                                 ? 'Edit Value Dependencies'
                                 : 'Add Value Dependencies'}
                             </Button>
-                            {fieldDef.picklistDependencies && Object.keys(fieldDef.picklistDependencies).length > 0 && (
+                            {fieldDef.picklistDependencies && fieldDef.picklistDependencies.length > 0 && (
                               <div className="text-xs bg-amber-50 p-2 rounded border border-amber-200">
-                                <div className="font-semibold text-amber-900 mb-1">Dependent Values:</div>
-                                {Object.entries(fieldDef.picklistDependencies).map(([val, conditions], idx) => (
+                                <div className="font-semibold text-amber-900 mb-1">Dependency Rules:</div>
+                                {fieldDef.picklistDependencies.map((rule, idx) => (
                                   <div key={idx} className="text-amber-700">
-                                    • "{val}" — {conditions.length} rule{conditions.length !== 1 ? 's' : ''}
+                                    • Rule {idx + 1}: {rule.conditions.length} condition{rule.conditions.length !== 1 ? 's' : ''} → {rule.values.length} value{rule.values.length !== 1 ? 's' : ''}
                                   </div>
                                 ))}
                               </div>
