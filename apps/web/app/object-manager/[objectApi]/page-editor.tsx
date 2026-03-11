@@ -45,6 +45,8 @@ import {
   Grid2x2,
   Search as SearchIcon,
   X,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 interface PageEditorProps {
@@ -122,6 +124,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [fieldSearchTerm, setFieldSearchTerm] = useState<string>('');
   const [selectedFieldObjects, setSelectedFieldObjects] = useState<string[]>([objectApiName]);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
+  const [showSectionVisibilityEditor, setShowSectionVisibilityEditor] = useState(false);
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
   const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -479,6 +482,26 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const toggleSectionCollapsed = (sectionId: string) => {
     setSections(
       sections.map((s) => (s.id === sectionId ? { ...s, collapsed: !s.collapsed } : s))
+    );
+  };
+
+  const moveSection = (sectionId: string, direction: 'up' | 'down') => {
+    const tabSections = sections
+      .filter((s) => s.tabId === activeTab)
+      .sort((a, b) => a.order - b.order);
+    const idx = tabSections.findIndex((s) => s.id === sectionId);
+    if (idx < 0) return;
+    if (direction === 'up' && idx === 0) return;
+    if (direction === 'down' && idx === tabSections.length - 1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    const currentOrder = tabSections[idx].order;
+    const swapOrder = tabSections[swapIdx].order;
+    setSections(
+      sections.map((s) => {
+        if (s.id === tabSections[idx].id) return { ...s, order: swapOrder };
+        if (s.id === tabSections[swapIdx].id) return { ...s, order: currentOrder };
+        return s;
+      })
     );
   };
 
@@ -905,7 +928,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     );
   };
 
-  const activeSections = sections.filter((s) => s.tabId === activeTab);
+  const activeSections = sections
+    .filter((s) => s.tabId === activeTab)
+    .sort((a, b) => a.order - b.order);
 
   const createNewLayout = () => {
     setEditingLayoutId(null);
@@ -1224,15 +1249,39 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                       ({section.columns} column{section.columns > 1 ? 's' : ''})
                     </span>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSection(section.id);
-                    }}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveSection(section.id, 'up');
+                      }}
+                      className="text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      disabled={activeSections[0]?.id === section.id}
+                      title="Move section up"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveSection(section.id, 'down');
+                      }}
+                      className="text-gray-400 hover:text-gray-700 disabled:opacity-30"
+                      disabled={activeSections[activeSections.length - 1]?.id === section.id}
+                      title="Move section down"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSection(section.id);
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {!section.collapsed && (
@@ -1351,6 +1400,38 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                       This section will be hidden when creating/editing records.
                     </p>
                   )}
+
+                  {/* Section Visibility Rules */}
+                  <div className="space-y-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setShowSectionVisibilityEditor(true)}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      {(sections.find((s) => s.id === selectedElement.id)?.visibleIf?.length ?? 0) > 0
+                        ? 'Edit Visibility Rules'
+                        : 'Add Visibility Rules'}
+                    </Button>
+                    {(() => {
+                      const sec = sections.find((s) => s.id === selectedElement.id);
+                      if (!sec?.visibleIf || sec.visibleIf.length === 0) return null;
+                      return (
+                        <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
+                          <div className="font-semibold text-blue-900 mb-1">Active Rules:</div>
+                          {sec.visibleIf.map((condition, idx) => {
+                            const condField = object?.fields.find(f => f.apiName === condition.left);
+                            return (
+                              <div key={idx} className="text-blue-700">
+                                • {condField?.label || condition.left} {condition.op} {condition.right}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
 
@@ -1446,6 +1527,50 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         </div>
         </div>
       </div>
+
+      {/* Section Visibility Rule Editor Modal */}
+      {showSectionVisibilityEditor && selectedElement && selectedElement.type === 'section' && (() => {
+        const section = sections.find((s) => s.id === selectedElement.id);
+        if (!section) return null;
+        const fakeField = {
+          label: section.label,
+          apiName: section.id,
+          visibleIf: section.visibleIf || [],
+        } as FieldDef;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-lg font-semibold">
+                  Section Visibility Rules: {section.label}
+                </h3>
+                <button
+                  onClick={() => setShowSectionVisibilityEditor(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6">
+                <FieldVisibilityRuleEditor
+                  field={fakeField}
+                  availableFields={object?.fields || []}
+                  onSave={(conditions) => {
+                    setSections(prev =>
+                      prev.map(s =>
+                        s.id === selectedElement.id ? { ...s, visibleIf: conditions } : s
+                      )
+                    );
+                    setShowSectionVisibilityEditor(false);
+                  }}
+                  onCancel={() => setShowSectionVisibilityEditor(false)}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Visibility Rule Editor Modal */}
       {showVisibilityEditor && selectedElement && selectedElement.type === 'field' && (() => {
