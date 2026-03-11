@@ -155,6 +155,7 @@ export function buildApp() {
 
     // Start with department permissions as base
     const deptRaw = (user.department?.permissions as any) || {};
+    const isAdminDept = !!deptRaw.isAdmin;
     const deptObjPerms: Record<string, Record<string, boolean>> = deptRaw.objectPermissions || {};
     const deptAppPerms: Record<string, boolean> = deptRaw.appPermissions || {};
 
@@ -209,8 +210,8 @@ export function buildApp() {
       }
     }
 
-    // ADMIN users always get full access
-    if (user.role === 'ADMIN') {
+    // Admin department or ADMIN role gets full access
+    if (isAdminDept || user.role === 'ADMIN') {
       const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
       // Include all custom objects dynamically
       const customObjects = await prisma.customObject.findMany({ select: { apiName: true } });

@@ -188,27 +188,39 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const appPerms: Record<string, boolean> = { ...(profilePerms.appPermissions || {}) };
     const fieldPerms: Record<string, Record<string, boolean>> = { ...(profilePerms.fieldPermissions || {}) };
 
-    // Apply department ceiling
+    // Admin department — grant full access to all objects
     const deptPerms = (user.department?.permissions as any) || {};
-    if (deptPerms.objectPermissions) {
-      for (const [obj, perms] of Object.entries(deptPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
-        if (!objectPerms[obj]) objectPerms[obj] = {};
-        for (const [action, granted] of Object.entries(perms)) {
-          if (!granted) {
-            // Department denies — enforce ceiling
-            objectPerms[obj][action] = false;
-          } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
-            objectPerms[obj][action] = true;
+    if (deptPerms.isAdmin) {
+      const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
+      const customObjects = await prisma.customObject.findMany({ select: { apiName: true } });
+      for (const obj of customObjects) {
+        objectPerms[obj.apiName] = Object.fromEntries(allActions.map(a => [a, true]));
+      }
+      const allAppPermKeys = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSummary', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
+      for (const p of allAppPermKeys) {
+        appPerms[p] = true;
+      }
+    } else {
+      // Apply department ceiling
+      if (deptPerms.objectPermissions) {
+        for (const [obj, perms] of Object.entries(deptPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
+          if (!objectPerms[obj]) objectPerms[obj] = {};
+          for (const [action, granted] of Object.entries(perms)) {
+            if (!granted) {
+              objectPerms[obj][action] = false;
+            } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
+              objectPerms[obj][action] = true;
+            }
           }
         }
       }
-    }
-    if (deptPerms.appPermissions) {
-      for (const [perm, granted] of Object.entries(deptPerms.appPermissions as Record<string, boolean>)) {
-        if (!granted) {
-          appPerms[perm] = false;
-        } else if (!(perm in appPerms)) {
-          appPerms[perm] = true;
+      if (deptPerms.appPermissions) {
+        for (const [perm, granted] of Object.entries(deptPerms.appPermissions as Record<string, boolean>)) {
+          if (!granted) {
+            appPerms[perm] = false;
+          } else if (!(perm in appPerms)) {
+            appPerms[perm] = true;
+          }
         }
       }
     }

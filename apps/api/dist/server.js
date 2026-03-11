@@ -213,6 +213,23 @@ async function objectRoutes(app2) {
         pageLayouts: true
       }
     });
+    try {
+      const allDepts = await prisma2.department.findMany({ select: { id: true, permissions: true } });
+      const fullPerms = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
+      for (const dept of allDepts) {
+        const perms = dept.permissions || {};
+        if (perms.isAdmin) {
+          const objPerms = perms.objectPermissions || {};
+          objPerms[object.apiName] = fullPerms;
+          await prisma2.department.update({
+            where: { id: dept.id },
+            data: { permissions: { ...perms, objectPermissions: objPerms } }
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to auto-grant admin department permissions:", err);
+    }
     reply.code(201).send(object);
   });
   app2.put("/objects/:apiName", async (req, reply) => {
@@ -665,7 +682,9 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
   });
   if (!user) return false;
   if (!user.department && !user.profile) return true;
-  const deptPerms = user.department?.permissions?.objectPermissions?.[objectApiName];
+  const deptRaw = user.department?.permissions || {};
+  if (deptRaw.isAdmin) return true;
+  const deptPerms = deptRaw.objectPermissions?.[objectApiName];
   if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
     return false;
   }
@@ -2369,24 +2388,36 @@ async function usersAdminRoutes(app2) {
     const appPerms = { ...profilePerms.appPermissions || {} };
     const fieldPerms = { ...profilePerms.fieldPermissions || {} };
     const deptPerms = user.department?.permissions || {};
-    if (deptPerms.objectPermissions) {
-      for (const [obj, perms] of Object.entries(deptPerms.objectPermissions)) {
-        if (!objectPerms[obj]) objectPerms[obj] = {};
-        for (const [action, granted] of Object.entries(perms)) {
-          if (!granted) {
-            objectPerms[obj][action] = false;
-          } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
-            objectPerms[obj][action] = true;
+    if (deptPerms.isAdmin) {
+      const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
+      const customObjects = await prisma13.customObject.findMany({ select: { apiName: true } });
+      for (const obj of customObjects) {
+        objectPerms[obj.apiName] = Object.fromEntries(allActions.map((a) => [a, true]));
+      }
+      const allAppPermKeys = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
+      for (const p of allAppPermKeys) {
+        appPerms[p] = true;
+      }
+    } else {
+      if (deptPerms.objectPermissions) {
+        for (const [obj, perms] of Object.entries(deptPerms.objectPermissions)) {
+          if (!objectPerms[obj]) objectPerms[obj] = {};
+          for (const [action, granted] of Object.entries(perms)) {
+            if (!granted) {
+              objectPerms[obj][action] = false;
+            } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
+              objectPerms[obj][action] = true;
+            }
           }
         }
       }
-    }
-    if (deptPerms.appPermissions) {
-      for (const [perm, granted] of Object.entries(deptPerms.appPermissions)) {
-        if (!granted) {
-          appPerms[perm] = false;
-        } else if (!(perm in appPerms)) {
-          appPerms[perm] = true;
+      if (deptPerms.appPermissions) {
+        for (const [perm, granted] of Object.entries(deptPerms.appPermissions)) {
+          if (!granted) {
+            appPerms[perm] = false;
+          } else if (!(perm in appPerms)) {
+            appPerms[perm] = true;
+          }
         }
       }
     }
@@ -2515,6 +2546,7 @@ function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
     const deptRaw = user.department?.permissions || {};
+    const isAdminDept = !!deptRaw.isAdmin;
     const deptObjPerms = deptRaw.objectPermissions || {};
     const deptAppPerms = deptRaw.appPermissions || {};
     const grantedObjPerms = {};
@@ -2557,7 +2589,7 @@ function buildApp() {
         appPerms[perm] = !!(deptAppPerms[perm] || grantedAppPerms[perm]);
       }
     }
-    if (user.role === "ADMIN") {
+    if (isAdminDept || user.role === "ADMIN") {
       const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
       const customObjects = await prisma14.customObject.findMany({ select: { apiName: true } });
       const allObjectNames = customObjects.map((o) => o.apiName);

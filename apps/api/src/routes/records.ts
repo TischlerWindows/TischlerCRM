@@ -24,9 +24,13 @@ async function checkObjectPermission(
   // If user has no department or profile — no permissions configured yet, allow access
   if (!user.department && !user.profile) return true;
 
+  // Admin departments have full access to every object
+  const deptRaw = (user.department?.permissions as any) || {};
+  if (deptRaw.isAdmin) return true;
+
   // Department restrictions are the CEILING
   // If department explicitly sets this action to false, deny regardless of other sources
-  const deptPerms = (user.department?.permissions as any)?.objectPermissions?.[objectApiName];
+  const deptPerms = deptRaw.objectPermissions?.[objectApiName];
   if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
     return false; // department explicitly denied — cannot be overridden
   }

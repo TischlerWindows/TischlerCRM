@@ -27,6 +27,7 @@ interface ObjectPerms {
 }
 
 interface Permissions {
+  isAdmin?: boolean;
   objectPermissions: Record<string, ObjectPerms>;
   appPermissions: Record<string, boolean>;
 }
@@ -89,6 +90,7 @@ export default function DepartmentsPage() {
   const [formDesc, setFormDesc] = useState('');
   const [formParent, setFormParent] = useState('');
   const [formPerms, setFormPerms] = useState<Permissions>(emptyPermissions());
+  const [formIsAdmin, setFormIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'objects' | 'app'>('details');
 
@@ -112,6 +114,7 @@ export default function DepartmentsPage() {
     setFormDesc('');
     setFormParent('');
     setFormPerms(emptyPermissions());
+    setFormIsAdmin(false);
     setActiveTab('details');
   };
 
@@ -123,7 +126,7 @@ export default function DepartmentsPage() {
         name: formName,
         description: formDesc || null,
         parentId: formParent || null,
-        permissions: formPerms,
+        permissions: { ...formPerms, isAdmin: formIsAdmin },
       });
       setSuccess(`Department "${formName}" created`);
       setShowCreate(false);
@@ -144,7 +147,7 @@ export default function DepartmentsPage() {
         name: formName,
         description: formDesc || null,
         parentId: formParent || null,
-        permissions: formPerms,
+        permissions: { ...formPerms, isAdmin: formIsAdmin },
       });
       setSuccess('Department updated');
       setShowEdit(null);
@@ -179,6 +182,7 @@ export default function DepartmentsPage() {
         }
       : emptyPermissions();
     setFormPerms(perms);
+    setFormIsAdmin(!!(d.permissions as any)?.isAdmin);
     setActiveTab('details');
     setShowEdit(d.id);
   };
@@ -235,7 +239,9 @@ export default function DepartmentsPage() {
 
   const permsSummary = (d: DepartmentRow) => {
     const p = d.permissions;
-    if (!p || !p.objectPermissions) return 'No permissions set';
+    if (!p) return 'No permissions set';
+    if ((p as any).isAdmin) return 'Admin — Full Access';
+    if (!p.objectPermissions) return 'No permissions set';
     const objCount = Object.values(p.objectPermissions).filter((o: any) => o?.read).length;
     return `${objCount}/${CRM_OBJECTS.length} objects`;
   };
@@ -405,6 +411,47 @@ export default function DepartmentsPage() {
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Admin Mode Toggle */}
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={formIsAdmin}
+                        onClick={() => {
+                          const newVal = !formIsAdmin;
+                          setFormIsAdmin(newVal);
+                          if (newVal) {
+                            // Auto-grant all permissions when enabling admin mode
+                            setFormPerms({
+                              ...formPerms,
+                              objectPermissions: Object.fromEntries(
+                                CRM_OBJECTS.map((o) => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true }])
+                              ),
+                              appPermissions: Object.fromEntries(APP_PERMISSIONS.map((p) => [p.key, true])),
+                            });
+                          }
+                        }}
+                        className={`mt-0.5 relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-brand-navy focus:ring-offset-2 ${
+                          formIsAdmin ? 'bg-brand-navy' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                            formIsAdmin ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Admin Mode</label>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Full access to all objects, including any new objects created in the future.
+                          Object and app permission tabs are still editable as overrides.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

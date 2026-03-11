@@ -120,6 +120,26 @@ export async function objectRoutes(app: FastifyInstance) {
       },
     });
 
+    // Auto-grant full permissions on the new object to all "admin" departments
+    try {
+      const allDepts = await prisma.department.findMany({ select: { id: true, permissions: true } });
+      const fullPerms = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
+      for (const dept of allDepts) {
+        const perms = (dept.permissions as any) || {};
+        if (perms.isAdmin) {
+          const objPerms = perms.objectPermissions || {};
+          objPerms[object.apiName] = fullPerms;
+          await prisma.department.update({
+            where: { id: dept.id },
+            data: { permissions: { ...perms, objectPermissions: objPerms } },
+          });
+        }
+      }
+    } catch (err) {
+      // Non-critical — don't fail the object creation
+      console.error('Failed to auto-grant admin department permissions:', err);
+    }
+
     reply.code(201).send(object);
   });
 
