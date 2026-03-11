@@ -1452,6 +1452,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                         <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
                           <div className="font-semibold text-blue-900 mb-1">Active Rules:</div>
                           {sec.visibleIf.map((condition, idx) => {
+                            if (condition.left === '__currentUser__') {
+                              return (
+                                <div key={idx} className="text-blue-700">
+                                  • Visible to specific users ({Array.isArray(condition.right) ? condition.right.length : 0})
+                                </div>
+                              );
+                            }
                             const condField = object?.fields.find(f => f.apiName === condition.left);
                             return (
                               <div key={idx} className="text-blue-700">
@@ -1513,6 +1520,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                             <div className="text-xs bg-blue-50 p-2 rounded border border-blue-200">
                               <div className="font-semibold text-blue-900 mb-1">Active Rules:</div>
                               {fieldDef.visibleIf.map((condition, idx) => {
+                                if (condition.left === '__currentUser__') {
+                                  return (
+                                    <div key={idx} className="text-blue-700">
+                                      • Visible to specific users ({Array.isArray(condition.right) ? condition.right.length : 0})
+                                    </div>
+                                  );
+                                }
                                 const condField = object?.fields.find(f => f.apiName === condition.left);
                                 return (
                                   <div key={idx} className="text-blue-700">

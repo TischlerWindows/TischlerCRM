@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { evaluateVisibility } from '@/lib/field-visibility';
+import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -204,8 +204,9 @@ export default function DynamicForm({
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
-  // Current user — used to auto-populate AutoUser fields
+  // Current user — used to auto-populate AutoUser fields & user-based visibility
   const { user: authUser } = useAuth();
+  const visibilityCtx: VisibilityContext = { currentUserId: authUser?.id };
 
   // If layoutId is provided, use it; otherwise check the default record type's
   // assigned layout, then fall back to finding by layoutType.
@@ -636,7 +637,7 @@ export default function DynamicForm({
       tab.sections
         .sort((a, b) => a.order - b.order)
         .forEach((section) => {
-          const isVisible = evaluateVisibility(section.visibleIf, formData);
+          const isVisible = evaluateVisibility(section.visibleIf, formData, visibilityCtx);
           if (isVisible && section.showInTemplate !== false) {
             allSections.push({ section, tabLabel: tab.label });
           }
@@ -756,7 +757,7 @@ export default function DynamicForm({
 
   const renderField = (fieldDef: FieldDef) => {
     // Check if field should be visible based on visibility rules
-    const isVisible = evaluateVisibility(fieldDef.visibleIf, formData);
+    const isVisible = evaluateVisibility(fieldDef.visibleIf, formData, visibilityCtx);
     if (!isVisible) {
       return null; // Field is not visible
     }
@@ -1422,7 +1423,7 @@ export default function DynamicForm({
           {currentTab.sections
             .sort((a, b) => a.order - b.order)
             .map((section) => {
-              const isSectionVisible = evaluateVisibility(section.visibleIf, formData);
+              const isSectionVisible = evaluateVisibility(section.visibleIf, formData, visibilityCtx);
               if (!isSectionVisible) return null;
               if (section.showInTemplate === false) return null;
 

@@ -1,12 +1,19 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ConditionExpr, FieldDef } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { X } from 'lucide-react';
+import { X, User, Check } from 'lucide-react';
 import { formatCondition } from '@/lib/field-visibility';
+import { apiClient } from '@/lib/api-client';
+
+interface UserRecord {
+  id: string;
+  name: string | null;
+  email: string;
+}
 
 interface FieldVisibilityRuleEditorProps {
   field: FieldDef;
@@ -21,7 +28,11 @@ export default function FieldVisibilityRuleEditor({
   onSave,
   onCancel,
 }: FieldVisibilityRuleEditorProps) {
-  const [conditions, setConditions] = useState<ConditionExpr[]>(field.visibleIf || []);
+  // Separate user-based conditions from field-based conditions
+  const existingUserCondition = (field.visibleIf || []).find(c => c.left === '__currentUser__');
+  const existingFieldConditions = (field.visibleIf || []).filter(c => c.left !== '__currentUser__');
+
+  const [conditions, setConditions] = useState<ConditionExpr[]>(existingFieldConditions);
   const [newCondition, setNewCondition] = useState<Partial<ConditionExpr>>({
     left: '',
     op: '==',
@@ -31,6 +42,31 @@ export default function FieldVisibilityRuleEditor({
   const [showFieldDropdown, setShowFieldDropdown] = useState(false);
   const [valueSearchTerm, setValueSearchTerm] = useState<string>('');
   const [showValueDropdown, setShowValueDropdown] = useState(false);
+
+  // User-based visibility state
+  const [enableUserVisibility, setEnableUserVisibility] = useState(!!existingUserCondition);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
+    existingUserCondition && Array.isArray(existingUserCondition.right) ? existingUserCondition.right : []
+  );
+  const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+  // Fetch users when user visibility is enabled
+  useEffect(() => {
+    if (enableUserVisibility && allUsers.length === 0) {
+      apiClient.get('/admin/users')
+        .then((res: any) => {
+          const users = res.data?.users || res.users || res.data || [];
+          setAllUsers(users);
+        })
+        .catch(() => {});
+    }
+  }, [enableUserVisibility, allUsers.length]);
+
+  // Build a map of userId -> display name for formatting
+  const userNameMap: Record<string, string> = {};
+  allUsers.forEach(u => { userNameMap[u.id] = u.name || u.email; });
 
   const handleAddCondition = () => {
     if (newCondition.left && newCondition.op && newCondition.right !== '') {
@@ -61,11 +97,11 @@ export default function FieldVisibilityRuleEditor({
       {/* Existing Conditions */}
       {conditions.length > 0 && (
         <div className="space-y-2">
-          <Label className="text-xs font-medium">Current Rules:</Label>
+          <Label className="text-xs font-medium">Current Field Rules:</Label>
           {conditions.map((condition, index) => (
             <div key={index} className="flex items-center justify-between bg-white p-2 rounded border text-sm">
               <span className="text-gray-700">
-                {formatCondition(condition, getFieldLabel(condition.left))}
+                {formatCondition(condition, getFieldLabel(condition.left), userNameMap)}
               </span>
               <button
                 onClick={() => handleRemoveCondition(index)}
@@ -262,15 +298,129 @@ export default function FieldVisibilityRuleEditor({
         </div>
       </div>
 
+      {/* Visibility by User */}
+      <div className="space-y-2 border-t pt-4">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="enable-user-visibility"
+            checked={enableUserVisibility}
+            onChange={(e) => {
+              setEnableUserVisibility(e.target.checked);
+              if (!e.target.checked) {
+                setSelectedUserIds([]);
+              }
+            }}
+            className="w-4 h-4 rounded border-gray-300"
+          />
+          <Label htmlFor="enable-user-visibility" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+            <User className="w-3.5 h-3.5" />
+            Visible to specific users only
+          </Label>
+        </div>
+
+        {enableUserVisibility && (
+          <div className="ml-6 space-y-2">
+            {/* Selected users */}
+            {selectedUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedUserIds.map(uid => {
+                  const u = allUsers.find(u => u.id === uid);
+                  return (
+                    <span key={uid} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs">
+                      {u ? (u.name || u.email) : uid}
+                      <button onClick={() => setSelectedUserIds(prev => prev.filter(id => id !== uid))} className="hover:text-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* User search */}
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Search users..."
+                value={userSearchTerm}
+                onChange={(e) => {
+                  setUserSearchTerm(e.target.value);
+                  setShowUserDropdown(true);
+                }}
+                onFocus={() => setShowUserDropdown(true)}
+                className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+              />
+              {showUserDropdown && (
+                <div className="absolute z-10 w-full mt-1 border border-gray-300 rounded bg-white shadow-lg max-h-48 overflow-y-auto">
+                  {allUsers
+                    .filter(u =>
+                      userSearchTerm === '' ||
+                      (u.name || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                      u.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+                    )
+                    .map(u => {
+                      const isSelected = selectedUserIds.includes(u.id);
+                      return (
+                        <div
+                          key={u.id}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedUserIds(prev => prev.filter(id => id !== u.id));
+                            } else {
+                              setSelectedUserIds(prev => [...prev, u.id]);
+                            }
+                          }}
+                          className={`px-3 py-2 hover:bg-[#f0f1fa] cursor-pointer text-xs border-b last:border-b-0 flex items-center gap-2 ${isSelected ? 'bg-blue-50' : ''}`}
+                        >
+                          <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                            {isSelected && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <div>
+                            <div className="font-medium">{u.name || 'No name'}</div>
+                            <div className="text-gray-500">{u.email}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {allUsers.filter(u =>
+                    userSearchTerm === '' ||
+                    (u.name || '').toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                    u.email.toLowerCase().includes(userSearchTerm.toLowerCase())
+                  ).length === 0 && (
+                    <div className="px-3 py-2 text-xs text-gray-500 text-center">
+                      {allUsers.length === 0 ? 'Loading users...' : 'No users found'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {selectedUserIds.length === 0 && (
+              <p className="text-xs text-amber-600">Select at least one user, or uncheck the option above</p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Actions */}
       <div className="flex gap-2 pt-4 border-t">
         <Button 
           onClick={() => {
             let finalConditions = [...conditions];
             
-            // Add the new condition if filled out
+            // Add the new field condition if filled out
             if (newCondition.left && newCondition.op && newCondition.right !== '') {
               finalConditions = [...finalConditions, newCondition as ConditionExpr];
+            }
+
+            // Add user visibility condition if enabled with selected users
+            if (enableUserVisibility && selectedUserIds.length > 0) {
+              finalConditions.push({
+                left: '__currentUser__',
+                op: 'IN',
+                right: selectedUserIds,
+              });
             }
             
             // Save all conditions
