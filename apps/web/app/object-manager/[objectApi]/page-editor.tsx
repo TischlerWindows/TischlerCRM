@@ -118,6 +118,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [overId, setOverId] = useState<string | null>(null);
   const [dropSide, setDropSide] = useState<'top' | 'right' | 'bottom' | 'left' | null>(null);
   const [overColumn, setOverColumn] = useState<{ sectionId: string; columnIndex: number } | null>(null);
+  const [layoutName, setLayoutName] = useState<string>('Page Layout');
   const [fieldSearchTerm, setFieldSearchTerm] = useState<string>('');
   const [selectedFieldObjects, setSelectedFieldObjects] = useState<string[]>([objectApiName]);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
@@ -484,19 +485,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const saveLayout = async () => {
     if (!object) return;
 
-    // Get existing layout name if editing, otherwise prompt for new name
-    let layoutName = 'Page Layout';
-    
-    if (editingLayoutId) {
-      const existingLayout = object.pageLayouts?.find((l) => l.id === editingLayoutId);
-      if (existingLayout) {
-        layoutName = existingLayout.name;
-      }
-    } else {
-      // Only prompt for name when creating a new layout
-      const promptedName = prompt('Enter a name for this layout:', 'Page Layout');
-      if (!promptedName) return;
-      layoutName = promptedName;
+    if (!layoutName.trim()) {
+      alert('Please enter a layout name.');
+      return;
     }
 
     // Convert canvas state to PageLayout
@@ -918,6 +909,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
   const createNewLayout = () => {
     setEditingLayoutId(null);
+    setLayoutName('Page Layout');
     setTabs([{ id: 'tab-1', label: 'General Information', order: 0 }]);
     setSections([
       {
@@ -939,6 +931,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     if (!layout) return;
 
     setEditingLayoutId(layoutId);
+    setLayoutName(layout.name || 'Page Layout');
 
     // Convert PageLayout to canvas state
     const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
@@ -1110,10 +1103,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               Back to Layouts
             </Button>
             <div>
-              <h2 className="text-lg font-semibold">
-                {editingLayoutId ? 'Edit Layout' : 'Create New Layout'}
-              </h2>
-              <p className="text-sm text-gray-600">
+              <Input
+                value={layoutName}
+                onChange={(e) => setLayoutName(e.target.value)}
+                placeholder="Layout name..."
+                className="text-lg font-semibold h-9 w-64 border-dashed"
+              />
+              <p className="text-sm text-gray-600 mt-1">
                 Design how forms appear for this object
               </p>
             </div>
