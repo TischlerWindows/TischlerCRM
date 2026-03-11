@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -28,12 +29,20 @@ async function getLookupRecords(objectType: string): Promise<any[]> {
     return lookupLoadingPromises[objectType];
   }
 
-  lookupLoadingPromises[objectType] = recordsService.getRecords(objectType).then(records => {
-    const flattened = records.map(r => ({ id: r.id, ...r.data }));
-    lookupCache[objectType] = flattened;
-    delete lookupLoadingPromises[objectType];
-    return flattened;
-  }).catch(() => {
+  lookupLoadingPromises[objectType] = (objectType === 'User'
+    ? apiClient.get<any[]>('/admin/users').then(users => {
+        const arr = Array.isArray(users) ? users : [];
+        lookupCache[objectType] = arr;
+        delete lookupLoadingPromises[objectType];
+        return arr;
+      })
+    : recordsService.getRecords(objectType).then(records => {
+        const flattened = records.map(r => ({ id: r.id, ...r.data }));
+        lookupCache[objectType] = flattened;
+        delete lookupLoadingPromises[objectType];
+        return flattened;
+      })
+  ).catch(() => {
     delete lookupLoadingPromises[objectType];
     return [];
   });

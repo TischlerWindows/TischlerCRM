@@ -237,6 +237,15 @@ export default function CustomObjectRecordsPage() {
     if (value === null || value === undefined) {
       return 'N/A';
     }
+
+    // Check if the field definition indicates a LookupUser type
+    const fieldDef = objectDef?.fields?.find(f => {
+      const stripped = columnId.replace(/^[A-Za-z]+__/, '');
+      return f.apiName === columnId || f.apiName.endsWith('__' + stripped);
+    });
+    if (fieldDef && (fieldDef.type === 'LookupUser' || (fieldDef.type === 'Lookup' && fieldDef.lookupObject === 'User'))) {
+      return resolveLookupDisplayName(value, 'User');
+    }
     
     // Check if this is a lookup field and resolve the display name
     const lookupObjectType = inferLookupObjectType(columnId);

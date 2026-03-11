@@ -32,6 +32,7 @@ import {
   Link as LinkIcon,
   Layout,
   Check,
+  User as UserIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -259,12 +260,15 @@ export default function DynamicForm({
     if (!object || !layout) return;
 
     const targetApis = new Set<string>();
+    let hasLookupUser = false;
     layout.tabs.forEach(tab => {
       tab.sections.forEach(section => {
         section.fields.forEach(field => {
           // Use embedded layout field data (self-contained) first, then fallback
           const fieldType = field.type || object.fields.find(f => f.apiName === field.apiName)?.type;
-          if (fieldType === 'Lookup' || fieldType === 'ExternalLookup') {
+          if (fieldType === 'LookupUser') {
+            hasLookupUser = true;
+          } else if (fieldType === 'Lookup' || fieldType === 'ExternalLookup') {
             const target = (field as any).lookupObject
               || (field as any).relationship?.targetObject
               || (field as any).relatedObject
@@ -277,6 +281,18 @@ export default function DynamicForm({
         });
       });
     });
+
+    // Fetch users for LookupUser fields
+    if (hasLookupUser) {
+      (async () => {
+        try {
+          const users = await apiClient.get<any[]>('/admin/users');
+          setLookupRecordsCache(prev => ({ ...prev, __users__: Array.isArray(users) ? users : [] }));
+        } catch (err) {
+          console.error('Failed to fetch users for LookupUser:', err);
+        }
+      })();
+    }
 
     if (targetApis.size === 0) return;
 
@@ -435,6 +451,7 @@ export default function DynamicForm({
       Geolocation: MapPin,
       Lookup: LinkIcon,
       ExternalLookup: LinkIcon,
+      LookupUser: UserIcon,
       AutoNumber: Hash,
       AutoUser: Layout,
       Formula: Hash,
@@ -1118,6 +1135,67 @@ export default function DynamicForm({
                     </button>
                   );
                 })()}
+              </div>
+            )}
+          </div>
+        );
+        break;
+
+      case 'LookupUser':
+        const userRecords = lookupRecordsCache['__users__'] || [];
+        const selectedUser = value ? userRecords.find((u) => String(u.id) === String(value)) : null;
+        const selectedUserLabel = selectedUser ? (selectedUser.name || selectedUser.email || '') : '';
+        const userLookupQuery = lookupQueries[fieldDef.apiName] ?? '';
+        const isUserLookupActive = activeLookupField === fieldDef.apiName;
+        const userDisplayValue = isUserLookupActive ? userLookupQuery : selectedUserLabel;
+
+        const filteredUsers = userRecords.filter((user) => {
+          const query = userLookupQuery.toLowerCase();
+          if (!query) return true;
+          const name = (user.name || '').toLowerCase();
+          const email = (user.email || '').toLowerCase();
+          const title = (user.title || '').toLowerCase();
+          return name.includes(query) || email.includes(query) || title.includes(query);
+        });
+
+        inputElement = (
+          <div className="relative">
+            <Input
+              {...commonProps}
+              value={userDisplayValue}
+              placeholder="Search users..."
+              onChange={(e) => {
+                setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: e.target.value }));
+                setActiveLookupField(fieldDef.apiName);
+              }}
+              onFocus={() => setActiveLookupField(fieldDef.apiName)}
+              onBlur={() => {
+                setTimeout(() => {
+                  setActiveLookupField((current) => (current === fieldDef.apiName ? null : current));
+                }, 150);
+              }}
+            />
+            {isUserLookupActive && (
+              <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.slice(0, 20).map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => {
+                        handleFieldChange(fieldDef.apiName, user.id);
+                        setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: user.name || user.email }));
+                        setActiveLookupField(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                    >
+                      <div className="font-medium text-gray-900 truncate">{user.name || user.email}</div>
+                      <div className="text-xs text-gray-500">{user.email}{user.title ? ` · ${user.title}` : ''}</div>
+                    </button>
+                  ))
+                ) : userLookupQuery ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">No users found.</div>
+                ) : null}
               </div>
             )}
           </div>

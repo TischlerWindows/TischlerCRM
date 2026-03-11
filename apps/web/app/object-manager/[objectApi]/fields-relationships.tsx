@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
+  import {
   Plus,
   Search,
   Edit,
@@ -34,6 +34,7 @@ import {
   X,
   Save,
   AlertCircle,
+  User,
 } from 'lucide-react';
 interface FieldsRelationshipsProps {
   objectApiName: string;
@@ -59,6 +60,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   // Relationship
   { value: 'Lookup', label: 'Lookup Relationship', description: 'Creates a relationship that links this object to another object. The relationship field allows users to click on a lookup icon to select a value from a popup list. The other object is the source of the values in the list.', category: 'Relationship', icon: LinkIcon },
   { value: 'ExternalLookup', label: 'External Lookup Relationship', description: 'Creates a relationship that links this object to an external object whose data is stored outside the Salesforce org.', category: 'Relationship', icon: ExternalLink },
+  { value: 'LookupUser', label: 'Lookup User', description: 'Creates a field that looks up and references a user in the system. Users can search for and select a user from the user list.', category: 'Relationship', icon: User },
   
   // Standard
   { value: 'Checkbox', label: 'Checkbox', description: 'Allows users to select a True (checked) or False (unchecked) value.', category: 'Standard', icon: CheckSquare },
@@ -146,7 +148,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       ...formData,
       type,
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' ? formData.picklistValues : [],
-      lookupObject: type === 'Lookup' ? formData.lookupObject : '',
+      lookupObject: type === 'Lookup' ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
       relationshipName: type === 'Lookup' ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',

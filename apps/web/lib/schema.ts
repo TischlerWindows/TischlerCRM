@@ -7,7 +7,7 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser";
+  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -44,6 +44,7 @@ export function normalizeFieldType(raw: string): FieldType {
     picklisttext: 'PicklistText',
     compositetext: 'CompositeText',
     autouser: 'AutoUser',
+    lookupuser: 'LookupUser',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }
@@ -301,13 +302,14 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Text (Encrypted)', value: 'EncryptedText', type: 'EncryptedText' },
   { label: 'Time', value: 'Time', type: 'Time' },
   { label: 'URL', value: 'URL', type: 'URL' },
-  { label: 'Address', value: 'Address', type: 'Address' }
+  { label: 'Address', value: 'Address', type: 'Address' },
+  { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' }
 ];
 
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "ExternalLookup"].includes(type)) return "Relationship";
+  if (["Lookup", "ExternalLookup", "LookupUser"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
@@ -323,6 +325,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     RollupSummary: "sigma",
     Lookup: "link",
     ExternalLookup: "external-link",
+    LookupUser: "user",
     Checkbox: "check-square",
     Currency: "dollar-sign",
     Date: "calendar",
