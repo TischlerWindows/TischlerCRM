@@ -17,15 +17,12 @@ async function checkObjectPermission(
     include: {
       department: true,
       profile: true,
-      permissionSetAssignments: {
-        include: { permissionSet: true },
-      },
     },
   });
   if (!user) return false;
 
-  // If user has no department, profile, or permission sets — no permissions configured yet, allow access
-  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
+  // If user has no department or profile — no permissions configured yet, allow access
+  if (!user.department && !user.profile) return true;
 
   // Department restrictions are the CEILING
   // If department explicitly sets this action to false, deny regardless of other sources
@@ -40,12 +37,6 @@ async function checkObjectPermission(
   // Check profile permissions
   const profPerms = (user.profile?.permissions as any)?.objectPermissions?.[objectApiName];
   if (profPerms?.[action]) return true;
-
-  // Check permission sets
-  for (const assignment of user.permissionSetAssignments) {
-    const psPerms = (assignment.permissionSet.permissions as any)?.objectPermissions?.[objectApiName];
-    if (psPerms?.[action]) return true;
-  }
 
   return false;
 }

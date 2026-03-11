@@ -102,7 +102,6 @@ class SchemaApiService {
         version: 1,
         updatedAt: new Date().toISOString(),
         objects,
-        permissionSets: [],
       };
 
       this.cachedSchema = schema;
@@ -122,7 +121,6 @@ class SchemaApiService {
         version: 1,
         updatedAt: new Date().toISOString(),
         objects: [],
-        permissionSets: [],
       };
     }
   }

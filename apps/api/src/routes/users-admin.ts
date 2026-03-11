@@ -68,11 +68,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         profile: { select: { id: true, name: true, permissions: true } },
         department: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true, email: true } },
-        permissionSetAssignments: {
-          include: {
-            permissionSet: { select: { id: true, name: true, permissions: true } },
-          },
-        },
       },
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
@@ -158,8 +153,6 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: 'User not found' });
-    // Delete related permission set assignments first
-    await prisma.permissionSetAssignment.deleteMany({ where: { userId: id } });
     await prisma.user.delete({ where: { id } });
     reply.code(204).send();
   });
@@ -177,16 +170,14 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     reply.send(user);
   });
 
-  // Get effective permissions (profile + permission sets merged)
+  // Get effective permissions (profile + department merged)
   app.get('/admin/users/:id/permissions', async (req, reply) => {
     const { id } = req.params as { id: string };
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
         profile: true,
-        permissionSetAssignments: {
-          include: { permissionSet: true },
-        },
+        department: true,
       },
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
@@ -197,31 +188,27 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const appPerms: Record<string, boolean> = { ...(profilePerms.appPermissions || {}) };
     const fieldPerms: Record<string, Record<string, boolean>> = { ...(profilePerms.fieldPermissions || {}) };
 
-    // Merge permission sets additively
-    for (const assignment of user.permissionSetAssignments) {
-      const ps = (assignment.permissionSet.permissions as any) || {};
-      // Object permissions
-      if (ps.objectPermissions) {
-        for (const [obj, perms] of Object.entries(ps.objectPermissions as Record<string, Record<string, boolean>>)) {
-          if (!objectPerms[obj]) objectPerms[obj] = {};
-          for (const [action, granted] of Object.entries(perms)) {
-            if (granted) objectPerms[obj][action] = true;
+    // Apply department ceiling
+    const deptPerms = (user.department?.permissions as any) || {};
+    if (deptPerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(deptPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
+        if (!objectPerms[obj]) objectPerms[obj] = {};
+        for (const [action, granted] of Object.entries(perms)) {
+          if (!granted) {
+            // Department denies — enforce ceiling
+            objectPerms[obj][action] = false;
+          } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
+            objectPerms[obj][action] = true;
           }
         }
       }
-      // App permissions
-      if (ps.appPermissions) {
-        for (const [perm, granted] of Object.entries(ps.appPermissions as Record<string, boolean>)) {
-          if (granted) appPerms[perm] = true;
-        }
-      }
-      // Field permissions
-      if (ps.fieldPermissions) {
-        for (const [field, perms] of Object.entries(ps.fieldPermissions as Record<string, Record<string, boolean>>)) {
-          if (!fieldPerms[field]) fieldPerms[field] = {};
-          for (const [access, granted] of Object.entries(perms)) {
-            if (granted) fieldPerms[field][access] = true;
-          }
+    }
+    if (deptPerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(deptPerms.appPermissions as Record<string, boolean>)) {
+        if (!granted) {
+          appPerms[perm] = false;
+        } else if (!(perm in appPerms)) {
+          appPerms[perm] = true;
         }
       }
     }
@@ -229,7 +216,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     reply.send({
       userId: id,
       profileName: user.profile?.name || 'No Profile',
-      permissionSets: user.permissionSetAssignments.map((a) => a.permissionSet.name),
+      departmentName: user.department?.name || 'No Department',
       effectivePermissions: {
         objectPermissions: objectPerms,
         appPermissions: appPerms,

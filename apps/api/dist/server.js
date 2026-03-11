@@ -11,8 +11,8 @@ import path2 from "path";
 import fs from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { dirname } from "path";
-import { prisma as prisma15 } from "@crm/db/client";
-import { z as z10 } from "zod";
+import { prisma as prisma14 } from "@crm/db/client";
+import { z as z9 } from "zod";
 
 // src/auth.ts
 import crypto from "crypto";
@@ -660,14 +660,11 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
     where: { id: userId },
     include: {
       department: true,
-      profile: true,
-      permissionSetAssignments: {
-        include: { permissionSet: true }
-      }
+      profile: true
     }
   });
   if (!user) return false;
-  if (!user.department && !user.profile && user.permissionSetAssignments.length === 0) return true;
+  if (!user.department && !user.profile) return true;
   const deptPerms = user.department?.permissions?.objectPermissions?.[objectApiName];
   if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
     return false;
@@ -675,10 +672,6 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
   if (deptPerms?.[action]) return true;
   const profPerms = user.profile?.permissions?.objectPermissions?.[objectApiName];
   if (profPerms?.[action]) return true;
-  for (const assignment of user.permissionSetAssignments) {
-    const psPerms = assignment.permissionSet.permissions?.objectPermissions?.[objectApiName];
-    if (psPerms?.[action]) return true;
-  }
   return false;
 }
 async function recordRoutes(app2) {
@@ -2207,127 +2200,27 @@ async function departmentRoutes(app2) {
   });
 }
 
-// src/routes/permission-sets.ts
+// src/routes/users-admin.ts
 import { prisma as prisma13 } from "@crm/db/client";
 import { z as z8 } from "zod";
-var permSetSchema = z8.object({
+var createUserSchema = z8.object({
   name: z8.string().min(1),
-  description: z8.string().optional().nullable(),
-  permissions: z8.record(z8.any()).optional(),
+  email: z8.string().email(),
+  password: z8.string().min(6),
+  profileId: z8.string().optional().nullable(),
+  departmentId: z8.string().optional().nullable(),
+  managerId: z8.string().optional().nullable(),
+  title: z8.string().optional().nullable(),
+  phone: z8.string().optional().nullable(),
+  mobilePhone: z8.string().optional().nullable(),
+  timezone: z8.string().optional().nullable(),
+  locale: z8.string().optional().nullable(),
   isActive: z8.boolean().optional()
-});
-async function permissionSetRoutes(app2) {
-  app2.get("/permission-sets", async (req, reply) => {
-    const sets = await prisma13.permissionSet.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { assignments: true } }
-      }
-    });
-    reply.send(sets);
-  });
-  app2.get("/permission-sets/:id", async (req, reply) => {
-    const { id } = req.params;
-    const ps = await prisma13.permissionSet.findUnique({
-      where: { id },
-      include: {
-        assignments: {
-          include: {
-            user: { select: { id: true, name: true, email: true, isActive: true } }
-          }
-        },
-        _count: { select: { assignments: true } }
-      }
-    });
-    if (!ps) return reply.code(404).send({ error: "Permission set not found" });
-    reply.send(ps);
-  });
-  app2.post("/permission-sets", async (req, reply) => {
-    const parsed = permSetSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const ps = await prisma13.permissionSet.create({
-      data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-        permissions: parsed.data.permissions || {},
-        isActive: parsed.data.isActive ?? true
-      }
-    });
-    reply.code(201).send(ps);
-  });
-  app2.put("/permission-sets/:id", async (req, reply) => {
-    const { id } = req.params;
-    const parsed = permSetSchema.partial().safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma13.permissionSet.findUnique({ where: { id } });
-    if (!existing) return reply.code(404).send({ error: "Permission set not found" });
-    const ps = await prisma13.permissionSet.update({
-      where: { id },
-      data: parsed.data
-    });
-    reply.send(ps);
-  });
-  app2.delete("/permission-sets/:id", async (req, reply) => {
-    const { id } = req.params;
-    const existing = await prisma13.permissionSet.findUnique({ where: { id } });
-    if (!existing) return reply.code(404).send({ error: "Permission set not found" });
-    await prisma13.permissionSet.delete({ where: { id } });
-    reply.code(204).send();
-  });
-  app2.post("/permission-sets/:id/assign", async (req, reply) => {
-    const { id } = req.params;
-    const { userIds } = req.body;
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return reply.code(400).send({ error: "userIds array is required" });
-    }
-    const existing = await prisma13.permissionSet.findUnique({ where: { id } });
-    if (!existing) return reply.code(404).send({ error: "Permission set not found" });
-    const results = await Promise.allSettled(
-      userIds.map(
-        (userId) => prisma13.permissionSetAssignment.upsert({
-          where: { userId_permissionSetId: { userId, permissionSetId: id } },
-          create: { userId, permissionSetId: id },
-          update: {}
-        })
-      )
-    );
-    const created = results.filter((r) => r.status === "fulfilled").length;
-    reply.send({ assigned: created, total: userIds.length });
-  });
-  app2.delete("/permission-sets/:id/assign/:userId", async (req, reply) => {
-    const { id, userId } = req.params;
-    try {
-      await prisma13.permissionSetAssignment.delete({
-        where: { userId_permissionSetId: { userId, permissionSetId: id } }
-      });
-      reply.code(204).send();
-    } catch {
-      reply.code(404).send({ error: "Assignment not found" });
-    }
-  });
-}
-
-// src/routes/users-admin.ts
-import { prisma as prisma14 } from "@crm/db/client";
-import { z as z9 } from "zod";
-var createUserSchema = z9.object({
-  name: z9.string().min(1),
-  email: z9.string().email(),
-  password: z9.string().min(6),
-  profileId: z9.string().optional().nullable(),
-  departmentId: z9.string().optional().nullable(),
-  managerId: z9.string().optional().nullable(),
-  title: z9.string().optional().nullable(),
-  phone: z9.string().optional().nullable(),
-  mobilePhone: z9.string().optional().nullable(),
-  timezone: z9.string().optional().nullable(),
-  locale: z9.string().optional().nullable(),
-  isActive: z9.boolean().optional()
 });
 var updateUserSchema = createUserSchema.omit({ password: true, email: true }).partial();
 async function usersAdminRoutes(app2) {
   app2.get("/admin/users", async (req, reply) => {
-    const users = await prisma14.user.findMany({
+    const users = await prisma13.user.findMany({
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -2348,7 +2241,7 @@ async function usersAdminRoutes(app2) {
   });
   app2.get("/admin/users/:id", async (req, reply) => {
     const { id } = req.params;
-    const user = await prisma14.user.findUnique({
+    const user = await prisma13.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -2369,12 +2262,7 @@ async function usersAdminRoutes(app2) {
         managerId: true,
         profile: { select: { id: true, name: true, permissions: true } },
         department: { select: { id: true, name: true } },
-        manager: { select: { id: true, name: true, email: true } },
-        permissionSetAssignments: {
-          include: {
-            permissionSet: { select: { id: true, name: true, permissions: true } }
-          }
-        }
+        manager: { select: { id: true, name: true, email: true } }
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
@@ -2383,10 +2271,10 @@ async function usersAdminRoutes(app2) {
   app2.post("/admin/users", async (req, reply) => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma14.user.findUnique({ where: { email: parsed.data.email } });
+    const existing = await prisma13.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     const passwordHash = hashPassword(parsed.data.password);
-    const user = await prisma14.user.create({
+    const user = await prisma13.user.create({
       data: {
         email: parsed.data.email,
         name: parsed.data.name,
@@ -2418,9 +2306,9 @@ async function usersAdminRoutes(app2) {
     const { id } = req.params;
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma14.user.findUnique({ where: { id } });
+    const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id },
       data: parsed.data,
       select: {
@@ -2442,25 +2330,24 @@ async function usersAdminRoutes(app2) {
     if (!password || password.length < 6) {
       return reply.code(400).send({ error: "Password must be at least 6 characters" });
     }
-    const existing = await prisma14.user.findUnique({ where: { id } });
+    const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
     const passwordHash = hashPassword(password);
-    await prisma14.user.update({ where: { id }, data: { passwordHash } });
+    await prisma13.user.update({ where: { id }, data: { passwordHash } });
     reply.send({ success: true });
   });
   app2.delete("/admin/users/:id", async (req, reply) => {
     const { id } = req.params;
-    const existing = await prisma14.user.findUnique({ where: { id } });
+    const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
-    await prisma14.permissionSetAssignment.deleteMany({ where: { userId: id } });
-    await prisma14.user.delete({ where: { id } });
+    await prisma13.user.delete({ where: { id } });
     reply.code(204).send();
   });
   app2.post("/admin/users/:id/freeze", async (req, reply) => {
     const { id } = req.params;
-    const existing = await prisma14.user.findUnique({ where: { id } });
+    const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
-    const user = await prisma14.user.update({
+    const user = await prisma13.user.update({
       where: { id },
       data: { isActive: !existing.isActive },
       select: { id: true, isActive: true }
@@ -2469,13 +2356,11 @@ async function usersAdminRoutes(app2) {
   });
   app2.get("/admin/users/:id/permissions", async (req, reply) => {
     const { id } = req.params;
-    const user = await prisma14.user.findUnique({
+    const user = await prisma13.user.findUnique({
       where: { id },
       include: {
         profile: true,
-        permissionSetAssignments: {
-          include: { permissionSet: true }
-        }
+        department: true
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
@@ -2483,34 +2368,32 @@ async function usersAdminRoutes(app2) {
     const objectPerms = { ...profilePerms.objectPermissions || {} };
     const appPerms = { ...profilePerms.appPermissions || {} };
     const fieldPerms = { ...profilePerms.fieldPermissions || {} };
-    for (const assignment of user.permissionSetAssignments) {
-      const ps = assignment.permissionSet.permissions || {};
-      if (ps.objectPermissions) {
-        for (const [obj, perms] of Object.entries(ps.objectPermissions)) {
-          if (!objectPerms[obj]) objectPerms[obj] = {};
-          for (const [action, granted] of Object.entries(perms)) {
-            if (granted) objectPerms[obj][action] = true;
+    const deptPerms = user.department?.permissions || {};
+    if (deptPerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(deptPerms.objectPermissions)) {
+        if (!objectPerms[obj]) objectPerms[obj] = {};
+        for (const [action, granted] of Object.entries(perms)) {
+          if (!granted) {
+            objectPerms[obj][action] = false;
+          } else if (!(obj in objectPerms) || !(action in objectPerms[obj])) {
+            objectPerms[obj][action] = true;
           }
         }
       }
-      if (ps.appPermissions) {
-        for (const [perm, granted] of Object.entries(ps.appPermissions)) {
-          if (granted) appPerms[perm] = true;
-        }
-      }
-      if (ps.fieldPermissions) {
-        for (const [field, perms] of Object.entries(ps.fieldPermissions)) {
-          if (!fieldPerms[field]) fieldPerms[field] = {};
-          for (const [access, granted] of Object.entries(perms)) {
-            if (granted) fieldPerms[field][access] = true;
-          }
+    }
+    if (deptPerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(deptPerms.appPermissions)) {
+        if (!granted) {
+          appPerms[perm] = false;
+        } else if (!(perm in appPerms)) {
+          appPerms[perm] = true;
         }
       }
     }
     reply.send({
       userId: id,
       profileName: user.profile?.name || "No Profile",
-      permissionSets: user.permissionSetAssignments.map((a) => a.permissionSet.name),
+      departmentName: user.department?.name || "No Department",
       effectivePermissions: {
         objectPermissions: objectPerms,
         appPermissions: appPerms,
@@ -2535,18 +2418,18 @@ function buildApp() {
   }
   app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v8-summary-perms" }));
   app2.post("/auth/signup", async (req, reply) => {
-    const schema = z10.object({
-      name: z10.string().min(1),
-      email: z10.string().email(),
-      password: z10.string().min(6)
+    const schema = z9.object({
+      name: z9.string().min(1),
+      email: z9.string().email(),
+      password: z9.string().min(6)
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma15.user.findUnique({ where: { email: parsed.data.email } });
+    const existing = await prisma14.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     try {
       const passwordHash = hashPassword(parsed.data.password);
-      const user = await prisma15.user.create({
+      const user = await prisma14.user.create({
         data: {
           email: parsed.data.email,
           name: parsed.data.name,
@@ -2566,10 +2449,10 @@ function buildApp() {
     }
   });
   app2.post("/auth/login", async (req, reply) => {
-    const schema = z10.object({
-      email: z10.string().email(),
-      password: z10.string().min(6),
-      accountId: z10.string().uuid().optional().nullable()
+    const schema = z9.object({
+      email: z9.string().email(),
+      password: z9.string().min(6),
+      accountId: z9.string().uuid().optional().nullable()
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
@@ -2581,7 +2464,7 @@ function buildApp() {
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const ip = (forwardedIp ? forwardedIp.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";
     const userAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
-    await prisma15.loginEvent.create({
+    await prisma14.loginEvent.create({
       data: {
         userId: user.id,
         accountId: parsed.data.accountId ?? null,
@@ -2592,13 +2475,13 @@ function buildApp() {
     return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   });
   app2.get("/security/login-events", async (req, reply) => {
-    const querySchema = z10.object({
-      accountId: z10.string().uuid().optional(),
-      take: z10.coerce.number().int().min(1).max(500).optional()
+    const querySchema = z9.object({
+      accountId: z9.string().uuid().optional(),
+      take: z9.coerce.number().int().min(1).max(500).optional()
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const events = await prisma15.loginEvent.findMany({
+    const events = await prisma14.loginEvent.findMany({
       where: parsed.data.accountId ? { accountId: parsed.data.accountId } : void 0,
       take: parsed.data.take ?? 100,
       orderBy: { createdAt: "desc" },
@@ -2623,14 +2506,11 @@ function buildApp() {
   });
   app2.get("/me/permissions", async (req, reply) => {
     const userId = req.user.sub;
-    const user = await prisma15.user.findUnique({
+    const user = await prisma14.user.findUnique({
       where: { id: userId },
       include: {
         department: true,
-        profile: true,
-        permissionSetAssignments: {
-          include: { permissionSet: true }
-        }
+        profile: true
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
@@ -2651,22 +2531,6 @@ function buildApp() {
     if (profPerms.appPermissions) {
       for (const [perm, granted] of Object.entries(profPerms.appPermissions)) {
         if (granted) grantedAppPerms[perm] = true;
-      }
-    }
-    for (const assignment of user.permissionSetAssignments) {
-      const ps = assignment.permissionSet.permissions || {};
-      if (ps.objectPermissions) {
-        for (const [obj, perms] of Object.entries(ps.objectPermissions)) {
-          if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
-          for (const [action, granted] of Object.entries(perms)) {
-            if (granted) grantedObjPerms[obj][action] = true;
-          }
-        }
-      }
-      if (ps.appPermissions) {
-        for (const [perm, granted] of Object.entries(ps.appPermissions)) {
-          if (granted) grantedAppPerms[perm] = true;
-        }
       }
     }
     const objectPerms = {};
@@ -2695,7 +2559,7 @@ function buildApp() {
     }
     if (user.role === "ADMIN") {
       const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
-      const customObjects = await prisma15.customObject.findMany({ select: { apiName: true } });
+      const customObjects = await prisma14.customObject.findMany({ select: { apiName: true } });
       const allObjectNames = customObjects.map((o) => o.apiName);
       for (const obj of allObjectNames) {
         objectPerms[obj] = Object.fromEntries(allActions.map((a) => [a, true]));
@@ -2715,14 +2579,14 @@ function buildApp() {
     });
   });
   app2.get("/accounts", async (req, reply) => {
-    const accounts = await prisma15.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
+    const accounts = await prisma14.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
     reply.send(accounts);
   });
-  const accountSchema = z10.object({ name: z10.string().min(1), domain: z10.string().optional().nullable(), ownerId: z10.string().uuid() });
+  const accountSchema = z9.object({ name: z9.string().min(1), domain: z9.string().optional().nullable(), ownerId: z9.string().uuid() });
   app2.post("/accounts", async (req, reply) => {
     const parsed = accountSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const created = await prisma15.account.create({ data: parsed.data });
+    const created = await prisma14.account.create({ data: parsed.data });
     reply.code(201).send(created);
   });
   const accountUpdate = accountSchema.partial();
@@ -2730,12 +2594,12 @@ function buildApp() {
     const id = req.params.id;
     const parsed = accountUpdate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const updated = await prisma15.account.update({ where: { id }, data: parsed.data });
+    const updated = await prisma14.account.update({ where: { id }, data: parsed.data });
     reply.send(updated);
   });
   app2.delete("/accounts/:id", async (req, reply) => {
     const id = req.params.id;
-    await prisma15.account.delete({ where: { id } });
+    await prisma14.account.delete({ where: { id } });
     reply.code(204).send();
   });
   app2.register(objectRoutes);
@@ -2749,13 +2613,12 @@ function buildApp() {
   app2.register(preferenceRoutes);
   app2.register(profileRoutes);
   app2.register(departmentRoutes);
-  app2.register(permissionSetRoutes);
   app2.register(usersAdminRoutes);
   return app2;
 }
 
 // src/ensure-core-objects.ts
-import { prisma as prisma16 } from "@crm/db/client";
+import { prisma as prisma15 } from "@crm/db/client";
 var CORE_OBJECTS = [
   {
     apiName: "Property",
@@ -2900,7 +2763,7 @@ var CORE_OBJECTS = [
 ];
 async function ensureCoreObjects() {
   console.log("[ensure-core-objects] Checking core objects...");
-  let systemUser = await prisma16.user.findFirst({ orderBy: { createdAt: "asc" } });
+  let systemUser = await prisma15.user.findFirst({ orderBy: { createdAt: "asc" } });
   if (!systemUser) {
     const crypto2 = await import("crypto");
     const ITERATIONS2 = 31e4;
@@ -2909,7 +2772,7 @@ async function ensureCoreObjects() {
     const salt = crypto2.randomBytes(16).toString("hex");
     const derived = crypto2.pbkdf2Sync("admin123", salt, ITERATIONS2, KEYLEN2, DIGEST2).toString("hex");
     const passwordHash = `pbkdf2$${ITERATIONS2}$${DIGEST2}$${salt}$${derived}`;
-    systemUser = await prisma16.user.create({
+    systemUser = await prisma15.user.create({
       data: {
         email: "admin@crm.local",
         passwordHash,
@@ -2922,7 +2785,7 @@ async function ensureCoreObjects() {
   let created = 0;
   let existed = 0;
   for (const objDef of CORE_OBJECTS) {
-    const existing = await prisma16.customObject.findFirst({
+    const existing = await prisma15.customObject.findFirst({
       where: { apiName: { equals: objDef.apiName, mode: "insensitive" } }
     });
     if (existing) {
@@ -2930,7 +2793,7 @@ async function ensureCoreObjects() {
       await ensureFields(existing.id, objDef.fields, systemUser.id);
       continue;
     }
-    const obj = await prisma16.customObject.create({
+    const obj = await prisma15.customObject.create({
       data: {
         apiName: objDef.apiName,
         label: objDef.label,
@@ -2952,20 +2815,20 @@ async function ensureCoreObjects() {
 }
 async function syncSchemaObjectsToDb(userId) {
   try {
-    const schemaSetting = await prisma16.setting.findUnique({ where: { key: "orgSchema" } });
+    const schemaSetting = await prisma15.setting.findUnique({ where: { key: "orgSchema" } });
     if (!schemaSetting || !schemaSetting.value) return;
     const schema = schemaSetting.value;
     const objects = schema.objects || [];
     let synced = 0;
     for (const obj of objects) {
       if (!obj.apiName || obj.apiName === "Home") continue;
-      const existing = await prisma16.customObject.findFirst({
+      const existing = await prisma15.customObject.findFirst({
         where: { apiName: { equals: obj.apiName, mode: "insensitive" } }
       });
       if (existing) continue;
       const validApiName = /^[A-Z][A-Za-z0-9_]*$/.test(obj.apiName) ? obj.apiName : obj.apiName.charAt(0).toUpperCase() + obj.apiName.slice(1);
       try {
-        const dbObj = await prisma16.customObject.create({
+        const dbObj = await prisma15.customObject.create({
           data: {
             apiName: validApiName,
             label: obj.label || validApiName,
@@ -2982,7 +2845,7 @@ async function syncSchemaObjectsToDb(userId) {
         );
         for (const fieldDef of customFields) {
           try {
-            await prisma16.customField.create({
+            await prisma15.customField.create({
               data: {
                 objectId: dbObj.id,
                 apiName: fieldDef.apiName,
@@ -3015,11 +2878,11 @@ async function syncSchemaObjectsToDb(userId) {
 }
 async function ensureFields(objectId, fields, userId) {
   for (const fieldDef of fields) {
-    const existing = await prisma16.customField.findFirst({
+    const existing = await prisma15.customField.findFirst({
       where: { objectId, apiName: fieldDef.apiName }
     });
     if (existing) continue;
-    await prisma16.customField.create({
+    await prisma15.customField.create({
       data: {
         objectId,
         apiName: fieldDef.apiName,
@@ -3036,11 +2899,11 @@ async function ensureFields(objectId, fields, userId) {
   }
 }
 async function createDefaultLayout(objectId, userId) {
-  const layoutExists = await prisma16.pageLayout.findFirst({
+  const layoutExists = await prisma15.pageLayout.findFirst({
     where: { objectId, name: "Default Layout" }
   });
   if (layoutExists) return;
-  const layout = await prisma16.pageLayout.create({
+  const layout = await prisma15.pageLayout.create({
     data: {
       objectId,
       name: "Default Layout",
@@ -3050,14 +2913,14 @@ async function createDefaultLayout(objectId, userId) {
       modifiedById: userId
     }
   });
-  const tab = await prisma16.layoutTab.create({
+  const tab = await prisma15.layoutTab.create({
     data: {
       layoutId: layout.id,
       label: "Details",
       order: 0
     }
   });
-  const section = await prisma16.layoutSection.create({
+  const section = await prisma15.layoutSection.create({
     data: {
       tabId: tab.id,
       label: "Information",
@@ -3065,11 +2928,11 @@ async function createDefaultLayout(objectId, userId) {
       order: 0
     }
   });
-  const objFields = await prisma16.customField.findMany({ where: { objectId } });
+  const objFields = await prisma15.customField.findMany({ where: { objectId } });
   for (let i = 0; i < objFields.length; i++) {
     const field = objFields[i];
     if (field) {
-      await prisma16.layoutField.create({
+      await prisma15.layoutField.create({
         data: {
           sectionId: section.id,
           fieldId: field.id,
@@ -3082,7 +2945,7 @@ async function createDefaultLayout(objectId, userId) {
 }
 
 // src/ensure-user-management.ts
-import { prisma as prisma17 } from "@crm/db/client";
+import { prisma as prisma16 } from "@crm/db/client";
 var SEED_PROFILES = [
   {
     name: "System Administrator",
@@ -3256,7 +3119,7 @@ var SEED_PROFILES = [
   },
   {
     name: "Minimum Access",
-    description: "No object access \u2014 use as a base with permission sets",
+    description: "No object access \u2014 minimal base profile",
     isSystemProfile: true,
     permissions: {
       objectPermissions: {},
@@ -3507,45 +3370,45 @@ var SEED_DEPARTMENTS = [
 async function ensureUserManagement() {
   console.log("[UserMgmt] Ensuring profiles and departments...");
   for (const profile of SEED_PROFILES) {
-    const existing = await prisma17.profile.findUnique({ where: { name: profile.name } });
+    const existing = await prisma16.profile.findUnique({ where: { name: profile.name } });
     if (!existing) {
-      await prisma17.profile.create({ data: profile });
+      await prisma16.profile.create({ data: profile });
       console.log(`[UserMgmt] Created profile: ${profile.name}`);
     }
   }
   for (const dept of SEED_DEPARTMENTS) {
-    const existing = await prisma17.department.findUnique({ where: { name: dept.name } });
+    const existing = await prisma16.department.findUnique({ where: { name: dept.name } });
     if (!existing) {
-      await prisma17.department.create({ data: dept });
+      await prisma16.department.create({ data: dept });
       console.log(`[UserMgmt] Created department: ${dept.name}`);
     } else {
       const existingPerms = existing.permissions;
       if (!existingPerms || Object.keys(existingPerms).length === 0) {
-        await prisma17.department.update({ where: { id: existing.id }, data: { permissions: dept.permissions } });
+        await prisma16.department.update({ where: { id: existing.id }, data: { permissions: dept.permissions } });
         console.log(`[UserMgmt] Updated permissions for department: ${dept.name}`);
       }
     }
   }
-  const adminProfile = await prisma17.profile.findUnique({ where: { name: "System Administrator" } });
+  const adminProfile = await prisma16.profile.findUnique({ where: { name: "System Administrator" } });
   if (adminProfile) {
-    const adminsWithoutProfile = await prisma17.user.findMany({
+    const adminsWithoutProfile = await prisma16.user.findMany({
       where: { role: "ADMIN", profileId: null }
     });
     for (const admin of adminsWithoutProfile) {
-      await prisma17.user.update({
+      await prisma16.user.update({
         where: { id: admin.id },
         data: { profileId: adminProfile.id }
       });
       console.log(`[UserMgmt] Assigned System Administrator profile to ${admin.email}`);
     }
   }
-  const standardProfile = await prisma17.profile.findUnique({ where: { name: "Standard User" } });
+  const standardProfile = await prisma16.profile.findUnique({ where: { name: "Standard User" } });
   if (standardProfile) {
-    const usersWithoutProfile = await prisma17.user.findMany({
+    const usersWithoutProfile = await prisma16.user.findMany({
       where: { profileId: null }
     });
     for (const user of usersWithoutProfile) {
-      await prisma17.user.update({
+      await prisma16.user.update({
         where: { id: user.id },
         data: { profileId: standardProfile.id }
       });

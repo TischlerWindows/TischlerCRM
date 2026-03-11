@@ -20,7 +20,6 @@ import { settingRoutes } from './routes/settings';
 import { preferenceRoutes } from './routes/preferences';
 import { profileRoutes } from './routes/profiles';
 import { departmentRoutes } from './routes/departments';
-import { permissionSetRoutes } from './routes/permission-sets';
 import { usersAdminRoutes } from './routes/users-admin';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -150,9 +149,6 @@ export function buildApp() {
       include: {
         department: true,
         profile: true,
-        permissionSetAssignments: {
-          include: { permissionSet: true },
-        },
       },
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
@@ -179,24 +175,6 @@ export function buildApp() {
     if (profPerms.appPermissions) {
       for (const [perm, granted] of Object.entries(profPerms.appPermissions as Record<string, boolean>)) {
         if (granted) grantedAppPerms[perm] = true;
-      }
-    }
-
-    // Permission set grants
-    for (const assignment of user.permissionSetAssignments) {
-      const ps = (assignment.permissionSet.permissions as any) || {};
-      if (ps.objectPermissions) {
-        for (const [obj, perms] of Object.entries(ps.objectPermissions as Record<string, Record<string, boolean>>)) {
-          if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
-          for (const [action, granted] of Object.entries(perms)) {
-            if (granted) grantedObjPerms[obj][action] = true;
-          }
-        }
-      }
-      if (ps.appPermissions) {
-        for (const [perm, granted] of Object.entries(ps.appPermissions as Record<string, boolean>)) {
-          if (granted) grantedAppPerms[perm] = true;
-        }
       }
     }
 
@@ -297,7 +275,6 @@ export function buildApp() {
   app.register(preferenceRoutes);
   app.register(profileRoutes);
   app.register(departmentRoutes);
-  app.register(permissionSetRoutes);
   app.register(usersAdminRoutes);
 
   return app;

@@ -173,7 +173,7 @@ const SEED_PROFILES = [
   },
   {
     name: 'Minimum Access',
-    description: 'No object access — use as a base with permission sets',
+    description: 'No object access — minimal base profile',
     isSystemProfile: true,
     permissions: {
       objectPermissions: {},

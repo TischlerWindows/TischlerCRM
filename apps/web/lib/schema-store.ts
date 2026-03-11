@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout, PermissionSet } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
 import { recordsService } from './records-service';
@@ -45,9 +45,6 @@ export interface SchemaStore {
   addValidationRule: (objectApi: string, rule: Omit<ValidationRule, 'id'>) => string;
   updateValidationRule: (objectApi: string, ruleId: string, updates: Partial<ValidationRule>) => void;
   deleteValidationRule: (objectApi: string, ruleId: string) => void;
-  
-  // Permission operations
-  updatePermissions: (permissionSet: PermissionSet) => void;
   
   // Schema versioning
   getVersionHistory: () => Promise<OrgSchema[]>;
@@ -746,25 +743,6 @@ export const useSchemaStore = create<SchemaStore>()(
         schemaService.saveSchema(updatedSchema);
       },
 
-      // Update permissions
-      updatePermissions: (permissionSet) => {
-        const { schema } = get();
-        if (!schema) return;
-
-        const updatedPermissionSets = schema.permissionSets.some(ps => ps.id === permissionSet.id)
-          ? schema.permissionSets.map(ps => ps.id === permissionSet.id ? permissionSet : ps)
-          : [...schema.permissionSets, permissionSet];
-
-        const updatedSchema = {
-          ...schema,
-          permissionSets: updatedPermissionSets,
-          updatedAt: new Date().toISOString()
-        };
-
-        set({ schema: updatedSchema });
-        schemaService.saveSchema(updatedSchema);
-      },
-
       // Get version history
       getVersionHistory: async () => {
         return await schemaService.getVersionHistory();
@@ -804,7 +782,6 @@ export const useSchemaStore = create<SchemaStore>()(
             const mergedSchema = {
               ...schema,
               objects: [...schema.objects, ...importedData.objects || []],
-              permissionSets: [...schema.permissionSets, ...importedData.permissionSets || []],
               version: schema.version + 1,
               updatedAt: new Date().toISOString()
             };

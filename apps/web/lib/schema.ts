@@ -172,25 +172,6 @@ export interface PageLayout {
   formattingRules?: FormattingRule[];
 }
 
-export interface PermissionSet {
-  id: string;
-  name: string;
-  objectPermissions: { 
-    [objectApi: string]: { 
-      read: boolean; 
-      create: boolean; 
-      edit: boolean; 
-      delete: boolean; 
-    } 
-  };
-  fieldPermissions: { 
-    [fieldApi: string]: { 
-      read: boolean; 
-      edit: boolean; 
-    } 
-  };
-}
-
 export interface ObjectDef {
   id: string;
   apiName: string;
@@ -209,7 +190,6 @@ export interface ObjectDef {
   compactLayout?: {
     fieldApiNames: string[];
   };
-  permissionSets?: string[];
   defaultRecordTypeId?: string;
   createdAt: string;
   updatedAt: string;
@@ -226,7 +206,6 @@ export interface SchemaVersion {
 export interface OrgSchema {
   version: number; // increment on save
   objects: ObjectDef[];
-  permissionSets: PermissionSet[];
   updatedAt: string;
   createdBy?: string;
 }

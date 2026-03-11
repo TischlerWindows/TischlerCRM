@@ -2643,10 +2643,6 @@ class LocalStorageSchemaService implements SchemaService {
             id: generateId()
           })) || []
         })),
-        permissionSets: parsed.permissionSets?.map((ps: any) => ({
-          ...ps,
-          id: generateId()
-        })) || []
       };
 
       return importedSchema;
@@ -4029,32 +4025,9 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
-    // Create permission sets for all objects
-    const allObjectPermissions: Record<string, any> = {};
-    objects.forEach(obj => {
-      allObjectPermissions[obj.apiName] = { read: true, create: true, edit: true, delete: false };
-    });
-
     const baseSchema: OrgSchema = {
       version: 1,
       objects,
-      permissionSets: [
-        {
-          id: generateId(),
-          name: 'Standard User',
-          objectPermissions: allObjectPermissions,
-          fieldPermissions: {}
-        },
-        {
-          id: generateId(),
-          name: 'System Administrator',
-          objectPermissions: Object.keys(allObjectPermissions).reduce((acc, key) => {
-            acc[key] = { read: true, create: true, edit: true, delete: true };
-            return acc;
-          }, {} as Record<string, any>),
-          fieldPermissions: {}
-        }
-      ],
       updatedAt: now
     };
 
