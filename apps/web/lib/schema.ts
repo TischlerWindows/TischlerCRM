@@ -5,7 +5,7 @@ export type FieldType =
   | "Lookup" | "ExternalLookup"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone"
-  | "Picklist" | "MultiPicklist" | "MultiSelectPicklist"
+  | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser";
 
@@ -41,6 +41,7 @@ export function normalizeFieldType(raw: string): FieldType {
     time: 'Time',
     url: 'URL',
     address: 'Address',
+    picklisttext: 'PicklistText',
     compositetext: 'CompositeText',
     autouser: 'AutoUser',
   };
@@ -63,6 +64,7 @@ export interface FieldDef {
   min?: number;
   max?: number;
   picklistValues?: string[];
+  picklistPosition?: 'left' | 'right';  // for PicklistText: which side gets the dropdown
   defaultValue?: any;
   helpText?: string;
   controllingField?: string; // for dependent picklists
@@ -291,6 +293,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Phone', value: 'Phone', type: 'Phone' },
   { label: 'Picklist', value: 'Picklist', type: 'Picklist' },
   { label: 'Multi-Select Picklist', value: 'MultiPicklist', type: 'MultiPicklist' },
+  { label: 'Picklist with Text', value: 'PicklistText', type: 'PicklistText' },
   { label: 'Text', value: 'Text', type: 'Text' },
   { label: 'Text Area', value: 'TextArea', type: 'TextArea' },
   { label: 'Text Area (Long)', value: 'LongTextArea', type: 'LongTextArea' },
@@ -308,7 +311,7 @@ export const getFieldTypeCategory = (type: FieldType): string => {
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
-  if (["Picklist", "MultiPicklist"].includes(type)) return "Selection";
+  if (["Picklist", "MultiPicklist", "PicklistText"].includes(type)) return "Selection";
   return "Other";
 };
 
@@ -331,6 +334,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     Phone: "phone",
     Picklist: "list",
     MultiPicklist: "list-checks",
+    PicklistText: "list",
     Text: "type",
     TextArea: "align-left",
     LongTextArea: "file-text",

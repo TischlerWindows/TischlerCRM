@@ -277,6 +277,12 @@ export function formatFieldValue(value: any, fieldType?: string): string {
       return '-';
     }
 
+    // Handle PicklistText objects (combined picklist + text value)
+    if (fieldType === 'PicklistText' || (value.picklist !== undefined && value.text !== undefined)) {
+      const parts = [value.picklist, value.text].filter(Boolean);
+      return parts.length > 0 ? parts.join(' — ') : '-';
+    }
+
     // Handle CompositeText objects (like Contact Name with salutation, firstName, lastName)
     // Check for various name key patterns
     const nameKeys = Object.keys(value);

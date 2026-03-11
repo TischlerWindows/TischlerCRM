@@ -72,6 +72,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Phone', label: 'Phone', description: 'Allows users to enter any phone number. Automatically formats it as a phone number.', category: 'Standard', icon: Phone },
   { value: 'Picklist', label: 'Picklist', description: 'Allows users to select a value from a list you define.', category: 'Standard', icon: List },
   { value: 'MultiPicklist', label: 'Picklist (Multi-Select)', description: 'Allows users to select multiple values from a list you define.', category: 'Standard', icon: List },
+  { value: 'PicklistText', label: 'Picklist with Text', description: 'A side-by-side combination of a picklist dropdown and a free-text input. Choose which side displays the dropdown.', category: 'Standard', icon: List },
   { value: 'Text', label: 'Text', description: 'Allows users to enter any combination of letters and numbers.', category: 'Standard', icon: FileText },
   { value: 'TextArea', label: 'Text Area', description: 'Allows users to enter up to 255 characters on separate lines.', category: 'Standard', icon: FileText },
   { value: 'LongTextArea', label: 'Text Area (Long)', description: 'Allows users to enter up to 131,072 characters on separate lines.', category: 'Standard', icon: FileText },
@@ -105,6 +106,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     displayFormat: '',
     formulaExpr: '',
     picklistValues: [] as string[],
+    picklistPosition: 'left' as 'left' | 'right',
     relationshipName: '',
     lookupObject: '',
   });
@@ -143,7 +145,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     setFormData({
       ...formData,
       type,
-      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' ? formData.picklistValues : [],
+      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' ? formData.picklistValues : [],
       lookupObject: type === 'Lookup' ? formData.lookupObject : '',
       relationshipName: type === 'Lookup' ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
@@ -172,6 +174,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFormat: '',
       formulaExpr: '',
       picklistValues: [],
+      picklistPosition: 'left' as 'left' | 'right',
       relationshipName: '',
       lookupObject: '',
     });
@@ -195,6 +198,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFormat: field.autoNumber?.displayFormat || '',
       formulaExpr: field.formulaExpr || '',
       picklistValues: field.picklistValues || [],
+      picklistPosition: (field as any).picklistPosition || 'left',
       relationshipName: field.relationshipName || '',
       lookupObject: field.lookupObject || '',
     });
@@ -226,6 +230,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       scale: formData.scale,
       formulaExpr: formData.formulaExpr,
       picklistValues: formData.picklistValues,
+      picklistPosition: formData.type === 'PicklistText' ? formData.picklistPosition : undefined,
       relationshipName: formData.relationshipName,
       lookupObject: formData.lookupObject,
     };
@@ -654,6 +659,60 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       <p className="text-xs text-gray-500 mt-1">
                         Enter each option on a new line.
                       </p>
+                    </div>
+                  )}
+
+                  {selectedType === 'PicklistText' && (
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="picklistPosition">Picklist Position</Label>
+                        <select
+                          id="picklistPosition"
+                          value={formData.picklistPosition}
+                          onChange={(e) => setFormData({ ...formData, picklistPosition: e.target.value as 'left' | 'right' })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
+                        >
+                          <option value="left">Picklist on Left, Text on Right</option>
+                          <option value="right">Text on Left, Picklist on Right</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Choose which side displays the dropdown picklist.
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="picklistValues">Picklist Values</Label>
+                        <Textarea
+                          id="picklistValues"
+                          value={formData.picklistValues.join('\n')}
+                          onChange={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n') })}
+                          onBlur={(e) => setFormData({ ...formData, picklistValues: e.target.value.split('\n').filter(v => v.trim()) })}
+                          placeholder="Enter one value per line"
+                          rows={5}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter each option on a new line.
+                        </p>
+                      </div>
+                      <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>
+                        <div className="flex gap-2">
+                          {formData.picklistPosition === 'left' ? (
+                            <>
+                              <select disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-500">
+                                <option>-- Select --</option>
+                              </select>
+                              <input disabled type="text" placeholder="Free text" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-400" />
+                            </>
+                          ) : (
+                            <>
+                              <input disabled type="text" placeholder="Free text" className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-400" />
+                              <select disabled className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-500">
+                                <option>-- Select --</option>
+                              </select>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 

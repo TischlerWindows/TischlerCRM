@@ -360,6 +360,7 @@ export default function DynamicForm({
       Picklist: List,
       MultiPicklist: List,
       MultiSelectPicklist: List,
+      PicklistText: List,
       Address: MapPin,
       Geolocation: MapPin,
       Lookup: LinkIcon,
@@ -770,6 +771,43 @@ export default function DynamicForm({
                 </label>
               </div>
             ))}
+          </div>
+        );
+        break;
+
+      case 'PicklistText':
+        const ptOptions = fieldDef.picklistValues || [];
+        const ptValue = (typeof value === 'object' && value !== null) ? value : { picklist: '', text: '' };
+        const ptPosition = (fieldDef as any).picklistPosition || 'left';
+        const picklistSelect = (
+          <select
+            value={ptValue.picklist || ''}
+            onChange={(e) =>
+              handleFieldChange(fieldDef.apiName, { ...ptValue, picklist: e.target.value })
+            }
+            disabled={isReadOnly}
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
+          >
+            <option value="">-- Select --</option>
+            {ptOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+        );
+        const textInput = (
+          <Input
+            value={ptValue.text || ''}
+            onChange={(e) =>
+              handleFieldChange(fieldDef.apiName, { ...ptValue, text: e.target.value })
+            }
+            disabled={isReadOnly}
+            placeholder="Enter text"
+            className="flex-1"
+          />
+        );
+        inputElement = (
+          <div className="flex gap-2">
+            {ptPosition === 'left' ? <>{picklistSelect}{textInput}</> : <>{textInput}{picklistSelect}</>}
           </div>
         );
         break;
