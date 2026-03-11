@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
+import { PicklistDependencyEditor } from '@/components/picklist-dependency-editor';
 import {
   Plus,
   Trash2,
@@ -47,6 +48,7 @@ import {
   X,
   ArrowUp,
   ArrowDown,
+  List,
 } from 'lucide-react';
 
 interface PageEditorProps {
@@ -125,6 +127,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [selectedFieldObjects, setSelectedFieldObjects] = useState<string[]>([objectApiName]);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
   const [showSectionVisibilityEditor, setShowSectionVisibilityEditor] = useState(false);
+  const [showPicklistDependencyEditor, setShowPicklistDependencyEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
@@ -651,6 +654,37 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     } catch (err) {
       console.error('Failed to save visibility rules:', err);
       alert('Failed to save visibility rules. Please try again.');
+    }
+  };
+
+  const handleSavePicklistDependencies = async (dependencies: { [value: string]: ConditionExpr[] }) => {
+    if (!selectedElement || selectedElement.type !== 'field' || !object) return;
+
+    const field = fields.find((f) => f.id === selectedElement.id);
+    if (!field) return;
+
+    const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
+    if (!fieldDef) return;
+
+    // Clean up: remove entries with empty condition arrays
+    const cleaned: { [value: string]: ConditionExpr[] } = {};
+    for (const [val, conds] of Object.entries(dependencies)) {
+      if (conds.length > 0) cleaned[val] = conds;
+    }
+
+    const updatedFields = object.fields.map((f) =>
+      f.apiName === fieldDef.apiName
+        ? { ...f, picklistDependencies: Object.keys(cleaned).length > 0 ? cleaned : undefined }
+        : f
+    );
+
+    try {
+      await updateObject(objectApiName, { fields: updatedFields });
+      markDirty();
+      setShowPicklistDependencyEditor(false);
+    } catch (err) {
+      console.error('Failed to save picklist dependencies:', err);
+      alert('Failed to save picklist dependencies. Please try again.');
     }
   };
 
@@ -1537,6 +1571,33 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                             </div>
                           )}
                         </div>
+
+                        {/* Picklist Value Dependencies — only for Picklist/MultiPicklist/PicklistText */}
+                        {(fieldDef.type === 'Picklist' || fieldDef.type === 'MultiPicklist' || fieldDef.type === 'MultiSelectPicklist' || fieldDef.type === 'PicklistText') && fieldDef.picklistValues && fieldDef.picklistValues.length > 0 && (
+                          <div className="space-y-2 mt-4 pt-4 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setShowPicklistDependencyEditor(true)}
+                            >
+                              <List className="h-4 w-4 mr-2" />
+                              {fieldDef.picklistDependencies && Object.keys(fieldDef.picklistDependencies).length > 0
+                                ? 'Edit Value Dependencies'
+                                : 'Add Value Dependencies'}
+                            </Button>
+                            {fieldDef.picklistDependencies && Object.keys(fieldDef.picklistDependencies).length > 0 && (
+                              <div className="text-xs bg-amber-50 p-2 rounded border border-amber-200">
+                                <div className="font-semibold text-amber-900 mb-1">Dependent Values:</div>
+                                {Object.entries(fieldDef.picklistDependencies).map(([val, conditions], idx) => (
+                                  <div key={idx} className="text-amber-700">
+                                    • "{val}" — {conditions.length} rule{conditions.length !== 1 ? 's' : ''}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     );
                   })()}
@@ -1691,6 +1752,39 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                   availableFields={object?.fields.filter(f => f.apiName !== fieldDef.apiName) || []}
                   onSave={handleSaveVisibilityRules}
                   onCancel={() => setShowVisibilityEditor(false)}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Picklist Value Dependency Editor Modal */}
+      {showPicklistDependencyEditor && selectedElement && selectedElement.type === 'field' && (() => {
+        const field = fields.find((f) => f.id === selectedElement.id);
+        const fieldDef = field ? getFieldDef(field.fieldApiName) : null;
+        if (!fieldDef || !fieldDef.picklistValues) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 className="text-lg font-semibold">
+                  Value Dependencies: {fieldDef.label}
+                </h3>
+                <button
+                  onClick={() => setShowPicklistDependencyEditor(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6">
+                <PicklistDependencyEditor
+                  field={fieldDef}
+                  availableFields={object?.fields.filter(f => f.apiName !== fieldDef.apiName) || []}
+                  onSave={handleSavePicklistDependencies}
+                  onCancel={() => setShowPicklistDependencyEditor(false)}
                 />
               </div>
             </div>

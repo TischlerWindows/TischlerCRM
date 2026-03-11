@@ -70,6 +70,7 @@ export interface FieldDef {
   helpText?: string;
   controllingField?: string; // for dependent picklists
   visibleIf?: ConditionExpr[]; // conditional visibility rules
+  picklistDependencies?: { [value: string]: ConditionExpr[] }; // per-value visibility for picklist options
   formulaExpr?: string;        // for formula fields
   lookupObject?: string;       // target object for lookup fields
   relationshipName?: string;   // name to display for relationship

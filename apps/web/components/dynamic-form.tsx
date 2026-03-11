@@ -787,6 +787,16 @@ export default function DynamicForm({
       return null; // Field is not visible
     }
 
+    // Helper: filter picklist values by picklistDependencies
+    const filterPicklistValues = (values: string[]) => {
+      if (!fieldDef.picklistDependencies) return values;
+      return values.filter((val) => {
+        const conditions = fieldDef.picklistDependencies?.[val];
+        if (!conditions || conditions.length === 0) return true; // No rules = always show
+        return evaluateVisibility(conditions, formData, visibilityCtx);
+      });
+    };
+
     const value = formData[fieldDef.apiName];
     const error = errors[fieldDef.apiName];
     const Icon = getFieldIcon(fieldDef.type);
@@ -847,11 +857,11 @@ export default function DynamicForm({
         break;
 
       case 'RichTextArea':
-        inputElement = <Textarea {...commonProps} rows={8} placeholder="Rich text editor (simplified)" />;
+        inputElement = <Textarea {...commonProps} rows={8} />;
         break;
 
       case 'Picklist':
-        const picklistOptions = fieldDef.picklistValues || [];
+        const picklistOptions = filterPicklistValues(fieldDef.picklistValues || []);
         inputElement = (
           <select {...commonProps} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent">
             <option value="">-- Select --</option>
@@ -866,7 +876,7 @@ export default function DynamicForm({
 
       case 'MultiPicklist':
       case 'MultiSelectPicklist':
-        const multiPicklistOptions = fieldDef.picklistValues || [];
+        const multiPicklistOptions = filterPicklistValues(fieldDef.picklistValues || []);
         const selectedValues = value ? value.split(';') : [];
         inputElement = (
           <div className="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto">
@@ -898,7 +908,7 @@ export default function DynamicForm({
         break;
 
       case 'PicklistText':
-        const ptOptions = fieldDef.picklistValues || [];
+        const ptOptions = filterPicklistValues(fieldDef.picklistValues || []);
         const ptValue = (typeof value === 'object' && value !== null) ? value : { picklist: '', text: '' };
         const ptPosition = (fieldDef as any).picklistPosition || 'left';
         const picklistSelect = (
