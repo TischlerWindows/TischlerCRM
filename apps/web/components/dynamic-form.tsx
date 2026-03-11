@@ -265,7 +265,8 @@ export default function DynamicForm({
       tab.sections.forEach(section => {
         section.fields.forEach(field => {
           // Use embedded layout field data (self-contained) first, then fallback
-          const fieldType = field.type || object.fields.find(f => f.apiName === field.apiName)?.type;
+          const rawType = field.type || object.fields.find(f => f.apiName === field.apiName)?.type;
+          const fieldType = rawType ? normalizeFieldType(rawType) : undefined;
           if (fieldType === 'LookupUser') {
             hasLookupUser = true;
           } else if (fieldType === 'Lookup' || fieldType === 'ExternalLookup') {
@@ -282,28 +283,36 @@ export default function DynamicForm({
       });
     });
 
-    // Fetch users for LookupUser fields
-    if (hasLookupUser) {
-      (async () => {
-        try {
-          const users = await apiClient.get<any[]>('/admin/users');
-          setLookupRecordsCache(prev => ({ ...prev, __users__: Array.isArray(users) ? users : [] }));
-        } catch (err) {
-          console.error('Failed to fetch users for LookupUser:', err);
-        }
-      })();
-    }
-
-    if (targetApis.size === 0) return;
+    if (targetApis.size === 0 && !hasLookupUser) return;
 
     (async () => {
-      const entries = await Promise.all(
-        Array.from(targetApis).map(async (api) => {
-          const records = await recordsService.getRecords(api);
-          return [api, records.map(r => ({ id: r.id, ...r.data }))] as [string, any[]];
-        })
-      );
-      setLookupRecordsCache(Object.fromEntries(entries));
+      const newCache: Record<string, any[]> = {};
+
+      // Fetch users for LookupUser fields
+      if (hasLookupUser) {
+        try {
+          const users = await apiClient.get<any[]>('/admin/users');
+          newCache['__users__'] = Array.isArray(users) ? users : [];
+        } catch (err) {
+          console.error('Failed to fetch users for LookupUser:', err);
+          newCache['__users__'] = [];
+        }
+      }
+
+      // Fetch records for regular Lookup fields
+      if (targetApis.size > 0) {
+        const entries = await Promise.all(
+          Array.from(targetApis).map(async (api) => {
+            const records = await recordsService.getRecords(api);
+            return [api, records.map(r => ({ id: r.id, ...r.data }))] as [string, any[]];
+          })
+        );
+        for (const [key, val] of entries) {
+          newCache[key] = val;
+        }
+      }
+
+      setLookupRecordsCache(prev => ({ ...prev, ...newCache }));
     })();
   }, [object, layout]);
 
