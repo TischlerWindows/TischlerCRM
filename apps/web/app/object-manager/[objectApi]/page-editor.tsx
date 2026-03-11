@@ -125,6 +125,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [selectedFieldObjects, setSelectedFieldObjects] = useState<string[]>([objectApiName]);
   const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
   const [showSectionVisibilityEditor, setShowSectionVisibilityEditor] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
   const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -309,6 +311,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           order: maxOrder + 1,
         };
         setFields([...fields, newField]);
+        markDirty();
       } else if (activeId.startsWith('placed-')) {
         // Moving an existing placed field to this column
         setFields(fields.map((f) =>
@@ -316,6 +319,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             ? { ...f, sectionId: targetSectionId, column: targetColumn, order: maxOrder + 1 }
             : f
         ));
+        markDirty();
       }
       return;
     }
@@ -377,6 +381,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       };
       
       setFields([...fields, newField]);
+      markDirty();
       return;
     }
 
@@ -420,6 +425,18 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       );
       
       setFields(updatedFields);
+      markDirty();
+    }
+  };
+
+  // Mark dirty whenever canvas state changes (after initial load)
+  const markDirty = () => setHasUnsavedChanges(true);
+
+  const handleBackToLayouts = () => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedDialog(true);
+    } else {
+      setViewMode('list');
     }
   };
 
@@ -431,6 +448,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     };
     setTabs([...tabs, newTab]);
     setActiveTab(newTab.id);
+    markDirty();
   };
 
   const addSection = () => {
@@ -445,6 +463,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       showInTemplate: true,
     };
     setSections([...sections, newSection]);
+    markDirty();
   };
 
   const deleteTab = (tabId: string) => {
@@ -456,27 +475,33 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     if (activeTab === tabId && remainingTabs.length > 0 && remainingTabs[0]) {
       setActiveTab(remainingTabs[0].id);
     }
+    markDirty();
   };
 
   const deleteSection = (sectionId: string) => {
     setSections(sections.filter((s) => s.id !== sectionId));
     setFields(fields.filter((f) => f.sectionId !== sectionId));
+    markDirty();
   };
 
   const deleteField = (fieldId: string) => {
     setFields(fields.filter((f) => f.id !== fieldId));
+    markDirty();
   };
 
   const updateTabLabel = (tabId: string, label: string) => {
     setTabs(tabs.map((t) => (t.id === tabId ? { ...t, label } : t)));
+    markDirty();
   };
 
   const updateSectionLabel = (sectionId: string, label: string) => {
     setSections(sections.map((s) => (s.id === sectionId ? { ...s, label } : s)));
+    markDirty();
   };
 
   const updateSectionColumns = (sectionId: string, columns: ColumnCount) => {
     setSections(sections.map((s) => (s.id === sectionId ? { ...s, columns } : s)));
+    markDirty();
   };
 
   const toggleSectionCollapsed = (sectionId: string) => {
@@ -503,6 +528,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         return s;
       })
     );
+    markDirty();
   };
 
   const saveLayout = async () => {
@@ -593,6 +619,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         recordTypes: updatedRecordTypes,
       });
       alert(`Layout "${layoutName}" saved successfully!`);
+      setHasUnsavedChanges(false);
       setViewMode('list');
     } catch (err) {
       console.error('Failed to save layout:', err);
@@ -948,6 +975,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     ]);
     setFields([]);
     setActiveTab('tab-1');
+    setHasUnsavedChanges(false);
     setViewMode('editor');
   };
 
@@ -999,6 +1027,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     setSections(newSections);
     setFields(newFields);
     setActiveTab(newTabs[0]?.id || 'tab-1');
+    setHasUnsavedChanges(false);
     setViewMode('editor');
   };
 
@@ -1121,7 +1150,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setViewMode('list')}
+              onClick={handleBackToLayouts}
               className="flex items-center gap-2"
             >
               <ChevronRight className="h-4 w-4 rotate-180" />
@@ -1130,7 +1159,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             <div>
               <Input
                 value={layoutName}
-                onChange={(e) => setLayoutName(e.target.value)}
+                onChange={(e) => { setLayoutName(e.target.value); markDirty(); }}
                 placeholder="Layout name..."
                 className="text-lg font-semibold h-9 w-64 border-dashed"
               />
@@ -1363,6 +1392,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                               : s
                           )
                         );
+                        markDirty();
                       }}
                       className="h-4 w-4 text-brand-navy border-gray-300 rounded"
                     />
@@ -1388,6 +1418,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                               : s
                           )
                         );
+                        markDirty();
                       }}
                       className="h-4 w-4 text-brand-navy border-gray-300 rounded"
                     />
@@ -1528,6 +1559,53 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         </div>
       </div>
 
+      {/* Unsaved Changes Dialog */}
+      {showUnsavedDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold">Unsaved Changes</h3>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-gray-600">
+                You have unsaved changes that will be lost. Would you like to save before leaving?
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowUnsavedDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowUnsavedDialog(false);
+                  setHasUnsavedChanges(false);
+                  setViewMode('list');
+                }}
+                className="text-red-600 hover:text-red-700"
+              >
+                Discard Changes
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setShowUnsavedDialog(false);
+                  saveLayout();
+                }}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save & Exit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section Visibility Rule Editor Modal */}
       {showSectionVisibilityEditor && selectedElement && selectedElement.type === 'section' && (() => {
         const section = sections.find((s) => s.id === selectedElement.id);
@@ -1562,6 +1640,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                         s.id === selectedElement.id ? { ...s, visibleIf: conditions } : s
                       )
                     );
+                    markDirty();
                     setShowSectionVisibilityEditor(false);
                   }}
                   onCancel={() => setShowSectionVisibilityEditor(false)}
