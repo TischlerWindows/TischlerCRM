@@ -1,11 +1,19 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Save, Trash2, Copy, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getPreference, setPreference, getSetting } from '@/lib/preferences';
+import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 const STORAGE_KEY = 'homeLayout';
+const TEMPLATES_KEY = 'homeLayoutTemplates';
+
+type HomeLayoutTemplate = {
+  id: string;
+  name: string;
+  layout: HomeLayout;
+  createdAt: string;
+};
 
 type PanelType = 'report' | 'widget';
 
@@ -94,6 +102,9 @@ export default function HomeLayoutEditor() {
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [fadeSaved, setFadeSaved] = useState(false);
+  const [templates, setTemplates] = useState<HomeLayoutTemplate[]>([]);
+  const [templateName, setTemplateName] = useState('');
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
 
   const getNextAvailableSlot = () => {
     const columns = Math.max(layout.columns, 1);
@@ -112,9 +123,49 @@ export default function HomeLayoutEditor() {
     return { row: maxExistingRow + 1, column: 0 };
   };
 
+  const loadTemplates = async () => {
+    try {
+      const saved = await getSetting<HomeLayoutTemplate[]>(TEMPLATES_KEY);
+      setTemplates(saved || []);
+    } catch {
+      setTemplates([]);
+    }
+  };
+
+  const saveAsTemplate = async () => {
+    if (!templateName.trim()) return;
+    const template: HomeLayoutTemplate = {
+      id: `hlt-${Date.now()}`,
+      name: templateName.trim(),
+      layout: { ...layout, updatedAt: new Date().toISOString() },
+      createdAt: new Date().toISOString(),
+    };
+    const next = [...templates, template];
+    await setSetting(TEMPLATES_KEY, next);
+    setTemplates(next);
+    setTemplateName('');
+    setShowTemplateDialog(false);
+    setShowSaved(true);
+    setFadeSaved(false);
+    window.setTimeout(() => setFadeSaved(true), 1500);
+    window.setTimeout(() => setShowSaved(false), 2000);
+  };
+
+  const deleteTemplate = async (id: string) => {
+    if (!confirm('Delete this template? Departments using it will keep their current assignment.')) return;
+    const next = templates.filter((t) => t.id !== id);
+    await setSetting(TEMPLATES_KEY, next);
+    setTemplates(next);
+  };
+
+  const loadFromTemplate = (template: HomeLayoutTemplate) => {
+    setLayout({ ...template.layout, updatedAt: new Date().toISOString() });
+  };
+
   useEffect(() => {
     (async () => {
       setLayout(await loadLayout());
+      await loadTemplates();
 
       try {
         const customReports = (await getSetting<any[]>('customReports')) || [];
@@ -414,7 +465,67 @@ export default function HomeLayoutEditor() {
             Reset
           </Button>
         </div>
+
+        <div className="border-t pt-4">
+          <Button onClick={() => setShowTemplateDialog(true)} size="sm" variant="outline" className="w-full">
+            <Copy className="h-4 w-4 mr-2" />
+            Save as Template
+          </Button>
+        </div>
+
+        {/* Saved Templates */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Page Layout Templates</h3>
+          {templates.length === 0 && (
+            <p className="text-xs text-gray-500">No templates saved yet. Save the current layout as a template to assign it to departments.</p>
+          )}
+          <div className="space-y-2">
+            {templates.map((t) => (
+              <div key={t.id} className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">{t.name}</div>
+                  <div className="text-xs text-gray-500">{t.layout.panels?.length || 0} panels · {t.layout.columns} cols</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => loadFromTemplate(t)} title="Load into editor">
+                    <FileText className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => deleteTemplate(t.id)} title="Delete template">
+                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </aside>
+
+      {/* Save as Template Dialog */}
+      {showTemplateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl w-[400px] p-6">
+            <h3 className="text-lg font-semibold mb-2">Save as Template</h3>
+            <p className="text-sm text-gray-600 mb-4">Give this home page layout a name. You can then assign it to departments.</p>
+            <input
+              type="text"
+              placeholder="e.g. Sales Home, Support Home"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && saveAsTemplate()}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowTemplateDialog(false); setTemplateName(''); }}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={saveAsTemplate} disabled={!templateName.trim()}>
+                Save Template
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 p-6 bg-gray-50 overflow-y-auto space-y-6">
         <div className="flex items-center justify-between">

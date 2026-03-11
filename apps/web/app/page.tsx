@@ -19,6 +19,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { getPreference, getSetting } from '@/lib/preferences';
 import { recordsService } from '@/lib/records-service';
+import { usePermissions } from '@/lib/permissions-context';
 
 type HomePanel = {
   id: string;
@@ -78,6 +79,7 @@ function getFormattedDate(): string {
 
 export default function HomePage() {
   const { user } = useAuth();
+  const { permissions } = usePermissions();
   const [homeLayout, setHomeLayout] = useState<HomeLayout | null>(null);
   const [reports, setReports] = useState<ReportConfig[]>([]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -86,6 +88,7 @@ export default function HomePage() {
 
   useEffect(() => {
     (async () => {
+      let layoutResolved = false;
       const storedLayout = await getPreference<any>('homeLayout');
       if (storedLayout) {
         try {
@@ -97,6 +100,7 @@ export default function HomePage() {
               column: panel.column ?? index % Math.max(raw.columns, 1),
             }));
             setHomeLayout({ ...raw, panels: migratedPanels } as HomeLayout);
+            layoutResolved = true;
           } else if (raw?.rows) {
             const panels = raw.rows
               .sort((a: any, b: any) => a.order - b.order)
@@ -114,9 +118,27 @@ export default function HomePage() {
               panels,
               updatedAt: new Date().toISOString(),
             });
+            layoutResolved = true;
           }
         } catch (e) {
           setHomeLayout(null);
+        }
+      }
+
+      // Fallback: use department's assigned Home Page layout
+      if (!layoutResolved && permissions?.homePageLayout) {
+        try {
+          const raw = permissions.homePageLayout;
+          if (raw?.panels && typeof raw.columns === 'number') {
+            const migratedPanels = raw.panels.map((panel: any, index: number) => ({
+              ...panel,
+              row: panel.row ?? Math.floor(index / Math.max(raw.columns, 1)),
+              column: panel.column ?? index % Math.max(raw.columns, 1),
+            }));
+            setHomeLayout({ ...raw, panels: migratedPanels } as HomeLayout);
+          }
+        } catch {
+          // ignore
         }
       }
 
@@ -126,7 +148,7 @@ export default function HomePage() {
       const saved = await getSetting<any[]>('dashboards') || [];
       setDashboards(saved);
     })();
-  }, []);
+  }, [permissions]);
 
   const reportMap = useMemo(() => new Map(reports.map((r) => [r.id, r])), [reports]);
   const widgetMap = useMemo(() => {

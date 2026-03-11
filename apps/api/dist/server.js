@@ -2601,13 +2601,27 @@ function buildApp() {
         appPerms[p] = true;
       }
     }
+    let homePageLayout = null;
+    const homePageLayoutId = deptRaw.homePageLayoutId;
+    if (homePageLayoutId) {
+      try {
+        const templatesSetting = await prisma14.setting.findUnique({ where: { key: "homeLayoutTemplates" } });
+        if (templatesSetting) {
+          const templates = templatesSetting.value;
+          const tpl = templates.find((t) => t.id === homePageLayoutId);
+          if (tpl?.layout) homePageLayout = tpl.layout;
+        }
+      } catch {
+      }
+    }
     reply.send({
       userId,
       departmentName: user.department?.name || null,
       profileName: user.profile?.name || null,
       role: user.role,
       objectPermissions: objectPerms,
-      appPermissions: appPerms
+      appPermissions: appPerms,
+      homePageLayout
     });
   });
   app2.get("/accounts", async (req, reply) => {

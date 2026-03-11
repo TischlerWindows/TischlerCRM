@@ -38,6 +38,7 @@ interface PermissionsData {
   role: string;
   objectPermissions: Record<string, ObjectPermission>;
   appPermissions: AppPermissions;
+  homePageLayout?: any;
 }
 
 interface PermissionsContextType {

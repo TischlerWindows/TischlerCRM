@@ -225,6 +225,20 @@ export function buildApp() {
       }
     }
 
+    // Resolve home page layout template for department
+    let homePageLayout: any = null;
+    const homePageLayoutId = deptRaw.homePageLayoutId;
+    if (homePageLayoutId) {
+      try {
+        const templatesSetting = await prisma.setting.findUnique({ where: { key: 'homeLayoutTemplates' } });
+        if (templatesSetting) {
+          const templates = templatesSetting.value as any[];
+          const tpl = templates.find((t: any) => t.id === homePageLayoutId);
+          if (tpl?.layout) homePageLayout = tpl.layout;
+        }
+      } catch { /* ignore */ }
+    }
+
     reply.send({
       userId,
       departmentName: user.department?.name || null,
@@ -232,6 +246,7 @@ export function buildApp() {
       role: user.role,
       objectPermissions: objectPerms,
       appPermissions: appPerms,
+      homePageLayout,
     });
   });
 

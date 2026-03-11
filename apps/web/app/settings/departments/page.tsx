@@ -12,9 +12,12 @@ import {
   FolderTree,
   Shield,
   Check,
+  Home,
+  LayoutDashboard,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
+import { getSetting } from '@/lib/preferences';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface ObjectPerms {
@@ -91,8 +94,10 @@ export default function DepartmentsPage() {
   const [formParent, setFormParent] = useState('');
   const [formPerms, setFormPerms] = useState<Permissions>(emptyPermissions());
   const [formIsAdmin, setFormIsAdmin] = useState(false);
+  const [formHomeLayoutId, setFormHomeLayoutId] = useState<string>('');
+  const [homeTemplates, setHomeTemplates] = useState<Array<{ id: string; name: string; layout: any }>>([]);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'objects' | 'app'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'objects' | 'app' | 'home'>('details');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +105,9 @@ export default function DepartmentsPage() {
       if (!schema) loadSchema();
       const data = await apiClient.get<DepartmentRow[]>('/departments');
       setDepartments(data);
+      // Load home layout templates
+      const tpls = await getSetting<Array<{ id: string; name: string; layout: any }>>('homeLayoutTemplates');
+      setHomeTemplates(tpls || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load departments');
     } finally {
@@ -115,6 +123,7 @@ export default function DepartmentsPage() {
     setFormParent('');
     setFormPerms(emptyPermissions());
     setFormIsAdmin(false);
+    setFormHomeLayoutId('');
     setActiveTab('details');
   };
 
@@ -126,7 +135,7 @@ export default function DepartmentsPage() {
         name: formName,
         description: formDesc || null,
         parentId: formParent || null,
-        permissions: { ...formPerms, isAdmin: formIsAdmin },
+        permissions: { ...formPerms, isAdmin: formIsAdmin, homePageLayoutId: formHomeLayoutId || undefined },
       });
       setSuccess(`Department "${formName}" created`);
       setShowCreate(false);
@@ -147,7 +156,7 @@ export default function DepartmentsPage() {
         name: formName,
         description: formDesc || null,
         parentId: formParent || null,
-        permissions: { ...formPerms, isAdmin: formIsAdmin },
+        permissions: { ...formPerms, isAdmin: formIsAdmin, homePageLayoutId: formHomeLayoutId || undefined },
       });
       setSuccess('Department updated');
       setShowEdit(null);
@@ -183,6 +192,7 @@ export default function DepartmentsPage() {
       : emptyPermissions();
     setFormPerms(perms);
     setFormIsAdmin(!!(d.permissions as any)?.isAdmin);
+    setFormHomeLayoutId((d.permissions as any)?.homePageLayoutId || '');
     setActiveTab('details');
     setShowEdit(d.id);
   };
@@ -361,7 +371,7 @@ export default function DepartmentsPage() {
 
             {/* Tabs */}
             <div className="border-b px-6 flex gap-0 flex-shrink-0">
-              {(['details', 'objects', 'app'] as const).map((tab) => (
+              {(['details', 'objects', 'app', 'home'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -371,7 +381,7 @@ export default function DepartmentsPage() {
                       : 'border-transparent text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  {tab === 'details' ? 'Details' : tab === 'objects' ? 'Object Permissions' : 'App Permissions'}
+                  {tab === 'details' ? 'Details' : tab === 'objects' ? 'Object Permissions' : tab === 'app' ? 'App Permissions' : 'Home Page'}
                 </button>
               ))}
             </div>
@@ -550,6 +560,73 @@ export default function DepartmentsPage() {
                       );
                     })}
                   </div>
+                </div>
+              )}
+
+              {/* ─ Home Page Layout tab ─ */}
+              {activeTab === 'home' && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Assign a Home Page layout template for members of this department.
+                    Users without a personal Home layout will see this layout when they log in.
+                  </p>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Home Page Layout Template
+                    </label>
+                    <select
+                      value={formHomeLayoutId}
+                      onChange={(e) => setFormHomeLayoutId(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+                    >
+                      <option value="">— None (use default) —</option>
+                      {homeTemplates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name} ({t.layout?.panels?.length || 0} panels, {t.layout?.columns || 2} columns)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {formHomeLayoutId && (() => {
+                    const selected = homeTemplates.find(t => t.id === formHomeLayoutId);
+                    if (!selected) return null;
+                    return (
+                      <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center gap-2 mb-3">
+                          <LayoutDashboard className="w-4 h-4 text-brand-navy" />
+                          <span className="text-sm font-medium text-gray-800">{selected.name}</span>
+                        </div>
+                        <div className="text-sm text-gray-600 mb-2">
+                          <span className="font-medium">{selected.layout?.columns || 2} columns</span>
+                          {' · '}
+                          <span>{selected.layout?.panels?.length || 0} panels</span>
+                        </div>
+                        {selected.layout?.panels && selected.layout.panels.length > 0 && (
+                          <div className="space-y-1">
+                            {selected.layout.panels.map((panel: any, idx: number) => (
+                              <div key={idx} className="text-xs text-gray-500 flex items-center gap-2">
+                                <span className="w-4 h-4 rounded bg-brand-navy/10 text-brand-navy flex items-center justify-center text-[10px] font-medium">{idx + 1}</span>
+                                <span>{panel.title || panel.sourceId || 'Untitled panel'}</span>
+                                <span className="text-gray-400">({panel.type})</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {homeTemplates.length === 0 && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <Home className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500 mb-1">No templates available</p>
+                      <p className="text-xs text-gray-400">
+                        Go to Object Manager → Home → Home Layout Editor to design a layout, then save it as a template.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
