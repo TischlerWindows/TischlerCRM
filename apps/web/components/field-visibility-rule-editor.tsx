@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ConditionExpr, FieldDef } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +43,40 @@ export default function FieldVisibilityRuleEditor({
   const [valueSearchTerm, setValueSearchTerm] = useState<string>('');
   const [showValueDropdown, setShowValueDropdown] = useState(false);
 
+  // Click-outside handler to close all dropdowns
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowFieldDropdown(false);
+        setShowValueDropdown(false);
+        setShowUserDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Refs for individual dropdowns to close when clicking outside their area
+  const fieldDropdownRef = useRef<HTMLDivElement>(null);
+  const valueDropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (fieldDropdownRef.current && !fieldDropdownRef.current.contains(e.target as Node)) {
+        setShowFieldDropdown(false);
+      }
+      if (valueDropdownRef.current && !valueDropdownRef.current.contains(e.target as Node)) {
+        setShowValueDropdown(false);
+      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setShowUserDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   // User-based visibility state
   const [enableUserVisibility, setEnableUserVisibility] = useState(!!existingUserCondition);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
@@ -55,9 +89,10 @@ export default function FieldVisibilityRuleEditor({
   // Fetch users when user visibility is enabled
   useEffect(() => {
     if (enableUserVisibility && allUsers.length === 0) {
-      apiClient.get('/admin/users')
+      apiClient.get<any>('/admin/users')
         .then((res: any) => {
-          const users = res.data?.users || res.users || res.data || [];
+          // API returns a plain array directly
+          const users = Array.isArray(res) ? res : (res.data?.users || res.users || res.data || []);
           setAllUsers(users);
         })
         .catch(() => {});
@@ -88,7 +123,7 @@ export default function FieldVisibilityRuleEditor({
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+    <div ref={containerRef} className="space-y-4 p-4 border rounded-lg bg-gray-50">
       <div>
         <h3 className="font-semibold text-sm mb-2">Field Visibility Rules for {field.label}</h3>
         <p className="text-xs text-gray-600 mb-4">This field will only show if ALL conditions are met (AND logic)</p>
@@ -119,7 +154,7 @@ export default function FieldVisibilityRuleEditor({
         <Label className="text-xs font-medium">Add Rule:</Label>
         
         {/* Field Selection */}
-        <div className="relative">
+        <div className="relative" ref={fieldDropdownRef}>
           <Label htmlFor="condition-field" className="text-xs">When field:</Label>
           <Input
             id="condition-field"
@@ -242,7 +277,7 @@ export default function FieldVisibilityRuleEditor({
               );
               
               return (
-                <div className="relative">
+                <div className="relative" ref={valueDropdownRef}>
                   <Input
                     id="condition-value"
                     type="text"
@@ -339,7 +374,7 @@ export default function FieldVisibilityRuleEditor({
             )}
 
             {/* User search */}
-            <div className="relative">
+            <div className="relative" ref={userDropdownRef}>
               <Input
                 type="text"
                 placeholder="Search users..."
