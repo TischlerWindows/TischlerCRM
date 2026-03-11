@@ -786,7 +786,8 @@ export default function DynamicForm({
               handleFieldChange(fieldDef.apiName, { ...ptValue, picklist: e.target.value })
             }
             disabled={isReadOnly}
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
+            className="w-1/2 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent whitespace-normal break-words"
+            style={{ height: 'auto', minHeight: '2.5rem' }}
           >
             <option value="">-- Select --</option>
             {ptOptions.map((option) => (
@@ -802,11 +803,11 @@ export default function DynamicForm({
             }
             disabled={isReadOnly}
             placeholder="Enter text"
-            className="flex-1"
+            className="w-1/2 min-w-0"
           />
         );
         inputElement = (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-start">
             {ptPosition === 'left' ? <>{picklistSelect}{textInput}</> : <>{textInput}{picklistSelect}</>}
           </div>
         );
