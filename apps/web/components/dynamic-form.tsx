@@ -276,7 +276,17 @@ export default function DynamicForm({
               || (field as any).relatedObject
               || (() => {
                 const fd = object.fields.find(f => f.apiName === field.apiName);
-                return fd?.lookupObject || fd?.relationship?.targetObject || (fd as any)?.relatedObject;
+                if (fd?.lookupObject) return fd.lookupObject;
+                if (fd?.relationship?.targetObject) return fd.relationship.targetObject;
+                if ((fd as any)?.relatedObject) return (fd as any).relatedObject;
+                // Infer from apiName pattern (e.g., "ContactId" -> "Contact")
+                const apiName = field.apiName;
+                if (apiName.endsWith('Id')) {
+                  const possibleTarget = apiName.slice(0, -2);
+                  const matchedObj = schema?.objects.find(o => o.apiName === possibleTarget);
+                  if (matchedObj) return matchedObj.apiName;
+                }
+                return undefined;
               })();
             if (target) targetApis.add(target);
           }
@@ -349,7 +359,22 @@ export default function DynamicForm({
 
   const getLookupTargetApi = (fieldDef: FieldDef): string | undefined => {
     const relatedObject = (fieldDef as any).relatedObject as string | undefined;
-    return fieldDef.lookupObject || fieldDef.relationship?.targetObject || relatedObject;
+    if (fieldDef.lookupObject) return fieldDef.lookupObject;
+    if (fieldDef.relationship?.targetObject) return fieldDef.relationship.targetObject;
+    if (relatedObject) return relatedObject;
+
+    // Fallback: try to find from object.fields by apiName
+    const objField = object.fields.find(f => f.apiName === fieldDef.apiName);
+    if (objField?.lookupObject) return objField.lookupObject;
+
+    // Last resort: infer from apiName pattern (e.g., "ContactId" -> "Contact")
+    if (fieldDef.apiName.endsWith('Id')) {
+      const possibleTarget = fieldDef.apiName.slice(0, -2);
+      const matchedObj = schema?.objects.find(o => o.apiName === possibleTarget);
+      if (matchedObj) return matchedObj.apiName;
+    }
+
+    return undefined;
   };
 
   const getLookupRecords = (targetApi: string) => {
