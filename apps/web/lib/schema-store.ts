@@ -160,40 +160,11 @@ export const useSchemaStore = create<SchemaStore>()(
           updatedAt: new Date().toISOString()
         };
 
-        const shouldRelateNewObject = !RELATIONSHIP_EXCLUSIONS.has(newObject.apiName);
-        const relatedObjects = schema.objects.filter((obj) => !RELATIONSHIP_EXCLUSIONS.has(obj.apiName));
-
-        const newObjectWithRelations: ObjectDef = shouldRelateNewObject
-          ? {
-              ...newObject,
-              fields: relatedObjects.reduce((fields, target) => {
-                if (target.apiName === newObject.apiName) return fields;
-                if (hasRelationshipField(fields, target.apiName)) return fields;
-                return [...fields, createRelationshipField(target)];
-              }, newObject.fields || [])
-            }
-          : newObject;
-
-        const newObjectWithLayouts = addLookupFieldsToLayouts(newObjectWithRelations);
-
-        const updatedExisting = schema.objects.map((obj) => {
-          if (RELATIONSHIP_EXCLUSIONS.has(obj.apiName) || !shouldRelateNewObject) {
-            return obj;
-          }
-          if (hasRelationshipField(obj.fields, newObject.apiName)) {
-            return obj;
-          }
-          const updatedObject = {
-            ...obj,
-            fields: [...obj.fields, createRelationshipField(newObject)],
-            updatedAt: new Date().toISOString()
-          };
-          return addLookupFieldsToLayouts(updatedObject);
-        });
-
+        // Simply add the new object — no auto-generated relationship fields.
+        // Users can manually create Lookup fields via the field editor.
         const updatedSchema = {
           ...schema,
-          objects: [...updatedExisting, newObjectWithLayouts],
+          objects: [...schema.objects, newObject],
           version: schema.version + 1,
           updatedAt: new Date().toISOString()
         };
@@ -214,7 +185,7 @@ export const useSchemaStore = create<SchemaStore>()(
           console.log(`[Schema] Object "${newObject.apiName}" created in database`);
 
           // Sync fields to the database so the records API can validate them
-          const fieldsToSync = (newObjectWithLayouts.fields || []).filter((f) => {
+          const fieldsToSync = (newObject.fields || []).filter((f) => {
             const isSystem = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(f.apiName);
             const isLookup = f.type === 'Lookup' || f.type === 'ExternalLookup';
             return !isSystem && !isLookup;
