@@ -35,6 +35,76 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Custom dropdown for PicklistText that allows selected value to wrap
+function PicklistTextDropdown({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: string[];
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="w-1/2 min-w-0 relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
+        className={cn(
+          'w-full min-h-[2.5rem] px-3 py-2 text-left border border-gray-300 rounded-lg bg-white',
+          'focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent focus:outline-none',
+          'flex items-start justify-between gap-1',
+          disabled && 'bg-gray-100 cursor-not-allowed opacity-70'
+        )}
+      >
+        <span className="break-words whitespace-normal flex-1">
+          {value || <span className="text-gray-500">-- Select --</span>}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" />
+      </button>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div
+            className={cn(
+              'px-3 py-2 cursor-pointer hover:bg-gray-100 text-gray-500',
+              !value && 'bg-blue-50'
+            )}
+            onClick={() => { onChange(''); setOpen(false); }}
+          >
+            -- Select --
+          </div>
+          {options.map((option) => (
+            <div
+              key={option}
+              className={cn(
+                'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal',
+                value === option && 'bg-blue-50 font-medium'
+              )}
+              onClick={() => { onChange(option); setOpen(false); }}
+            >
+              {option}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface DynamicFormProps {
   objectApiName: string;
   layoutType: 'create' | 'edit';
@@ -780,20 +850,14 @@ export default function DynamicForm({
         const ptValue = (typeof value === 'object' && value !== null) ? value : { picklist: '', text: '' };
         const ptPosition = (fieldDef as any).picklistPosition || 'left';
         const picklistSelect = (
-          <select
+          <PicklistTextDropdown
+            options={ptOptions}
             value={ptValue.picklist || ''}
-            onChange={(e) =>
-              handleFieldChange(fieldDef.apiName, { ...ptValue, picklist: e.target.value })
+            onChange={(val) =>
+              handleFieldChange(fieldDef.apiName, { ...ptValue, picklist: val })
             }
             disabled={isReadOnly}
-            className="w-1/2 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent whitespace-normal break-words"
-            style={{ height: 'auto', minHeight: '2.5rem' }}
-          >
-            <option value="">-- Select --</option>
-            {ptOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
+          />
         );
         const textInput = (
           <Input
