@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { OrgSchema, ObjectDef, FieldDef, ValidationRule, RecordType, PageLayout } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
@@ -101,6 +102,7 @@ function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
 }
 
 export const useSchemaStore = create<SchemaStore>()(
+  persist(
     (set, get) => ({
       // Initial state
       schema: null,
@@ -797,5 +799,10 @@ export const useSchemaStore = create<SchemaStore>()(
       setSelectedLayout: (layoutId) => set({ selectedLayoutId: layoutId }),
       setError: (error) => set({ error }),
       clearError: () => set({ error: null })
-    })
+    }),
+    {
+      name: 'crm-schema-cache',
+      partialize: (state) => ({ schema: state.schema }),
+    }
+  )
 );
