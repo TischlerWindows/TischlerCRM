@@ -63,9 +63,26 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       return Array.isArray(condition.right) && condition.right.includes(leftValue);
     
     case 'INCLUDES':
-      // For multi-select fields - check if any value in leftValue array is in rightValue array
-      if (Array.isArray(leftValue) && Array.isArray(condition.right)) {
-        return leftValue.some(val => condition.right.includes(val));
+      // For multi-select fields — check if the field's selected values
+      // contain the target value.  Multi-select values can be stored as:
+      //   - an array: ["A", "B"]
+      //   - a semicolon-separated string: "A;B"
+      //   - a comma-separated string: "A, B"
+      // condition.right is the single value we're looking for.
+      if (Array.isArray(leftValue)) {
+        // leftValue is already an array — just check membership
+        if (Array.isArray(condition.right)) {
+          return leftValue.some(val => condition.right.includes(val));
+        }
+        return leftValue.includes(condition.right);
+      }
+      if (typeof leftValue === 'string' && leftValue.length > 0) {
+        // Split on semicolons or commas (with optional surrounding whitespace)
+        const parts = leftValue.split(/\s*[;,]\s*/);
+        if (Array.isArray(condition.right)) {
+          return parts.some(val => condition.right.includes(val));
+        }
+        return parts.includes(condition.right);
       }
       return false;
     
