@@ -658,7 +658,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   };
 
   const handleSavePicklistDependencies = async (depRules: PicklistDependencyRule[]) => {
-    if (!selectedElement || selectedElement.type !== 'field' || !object) return;
+    if (!selectedElement || selectedElement.type !== 'field' || !object) {
+      return;
+    }
 
     const field = fields.find((f) => f.id === selectedElement.id);
     if (!field) return;
@@ -677,7 +679,6 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
     try {
       await updateObject(objectApiName, { fields: updatedFields });
-      markDirty();
       setShowPicklistDependencyEditor(false);
     } catch (err) {
       console.error('Failed to save picklist dependencies:', err);

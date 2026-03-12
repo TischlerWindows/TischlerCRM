@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ConditionExpr, FieldDef, PicklistDependencyRule } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,39 @@ interface PicklistDependencyEditorProps {
   onCancel: () => void;
 }
 
+/**
+ * Migrate old-format picklistDependencies ({ [value: string]: ConditionExpr[] })
+ * to new-format (PicklistDependencyRule[]).
+ */
+function migratePicklistDependencies(
+  raw: any
+): PicklistDependencyRule[] {
+  if (!raw) return [];
+  // New format: already an array of { conditions, values }
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((r: any) => r && Array.isArray(r.conditions) && Array.isArray(r.values))
+      .map((r: any) => ({
+        conditions: [...r.conditions],
+        values: [...r.values],
+      }));
+  }
+  // Old format: { [value: string]: ConditionExpr[] }
+  if (typeof raw === 'object') {
+    const rules: PicklistDependencyRule[] = [];
+    for (const [value, conditions] of Object.entries(raw)) {
+      if (Array.isArray(conditions) && conditions.length > 0) {
+        rules.push({
+          conditions: conditions as ConditionExpr[],
+          values: [value],
+        });
+      }
+    }
+    return rules;
+  }
+  return [];
+}
+
 export default function PicklistDependencyEditor({
   field,
   availableFields,
@@ -22,13 +55,8 @@ export default function PicklistDependencyEditor({
   onCancel,
 }: PicklistDependencyEditorProps) {
   const picklistValues = field.picklistValues || [];
-  const [rules, setRules] = useState<PicklistDependencyRule[]>(
-    field.picklistDependencies
-      ? field.picklistDependencies.map(r => ({
-          conditions: [...r.conditions],
-          values: [...r.values],
-        }))
-      : []
+  const [rules, setRules] = useState<PicklistDependencyRule[]>(() =>
+    migratePicklistDependencies(field.picklistDependencies)
   );
   const [expandedRule, setExpandedRule] = useState<number | null>(null);
 
@@ -58,52 +86,75 @@ export default function PicklistDependencyEditor({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const getFieldLabel = (apiName: string) => {
-    return availableFields.find((f) => f.apiName === apiName)?.label || apiName;
-  };
+  const getFieldLabel = useCallback(
+    (apiName: string) =>
+      availableFields.find((f) => f.apiName === apiName)?.label || apiName,
+    [availableFields]
+  );
 
-  const addNewRule = () => {
-    const newIdx = rules.length;
-    setRules([...rules, { conditions: [], values: [] }]);
-    setExpandedRule(newIdx);
-    setEditingCondition({ ruleIdx: newIdx, cond: { left: '', op: '==', right: '' } });
-    setFieldSearchTerm('');
-    setValueSearchTerm('');
-  };
+  const addNewRule = useCallback(() => {
+    setRules((prev) => {
+      const newIdx = prev.length;
+      setExpandedRule(newIdx);
+      setEditingCondition({ ruleIdx: newIdx, cond: { left: '', op: '==', right: '' } });
+      setFieldSearchTerm('');
+      setValueSearchTerm('');
+      return [...prev, { conditions: [], values: [] }];
+    });
+  }, []);
 
-  const deleteRule = (idx: number) => {
-    setRules(rules.filter((_, i) => i !== idx));
-    if (expandedRule === idx) setExpandedRule(null);
-    else if (expandedRule !== null && expandedRule > idx) setExpandedRule(expandedRule - 1);
-    if (editingCondition?.ruleIdx === idx) setEditingCondition(null);
-  };
+  const deleteRule = useCallback((idx: number) => {
+    setRules((prev) => prev.filter((_, i) => i !== idx));
+    setExpandedRule((prev) => {
+      if (prev === idx) return null;
+      if (prev !== null && prev > idx) return prev - 1;
+      return prev;
+    });
+    setEditingCondition((prev) => {
+      if (prev?.ruleIdx === idx) return null;
+      return prev;
+    });
+  }, []);
 
-  const addConditionToRule = (ruleIdx: number) => {
-    if (!editingCondition || editingCondition.ruleIdx !== ruleIdx) return;
-    const { cond } = editingCondition;
-    if (!cond.left || !cond.op || cond.right === '' || cond.right === undefined) return;
+  const addConditionToRule = useCallback(
+    (ruleIdx: number) => {
+      setEditingCondition((prev) => {
+        if (!prev || prev.ruleIdx !== ruleIdx) return prev;
+        const { cond } = prev;
+        if (!cond.left || !cond.op || cond.right === '' || cond.right === undefined) return prev;
 
-    setRules(
-      rules.map((r, i) =>
-        i === ruleIdx ? { ...r, conditions: [...r.conditions, cond as ConditionExpr] } : r
+        // Add condition to rules
+        setRules((prevRules) =>
+          prevRules.map((r, i) =>
+            i === ruleIdx
+              ? { ...r, conditions: [...r.conditions, cond as ConditionExpr] }
+              : r
+          )
+        );
+
+        setFieldSearchTerm('');
+        setValueSearchTerm('');
+
+        // Reset editing condition
+        return { ruleIdx, cond: { left: '', op: '==', right: '' } };
+      });
+    },
+    []
+  );
+
+  const removeConditionFromRule = useCallback((ruleIdx: number, condIdx: number) => {
+    setRules((prev) =>
+      prev.map((r, i) =>
+        i === ruleIdx
+          ? { ...r, conditions: r.conditions.filter((_, ci) => ci !== condIdx) }
+          : r
       )
     );
-    setEditingCondition({ ruleIdx, cond: { left: '', op: '==', right: '' } });
-    setFieldSearchTerm('');
-    setValueSearchTerm('');
-  };
+  }, []);
 
-  const removeConditionFromRule = (ruleIdx: number, condIdx: number) => {
-    setRules(
-      rules.map((r, i) =>
-        i === ruleIdx ? { ...r, conditions: r.conditions.filter((_, ci) => ci !== condIdx) } : r
-      )
-    );
-  };
-
-  const toggleValueInRule = (ruleIdx: number, value: string) => {
-    setRules(
-      rules.map((r, i) => {
+  const toggleValueInRule = useCallback((ruleIdx: number, value: string) => {
+    setRules((prev) =>
+      prev.map((r, i) => {
         if (i !== ruleIdx) return r;
         const has = r.values.includes(value);
         return {
@@ -112,17 +163,32 @@ export default function PicklistDependencyEditor({
         };
       })
     );
-  };
+  }, []);
 
-  const selectAllValues = (ruleIdx: number) => {
-    setRules(rules.map((r, i) => (i === ruleIdx ? { ...r, values: [...picklistValues] } : r)));
-  };
+  const selectAllValues = useCallback(
+    (ruleIdx: number) => {
+      setRules((prev) =>
+        prev.map((r, i) => (i === ruleIdx ? { ...r, values: [...picklistValues] } : r))
+      );
+    },
+    [picklistValues]
+  );
 
-  const deselectAllValues = (ruleIdx: number) => {
-    setRules(rules.map((r, i) => (i === ruleIdx ? { ...r, values: [] } : r)));
-  };
+  const deselectAllValues = useCallback((ruleIdx: number) => {
+    setRules((prev) =>
+      prev.map((r, i) => (i === ruleIdx ? { ...r, values: [] } : r))
+    );
+  }, []);
 
   const totalConditions = rules.reduce((sum, r) => sum + r.conditions.length, 0);
+
+  const handleSave = useCallback(() => {
+    // Clean: remove rules with no conditions or no values
+    const cleaned = rules.filter(
+      (r) => r.conditions.length > 0 && r.values.length > 0
+    );
+    onSave(cleaned);
+  }, [rules, onSave]);
 
   return (
     <div className="space-y-4">
@@ -153,6 +219,7 @@ export default function PicklistDependencyEditor({
               {/* Rule header */}
               <div className="flex items-center justify-between px-3 py-2">
                 <button
+                  type="button"
                   onClick={() => {
                     setExpandedRule(isExpanded ? null : ruleIdx);
                     if (!isExpanded) {
@@ -184,6 +251,7 @@ export default function PicklistDependencyEditor({
                   </span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => deleteRule(ruleIdx)}
                   className="text-red-400 hover:text-red-600 p-1"
                   title="Delete rule"
@@ -213,6 +281,7 @@ export default function PicklistDependencyEditor({
                               {formatCondition(condition, getFieldLabel(condition.left), {})}
                             </span>
                             <button
+                              type="button"
                               onClick={() => removeConditionFromRule(ruleIdx, condIdx)}
                               className="text-red-500 hover:text-red-700 ml-2"
                             >
@@ -274,7 +343,7 @@ export default function PicklistDependencyEditor({
                                   onClick={() => {
                                     setEditingCondition({
                                       ruleIdx,
-                                      cond: { ...editingCondition!.cond, left: f.apiName },
+                                      cond: { ...(editingCondition?.cond || {}), left: f.apiName },
                                     });
                                     setFieldSearchTerm(f.label);
                                     setShowFieldDropdown(false);
@@ -470,6 +539,7 @@ export default function PicklistDependencyEditor({
                         })()}
 
                         <Button
+                          type="button"
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 flex-shrink-0"
@@ -496,12 +566,14 @@ export default function PicklistDependencyEditor({
                       </Label>
                       <div className="flex gap-2">
                         <button
+                          type="button"
                           onClick={() => selectAllValues(ruleIdx)}
                           className="text-[10px] text-blue-600 hover:text-blue-800"
                         >
                           All
                         </button>
                         <button
+                          type="button"
                           onClick={() => deselectAllValues(ruleIdx)}
                           className="text-[10px] text-blue-600 hover:text-blue-800"
                         >
@@ -513,10 +585,10 @@ export default function PicklistDependencyEditor({
                       {picklistValues.map((val) => {
                         const isSelected = rule.values.includes(val);
                         return (
-                          <label
+                          <div
                             key={val}
-                            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs"
                             onClick={() => toggleValueInRule(ruleIdx, val)}
+                            className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
                           >
                             <div
                               className={`w-4 h-4 border rounded flex items-center justify-center flex-shrink-0 ${
@@ -530,7 +602,7 @@ export default function PicklistDependencyEditor({
                             <span className={isSelected ? 'font-medium' : ''}>
                               {val}
                             </span>
-                          </label>
+                          </div>
                         );
                       })}
                     </div>
@@ -548,7 +620,7 @@ export default function PicklistDependencyEditor({
       </div>
 
       {/* Add Rule Button */}
-      <Button variant="outline" size="sm" className="w-full" onClick={addNewRule}>
+      <Button type="button" variant="outline" size="sm" className="w-full" onClick={addNewRule}>
         <Plus className="w-4 h-4 mr-2" />
         Add Rule
       </Button>
@@ -556,19 +628,14 @@ export default function PicklistDependencyEditor({
       {/* Actions */}
       <div className="flex gap-2 pt-4 border-t">
         <Button
-          onClick={() => {
-            // Clean: remove rules with no conditions or no values
-            const cleaned = rules.filter(
-              (r) => r.conditions.length > 0 && r.values.length > 0
-            );
-            onSave(cleaned);
-          }}
+          type="button"
+          onClick={handleSave}
           size="sm"
           className="flex-1 border-2 border-brand-navy"
         >
           Save Value Dependencies
         </Button>
-        <Button onClick={onCancel} variant="outline" size="sm" className="flex-1">
+        <Button type="button" onClick={onCancel} variant="outline" size="sm" className="flex-1">
           Cancel
         </Button>
       </div>
