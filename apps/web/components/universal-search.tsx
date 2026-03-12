@@ -5,6 +5,7 @@ import { Search, MapPin, Users, Building2, Lightbulb, Target, Briefcase, X } fro
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { recordsService } from '@/lib/records-service';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface SearchResult {
   id: string;
@@ -62,6 +63,23 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { schema } = useSchemaStore();
+
+  // Map search result types to schema object apiNames
+  const typeToApiName: Record<string, string> = {
+    property: 'Property', account: 'Account', contact: 'Contact',
+    lead: 'Lead', deal: 'Deal', project: 'Project',
+  };
+
+  // Resolve display label from schema (falls back to typeConfig default)
+  const getTypeLabel = (type: string): string => {
+    const apiName = typeToApiName[type];
+    if (apiName && schema) {
+      const obj = schema.objects.find(o => o.apiName === apiName);
+      if (obj) return obj.label;
+    }
+    return typeConfig[type as keyof typeof typeConfig]?.label || type;
+  };
 
   // Search across all record types
   const performSearch = async (query: string) => {
@@ -347,7 +365,10 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
           }}
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search properties, accounts, contacts, leads, deals, projects..."
+          placeholder={`Search ${['Property', 'Account', 'Contact', 'Lead', 'Deal', 'Project'].map(api => {
+            const obj = schema?.objects.find(o => o.apiName === api);
+            return (obj?.pluralLabel || obj?.label || api + 's').toLowerCase();
+          }).join(', ')}...`}
           className={cn(
             'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 bg-white dark:bg-gray-800 dark:text-white text-sm',
             inputClassName
@@ -416,7 +437,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
                             'dark:bg-opacity-20'
                           )}
                         >
-                          {config.label}
+                          {getTypeLabel(result.type)}
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 dark:text-gray-400 truncate">

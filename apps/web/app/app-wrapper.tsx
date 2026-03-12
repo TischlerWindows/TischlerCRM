@@ -144,6 +144,17 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     setSetting('tabConfiguration', newTabs);
   };
 
+  // Resolve the display name for a tab from the schema object labels
+  // This ensures renamed objects show their updated label in the tab bar
+  const resolveTabName = (tab: { name: string; href: string }): string => {
+    if (!schema) return tab.name;
+    const objectApiName = hrefToObjectMap[tab.href];
+    if (!objectApiName) return tab.name;
+    const obj = schema.objects.find(o => o.apiName === objectApiName);
+    if (!obj) return tab.name;
+    return obj.pluralLabel || obj.label || tab.name;
+  };
+
   const handleResetToDefault = () => {
     setTabs(defaultTabs);
     saveTabConfiguration(defaultTabs);
@@ -285,7 +296,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
                       : 'text-brand-dark/70 hover:text-brand-navy'
                   )}
                 >
-                  {item.name}
+                  {resolveTabName(item)}
                   {/* Active indicator — brand red bottom bar */}
                   {isActive && (
                     <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-brand-red rounded-t-full" />
@@ -326,7 +337,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
                 {tabs.map((item, index) => (
                   <div key={item.name} draggable onDragStart={() => handleDragStart(index)} onDragOver={(e) => handleDragOver(e, index)} onDragEnd={handleDragEnd} className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 cursor-move group transition-colors">
                     <GripVertical className="w-4 h-4 text-gray-400" />
-                    <span className="flex-1 text-sm font-medium text-brand-dark">{item.name}</span>
+                    <span className="flex-1 text-sm font-medium text-brand-dark">{resolveTabName(item)}</span>
                     <button onClick={() => handleRemoveTab(index)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove"><X className="w-3.5 h-3.5 text-gray-500" /></button>
                   </div>
                 ))}
