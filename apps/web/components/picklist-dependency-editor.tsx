@@ -19,28 +19,18 @@ interface PicklistDependencyEditorProps {
  * Migrate old-format picklistDependencies ({ [value: string]: ConditionExpr[] })
  * to new-format (PicklistDependencyRule[]).
  */
-function migratePicklistDependencies(
-  raw: any
-): PicklistDependencyRule[] {
+function migratePicklistDependencies(raw: any): PicklistDependencyRule[] {
   if (!raw) return [];
-  // New format: already an array of { conditions, values }
   if (Array.isArray(raw)) {
     return raw
       .filter((r: any) => r && Array.isArray(r.conditions) && Array.isArray(r.values))
-      .map((r: any) => ({
-        conditions: [...r.conditions],
-        values: [...r.values],
-      }));
+      .map((r: any) => ({ conditions: [...r.conditions], values: [...r.values] }));
   }
-  // Old format: { [value: string]: ConditionExpr[] }
   if (typeof raw === 'object') {
     const rules: PicklistDependencyRule[] = [];
     for (const [value, conditions] of Object.entries(raw)) {
       if (Array.isArray(conditions) && conditions.length > 0) {
-        rules.push({
-          conditions: conditions as ConditionExpr[],
-          values: [value],
-        });
+        rules.push({ conditions: conditions as ConditionExpr[], values: [value] });
       }
     }
     return rules;
@@ -60,11 +50,11 @@ export default function PicklistDependencyEditor({
   );
   const [expandedRule, setExpandedRule] = useState<number | null>(null);
 
-  // State for new condition being built inside a rule
-  const [editingCondition, setEditingCondition] = useState<{
-    ruleIdx: number;
-    cond: Partial<ConditionExpr>;
-  } | null>(null);
+  // Condition being built inside a rule
+  const [editingRuleIdx, setEditingRuleIdx] = useState<number | null>(null);
+  const [condLeft, setCondLeft] = useState('');
+  const [condOp, setCondOp] = useState<string>('==');
+  const [condRight, setCondRight] = useState<any>('');
   const [fieldSearchTerm, setFieldSearchTerm] = useState('');
   const [showFieldDropdown, setShowFieldDropdown] = useState(false);
   const [valueSearchTerm, setValueSearchTerm] = useState('');
@@ -92,103 +82,33 @@ export default function PicklistDependencyEditor({
     [availableFields]
   );
 
+  // Reset editing condition state for a given rule
+  const resetConditionForm = useCallback((ruleIdx: number) => {
+    setEditingRuleIdx(ruleIdx);
+    setCondLeft('');
+    setCondOp('==');
+    setCondRight('');
+    setFieldSearchTerm('');
+    setValueSearchTerm('');
+  }, []);
+
   const addNewRule = useCallback(() => {
+    setRules((prev) => [...prev, { conditions: [], values: [] }]);
+    // Use the callback to compute the correct index
+    // Since we just pushed, the new rule's index = current length
     setRules((prev) => {
-      const newIdx = prev.length;
+      // Expand the last rule and reset the editing form
+      const newIdx = prev.length - 1;
       setExpandedRule(newIdx);
-      setEditingCondition({ ruleIdx: newIdx, cond: { left: '', op: '==', right: '' } });
-      setFieldSearchTerm('');
-      setValueSearchTerm('');
-      return [...prev, { conditions: [], values: [] }];
+      resetConditionForm(newIdx);
+      return prev; // don't modify rules, just use this to read the latest length
     });
-  }, []);
+  }, [resetConditionForm]);
 
-  const deleteRule = useCallback((idx: number) => {
-    setRules((prev) => prev.filter((_, i) => i !== idx));
-    setExpandedRule((prev) => {
-      if (prev === idx) return null;
-      if (prev !== null && prev > idx) return prev - 1;
-      return prev;
-    });
-    setEditingCondition((prev) => {
-      if (prev?.ruleIdx === idx) return null;
-      return prev;
-    });
-  }, []);
-
-  const addConditionToRule = useCallback(
-    (ruleIdx: number) => {
-      setEditingCondition((prev) => {
-        if (!prev || prev.ruleIdx !== ruleIdx) return prev;
-        const { cond } = prev;
-        if (!cond.left || !cond.op || cond.right === '' || cond.right === undefined) return prev;
-
-        // Add condition to rules
-        setRules((prevRules) =>
-          prevRules.map((r, i) =>
-            i === ruleIdx
-              ? { ...r, conditions: [...r.conditions, cond as ConditionExpr] }
-              : r
-          )
-        );
-
-        setFieldSearchTerm('');
-        setValueSearchTerm('');
-
-        // Reset editing condition
-        return { ruleIdx, cond: { left: '', op: '==', right: '' } };
-      });
-    },
-    []
-  );
-
-  const removeConditionFromRule = useCallback((ruleIdx: number, condIdx: number) => {
-    setRules((prev) =>
-      prev.map((r, i) =>
-        i === ruleIdx
-          ? { ...r, conditions: r.conditions.filter((_, ci) => ci !== condIdx) }
-          : r
-      )
-    );
-  }, []);
-
-  const toggleValueInRule = useCallback((ruleIdx: number, value: string) => {
-    setRules((prev) =>
-      prev.map((r, i) => {
-        if (i !== ruleIdx) return r;
-        const has = r.values.includes(value);
-        return {
-          ...r,
-          values: has ? r.values.filter((v) => v !== value) : [...r.values, value],
-        };
-      })
-    );
-  }, []);
-
-  const selectAllValues = useCallback(
-    (ruleIdx: number) => {
-      setRules((prev) =>
-        prev.map((r, i) => (i === ruleIdx ? { ...r, values: [...picklistValues] } : r))
-      );
-    },
-    [picklistValues]
-  );
-
-  const deselectAllValues = useCallback((ruleIdx: number) => {
-    setRules((prev) =>
-      prev.map((r, i) => (i === ruleIdx ? { ...r, values: [] } : r))
-    );
-  }, []);
+  // Hmm, that's still nested. Let me use a different approach.
+  // Actually the issue is simpler - just compute the index directly.
 
   const totalConditions = rules.reduce((sum, r) => sum + r.conditions.length, 0);
-
-  const handleSave = useCallback(() => {
-    // Clean: remove rules with no conditions or no values
-    const cleaned = rules.filter(
-      (r) => r.conditions.length > 0 && r.values.length > 0
-    );
-    onSave(cleaned);
-  }, [rules, onSave]);
 
   return (
     <div className="space-y-4">
@@ -221,14 +141,11 @@ export default function PicklistDependencyEditor({
                 <button
                   type="button"
                   onClick={() => {
-                    setExpandedRule(isExpanded ? null : ruleIdx);
-                    if (!isExpanded) {
-                      setEditingCondition({
-                        ruleIdx,
-                        cond: { left: '', op: '==', right: '' },
-                      });
-                      setFieldSearchTerm('');
-                      setValueSearchTerm('');
+                    if (isExpanded) {
+                      setExpandedRule(null);
+                    } else {
+                      setExpandedRule(ruleIdx);
+                      resetConditionForm(ruleIdx);
                     }
                   }}
                   className="flex items-center gap-2 text-sm hover:text-gray-900 flex-1 text-left"
@@ -252,7 +169,12 @@ export default function PicklistDependencyEditor({
                 </button>
                 <button
                   type="button"
-                  onClick={() => deleteRule(ruleIdx)}
+                  onClick={() => {
+                    setRules((prev) => prev.filter((_, i) => i !== ruleIdx));
+                    if (expandedRule === ruleIdx) setExpandedRule(null);
+                    else if (expandedRule !== null && expandedRule > ruleIdx) setExpandedRule(expandedRule - 1);
+                    if (editingRuleIdx === ruleIdx) setEditingRuleIdx(null);
+                  }}
                   className="text-red-400 hover:text-red-600 p-1"
                   title="Delete rule"
                 >
@@ -282,7 +204,15 @@ export default function PicklistDependencyEditor({
                             </span>
                             <button
                               type="button"
-                              onClick={() => removeConditionFromRule(ruleIdx, condIdx)}
+                              onClick={() => {
+                                setRules((prev) =>
+                                  prev.map((r, i) =>
+                                    i === ruleIdx
+                                      ? { ...r, conditions: r.conditions.filter((_, ci) => ci !== condIdx) }
+                                      : r
+                                  )
+                                );
+                              }}
                               className="text-red-500 hover:text-red-700 ml-2"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -301,50 +231,37 @@ export default function PicklistDependencyEditor({
                         <Input
                           type="text"
                           placeholder="Select field..."
-                          value={editingCondition?.ruleIdx === ruleIdx ? fieldSearchTerm : ''}
+                          value={editingRuleIdx === ruleIdx ? fieldSearchTerm : ''}
                           onChange={(e) => {
                             setFieldSearchTerm(e.target.value);
                             setShowFieldDropdown(true);
-                            if (!editingCondition || editingCondition.ruleIdx !== ruleIdx) {
-                              setEditingCondition({
-                                ruleIdx,
-                                cond: { left: '', op: '==', right: '' },
-                              });
+                            if (editingRuleIdx !== ruleIdx) {
+                              resetConditionForm(ruleIdx);
                             }
                           }}
                           onFocus={() => {
                             setShowFieldDropdown(true);
-                            if (!editingCondition || editingCondition.ruleIdx !== ruleIdx) {
-                              setEditingCondition({
-                                ruleIdx,
-                                cond: { left: '', op: '==', right: '' },
-                              });
+                            if (editingRuleIdx !== ruleIdx) {
+                              resetConditionForm(ruleIdx);
                             }
                           }}
                           className="h-7 text-xs"
                         />
-                        {showFieldDropdown && editingCondition?.ruleIdx === ruleIdx && (
+                        {showFieldDropdown && editingRuleIdx === ruleIdx && (
                           <div className="absolute z-20 w-full mt-1 border border-gray-300 rounded bg-white shadow-lg max-h-40 overflow-y-auto">
                             {availableFields
                               .filter(
                                 (f) =>
                                   f.apiName !== field.apiName &&
                                   (fieldSearchTerm === '' ||
-                                    f.label
-                                      .toLowerCase()
-                                      .includes(fieldSearchTerm.toLowerCase()) ||
-                                    f.apiName
-                                      .toLowerCase()
-                                      .includes(fieldSearchTerm.toLowerCase()))
+                                    f.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                                    f.apiName.toLowerCase().includes(fieldSearchTerm.toLowerCase()))
                               )
                               .map((f) => (
                                 <div
                                   key={f.apiName}
                                   onClick={() => {
-                                    setEditingCondition({
-                                      ruleIdx,
-                                      cond: { ...(editingCondition?.cond || {}), left: f.apiName },
-                                    });
+                                    setCondLeft(f.apiName);
                                     setFieldSearchTerm(f.label);
                                     setShowFieldDropdown(false);
                                   }}
@@ -358,12 +275,8 @@ export default function PicklistDependencyEditor({
                               (f) =>
                                 f.apiName !== field.apiName &&
                                 (fieldSearchTerm === '' ||
-                                  f.label
-                                    .toLowerCase()
-                                    .includes(fieldSearchTerm.toLowerCase()) ||
-                                  f.apiName
-                                    .toLowerCase()
-                                    .includes(fieldSearchTerm.toLowerCase()))
+                                  f.label.toLowerCase().includes(fieldSearchTerm.toLowerCase()) ||
+                                  f.apiName.toLowerCase().includes(fieldSearchTerm.toLowerCase()))
                             ).length === 0 && (
                               <div className="px-3 py-1.5 text-xs text-gray-500 text-center">
                                 No fields found
@@ -376,21 +289,9 @@ export default function PicklistDependencyEditor({
                       {/* Operator + Value row */}
                       <div className="flex gap-2">
                         <select
-                          value={
-                            editingCondition?.ruleIdx === ruleIdx
-                              ? editingCondition.cond.op || '=='
-                              : '=='
-                          }
+                          value={editingRuleIdx === ruleIdx ? condOp : '=='}
                           onChange={(e) => {
-                            if (editingCondition && editingCondition.ruleIdx === ruleIdx) {
-                              setEditingCondition({
-                                ruleIdx,
-                                cond: {
-                                  ...editingCondition.cond,
-                                  op: e.target.value as ConditionExpr['op'],
-                                },
-                              });
-                            }
+                            setCondOp(e.target.value);
                           }}
                           className="h-7 px-1 border border-gray-300 rounded text-xs flex-shrink-0 w-28"
                         >
@@ -408,15 +309,10 @@ export default function PicklistDependencyEditor({
 
                         {/* Value input — smart based on field type */}
                         {(() => {
-                          const cond =
-                            editingCondition?.ruleIdx === ruleIdx
-                              ? editingCondition.cond
-                              : null;
-                          const selectedField = cond
-                            ? availableFields.find((f) => f.apiName === cond.left)
+                          const selectedField = condLeft
+                            ? availableFields.find((f) => f.apiName === condLeft)
                             : null;
-                          const isCheckbox =
-                            selectedField && selectedField.type === 'Checkbox';
+                          const isCheckbox = selectedField?.type === 'Checkbox';
                           const isPicklistField =
                             selectedField &&
                             (selectedField.type === 'Picklist' ||
@@ -430,15 +326,8 @@ export default function PicklistDependencyEditor({
                                   <input
                                     type="radio"
                                     name={`cb-rule-${ruleIdx}`}
-                                    checked={
-                                      cond?.right === true || cond?.right === 'true'
-                                    }
-                                    onChange={() =>
-                                      setEditingCondition({
-                                        ruleIdx,
-                                        cond: { ...cond!, right: true },
-                                      })
-                                    }
+                                    checked={condRight === true || condRight === 'true'}
+                                    onChange={() => setCondRight(true)}
                                     className="w-3 h-3"
                                   />
                                   Checked
@@ -447,15 +336,8 @@ export default function PicklistDependencyEditor({
                                   <input
                                     type="radio"
                                     name={`cb-rule-${ruleIdx}`}
-                                    checked={
-                                      cond?.right === false || cond?.right === 'false'
-                                    }
-                                    onChange={() =>
-                                      setEditingCondition({
-                                        ruleIdx,
-                                        cond: { ...cond!, right: false },
-                                      })
-                                    }
+                                    checked={condRight === false || condRight === 'false'}
+                                    onChange={() => setCondRight(false)}
                                     className="w-3 h-3"
                                   />
                                   Unchecked
@@ -470,11 +352,7 @@ export default function PicklistDependencyEditor({
                                 <Input
                                   type="text"
                                   placeholder="Select value..."
-                                  value={
-                                    editingCondition?.ruleIdx === ruleIdx
-                                      ? valueSearchTerm
-                                      : ''
-                                  }
+                                  value={editingRuleIdx === ruleIdx ? valueSearchTerm : ''}
                                   onChange={(e) => {
                                     setValueSearchTerm(e.target.value);
                                     setShowValueDropdown(true);
@@ -488,18 +366,13 @@ export default function PicklistDependencyEditor({
                                       .filter(
                                         (v) =>
                                           valueSearchTerm === '' ||
-                                          v
-                                            .toLowerCase()
-                                            .includes(valueSearchTerm.toLowerCase())
+                                          v.toLowerCase().includes(valueSearchTerm.toLowerCase())
                                       )
                                       .map((v) => (
                                         <div
                                           key={v}
                                           onClick={() => {
-                                            setEditingCondition({
-                                              ruleIdx,
-                                              cond: { ...cond!, right: v },
-                                            });
+                                            setCondRight(v);
                                             setValueSearchTerm(v);
                                             setShowValueDropdown(false);
                                           }}
@@ -518,21 +391,8 @@ export default function PicklistDependencyEditor({
                             <Input
                               type="text"
                               placeholder="Value"
-                              value={cond?.right != null ? String(cond.right) : ''}
-                              onChange={(e) => {
-                                if (
-                                  editingCondition &&
-                                  editingCondition.ruleIdx === ruleIdx
-                                ) {
-                                  setEditingCondition({
-                                    ruleIdx,
-                                    cond: {
-                                      ...editingCondition.cond,
-                                      right: e.target.value,
-                                    },
-                                  });
-                                }
-                              }}
+                              value={condRight != null ? String(condRight) : ''}
+                              onChange={(e) => setCondRight(e.target.value)}
                               className="h-7 text-xs flex-1"
                             />
                           );
@@ -543,14 +403,28 @@ export default function PicklistDependencyEditor({
                           variant="outline"
                           size="sm"
                           className="h-7 px-2 flex-shrink-0"
-                          onClick={() => addConditionToRule(ruleIdx)}
-                          disabled={
-                            !editingCondition ||
-                            editingCondition.ruleIdx !== ruleIdx ||
-                            !editingCondition.cond.left ||
-                            editingCondition.cond.right === '' ||
-                            editingCondition.cond.right === undefined
-                          }
+                          disabled={!condLeft || condRight === '' || condRight === undefined}
+                          onClick={() => {
+                            if (!condLeft || condRight === '' || condRight === undefined) return;
+                            const newCondition: ConditionExpr = {
+                              left: condLeft,
+                              op: condOp as ConditionExpr['op'],
+                              right: condRight,
+                            };
+                            setRules((prev) =>
+                              prev.map((r, i) =>
+                                i === ruleIdx
+                                  ? { ...r, conditions: [...r.conditions, newCondition] }
+                                  : r
+                              )
+                            );
+                            // Reset the condition form
+                            setCondLeft('');
+                            setCondOp('==');
+                            setCondRight('');
+                            setFieldSearchTerm('');
+                            setValueSearchTerm('');
+                          }}
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </Button>
@@ -567,14 +441,22 @@ export default function PicklistDependencyEditor({
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={() => selectAllValues(ruleIdx)}
+                          onClick={() => {
+                            setRules((prev) =>
+                              prev.map((r, i) => (i === ruleIdx ? { ...r, values: [...picklistValues] } : r))
+                            );
+                          }}
                           className="text-[10px] text-blue-600 hover:text-blue-800"
                         >
                           All
                         </button>
                         <button
                           type="button"
-                          onClick={() => deselectAllValues(ruleIdx)}
+                          onClick={() => {
+                            setRules((prev) =>
+                              prev.map((r, i) => (i === ruleIdx ? { ...r, values: [] } : r))
+                            );
+                          }}
                           className="text-[10px] text-blue-600 hover:text-blue-800"
                         >
                           None
@@ -587,7 +469,20 @@ export default function PicklistDependencyEditor({
                         return (
                           <div
                             key={val}
-                            onClick={() => toggleValueInRule(ruleIdx, val)}
+                            onClick={() => {
+                              setRules((prev) =>
+                                prev.map((r, i) => {
+                                  if (i !== ruleIdx) return r;
+                                  const has = r.values.includes(val);
+                                  return {
+                                    ...r,
+                                    values: has
+                                      ? r.values.filter((v) => v !== val)
+                                      : [...r.values, val],
+                                  };
+                                })
+                              );
+                            }}
                             className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer text-xs select-none"
                           >
                             <div
@@ -620,7 +515,19 @@ export default function PicklistDependencyEditor({
       </div>
 
       {/* Add Rule Button */}
-      <Button type="button" variant="outline" size="sm" className="w-full" onClick={addNewRule}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full"
+        onClick={() => {
+          const newRule: PicklistDependencyRule = { conditions: [], values: [] };
+          const newIdx = rules.length;
+          setRules((prev) => [...prev, newRule]);
+          setExpandedRule(newIdx);
+          resetConditionForm(newIdx);
+        }}
+      >
         <Plus className="w-4 h-4 mr-2" />
         Add Rule
       </Button>
@@ -629,7 +536,12 @@ export default function PicklistDependencyEditor({
       <div className="flex gap-2 pt-4 border-t">
         <Button
           type="button"
-          onClick={handleSave}
+          onClick={() => {
+            const cleaned = rules.filter(
+              (r) => r.conditions.length > 0 && r.values.length > 0
+            );
+            onSave(cleaned);
+          }}
           size="sm"
           className="flex-1 border-2 border-brand-navy"
         >
