@@ -42,6 +42,8 @@ export default function FieldVisibilityRuleEditor({
   const [showFieldDropdown, setShowFieldDropdown] = useState(false);
   const [valueSearchTerm, setValueSearchTerm] = useState<string>('');
   const [showValueDropdown, setShowValueDropdown] = useState(false);
+  // Multi-value state for INCLUDES operator
+  const [selectedIncludesValues, setSelectedIncludesValues] = useState<string[]>([]);
 
   // Click-outside handler to close all dropdowns
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,9 +106,12 @@ export default function FieldVisibilityRuleEditor({
   allUsers.forEach(u => { userNameMap[u.id] = u.name || u.email; });
 
   const handleAddCondition = () => {
-    if (newCondition.left && newCondition.op && newCondition.right !== '') {
+    if (newCondition.left && newCondition.op && newCondition.right !== '' &&
+        !(Array.isArray(newCondition.right) && newCondition.right.length === 0)) {
       setConditions([...conditions, newCondition as ConditionExpr]);
       setNewCondition({ left: '', op: '==', right: '' });
+      setSelectedIncludesValues([]);
+      setValueSearchTerm('');
     }
   };
 
@@ -182,9 +187,12 @@ export default function FieldVisibilityRuleEditor({
                   <div
                     key={f.apiName}
                     onClick={() => {
-                      setNewCondition({ ...newCondition, left: f.apiName });
+                      const isMultiOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN';
+                      setNewCondition({ ...newCondition, left: f.apiName, right: isMultiOp ? [] : '' });
                       setFieldSearchTerm(f.label);
                       setShowFieldDropdown(false);
+                      setSelectedIncludesValues([]);
+                      setValueSearchTerm('');
                     }}
                     className="px-3 py-2 hover:bg-[#f0f1fa] cursor-pointer text-xs border-b last:border-b-0"
                   >
@@ -212,12 +220,16 @@ export default function FieldVisibilityRuleEditor({
           <select
             id="condition-op"
             value={newCondition.op || '=='}
-            onChange={(e) =>
+            onChange={(e) => {
+              const op = e.target.value as ConditionExpr['op'];
+              const isMultiOp = op === 'INCLUDES' || op === 'IN';
+              setSelectedIncludesValues([]);
               setNewCondition({
                 ...newCondition,
-                op: e.target.value as ConditionExpr['op'],
-              })
-            }
+                op,
+                right: isMultiOp ? [] : '',
+              });
+            }}
             className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
           >
             <option value="==">Equals</option>
@@ -272,10 +284,88 @@ export default function FieldVisibilityRuleEditor({
             }
             
             if (isPicklist && selectedField?.picklistValues) {
+              const isMultiValueOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN';
               const filteredValues = selectedField.picklistValues.filter(v =>
                 valueSearchTerm === '' || v.toLowerCase().includes(valueSearchTerm.toLowerCase())
               );
               
+              // Multi-value picker for INCLUDES / IN operators
+              if (isMultiValueOp) {
+                return (
+                  <div className="space-y-2">
+                    {/* Selected value pills */}
+                    {selectedIncludesValues.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {selectedIncludesValues.map(val => (
+                          <span key={val} className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs">
+                            {val}
+                            <button
+                              onClick={() => {
+                                const next = selectedIncludesValues.filter(v => v !== val);
+                                setSelectedIncludesValues(next);
+                                setNewCondition({ ...newCondition, right: next });
+                              }}
+                              className="hover:text-red-600"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Search + dropdown */}
+                    <div className="relative" ref={valueDropdownRef}>
+                      <Input
+                        id="condition-value"
+                        type="text"
+                        placeholder="Search values..."
+                        value={valueSearchTerm}
+                        onChange={(e) => {
+                          setValueSearchTerm(e.target.value);
+                          setShowValueDropdown(true);
+                        }}
+                        onFocus={() => setShowValueDropdown(true)}
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs"
+                      />
+                      {showValueDropdown && (
+                        <div className="absolute z-10 w-full mt-1 border border-gray-300 rounded bg-white shadow-lg max-h-48 overflow-y-auto">
+                          {filteredValues.map(value => {
+                            const isSelected = selectedIncludesValues.includes(value);
+                            return (
+                              <div
+                                key={value}
+                                onClick={() => {
+                                  let next: string[];
+                                  if (isSelected) {
+                                    next = selectedIncludesValues.filter(v => v !== value);
+                                  } else {
+                                    next = [...selectedIncludesValues, value];
+                                  }
+                                  setSelectedIncludesValues(next);
+                                  setNewCondition({ ...newCondition, right: next });
+                                }}
+                                className={`px-3 py-2 hover:bg-[#f0f1fa] cursor-pointer text-xs border-b last:border-b-0 flex items-center gap-2 ${isSelected ? 'bg-amber-50' : ''}`}
+                              >
+                                <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-amber-600 border-amber-600' : 'border-gray-300'}`}>
+                                  {isSelected && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                                {value}
+                              </div>
+                            );
+                          })}
+                          {filteredValues.length === 0 && (
+                            <div className="px-3 py-2 text-xs text-gray-500 text-center">
+                              No values found
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+
+              // Single-value picker for other operators
               return (
                 <div className="relative" ref={valueDropdownRef}>
                   <Input
@@ -445,7 +535,10 @@ export default function FieldVisibilityRuleEditor({
             let finalConditions = [...conditions];
             
             // Add the new field condition if filled out
-            if (newCondition.left && newCondition.op && newCondition.right !== '') {
+            const rightFilled = Array.isArray(newCondition.right)
+              ? newCondition.right.length > 0
+              : newCondition.right !== '' && newCondition.right !== undefined;
+            if (newCondition.left && newCondition.op && rightFilled) {
               finalConditions = [...finalConditions, newCondition as ConditionExpr];
             }
 
