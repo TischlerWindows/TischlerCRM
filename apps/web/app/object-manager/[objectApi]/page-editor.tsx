@@ -1323,6 +1323,19 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                     <span className="text-xs text-gray-600">
                       ({section.columns} column{section.columns > 1 ? 's' : ''})
                     </span>
+                    {section.visibleIf && section.visibleIf.length > 0 && (
+                      <div 
+                        className="p-1 bg-orange-500 rounded flex-shrink-0"
+                        title={`Section visibility: ${section.visibleIf.length} rule${section.visibleIf.length !== 1 ? 's' : ''}`}
+                      >
+                        <Eye 
+                          className="w-3 h-3" 
+                          fill="white"
+                          stroke="black"
+                          strokeWidth="0.5px"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <button
