@@ -101,11 +101,24 @@ function addLookupFieldsToLayouts(objectDef: ObjectDef): ObjectDef {
   return objectDef;
 }
 
+// Read cached schema synchronously so the very first render has it (no flash)
+function getCachedSchema(): OrgSchema | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('crm-schema-cache');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.state?.schema ?? null;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 export const useSchemaStore = create<SchemaStore>()(
   persist(
     (set, get) => ({
-      // Initial state
-      schema: null,
+      // Initial state — use cached schema so labels are correct on first paint
+      schema: getCachedSchema(),
       loading: false,
       saving: false,
       error: null,
