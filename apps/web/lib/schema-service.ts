@@ -232,7 +232,7 @@ const DEAL_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: s
     label: 'Contact Information',
     columns: 2,
     fields: [
-      'Deal Name',
+      'Opportunity Name',
       'Architect Firm',
       'Architect',
       'Contractor Company',
@@ -242,14 +242,14 @@ const DEAL_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: s
       'Quote Email',
       'Quote Phone',
       'Secondary Quote Phone',
-      'Deal Owner'
+      'Opportunity Owner'
     ]
   },
   {
-    label: 'Deal Information',
+    label: 'Opportunity Information',
     columns: 2,
     fields: [
-      'Deal Number',
+      'Opportunity Number',
       'Property Address',
       'Estimated Contract Date',
       'Product Required Onsite',
@@ -261,7 +261,7 @@ const DEAL_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: s
       'Quote Budget',
       'Plans Dated',
       'Shared Opportunity',
-      'Deal Notes',
+      'Opportunity Notes',
       'Korn Priority'
     ]
   },
@@ -1756,7 +1756,7 @@ class LocalStorageSchemaService implements SchemaService {
     const deal = schema.objects.find((obj) => obj.apiName === 'Deal');
     if (!deal) return schema;
 
-    const hasLayout = deal.pageLayouts?.some((layout) => layout.name === 'Deal - Default Template');
+    const hasLayout = deal.pageLayouts?.some((layout) => layout.name === 'Opportunity - Default Template' || layout.name === 'Deal - Default Template');
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
@@ -1767,7 +1767,7 @@ class LocalStorageSchemaService implements SchemaService {
     ensureField({
       id: generateId(),
       apiName: 'Deal__dealName',
-      label: 'Deal Name',
+      label: 'Opportunity Name',
       type: 'Text',
       maxLength: 255
     });
@@ -1843,15 +1843,15 @@ class LocalStorageSchemaService implements SchemaService {
     ensureField({
       id: generateId(),
       apiName: 'Deal__dealOwner',
-      label: 'Deal Owner',
+      label: 'Opportunity Owner',
       type: 'Lookup',
       lookupObject: 'User',
-      relationshipName: 'Deal Owners'
+      relationshipName: 'Opportunity Owners'
     });
     ensureField({
       id: generateId(),
       apiName: 'Deal__dealNumber',
-      label: 'Deal Number',
+      label: 'Opportunity Number',
       type: 'AutoNumber',
       autoNumber: { displayFormat: 'YY{000}', startingNumber: 1 }
     });
@@ -1973,7 +1973,7 @@ class LocalStorageSchemaService implements SchemaService {
     ensureField({
       id: generateId(),
       apiName: 'Deal__dealNotes',
-      label: 'Deal Notes',
+      label: 'Opportunity Notes',
       type: 'RichTextArea'
     });
     ensureField({
@@ -2506,13 +2506,13 @@ class LocalStorageSchemaService implements SchemaService {
     });
 
     if (missing.size > 0) {
-      console.warn('[Schema] Missing Deal fields for default template:', Array.from(missing));
+      console.warn('[Schema] Missing Opportunity fields for default template:', Array.from(missing));
     }
 
     const layoutId = generateId();
     const layout = {
       id: layoutId,
-      name: 'Deal - Default Template',
+      name: 'Opportunity - Default Template',
       layoutType: 'edit',
       tabs: [
         {
@@ -3739,17 +3739,17 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
-    // 6. Deal
+    // 6. Deal (displayed as Opportunity)
     objects.push(createBasicObject(
       'Deal',
-      'Deal',
-      'Deals',
-      'Sales opportunities and deals',
+      'Opportunity',
+      'Opportunities',
+      'Sales opportunities and pipeline',
       [
         {
           id: generateId(),
           apiName: 'Deal__dealName',
-          label: 'Deal Name',
+          label: 'Opportunity Name',
           type: 'Text',
           required: true,
           maxLength: 255

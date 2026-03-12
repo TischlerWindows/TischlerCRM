@@ -56,7 +56,8 @@ import {
   FileText,
   Calendar,
   Users,
-  Lock
+  Lock,
+  Pencil
 } from 'lucide-react';
 
 // Core objects that cannot be deleted
@@ -82,6 +83,7 @@ export default function ObjectManagerPage() {
     error,
     loadSchema, 
     createObject, 
+    updateObject,
     deleteObject,
     exportSchema,
     importSchema,
@@ -98,6 +100,9 @@ export default function ObjectManagerPage() {
     description: ''
   });
   const [importData, setImportData] = useState('');
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingObject, setEditingObject] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ label: '', pluralLabel: '' });
 
   useEffect(() => {
     loadSchema();
@@ -201,6 +206,26 @@ export default function ObjectManagerPage() {
       setImportData('');
     } catch (err) {
       console.error('Failed to import schema:', err);
+    }
+  };
+
+  const handleEditObject = (obj: ObjectDef) => {
+    setEditingObject(obj.apiName);
+    setEditForm({ label: obj.label, pluralLabel: obj.pluralLabel || obj.label + 's' });
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingObject || !editForm.label.trim()) return;
+    try {
+      await updateObject(editingObject, {
+        label: editForm.label.trim(),
+        pluralLabel: editForm.pluralLabel.trim() || editForm.label.trim() + 's'
+      });
+      setShowEditDialog(false);
+      setEditingObject(null);
+    } catch (err) {
+      console.error('Failed to update object name:', err);
     }
   };
 
@@ -467,6 +492,12 @@ export default function ObjectManagerPage() {
                             Configure
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() => handleEditObject(object)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit Name
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => handleExportObject(object.apiName)}
                           >
                             <Download className="h-4 w-4 mr-2" />
@@ -520,6 +551,43 @@ export default function ObjectManagerPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Name Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Object Name</DialogTitle>
+              <DialogDescription>
+                Change the display name for this object. The API name will remain unchanged.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="editLabel">Label (Singular)</Label>
+                <Input
+                  id="editLabel"
+                  value={editForm.label}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, label: e.target.value })}
+                  placeholder="e.g., Opportunity"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editPluralLabel">Label (Plural)</Label>
+                <Input
+                  id="editPluralLabel"
+                  value={editForm.pluralLabel}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditForm({ ...editForm, pluralLabel: e.target.value })}
+                  placeholder="e.g., Opportunities"
+                />
+              </div>
+              <p className="text-xs text-gray-500">API Name: <code className="bg-gray-100 px-1.5 py-0.5 rounded">{editingObject}</code></p>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+                <Button onClick={handleSaveEdit} disabled={!editForm.label.trim()}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {error && (
           <div className="mt-4">

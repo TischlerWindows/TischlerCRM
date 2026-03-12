@@ -201,6 +201,8 @@ export default function DynamicForm({
   const [inlineCreateForField, setInlineCreateForField] = useState<string | null>(null); // which lookup field triggered it
   const [inlineCreateLayoutId, setInlineCreateLayoutId] = useState<string | null>(null); // selected layout for inline create
   const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
+  // Review mode: show read-only summary before final save (create mode only)
+  const [showReview, setShowReview] = useState(false);
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
@@ -742,6 +744,62 @@ export default function DynamicForm({
       } finally {
         setIsSubmitting(false);
       }
+    }
+  };
+
+  /** Validate the form and switch to review mode (create only). */
+  const enterReview = () => {
+    // For wizard mode, validate the current (last) section first
+    if (isWizardMode) {
+      const currentSection = wizardSections[currentStep].section;
+      if (!validateSection(currentSection)) return;
+    }
+    // Then do a full-form validation
+    if (validateForm()) {
+      setShowReview(true);
+    }
+  };
+
+  /** Format a single field value for display in the review page */
+  const formatReviewValue = (fieldDef: FieldDef, val: any): string => {
+    if (val === undefined || val === null || val === '') return '—';
+    switch (fieldDef.type) {
+      case 'Checkbox':
+        return val === true || val === 'true' ? 'Yes' : 'No';
+      case 'Currency':
+        return typeof val === 'number' ? `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : String(val);
+      case 'Percent':
+        return `${val}%`;
+      case 'Date':
+        try { return new Date(val).toLocaleDateString(); } catch { return String(val); }
+      case 'DateTime':
+        try { return new Date(val).toLocaleString(); } catch { return String(val); }
+      case 'MultiPicklist':
+        if (Array.isArray(val)) return val.join(', ');
+        return String(val);
+      case 'Lookup':
+      case 'ExternalLookup':
+      case 'LookupUser': {
+        // Try to display the lookup label from the search input state
+        const lookupLabel = lookupQueries[fieldDef.apiName];
+        return lookupLabel || String(val);
+      }
+      case 'CompositeText': {
+        if (typeof val === 'object' && val !== null) {
+          const parts = Object.values(val).filter(Boolean);
+          return parts.join(' ') || '—';
+        }
+        return String(val);
+      }
+      case 'Address': {
+        if (typeof val === 'object' && val !== null) {
+          const { street, city, state, zipCode, country } = val as any;
+          return [street, city, state, zipCode, country].filter(Boolean).join(', ') || '—';
+        }
+        return String(val);
+      }
+      default:
+        return String(val);
     }
   };
 
@@ -1382,46 +1440,72 @@ export default function DynamicForm({
             className="flex items-center overflow-x-auto scrollbar-hide"
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
-            {wizardSections.map((ws, index) => (
-              <React.Fragment key={ws.section.id}>
-                {/* Step circle + label */}
-                <div
-                  className="flex flex-col items-center flex-shrink-0"
-                  style={{ width: 100 }}
-                  data-active-step={index === currentStep ? 'true' : undefined}
-                >
+            {wizardSections.map((ws, index) => {
+              const isBeforeCurrent = showReview ? true : index < currentStep;
+              const isCurrent = !showReview && index === currentStep;
+              const isAfterCurrent = !showReview && index > currentStep;
+              return (
+                <React.Fragment key={ws.section.id}>
+                  {/* Step circle + label */}
                   <div
-                    className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
-                      index < currentStep && 'bg-green-500 text-white',
-                      index === currentStep && 'bg-brand-navy text-white',
-                      index > currentStep && 'bg-gray-200 text-gray-500'
-                    )}
+                    className="flex flex-col items-center flex-shrink-0"
+                    style={{ width: 100 }}
+                    data-active-step={isCurrent ? 'true' : undefined}
                   >
-                    {index < currentStep ? <Check className="w-4 h-4" /> : index + 1}
+                    <div
+                      className={cn(
+                        'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
+                        isBeforeCurrent && 'bg-green-500 text-white',
+                        isCurrent && 'bg-brand-navy text-white',
+                        isAfterCurrent && 'bg-gray-200 text-gray-500'
+                      )}
+                    >
+                      {isBeforeCurrent ? <Check className="w-4 h-4" /> : index + 1}
+                    </div>
+                    <span
+                      className={cn(
+                        'text-xs mt-1.5 text-center w-full truncate px-1',
+                        isCurrent ? 'text-brand-navy font-semibold' : 'text-gray-500'
+                      )}
+                      title={ws.section.label}
+                    >
+                      {ws.section.label}
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      'text-xs mt-1.5 text-center w-full truncate px-1',
-                      index === currentStep ? 'text-brand-navy font-semibold' : 'text-gray-500'
-                    )}
-                    title={ws.section.label}
-                  >
-                    {ws.section.label}
-                  </span>
-                </div>
-                {/* Connector line */}
-                {index < wizardSections.length - 1 && (
+                  {/* Connector line */}
                   <div
                     className={cn(
                       'h-0.5 flex-shrink-0 mt-[-16px]',
-                      index < currentStep ? 'bg-green-500' : 'bg-gray-200'
+                      isBeforeCurrent ? 'bg-green-500' : 'bg-gray-200'
                     )}
                     style={{ width: 24 }}
                   />
+                </React.Fragment>
+              );
+            })}
+            {/* Review step at the end */}
+            <div
+              className="flex flex-col items-center flex-shrink-0"
+              style={{ width: 100 }}
+              data-active-step={showReview ? 'true' : undefined}
+            >
+              <div
+                className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
+                  showReview ? 'bg-brand-navy text-white' : 'bg-gray-200 text-gray-500'
                 )}
-              </React.Fragment>
-            ))}
+              >
+                {wizardSections.length + 1}
+              </div>
+              <span
+                className={cn(
+                  'text-xs mt-1.5 text-center w-full truncate px-1',
+                  showReview ? 'text-brand-navy font-semibold' : 'text-gray-500'
+                )}
+              >
+                Review
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -1448,7 +1532,7 @@ export default function DynamicForm({
       )}
 
       {/* Sections — wizard mode (one section at a time) */}
-      {isWizardMode && wizardSections[currentStep] && (
+      {!showReview && isWizardMode && wizardSections[currentStep] && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           <div className="bg-white rounded-lg border border-gray-200">
             <div className="p-4 bg-gray-100 rounded-t-lg">
@@ -1462,7 +1546,7 @@ export default function DynamicForm({
       )}
 
       {/* Sections — normal mode (all sections shown) */}
-      {!isWizardMode && (
+      {!showReview && !isWizardMode && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {currentTab.sections
             .sort((a, b) => a.order - b.order)
@@ -1495,6 +1579,74 @@ export default function DynamicForm({
         </div>
       )}
 
+      {/* Review mode — read-only summary of all sections before final save */}
+      {showReview && (
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* Review header */}
+          <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-blue-900">Review Your Record</h3>
+              <p className="text-sm text-blue-700">Please review the information below. Click <strong>Edit</strong> to make changes or <strong>Save</strong> to confirm.</p>
+            </div>
+          </div>
+          {/* Render all sections read-only */}
+          {layout.tabs.map((tab) =>
+            tab.sections
+              .sort((a, b) => a.order - b.order)
+              .map((section) => {
+                const isSectionVisible = evaluateVisibility(section.visibleIf, formData, visibilityCtx);
+                if (!isSectionVisible) return null;
+                if (section.showInTemplate === false) return null;
+
+                const columnArrays: FieldDef[][] = [];
+                for (let ci = 0; ci < section.columns; ci++) {
+                  columnArrays[ci] = section.fields
+                    .filter((f) => f.column === ci)
+                    .sort((a, b) => a.order - b.order)
+                    .map((f) => getFieldDef(f.apiName, f))
+                    .filter((f): f is FieldDef => f !== undefined);
+                }
+
+                return (
+                  <div key={section.id} className="bg-white rounded-lg border border-gray-200">
+                    <div className="p-4 bg-gray-100 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">{section.label}</h3>
+                    </div>
+                    <div className="p-4">
+                      <div
+                        className={cn(
+                          'grid gap-x-8 gap-y-3',
+                          section.columns === 1 && 'grid-cols-1',
+                          section.columns === 2 && 'grid-cols-1 md:grid-cols-2',
+                          section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                        )}
+                      >
+                        {columnArrays.map((columnFields, colIndex) => (
+                          <div key={`review-col-${colIndex}`} className="flex flex-col gap-3">
+                            {columnFields.map((fieldDef) => {
+                              const isVisible = evaluateVisibility(fieldDef.visibleIf, formData, visibilityCtx);
+                              if (!isVisible) return null;
+                              const val = formData[fieldDef.apiName];
+                              const display = formatReviewValue(fieldDef, val);
+                              return (
+                                <div key={fieldDef.apiName} className="py-1">
+                                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">{fieldDef.label}</dt>
+                                  <dd className="mt-0.5 text-sm text-gray-900">{display}</dd>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+          )}
+        </div>
+      )}
+
       {/* Error banner */}
       {submitError && (
         <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
@@ -1503,7 +1655,7 @@ export default function DynamicForm({
       )}
 
       {/* Actions — wizard mode */}
-      {isWizardMode && (
+      {isWizardMode && !showReview && (
         <div className="flex items-center justify-between p-6 border-t bg-gray-50">
           <div className="text-sm text-gray-500">
             Step {currentStep + 1} of {wizardSections.length}
@@ -1526,8 +1678,9 @@ export default function DynamicForm({
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             ) : (
-              <Button type="button" onClick={submitForm} disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Create'}
+              <Button type="button" onClick={enterReview}>
+                Review
+                <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             )}
           </div>
@@ -1535,16 +1688,41 @@ export default function DynamicForm({
       )}
 
       {/* Actions — normal mode */}
-      {!isWizardMode && (
+      {!isWizardMode && !showReview && (
         <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
               Cancel
             </Button>
           )}
-          <Button type="button" onClick={submitForm} disabled={isSubmitting}>
-            {isSubmitting ? 'Saving...' : layoutType === 'create' ? 'Create' : 'Save'}
-          </Button>
+          {layoutType === 'create' ? (
+            <Button type="button" onClick={enterReview}>
+              Review
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          ) : (
+            <Button type="button" onClick={submitForm} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Actions — review mode */}
+      {showReview && (
+        <div className="flex items-center justify-between p-6 border-t bg-gray-50">
+          <div className="text-sm text-gray-500 font-medium">
+            Review Complete
+          </div>
+          <div className="flex gap-3">
+            <Button type="button" variant="outline" onClick={() => setShowReview(false)}>
+              <ChevronLeft className="w-4 h-4 mr-1" />
+              Edit
+            </Button>
+            <Button type="button" onClick={submitForm} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
         </div>
       )}
     </form>

@@ -42,7 +42,7 @@ const typeConfig = {
   },
   deal: {
     icon: Target,
-    label: 'Deal',
+    label: 'Opportunity',
     color: 'text-red-600',
     bgColor: 'bg-red-50',
   },
@@ -347,7 +347,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
           }}
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Search properties, accounts, contacts, leads, deals, projects..."
+          placeholder="Search properties, accounts, contacts, leads, opportunities, projects..."
           className={cn(
             'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 bg-white dark:bg-gray-800 dark:text-white text-sm',
             inputClassName

@@ -64,7 +64,7 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/deals' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
 ];
@@ -116,6 +116,8 @@ export default function DealsPage() {
   
   // Check if Deal object exists with page layouts
   const dealObject = schema?.objects.find(obj => obj.apiName === 'Deal');
+  const objectLabel = dealObject?.label || 'Opportunity';
+  const objectPluralLabel = dealObject?.pluralLabel || 'Opportunities';
   const pageLayouts = dealObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -452,7 +454,7 @@ export default function DealsPage() {
   };
 
   const handleDeleteDeal = async (id: string) => {
-    if (confirm('Are you sure you want to delete this deal?')) {
+    if (confirm(`Are you sure you want to delete this ${objectLabel.toLowerCase()}?`)) {
       try {
         await recordsService.deleteRecord('Deal', id);
         const updatedDeals = deals.filter(d => d.id !== id);
@@ -519,7 +521,7 @@ export default function DealsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading deals...</div>
+        <div className="text-gray-600">Loading {objectPluralLabel.toLowerCase()}...</div>
       </div>
     );
   }
@@ -530,7 +532,7 @@ export default function DealsPage() {
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Deals.</p>
+          <p className="text-gray-600 mb-6">You don&apos;t have permission to view {objectPluralLabel}.</p>
           <Link href="/" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Go to Home</Link>
         </div>
       </div>
@@ -544,12 +546,12 @@ export default function DealsPage() {
           <div className="pb-6 border-b border-gray-200 mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center"><Target className="w-6 h-6 text-brand-navy" /></div>
-              <h1 className="text-2xl font-bold text-gray-900">Deals</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{objectPluralLabel}</h1>
             </div>
             <p className="text-sm text-gray-600 ml-13">Manage sales opportunities and pipeline</p>
           </div>
           <div>
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Deals</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{objectPluralLabel}</h3>
             <nav className="space-y-1">
               <button
                 onClick={() => setSidebarFilter('recent')}
@@ -582,7 +584,7 @@ export default function DealsPage() {
                 }`}
               >
                 <List className="w-4 h-4 mr-3" />
-                All Deals
+                All {objectPluralLabel}
               </button>
               <button
                 onClick={() => setSidebarFilter('favorites')}
@@ -603,7 +605,7 @@ export default function DealsPage() {
         <div className="flex-1 overflow-y-auto">
         <div className="px-6 py-6">
         <div className="mb-6 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Deal Records</h3>
+          <h3 className="text-lg font-medium text-gray-900">{objectLabel} Records</h3>
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilterSettings(true)}
@@ -627,7 +629,7 @@ export default function DealsPage() {
               className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
             >
               <Plus className="w-5 h-5 mr-2" />
-              New Deal
+              New {objectLabel}
             </button>
             )}
           </div>
@@ -639,7 +641,7 @@ export default function DealsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search deals by number, name, account, or stage..."
+              placeholder={`Search ${objectPluralLabel.toLowerCase()} by number, name, account, or stage...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
