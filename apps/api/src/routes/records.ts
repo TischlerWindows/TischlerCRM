@@ -177,14 +177,26 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     // Validate required fields — only reject if value is undefined or null
-    // Support both prefixed (e.g., "TestObject__name") and unprefixed ("name") keys in data
+    // Support both prefixed (e.g., "Contact__firstName") and unprefixed ("firstName") keys in data
     const requiredFields = object.fields.filter((f) => f.required);
     const missingFields = requiredFields.filter((f) => {
-      const prefixed = data[f.apiName];
-      // Also check unprefixed: strip "ObjectName__" prefix from field apiName
+      // Check the field's own apiName as-is
+      const direct = data[f.apiName];
+      // Strip "ObjectName__" prefix from field apiName to get the bare key
       const unprefixedKey = f.apiName.replace(/^[A-Za-z]+__/, '');
       const unprefixed = data[unprefixedKey];
-      return (prefixed === undefined || prefixed === null) && (unprefixed === undefined || unprefixed === null);
+      // Also check the object-prefixed form: "Contact__firstName" when field is "firstName"
+      const objectPrefixed = data[`${apiName}__${f.apiName}`];
+      // Also check composite sub-field patterns like "Contact__name_firstName"
+      const compositeMatch = Object.keys(data).some(
+        (k) => k.endsWith(`_${f.apiName}`) && k.startsWith(`${apiName}__`) && data[k] !== undefined && data[k] !== null
+      );
+      return (
+        (direct === undefined || direct === null) &&
+        (unprefixed === undefined || unprefixed === null) &&
+        (objectPrefixed === undefined || objectPrefixed === null) &&
+        !compositeMatch
+      );
     });
 
     if (missingFields.length > 0) {
