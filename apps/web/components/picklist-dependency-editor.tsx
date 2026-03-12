@@ -537,8 +537,30 @@ export default function PicklistDependencyEditor({
         <Button
           type="button"
           onClick={() => {
+            // Auto-capture any in-progress condition that the user filled in
+            // but didn't explicitly click the "+" button for (mirrors how the
+            // visibility rules editor works).
+            let finalRules = rules;
+            if (
+              editingRuleIdx !== null &&
+              condLeft &&
+              condRight !== '' &&
+              condRight !== undefined
+            ) {
+              const pendingCondition: ConditionExpr = {
+                left: condLeft,
+                op: condOp as ConditionExpr['op'],
+                right: condRight,
+              };
+              finalRules = finalRules.map((r, i) =>
+                i === editingRuleIdx
+                  ? { ...r, conditions: [...r.conditions, pendingCondition] }
+                  : r
+              );
+            }
+
             // Only discard completely empty rules (no conditions AND no values)
-            const cleaned = rules.filter(
+            const cleaned = finalRules.filter(
               (r) => r.conditions.length > 0 || r.values.length > 0
             );
             onSave(cleaned);
