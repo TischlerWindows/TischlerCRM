@@ -668,12 +668,11 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
     if (!fieldDef) return;
 
-    // Clean: keep only rules with conditions AND values
-    const cleaned = depRules.filter(r => r.conditions.length > 0 && r.values.length > 0);
-
+    // Update the field definition with picklist dependencies
+    // (exact same pattern as handleSaveVisibilityRules)
     const updatedFields = object.fields.map((f) =>
       f.apiName === fieldDef.apiName
-        ? { ...f, picklistDependencies: cleaned.length > 0 ? cleaned : undefined }
+        ? { ...f, picklistDependencies: depRules }
         : f
     );
 
