@@ -8,7 +8,7 @@ export default function DealDetailPage() {
     <RecordDetailPage
       objectApiName="Deal"
       backRoute="/deals"
-      backLabel="Opportunities"
+      backLabel="Deals"
       icon={FileText}
     />
   );

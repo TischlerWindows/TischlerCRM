@@ -4,7 +4,7 @@ export const DEFAULT_TAB_ORDER = [
   { name: 'Accounts', href: '/accounts' },
   { name: 'Products', href: '/products' },
   { name: 'Leads', href: '/leads' },
-  { name: 'Opportunities', href: '/deals' },
+  { name: 'Deals', href: '/deals' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
   { name: 'Quotes', href: '/quotes' },
