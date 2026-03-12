@@ -92,21 +92,43 @@ export default function PicklistDependencyEditor({
     setValueSearchTerm('');
   }, []);
 
+  // Auto-commit any in-progress condition before switching rules.
+  // Uses refs to read the latest condition values synchronously so the
+  // callback is stable and doesn't depend on stale closure state.
+  const condLeftRef = useRef(condLeft);
+  const condOpRef = useRef(condOp);
+  const condRightRef = useRef(condRight);
+  const editingRuleIdxRef = useRef(editingRuleIdx);
+  useEffect(() => { condLeftRef.current = condLeft; }, [condLeft]);
+  useEffect(() => { condOpRef.current = condOp; }, [condOp]);
+  useEffect(() => { condRightRef.current = condRight; }, [condRight]);
+  useEffect(() => { editingRuleIdxRef.current = editingRuleIdx; }, [editingRuleIdx]);
+
+  const commitPendingCondition = useCallback(() => {
+    const left = condLeftRef.current;
+    const op = condOpRef.current;
+    const right = condRightRef.current;
+    const idx = editingRuleIdxRef.current;
+    if (idx !== null && left && right !== '' && right !== undefined) {
+      const pending: ConditionExpr = { left, op: op as ConditionExpr['op'], right };
+      setRules((prev) =>
+        prev.map((r, i) =>
+          i === idx ? { ...r, conditions: [...r.conditions, pending] } : r
+        )
+      );
+    }
+  }, []);
+
   const addNewRule = useCallback(() => {
-    setRules((prev) => [...prev, { conditions: [], values: [] }]);
-    // Use the callback to compute the correct index
-    // Since we just pushed, the new rule's index = current length
+    commitPendingCondition();
     setRules((prev) => {
-      // Expand the last rule and reset the editing form
-      const newIdx = prev.length - 1;
+      const updated = [...prev, { conditions: [], values: [] }];
+      const newIdx = updated.length - 1;
       setExpandedRule(newIdx);
       resetConditionForm(newIdx);
-      return prev; // don't modify rules, just use this to read the latest length
+      return updated;
     });
-  }, [resetConditionForm]);
-
-  // Hmm, that's still nested. Let me use a different approach.
-  // Actually the issue is simpler - just compute the index directly.
+  }, [commitPendingCondition, resetConditionForm]);
 
   const totalConditions = rules.reduce((sum, r) => sum + r.conditions.length, 0);
 
@@ -142,8 +164,10 @@ export default function PicklistDependencyEditor({
                   type="button"
                   onClick={() => {
                     if (isExpanded) {
+                      commitPendingCondition();
                       setExpandedRule(null);
                     } else {
+                      commitPendingCondition();
                       setExpandedRule(ruleIdx);
                       resetConditionForm(ruleIdx);
                     }
