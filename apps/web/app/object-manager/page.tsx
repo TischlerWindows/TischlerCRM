@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSchemaStore } from '@/lib/schema-store';
-import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS } from '@/lib/schema';
+import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, cloneSystemFields } from '@/lib/schema';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { deletePreference } from '@/lib/preferences';
 import { 
@@ -121,7 +121,7 @@ export default function ObjectManagerPage() {
       const newObject: Omit<ObjectDef, 'id' | 'createdAt' | 'updatedAt'> = {
         apiName,
         label: createForm.label,
-        fields: [...SYSTEM_FIELDS],
+        fields: cloneSystemFields(),
         recordTypes: [defaultRecordType],
         pageLayouts: [defaultLayout],
         validationRules: [],

@@ -240,8 +240,10 @@ export interface DragDropItem {
   data: any;
 }
 
-// Default field definitions for system objects
-export const SYSTEM_FIELDS: FieldDef[] = [
+// Default field definitions for system objects.
+// Exported as a getter so every consumer receives fresh clones — prevents
+// shared-reference mutations across different ObjectDef instances.
+const _SYSTEM_FIELDS: FieldDef[] = [
   {
     id: 'id',
     apiName: 'Id',
@@ -282,6 +284,16 @@ export const SYSTEM_FIELDS: FieldDef[] = [
     helpText: 'User who last modified this record'
   }
 ];
+
+/** Return a deep-cloned copy of the system fields so no two objects share references. */
+export const SYSTEM_FIELDS: FieldDef[] = Object.freeze(
+  _SYSTEM_FIELDS
+) as unknown as FieldDef[];
+
+/** Get independent copies of system fields for embedding in a new object. */
+export function cloneSystemFields(): FieldDef[] {
+  return _SYSTEM_FIELDS.map(f => ({ ...f }));
+}
 
 // Field type metadata for UI
 export const FIELD_TYPES: FieldOption[] = [

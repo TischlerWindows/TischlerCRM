@@ -1,4 +1,4 @@
-import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, normalizeFieldType } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, cloneSystemFields, normalizeFieldType } from './schema';
 import { apiClient } from './api-client';
 
 const STORAGE_KEY = 'tces-object-manager-schema';
@@ -416,10 +416,12 @@ class LocalStorageSchemaService implements SchemaService {
         // Normalise field types so DB variants (lowercase, aliases like
         // "MultiSelectPicklist") map to canonical FieldType values used by
         // the DynamicForm switch statement.
+        // IMPORTANT: create new field objects to avoid mutating shared references.
         for (const obj of schema.objects) {
-          for (const field of obj.fields) {
-            (field as any).type = normalizeFieldType(field.type);
-          }
+          obj.fields = obj.fields.map(field => {
+            const normalized = normalizeFieldType(field.type);
+            return normalized !== field.type ? { ...field, type: normalized } : field;
+          });
         }
         
         // Run the same migrations/fixes as before
@@ -600,7 +602,7 @@ class LocalStorageSchemaService implements SchemaService {
       createdAt: now,
       updatedAt: now,
       fields: [
-        ...SYSTEM_FIELDS,
+        ...cloneSystemFields(),
         {
           id: generateId(),
           apiName: 'Home__ReportsPanel',
@@ -2707,7 +2709,7 @@ class LocalStorageSchemaService implements SchemaService {
         description,
         createdAt: now,
         updatedAt: now,
-        fields: [...SYSTEM_FIELDS, ...customFields],
+        fields: [...cloneSystemFields(), ...customFields],
         recordTypes: [recordType],
         pageLayouts: [layout],
         validationRules: [],
@@ -2869,7 +2871,7 @@ class LocalStorageSchemaService implements SchemaService {
       description: 'Physical locations and real estate properties',
       createdAt: now,
       updatedAt: now,
-      fields: [...SYSTEM_FIELDS, ...propertyFields.map((field) => ({ ...field, custom: true }))],
+      fields: [...cloneSystemFields(), ...propertyFields.map((field) => ({ ...field, custom: true }))],
       recordTypes: [propertyRecordType],
       pageLayouts: [propertyWoodLayout],
       validationRules: [],
@@ -2890,7 +2892,7 @@ class LocalStorageSchemaService implements SchemaService {
       createdAt: now,
       updatedAt: now,
       fields: [
-        ...SYSTEM_FIELDS,
+        ...cloneSystemFields(),
         {
           id: generateId(),
           apiName: 'Home__ReportsPanel',

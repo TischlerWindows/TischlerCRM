@@ -183,26 +183,32 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
   };
 
   const handleEditField = (field: FieldDef) => {
-    setEditingField(field);
+    // Deep-clone the field so editingField is independent from the live
+    // schema state — prevents shared references from leaking mutations.
+    const cloned: FieldDef = {
+      ...field,
+      picklistValues: field.picklistValues ? [...field.picklistValues] : undefined,
+    };
+    setEditingField(cloned);
     setSelectedType(field.type);
     setShowTypeSelector(false);
     setFormData({
-      label: field.label,
-      apiName: field.apiName,
-      type: field.type,
-      required: field.required || false,
-      unique: field.unique || false,
-      helpText: field.helpText || '',
-      defaultValue: field.defaultValue || '',
-      maxLength: field.maxLength || 255,
-      precision: field.precision || 18,
-      scale: field.scale || 2,
-      displayFormat: field.autoNumber?.displayFormat || '',
-      formulaExpr: field.formulaExpr || '',
-      picklistValues: field.picklistValues || [],
-      picklistPosition: (field as any).picklistPosition || 'left',
-      relationshipName: field.relationshipName || '',
-      lookupObject: field.lookupObject || '',
+      label: cloned.label,
+      apiName: cloned.apiName,
+      type: cloned.type,
+      required: cloned.required || false,
+      unique: cloned.unique || false,
+      helpText: cloned.helpText || '',
+      defaultValue: cloned.defaultValue || '',
+      maxLength: cloned.maxLength || 255,
+      precision: cloned.precision || 18,
+      scale: cloned.scale || 2,
+      displayFormat: cloned.autoNumber?.displayFormat || '',
+      formulaExpr: cloned.formulaExpr || '',
+      picklistValues: cloned.picklistValues ? [...cloned.picklistValues] : [],
+      picklistPosition: (cloned as any).picklistPosition || 'left',
+      relationshipName: cloned.relationshipName || '',
+      lookupObject: cloned.lookupObject || '',
     });
     setShowCreateDialog(true);
   };
@@ -219,6 +225,16 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       return;
     }
 
+    // Prevent duplicate API names — a duplicate would cause updateField to
+    // modify multiple field definitions at once.
+    const existingField = fields.find(f => f.apiName === formData.apiName);
+    if (existingField && (!editingField || existingField.apiName !== editingField.apiName)) {
+      alert(`A field with API Name "${formData.apiName}" already exists. Please choose a unique API Name.`);
+      return;
+    }
+
+    // Build the update payload with only the properties relevant to this
+    // field type so unrelated defaults don't leak onto the definition.
     const newField: Partial<FieldDef> = {
       apiName: formData.apiName,
       label: formData.label,
@@ -227,22 +243,38 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       unique: formData.unique,
       helpText: formData.helpText,
       defaultValue: formData.defaultValue,
-      maxLength: formData.maxLength,
-      precision: formData.precision,
-      scale: formData.scale,
-      formulaExpr: formData.formulaExpr,
-      picklistValues: formData.picklistValues,
-      picklistPosition: formData.type === 'PicklistText' ? formData.picklistPosition : undefined,
-      relationshipName: formData.relationshipName,
-      lookupObject: formData.lookupObject,
     };
 
-    // Add autoNumber config if applicable
-    if (formData.type === 'AutoNumber' && formData.displayFormat) {
+    // Type-specific properties
+    const t = formData.type;
+    if (t === 'Text' || t === 'TextArea' || t === 'EncryptedText' || t === 'LongTextArea' || t === 'RichTextArea') {
+      newField.maxLength = formData.maxLength;
+    }
+    if (t === 'Number' || t === 'Currency' || t === 'Percent') {
+      newField.precision = formData.precision;
+      newField.scale = formData.scale;
+    }
+    if (t === 'AutoNumber' && formData.displayFormat) {
       (newField as any).autoNumber = {
         displayFormat: formData.displayFormat,
         startingNumber: 1,
       };
+    }
+    if (t === 'Formula') {
+      newField.formulaExpr = formData.formulaExpr;
+    }
+    if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText') {
+      newField.picklistValues = [...formData.picklistValues];
+    }
+    if (t === 'PicklistText') {
+      (newField as any).picklistPosition = formData.picklistPosition;
+    }
+    if (t === 'Lookup' || t === 'ExternalLookup') {
+      newField.relationshipName = formData.relationshipName;
+      newField.lookupObject = formData.lookupObject;
+    }
+    if (t === 'LookupUser') {
+      newField.lookupObject = 'User';
     }
 
     if (editingField) {
@@ -259,10 +291,10 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     // existing field the apiName must stay stable so page layouts
     // and existing records keep referencing the same key.
     if (editingField) {
-      setFormData({ ...formData, label });
+      setFormData(prev => ({ ...prev, label }));
     } else {
       const apiName = `${objectApiName}__${label.replace(/\s+/g, '_').toLowerCase()}`;
-      setFormData({ ...formData, label, apiName });
+      setFormData(prev => ({ ...prev, label, apiName }));
     }
   };
 

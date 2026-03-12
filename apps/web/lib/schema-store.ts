@@ -325,7 +325,11 @@ export const useSchemaStore = create<SchemaStore>()(
 
         // Detect apiName change so we can cascade to layouts & records
         const targetObj = schema.objects.find(o => o.apiName === objectApi);
-        const oldField = targetObj?.fields.find(f => f.id === fieldId || f.apiName === fieldId);
+        // Match by apiName first (preferred), fall back to id only if no
+        // apiName match found.  Using OR could accidentally match unrelated
+        // fields when an id collides with another field's apiName.
+        const oldField = targetObj?.fields.find(f => f.apiName === fieldId)
+                      || targetObj?.fields.find(f => f.id === fieldId);
         const oldApiName = oldField?.apiName;
         const newApiName = updates.apiName;
         const apiNameChanged = oldApiName && newApiName && oldApiName !== newApiName;
@@ -333,10 +337,17 @@ export const useSchemaStore = create<SchemaStore>()(
         const updatedObjects = schema.objects.map(obj => {
           if (obj.apiName !== objectApi) return obj;
 
-          // Update the field definition
-          const updatedFields = obj.fields.map(field =>
-            (field.id === fieldId || field.apiName === fieldId) ? { ...field, ...updates } : field
-          );
+          // Update ONLY the single matching field definition.
+          // Match by apiName first; fall back to id only if needed.
+          let matched = false;
+          const updatedFields = obj.fields.map(field => {
+            if (matched) return field; // already found the one field
+            if (field.apiName === fieldId || (!matched && field.id === fieldId)) {
+              matched = true;
+              return { ...field, ...updates };
+            }
+            return field;
+          });
 
           // Cascade apiName change + field property changes to page layouts
           const updatedLayouts = (obj.pageLayouts || []).map(layout => ({
@@ -365,7 +376,7 @@ export const useSchemaStore = create<SchemaStore>()(
                     label: freshField.label,
                     type: freshField.type,
                     required: freshField.required,
-                    picklistValues: freshField.picklistValues,
+                    picklistValues: freshField.picklistValues ? [...freshField.picklistValues] : freshField.picklistValues,
                     defaultValue: freshField.defaultValue,
                   };
                 }),
