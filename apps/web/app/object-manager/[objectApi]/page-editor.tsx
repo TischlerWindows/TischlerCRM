@@ -658,15 +658,26 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   };
 
   const handleSavePicklistDependencies = async (depRules: PicklistDependencyRule[]) => {
+    console.warn('[PD-SAVE] handler called, depRules:', JSON.stringify(depRules));
+
     if (!selectedElement || selectedElement.type !== 'field' || !object) {
+      window.alert('[PD-DEBUG] EARLY RETURN: selectedElement=' + JSON.stringify(selectedElement) + ', object=' + !!object);
       return;
     }
 
     const field = fields.find((f) => f.id === selectedElement.id);
-    if (!field) return;
+    if (!field) {
+      window.alert('[PD-DEBUG] EARLY RETURN: field not found for selectedElement.id=' + selectedElement.id);
+      return;
+    }
 
     const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
-    if (!fieldDef) return;
+    if (!fieldDef) {
+      window.alert('[PD-DEBUG] EARLY RETURN: fieldDef not found for apiName=' + field.fieldApiName);
+      return;
+    }
+
+    console.warn('[PD-SAVE] Saving', depRules.length, 'rules for field', fieldDef.apiName);
 
     // Update the field definition with picklist dependencies
     // (exact same pattern as handleSaveVisibilityRules)
@@ -678,9 +689,11 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
     try {
       await updateObject(objectApiName, { fields: updatedFields });
+      console.warn('[PD-SAVE] SUCCESS — saved', depRules.length, 'rules for', fieldDef.apiName);
+      window.alert('Value dependencies saved! (' + depRules.length + ' rules for ' + fieldDef.label + ')');
       setShowPicklistDependencyEditor(false);
     } catch (err) {
-      console.error('Failed to save picklist dependencies:', err);
+      console.error('[PD-SAVE] FAILED:', err);
       alert('Failed to save picklist dependencies. Please try again.');
     }
   };

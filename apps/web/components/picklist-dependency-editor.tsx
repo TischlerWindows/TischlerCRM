@@ -537,9 +537,14 @@ export default function PicklistDependencyEditor({
         <Button
           type="button"
           onClick={() => {
+            console.warn('[PD-EDITOR] Save clicked, rules:', JSON.stringify(rules));
             const cleaned = rules.filter(
               (r) => r.conditions.length > 0 && r.values.length > 0
             );
+            console.warn('[PD-EDITOR] After filter:', cleaned.length, 'rules (from', rules.length, 'total)');
+            if (cleaned.length === 0 && rules.length > 0) {
+              window.alert('Warning: All ' + rules.length + ' rules were filtered out because they need both conditions AND values. Please add at least one condition and select at least one value for each rule.');
+            }
             onSave(cleaned);
           }}
           size="sm"
