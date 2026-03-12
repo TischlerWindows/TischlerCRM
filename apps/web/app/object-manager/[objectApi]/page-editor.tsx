@@ -889,6 +889,18 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                 />
               </div>
             )}
+            {fieldDef.picklistDependencies && fieldDef.picklistDependencies.length > 0 && (
+              <div 
+                className="p-1 bg-amber-500 rounded flex-shrink-0"
+                title={`Value dependencies: ${fieldDef.picklistDependencies.length} rule${fieldDef.picklistDependencies.length !== 1 ? 's' : ''}`}
+              >
+                <List 
+                  className="w-3 h-3" 
+                  stroke="white"
+                  strokeWidth="2.5px"
+                />
+              </div>
+            )}
             <button
               className="opacity-0 group-hover:opacity-100"
               onClick={(e) => {
