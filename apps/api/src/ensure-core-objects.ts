@@ -26,8 +26,8 @@ const CORE_OBJECTS = [
     pluralLabel: 'Contacts',
     description: 'People and contacts',
     fields: [
-      { apiName: 'firstName', label: 'First Name', type: 'Text', required: true },
-      { apiName: 'lastName', label: 'Last Name', type: 'Text', required: true },
+      { apiName: 'firstName', label: 'First Name', type: 'Text' },
+      { apiName: 'lastName', label: 'Last Name', type: 'Text' },
       { apiName: 'email', label: 'Email', type: 'Email' },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
       { apiName: 'title', label: 'Title', type: 'Text' },
@@ -221,6 +221,27 @@ export async function ensureCoreObjects(): Promise<void> {
   console.log(
     `[ensure-core-objects] Done — ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
   );
+
+  // Fix: ensure Contact firstName/lastName are NOT required in the DB.
+  // The web schema uses a CompositeText "Name" field instead of separate
+  // firstName/lastName fields, so requiring them blocks record creation.
+  try {
+    const contactObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
+    });
+    if (contactObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: contactObj.id,
+          apiName: { in: ['firstName', 'lastName'] },
+          required: true,
+        },
+        data: { required: false },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Contact name field requirements:', err);
+  }
 
   // Also sync any user-created objects from the schema settings to the DB.
   // The schema (stored in the Setting table under 'orgSchema') may contain
