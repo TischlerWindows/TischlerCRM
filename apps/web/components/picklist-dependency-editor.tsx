@@ -83,44 +83,39 @@ export default function PicklistDependencyEditor({
   );
 
   // Reset editing condition state for a given rule
-  const resetConditionForm = useCallback((ruleIdx: number) => {
+  const resetConditionForm = (ruleIdx: number) => {
     setEditingRuleIdx(ruleIdx);
     setCondLeft('');
     setCondOp('==');
     setCondRight('');
     setFieldSearchTerm('');
     setValueSearchTerm('');
-  }, []);
+  };
 
-  // Auto-commit any in-progress condition before switching rules.
-  // Uses refs to read the latest condition values synchronously so the
-  // callback is stable and doesn't depend on stale closure state.
-  const condLeftRef = useRef(condLeft);
-  const condOpRef = useRef(condOp);
-  const condRightRef = useRef(condRight);
-  const editingRuleIdxRef = useRef(editingRuleIdx);
-  useEffect(() => { condLeftRef.current = condLeft; }, [condLeft]);
-  useEffect(() => { condOpRef.current = condOp; }, [condOp]);
-  useEffect(() => { condRightRef.current = condRight; }, [condRight]);
-  useEffect(() => { editingRuleIdxRef.current = editingRuleIdx; }, [editingRuleIdx]);
-
-  const commitPendingCondition = useCallback(() => {
-    const left = condLeftRef.current;
-    const op = condOpRef.current;
-    const right = condRightRef.current;
-    const idx = editingRuleIdxRef.current;
-    if (idx !== null && left && right !== '' && right !== undefined) {
-      const pending: ConditionExpr = { left, op: op as ConditionExpr['op'], right };
+  // Commit any in-progress condition (field + op + value all filled in)
+  // to the specified rule index, then reset the form.  Reads closure state
+  // directly so values are always current.
+  const commitAndReset = (nextRuleIdx: number | null) => {
+    if (editingRuleIdx !== null && condLeft && condRight !== '' && condRight !== undefined) {
+      const pending: ConditionExpr = {
+        left: condLeft,
+        op: condOp as ConditionExpr['op'],
+        right: condRight,
+      };
       setRules((prev) =>
         prev.map((r, i) =>
-          i === idx ? { ...r, conditions: [...r.conditions, pending] } : r
+          i === editingRuleIdx ? { ...r, conditions: [...r.conditions, pending] } : r
         )
       );
     }
-  }, []);
+    if (nextRuleIdx !== null) {
+      resetConditionForm(nextRuleIdx);
+    }
+  };
 
-  const addNewRule = useCallback(() => {
-    commitPendingCondition();
+  const addNewRule = () => {
+    // Commit pending condition for current rule first
+    commitAndReset(null);
     setRules((prev) => {
       const updated = [...prev, { conditions: [], values: [] }];
       const newIdx = updated.length - 1;
@@ -128,7 +123,7 @@ export default function PicklistDependencyEditor({
       resetConditionForm(newIdx);
       return updated;
     });
-  }, [commitPendingCondition, resetConditionForm]);
+  };
 
   const totalConditions = rules.reduce((sum, r) => sum + r.conditions.length, 0);
 
@@ -164,12 +159,11 @@ export default function PicklistDependencyEditor({
                   type="button"
                   onClick={() => {
                     if (isExpanded) {
-                      commitPendingCondition();
+                      commitAndReset(null);
                       setExpandedRule(null);
                     } else {
-                      commitPendingCondition();
+                      commitAndReset(ruleIdx);
                       setExpandedRule(ruleIdx);
-                      resetConditionForm(ruleIdx);
                     }
                   }}
                   className="flex items-center gap-2 text-sm hover:text-gray-900 flex-1 text-left"
