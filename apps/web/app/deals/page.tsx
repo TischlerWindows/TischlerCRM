@@ -767,9 +767,9 @@ export default function DealsPage() {
         {filteredDeals.length === 0 && (
           <div className="text-center py-12">
             <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No deals found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No {objectPluralLabel.toLowerCase()} found</h3>
             <p className="text-gray-600">
-              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first deal.'}
+              {searchTerm ? 'Try adjusting your search.' : `Get started by creating your first ${objectLabel.toLowerCase()}.`}
             </p>
           </div>
         )}
