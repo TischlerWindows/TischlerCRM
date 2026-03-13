@@ -664,7 +664,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   )}
 
-                  {(selectedType === 'Lookup' || selectedType === 'ExternalLookup' || selectedType === 'PicklistLookup') && (
+                  {(selectedType === 'Lookup' || selectedType === 'ExternalLookup') && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="lookupObject">Related To (Object)</Label>
@@ -775,6 +775,41 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
                   {selectedType === 'PicklistLookup' && (
                     <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="lookupObject">Related To (Object)</Label>
+                          <select
+                            id="lookupObject"
+                            value={formData.lookupObject}
+                            onChange={(e) => {
+                              const selectedObj = schema?.objects.find(o => o.apiName === e.target.value);
+                              setFormData({
+                                ...formData,
+                                lookupObject: e.target.value,
+                                relationshipName: selectedObj?.pluralLabel || selectedObj?.label || e.target.value,
+                              });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                          >
+                            <option value="">-- Select Object --</option>
+                            {schema?.objects
+                              .filter(o => o.apiName !== objectApiName)
+                              .sort((a, b) => a.label.localeCompare(b.label))
+                              .map(o => (
+                                <option key={o.apiName} value={o.apiName}>{o.label}</option>
+                              ))}
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor="relationshipName">Relationship Name</Label>
+                          <Input
+                            id="relationshipName"
+                            value={formData.relationshipName}
+                            onChange={(e) => setFormData({ ...formData, relationshipName: e.target.value })}
+                            placeholder="e.g., account"
+                          />
+                        </div>
+                      </div>
                       <div>
                         <Label htmlFor="picklistPosition">Picklist Position</Label>
                         <select
