@@ -1232,8 +1232,13 @@ export default function DynamicForm({
         // Determine what to display:
         // - If lookup is active (user is typing), show the query
         // - If we have a selected label (found the record), show that
+        // - If a value is set but record isn't in cache yet (just created
+        //   inline), fall back to lookupQuery which was set by the inline
+        //   create handler
         // - Otherwise show empty (don't show raw ID to users)
-        const displayValue = isLookupActive ? lookupQuery : selectedLabel;
+        const displayValue = isLookupActive
+          ? lookupQuery
+          : selectedLabel || (value ? lookupQuery : '');
 
         const filteredRecords = recordsArray.filter((record) => {
           const label = getRecordLabel(record);
@@ -1907,6 +1912,18 @@ export default function DynamicForm({
                       const flat = recordsService.flattenRecord(created);
                       const label = getRecordLabel(flat);
                       setLookupQueries((prev) => ({ ...prev, [inlineCreateForField!]: typeof label === 'string' ? label : String(label) }));
+
+                      // Add the new record to the lookup cache so the
+                      // field immediately shows the label without a page reload.
+                      if (inlineCreateTarget) {
+                        setLookupRecordsCache((prev) => {
+                          const existing = prev[inlineCreateTarget!] || [];
+                          return {
+                            ...prev,
+                            [inlineCreateTarget!]: [...existing, { id: created.id, ...flat }],
+                          };
+                        });
+                      }
                     }
                   } catch (err) {
                     console.error('Inline create failed:', err);
