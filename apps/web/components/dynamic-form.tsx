@@ -1887,8 +1887,16 @@ export default function DynamicForm({
                       }
                     }
 
+                    // Normalize data keys: strip the "ObjectName__" prefix so the
+                    // API receives unprefixed field names matching the DB schema.
+                    const normalizedData: Record<string, any> = {};
+                    Object.entries(data).forEach(([key, value]) => {
+                      const cleanKey = key.replace(/^[A-Za-z]+__/, '');
+                      normalizedData[cleanKey] = value;
+                    });
+
                     const created = await recordsService.createRecord(inlineCreateTarget!, {
-                      data,
+                      data: normalizedData,
                       pageLayoutId: inlineLayoutId || inlineCreateLayoutId,
                     });
                     if (created && inlineCreateForField) {

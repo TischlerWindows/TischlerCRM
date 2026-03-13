@@ -12,7 +12,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Properties',
     description: 'Real estate properties',
     fields: [
-      { apiName: 'propertyNumber', label: 'Property Number', type: 'Text', required: true, unique: true },
+      { apiName: 'propertyNumber', label: 'Property Number', type: 'Text', unique: true },
       { apiName: 'address', label: 'Address', type: 'Text', required: true },
       { apiName: 'city', label: 'City', type: 'Text', required: true },
       { apiName: 'state', label: 'State/Province', type: 'Text', required: true },
@@ -40,8 +40,8 @@ const CORE_OBJECTS = [
     pluralLabel: 'Accounts',
     description: 'Business accounts and organizations',
     fields: [
-      { apiName: 'accountNumber', label: 'Account Number', type: 'Text', required: true, unique: true },
-      { apiName: 'name', label: 'Account Name', type: 'Text', required: true },
+      { apiName: 'accountNumber', label: 'Account Number', type: 'Text', unique: true },
+      { apiName: 'name', label: 'Account Name', type: 'Text' },
       { apiName: 'type', label: 'Type', type: 'Picklist', picklistValues: ['Customer', 'Prospect', 'Partner', 'Vendor'] },
       { apiName: 'email', label: 'Email', type: 'Email' },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
@@ -55,7 +55,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Products',
     description: 'Products and services catalog',
     fields: [
-      { apiName: 'productCode', label: 'Product Code', type: 'Text', required: true, unique: true },
+      { apiName: 'productCode', label: 'Product Code', type: 'Text', unique: true },
       { apiName: 'productName', label: 'Product Name', type: 'Text', required: true },
       { apiName: 'description', label: 'Description', type: 'TextArea' },
       { apiName: 'unitPrice', label: 'Unit Price', type: 'Currency' },
@@ -69,7 +69,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Leads',
     description: 'Sales leads',
     fields: [
-      { apiName: 'leadNumber', label: 'Lead Number', type: 'Text', required: true, unique: true },
+      { apiName: 'leadNumber', label: 'Lead Number', type: 'Text', unique: true },
       { apiName: 'firstName', label: 'First Name', type: 'Text' },
       { apiName: 'lastName', label: 'Last Name', type: 'Text', required: true },
       { apiName: 'company', label: 'Company', type: 'Text' },
@@ -85,7 +85,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Deals',
     description: 'Sales opportunities and deals',
     fields: [
-      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', required: true, unique: true },
+      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', unique: true },
       { apiName: 'dealName', label: 'Deal Name', type: 'Text', required: true },
       { apiName: 'amount', label: 'Amount', type: 'Currency' },
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
@@ -99,7 +99,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Projects',
     description: 'Project management',
     fields: [
-      { apiName: 'projectNumber', label: 'Project Number', type: 'Text', required: true, unique: true },
+      { apiName: 'projectNumber', label: 'Project Number', type: 'Text', unique: true },
       { apiName: 'projectName', label: 'Project Name', type: 'Text', required: true },
       { apiName: 'description', label: 'Description', type: 'TextArea' },
       { apiName: 'startDate', label: 'Start Date', type: 'Date' },
@@ -113,7 +113,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Services',
     description: 'Service tickets and requests',
     fields: [
-      { apiName: 'serviceNumber', label: 'Service Number', type: 'Text', required: true, unique: true },
+      { apiName: 'serviceNumber', label: 'Service Number', type: 'Text', unique: true },
       { apiName: 'serviceName', label: 'Service Name', type: 'Text', required: true },
       { apiName: 'description', label: 'Description', type: 'TextArea' },
       { apiName: 'priority', label: 'Priority', type: 'Picklist', picklistValues: ['Low', 'Medium', 'High', 'Critical'], defaultValue: 'Medium' },
@@ -126,7 +126,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Quotes',
     description: 'Sales quotes and proposals',
     fields: [
-      { apiName: 'quoteNumber', label: 'Quote Number', type: 'Text', required: true, unique: true },
+      { apiName: 'quoteNumber', label: 'Quote Number', type: 'Text', unique: true },
       { apiName: 'quoteName', label: 'Quote Name', type: 'Text', required: true },
       { apiName: 'totalAmount', label: 'Total Amount', type: 'Currency' },
       { apiName: 'validUntil', label: 'Valid Until', type: 'Date' },
@@ -139,7 +139,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Installations',
     description: 'Installation tracking',
     fields: [
-      { apiName: 'installationNumber', label: 'Installation Number', type: 'Text', required: true, unique: true },
+      { apiName: 'installationNumber', label: 'Installation Number', type: 'Text', unique: true },
       { apiName: 'installationName', label: 'Installation Name', type: 'Text', required: true },
       { apiName: 'scheduledDate', label: 'Scheduled Date', type: 'Date' },
       { apiName: 'completedDate', label: 'Completed Date', type: 'Date' },
@@ -241,6 +241,42 @@ export async function ensureCoreObjects(): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Contact name field requirements:', err);
+  }
+
+  // Fix: ensure auto-generated number fields are NOT required in the DB.
+  // These are populated by the application (e.g., 'A-001'), not by the user.
+  // Also fix the Account 'name' field — the web schema stores it as
+  // 'accountName' so requiring the DB 'name' field blocks inline creates.
+  try {
+    const autoNumberFieldNames = [
+      'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
+      'dealNumber', 'productCode', 'projectNumber', 'quoteNumber',
+      'serviceNumber', 'installationNumber',
+    ];
+    await prisma.customField.updateMany({
+      where: {
+        apiName: { in: autoNumberFieldNames },
+        required: true,
+      },
+      data: { required: false },
+    });
+
+    // Account 'name' field is stored as 'accountName' in the web schema
+    const accountObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Account', mode: 'insensitive' } },
+    });
+    if (accountObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: accountObj.id,
+          apiName: 'name',
+          required: true,
+        },
+        data: { required: false },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);
   }
 
   // Also sync any user-created objects from the schema settings to the DB.
