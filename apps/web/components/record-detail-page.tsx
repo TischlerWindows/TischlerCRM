@@ -222,6 +222,12 @@ export default function RecordDetailPage({
       return value ? 'Yes' : 'No';
     }
 
+    // PicklistText
+    if (fieldType === 'PicklistText' && typeof value === 'object' && value !== null) {
+      const parts = [value.picklist, value.text].filter(Boolean);
+      return parts.length > 0 ? parts.join(' — ') : '-';
+    }
+
     // Address (object)
     if (fieldType === 'Address' && typeof value === 'object') {
       const parts = [value.street, value.city, value.state, value.postalCode, value.country].filter(Boolean);

@@ -258,7 +258,7 @@ export default function CustomObjectRecordsPage() {
     }
     
     if (typeof value === 'object') {
-      return formatFieldValue(value);
+      return formatFieldValue(value, fieldDef?.type);
     }
     
     return String(value);
