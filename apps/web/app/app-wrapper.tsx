@@ -96,11 +96,16 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
+  // Always refresh schema from the API on mount / when user changes.
+  // The persisted Zustand cache provides a value for the very first paint
+  // (avoiding a label flash), but we must still fetch the latest schema so
+  // layout and field changes made in Object Manager are picked up on every
+  // page load — not only when visiting the Object Manager itself.
   useEffect(() => {
-    if (!schema && user) {
+    if (user) {
       loadSchema();
     }
-  }, [schema, loadSchema, user]);
+  }, [loadSchema, user]);
 
   useEffect(() => {
     (async () => {
