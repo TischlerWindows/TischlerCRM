@@ -416,7 +416,13 @@ export default function AccountsPage() {
       if (!fieldType) {
         if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
       }
-      return formatFieldValue(value, fieldType, schemaField?.lookupObject); = async (data: Record<string, any>, layoutId?: string) => {
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
+    }
+    
+    return String(value);
+  };
+
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
     
     const normalizeFieldName = (fieldName: string): string => {

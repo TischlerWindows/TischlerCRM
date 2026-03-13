@@ -415,7 +415,13 @@ export default function ProductsPage() {
     if (typeof value === 'object') {
       const schemaField = productObject?.fields?.find(f => f.apiName === `Product__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType, schemaField?.lookupObject); = async (data: Record<string, any>, layoutId?: string) => {
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
+    }
+    
+    return String(value);
+  };
+
+  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {
       console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
       
