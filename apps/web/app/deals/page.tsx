@@ -382,7 +382,7 @@ export default function DealsPage() {
     if (typeof value === 'object') {
       const schemaField = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
     if (typeof value === 'number' && columnId === 'value') {

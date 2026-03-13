@@ -430,7 +430,7 @@ export default function PropertiesPage() {
       if (!fieldType) {
         if (columnId === 'address') fieldType = 'Address';
       }
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
     return String(value);

@@ -223,7 +223,7 @@ export default function InstallationsPage() {
     if (typeof value === 'object') {
       const schemaField = installationObject?.fields?.find(f => f.apiName === `Installation__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     return String(value);
   };

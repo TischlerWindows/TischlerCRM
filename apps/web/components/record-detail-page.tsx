@@ -321,7 +321,7 @@ export default function RecordDetailPage({
       }
     }
 
-    return formatFieldValue(value, fieldType);
+    return formatFieldValue(value, fieldType, fieldDef?.lookupObject);
   };
 
   // ── Build a display title from the record ────────────────────────────

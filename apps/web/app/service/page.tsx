@@ -361,13 +361,7 @@ export default function ServicePage() {
     if (typeof value === 'object') {
       const schemaField = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType);
-    }
-    
-    return String(value);
-  };
-
-  const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject); = async (data: Record<string, any>, layoutId?: string) => {
     try {
       // Map schema field names (e.g., Service__serviceName) to simple field names
       const normalizeFieldName = (fieldName: string): string => {

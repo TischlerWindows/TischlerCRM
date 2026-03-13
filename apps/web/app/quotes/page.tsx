@@ -226,7 +226,7 @@ export default function QuotesPage() {
     if (typeof value === 'object') {
       const schemaField = quoteObject?.fields?.find(f => f.apiName === `Quote__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     if (columnId === 'totalAmount') return `$${Number(value).toLocaleString()}`;
     return String(value);

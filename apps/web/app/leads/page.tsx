@@ -395,7 +395,7 @@ export default function LeadsPage() {
         if (columnId === 'propertyAddress') fieldType = 'Address';
         if (columnId === 'contactName' || columnId.toLowerCase().includes('name')) fieldType = 'Name';
       }
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
     if (typeof value === 'number' && columnId === 'estimatedValue') {

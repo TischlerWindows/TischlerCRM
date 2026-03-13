@@ -258,7 +258,7 @@ export function formatDateShort(date: Date): string {
     day: 'numeric',
   }).format(date);
 }
-export function formatFieldValue(value: any, fieldType?: string): string {
+export function formatFieldValue(value: any, fieldType?: string, lookupObject?: string): string {
   // Handle null or undefined
   if (value === null || value === undefined) {
     return '-';
@@ -311,6 +311,29 @@ export function formatFieldValue(value: any, fieldType?: string): string {
     // Handle PicklistText objects (combined picklist + text value)
     if (fieldType === 'PicklistText' || (value.picklist !== undefined && value.text !== undefined)) {
       const parts = [value.picklist, value.text].filter(Boolean);
+      return parts.length > 0 ? parts.join(' — ') : '-';
+    }
+
+    // Handle PicklistLookup objects (combined picklist + lookup value)
+    if (fieldType === 'PicklistLookup' || (value.picklist !== undefined && value.lookup !== undefined)) {
+      const picklistPart = value.picklist || '';
+      let lookupPart = '';
+      if (value.lookup) {
+        if (lookupObject) {
+          lookupPart = resolveLookupDisplayName(value.lookup, lookupObject);
+        } else {
+          // Scan all cached object types to resolve the UUID
+          for (const objType of Object.keys(lookupCache)) {
+            const records = lookupCache[objType];
+            if (records && records.find((r: any) => String(r.id) === String(value.lookup))) {
+              lookupPart = resolveLookupDisplayName(value.lookup, objType);
+              break;
+            }
+          }
+          if (!lookupPart) lookupPart = String(value.lookup);
+        }
+      }
+      const parts = [picklistPart, lookupPart].filter(Boolean);
       return parts.length > 0 ? parts.join(' — ') : '-';
     }
 

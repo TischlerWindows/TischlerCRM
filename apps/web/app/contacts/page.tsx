@@ -323,7 +323,7 @@ export default function ContactsPage() {
         if (columnId === 'address') fieldType = 'Address';
         if (columnId === 'name') fieldType = 'CompositeText';
       }
-      return formatFieldValue(value, fieldType);
+      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     return String(value);
   };
