@@ -61,6 +61,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Lookup', label: 'Lookup Relationship', description: 'Creates a relationship that links this object to another object. The relationship field allows users to click on a lookup icon to select a value from a popup list. The other object is the source of the values in the list.', category: 'Relationship', icon: LinkIcon },
   { value: 'ExternalLookup', label: 'External Lookup Relationship', description: 'Creates a relationship that links this object to an external object whose data is stored outside the Salesforce org.', category: 'Relationship', icon: ExternalLink },
   { value: 'LookupUser', label: 'Lookup User', description: 'Creates a field that looks up and references a user in the system. Users can search for and select a user from the user list.', category: 'Relationship', icon: User },
+  { value: 'PicklistLookup', label: 'Picklist Lookup', description: 'Creates a dropdown field populated with records from another object. Users select a value from a pre-populated list instead of searching.', category: 'Relationship', icon: List },
   
   // Standard
   { value: 'Checkbox', label: 'Checkbox', description: 'Allows users to select a True (checked) or False (unchecked) value.', category: 'Standard', icon: CheckSquare },
