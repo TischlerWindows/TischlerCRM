@@ -316,7 +316,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Picklist', value: 'Picklist', type: 'Picklist' },
   { label: 'Multi-Select Picklist', value: 'MultiPicklist', type: 'MultiPicklist' },
   { label: 'Picklist with Text', value: 'PicklistText', type: 'PicklistText' },
-  { label: 'Picklist Lookup', value: 'PicklistLookup', type: 'PicklistLookup' },
+  { label: 'Picklist with Lookup', value: 'PicklistLookup', type: 'PicklistLookup' },
   { label: 'Text', value: 'Text', type: 'Text' },
   { label: 'Text Area', value: 'TextArea', type: 'TextArea' },
   { label: 'Text Area (Long)', value: 'LongTextArea', type: 'LongTextArea' },

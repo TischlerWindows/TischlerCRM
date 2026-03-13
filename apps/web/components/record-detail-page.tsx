@@ -169,8 +169,8 @@ export default function RecordDetailPage({
 
     const fieldType = fieldDef?.type;
 
-    // Lookup / PicklistLookup → clickable link showing resolved label (not raw UUID)
-    if ((fieldType === 'Lookup' || fieldType === 'LookupUser' || fieldType === 'PicklistLookup') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
+    // Lookup → clickable link showing resolved label (not raw UUID)
+    if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
       const lookupTarget = fieldDef?.lookupObject || 'User';
       const routeMap: Record<string, string> = {
         Contact: 'contacts',
@@ -260,6 +260,35 @@ export default function RecordDetailPage({
     if (fieldType === 'PicklistText' && typeof value === 'object' && value !== null) {
       const parts = [value.picklist, value.text].filter(Boolean);
       return parts.length > 0 ? parts.join(' — ') : '-';
+    }
+
+    // PicklistLookup — composite: picklist selection + lookup record
+    if (fieldType === 'PicklistLookup' && typeof value === 'object' && value !== null) {
+      const lookupTarget = fieldDef?.lookupObject;
+      const picklistPart = value.picklist || '';
+      let lookupPart: React.ReactNode = '';
+      if (value.lookup && lookupTarget) {
+        const routeMap: Record<string, string> = {
+          Contact: 'contacts', Account: 'accounts', Property: 'properties',
+          Lead: 'leads', Deal: 'deals', Product: 'products',
+          Quote: 'quotes', Project: 'projects', Service: 'service',
+          Installation: 'installations',
+        };
+        const route = routeMap[lookupTarget];
+        const displayLabel = resolveLookupDisplayName(value.lookup, lookupTarget);
+        void lookupTick;
+        lookupPart = route ? (
+          <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:text-brand-navy">
+            {displayLabel}
+          </Link>
+        ) : displayLabel;
+      }
+      if (!picklistPart && !lookupPart) return '-';
+      return (
+        <span className="inline-flex items-center gap-1">
+          {picklistPart}{picklistPart && lookupPart ? ' — ' : ''}{lookupPart}
+        </span>
+      );
     }
 
     // Address (object)

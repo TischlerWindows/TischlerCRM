@@ -247,8 +247,18 @@ export default function CustomObjectRecordsPage() {
       return resolveLookupDisplayName(value, 'User');
     }
 
-    // Check if this is a PicklistLookup or regular Lookup field and resolve via field definition
-    if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup' || fieldDef.type === 'PicklistLookup') && fieldDef.lookupObject && typeof value === 'string') {
+    // Check if this is a PicklistLookup (composite: { picklist, lookup })
+    if (fieldDef && fieldDef.type === 'PicklistLookup' && typeof value === 'object' && value !== null) {
+      const picklistPart = value.picklist || '';
+      const lookupPart = value.lookup && fieldDef.lookupObject
+        ? resolveLookupDisplayName(value.lookup, fieldDef.lookupObject)
+        : '';
+      const parts = [picklistPart, lookupPart].filter(Boolean);
+      return parts.length > 0 ? parts.join(' — ') : 'N/A';
+    }
+
+    // Check if this is a regular Lookup field and resolve via field definition
+    if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup') && fieldDef.lookupObject && typeof value === 'string') {
       return resolveLookupDisplayName(value, fieldDef.lookupObject);
     }
     

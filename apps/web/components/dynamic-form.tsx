@@ -562,6 +562,12 @@ export default function DynamicForm({
                 newErrors[field.apiName] = `${fieldDef.label} is required`;
               }
             }
+            // PicklistLookup: treat { picklist: '', lookup: '' } as empty
+            if (fieldDef.type === 'PicklistLookup' && typeof value === 'object' && value !== null) {
+              if (!value.picklist && !value.lookup) {
+                newErrors[field.apiName] = `${fieldDef.label} is required`;
+              }
+            }
             // Address: treat all-empty address as empty
             if (fieldDef.type === 'Address' && typeof value === 'object' && value !== null) {
               const addrParts = [value.street, value.city, value.state, value.postalCode, value.country].filter(Boolean);
@@ -760,6 +766,9 @@ export default function DynamicForm({
                 case 'PicklistText':
                   completeData[field.apiName] = { picklist: 'N/A', text: '' };
                   break;
+                case 'PicklistLookup':
+                  completeData[field.apiName] = { picklist: 'N/A', lookup: '' };
+                  break;
                 case 'Address':
                   completeData[field.apiName] = { street: '', city: '', state: '', postalCode: '', country: '' };
                   break;
@@ -839,6 +848,13 @@ export default function DynamicForm({
       case 'PicklistText': {
         if (typeof val === 'object' && val !== null) {
           const parts = [val.picklist, val.text].filter(Boolean);
+          return parts.length > 0 ? parts.join(' — ') : '—';
+        }
+        return String(val);
+      }
+      case 'PicklistLookup': {
+        if (typeof val === 'object' && val !== null) {
+          const parts = [val.picklist, val.lookup].filter(Boolean);
           return parts.length > 0 ? parts.join(' — ') : '—';
         }
         return String(val);
@@ -1435,29 +1451,110 @@ export default function DynamicForm({
         break;
 
       case 'PicklistLookup': {
-        const plTargetApi = getLookupTargetApi(fieldDef);
-        const plRecords = plTargetApi ? getLookupRecords(plTargetApi) : [];
-        const plRecordsArray = Array.isArray(plRecords) ? plRecords : [];
+        const plkOptions = filterPicklistValues(fieldDef.picklistValues || []);
+        const plkValue = (typeof value === 'object' && value !== null) ? value : { picklist: '', lookup: '' };
+        const plkPosition = (fieldDef as any).picklistPosition || 'left';
+        const plkTargetApi = getLookupTargetApi(fieldDef);
+        const plkRecords = plkTargetApi ? getLookupRecords(plkTargetApi) : [];
+        const plkRecordsArray = Array.isArray(plkRecords) ? plkRecords : [];
+        const plkSelectedRecord = plkValue.lookup ? plkRecordsArray.find((r) => String(r.id) === String(plkValue.lookup)) : null;
+        const plkSelectedLabel = plkSelectedRecord ? getRecordLabel(plkSelectedRecord) : '';
+        const plkLookupQuery = lookupQueries[fieldDef.apiName + '__lookup'] ?? '';
+        const isPlkLookupActive = activeLookupField === fieldDef.apiName + '__lookup';
+        const plkDisplayValue = isPlkLookupActive
+          ? plkLookupQuery
+          : plkSelectedLabel || (plkValue.lookup ? plkLookupQuery : '');
+
+        const plkFilteredRecords = plkRecordsArray.filter((record) => {
+          const label = getRecordLabel(record);
+          const labelStr = typeof label === 'string' ? label : String(label || '');
+          if (!labelStr) return true;
+          const query = plkLookupQuery.toLowerCase();
+          if (labelStr.toLowerCase().includes(query)) return true;
+          return Object.values(record).some((val) =>
+            typeof val === 'string' && val.toLowerCase().includes(query)
+          );
+        });
+
+        const picklistSide = (
+          <PicklistTextDropdown
+            options={plkOptions}
+            value={plkValue.picklist || ''}
+            onChange={(val) =>
+              handleFieldChange(fieldDef.apiName, { ...plkValue, picklist: val })
+            }
+            disabled={isReadOnly}
+          />
+        );
+
+        const lookupSide = (
+          <div className="relative w-1/2 min-w-0">
+            <Input
+              value={plkDisplayValue}
+              placeholder={`Search ${fieldDef.relationshipName || plkTargetApi || 'records'}...`}
+              onChange={(e) => {
+                setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName + '__lookup']: e.target.value }));
+                setActiveLookupField(fieldDef.apiName + '__lookup');
+              }}
+              onFocus={() => setActiveLookupField(fieldDef.apiName + '__lookup')}
+              onBlur={() => {
+                setTimeout(() => {
+                  setActiveLookupField((current) => (current === fieldDef.apiName + '__lookup' ? null : current));
+                }, 150);
+              }}
+              disabled={isReadOnly}
+            />
+            {isPlkLookupActive && (
+              <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                {plkFilteredRecords.length > 0 ? (
+                  plkFilteredRecords.slice(0, 20).map((record) => {
+                    const label = getRecordLabel(record);
+                    const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
+                    return (
+                      <button
+                        key={record.id}
+                        type="button"
+                        onClick={() => {
+                          handleFieldChange(fieldDef.apiName, { ...plkValue, lookup: record.id });
+                          setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName + '__lookup']: displayLabel }));
+                          setActiveLookupField(null);
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                      >
+                        <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
+                        <div className="text-xs text-gray-500">{record.id}</div>
+                      </button>
+                    );
+                  })
+                ) : plkLookupQuery ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">No matches found.</div>
+                ) : null}
+                {plkTargetApi && (() => {
+                  const targetObj = schema?.objects.find((o) => o.apiName === plkTargetApi);
+                  const createLabel = targetObj?.label || plkTargetApi;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInlineCreateTarget(plkTargetApi);
+                        setInlineCreateForField(fieldDef.apiName);
+                        setActiveLookupField(null);
+                      }}
+                      className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
+                    >
+                      + Create new {createLabel}
+                    </button>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        );
 
         inputElement = (
-          <select
-            id={fieldDef.apiName}
-            value={value || ''}
-            onChange={(e) => handleFieldChange(fieldDef.apiName, e.target.value)}
-            disabled={isReadOnly}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent bg-white"
-          >
-            <option value="">-- Select --</option>
-            {plRecordsArray.map((record) => {
-              const label = getRecordLabel(record);
-              const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
-              return (
-                <option key={record.id} value={record.id}>
-                  {displayLabel}
-                </option>
-              );
-            })}
-          </select>
+          <div className="flex gap-2 items-start">
+            {plkPosition === 'left' ? <>{picklistSide}{lookupSide}</> : <>{lookupSide}{picklistSide}</>}
+          </div>
         );
         break;
       }
