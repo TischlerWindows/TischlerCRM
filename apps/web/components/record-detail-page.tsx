@@ -111,9 +111,14 @@ export default function RecordDetailPage({
     if (!objectDef) return;
     // Collect lookup target objects from object fields (layout-independent)
     const lookupTargets = new Set<string>();
+    // Always preload Users — system fields (Created By, Last Modified By) need it
+    lookupTargets.add('User');
     for (const field of objectDef.fields) {
-      if ((field.type === 'Lookup' || field.type === 'ExternalLookup') && field.lookupObject) {
+      if ((field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser') && field.lookupObject) {
         lookupTargets.add(field.lookupObject);
+      }
+      if (field.type === 'LookupUser') {
+        lookupTargets.add('User');
       }
     }
     if (lookupTargets.size > 0) {
@@ -165,7 +170,8 @@ export default function RecordDetailPage({
     const fieldType = fieldDef?.type;
 
     // Lookup → clickable link showing resolved label (not raw UUID)
-    if (fieldType === 'Lookup' && fieldDef?.lookupObject) {
+    if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
+      const lookupTarget = fieldDef?.lookupObject || 'User';
       const routeMap: Record<string, string> = {
         Contact: 'contacts',
         Account: 'accounts',
@@ -178,9 +184,9 @@ export default function RecordDetailPage({
         Service: 'service',
         Installation: 'installations',
       };
-      const route = routeMap[fieldDef.lookupObject];
+      const route = routeMap[lookupTarget];
       // Resolve UUID → human-readable label (uses lookupTick to re-render)
-      const displayLabel = resolveLookupDisplayName(value, fieldDef.lookupObject);
+      const displayLabel = resolveLookupDisplayName(value, lookupTarget);
       // Suppress unused-var warning — lookupTick forces re-render after cache loads
       void lookupTick;
       if (route) {
