@@ -798,6 +798,13 @@ export default function DynamicForm({
         }
         return String(val);
       }
+      case 'PicklistText': {
+        if (typeof val === 'object' && val !== null) {
+          const parts = [val.picklist, val.text].filter(Boolean);
+          return parts.length > 0 ? parts.join(' — ') : '—';
+        }
+        return String(val);
+      }
       default:
         return String(val);
     }
