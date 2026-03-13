@@ -28,6 +28,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
 interface CustomRecord {
@@ -76,6 +77,7 @@ export default function CustomObjectRecordsPage() {
       obj.label.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase()
     );
   }, [schema, slug]);
+  const lookupTick = useLookupPreloader(objectDef);
   
   const pageLayouts = objectDef?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
@@ -232,6 +234,7 @@ export default function CustomObjectRecordsPage() {
   };
 
   const getFieldValue = (record: CustomRecord, columnId: string): string => {
+    void lookupTick; // re-render after lookup cache loads
     const value = record[columnId];
     
     if (value === null || value === undefined) {

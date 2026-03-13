@@ -32,6 +32,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
@@ -116,6 +117,7 @@ export default function DealsPage() {
   
   // Check if Deal object exists with page layouts
   const dealObject = schema?.objects.find(obj => obj.apiName === 'Deal');
+  const lookupTick = useLookupPreloader(dealObject);
   const objectLabel = dealObject?.label || 'Deal';
   const objectPluralLabel = dealObject?.pluralLabel || objectLabel + 's';
   const pageLayouts = dealObject?.pageLayouts || [];
@@ -363,6 +365,7 @@ export default function DealsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (deal: Deal, columnId: string) => {
+    void lookupTick; // re-render after lookup cache loads
     const value = (deal as any)[columnId];
     
     if (value === null || value === undefined) {

@@ -32,6 +32,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
@@ -93,6 +94,7 @@ export default function InstallationsPage() {
   
   // Check if Installation object exists with page layouts
   const installationObject = schema?.objects.find(obj => obj.apiName === 'Installation');
+  const lookupTick = useLookupPreloader(installationObject);
   const pageLayouts = installationObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -210,6 +212,7 @@ export default function InstallationsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (installation: Installation, columnId: string) => {
+    void lookupTick; // re-render after lookup cache loads
     const value = installation[columnId as keyof Installation];
     if (value === null || value === undefined) return '-';
     

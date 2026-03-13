@@ -37,6 +37,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
@@ -143,6 +144,7 @@ export default function PropertiesPage() {
   
   // Check if Property object exists with page layouts
   const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
+  const lookupTick = useLookupPreloader(propertyObject);
   const pageLayouts = propertyObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -407,6 +409,7 @@ export default function PropertiesPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (property: Property, columnId: string) => {
+    void lookupTick; // re-render after lookup cache loads
     const value = (property as any)[columnId];
     
     if (value === null || value === undefined) {

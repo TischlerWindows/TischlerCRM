@@ -32,6 +32,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
@@ -115,6 +116,7 @@ export default function ProjectsPage() {
   
   // Check if Project object exists with page layouts
   const projectObject = schema?.objects.find(obj => obj.apiName === 'Project');
+  const lookupTick = useLookupPreloader(projectObject);
   const pageLayouts = projectObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -283,6 +285,7 @@ export default function ProjectsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (project: Project, columnId: string) => {
+    void lookupTick; // re-render after lookup cache loads
     const value = project[columnId as keyof Project];
     if (value === null || value === undefined) return '-';
     
