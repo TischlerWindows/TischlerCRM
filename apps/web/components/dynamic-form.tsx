@@ -1308,6 +1308,20 @@ export default function DynamicForm({
             />
             {isLookupActive && (
               <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFieldChange(fieldDef.apiName, '');
+                    setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: '' }));
+                    setActiveLookupField(null);
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                    !value && 'bg-blue-50'
+                  )}
+                >
+                  -- None --
+                </button>
                 {filteredRecords.length > 0 ? (
                   filteredRecords.slice(0, 20).map((record) => {
                     const label = getRecordLabel(record);
@@ -1390,6 +1404,20 @@ export default function DynamicForm({
             />
             {isUserLookupActive && (
               <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFieldChange(fieldDef.apiName, '');
+                    setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName]: '' }));
+                    setActiveLookupField(null);
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                    !value && 'bg-blue-50'
+                  )}
+                >
+                  -- None --
+                </button>
                 {filteredUsers.length > 0 ? (
                   filteredUsers.slice(0, 20).map((user) => (
                     <button
@@ -1528,6 +1556,20 @@ export default function DynamicForm({
             />
             {isPlkLookupActive && (
               <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleFieldChange(fieldDef.apiName, { ...plkValue, lookup: '' });
+                    setLookupQueries((prev) => ({ ...prev, [fieldDef.apiName + '__lookup']: '' }));
+                    setActiveLookupField(null);
+                  }}
+                  className={cn(
+                    'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                    !plkValue.lookup && 'bg-blue-50'
+                  )}
+                >
+                  -- None --
+                </button>
                 {plkFilteredRecords.length > 0 ? (
                   plkFilteredRecords.slice(0, 20).map((record) => {
                     const label = getRecordLabel(record);
