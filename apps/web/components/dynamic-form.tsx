@@ -1870,8 +1870,11 @@ export default function DynamicForm({
                         for (const field of targetObj.fields) {
                           const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
                           if (!isSystemField && field.type !== 'Lookup' && field.type !== 'ExternalLookup') {
+                            // Strip "ObjectName__" prefix so DB fields use bare apiNames
+                            // matching what ensure-core-objects creates.
+                            const bareApiName = field.apiName.replace(/^[A-Za-z]+__/, '');
                             await apiClient.createField(targetObj.apiName, {
-                              apiName: field.apiName,
+                              apiName: bareApiName,
                               label: field.label,
                               type: field.type || 'Text',
                               required: field.required || false,
