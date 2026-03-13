@@ -97,6 +97,7 @@ export interface FieldDef {
     displayFormat: string;
     startingNumber: number;
   };
+  staticUrl?: string;  // for URL fields: a fixed hyperlink instead of a fillable field
   subFields?: Array<{
     apiName: string;
     label: string;

@@ -209,9 +209,10 @@ export default function RecordDetailPage({
 
     // URL
     if (fieldType === 'URL') {
+      const href = fieldDef?.staticUrl || value;
       return (
-        <a href={value} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:text-brand-navy">
-          {value}
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:text-brand-navy">
+          {fieldDef?.staticUrl || value}
         </a>
       );
     }

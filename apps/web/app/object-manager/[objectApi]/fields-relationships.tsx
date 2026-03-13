@@ -111,6 +111,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     picklistPosition: 'left' as 'left' | 'right',
     relationshipName: '',
     lookupObject: '',
+    staticUrl: '',
   });
 
   const object = schema?.objects.find(o => o.apiName === objectApiName);
@@ -153,6 +154,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
       maxLength: type === 'Text' || type === 'LongTextArea' || type === 'RichTextArea' ? formData.maxLength : 255,
+      staticUrl: type === 'URL' ? formData.staticUrl : '',
     });
     setShowTypeSelector(false);
   };
@@ -179,6 +181,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       picklistPosition: 'left' as 'left' | 'right',
       relationshipName: '',
       lookupObject: '',
+      staticUrl: '',
     });
   };
 
@@ -209,6 +212,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       picklistPosition: (cloned as any).picklistPosition || 'left',
       relationshipName: cloned.relationshipName || '',
       lookupObject: cloned.lookupObject || '',
+      staticUrl: cloned.staticUrl || '',
     });
     setShowCreateDialog(true);
   };
@@ -275,6 +279,9 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     }
     if (t === 'LookupUser') {
       newField.lookupObject = 'User';
+    }
+    if (t === 'URL' && formData.staticUrl) {
+      newField.staticUrl = formData.staticUrl;
     }
 
     if (editingField) {
@@ -762,6 +769,23 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           )}
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {selectedType === 'URL' && (
+                    <div>
+                      <Label htmlFor="staticUrl">Link URL (Optional)</Label>
+                      <Input
+                        id="staticUrl"
+                        type="url"
+                        value={formData.staticUrl}
+                        onChange={(e) => setFormData({ ...formData, staticUrl: e.target.value })}
+                        placeholder="e.g., https://example.com"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        If provided, this field will display as a static hyperlink instead of a fillable input.
+                        The link will be the same for every record.
+                      </p>
                     </div>
                   )}
 
