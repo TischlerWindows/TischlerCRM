@@ -199,6 +199,11 @@ export default function RecordDetailPage({
       return displayLabel;
     }
 
+    // TextArea — preserve line breaks
+    if (fieldType === 'TextArea' && typeof value === 'string') {
+      return <span className="whitespace-pre-wrap">{value}</span>;
+    }
+
     // CompositeText (e.g. Name)
     if (fieldType === 'CompositeText' && typeof value === 'object') {
       const keys = Object.keys(value);
