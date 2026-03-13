@@ -661,12 +661,14 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         id="formulaExpr"
                         value={formData.formulaExpr}
                         onChange={(e) => setFormData({ ...formData, formulaExpr: e.target.value })}
-                        placeholder="e.g., Amount * 0.1"
+                        placeholder="e.g., Amount * 0.1 or primaryContact.phone"
                         rows={3}
                       />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Enter the formula expression to calculate the field value.
-                      </p>
+                      <div className="text-xs text-gray-500 mt-1 space-y-1">
+                        <p>Use field API names to reference values on this record. Supports math operators (+, -, *, /), functions (IF, CONCAT, UPPER, LOWER, etc.), and comparisons.</p>
+                        <p><strong>Cross-object formulas:</strong> Pull values from related records using dot notation — <code className="bg-gray-100 px-1 rounded">LookupFieldName.TargetFieldName</code></p>
+                        <p className="text-gray-400">Examples: <code className="bg-gray-100 px-1 rounded">primaryContact.phone</code>, <code className="bg-gray-100 px-1 rounded">CONCAT(accountLookup.accountName, " — ", stage)</code></p>
+                      </div>
                     </div>
                   )}
 

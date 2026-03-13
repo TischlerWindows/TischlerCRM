@@ -27,7 +27,7 @@ import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
-import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
@@ -236,6 +236,17 @@ export default function CustomObjectRecordsPage() {
   const getFieldValue = (record: CustomRecord, columnId: string): string => {
     void lookupTick; // re-render after lookup cache loads
     const value = record[columnId];
+
+    // Formula fields: evaluate expression instead of showing raw value
+    const schemaFieldForFormula = objectDef?.fields?.find(f => {
+      const stripped = columnId.replace(/^[A-Za-z]+__/, '');
+      return f.apiName === columnId || f.apiName.endsWith('__' + stripped);
+    });
+    if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
+      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, record as any, objectDef);
+      if (computed !== null && computed !== undefined) return String(computed);
+      return 'N/A';
+    }
     
     if (value === null || value === undefined) {
       return 'N/A';

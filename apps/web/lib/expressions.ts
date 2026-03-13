@@ -72,7 +72,7 @@ class ExpressionParser {
 
   private tokenize(expression: string): string[] {
     // Simple tokenizer that handles strings, numbers, operators, and identifiers
-    const tokenRegex = /("([^"\\]|\\.)*")|(\d+\.?\d*)|([<>=!&|]+)|([\w_]+)|([()[\],])/g;
+    const tokenRegex = /("([^"\\]|\\.)*")|(\d+\.?\d*)|([<>=!&|]+)|([\w_]+(?:\.[\w_]+)*)|([()\[\],])/g;
     const tokens: string[] = [];
     let match;
 
@@ -341,7 +341,7 @@ class ExpressionParser {
   }
 
   private isIdentifier(token: string): boolean {
-    return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(token);
+    return /^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(token);
   }
 
   evaluateExpression(expr: ParsedExpression, context: ExpressionContext): ExpressionValue {
@@ -350,6 +350,19 @@ class ExpressionParser {
         return expr.value;
 
       case 'field':
+        // Support dot-notation for cross-object references: LookupField.TargetField
+        if (typeof expr.value === 'string' && expr.value.includes('.')) {
+          // Try dot-path lookup: context may contain pre-resolved "Lookup.Field" keys
+          if (expr.value in context) return context[expr.value];
+          // Fallback: split and traverse nested objects
+          const parts = expr.value.split('.');
+          let current: any = context;
+          for (const part of parts) {
+            if (current == null || typeof current !== 'object') return undefined;
+            current = (current as Record<string, any>)[part];
+          }
+          return current as ExpressionValue;
+        }
         return context[expr.value];
 
       case 'operator':
@@ -516,4 +529,31 @@ export function evaluateFormula(
     console.error('Formula evaluation error:', error);
     return null;
   }
+}
+
+/**
+ * Extract cross-object field references from a formula.
+ * Returns an array of { lookupField, targetField } pairs.
+ * e.g. "Contact.Phone" → [{ lookupField: 'Contact', targetField: 'Phone' }]
+ */
+export function extractCrossObjectRefs(formula: string): { lookupField: string; targetField: string }[] {
+  const refs: { lookupField: string; targetField: string }[] = [];
+  const seen = new Set<string>();
+  try {
+    const fieldRefs = expressionEngine.getFieldReferences(formula);
+    for (const ref of fieldRefs) {
+      if (ref.includes('.')) {
+        const [lookupField, ...rest] = ref.split('.');
+        const targetField = rest.join('.');
+        const key = `${lookupField}.${targetField}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          refs.push({ lookupField, targetField });
+        }
+      }
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return refs;
 }

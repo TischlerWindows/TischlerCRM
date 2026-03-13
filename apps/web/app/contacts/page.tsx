@@ -32,7 +32,7 @@ import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
 import { applyFilters, describeCondition } from '@/lib/filter-utils';
-import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
@@ -309,6 +309,15 @@ export default function ContactsPage() {
   const formatColumnValue = (contact: Contact, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
     let value: any = contact[columnId];
+
+    // Formula fields: evaluate expression instead of showing raw value
+    const schemaFieldForFormula = contactObject?.fields?.find(f => f.apiName === `Contact__${columnId}` || f.apiName === columnId);
+    if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
+      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, contact as any, contactObject);
+      if (computed !== null && computed !== undefined) return String(computed);
+      return '-';
+    }
+
     if (value === null || value === undefined) return '-';
     // Auto-parse JSON strings
     if (typeof value === 'string' && value.startsWith('{')) {

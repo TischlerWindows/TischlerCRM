@@ -10,6 +10,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from '@/lib/utils';
 import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
+import { useFormulaFields } from '@/lib/use-formula-fields';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -58,6 +59,9 @@ export default function RecordDetailPage({
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase()
   );
+
+  // Evaluate formula fields (including cross-object references)
+  const { values: formulaValues } = useFormulaFields(objectDef, record);
 
   // ── Load record ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -164,6 +168,12 @@ export default function RecordDetailPage({
   /** Read a value from the flattened record, trying prefixed then stripped key. */
   const getRecordValue = (apiName: string, fieldDef?: FieldDef): any => {
     if (!record) return undefined;
+
+    // For Formula fields, return the computed value from the formula hook
+    if (fieldDef?.type === 'Formula' && fieldDef.formulaExpr) {
+      const computed = formulaValues[fieldDef.apiName] ?? formulaValues[apiName];
+      if (computed !== undefined && computed !== null) return computed;
+    }
 
     let value = record[apiName] ?? record[apiName.replace(/^[A-Za-z]+__/, '')];
 

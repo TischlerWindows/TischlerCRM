@@ -31,7 +31,7 @@ import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
@@ -287,6 +287,15 @@ export default function ProjectsPage() {
   const formatColumnValue = (project: Project, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
     let value: any = project[columnId as keyof Project];
+
+    // Formula fields: evaluate expression instead of showing raw value
+    const schemaFieldForFormula = projectObject?.fields?.find(f => f.apiName === `Project__${columnId}` || f.apiName === columnId);
+    if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
+      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, project as any, projectObject);
+      if (computed !== null && computed !== undefined) return String(computed);
+      return '-';
+    }
+
     if (value === null || value === undefined) return '-';
     // Auto-parse JSON strings
     if (typeof value === 'string' && value.startsWith('{')) {

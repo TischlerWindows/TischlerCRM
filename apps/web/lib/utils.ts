@@ -2,6 +2,8 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
+import { evaluateFormula, extractCrossObjectRefs, ExpressionContext } from '@/lib/expressions';
+import { FieldDef, ObjectDef } from '@/lib/schema';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -381,4 +383,94 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
 
   // Handle primitives
   return String(value);
+}
+
+/**
+ * Evaluate a formula field value for a record, including cross-object references.
+ * Uses the in-memory lookupCache for related record resolution (synchronous).
+ *
+ * Cross-object syntax: LookupFieldApiName.TargetFieldApiName
+ * Example: primaryContact.phone → fetches the Contact record referenced by
+ * the "primaryContact" lookup field on this record, returns its "phone" value.
+ *
+ * @param formulaExpr The formula expression string
+ * @param record The flattened record data
+ * @param objectDef The object definition (to look up field types and lookupObject)
+ * @returns The evaluated value, or null if evaluation fails
+ */
+export function evaluateFormulaForRecord(
+  formulaExpr: string,
+  record: Record<string, any>,
+  objectDef?: ObjectDef | null
+): any {
+  if (!formulaExpr || !record) return null;
+
+  // Build context from all record fields (both prefixed and bare keys)
+  const context: ExpressionContext = {};
+  for (const [key, val] of Object.entries(record)) {
+    context[key] = val as any;
+    const bare = key.replace(/^[A-Za-z]+__/, '');
+    if (bare !== key) context[bare] = val as any;
+  }
+
+  // Resolve cross-object references from the lookup cache
+  if (objectDef) {
+    const crossRefs = extractCrossObjectRefs(formulaExpr);
+    for (const ref of crossRefs) {
+      // Find the lookup field definition
+      const lookupFieldDef = objectDef.fields.find(f => {
+        const bare = f.apiName.replace(/^[A-Za-z]+__/, '');
+        return f.apiName === ref.lookupField || bare === ref.lookupField;
+      });
+      if (!lookupFieldDef) continue;
+
+      const lookupTypes = ['Lookup', 'ExternalLookup', 'LookupUser', 'PicklistLookup'];
+      if (!lookupTypes.includes(lookupFieldDef.type)) continue;
+
+      const lookupObject = lookupFieldDef.lookupObject || (lookupFieldDef.type === 'LookupUser' ? 'User' : undefined);
+      if (!lookupObject) continue;
+
+      // Get the lookup value (UUID) from the record
+      let lookupValue = record[lookupFieldDef.apiName] ?? record[lookupFieldDef.apiName.replace(/^[A-Za-z]+__/, '')];
+      if (lookupFieldDef.type === 'PicklistLookup' && typeof lookupValue === 'object' && lookupValue !== null) {
+        lookupValue = lookupValue.lookup;
+      }
+      if (!lookupValue) continue;
+
+      // Look up the related record from the lookup cache
+      const cachedRecords = lookupCache[lookupObject];
+      if (!cachedRecords) {
+        // Trigger background load so next render will have the data
+        getLookupRecords(lookupObject);
+        continue;
+      }
+
+      const relatedRecord = cachedRecords.find((r: any) => String(r.id) === String(lookupValue));
+      if (!relatedRecord) continue;
+
+      // Resolve the target field from the related record
+      const targetField = ref.targetField;
+      let resolvedValue = relatedRecord[targetField];
+      if (resolvedValue === undefined) {
+        // Try bare key
+        const bare = targetField.replace(/^[A-Za-z]+__/, '');
+        resolvedValue = relatedRecord[bare];
+        if (resolvedValue === undefined) {
+          // Try matching with any prefix
+          for (const k of Object.keys(relatedRecord)) {
+            const kBare = k.replace(/^[A-Za-z]+__/, '');
+            if (kBare === bare || kBare === targetField) {
+              resolvedValue = relatedRecord[k];
+              break;
+            }
+          }
+        }
+      }
+
+      const contextKey = `${ref.lookupField}.${ref.targetField}`;
+      context[contextKey] = resolvedValue as any;
+    }
+  }
+
+  return evaluateFormula(formulaExpr, context);
 }

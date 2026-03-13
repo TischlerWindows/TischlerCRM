@@ -34,7 +34,7 @@ import {
   Check,
   User as UserIcon,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, evaluateFormulaForRecord } from '@/lib/utils';
 
 // Custom dropdown for PicklistText that allows selected value to wrap
 function PicklistTextDropdown({
@@ -1156,7 +1156,6 @@ export default function DynamicForm({
         break;
 
       case 'AutoNumber':
-      case 'Formula':
       case 'RollupSummary':
         inputElement = (
           <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
@@ -1164,6 +1163,22 @@ export default function DynamicForm({
           </div>
         );
         break;
+
+      case 'Formula': {
+        // Compute formula value from current form data
+        const objectDef = schema?.objects.find(o => o.apiName === objectApiName);
+        let formulaDisplay: any = value;
+        if (fieldDef.formulaExpr) {
+          const computed = evaluateFormulaForRecord(fieldDef.formulaExpr, formData, objectDef);
+          if (computed !== null && computed !== undefined) formulaDisplay = computed;
+        }
+        inputElement = (
+          <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600">
+            {formulaDisplay != null && formulaDisplay !== '' ? String(formulaDisplay) : '(Computed)'}
+          </div>
+        );
+        break;
+      }
 
       case 'AutoUser':
         inputElement = (
