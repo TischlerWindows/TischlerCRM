@@ -272,7 +272,7 @@ export default function DynamicForm({
           const fieldType = rawType ? normalizeFieldType(rawType) : undefined;
           if (fieldType === 'LookupUser') {
             hasLookupUser = true;
-          } else if (fieldType === 'Lookup' || fieldType === 'ExternalLookup') {
+          } else if (fieldType === 'Lookup' || fieldType === 'ExternalLookup' || fieldType === 'PicklistLookup') {
             const target = (field as any).lookupObject
               || (field as any).relationship?.targetObject
               || (field as any).relatedObject
@@ -1433,6 +1433,34 @@ export default function DynamicForm({
           </div>
         );
         break;
+
+      case 'PicklistLookup': {
+        const plTargetApi = getLookupTargetApi(fieldDef);
+        const plRecords = plTargetApi ? getLookupRecords(plTargetApi) : [];
+        const plRecordsArray = Array.isArray(plRecords) ? plRecords : [];
+
+        inputElement = (
+          <select
+            id={fieldDef.apiName}
+            value={value || ''}
+            onChange={(e) => handleFieldChange(fieldDef.apiName, e.target.value)}
+            disabled={isReadOnly}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent bg-white"
+          >
+            <option value="">-- Select --</option>
+            {plRecordsArray.map((record) => {
+              const label = getRecordLabel(record);
+              const displayLabel = typeof label === 'string' ? label : String(label || 'Record');
+              return (
+                <option key={record.id} value={record.id}>
+                  {displayLabel}
+                </option>
+              );
+            })}
+          </select>
+        );
+        break;
+      }
 
       default:
         inputElement = <Input {...commonProps} type="text" />;

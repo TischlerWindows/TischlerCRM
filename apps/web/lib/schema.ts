@@ -5,7 +5,7 @@ export type FieldType =
   | "Lookup" | "ExternalLookup"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone"
-  | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText"
+  | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser";
 
@@ -42,6 +42,7 @@ export function normalizeFieldType(raw: string): FieldType {
     url: 'URL',
     address: 'Address',
     picklisttext: 'PicklistText',
+    picklistlookup: 'PicklistLookup',
     compositetext: 'CompositeText',
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
@@ -315,6 +316,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Picklist', value: 'Picklist', type: 'Picklist' },
   { label: 'Multi-Select Picklist', value: 'MultiPicklist', type: 'MultiPicklist' },
   { label: 'Picklist with Text', value: 'PicklistText', type: 'PicklistText' },
+  { label: 'Picklist Lookup', value: 'PicklistLookup', type: 'PicklistLookup' },
   { label: 'Text', value: 'Text', type: 'Text' },
   { label: 'Text Area', value: 'TextArea', type: 'TextArea' },
   { label: 'Text Area (Long)', value: 'LongTextArea', type: 'LongTextArea' },
@@ -329,7 +331,7 @@ export const FIELD_TYPES: FieldOption[] = [
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "ExternalLookup", "LookupUser"].includes(type)) return "Relationship";
+  if (["Lookup", "ExternalLookup", "LookupUser", "PicklistLookup"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
@@ -358,6 +360,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     Picklist: "list",
     MultiPicklist: "list-checks",
     PicklistText: "list",
+    PicklistLookup: "list",
     Text: "type",
     TextArea: "align-left",
     LongTextArea: "file-text",

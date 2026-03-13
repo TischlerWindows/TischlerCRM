@@ -149,8 +149,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       ...formData,
       type,
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' ? formData.picklistValues : [],
-      lookupObject: (type === 'Lookup' || type === 'ExternalLookup') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
-      relationshipName: (type === 'Lookup' || type === 'ExternalLookup') ? formData.relationshipName : '',
+      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
+      relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
       maxLength: type === 'Text' || type === 'LongTextArea' || type === 'RichTextArea' ? formData.maxLength : 255,
@@ -273,7 +273,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     if (t === 'PicklistText') {
       (newField as any).picklistPosition = formData.picklistPosition;
     }
-    if (t === 'Lookup' || t === 'ExternalLookup') {
+    if (t === 'Lookup' || t === 'ExternalLookup' || t === 'PicklistLookup') {
       newField.relationshipName = formData.relationshipName;
       newField.lookupObject = formData.lookupObject;
     }
@@ -663,7 +663,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   )}
 
-                  {(selectedType === 'Lookup' || selectedType === 'ExternalLookup') && (
+                  {(selectedType === 'Lookup' || selectedType === 'ExternalLookup' || selectedType === 'PicklistLookup') && (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="lookupObject">Related To (Object)</Label>

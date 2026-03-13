@@ -246,6 +246,11 @@ export default function CustomObjectRecordsPage() {
     if (fieldDef && (fieldDef.type === 'LookupUser' || (fieldDef.type === 'Lookup' && fieldDef.lookupObject === 'User'))) {
       return resolveLookupDisplayName(value, 'User');
     }
+
+    // Check if this is a PicklistLookup or regular Lookup field and resolve via field definition
+    if (fieldDef && (fieldDef.type === 'Lookup' || fieldDef.type === 'ExternalLookup' || fieldDef.type === 'PicklistLookup') && fieldDef.lookupObject && typeof value === 'string') {
+      return resolveLookupDisplayName(value, fieldDef.lookupObject);
+    }
     
     // Check if this is a lookup field and resolve the display name
     const lookupObjectType = inferLookupObjectType(columnId);

@@ -114,7 +114,7 @@ export default function RecordDetailPage({
     // Always preload Users — system fields (Created By, Last Modified By) need it
     lookupTargets.add('User');
     for (const field of objectDef.fields) {
-      if ((field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser') && field.lookupObject) {
+      if ((field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser' || field.type === 'PicklistLookup') && field.lookupObject) {
         lookupTargets.add(field.lookupObject);
       }
       if (field.type === 'LookupUser') {
@@ -169,8 +169,8 @@ export default function RecordDetailPage({
 
     const fieldType = fieldDef?.type;
 
-    // Lookup → clickable link showing resolved label (not raw UUID)
-    if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
+    // Lookup / PicklistLookup → clickable link showing resolved label (not raw UUID)
+    if ((fieldType === 'Lookup' || fieldType === 'LookupUser' || fieldType === 'PicklistLookup') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
       const lookupTarget = fieldDef?.lookupObject || 'User';
       const routeMap: Record<string, string> = {
         Contact: 'contacts',
