@@ -109,12 +109,18 @@ export default function RecordDetailPage({
   // ── Preload lookup target records so IDs resolve to labels ──────────
   useEffect(() => {
     if (!objectDef) return;
+    // Build set of known objects to validate lookupObject targets
+    const knownObjects = new Set<string>(
+      (schema?.objects || []).map((o: any) => o.apiName)
+    );
+    knownObjects.add('User'); // always valid
+
     // Collect lookup target objects from object fields (layout-independent)
     const lookupTargets = new Set<string>();
     // Always preload Users — system fields (Created By, Last Modified By) need it
     lookupTargets.add('User');
     for (const field of objectDef.fields) {
-      if ((field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser' || field.type === 'PicklistLookup') && field.lookupObject) {
+      if ((field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser' || field.type === 'PicklistLookup') && field.lookupObject && knownObjects.has(field.lookupObject)) {
         lookupTargets.add(field.lookupObject);
       }
       if (field.type === 'LookupUser') {
@@ -126,7 +132,7 @@ export default function RecordDetailPage({
         Array.from(lookupTargets).map((t) => preloadLookupRecords(t))
       ).then(() => setLookupTick((n) => n + 1));
     }
-  }, [objectDef]);
+  }, [objectDef, schema]);
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const getFieldDef = (apiName: string, layoutField?: PageField): FieldDef | undefined => {

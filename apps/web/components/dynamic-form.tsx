@@ -312,12 +312,34 @@ export default function DynamicForm({
         }
       }
 
-      // Fetch records for regular Lookup fields
+      // Fetch records for regular Lookup fields (skip invalid targets)
       if (targetApis.size > 0) {
+        const knownApis = new Set<string>(
+          (schema?.objects || []).map((o: any) => o.apiName)
+        );
+        const validApis = Array.from(targetApis).filter(api => {
+          if (api === 'User') return false; // handled above via /admin/users
+          return knownApis.has(api);
+        });
+
+        // If 'User' is in targetApis but not hasLookupUser, fetch users too
+        if (targetApis.has('User') && !newCache['__users__']) {
+          try {
+            const users = await apiClient.get<any[]>('/admin/users');
+            newCache['__users__'] = Array.isArray(users) ? users : [];
+          } catch {
+            newCache['__users__'] = [];
+          }
+        }
+
         const entries = await Promise.all(
-          Array.from(targetApis).map(async (api) => {
-            const records = await recordsService.getRecords(api);
-            return [api, records.map(r => ({ id: r.id, ...r.data }))] as [string, any[]];
+          validApis.map(async (api) => {
+            try {
+              const records = await recordsService.getRecords(api);
+              return [api, records.map(r => ({ id: r.id, ...r.data }))] as [string, any[]];
+            } catch {
+              return [api, []] as [string, any[]];
+            }
           })
         );
         for (const [key, val] of entries) {
