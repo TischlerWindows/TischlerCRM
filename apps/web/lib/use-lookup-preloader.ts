@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { preloadLookupRecords } from '@/lib/utils';
+import { useSchemaStore } from '@/lib/schema-store';
 
 /**
  * Hook that preloads lookup records for an object definition's
@@ -16,9 +17,16 @@ export function useLookupPreloader(
   objectDef: { fields: { type: string; lookupObject?: string }[] } | null | undefined
 ): number {
   const [tick, setTick] = useState(0);
+  const schema = useSchemaStore((s) => s.schema);
 
   useEffect(() => {
     if (!objectDef) return;
+
+    // Build set of known object apiNames so we only preload valid objects
+    const knownObjects = new Set<string>(
+      (schema?.objects || []).map((o: any) => o.apiName)
+    );
+    knownObjects.add('User'); // always valid
 
     const targets = new Set<string>();
     // System fields always need User records
@@ -28,7 +36,8 @@ export function useLookupPreloader(
       const t = field.type;
       if (
         (t === 'Lookup' || t === 'ExternalLookup' || t === 'LookupUser' || t === 'PicklistLookup') &&
-        field.lookupObject
+        field.lookupObject &&
+        knownObjects.has(field.lookupObject)
       ) {
         targets.add(field.lookupObject);
       }
@@ -42,7 +51,7 @@ export function useLookupPreloader(
         setTick((n) => n + 1)
       );
     }
-  }, [objectDef]);
+  }, [objectDef, schema]);
 
   return tick;
 }

@@ -424,7 +424,6 @@ export default function AccountsPage() {
       if (!fieldType) {
         if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
       }
-      console.log('[accounts formatColumnValue] object value for', columnId, '→ fieldType:', fieldType, 'lookupObject:', schemaField?.lookupObject, 'value:', JSON.stringify(value));
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     

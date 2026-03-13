@@ -230,6 +230,12 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       return;
     }
 
+    // Require a valid Related To (Object) for lookup-type fields
+    if ((formData.type === 'Lookup' || formData.type === 'ExternalLookup' || formData.type === 'PicklistLookup') && !formData.lookupObject) {
+      alert('Please select a Related To (Object) for this lookup field.');
+      return;
+    }
+
     // Prevent duplicate API names — a duplicate would cause updateField to
     // modify multiple field definitions at once.
     const existingField = fields.find(f => f.apiName === formData.apiName);

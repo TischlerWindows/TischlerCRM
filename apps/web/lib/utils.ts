@@ -345,7 +345,6 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
         // If resolveLookupDisplayName returned '-', treat as unresolved
         if (lookupPart === '-') lookupPart = String(value.lookup);
       }
-      console.log('[PicklistLookup] fieldType:', fieldType, 'lookupObject:', lookupObject, 'value:', JSON.stringify(value), 'picklistPart:', picklistPart, 'lookupPart:', lookupPart, 'cacheKeys:', Object.keys(lookupCache));
       const parts = [picklistPart, lookupPart].filter(Boolean);
       return parts.length > 0 ? parts.join(' — ') : '-';
     }
