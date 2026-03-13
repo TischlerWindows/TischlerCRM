@@ -7,7 +7,7 @@ import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight } from 'lu
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
-import { formatFieldValue } from '@/lib/utils';
+import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from '@/lib/utils';
 import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 
@@ -52,6 +52,8 @@ export default function RecordDetailPage({
   const [showEditForm, setShowEditForm] = useState(false);
   // Tracks which sections the user has manually toggled open/closed
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
+  // Counter bumped after lookup records finish loading to trigger re-render
+  const [lookupTick, setLookupTick] = useState(0);
 
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase()
@@ -104,6 +106,23 @@ export default function RecordDetailPage({
 
   const pageLayout = resolveLayout();
 
+  // ── Preload lookup target records so IDs resolve to labels ──────────
+  useEffect(() => {
+    if (!objectDef) return;
+    // Collect lookup target objects from object fields (layout-independent)
+    const lookupTargets = new Set<string>();
+    for (const field of objectDef.fields) {
+      if ((field.type === 'Lookup' || field.type === 'ExternalLookup') && field.lookupObject) {
+        lookupTargets.add(field.lookupObject);
+      }
+    }
+    if (lookupTargets.size > 0) {
+      Promise.all(
+        Array.from(lookupTargets).map((t) => preloadLookupRecords(t))
+      ).then(() => setLookupTick((n) => n + 1));
+    }
+  }, [objectDef]);
+
   // ── Helpers ──────────────────────────────────────────────────────────
   const getFieldDef = (apiName: string, layoutField?: PageField): FieldDef | undefined => {
     // Self-contained path: use enriched layout field data directly
@@ -145,7 +164,7 @@ export default function RecordDetailPage({
 
     const fieldType = fieldDef?.type;
 
-    // Lookup → clickable link
+    // Lookup → clickable link showing resolved label (not raw UUID)
     if (fieldType === 'Lookup' && fieldDef?.lookupObject) {
       const routeMap: Record<string, string> = {
         Contact: 'contacts',
@@ -160,14 +179,18 @@ export default function RecordDetailPage({
         Installation: 'installations',
       };
       const route = routeMap[fieldDef.lookupObject];
+      // Resolve UUID → human-readable label (uses lookupTick to re-render)
+      const displayLabel = resolveLookupDisplayName(value, fieldDef.lookupObject);
+      // Suppress unused-var warning — lookupTick forces re-render after cache loads
+      void lookupTick;
       if (route) {
         return (
           <Link href={`/${route}/${value}`} className="text-brand-navy hover:text-brand-navy">
-            {String(value)}
+            {displayLabel}
           </Link>
         );
       }
-      return String(value);
+      return displayLabel;
     }
 
     // CompositeText (e.g. Name)
