@@ -216,8 +216,12 @@ export default function QuotesPage() {
 
   const formatColumnValue = (quote: Quote, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
-    const value = quote[columnId as keyof Quote];
+    let value: any = quote[columnId as keyof Quote];
     if (value === null || value === undefined) return '-';
+    // Auto-parse JSON strings
+    if (typeof value === 'string' && value.startsWith('{')) {
+      try { value = JSON.parse(value); } catch { /* not JSON */ }
+    }
     
     // Check if this is a lookup field and resolve the display name
     const lookupObjectType = inferLookupObjectType(columnId);

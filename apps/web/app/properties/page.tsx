@@ -410,10 +410,14 @@ export default function PropertiesPage() {
 
   const formatColumnValue = (property: Property, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
-    const value = (property as any)[columnId];
+    let value = (property as any)[columnId];
     
     if (value === null || value === undefined) {
       return 'N/A';
+    }
+    // Auto-parse JSON strings
+    if (typeof value === 'string' && value.startsWith('{')) {
+      try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
     
     // Check if this is a lookup field and resolve the display name

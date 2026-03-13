@@ -258,7 +258,17 @@ export function formatDateShort(date: Date): string {
     day: 'numeric',
   }).format(date);
 }
-export function formatFieldValue(value: any, fieldType?: string, lookupObject?: string): string {
+export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject?: string): string {
+  // Auto-parse JSON strings that look like objects/arrays
+  let value = rawValue;
+  if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      // Not valid JSON, treat as plain string
+    }
+  }
+
   // Handle null or undefined
   if (value === null || value === undefined) {
     return '-';
@@ -332,7 +342,10 @@ export function formatFieldValue(value: any, fieldType?: string, lookupObject?: 
           }
           if (!lookupPart) lookupPart = String(value.lookup);
         }
+        // If resolveLookupDisplayName returned '-', treat as unresolved
+        if (lookupPart === '-') lookupPart = String(value.lookup);
       }
+      console.log('[PicklistLookup] fieldType:', fieldType, 'lookupObject:', lookupObject, 'value:', JSON.stringify(value), 'picklistPart:', picklistPart, 'lookupPart:', lookupPart, 'cacheKeys:', Object.keys(lookupCache));
       const parts = [picklistPart, lookupPart].filter(Boolean);
       return parts.length > 0 ? parts.join(' — ') : '-';
     }

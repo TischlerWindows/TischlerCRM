@@ -396,10 +396,15 @@ export default function AccountsPage() {
 
   const formatColumnValue = (account: Account, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
-    const value = (account as any)[columnId];
+    let value = (account as any)[columnId];
     
     if (value === null || value === undefined) {
       return 'N/A';
+    }
+
+    // Auto-parse JSON strings
+    if (typeof value === 'string' && value.startsWith('{')) {
+      try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
     
     // Check if this is a lookup field and resolve the display name
@@ -419,6 +424,7 @@ export default function AccountsPage() {
       if (!fieldType) {
         if (columnId === 'shippingAddress' || columnId === 'billingAddress') fieldType = 'Address';
       }
+      console.log('[accounts formatColumnValue] object value for', columnId, '→ fieldType:', fieldType, 'lookupObject:', schemaField?.lookupObject, 'value:', JSON.stringify(value));
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     

@@ -164,7 +164,12 @@ export default function RecordDetailPage({
   };
 
   /** Render a field value, handling Links, CompositeText, Email, Phone, etc. */
-  const renderValue = (apiName: string, value: any, fieldDef?: FieldDef): React.ReactNode => {
+  const renderValue = (apiName: string, rawValue: any, fieldDef?: FieldDef): React.ReactNode => {
+    // Auto-parse JSON strings
+    let value = rawValue;
+    if (typeof value === 'string' && value.startsWith('{')) {
+      try { value = JSON.parse(value); } catch { /* not JSON */ }
+    }
     if (value === null || value === undefined || value === '') return '-';
 
     const fieldType = fieldDef?.type;
