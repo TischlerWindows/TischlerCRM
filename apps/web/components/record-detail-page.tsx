@@ -136,18 +136,29 @@ export default function RecordDetailPage({
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const getFieldDef = (apiName: string, layoutField?: PageField): FieldDef | undefined => {
+    // Always get the authoritative field definition from object fields
+    const objField = objectDef?.fields.find((f) => f.apiName === apiName);
+
     // Self-contained path: use enriched layout field data directly
     if (layoutField && layoutField.type && layoutField.label) {
       const { column, order, ...fieldProps } = layoutField;
-      return {
+      const def = {
         id: fieldProps.id || apiName,
         ...fieldProps,
         apiName,
         type: normalizeFieldType(fieldProps.type!),
       } as FieldDef;
+      // Ensure lookupObject always comes from the authoritative field definition
+      if (objField?.lookupObject) {
+        def.lookupObject = objField.lookupObject;
+      }
+      if (objField?.relationshipName) {
+        def.relationshipName = objField.relationshipName;
+      }
+      return def;
     }
     // Fallback: cross-reference object fields
-    return objectDef?.fields.find((f) => f.apiName === apiName);
+    return objField;
   };
 
   /** Read a value from the flattened record, trying prefixed then stripped key. */

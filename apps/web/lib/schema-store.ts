@@ -391,6 +391,8 @@ export const useSchemaStore = create<SchemaStore>()(
                     label: freshField.label,
                     type: freshField.type,
                     required: freshField.required,
+                    lookupObject: freshField.lookupObject,
+                    relationshipName: freshField.relationshipName,
                     picklistValues: freshField.picklistValues ? [...freshField.picklistValues] : freshField.picklistValues,
                     defaultValue: freshField.defaultValue,
                   };

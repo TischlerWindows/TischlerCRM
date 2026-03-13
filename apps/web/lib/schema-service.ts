@@ -952,9 +952,17 @@ class LocalStorageSchemaService implements SchemaService {
               const fieldDef = fieldMap.get(pf.apiName);
               if (!fieldDef) return pf; // field not found — leave as-is
               // Spread the full FieldDef, then overlay the layout-specific
-              // positioning (column, order) on top.
+              // positioning (column, order) on top. Key field-definition props
+              // (type, lookupObject, etc.) must come from the FIELD DEF source
+              // of truth, not from a stale embedded copy in the layout page field.
               const { apiName, ...rest } = fieldDef;
-              return { ...rest, ...pf, type: normalizeFieldType(fieldDef.type) };
+              return {
+                ...rest,
+                ...pf,
+                type: normalizeFieldType(fieldDef.type),
+                lookupObject: fieldDef.lookupObject,
+                relationshipName: fieldDef.relationshipName,
+              };
             });
           }
         }
