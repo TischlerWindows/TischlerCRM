@@ -264,6 +264,28 @@ export function formatFieldValue(value: any, fieldType?: string): string {
     return '-';
   }
 
+  // Handle Date and DateTime fields
+  if (fieldType === 'Date' && typeof value === 'string') {
+    const d = new Date(value + (value.includes('T') ? '' : 'T00:00:00'));
+    if (!isNaN(d.getTime())) {
+      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(d.getUTCDate()).padStart(2, '0');
+      const yyyy = d.getUTCFullYear();
+      return `${mm}-${dd}-${yyyy}`;
+    }
+  }
+  if (fieldType === 'DateTime' && typeof value === 'string') {
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) {
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      return `${mm}-${dd}-${yyyy} ${hh}:${min}`;
+    }
+  }
+
   // Handle objects (check before arrays since arrays are objects)
   if (typeof value === 'object' && !Array.isArray(value)) {
     // Handle Address objects
