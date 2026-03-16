@@ -14,7 +14,8 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function LocationMapPreview({ lat, lng, address, className }: LocationMapPreviewProps) {
   const [imgError, setImgError] = useState(false);
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const googleMapsQuery = address || `${lat},${lng}`;
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
   const staticMapUrl = token

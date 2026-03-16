@@ -135,8 +135,9 @@ export function buildApp() {
 
   // Auth guard hook
   app.addHook('onRequest', async (req, reply) => {
-    if (req.routerPath && req.routerPath.startsWith('/auth')) return; // allow auth routes
+    if (req.routerPath && req.routerPath.startsWith('/auth')) return;
     if (req.routerPath === '/health') return;
+    if (req.routerPath === '/places/static-map') return; // auth handled in route via query token
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
       return reply.code(401).send({ error: 'Missing bearer token' });

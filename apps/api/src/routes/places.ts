@@ -10,6 +10,8 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 import { decrypt } from '../crypto';
+import { verifyJwt } from '../auth';
+import { loadEnv } from '../config';
 
 interface PlacePrediction {
   description: string;
@@ -150,15 +152,11 @@ export async function placesRoutes(app: FastifyInstance) {
   // Accepts auth token via query param so <img> tags can load the image directly.
   app.get('/places/static-map', async (req, reply) => {
     const query = req.query as Record<string, string>;
-    const user = req.user ?? (() => {
-      if (query.token) {
-        const { loadEnv } = require('../config');
-        const { verifyJwt } = require('../auth');
-        const env = loadEnv();
-        return verifyJwt(query.token, env.JWT_SECRET) || null;
-      }
-      return null;
-    })();
+    let user = req.user;
+    if (!user && query.token) {
+      const env = loadEnv();
+      user = verifyJwt(query.token, env.JWT_SECRET) as any;
+    }
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const querySchema = z.object({
