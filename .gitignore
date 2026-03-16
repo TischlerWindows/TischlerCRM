@@ -12,7 +12,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build
-.dist/
+dist/
 .next/
 coverage/
 
