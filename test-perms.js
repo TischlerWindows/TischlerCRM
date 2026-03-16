@@ -47,7 +47,7 @@ async function testWithToken(token) {
   const perms = JSON.parse(permsRes.body);
   console.log('Role:', perms.role);
   console.log('Department:', perms.departmentName);
-  console.log('Profile:', perms.profileName);
+  console.log('Role:', perms.roleName);
   console.log('\nObject Permissions:');
   for (const [obj, p] of Object.entries(perms.objectPermissions)) {
     console.log(`  ${obj}: read=${p.read}, create=${p.create}, edit=${p.edit}, delete=${p.delete}`);

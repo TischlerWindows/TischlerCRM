@@ -8,6 +8,7 @@ import {
   Plus,
   Search,
   Building2,
+  Shield,
   UserCheck,
   UserX,
   RefreshCw,
@@ -15,6 +16,12 @@ import {
   X,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+
+interface RoleRef {
+  id: string;
+  name: string;
+  label: string;
+}
 
 interface UserRow {
   id: string;
@@ -26,7 +33,7 @@ interface UserRow {
   phone: string | null;
   lastLoginAt: string | null;
   createdAt: string;
-  profile: { id: string; name: string } | null;
+  orgRole: RoleRef | null;
   department: { id: string; name: string } | null;
   manager: { id: string; name: string; email: string } | null;
 }
@@ -39,6 +46,7 @@ interface Department {
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [roles, setRoles] = useState<RoleRef[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDepartment, setFilterDepartment] = useState('');
@@ -50,24 +58,26 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Create form state
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
   const [formTitle, setFormTitle] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formDeptId, setFormDeptId] = useState('');
+  const [formRoleId, setFormRoleId] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [usersData, deptsData] = await Promise.all([
+      const [usersData, deptsData, rolesData] = await Promise.all([
         apiClient.get<UserRow[]>('/admin/users'),
         apiClient.get<Department[]>('/departments'),
+        apiClient.get<RoleRef[]>('/admin/roles'),
       ]);
       setUsers(usersData);
       setDepartments(deptsData);
+      setRoles(rolesData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -109,6 +119,7 @@ export default function UsersPage() {
         title: formTitle || null,
         phone: formPhone || null,
         departmentId: formDeptId || null,
+        roleId: formRoleId || null,
       });
       setSuccess('User created successfully');
       setShowCreateModal(false);
@@ -131,6 +142,7 @@ export default function UsersPage() {
         title: formTitle || null,
         phone: formPhone || null,
         departmentId: formDeptId || null,
+        roleId: formRoleId || null,
       });
       if (formPassword) {
         await apiClient.post(`/admin/users/${editUser.id}/reset-password`, { password: formPassword });
@@ -157,10 +169,10 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (user: UserRow) => {
-    if (!confirm(`Are you sure you want to permanently delete ${user.name || user.email}? This cannot be undone.`)) return;
+    if (!confirm(`Delete ${user.name || user.email}? They can be restored from the Recycle Bin.`)) return;
     try {
       await apiClient.delete(`/admin/users/${user.id}`);
-      setSuccess(`User "${user.name || user.email}" deleted`);
+      setSuccess(`User "${user.name || user.email}" moved to Recycle Bin`);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete user');
@@ -174,6 +186,7 @@ export default function UsersPage() {
     setFormTitle(user.title || '');
     setFormPhone(user.phone || '');
     setFormDeptId(user.department?.id || '');
+    setFormRoleId(user.orgRole?.id || '');
     setFormPassword('');
     setShowEditModal(user.id);
   };
@@ -185,11 +198,11 @@ export default function UsersPage() {
     setFormTitle('');
     setFormPhone('');
     setFormDeptId('');
+    setFormRoleId('');
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="px-6 py-4">
           <div className="flex items-center gap-3 mb-2">
@@ -199,11 +212,10 @@ export default function UsersPage() {
             <Users className="w-6 h-6 text-brand-navy" />
             <h1 className="text-2xl font-bold text-gray-900">Users</h1>
           </div>
-          <p className="text-sm text-gray-600 ml-10">Manage user accounts and departments</p>
+          <p className="text-sm text-gray-600 ml-10">Manage user accounts, roles, and departments</p>
         </div>
       </div>
 
-      {/* Alerts */}
       {error && (
         <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
           {error}
@@ -217,7 +229,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Toolbar */}
       <div className="px-6 py-4">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -230,21 +241,11 @@ export default function UsersPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy focus:border-brand-navy"
             />
           </div>
-          <select
-            value={filterDepartment}
-            onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
+          <select value={filterDepartment} onChange={(e) => setFilterDepartment(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="">All Departments</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
+            {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
-          <select
-            value={filterActive}
-            onChange={(e) => setFilterActive(e.target.value as '' | 'true' | 'false')}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-          >
+          <select value={filterActive} onChange={(e) => setFilterActive(e.target.value as '' | 'true' | 'false')} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
             <option value="">All Status</option>
             <option value="true">Active</option>
             <option value="false">Inactive</option>
@@ -261,7 +262,6 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="px-6 pb-8">
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           {loading ? (
@@ -275,6 +275,7 @@ export default function UsersPage() {
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Role</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Department</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Login</th>
@@ -298,50 +299,35 @@ export default function UsersPage() {
                       <td className="px-4 py-3 text-sm text-gray-700">{user.email}</td>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center gap-1 text-sm text-gray-700">
+                          <Shield className="w-3.5 h-3.5 text-gray-400" />
+                          {user.orgRole?.label || '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 text-sm text-gray-700">
                           <Building2 className="w-3.5 h-3.5 text-gray-400" />
                           {user.department?.name || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                            user.isActive
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
-                        >
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${user.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                           {user.isActive ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
                           {user.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
-                        {user.lastLoginAt
-                          ? new Date(user.lastLoginAt).toLocaleDateString()
-                          : 'Never'}
+                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => openEdit(user)}
-                            className="px-3 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/10 rounded transition-colors"
-                          >
-                            Edit
-                          </button>
+                          <button onClick={() => openEdit(user)} className="px-3 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/10 rounded transition-colors">Edit</button>
                           <button
                             onClick={() => handleToggleActive(user.id)}
-                            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                              user.isActive
-                                ? 'text-red-600 hover:bg-red-50'
-                                : 'text-green-600 hover:bg-green-50'
-                            }`}
+                            className={`px-3 py-1 text-xs font-medium rounded transition-colors ${user.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
                           >
                             {user.isActive ? 'Freeze' : 'Activate'}
                           </button>
-                          <button
-                            onClick={() => handleDelete(user)}
-                            className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
-                            title="Delete user"
-                          >
+                          <button onClick={() => handleDelete(user)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete user">
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -356,7 +342,6 @@ export default function UsersPage() {
         <div className="mt-2 text-xs text-gray-500">{filteredUsers.length} user(s)</div>
       </div>
 
-      {/* Create User Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowCreateModal(false)}>
           <div className="bg-white rounded-lg w-full max-w-lg mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -389,12 +374,21 @@ export default function UsersPage() {
                   <input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>
-              <div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select value={formRoleId} onChange={(e) => setFormRoleId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Select Role</option>
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <select value={formDeptId} onChange={(e) => setFormDeptId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     <option value="">Select Dept</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
+                </div>
               </div>
             </div>
             <div className="border-t px-6 py-3 flex justify-end gap-2">
@@ -407,7 +401,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Edit User Modal */}
       {showEditModal && editUser && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => { setShowEditModal(null); setEditUser(null); }}>
           <div className="bg-white rounded-lg w-full max-w-lg mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -436,17 +429,26 @@ export default function UsersPage() {
                   <input value={formPhone} onChange={(e) => setFormPhone(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
                 </div>
               </div>
-              <div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select value={formRoleId} onChange={(e) => setFormRoleId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="">Select Role</option>
+                    {roles.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <select value={formDeptId} onChange={(e) => setFormDeptId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
                     <option value="">Select Dept</option>
                     {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
+                </div>
               </div>
               <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                  <input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Leave blank to keep current" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-                  <p className="text-xs text-gray-400 mt-1">Min 6 characters. Leave blank to keep current password.</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input type="password" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} placeholder="Leave blank to keep current" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <p className="text-xs text-gray-400 mt-1">Min 6 characters. Leave blank to keep current password.</p>
               </div>
             </div>
             <div className="border-t px-6 py-3 flex justify-end gap-2">

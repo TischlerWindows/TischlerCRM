@@ -1,240 +1,212 @@
 import { prisma } from '@crm/db/client';
 
-const SEED_PROFILES = [
+const FULL_OBJ_PERMS = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
+const STD_OBJ_PERMS = { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false };
+const READ_ONLY_OBJ = { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false };
+const NO_OBJ_PERMS = { read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false };
+
+const CORE_OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
+
+function buildObjPerms(template: Record<string, boolean>) {
+  return Object.fromEntries(CORE_OBJECTS.map(o => [o, { ...template }]));
+}
+
+const ALL_APP_PERMS_TRUE: Record<string, boolean> = {
+  manageUsers: true, manageRoles: true, manageDepartments: true,
+  exportData: true, importData: true, manageReports: true,
+  manageDashboards: true, viewSummary: true, viewSetup: true,
+  customizeApplication: true, manageSharing: true, viewAllData: true, modifyAllData: true,
+};
+
+const SEED_ROLES = [
   {
-    name: 'System Administrator',
+    name: 'system_administrator',
+    label: 'System Administrator',
     description: 'Full access to all features and settings',
-    isSystemProfile: true,
+    level: 1,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Product: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Project: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Installation: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-      },
-      appPermissions: {
-        manageUsers: true,
-        manageProfiles: true,
-        manageRoles: true,
-        exportData: true,
-        importData: true,
-        manageReports: true,
-        manageDashboards: true,
-        viewSetup: true,
-        customizeApplication: true,
-        manageSharing: true,
-        viewAllData: true,
-        modifyAllData: true,
-      },
-      tabVisibility: {},
+      objectPermissions: buildObjPerms(FULL_OBJ_PERMS),
+      appPermissions: ALL_APP_PERMS_TRUE,
     },
+    visibility: {},
   },
   {
-    name: 'Standard User',
+    name: 'executive',
+    label: 'Executive',
+    description: 'Full read access, limited write on all objects',
+    level: 2,
+    isSystem: false,
+    permissions: {
+      objectPermissions: Object.fromEntries(CORE_OBJECTS.map(o => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
+      appPermissions: { ...ALL_APP_PERMS_TRUE, customizeApplication: false, manageSharing: false },
+    },
+    visibility: {},
+  },
+  {
+    name: 'manager',
+    label: 'Manager',
+    description: 'Standard access plus delete and viewAll',
+    level: 3,
+    isSystem: false,
+    permissions: {
+      objectPermissions: Object.fromEntries(CORE_OBJECTS.map(o => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
+      appPermissions: {
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: true, importData: true, manageReports: true,
+        manageDashboards: true, viewSummary: true, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: true, modifyAllData: false,
+      },
+    },
+    visibility: {},
+  },
+  {
+    name: 'standard_employee',
+    label: 'Standard Employee',
     description: 'Standard access to core CRM features',
-    isSystemProfile: true,
+    level: 4,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Contact: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Account: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Deal: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Project: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Quote: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Installation: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-      },
+      objectPermissions: buildObjPerms(STD_OBJ_PERMS),
       appPermissions: {
-        manageUsers: false,
-        manageProfiles: false,
-        manageRoles: false,
-        exportData: true,
-        importData: false,
-        manageReports: true,
-        manageDashboards: true,
-        viewSetup: false,
-        customizeApplication: false,
-        manageSharing: false,
-        viewAllData: false,
-        modifyAllData: false,
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true,
+        manageDashboards: true, viewSummary: true, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
       },
-      tabVisibility: {},
     },
+    visibility: {},
   },
   {
-    name: 'Sales User',
+    name: 'sales_user',
+    label: 'Sales User',
     description: 'Full access to sales objects: Leads, Deals, Contacts, Accounts',
-    isSystemProfile: false,
+    level: 4,
+    isSystem: false,
     permissions: {
       objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Property: { ...READ_ONLY_OBJ, viewAll: false },
         Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
         Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Product: READ_ONLY_OBJ,
+        Lead: { ...FULL_OBJ_PERMS },
+        Deal: { ...FULL_OBJ_PERMS },
+        Project: { ...READ_ONLY_OBJ, viewAll: false },
+        Service: { ...READ_ONLY_OBJ, viewAll: false },
         Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Installation: { ...READ_ONLY_OBJ, viewAll: false },
       },
       appPermissions: {
-        manageUsers: false,
-        manageProfiles: false,
-        manageRoles: false,
-        exportData: true,
-        importData: false,
-        manageReports: true,
-        manageDashboards: true,
-        viewSetup: false,
-        customizeApplication: false,
-        manageSharing: false,
-        viewAllData: false,
-        modifyAllData: false,
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: true,
+        manageDashboards: true, viewSummary: true, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
       },
-      tabVisibility: {},
     },
+    visibility: {},
   },
   {
-    name: 'Marketing User',
+    name: 'marketing_user',
+    label: 'Marketing User',
     description: 'Full access to Leads and Contacts; read-only Deals',
-    isSystemProfile: false,
+    level: 4,
+    isSystem: false,
     permissions: {
       objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Property: { ...READ_ONLY_OBJ, viewAll: false },
         Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
         Account: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Quote: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Product: READ_ONLY_OBJ,
+        Lead: { ...FULL_OBJ_PERMS },
+        Deal: { ...READ_ONLY_OBJ, viewAll: false },
+        Project: { ...READ_ONLY_OBJ, viewAll: false },
+        Service: { ...READ_ONLY_OBJ, viewAll: false },
+        Quote: { ...READ_ONLY_OBJ, viewAll: false },
+        Installation: { ...READ_ONLY_OBJ, viewAll: false },
       },
       appPermissions: {
-        manageUsers: false,
-        manageProfiles: false,
-        manageRoles: false,
-        exportData: true,
-        importData: true,
-        manageReports: true,
-        manageDashboards: true,
-        viewSetup: false,
-        customizeApplication: false,
-        manageSharing: false,
-        viewAllData: false,
-        modifyAllData: false,
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: true, importData: true, manageReports: true,
+        manageDashboards: true, viewSummary: true, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
       },
-      tabVisibility: {},
     },
+    visibility: {},
   },
   {
-    name: 'Read Only',
+    name: 'read_only',
+    label: 'Read Only',
     description: 'Read-only access to all objects',
-    isSystemProfile: true,
+    level: 5,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Contact: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Account: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Lead: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Deal: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Quote: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-      },
+      objectPermissions: buildObjPerms(READ_ONLY_OBJ),
       appPermissions: {
-        manageUsers: false,
-        manageProfiles: false,
-        manageRoles: false,
-        exportData: true,
-        importData: false,
-        manageReports: false,
-        manageDashboards: false,
-        viewSetup: false,
-        customizeApplication: false,
-        manageSharing: false,
-        viewAllData: true,
-        modifyAllData: false,
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: true, importData: false, manageReports: false,
+        manageDashboards: false, viewSummary: true, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: true, modifyAllData: false,
       },
-      tabVisibility: {},
     },
+    visibility: {},
   },
   {
-    name: 'Minimum Access',
-    description: 'No object access — minimal base profile',
-    isSystemProfile: true,
+    name: 'contractor',
+    label: 'Contractor',
+    description: 'Minimal base access',
+    level: 5,
+    isSystem: true,
     permissions: {
       objectPermissions: {},
       appPermissions: {
-        manageUsers: false,
-        manageProfiles: false,
-        manageRoles: false,
-        exportData: false,
-        importData: false,
-        manageReports: false,
-        manageDashboards: false,
-        viewSetup: false,
-        customizeApplication: false,
-        manageSharing: false,
-        viewAllData: false,
-        modifyAllData: false,
+        manageUsers: false, manageRoles: false, manageDepartments: false,
+        exportData: false, importData: false, manageReports: false,
+        manageDashboards: false, viewSummary: false, viewSetup: false,
+        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
       },
-      tabVisibility: {},
     },
+    visibility: {},
   },
 ];
 
 export async function ensureUserManagement() {
-  console.log('[UserMgmt] Ensuring profiles...');
+  console.log('[UserMgmt] Ensuring roles...');
 
-  // Seed Profiles
-  for (const profile of SEED_PROFILES) {
-    const existing = await prisma.profile.findUnique({ where: { name: profile.name } });
+  for (const roleDef of SEED_ROLES) {
+    const existing = await prisma.role.findUnique({ where: { name: roleDef.name } });
     if (!existing) {
-      await prisma.profile.create({ data: profile });
-      console.log(`[UserMgmt] Created profile: ${profile.name}`);
+      await prisma.role.create({ data: roleDef });
+      console.log(`[UserMgmt] Created role: ${roleDef.label}`);
     }
   }
 
-  // Assign System Administrator profile to any admin users that don't have a profile
-  const adminProfile = await prisma.profile.findUnique({ where: { name: 'System Administrator' } });
-  if (adminProfile) {
-    const adminsWithoutProfile = await prisma.user.findMany({
-      where: { role: 'ADMIN', profileId: null },
+  // Assign System Administrator role to admin users without a role
+  const adminRole = await prisma.role.findUnique({ where: { name: 'system_administrator' } });
+  if (adminRole) {
+    const adminsWithoutRole = await prisma.user.findMany({
+      where: { role: 'ADMIN', roleId: null },
     });
-    for (const admin of adminsWithoutProfile) {
+    for (const admin of adminsWithoutRole) {
       await prisma.user.update({
         where: { id: admin.id },
-        data: { profileId: adminProfile.id },
+        data: { roleId: adminRole.id },
       });
-      console.log(`[UserMgmt] Assigned System Administrator profile to ${admin.email}`);
+      console.log(`[UserMgmt] Assigned System Administrator role to ${admin.email}`);
     }
   }
 
-  // Assign Standard User profile to any regular users that don't have a profile
-  const standardProfile = await prisma.profile.findUnique({ where: { name: 'Standard User' } });
-  if (standardProfile) {
-    const usersWithoutProfile = await prisma.user.findMany({
-      where: { profileId: null },
+  // Assign Standard Employee role to regular users without a role
+  const standardRole = await prisma.role.findUnique({ where: { name: 'standard_employee' } });
+  if (standardRole) {
+    const usersWithoutRole = await prisma.user.findMany({
+      where: { roleId: null },
     });
-    for (const user of usersWithoutProfile) {
+    for (const user of usersWithoutRole) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { profileId: standardProfile.id },
+        data: { roleId: standardRole.id },
       });
-      console.log(`[UserMgmt] Assigned Standard User profile to ${user.email}`);
+      console.log(`[UserMgmt] Assigned Standard Employee role to ${user.email}`);
     }
   }
 

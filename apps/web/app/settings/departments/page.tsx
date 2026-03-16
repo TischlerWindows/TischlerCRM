@@ -56,7 +56,7 @@ const PERM_KEYS: (keyof ObjectPerms)[] = ['read', 'create', 'edit', 'delete', 'v
 
 const APP_PERMISSIONS = [
   { key: 'manageUsers', label: 'Manage Users' },
-  { key: 'manageProfiles', label: 'Manage Profiles' },
+  { key: 'manageRoles', label: 'Manage Roles' },
   { key: 'manageDepartments', label: 'Manage Departments' },
   { key: 'exportData', label: 'Export Data' },
   { key: 'importData', label: 'Import Data' },

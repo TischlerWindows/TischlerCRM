@@ -5,10 +5,10 @@ async function main() {
   await c.connect();
   
   // List all users
-  const users = await c.query('SELECT id, email, name, role, "departmentId", "profileId" FROM "User" ORDER BY email');
+  const users = await c.query('SELECT id, email, name, role, "departmentId", "roleId" FROM "User" ORDER BY email');
   console.log('=== USERS ===');
   for (const u of users.rows) {
-    console.log(`  ${u.email} | role=${u.role} | dept=${u.departmentId} | profile=${u.profileId}`);
+    console.log(`  ${u.email} | role=${u.role} | dept=${u.departmentId} | orgRole=${u.roleId}`);
   }
 
   // For non-admin users, show department permissions
@@ -26,14 +26,14 @@ async function main() {
       console.log('  No department assigned');
     }
     
-    if (u.profileId) {
-      const prof = await c.query('SELECT name, permissions FROM "Profile" WHERE id = $1', [u.profileId]);
-      if (prof.rows.length > 0) {
-        console.log(`  Profile: ${prof.rows[0].name}`);
-        console.log(`  Profile perms:`, JSON.stringify(prof.rows[0].permissions, null, 4));
+    if (u.roleId) {
+      const rl = await c.query('SELECT name, label, permissions FROM "Role" WHERE id = $1', [u.roleId]);
+      if (rl.rows.length > 0) {
+        console.log(`  Role: ${rl.rows[0].label} (${rl.rows[0].name})`);
+        console.log(`  Role perms:`, JSON.stringify(rl.rows[0].permissions, null, 4));
       }
     } else {
-      console.log('  No profile assigned');
+      console.log('  No role assigned');
     }
     
     const ps = await c.query(`

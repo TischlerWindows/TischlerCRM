@@ -16,13 +16,13 @@ async function checkObjectPermission(
     where: { id: userId },
     include: {
       department: true,
-      profile: true,
+      orgRole: true,
     },
   });
   if (!user) return false;
 
-  // If user has no department or profile — no permissions configured yet, allow access
-  if (!user.department && !user.profile) return true;
+  // If user has no department or role — no permissions configured yet, allow access
+  if (!user.department && !user.orgRole) return true;
 
   // Admin departments have full access to every object
   const deptRaw = (user.department?.permissions as any) || {};
@@ -38,9 +38,9 @@ async function checkObjectPermission(
   // Check if any source grants the permission
   if (deptPerms?.[action]) return true;
 
-  // Check profile permissions
-  const profPerms = (user.profile?.permissions as any)?.objectPermissions?.[objectApiName];
-  if (profPerms?.[action]) return true;
+  // Check role permissions
+  const rolePerms = (user.orgRole?.permissions as any)?.objectPermissions?.[objectApiName];
+  if (rolePerms?.[action]) return true;
 
   return false;
 }

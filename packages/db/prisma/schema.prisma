@@ -19,14 +19,20 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Profile & Department assignments
-  profileId    String?
-  profile      Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  // Role & Department assignments
+  roleId       String?
+  orgRole      Role?       @relation(fields: [roleId], references: [id], onDelete: SetNull)
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   managerId    String?
   manager      User?       @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
   directReports User[]    @relation("UserManager")
+
+  // Soft delete
+  deletedAt    DateTime?
+  deletedById  String?
+  deletedBy    User?       @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedUsers User[]      @relation("UserDeletedBy")
 
   // Extended user fields
   title        String?
@@ -53,28 +59,39 @@ model User {
   modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
   loginEvents         LoginEvent[]
   preferences         UserPreference[]
+  auditLogs           AuditLog[]      @relation("AuditActor")
+  deletedDepartments  Department[]    @relation("DepartmentDeletedBy")
 
-  @@index([profileId])
+  @@index([roleId])
   @@index([departmentId])
   @@index([managerId])
   @@index([isActive])
+  @@index([deletedAt])
 }
 
 // ============================================
-// Profiles, Departments, Roles & Permission Sets
+// Roles, Departments & Audit
 // ============================================
 
-model Profile {
-  id              String   @id @default(uuid())
-  name            String   @unique
-  description     String?
-  isSystemProfile Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  permissions     Json     @default("{}")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  label       String
+  description String?
+  level       Int
+  parentId    String?
+  parent      Role?    @relation("RoleHierarchy", fields: [parentId], references: [id])
+  children    Role[]   @relation("RoleHierarchy")
+  permissions Json     @default("{}")
+  visibility  Json     @default("{}")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  users           User[]
+  users       User[]
+
+  @@index([parentId])
+  @@index([level])
 }
 
 model Department {
@@ -89,9 +106,34 @@ model Department {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  // Soft delete
+  deletedAt    DateTime?
+  deletedById  String?
+  deletedBy    User?     @relation("DepartmentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+
   users       User[]
 
   @@index([parentId])
+  @@index([deletedAt])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  action     String
+  objectType String
+  objectId   String
+  objectName String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([objectType, objectId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 

@@ -17,7 +17,7 @@ export interface ObjectPermission {
 
 export interface AppPermissions {
   manageUsers: boolean;
-  manageProfiles: boolean;
+  manageRoles: boolean;
   manageDepartments: boolean;
   exportData: boolean;
   importData: boolean;
@@ -34,7 +34,7 @@ export interface AppPermissions {
 interface PermissionsData {
   userId: string;
   departmentName: string | null;
-  profileName: string | null;
+  roleName: string | null;
   role: string;
   objectPermissions: Record<string, ObjectPermission>;
   appPermissions: AppPermissions;
@@ -122,7 +122,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const objPerms = permissions.objectPermissions[objectApiName];
       // If no permissions configured for this object, DENY by default
       // (admins are already handled above; for regular users, if no
-      // department/profile/permset mentions an object it stays locked)
+      // department/role/permset mentions an object it stays locked)
       if (!objPerms) return false;
       return !!objPerms[action];
     },

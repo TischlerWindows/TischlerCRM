@@ -18,9 +18,11 @@ import { dashboardRoutes } from './routes/dashboards';
 import { backupRoutes } from './routes/backup';
 import { settingRoutes } from './routes/settings';
 import { preferenceRoutes } from './routes/preferences';
-import { profileRoutes } from './routes/profiles';
 import { departmentRoutes } from './routes/departments';
 import { usersAdminRoutes } from './routes/users-admin';
+import { rolesRoutes } from './routes/roles';
+import { auditLogRoutes } from './routes/audit-log';
+import { recycleBinRoutes } from './routes/recycle-bin';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -148,40 +150,36 @@ export function buildApp() {
       where: { id: userId },
       include: {
         department: true,
-        profile: true,
+        orgRole: true,
       },
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    // Start with department permissions as base
     const deptRaw = (user.department?.permissions as any) || {};
     const isAdminDept = !!deptRaw.isAdmin;
     const deptObjPerms: Record<string, Record<string, boolean>> = deptRaw.objectPermissions || {};
     const deptAppPerms: Record<string, boolean> = deptRaw.appPermissions || {};
 
-    // Collect grants from profile and permission sets
     const grantedObjPerms: Record<string, Record<string, boolean>> = {};
     const grantedAppPerms: Record<string, boolean> = {};
 
-    // Profile grants
-    const profPerms = (user.profile?.permissions as any) || {};
-    if (profPerms.objectPermissions) {
-      for (const [obj, perms] of Object.entries(profPerms.objectPermissions as Record<string, Record<string, boolean>>)) {
+    // Role grants (replaces old Profile grants)
+    const rolePerms = (user.orgRole?.permissions as any) || {};
+    if (rolePerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(rolePerms.objectPermissions as Record<string, Record<string, boolean>>)) {
         if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
         for (const [action, granted] of Object.entries(perms)) {
           if (granted) grantedObjPerms[obj][action] = true;
         }
       }
     }
-    if (profPerms.appPermissions) {
-      for (const [perm, granted] of Object.entries(profPerms.appPermissions as Record<string, boolean>)) {
+    if (rolePerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(rolePerms.appPermissions as Record<string, boolean>)) {
         if (granted) grantedAppPerms[perm] = true;
       }
     }
 
     // Merge: department restrictions are the CEILING.
-    // If department explicitly sets action=false, it cannot be overridden.
-    // Otherwise take the union of dept + profile + permsets grants.
     const objectPerms: Record<string, Record<string, boolean>> = {};
     const allObjKeys = new Set([...Object.keys(deptObjPerms), ...Object.keys(grantedObjPerms)]);
     for (const obj of allObjKeys) {
@@ -190,11 +188,9 @@ export function buildApp() {
       const grantedObj = grantedObjPerms[obj] || {};
       const allActions = new Set([...Object.keys(deptObj), ...Object.keys(grantedObj)]);
       for (const action of allActions) {
-        // If department explicitly set this action to false, deny it
         if (user.department && obj in deptObjPerms && action in deptObj && !deptObj[action]) {
           objectPerms[obj][action] = false;
         } else {
-          // Otherwise, grant if any source grants it
           objectPerms[obj][action] = !!(deptObj[action] || grantedObj[action]);
         }
       }
@@ -210,22 +206,18 @@ export function buildApp() {
       }
     }
 
-    // Admin department or ADMIN role gets full access
     if (isAdminDept || user.role === 'ADMIN') {
       const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
-      // Include all custom objects dynamically
       const customObjects = await prisma.customObject.findMany({ select: { apiName: true } });
-      const allObjectNames = customObjects.map(o => o.apiName);
-      for (const obj of allObjectNames) {
-        objectPerms[obj] = Object.fromEntries(allActions.map(a => [a, true]));
+      for (const obj of customObjects) {
+        objectPerms[obj.apiName] = Object.fromEntries(allActions.map(a => [a, true]));
       }
-      const allAppPerms = ['manageUsers', 'manageProfiles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSummary', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
-      for (const p of allAppPerms) {
+      const allAppPermKeys = ['manageUsers', 'manageRoles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSummary', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
+      for (const p of allAppPermKeys) {
         appPerms[p] = true;
       }
     }
 
-    // Resolve home page layout template for department
     let homePageLayout: any = null;
     const homePageLayoutId = deptRaw.homePageLayoutId;
     if (homePageLayoutId) {
@@ -242,7 +234,7 @@ export function buildApp() {
     reply.send({
       userId,
       departmentName: user.department?.name || null,
-      profileName: user.profile?.name || null,
+      roleName: user.orgRole?.label || null,
       role: user.role,
       objectPermissions: objectPerms,
       appPermissions: appPerms,
@@ -279,7 +271,16 @@ export function buildApp() {
     reply.code(204).send();
   });
 
-  // Register new API routes
+  // Admin route guard — enforce crm-security Pillar 4
+  app.addHook('onRequest', async (req, reply) => {
+    if (!req.routerPath?.startsWith('/admin')) return;
+    const user = (req as any).user;
+    if (!user || user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
+  });
+
+  // Register API routes
   app.register(objectRoutes);
   app.register(fieldRoutes);
   app.register(layoutRoutes);
@@ -289,9 +290,11 @@ export function buildApp() {
   app.register(backupRoutes);
   app.register(settingRoutes);
   app.register(preferenceRoutes);
-  app.register(profileRoutes);
   app.register(departmentRoutes);
   app.register(usersAdminRoutes);
+  app.register(rolesRoutes);
+  app.register(auditLogRoutes);
+  app.register(recycleBinRoutes);
 
   return app;
 }

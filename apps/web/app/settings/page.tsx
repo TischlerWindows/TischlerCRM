@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -23,7 +23,10 @@ const setupSections = [
     title: 'Administration',
     items: [
       { name: 'Users', href: '/settings/users' },
+      { name: 'Roles', href: '/settings/roles' },
       { name: 'Departments', href: '/settings/departments' },
+      { name: 'Audit Log', href: '/settings/audit-log' },
+      { name: 'Recycle Bin', href: '/settings/recycle-bin' },
       { name: 'Data', href: '/settings/data' },
       { name: 'Backups', href: '/settings/backups' },
       { name: 'Email', href: '/settings/email' },
