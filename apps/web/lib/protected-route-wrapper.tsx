@@ -15,19 +15,9 @@ export function ProtectedRouteWrapper({ children }: { children: React.ReactNode 
   const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    console.log('ProtectedRouteWrapper effect:', {
-      pathname,
-      isAuthenticated,
-      loading,
-      isPublic: isPublicRoute(pathname),
-    });
-
-    // Don't redirect while loading
     if (loading) return;
 
-    // If trying to access protected route without auth
     if (!isAuthenticated && !isPublicRoute(pathname)) {
-      console.log('Redirecting to login');
       router.push('/login');
     }
   }, [pathname, router, isAuthenticated, loading]);

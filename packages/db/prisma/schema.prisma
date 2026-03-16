@@ -61,6 +61,8 @@ model User {
   preferences         UserPreference[]
   auditLogs           AuditLog[]      @relation("AuditActor")
   deletedDepartments  Department[]    @relation("DepartmentDeletedBy")
+  userIntegrations    UserIntegration[]
+  configuredIntegrations Integration[] @relation("IntegrationConfiguredBy")
 
   @@index([roleId])
   @@index([departmentId])
@@ -504,4 +506,72 @@ model UserPreference {
 
   @@unique([userId, key])
   @@index([userId])
+}
+
+// ============================================
+// External Integrations
+// ============================================
+
+// Org-level integration configuration (admin-managed)
+model Integration {
+  id              String    @id @default(uuid())
+  provider        String    @unique  // e.g. "google_maps", "dropbox", "outlook"
+  displayName     String               // Human-readable name
+  description     String?
+  category        String    @default("general") // "maps", "storage", "calendar", "email"
+  enabled         Boolean   @default(false)
+
+  // Org-level credentials (encrypted at rest)
+  apiKey          String?   // Encrypted — for simple API-key integrations (e.g. Google Maps)
+  clientId        String?   // OAuth app client ID
+  clientSecret    String?   // Encrypted — OAuth app client secret
+
+  // Configuration
+  config          Json      @default("{}")  // Provider-specific settings (sync intervals, scopes, etc.)
+  webhookUrl      String?
+
+  // Audit
+  configuredById  String?
+  configuredBy    User?     @relation("IntegrationConfiguredBy", fields: [configuredById], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userIntegrations UserIntegration[]
+
+  @@index([provider])
+  @@index([enabled])
+  @@index([category])
+}
+
+// Per-user integration connection (OAuth tokens, sync state)
+model UserIntegration {
+  id              String    @id @default(uuid())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integrationId   String
+
+  // OAuth tokens (encrypted at rest)
+  accessToken     String?   // Encrypted
+  refreshToken    String?   // Encrypted
+  tokenExpiresAt  DateTime?
+  scopes          String?   // Comma-separated granted scopes
+
+  // Sync state
+  syncEnabled     Boolean   @default(true)
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?   // "success", "error", "partial"
+  lastSyncError   String?
+  syncCursor      String?   // Provider-specific delta/cursor token for incremental sync
+
+  // Connection metadata
+  externalAccountId String? // Provider's user/account ID
+  externalEmail     String? // Email associated with the provider account
+  connectedAt       DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([userId, integrationId])
+  @@index([userId])
+  @@index([integrationId])
+  @@index([lastSyncAt])
 }

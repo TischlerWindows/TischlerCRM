@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -86,15 +86,39 @@ export default function NewContactPage() {
   const [showReportsToSearch, setShowReportsToSearch] = useState(false);
   const [reportsToSearchTerm, setReportsToSearchTerm] = useState('');
   const [availableContacts, setAvailableContacts] = useState<Array<{ id: string; name: string }>>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleChange = (field: keyof ContactForm, value: any) => {
+  const handleChange = (field: keyof ContactForm, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    if (validationErrors[field]) {
+      setValidationErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+    }
+  };
+
+  const validate = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (!formData.firstName.trim()) errors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) errors.lastName = 'Last name is required';
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    if (formData.secondaryEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.secondaryEmail)) {
+      errors.secondaryEmail = 'Please enter a valid email address';
+    }
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSave = async () => {
-    const today = new Date().toISOString().split('T')[0];
+    if (!validate()) return;
 
-    // Create new contact via API
+    setSaving(true);
+    setSaveError(null);
+
     const recordData = {
       firstName: formData.firstName,
       lastName: formData.lastName,
@@ -119,12 +143,13 @@ export default function NewContactPage() {
 
     try {
       await recordsService.createRecord('Contact', { data: recordData });
+      router.push('/contacts');
     } catch (err) {
       console.error('Failed to create contact via API:', err);
+      setSaveError('Failed to create contact. Please check your input and try again.');
+    } finally {
+      setSaving(false);
     }
-
-    // Navigate back to contacts list
-    router.push('/contacts');
   };
 
   const handleCancel = () => {
@@ -185,10 +210,11 @@ export default function NewContactPage() {
               </button>
               <button
                 onClick={handleSave}
-                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
+                disabled={saving}
+                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4 mr-2" />
-                Save Contact
+                {saving ? 'Saving...' : 'Save Contact'}
               </button>
             </div>
           </div>
@@ -197,6 +223,23 @@ export default function NewContactPage() {
 
       {/* Form Content */}
       <div className="px-6 py-6 max-w-6xl mx-auto">
+        {saveError && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              <span className="text-sm">{saveError}</span>
+            </div>
+            <button onClick={() => setSaveError(null)} className="text-sm text-red-600 hover:text-red-800 font-medium">Dismiss</button>
+          </div>
+        )}
+        {Object.keys(validationErrors).length > 0 && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm font-medium text-amber-800">Please fix the following errors:</p>
+            <ul className="mt-1 list-disc list-inside text-sm text-amber-700">
+              {Object.values(validationErrors).map((err, i) => <li key={i}>{err}</li>)}
+            </ul>
+          </div>
+        )}
         <div className="space-y-6">
           {/* Contact Information */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -212,9 +255,10 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => handleChange('firstName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy ${validationErrors.firstName ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="Enter first name"
                 />
+                {validationErrors.firstName && <p className="mt-1 text-xs text-red-600">{validationErrors.firstName}</p>}
               </div>
 
               <div>
@@ -225,9 +269,10 @@ export default function NewContactPage() {
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => handleChange('lastName', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy ${validationErrors.lastName ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="Enter last name"
                 />
+                {validationErrors.lastName && <p className="mt-1 text-xs text-red-600">{validationErrors.lastName}</p>}
               </div>
 
               <div>
@@ -251,9 +296,10 @@ export default function NewContactPage() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-brand-navy ${validationErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
                   placeholder="email@example.com"
                 />
+                {validationErrors.email && <p className="mt-1 text-xs text-red-600">{validationErrors.email}</p>}
               </div>
 
               <div>

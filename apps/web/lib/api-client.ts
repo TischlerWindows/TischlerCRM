@@ -384,6 +384,43 @@ class ApiClient {
   async deletePreference(key: string) {
     return this.request<void>(`/user/preferences/${encodeURIComponent(key)}`, { method: 'DELETE' });
   }
+
+  // Integrations
+  async getIntegrations() {
+    return this.request<any[]>('/integrations');
+  }
+
+  async getIntegration(provider: string) {
+    return this.request<any>(`/integrations/${encodeURIComponent(provider)}`);
+  }
+
+  async updateIntegration(provider: string, data: {
+    enabled?: boolean;
+    apiKey?: string | null;
+    clientId?: string | null;
+    clientSecret?: string | null;
+    config?: Record<string, any>;
+    webhookUrl?: string | null;
+  }) {
+    return this.request<any>(`/integrations/${encodeURIComponent(provider)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async resetIntegration(provider: string) {
+    return this.request<void>(`/integrations/${encodeURIComponent(provider)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getIntegrationApiKey(provider: string) {
+    return this.request<{ apiKey: string }>(`/integrations/${encodeURIComponent(provider)}/api-key`);
+  }
+
+  async getMyConnections() {
+    return this.request<any[]>('/integrations/me/connections');
+  }
 }
 
 // Export singleton instance

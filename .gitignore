@@ -19,3 +19,6 @@ coverage/
 # IDE
 .vscode/
 .DS_Store
+
+# Local Claude/Cursor machine-specific settings (contain hardcoded local paths)
+.claude/settings.local.json

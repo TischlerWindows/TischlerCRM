@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -1095,9 +1095,6 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   if (viewMode === 'list') {
     const existingLayouts = object?.pageLayouts || [];
     
-    console.log('Page Editor List View - Object:', objectApiName);
-    console.log('Page Editor List View - Layouts:', existingLayouts);
-
     return (
       <div className="p-6">
         <div className="mb-6">

@@ -46,13 +46,64 @@ async function checkObjectPermission(
 }
 
 export async function recordRoutes(app: FastifyInstance) {
+  // Search records (registered before /:recordId to avoid being swallowed by the param route)
+  app.get('/objects/:apiName/records/search', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const { q } = req.query as { q?: string };
+
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+
+    if (!object) {
+      return reply.code(404).send({ error: 'Object not found' });
+    }
+
+    if (!q) {
+      return reply.send([]);
+    }
+
+    const records = await prisma.record.findMany({
+      where: {
+        objectId: object.id,
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      take: 20,
+    });
+
+    const searchTerm = q.toLowerCase();
+    const filtered = records.filter((record) => {
+      const data = record.data as Record<string, any>;
+      return Object.values(data).some((value) =>
+        String(value).toLowerCase().includes(searchTerm)
+      );
+    });
+
+    reply.send(filtered);
+  });
+
   // Get all records for an object
   app.get('/objects/:apiName/records', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const { limit = 50, offset = 0 } = req.query as { limit?: number; offset?: number };
+    const rawQuery = req.query as { limit?: string; offset?: string };
+    const limit = Math.min(Math.max(Number(rawQuery.limit) || 50, 1), 200);
+    const offset = Math.max(Number(rawQuery.offset) || 0, 0);
 
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
     const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
     if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
 
@@ -90,8 +141,8 @@ export async function recordRoutes(app: FastifyInstance) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: Number(limit),
-      skip: Number(offset),
+      take: limit,
+      skip: offset,
     });
 
     reply.send(records);
@@ -101,8 +152,8 @@ export async function recordRoutes(app: FastifyInstance) {
   app.get('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId } = req.params as { apiName: string; recordId: string };
 
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
     const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
     if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
 
@@ -158,8 +209,8 @@ export async function recordRoutes(app: FastifyInstance) {
 
     req.log.info({ apiName, dataKeys: Object.keys(data || {}) }, 'CREATE RECORD request');
 
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
     const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
     if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records for this object' });
 
@@ -306,8 +357,8 @@ export async function recordRoutes(app: FastifyInstance) {
     const body = req.body as Record<string, any>;
     const updateData = body.data || body;
 
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
     const allowed = await checkObjectPermission(userId, userRole, apiName, 'edit');
     if (!allowed) return reply.code(403).send({ error: 'You do not have permission to edit records for this object' });
 
@@ -372,8 +423,8 @@ export async function recordRoutes(app: FastifyInstance) {
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId } = req.params as { apiName: string; recordId: string };
 
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
     const allowed = await checkObjectPermission(userId, userRole, apiName, 'delete');
     if (!allowed) return reply.code(403).send({ error: 'You do not have permission to delete records for this object' });
 
@@ -403,54 +454,4 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.code(204).send();
   });
 
-  // Search records
-  app.get('/objects/:apiName/records/search', async (req, reply) => {
-    const { apiName } = req.params as { apiName: string };
-    const { q } = req.query as { q?: string };
-
-    const userId = (req as any).user.sub;
-    const userRole = (req as any).user.role;
-    const allowed = await checkObjectPermission(userId, userRole, apiName, 'read');
-    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to view this object' });
-
-    const object = await prisma.customObject.findFirst({
-      where: { apiName: { equals: apiName, mode: 'insensitive' } },
-    });
-
-    if (!object) {
-      return reply.code(404).send({ error: 'Object not found' });
-    }
-
-    if (!q) {
-      return reply.send([]);
-    }
-
-    // Simple search in JSON data (this could be enhanced with full-text search)
-    const records = await prisma.record.findMany({
-      where: {
-        objectId: object.id,
-      },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-      take: 20,
-    });
-
-    // Filter records that contain the search term in any field
-    const searchTerm = q.toLowerCase();
-    const filtered = records.filter((record) => {
-      const data = record.data as Record<string, any>;
-      return Object.values(data).some((value) =>
-        String(value).toLowerCase().includes(searchTerm)
-      );
-    });
-
-    reply.send(filtered);
-  });
 }

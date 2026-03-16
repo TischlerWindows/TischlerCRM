@@ -197,7 +197,6 @@ export const useSchemaStore = create<SchemaStore>()(
             pluralLabel: objectData.pluralLabel || objectData.label || newObject.apiName,
             description: objectData.description,
           });
-          console.log(`[Schema] Object "${newObject.apiName}" created in database`);
 
           // Sync fields to the database so the records API can validate them
           const fieldsToSync = (newObject.fields || []).filter((f) => {
@@ -221,7 +220,6 @@ export const useSchemaStore = create<SchemaStore>()(
               // Field may already exist
             }
           }
-          console.log(`[Schema] Synced ${fieldsToSync.length} fields for "${newObject.apiName}" to database`);
         } catch (err) {
           // Object may already exist in DB (e.g., seeded objects) — that's OK
           console.warn(`[Schema] Could not create object "${newObject.apiName}" in database (may already exist):`, err);
@@ -323,8 +321,6 @@ export const useSchemaStore = create<SchemaStore>()(
             minLength: fieldData.minLength,
             picklistValues: fieldData.picklistValues,
             defaultValue: fieldData.defaultValue,
-          }).then(() => {
-            console.log(`[Schema] Field "${fieldData.apiName}" synced to database`);
           }).catch((err: any) => {
             console.warn(`[Schema] Could not sync field "${fieldData.apiName}" to database:`, err);
           });

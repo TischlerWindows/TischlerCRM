@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -972,7 +972,6 @@ export default function SummaryPage() {
             
             // BK: =IF(E6<=1000,72,IF(AND(E6>1000,E6<=2000),102,IF(E6>2000,132)))
             const bk = widthMM <= 1000 ? 72 : (widthMM <= 2000 ? 102 : 132);
-            console.log('Debug Shade Boxes:', { widthMM, heightMM, bg, bh, bi, bj, bk, sum: bg+bh+bj+bk, result: Math.ceil((bg + bh + bj + bk) * 1.362161) });
             // Final: =ROUNDUP(SUM(BG6+BH6+BJ6+BK6)*1.362161,0)
             updatedRow.shadeBoxesNoSideTrimUnit = Math.ceil((bg + bh + bj + bk) * 1.362161).toString();
             
@@ -1301,7 +1300,6 @@ export default function SummaryPage() {
             
             // BK: =IF(E6<=1000,72,IF(AND(E6>1000,E6<=2000),102,IF(E6>2000,132)))
             const bk = widthMM <= 1000 ? 72 : (widthMM <= 2000 ? 102 : 132);
-            console.log('Debug Shade Boxes:', { widthMM, heightMM, bg, bh, bi, bj, bk, sum: bg+bh+bj+bk, result: Math.ceil((bg + bh + bj + bk) * 1.362161) });
             // Final: =ROUNDUP(SUM(BG6+BH6+BJ6+BK6)*1.362161,0)
             updatedRow.shadeBoxesNoSideTrimUnit = Math.ceil((bg + bh + bj + bk) * 1.362161).toString();
             

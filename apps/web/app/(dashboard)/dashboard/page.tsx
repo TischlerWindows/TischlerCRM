@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
@@ -211,8 +211,6 @@ export default function DashboardPage() {
 
   // Generate preview data based on widget config
   const previewData = useMemo(() => {
-    console.log('🎯 useMemo running - selectedWidgetType:', selectedWidgetType, 'reportId:', widgetConfig.reportId, 'xAxis:', widgetConfig.xAxis, 'yAxis:', widgetConfig.yAxis, 'stackBy:', widgetConfig.stackBy);
-    
     if (!selectedWidgetType) return null;
     
     // For stacked bar charts with real data
@@ -220,10 +218,7 @@ export default function DashboardPage() {
       const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
       
       if (selectedReport) {
-        console.log('✅ Fetching stacked data for:', { objectType: selectedReport.objectType, xAxis: widgetConfig.xAxis, yAxis: widgetConfig.yAxis, stackBy: widgetConfig.stackBy });
-        
         try {
-          // Use the stacked aggregation utility to get real data from records cache
           const { data, stackKeys } = aggregateStackedChartData({
             objectType: selectedReport.objectType,
             xAxisField: widgetConfig.xAxis,
@@ -231,8 +226,6 @@ export default function DashboardPage() {
             stackByField: widgetConfig.stackBy,
             aggregationType: widgetConfig.aggregationType || 'sum'
           });
-          
-          console.log('📊 Stacked aggregated data:', { data, stackKeys });
           
           if (data && data.length > 0) {
             return { data, stackKeys };
@@ -251,18 +244,13 @@ export default function DashboardPage() {
       const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
       
       if (selectedReport) {
-        console.log('✅ Fetching real data for:', { objectType: selectedReport.objectType, xAxis: widgetConfig.xAxis, yAxis: widgetConfig.yAxis });
-        
         try {
-          // Use the aggregation utility to get real data from records cache
           const aggregatedData = aggregateChartData({
             objectType: selectedReport.objectType,
             xAxisField: widgetConfig.xAxis,
             yAxisField: widgetConfig.yAxis,
             aggregationType: widgetConfig.aggregationType || 'sum'
           });
-          
-          console.log('📊 Aggregated data:', aggregatedData);
           
           if (aggregatedData && aggregatedData.length > 0) {
             return { data: aggregatedData };
@@ -660,8 +648,6 @@ export default function DashboardPage() {
       return;
     }
 
-    console.log(`🔄 Refreshing widget: ${widget.title} with ${objectType}, ${xField}, ${yField}, ${stackByField || 'no stack'}`);
-
     try {
       // Check if this is a stacked chart
       if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
@@ -698,7 +684,6 @@ export default function DashboardPage() {
         setSelectedDashboard(updatedDashboard);
         setSetting('dashboards', updated);
 
-        console.log(`✨ Refreshed stacked widget: ${widget.title} with ${data.length} data points and ${stackKeys.length} stacks`);
       } else {
         // Use regular aggregation for non-stacked charts
         const aggregatedData = aggregateChartData({
@@ -732,7 +717,6 @@ export default function DashboardPage() {
         setSelectedDashboard(updatedDashboard);
         setSetting('dashboards', updated);
 
-        console.log(`✨ Refreshed widget: ${widget.title} with ${aggregatedData.length} data points`);
       }
       
       // Hide loading overlay after a brief moment
@@ -2369,9 +2353,6 @@ export default function DashboardPage() {
                         config: { ...widgetConfig, ...currentPreviewData },
                         position: { x: 0, y: 0, w: 4, h: 2 }
                       };
-
-                      console.log('Preview Widget Config:', previewWidget.config);
-                      console.log('Preview Data:', currentPreviewData);
 
                       return renderWidget(previewWidget);
                     })()

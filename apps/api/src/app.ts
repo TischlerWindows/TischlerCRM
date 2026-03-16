@@ -23,6 +23,7 @@ import { usersAdminRoutes } from './routes/users-admin';
 import { rolesRoutes } from './routes/roles';
 import { auditLogRoutes } from './routes/audit-log';
 import { recycleBinRoutes } from './routes/recycle-bin';
+import { integrationRoutes } from './routes/integrations';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -109,8 +110,11 @@ export function buildApp() {
     return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   });
 
-  // Security: login history
+  // Security: login history (admin-only)
   app.get('/security/login-events', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions' });
+    }
     const querySchema = z.object({
       accountId: z.string().uuid().optional(),
       take: z.coerce.number().int().min(1).max(500).optional(),
@@ -140,12 +144,12 @@ export function buildApp() {
     const env = loadEnv();
     const payload = verifyJwt(token, env.JWT_SECRET);
     if (!payload) return reply.code(401).send({ error: 'Invalid token' });
-    (req as any).user = payload; // attach user payload
+    req.user = payload as any;
   });
 
   // ── Current user's effective permissions ──
   app.get('/me/permissions', async (req, reply) => {
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
@@ -242,40 +246,10 @@ export function buildApp() {
     });
   });
 
-  // Accounts CRUD (minimal)
-  app.get('/accounts', async (req, reply) => {
-    const accounts = await prisma.account.findMany({ take: 50, orderBy: { createdAt: 'desc' } });
-    reply.send(accounts);
-  });
-
-  const accountSchema = z.object({ name: z.string().min(1), domain: z.string().optional().nullable(), ownerId: z.string().uuid() });
-  app.post('/accounts', async (req, reply) => {
-    const parsed = accountSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const created = await prisma.account.create({ data: parsed.data });
-    reply.code(201).send(created);
-  });
-
-  const accountUpdate = accountSchema.partial();
-  app.put('/accounts/:id', async (req, reply) => {
-    const id = (req.params as any).id as string;
-    const parsed = accountUpdate.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const updated = await prisma.account.update({ where: { id }, data: parsed.data });
-    reply.send(updated);
-  });
-
-  app.delete('/accounts/:id', async (req, reply) => {
-    const id = (req.params as any).id as string;
-    await prisma.account.delete({ where: { id } });
-    reply.code(204).send();
-  });
-
   // Admin route guard — enforce crm-security Pillar 4
   app.addHook('onRequest', async (req, reply) => {
     if (!req.routerPath?.startsWith('/admin')) return;
-    const user = (req as any).user;
-    if (!user || user.role !== 'ADMIN') {
+    if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions.' });
     }
   });
@@ -295,6 +269,7 @@ export function buildApp() {
   app.register(rolesRoutes);
   app.register(auditLogRoutes);
   app.register(recycleBinRoutes);
+  app.register(integrationRoutes);
 
   return app;
 }

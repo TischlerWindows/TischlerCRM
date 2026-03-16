@@ -195,11 +195,11 @@ export async function ensureUserManagement() {
     }
   }
 
-  // Assign Standard Employee role to regular users without a role
+  // Assign Standard Employee role to non-admin users without a role
   const standardRole = await prisma.role.findUnique({ where: { name: 'standard_employee' } });
   if (standardRole) {
     const usersWithoutRole = await prisma.user.findMany({
-      where: { roleId: null },
+      where: { roleId: null, role: { not: 'ADMIN' } },
     });
     for (const user of usersWithoutRole) {
       await prisma.user.update({

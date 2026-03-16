@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { Calendar, Video, Phone, Clock } from 'lucide-react';
@@ -125,9 +125,12 @@ export function CalendarMini({ events, loading }: CalendarMiniProps) {
                         Close
                       </button>
                       <button
+                        onClick={() => {
+                          setSelectedEvent(null);
+                        }}
                         className="flex-1 px-3 py-1.5 text-sm font-medium text-white bg-brand-navy hover:bg-brand-navy-dark rounded transition-colors"
                       >
-                        View Details
+                        Dismiss
                       </button>
                     </div>
                   </div>

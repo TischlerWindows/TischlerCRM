@@ -69,7 +69,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'CREATE',
@@ -113,7 +113,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'UPDATE',
@@ -141,7 +141,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: `Cannot delete department: ${userCount} users are assigned. Reassign them first.` });
     }
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await prisma.department.update({
       where: { id },
       data: { deletedAt: new Date(), deletedById: actorId, isActive: false },

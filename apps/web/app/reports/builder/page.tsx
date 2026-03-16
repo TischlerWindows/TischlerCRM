@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -124,37 +124,24 @@ export default function ReportBuilderPage() {
   // Load schema on mount
   useEffect(() => {
     if (!schema) {
-      console.log('🔄 Loading schema...');
       loadSchema();
-    } else {
-      console.log('✅ Schema already loaded:', schema.objects?.length, 'objects');
     }
   }, [schema, loadSchema]);
 
   // Get fields from schema store for the selected object
   const availableFields = React.useMemo(() => {
     if (!objectType) {
-      console.log('⚠️ No objectType selected');
       return [];
     }
     
-    // Try to get fields from schema store first
     if (schema?.objects) {
-      console.log('🔍 Looking for objectType:', objectType);
-      console.log('🔍 Available objects in schema:', schema.objects.map(obj => obj.apiName));
-      
       const objectDef = schema.objects.find(obj => obj.apiName === objectType);
       if (objectDef?.fields) {
         const fields = objectDef.fields.map(field => field.apiName);
-        console.log(`✅ Loaded ${fields.length} fields from schema for ${objectType}:`, fields);
         return fields;
-      } else {
-        console.log(`❌ Object ${objectType} not found in schema or has no fields`);
       }
     }
     
-    // Fallback: schema not available yet, return hard-coded fields
-    console.log(`⚠️ Using hard-coded fields for ${objectType}`);
     const fallback = OBJECT_TYPES.find(t => t.value === objectType);
     return fallback?.fields || [];
   }, [objectType, schema]);
@@ -236,7 +223,6 @@ export default function ReportBuilderPage() {
         
         try {
           const allRecords = await recordsService.getRecords(objectType, { limit: 10 });
-          console.log(`📂 Preview: Loaded ${allRecords.length} records from API for ${objectType}`);
           
           // Strip object prefix from field names when accessing data
           const stripPrefix = (fieldName: string, objectType: string) => {
@@ -262,7 +248,6 @@ export default function ReportBuilderPage() {
       
       // If no real data exists, generate sample data
       if (records.length === 0) {
-        console.log(`⚠️ Preview: No real data found for ${objectType}, generating sample data`);
         for (let i = 0; i < 5; i++) {
           const row: any = {};
           columns.forEach(col => {

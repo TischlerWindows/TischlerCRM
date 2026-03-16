@@ -12,6 +12,7 @@ import {
   Database,
   Settings2,
   ArrowRight,
+  Home,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   }, []);
 
   const cards: OverviewCard[] = [
+    { title: 'Company Settings', icon: Home, href: '/settings/company', description: 'Organization info, address, and locale', color: '#0d9488' },
     { title: 'Users', icon: Users, href: '/settings/users', count: counts.users, description: 'Manage user accounts and access', color: '#151f6d' },
     { title: 'Roles', icon: Shield, href: '/settings/roles', count: counts.roles, description: 'Configure role hierarchy and permissions', color: '#1e2a7a' },
     { title: 'Departments', icon: Building2, href: '/settings/departments', count: counts.departments, description: 'Organize team structure', color: '#2563eb' },

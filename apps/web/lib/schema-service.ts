@@ -429,7 +429,6 @@ class LocalStorageSchemaService implements SchemaService {
         if (contactObj) {
           const nameFieldIndex = contactObj.fields?.findIndex((f: any) => f.apiName === 'Contact__name');
           if (nameFieldIndex === -1) {
-            console.log('[Schema] Adding missing Contact__name field');
             const nameField = {
               id: Math.random().toString(36).substr(2, 9),
               apiName: 'Contact__name',
@@ -449,7 +448,6 @@ class LocalStorageSchemaService implements SchemaService {
             await this.saveSchema(schema);
             return schema;
           } else if (nameFieldIndex >= 0 && contactObj.fields[nameFieldIndex].type !== 'CompositeText') {
-            console.log('[Schema] Fixing Contact__name field - converting to CompositeText');
             contactObj.fields[nameFieldIndex] = {
               ...contactObj.fields[nameFieldIndex],
               type: 'CompositeText',
@@ -490,7 +488,6 @@ class LocalStorageSchemaService implements SchemaService {
         let addedMissingObjects = false;
         for (const defaultObj of defaultSchema.objects) {
           if (!existingApiNames.has(defaultObj.apiName)) {
-            console.log(`[Schema] Adding missing default object: ${defaultObj.apiName}`);
             migratedSchema.objects.push(defaultObj);
             addedMissingObjects = true;
           }
@@ -512,7 +509,6 @@ class LocalStorageSchemaService implements SchemaService {
       if (stored) {
         try {
           const schema = JSON.parse(stored);
-          console.log('[Schema] Migrating localStorage schema to API...');
           // Try to save to API (best-effort)
           try {
             await this.saveSchema(schema);
@@ -847,8 +843,6 @@ class LocalStorageSchemaService implements SchemaService {
       }
 
       // No populated layout — auto-generate one from the object's fields
-      console.log(`[Schema] Auto-generating layout for ${obj.apiName} (no layout has fields)`);
-
       const customFields = obj.fields.filter(
         (f) => !systemFieldApiNames.has(f.apiName) && f.apiName.startsWith(`${obj.apiName}__`) &&
                f.type !== 'AutoNumber' && f.type !== 'Formula' && f.type !== 'RollupSummary'

@@ -37,7 +37,8 @@ export async function reportRoutes(app: FastifyInstance) {
       folderId?: string;
     };
 
-    const userId = req.user?.id || 'default-user-id'; // TODO: Get from auth
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const where: any = {};
 
@@ -117,7 +118,8 @@ export async function reportRoutes(app: FastifyInstance) {
 
   // Create report
   app.post('/reports', async (req, reply) => {
-    const userId = req.user?.id || 'default-user-id'; // TODO: Get from auth
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     try {
       const data = reportSchema.parse(req.body);
@@ -159,7 +161,8 @@ export async function reportRoutes(app: FastifyInstance) {
   // Update report
   app.put('/reports/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const userId = req.user?.id || 'default-user-id'; // TODO: Get from auth
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     try {
       const data = reportSchema.partial().parse(req.body);
@@ -339,7 +342,8 @@ export async function reportRoutes(app: FastifyInstance) {
 
   // Get all folders
   app.get('/reports/folders', async (req, reply) => {
-    const userId = req.user?.id || 'default-user-id';
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const folders = await prisma.reportFolder.findMany({
       include: {
@@ -371,7 +375,8 @@ export async function reportRoutes(app: FastifyInstance) {
 
   // Create folder
   app.post('/reports/folders', async (req, reply) => {
-    const userId = req.user?.id || 'default-user-id';
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { name, description, parentId, isPrivate } = req.body as {
       name: string;
@@ -416,7 +421,8 @@ export async function reportRoutes(app: FastifyInstance) {
   // Update folder
   app.put('/reports/folders/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const userId = req.user?.id || 'default-user-id';
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { name, description, parentId, isPrivate } = req.body as {
       name?: string;

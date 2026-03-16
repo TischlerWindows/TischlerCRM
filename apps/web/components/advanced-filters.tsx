@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { Filter, X, Plus, Save, Trash2, ChevronDown } from 'lucide-react';
@@ -203,7 +203,7 @@ export default function AdvancedFilters({
           />
 
           {/* Panel */}
-          <div className="absolute right-0 top-full mt-2 w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-[600px] overflow-hidden flex flex-col">
+          <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] max-w-[600px] bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-[600px] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Advanced Filters</h3>

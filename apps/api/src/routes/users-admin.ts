@@ -138,7 +138,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'CREATE',
@@ -191,7 +191,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'UPDATE',
@@ -219,7 +219,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const passwordHash = hashPassword(parsed.data.password);
     await prisma.user.update({ where: { id }, data: { passwordHash } });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'RESET_PASSWORD',
@@ -240,7 +240,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     if (!existing) return reply.code(404).send({ error: 'User not found' });
     if (existing.deletedAt) return reply.code(400).send({ error: 'User is already deleted' });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await prisma.user.update({
       where: { id },
       data: { deletedAt: new Date(), deletedById: actorId, isActive: false },
@@ -273,7 +273,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       select: { id: true, isActive: true },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: newActive ? 'UNFREEZE' : 'FREEZE',

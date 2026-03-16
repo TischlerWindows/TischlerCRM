@@ -47,12 +47,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       
       {/* Toast container */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] space-y-2" role="region" aria-live="polite">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-[calc(100vw-2rem)] max-w-xl" role="status" aria-live="polite" aria-atomic="true">
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role="alert"
             className={`
-              flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[420px] max-w-xl
+              flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg w-full
               transition-opacity duration-300
               ${toast.type === 'success' 
                 ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800' 

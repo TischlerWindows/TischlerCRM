@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Toast } from '@/components/ui/toast';
+
 import {
   Table,
   TableBody,
@@ -505,8 +505,6 @@ export default function ObjectManagerPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => {
-                              // Clone object logic would go here
-                              console.log('Clone object:', object.apiName);
                             }}
                           >
                             <Copy className="h-4 w-4 mr-2" />

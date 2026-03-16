@@ -1,13 +1,33 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { z } from 'zod';
+
+const dashboardSchema = z.object({
+  name: z.string().min(1, 'Dashboard name is required'),
+  description: z.string().optional(),
+  isFavorite: z.boolean().optional(),
+  widgets: z.array(z.object({
+    type: z.string(),
+    title: z.string(),
+    dataSource: z.string(),
+    reportId: z.string().optional().nullable(),
+    config: z.record(z.unknown()).optional(),
+    position: z.object({
+      x: z.number(),
+      y: z.number(),
+      w: z.number(),
+      h: z.number(),
+    }).optional(),
+  })).optional().default([]),
+});
 
 export async function dashboardRoutes(app: FastifyInstance) {
   // GET /dashboards - List all dashboards for the current user
   app.get('/dashboards', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user?.id;
+      const userId = request.user?.sub;
       if (!userId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const dashboards = await prisma.dashboard.findMany({
@@ -31,23 +51,21 @@ export async function dashboardRoutes(app: FastifyInstance) {
       return reply.send(dashboards);
     } catch (error) {
       console.error('Error fetching dashboards:', error);
-      return reply.status(500).send({ error: 'Failed to fetch dashboards' });
+      return reply.code(500).send({ error: 'Failed to fetch dashboards' });
     }
   });
 
   // POST /dashboards - Create a new dashboard
   app.post('/dashboards', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user?.id;
+      const userId = request.user?.sub;
       if (!userId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { name, description, widgets = [] } = request.body as any;
-
-      if (!name) {
-        return reply.status(400).send({ error: 'Dashboard name is required' });
-      }
+      const parsed = dashboardSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { name, description, widgets } = parsed.data;
 
       const dashboard = await prisma.dashboard.create({
         data: {
@@ -77,17 +95,17 @@ export async function dashboardRoutes(app: FastifyInstance) {
         },
       });
 
-      return reply.status(201).send(dashboard);
+      return reply.code(201).send(dashboard);
     } catch (error) {
       console.error('Error creating dashboard:', error);
-      return reply.status(500).send({ error: 'Failed to create dashboard' });
+      return reply.code(500).send({ error: 'Failed to create dashboard' });
     }
   });
 
   // GET /dashboards/:id - Get a specific dashboard
   app.get('/dashboards/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user?.id;
+      const userId = request.user?.sub;
       const { id } = request.params as any;
 
       const dashboard = await prisma.dashboard.findUnique({
@@ -103,31 +121,33 @@ export async function dashboardRoutes(app: FastifyInstance) {
       });
 
       if (!dashboard) {
-        return reply.status(404).send({ error: 'Dashboard not found' });
+        return reply.code(404).send({ error: 'Dashboard not found' });
       }
 
       // Check permissions
       if (dashboard.isPrivate && dashboard.createdById !== userId) {
-        return reply.status(403).send({ error: 'Access denied' });
+        return reply.code(403).send({ error: 'Access denied' });
       }
 
       return reply.send(dashboard);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
-      return reply.status(500).send({ error: 'Failed to fetch dashboard' });
+      return reply.code(500).send({ error: 'Failed to fetch dashboard' });
     }
   });
 
   // PUT /dashboards/:id - Update a dashboard
   app.put('/dashboards/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user?.id;
+      const userId = request.user?.sub;
       if (!userId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const { id } = request.params as any;
-      const { name, description, isFavorite, widgets = [] } = request.body as any;
+      const parsed = dashboardSchema.partial().safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+      const { name, description, isFavorite, widgets = [] } = parsed.data;
 
       // Check ownership
       const dashboard = await prisma.dashboard.findUnique({
@@ -136,7 +156,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
       });
 
       if (!dashboard || dashboard.createdById !== userId) {
-        return reply.status(403).send({ error: 'Access denied' });
+        return reply.code(403).send({ error: 'Access denied' });
       }
 
       // Delete existing widgets and create new ones
@@ -173,16 +193,16 @@ export async function dashboardRoutes(app: FastifyInstance) {
       return reply.send(updated);
     } catch (error) {
       console.error('Error updating dashboard:', error);
-      return reply.status(500).send({ error: 'Failed to update dashboard' });
+      return reply.code(500).send({ error: 'Failed to update dashboard' });
     }
   });
 
   // DELETE /dashboards/:id - Delete a dashboard
   app.delete('/dashboards/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user?.id;
+      const userId = request.user?.sub;
       if (!userId) {
-        return reply.status(401).send({ error: 'Unauthorized' });
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const { id } = request.params as any;
@@ -194,17 +214,17 @@ export async function dashboardRoutes(app: FastifyInstance) {
       });
 
       if (!dashboard || dashboard.createdById !== userId) {
-        return reply.status(403).send({ error: 'Access denied' });
+        return reply.code(403).send({ error: 'Access denied' });
       }
 
       await prisma.dashboard.delete({
         where: { id },
       });
 
-      return reply.status(204).send();
+      return reply.code(204).send();
     } catch (error) {
       console.error('Error deleting dashboard:', error);
-      return reply.status(500).send({ error: 'Failed to delete dashboard' });
+      return reply.code(500).send({ error: 'Failed to delete dashboard' });
     }
   });
 
@@ -213,9 +233,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
     '/dashboards/:id/widgets',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request as any).user?.id;
+        const userId = request.user?.sub;
         if (!userId) {
-          return reply.status(401).send({ error: 'Unauthorized' });
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const { id } = request.params as any;
@@ -227,11 +247,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!dashboard) {
-          return reply.status(404).send({ error: 'Dashboard not found' });
+          return reply.code(404).send({ error: 'Dashboard not found' });
         }
 
         if (dashboard.isPrivate && dashboard.createdById !== userId) {
-          return reply.status(403).send({ error: 'Access denied' });
+          return reply.code(403).send({ error: 'Access denied' });
         }
 
         const widgets = await prisma.dashboardWidget.findMany({
@@ -242,7 +262,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         return reply.send(widgets);
       } catch (error) {
         console.error('Error fetching widgets:', error);
-        return reply.status(500).send({ error: 'Failed to fetch widgets' });
+        return reply.code(500).send({ error: 'Failed to fetch widgets' });
       }
     }
   );
@@ -252,20 +272,23 @@ export async function dashboardRoutes(app: FastifyInstance) {
     '/dashboards/:id/widgets',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request as any).user?.id;
+        const userId = request.user?.sub;
         if (!userId) {
-          return reply.status(401).send({ error: 'Unauthorized' });
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const { id } = request.params as any;
-        const { type, title, dataSource, reportId, config, position } =
-          request.body as any;
-
-        if (!type || !title || !dataSource) {
-          return reply.status(400).send({
-            error: 'type, title, and dataSource are required',
-          });
-        }
+        const widgetSchema = z.object({
+          type: z.string().min(1),
+          title: z.string().min(1),
+          dataSource: z.string().min(1),
+          reportId: z.string().optional().nullable(),
+          config: z.record(z.unknown()).optional(),
+          position: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).optional(),
+        });
+        const parsed = widgetSchema.safeParse(request.body);
+        if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+        const { type, title, dataSource, reportId, config, position } = parsed.data;
 
         // Verify dashboard exists and user owns it
         const dashboard = await prisma.dashboard.findUnique({
@@ -274,7 +297,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!dashboard || dashboard.createdById !== userId) {
-          return reply.status(403).send({ error: 'Access denied' });
+          return reply.code(403).send({ error: 'Access denied' });
         }
 
         const widget = await prisma.dashboardWidget.create({
@@ -292,10 +315,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
           },
         });
 
-        return reply.status(201).send(widget);
+        return reply.code(201).send(widget);
       } catch (error) {
         console.error('Error creating widget:', error);
-        return reply.status(500).send({ error: 'Failed to create widget' });
+        return reply.code(500).send({ error: 'Failed to create widget' });
       }
     }
   );
@@ -305,9 +328,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
     '/dashboards/:id/widgets/:widgetId',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request as any).user?.id;
+        const userId = request.user?.sub;
         if (!userId) {
-          return reply.status(401).send({ error: 'Unauthorized' });
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const { id, widgetId } = request.params as any;
@@ -321,7 +344,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!dashboard || dashboard.createdById !== userId) {
-          return reply.status(403).send({ error: 'Access denied' });
+          return reply.code(403).send({ error: 'Access denied' });
         }
 
         // Verify widget exists in this dashboard
@@ -330,7 +353,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!widget) {
-          return reply.status(404).send({ error: 'Widget not found' });
+          return reply.code(404).send({ error: 'Widget not found' });
         }
 
         const updated = await prisma.dashboardWidget.update({
@@ -353,7 +376,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         return reply.send(updated);
       } catch (error) {
         console.error('Error updating widget:', error);
-        return reply.status(500).send({ error: 'Failed to update widget' });
+        return reply.code(500).send({ error: 'Failed to update widget' });
       }
     }
   );
@@ -363,9 +386,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
     '/dashboards/:id/widgets/:widgetId',
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request as any).user?.id;
+        const userId = request.user?.sub;
         if (!userId) {
-          return reply.status(401).send({ error: 'Unauthorized' });
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const { id, widgetId } = request.params as any;
@@ -377,7 +400,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!dashboard || dashboard.createdById !== userId) {
-          return reply.status(403).send({ error: 'Access denied' });
+          return reply.code(403).send({ error: 'Access denied' });
         }
 
         // Verify widget exists in this dashboard
@@ -386,17 +409,17 @@ export async function dashboardRoutes(app: FastifyInstance) {
         });
 
         if (!widget) {
-          return reply.status(404).send({ error: 'Widget not found' });
+          return reply.code(404).send({ error: 'Widget not found' });
         }
 
         await prisma.dashboardWidget.delete({
           where: { id: widgetId },
         });
 
-        return reply.status(204).send();
+        return reply.code(204).send();
       } catch (error) {
         console.error('Error deleting widget:', error);
-        return reply.status(500).send({ error: 'Failed to delete widget' });
+        return reply.code(500).send({ error: 'Failed to delete widget' });
       }
     }
   );

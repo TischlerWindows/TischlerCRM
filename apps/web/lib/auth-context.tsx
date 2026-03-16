@@ -29,9 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check if token exists in cookies
     try {
-      console.log('AuthProvider: Reading cookies...');
       const allCookies = document.cookie;
-      console.log('All cookies:', allCookies);
 
       let tokenFromCookie: string | undefined;
       if (allCookies) {
@@ -46,11 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const userFromSession = sessionStorage.getItem('user');
-      
-      console.log('AuthProvider: Initialized', {
-        hasTokenCookie: !!tokenFromCookie,
-        hasUserSession: !!userFromSession,
-      });
       
       if (tokenFromCookie && userFromSession) {
         setToken(tokenFromCookie);
@@ -73,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = () => {
-    console.log('AuthProvider: Logging out');
     sessionStorage.removeItem('user');
     // Clear auth cookie
     document.cookie = 'auth-token=; Max-Age=0; path=/;';
@@ -84,7 +76,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const setAuth = (newToken: string, newUser: User) => {
-    console.log('AuthProvider: setAuth called with', { token: newToken, user: newUser });
     setToken(newToken);
     setUser(newUser);
     // Sync token to API client

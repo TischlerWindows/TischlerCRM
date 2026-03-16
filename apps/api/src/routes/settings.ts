@@ -37,12 +37,14 @@ export async function settingRoutes(app: FastifyInstance) {
   app.put('/settings/:key', async (req, reply) => {
     try {
       const { key } = req.params as { key: string };
-      const body = req.body as any;
+      const schema = z.object({ value: z.unknown() });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'Request body must include a "value" field' });
 
       const setting = await prisma.setting.upsert({
         where: { key },
-        create: { key, value: body.value },
-        update: { value: body.value },
+        create: { key, value: parsed.data.value as any },
+        update: { value: parsed.data.value as any },
       });
 
       reply.send({ key: setting.key, value: setting.value });

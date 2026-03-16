@@ -96,7 +96,7 @@ export async function backupRoutes(app: FastifyInstance) {
 
   // Create a new backup
   app.post('/admin/backup', async (req, reply) => {
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     try {
       await ensureBackupTable();

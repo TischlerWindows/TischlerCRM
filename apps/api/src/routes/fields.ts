@@ -63,7 +63,7 @@ export async function fieldRoutes(app: FastifyInstance) {
       return reply.code(400).send(parsed.error.flatten());
     }
 
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -112,7 +112,7 @@ export async function fieldRoutes(app: FastifyInstance) {
       return reply.code(400).send(parsed.error.flatten());
     }
 
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },
@@ -150,7 +150,7 @@ export async function fieldRoutes(app: FastifyInstance) {
   // Delete field (soft delete)
   app.delete('/objects/:apiName/fields/:fieldApiName', async (req, reply) => {
     const { apiName, fieldApiName } = req.params as { apiName: string; fieldApiName: string };
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     const object = await prisma.customObject.findFirst({
       where: { apiName: { equals: apiName, mode: 'insensitive' } },

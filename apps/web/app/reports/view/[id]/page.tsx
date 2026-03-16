@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -75,26 +75,17 @@ export default function ReportViewerPage() {
     
     setReport(reportConfig);
     
-    console.log('🔍 Report config:', reportConfig);
-    console.log('🔍 Looking for objectType:', reportConfig.objectType);
-    console.log('🔍 Report fields:', reportConfig.fields);
-    
     // Load data from records service
     let records: any[] = [];
     
     try {
       records = await recordsService.getRecords(reportConfig.objectType);
-      console.log(`📂 Loaded ${records.length} records from API for ${reportConfig.objectType}`);
-      if (records.length > 0) {
-        console.log('📋 First record sample:', records[0]);
-      }
     } catch (e) {
       console.error('Error loading records from API:', e);
     }
     
     // Generate mock data if no real data exists
     if (records.length === 0) {
-      console.log(`⚠️ No data found for ${reportConfig.objectType}, generating mock data`);
       records = generateMockData(reportConfig.objectType, reportConfig.fields);
     }
     
@@ -107,22 +98,15 @@ export default function ReportViewerPage() {
       return fieldName;
     };
     
-    console.log('🔧 Mapping records to clean field names...');
-    
     // Map records to use clean field names
-    records = records.map((record, idx) => {
+    records = records.map((record) => {
       const cleanRecord: any = {};
       reportConfig.fields.forEach(field => {
         const cleanField = stripPrefix(field, reportConfig.objectType);
-        cleanRecord[field] = record[cleanField] || record[field]; // Try clean name first, fallback to original
-        if (idx === 0) {
-          console.log(`  ${field} -> looking for '${cleanField}' in record, found:`, record[cleanField] || record[field]);
-        }
+        cleanRecord[field] = record[cleanField] || record[field];
       });
       return cleanRecord;
     });
-    
-    console.log('✅ Mapped records, first record:', records[0]);
     
     // Apply filters
     records = applyFilters(records, reportConfig.filters);

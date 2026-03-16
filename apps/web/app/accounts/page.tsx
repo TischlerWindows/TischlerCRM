@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -113,6 +113,7 @@ export default function AccountsPage() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -187,12 +188,6 @@ export default function AccountsPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Account Object:', accountObject);
-    console.log('📋 Page Layouts:', pageLayouts);
-    console.log('✅ Has Page Layout:', hasPageLayout);
-  }, [accountObject, pageLayouts, hasPageLayout]);
 
   // Load saved tab configuration and custom objects from API
   useEffect(() => {
@@ -223,6 +218,7 @@ export default function AccountsPage() {
   const fetchAccounts = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const records = await recordsService.getRecords('Account');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
@@ -235,6 +231,7 @@ export default function AccountsPage() {
       setAccounts(flattenedRecords as Account[]);
     } catch (error) {
       console.error('Failed to fetch accounts from API:', error);
+      setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -439,8 +436,6 @@ export default function AccountsPage() {
   };
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
-    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
-    
     const normalizeFieldName = (fieldName: string): string => {
       return fieldName.replace('Account__', '');
     };
@@ -687,6 +682,15 @@ export default function AccountsPage() {
           </div>
         </div>
 
+        {fetchError && (
+          <div className="mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              <span className="text-sm">{fetchError}</span>
+            </div>
+            <button onClick={() => { setFetchError(null); window.location.reload(); }} className="text-sm text-red-600 hover:text-red-800 font-medium">Retry</button>
+          </div>
+        )}
         {/* Accounts List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">

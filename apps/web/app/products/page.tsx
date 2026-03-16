@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -104,6 +104,7 @@ export default function ProductsPage() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -178,12 +179,6 @@ export default function ProductsPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Product Object:', productObject);
-    console.log('📋 Page Layouts:', pageLayouts);
-    console.log('✅ Has Page Layout:', hasPageLayout);
-  }, [productObject, pageLayouts, hasPageLayout]);
 
   // Load saved tab configuration
   useEffect(() => {
@@ -210,6 +205,7 @@ export default function ProductsPage() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const records = await recordsService.getRecords('Product');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
@@ -222,6 +218,7 @@ export default function ProductsPage() {
       setProducts(flattenedRecords as Product[]);
     } catch (error) {
       console.error('Failed to fetch products from API:', error);
+      setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -438,22 +435,15 @@ export default function ProductsPage() {
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {
-      console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
-      
-      // Map schema field names (e.g., Product__productName) to simple property names
       const normalizeFieldName = (fieldName: string): string => {
         return fieldName.replace('Product__', '');
       };
 
-      // Create normalized data object with simple field names
       const normalizedData: Record<string, any> = {};
       Object.entries(data).forEach(([key, value]) => {
         const cleanKey = normalizeFieldName(key);
         normalizedData[cleanKey] = value;
-        console.log(`  ${key} -> ${cleanKey}:`, value);
       });
-      
-      console.log('📝 Normalized data:', normalizedData);
       
       const existingNumbers = products
         .map(p => p.productCode)
@@ -486,18 +476,12 @@ export default function ProductsPage() {
         ...normalizedData,
       };
       
-      console.log('💾 New product object:', newProduct);
-
       const updatedProducts = [newProduct, ...products];
       setProducts(updatedProducts);
-      
-      console.log('✅ New product saved:', newProduct);
-      console.log('📍 Redirecting to:', `/products/${result.id}`);
       
       setShowDynamicForm(false);
       
       setTimeout(() => {
-        console.log('🔄 Pushing route to:', `/products/${result.id}`);
         router.push(`/products/${result.id}`);
       }, 200);
     } catch (error) {
@@ -713,6 +697,15 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        {fetchError && (
+          <div className="mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              <span className="text-sm">{fetchError}</span>
+            </div>
+            <button onClick={() => { setFetchError(null); window.location.reload(); }} className="text-sm text-red-600 hover:text-red-800 font-medium">Retry</button>
+          </div>
+        )}
         {/* Products List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">

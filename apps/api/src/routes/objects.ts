@@ -106,7 +106,7 @@ export async function objectRoutes(app: FastifyInstance) {
       return reply.code(400).send(parsed.error.flatten());
     }
 
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     const object = await prisma.customObject.create({
       data: {
@@ -151,7 +151,7 @@ export async function objectRoutes(app: FastifyInstance) {
       return reply.code(400).send(parsed.error.flatten());
     }
 
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     const object = await prisma.customObject.update({
       where: { apiName },
@@ -171,7 +171,7 @@ export async function objectRoutes(app: FastifyInstance) {
   // Delete object (soft delete)
   app.delete('/objects/:apiName', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const userId = (req as any).user.sub;
+    const userId = req.user!.sub;
 
     await prisma.customObject.update({
       where: { apiName },

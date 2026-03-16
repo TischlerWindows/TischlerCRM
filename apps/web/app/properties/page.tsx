@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -112,6 +112,7 @@ export default function PropertiesPage() {
   const { user } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
@@ -201,12 +202,6 @@ export default function PropertiesPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('🔍 Property Object:', propertyObject);
-    console.log('📋 Page Layouts:', pageLayouts);
-    console.log('✅ Has Page Layout:', hasPageLayout);
-  }, [propertyObject, pageLayouts, hasPageLayout]);
 
   // Load saved tab configuration
   useEffect(() => {
@@ -237,6 +232,7 @@ export default function PropertiesPage() {
   const fetchProperties = useCallback(async () => {
     try {
       setLoading(true);
+      setFetchError(null);
       const records = await recordsService.getRecords('Property');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
@@ -249,6 +245,7 @@ export default function PropertiesPage() {
       setProperties(flattenedRecords as Property[]);
     } catch (error) {
       console.error('Failed to fetch properties from API:', error);
+      setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
     }
@@ -453,23 +450,16 @@ export default function PropertiesPage() {
 
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
-    console.log('🔍 handleDynamicFormSubmit called with:', data, 'layoutId:', layoutId);
-    
-    // Map schema field names (e.g., Property__city) to simple property names
     const normalizeFieldName = (fieldName: string): string => {
       return fieldName.replace('Property__', '');
     };
 
-    // Create normalized data object with simple field names
     const normalizedData: Record<string, any> = {};
     Object.entries(data).forEach(([key, value]) => {
       const cleanKey = normalizeFieldName(key);
       normalizedData[cleanKey] = value;
-      console.log(`  ${key} -> ${cleanKey}:`, value);
     });
     
-    console.log('📝 Normalized data:', normalizedData);
-    console.log('📍 Address field value:', normalizedData.address, 'Type:', typeof normalizedData.address);
     const existingNumbers = properties
       .map(p => p.propertyNumber)
       .filter(num => num.startsWith('P-'))
@@ -495,7 +485,6 @@ export default function PropertiesPage() {
     try {
       // Create record via API
       const createdRecord = await recordsService.createRecord('Property', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
-      console.log('✅ Record created via API:', createdRecord);
       
       if (!createdRecord) {
         throw new Error('Failed to create record - null response');
@@ -723,6 +712,15 @@ export default function PropertiesPage() {
           </div>
         </div>
 
+        {fetchError && (
+          <div className="mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2 text-red-700">
+              <svg className="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" /></svg>
+              <span className="text-sm">{fetchError}</span>
+            </div>
+            <button onClick={() => { setFetchError(null); window.location.reload(); }} className="text-sm text-red-600 hover:text-red-800 font-medium">Retry</button>
+          </div>
+        )}
         {/* Properties List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">

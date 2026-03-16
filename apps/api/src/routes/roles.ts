@@ -72,7 +72,7 @@ export async function rolesRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'CREATE',
@@ -114,7 +114,7 @@ export async function rolesRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'UPDATE',
@@ -147,7 +147,7 @@ export async function rolesRoutes(app: FastifyInstance) {
 
     await prisma.role.delete({ where: { id } });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'DELETE',

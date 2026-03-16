@@ -77,9 +77,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      console.log('[Permissions] Fetching /me/permissions...');
       const data = await apiClient.get<PermissionsData>('/me/permissions');
-      console.log('[Permissions] Loaded:', data?.role, 'objects:', Object.keys(data?.objectPermissions || {}));
       setPermissions(data);
     } catch (err) {
       console.error('[Permissions] Failed to load:', err);
@@ -87,7 +85,6 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       try {
         await new Promise(r => setTimeout(r, 1000));
         const data = await apiClient.get<PermissionsData>('/me/permissions');
-        console.log('[Permissions] Retry succeeded:', data?.role);
         setPermissions(data);
       } catch (retryErr) {
         console.error('[Permissions] Retry also failed:', retryErr);

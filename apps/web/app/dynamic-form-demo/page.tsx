@@ -13,8 +13,15 @@ export default function DynamicFormDemo() {
   const [submittedData, setSubmittedData] = useState<Record<string, any> | null>(null);
   const { schema } = useSchemaStore();
 
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-500">This page is only available in development mode.</p>
+      </div>
+    );
+  }
+
   const handleSubmit = (data: Record<string, any>) => {
-    console.log('Form submitted:', data);
     setSubmittedData(data);
   };
 

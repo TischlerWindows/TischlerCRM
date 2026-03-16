@@ -50,7 +50,7 @@ export async function recycleBinRoutes(app: FastifyInstance) {
       select: { id: true, name: true, email: true, isActive: true },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'RESTORE',
@@ -77,7 +77,7 @@ export async function recycleBinRoutes(app: FastifyInstance) {
       select: { id: true, name: true },
     });
 
-    const actorId = (req as any).user.sub;
+    const actorId = req.user!.sub;
     await logAudit({
       actorId,
       action: 'RESTORE',

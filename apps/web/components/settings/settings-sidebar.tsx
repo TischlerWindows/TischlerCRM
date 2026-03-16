@@ -18,6 +18,7 @@ import {
   Bell,
   WifiOff,
   Zap,
+  Plug,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -52,7 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Settings',
     items: [
-      { name: 'Company Settings', href: '/settings/company', icon: Home, disabled: true },
+      { name: 'Company Settings', href: '/settings/company', icon: Home },
       { name: 'Security', href: '/settings/security', icon: Lock },
       { name: 'Privacy Center', href: '/settings/privacy', icon: ShieldAlert, disabled: true },
     ],
@@ -60,6 +61,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Integrations',
     items: [
+      { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell, disabled: true },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
     ],

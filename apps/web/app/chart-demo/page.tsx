@@ -187,9 +187,16 @@ const sampleRecords = [
 ];
 
 export default function ChartDemoPage() {
+  if (process.env.NODE_ENV === 'production') {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-gray-500">This page is only available in development mode.</p>
+      </div>
+    );
+  }
+
   const handleSave = (config: any) => {
-    console.log('Chart configuration saved:', config);
-    alert('Configuration saved! Check console for details.');
+    alert('Configuration saved!');
   };
 
   return (

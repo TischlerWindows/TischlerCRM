@@ -17,21 +17,11 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    console.log('ProtectedRoute: Effect running', {
-      pathname,
-      isAuthenticated,
-      loading,
-      isPublic: isPublicRoute(pathname),
-    });
-
     if (loading) {
-      // Still loading auth state, don't do anything yet
       return;
     }
 
-    // If not authenticated and not a public route, redirect to login
     if (!isAuthenticated && !isPublicRoute(pathname)) {
-      console.log('ProtectedRoute: Redirecting to login');
       router.push('/login');
     }
   }, [isAuthenticated, loading, pathname, router]);
