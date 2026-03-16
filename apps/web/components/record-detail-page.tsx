@@ -160,6 +160,9 @@ export default function RecordDetailPage({
       if (objField?.relationshipName) {
         def.relationshipName = objField.relationshipName;
       }
+      if (objField?.targetFields) {
+        def.targetFields = objField.targetFields;
+      }
       return def;
     }
     // Fallback: cross-reference object fields
