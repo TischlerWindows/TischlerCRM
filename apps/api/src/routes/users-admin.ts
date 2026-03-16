@@ -37,6 +37,12 @@ const listQuerySchema = z.object({ includeDeleted: z.enum(['true', 'false']).opt
 
 const roleSelect = { select: { id: true, name: true, label: true } };
 
+async function resolveSystemRole(roleId: string | null | undefined): Promise<'ADMIN' | 'USER'> {
+  if (!roleId) return 'USER';
+  const orgRole = await prisma.role.findUnique({ where: { id: roleId }, select: { name: true } });
+  return orgRole?.name === 'system_administrator' ? 'ADMIN' : 'USER';
+}
+
 export async function usersAdminRoutes(app: FastifyInstance) {
   app.get('/admin/users', async (req, reply) => {
     const qParsed = listQuerySchema.safeParse(req.query);
@@ -104,12 +110,13 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: 'Email already registered' });
     const passwordHash = hashPassword(parsed.data.password);
+    const systemRole = await resolveSystemRole(parsed.data.roleId);
     const user = await prisma.user.create({
       data: {
         email: parsed.data.email,
         name: parsed.data.name,
         passwordHash,
-        role: 'USER',
+        role: systemRole,
         roleId: parsed.data.roleId,
         departmentId: parsed.data.departmentId,
         managerId: parsed.data.managerId,
@@ -163,9 +170,15 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       }
     }
 
+    // Keep system role in sync with org role assignment
+    const roleUpdate: { role?: 'ADMIN' | 'USER' } = {};
+    if (parsed.data.roleId !== undefined) {
+      roleUpdate.role = await resolveSystemRole(parsed.data.roleId);
+    }
+
     const user = await prisma.user.update({
       where: { id },
-      data: parsed.data,
+      data: { ...parsed.data, ...roleUpdate },
       select: {
         id: true,
         email: true,

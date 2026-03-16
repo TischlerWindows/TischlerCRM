@@ -2309,6 +2309,11 @@ var updateUserSchema = z7.object({
 var uuidParam2 = z7.object({ id: z7.string().uuid() });
 var listQuerySchema = z7.object({ includeDeleted: z7.enum(["true", "false"]).optional() });
 var roleSelect = { select: { id: true, name: true, label: true } };
+async function resolveSystemRole(roleId) {
+  if (!roleId) return "USER";
+  const orgRole = await prisma13.role.findUnique({ where: { id: roleId }, select: { name: true } });
+  return orgRole?.name === "system_administrator" ? "ADMIN" : "USER";
+}
 async function usersAdminRoutes(app2) {
   app2.get("/admin/users", async (req, reply) => {
     const qParsed = listQuerySchema.safeParse(req.query);
@@ -2373,12 +2378,13 @@ async function usersAdminRoutes(app2) {
     const existing = await prisma13.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     const passwordHash = hashPassword(parsed.data.password);
+    const systemRole = await resolveSystemRole(parsed.data.roleId);
     const user = await prisma13.user.create({
       data: {
         email: parsed.data.email,
         name: parsed.data.name,
         passwordHash,
-        role: "USER",
+        role: systemRole,
         roleId: parsed.data.roleId,
         departmentId: parsed.data.departmentId,
         managerId: parsed.data.managerId,
@@ -2427,9 +2433,13 @@ async function usersAdminRoutes(app2) {
         after[key] = value;
       }
     }
+    const roleUpdate = {};
+    if (parsed.data.roleId !== void 0) {
+      roleUpdate.role = await resolveSystemRole(parsed.data.roleId);
+    }
     const user = await prisma13.user.update({
       where: { id },
-      data: parsed.data,
+      data: { ...parsed.data, ...roleUpdate },
       select: {
         id: true,
         email: true,
