@@ -146,6 +146,66 @@ export async function placesRoutes(app: FastifyInstance) {
     }
   });
 
+  // GET /places/static-map?lat=...&lng=...&zoom=...&size=...&token=...
+  // Accepts auth token via query param so <img> tags can load the image directly.
+  app.get('/places/static-map', async (req, reply) => {
+    const query = req.query as Record<string, string>;
+    const user = req.user ?? (() => {
+      if (query.token) {
+        const { loadEnv } = require('../config');
+        const { verifyJwt } = require('../auth');
+        const env = loadEnv();
+        return verifyJwt(query.token, env.JWT_SECRET) || null;
+      }
+      return null;
+    })();
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const querySchema = z.object({
+      lat: z.string().min(1),
+      lng: z.string().min(1),
+      zoom: z.string().optional(),
+      size: z.string().optional(),
+      token: z.string().optional(),
+    });
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+
+    const apiKey = await getGoogleMapsKey();
+    if (!apiKey) {
+      return reply.code(400).send({ error: 'Google Maps integration is not configured or disabled.' });
+    }
+
+    const { lat, lng, zoom = '15', size = '600x300' } = parsed.data;
+    const params = new URLSearchParams({
+      center: `${lat},${lng}`,
+      zoom,
+      size,
+      maptype: 'roadmap',
+      markers: `color:red|${lat},${lng}`,
+      key: apiKey,
+    });
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/staticmap?${params}`;
+      const res = await fetch(url);
+
+      if (!res.ok) {
+        app.log.warn({ status: res.status }, 'Static Maps API returned non-OK status');
+        return reply.code(502).send({ error: 'Google Static Maps API error' });
+      }
+
+      const buffer = Buffer.from(await res.arrayBuffer());
+      reply
+        .header('Content-Type', res.headers.get('content-type') || 'image/png')
+        .header('Cache-Control', 'public, max-age=86400')
+        .send(buffer);
+    } catch (err: any) {
+      app.log.error(err, 'Static Maps proxy failed');
+      reply.code(502).send({ error: 'Failed to reach Google Static Maps API' });
+    }
+  });
+
   // GET /places/details?placeId=...&sessionToken=...
   app.get('/places/details', async (req, reply) => {
     const user = req.user;
