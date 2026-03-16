@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   Shield,
   Plus,
   ChevronRight,
@@ -15,6 +13,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { SettingsContentCard } from '@/components/settings/settings-content-card';
 
 interface Role {
   id: string;
@@ -90,7 +90,7 @@ export default function RolesPage() {
     });
   };
 
-  const openCreate = () => {
+  const resetForm = () => {
     setEditingRole(null);
     setFormName('');
     setFormLabel('');
@@ -100,6 +100,10 @@ export default function RolesPage() {
     setFormObjPerms({});
     setFormAppPerms({});
     setActiveTab('objects');
+  };
+
+  const openCreate = () => {
+    resetForm();
     setShowModal(true);
   };
 
@@ -183,100 +187,90 @@ export default function RolesPage() {
   const sortedLevels = Object.keys(rolesByLevel).map(Number).sort((a, b) => a - b);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/settings" className="p-1 hover:bg-gray-100 rounded transition-colors">
-              <ArrowLeft className="w-5 h-5 text-gray-500" />
-            </Link>
-            <Shield className="w-6 h-6 text-brand-navy" />
-            <h1 className="text-2xl font-bold text-gray-900">Roles</h1>
-          </div>
-          <p className="text-sm text-gray-600 ml-10">Define organizational hierarchy, permissions, and UI visibility</p>
-        </div>
-      </div>
+    <>
+      <SettingsPageHeader
+        icon={Shield}
+        title="Roles"
+        subtitle="Configure role hierarchy and permissions"
+        action={{
+          label: 'New Role',
+          icon: Plus,
+          onClick: () => { resetForm(); setShowModal(true); },
+        }}
+      />
 
       {error && (
-        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
+        <div className="mx-8 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
           {error}
           <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
-        <div className="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center justify-between">
+        <div className="mx-8 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex items-center justify-between">
           {success}
           <button onClick={() => setSuccess(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      <div className="px-6 py-4 flex justify-end">
-        <button onClick={openCreate} className="px-4 py-2 bg-brand-navy text-white text-sm font-medium rounded-lg hover:bg-brand-navy/90 transition-colors flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Role
-        </button>
-      </div>
-
-      <div className="px-6 pb-8">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center text-gray-500">Loading roles...</div>
-          ) : roles.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">No roles defined</div>
-          ) : (
-            <div>
-              {sortedLevels.map(level => (
-                <div key={level}>
-                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-200">
-                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Level {level}</span>
-                  </div>
-                  {rolesByLevel[level].map(role => (
-                    <div key={role.id} className="border-b border-gray-100 last:border-b-0">
-                      <div className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors">
-                        <button onClick={() => toggleExpanded(role.id)} className="p-1 mr-2">
-                          {expandedRoles.has(role.id) ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{role.label}</span>
-                            {role.isSystem && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-navy/10 text-brand-navy">
-                                <Lock className="w-2.5 h-2.5" /> System
-                              </span>
-                            )}
-                          </div>
-                          {role.description && <div className="text-xs text-gray-500 mt-0.5">{role.description}</div>}
-                        </div>
-                        <div className="flex items-center gap-4 ml-4">
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <Users className="w-3.5 h-3.5" /> {role._count.users}
-                          </span>
-                          <button onClick={() => openEdit(role)} className="p-1.5 text-gray-400 hover:text-brand-navy hover:bg-brand-navy/10 rounded transition-colors">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                          {!role.isSystem && (
-                            <button onClick={() => handleDelete(role)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      {expandedRoles.has(role.id) && (
-                        <div className="px-12 pb-3 text-xs text-gray-500 space-y-1">
-                          <div><span className="font-medium">Name:</span> {role.name}</div>
-                          {role.parent && <div><span className="font-medium">Parent:</span> {role.parent.label}</div>}
-                          {role.children.length > 0 && (
-                            <div><span className="font-medium">Children:</span> {role.children.map(c => c.label).join(', ')}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+      <SettingsContentCard>
+        {loading ? (
+          <div className="p-12 text-center text-gray-500">Loading roles...</div>
+        ) : roles.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">No roles defined</div>
+        ) : (
+          <div>
+            {sortedLevels.map(level => (
+              <div key={level}>
+                <div className="px-4 py-2 bg-[#fafafa] border-b border-gray-200">
+                  <span className="text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Level {level}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+                {rolesByLevel[level].map(role => (
+                  <div key={role.id} className="border-b border-gray-100 last:border-b-0">
+                    <div className="flex items-center px-4 py-3 hover:bg-gray-50 transition-colors">
+                      <button onClick={() => toggleExpanded(role.id)} className="p-1 mr-2">
+                        {expandedRoles.has(role.id) ? <ChevronDown className="w-4 h-4 text-gray-400" /> : <ChevronRight className="w-4 h-4 text-gray-400" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900">{role.label}</span>
+                          {role.isSystem && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-brand-navy/10 text-brand-navy">
+                              <Lock className="w-2.5 h-2.5" /> System
+                            </span>
+                          )}
+                        </div>
+                        {role.description && <div className="text-xs text-gray-500 mt-0.5">{role.description}</div>}
+                      </div>
+                      <div className="flex items-center gap-4 ml-4">
+                        <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                          <Users className="w-3.5 h-3.5" /> {role._count.users}
+                        </span>
+                        <button onClick={() => openEdit(role)} className="p-1.5 text-gray-400 hover:text-brand-navy hover:bg-brand-navy/10 rounded transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {!role.isSystem && (
+                          <button onClick={() => handleDelete(role)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {expandedRoles.has(role.id) && (
+                      <div className="px-12 pb-3 text-xs text-gray-500 space-y-1">
+                        <div><span className="font-medium">Name:</span> {role.name}</div>
+                        {role.parent && <div><span className="font-medium">Parent:</span> {role.parent.label}</div>}
+                        {role.children.length > 0 && (
+                          <div><span className="font-medium">Children:</span> {role.children.map(c => c.label).join(', ')}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </SettingsContentCard>
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={() => setShowModal(false)}>
@@ -384,6 +378,6 @@ export default function RolesPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   Building2,
   Plus,
   Trash2,
@@ -18,6 +16,8 @@ import {
 import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting } from '@/lib/preferences';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { SettingsContentCard } from '@/components/settings/settings-content-card';
 
 // ── Types ──────────────────────────────────────────────────────────
 interface ObjectPerms {
@@ -291,59 +291,42 @@ export default function DepartmentsPage() {
   const isModalOpen = showCreate || showEdit;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/settings" className="p-1 hover:bg-gray-100 rounded">
-              <ArrowLeft className="w-5 h-5 text-gray-500" />
-            </Link>
-            <Building2 className="w-6 h-6 text-brand-navy" />
-            <h1 className="text-2xl font-bold text-gray-900">Departments</h1>
-          </div>
-          <p className="text-sm text-gray-600 ml-10">
-            Manage departments and their permissions — each department controls what its members can access
-          </p>
-        </div>
-      </div>
+    <>
+      <SettingsPageHeader
+        icon={Building2}
+        title="Departments"
+        subtitle="Organize team structure and permissions"
+        action={{
+          label: 'New Department',
+          icon: Plus,
+          onClick: () => { resetForm(); setShowCreate(true); },
+        }}
+      />
 
       {/* Alerts */}
       {error && (
-        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex justify-between">
+        <div className="mx-8 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex justify-between">
           {error}
           <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
       {success && (
-        <div className="mx-6 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex justify-between">
+        <div className="mx-8 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm flex justify-between">
           {success}
           <button onClick={() => setSuccess(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="px-6 py-4 flex justify-end">
-        <button
-          onClick={() => { resetForm(); setShowCreate(true); }}
-          className="px-4 py-2 bg-brand-navy text-white text-sm font-medium rounded-lg hover:bg-brand-navy/90 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" /> New Department
-        </button>
-      </div>
-
       {/* Department tree */}
-      <div className="px-6 pb-8">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center text-gray-500">Loading...</div>
-          ) : departments.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">No departments yet</div>
-          ) : (
-            rootDepts.map((d) => renderDept(d))
-          )}
-        </div>
-      </div>
+      <SettingsContentCard>
+        {loading ? (
+          <div className="p-12 text-center text-gray-500">Loading...</div>
+        ) : departments.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">No departments yet</div>
+        ) : (
+          rootDepts.map((d) => renderDept(d))
+        )}
+      </SettingsContentCard>
 
       {/* ── Create / Edit Modal ────────────────────────────────────── */}
       {isModalOpen && (
@@ -483,10 +466,10 @@ export default function DepartmentsPage() {
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="text-left px-3 py-2 font-medium text-gray-700 w-32">Object</th>
+                        <tr className="bg-[#fafafa] border-b border-gray-200">
+                          <th className="text-left px-3 py-2 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em] w-32">Object</th>
                           {PERM_KEYS.map((k) => (
-                            <th key={k} className="text-center px-2 py-2 font-medium text-gray-700 text-xs uppercase">
+                            <th key={k} className="text-center px-2 py-2 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
                               {k === 'viewAll' ? 'View All' : k === 'modifyAll' ? 'Modify All' : k.charAt(0).toUpperCase() + k.slice(1)}
                             </th>
                           ))}
@@ -650,6 +633,6 @@ export default function DepartmentsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

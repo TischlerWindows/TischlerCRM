@@ -1,9 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   Database,
   Download,
   Trash2,
@@ -17,6 +15,8 @@ import {
   Loader2,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { SettingsContentCard } from '@/components/settings/settings-content-card';
 
 interface Backup {
   id: string;
@@ -138,86 +138,48 @@ export default function BackupsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <Link
-            href="/settings"
-            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
+    <>
+      <SettingsPageHeader
+        icon={Database}
+        title="Database Backups"
+        subtitle="Create, download, and restore database snapshots"
+        action={{
+          label: 'Create Backup',
+          icon: Plus,
+          onClick: handleCreateBackup,
+        }}
+      />
+
+      {/* Messages */}
+      {successMessage && (
+        <div className="mx-8 mt-6 flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <span className="text-sm text-green-800">{successMessage}</span>
+          <button
+            onClick={() => setSuccessMessage(null)}
+            className="ml-auto text-green-600 hover:text-green-800 text-sm"
           >
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to Settings
-          </Link>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
-                <HardDrive className="w-6 h-6 text-brand-navy" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Database Backups</h1>
-                <p className="text-sm text-gray-600">
-                  Create, download, and restore database snapshots
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={loadBackups}
-                disabled={loading}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700 disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </button>
-              <button
-                onClick={handleCreateBackup}
-                disabled={creating}
-                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark text-sm font-medium disabled:opacity-50"
-              >
-                {creating ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                {creating ? 'Creating Backup...' : 'Create Backup'}
-              </button>
-            </div>
-          </div>
+            Dismiss
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Messages */}
-        {successMessage && (
-          <div className="mb-6 flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-            <span className="text-sm text-green-800">{successMessage}</span>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="ml-auto text-green-600 hover:text-green-800 text-sm"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+      {error && (
+        <div className="mx-8 mt-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <span className="text-sm text-red-800">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-600 hover:text-red-800 text-sm"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
-        {error && (
-          <div className="mb-6 flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
-            <span className="text-sm text-red-800">{error}</span>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-600 hover:text-red-800 text-sm"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Info Card */}
-        <div className="mb-6 bg-[#f0f1fa] border border-[#d4d8f0] rounded-lg p-4">
+      {/* Info Card */}
+      <SettingsContentCard>
+        <div className="p-4">
           <div className="flex items-start gap-3">
             <Database className="w-5 h-5 text-brand-navy mt-0.5 flex-shrink-0" />
             <div className="text-sm text-brand-dark">
@@ -231,14 +193,16 @@ export default function BackupsPage() {
             </div>
           </div>
         </div>
+      </SettingsContentCard>
 
-        {/* Backups Table */}
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 text-brand-navy animate-spin" />
-          </div>
-        ) : backups.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+      {/* Backups Table */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-8 h-8 text-brand-navy animate-spin" />
+        </div>
+      ) : backups.length === 0 ? (
+        <SettingsContentCard>
+          <div className="p-12 text-center">
             <HardDrive className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No backups yet</h3>
             <p className="text-gray-600 mb-6">
@@ -257,118 +221,120 @@ export default function BackupsPage() {
               Create Backup
             </button>
           </div>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Backup
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Records
-                  </th>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {backups.map((backup) => (
-                  <tr key={backup.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Database className="w-5 h-5 text-gray-400" />
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{backup.name}</div>
-                          <div className="text-xs text-gray-500">
-                            {backup.tables && typeof backup.tables === 'object'
-                              ? Object.entries(backup.tables)
-                                  .filter(([, count]) => (count as number) > 0)
-                                  .map(([table, count]) => `${count} ${table}`)
-                                  .join(', ')
-                              : ''}
-                          </div>
+        </SettingsContentCard>
+      ) : (
+        <SettingsContentCard>
+          <table className="w-full">
+            <thead>
+              <tr className="bg-[#fafafa] border-b border-gray-200">
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Backup
+                </th>
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Date
+                </th>
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Size
+                </th>
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Records
+                </th>
+                <th className="text-left px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Status
+                </th>
+                <th className="text-right px-6 py-3 text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {backups.map((backup) => (
+                <tr key={backup.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-gray-400" />
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">{backup.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {backup.tables && typeof backup.tables === 'object'
+                            ? Object.entries(backup.tables)
+                                .filter(([, count]) => (count as number) > 0)
+                                .map(([table, count]) => `${count} ${table}`)
+                                .join(', ')
+                            : ''}
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        {formatDate(backup.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700">{backup.sizeMB} MB</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700">
-                        {backup.tables ? totalRecords(backup.tables).toLocaleString() : '—'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        <CheckCircle2 className="w-3 h-3" />
-                        {backup.status || 'Completed'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => handleDownload(backup)}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                          title="Download backup"
-                        >
-                          <Download className="w-3.5 h-3.5 mr-1" />
-                          Download
-                        </button>
-                        <button
-                          onClick={() => handleRestore(backup)}
-                          disabled={restoring === backup.id}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 border border-amber-300 rounded-md hover:bg-amber-50 disabled:opacity-50"
-                          title="Restore from this backup"
-                        >
-                          {restoring === backup.id ? (
-                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                          ) : (
-                            <RotateCcw className="w-3.5 h-3.5 mr-1" />
-                          )}
-                          Restore
-                        </button>
-                        <button
-                          onClick={() => handleDelete(backup)}
-                          disabled={deleting === backup.id}
-                          className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
-                          title="Delete backup"
-                        >
-                          {deleting === backup.id ? (
-                            <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5 mr-1" />
-                          )}
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <Calendar className="w-4 h-4 text-gray-400" />
+                      {formatDate(backup.createdAt)}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-700">{backup.sizeMB} MB</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm text-gray-700">
+                      {backup.tables ? totalRecords(backup.tables).toLocaleString() : '—'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {backup.status || 'Completed'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => handleDownload(backup)}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                        title="Download backup"
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1" />
+                        Download
+                      </button>
+                      <button
+                        onClick={() => handleRestore(backup)}
+                        disabled={restoring === backup.id}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 border border-amber-300 rounded-md hover:bg-amber-50 disabled:opacity-50"
+                        title="Restore from this backup"
+                      >
+                        {restoring === backup.id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        Restore
+                      </button>
+                      <button
+                        onClick={() => handleDelete(backup)}
+                        disabled={deleting === backup.id}
+                        className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50"
+                        title="Delete backup"
+                      >
+                        {deleting === backup.id ? (
+                          <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </SettingsContentCard>
+      )}
 
-        {/* Storage Usage */}
-        {backups.length > 0 && (
-          <div className="mt-6 bg-white rounded-lg border border-gray-200 p-6">
+      {/* Storage Usage */}
+      {backups.length > 0 && (
+        <SettingsContentCard>
+          <div className="p-6">
             <h3 className="text-sm font-medium text-gray-900 mb-3">Storage Summary</h3>
             <div className="grid grid-cols-3 gap-6">
               <div>
@@ -387,8 +353,8 @@ export default function BackupsPage() {
               </div>
             </div>
           </div>
-        )}
-      </div>
-    </div>
+        </SettingsContentCard>
+      )}
+    </>
   );
 }

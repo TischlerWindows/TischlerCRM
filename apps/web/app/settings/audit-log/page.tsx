@@ -1,17 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import {
-  ArrowLeft,
   FileText,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
   X,
-  Filter,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
+import { SettingsContentCard } from '@/components/settings/settings-content-card';
 
 interface AuditEntry {
   id: string;
@@ -79,126 +78,149 @@ export default function AuditLogPage() {
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const startItem = data ? (data.page - 1) * data.pageSize + 1 : 0;
+  const endItem = data ? Math.min(data.page * data.pageSize, data.total) : 0;
+
+  const getPageNumbers = () => {
+    if (!data || data.totalPages <= 1) return [];
+    const pages: number[] = [];
+    const total = data.totalPages;
+    const current = data.page;
+    const delta = 2;
+    for (let i = 1; i <= total; i++) {
+      if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
+        pages.push(i);
+      }
+    }
+    return pages;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/settings" className="p-1 hover:bg-gray-100 rounded transition-colors">
-              <ArrowLeft className="w-5 h-5 text-gray-500" />
-            </Link>
-            <FileText className="w-6 h-6 text-brand-navy" />
-            <h1 className="text-2xl font-bold text-gray-900">Audit Log</h1>
-          </div>
-          <p className="text-sm text-gray-600 ml-10">Track all changes to users, roles, departments, and records</p>
-        </div>
-      </div>
+    <>
+      <SettingsPageHeader icon={FileText} title="Audit Log" subtitle="Track all system activity and changes" />
 
       {error && (
-        <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
+        <div className="mx-8 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
           {error}
           <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      <div className="px-6 py-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Filter className="w-4 h-4 text-gray-400" />
-          <select value={filterAction} onChange={e => { setFilterAction(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="">All Actions</option>
-            {Object.keys(ACTION_BADGES).map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-          <select value={filterObjectType} onChange={e => { setFilterObjectType(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
-            <option value="">All Types</option>
-            <option value="User">User</option>
-            <option value="Role">Role</option>
-            <option value="Department">Department</option>
-          </select>
-        </div>
-      </div>
+      <SettingsFilterBar
+        filters={[
+          {
+            value: filterAction,
+            onChange: (v) => { setFilterAction(v); setPage(1); },
+            options: [
+              { value: '', label: 'All Actions' },
+              ...Object.keys(ACTION_BADGES).map(a => ({ value: a, label: a })),
+            ],
+          },
+          {
+            value: filterObjectType,
+            onChange: (v) => { setFilterObjectType(v); setPage(1); },
+            options: [
+              { value: '', label: 'All Types' },
+              { value: 'User', label: 'User' },
+              { value: 'Role', label: 'Role' },
+              { value: 'Department', label: 'Department' },
+            ],
+          },
+        ]}
+      />
 
-      <div className="px-6 pb-8">
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center text-gray-500">Loading audit log...</div>
-          ) : !data || data.items.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">No audit entries found</div>
-          ) : (
-            <>
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="w-8"></th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Timestamp</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actor</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+      <SettingsContentCard>
+        {loading ? (
+          <div className="p-12 text-center text-gray-500">Loading audit log...</div>
+        ) : !data || data.items.length === 0 ? (
+          <div className="p-12 text-center text-gray-500">No audit entries found</div>
+        ) : (
+          <>
+            <table className="w-full">
+              <thead>
+                <tr className="bg-[#fafafa] border-b border-gray-200">
+                  <th className="w-8"></th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Timestamp</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Actor</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Action</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Type</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Name</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.items.map(entry => (
+                  <tr key={entry.id} className="group">
+                    <td className="pl-3 py-3">
+                      {(entry.before || entry.after) && (
+                        <button onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} className="p-0.5 hover:bg-gray-100 rounded">
+                          {expandedId === entry.id ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{entry.actor.name || entry.actor.email}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ACTION_BADGES[entry.action] || 'bg-gray-100 text-gray-700'}`}>
+                        {entry.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{entry.objectType}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{entry.objectName || entry.objectId.slice(0, 8)}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {data.items.map(entry => (
-                    <tr key={entry.id} className="group">
-                      <td className="pl-3 py-3">
-                        {(entry.before || entry.after) && (
-                          <button onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} className="p-0.5 hover:bg-gray-100 rounded">
-                            {expandedId === entry.id ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-                          </button>
+                ))}
+                {data.items.map(entry => expandedId === entry.id && (entry.before || entry.after) && (
+                  <tr key={`${entry.id}-detail`} className="bg-gray-50">
+                    <td colSpan={6} className="px-8 py-3">
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        {entry.before && (
+                          <div>
+                            <div className="font-semibold text-gray-600 mb-1">Before</div>
+                            <pre className="bg-white p-2 rounded border border-gray-200 overflow-auto max-h-40">{JSON.stringify(entry.before, null, 2)}</pre>
+                          </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{entry.actor.name || entry.actor.email}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${ACTION_BADGES[entry.action] || 'bg-gray-100 text-gray-700'}`}>
-                          {entry.action}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{entry.objectType}</td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{entry.objectName || entry.objectId.slice(0, 8)}</td>
-                    </tr>
-                  ))}
-                  {data.items.map(entry => expandedId === entry.id && (entry.before || entry.after) && (
-                    <tr key={`${entry.id}-detail`} className="bg-gray-50">
-                      <td colSpan={6} className="px-8 py-3">
-                        <div className="grid grid-cols-2 gap-4 text-xs">
-                          {entry.before && (
-                            <div>
-                              <div className="font-semibold text-gray-600 mb-1">Before</div>
-                              <pre className="bg-white p-2 rounded border border-gray-200 overflow-auto max-h-40">{JSON.stringify(entry.before, null, 2)}</pre>
-                            </div>
-                          )}
-                          {entry.after && (
-                            <div>
-                              <div className="font-semibold text-gray-600 mb-1">After</div>
-                              <pre className="bg-white p-2 rounded border border-gray-200 overflow-auto max-h-40">{JSON.stringify(entry.after, null, 2)}</pre>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        {entry.after && (
+                          <div>
+                            <div className="font-semibold text-gray-600 mb-1">After</div>
+                            <pre className="bg-white p-2 rounded border border-gray-200 overflow-auto max-h-40">{JSON.stringify(entry.after, null, 2)}</pre>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-              {data.totalPages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-                  <div className="text-xs text-gray-500">
-                    Page {data.page} of {data.totalPages} ({data.total} entries)
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1">
-                      <ChevronLeft className="w-3.5 h-3.5" /> Prev
-                    </button>
-                    <button onClick={() => setPage(p => Math.min(data.totalPages, p + 1))} disabled={page >= data.totalPages} className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1">
-                      Next <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+            {data.totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+                <div className="text-xs text-gray-500">
+                  Showing {startItem}-{endItem} of {data.total}
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+                <div className="flex gap-1">
+                  {getPageNumbers().map((p, i, arr) => {
+                    const showGap = i > 0 && p - arr[i - 1] > 1;
+                    return (
+                      <span key={p} className="flex items-center gap-1">
+                        {showGap && <span className="px-1 text-xs text-gray-400">...</span>}
+                        <button
+                          onClick={() => setPage(p)}
+                          className={`min-w-[32px] h-8 px-2 text-sm rounded-lg ${
+                            p === page
+                              ? 'bg-brand-navy text-white'
+                              : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </SettingsContentCard>
+    </>
   );
 }
