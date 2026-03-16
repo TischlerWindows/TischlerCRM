@@ -11,7 +11,7 @@
     "dev": "pnpm -r --parallel run dev",
     "start": "pnpm --filter=api start",
     "start:web": "pnpm --filter=web start",
-    "start:api": "pnpm --filter=api start",
+    "start:api": "pnpm --filter @crm/db run prisma:push:deploy && pnpm --filter=api start",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
