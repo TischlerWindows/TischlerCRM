@@ -414,25 +414,8 @@ class ApiClient {
     });
   }
 
-  async getIntegrationApiKey(provider: string) {
-    return this.request<{ apiKey: string }>(`/integrations/${encodeURIComponent(provider)}/api-key`);
-  }
-
   async getMyConnections() {
     return this.request<any[]>('/integrations/me/connections');
-  }
-
-  // Geocoding (proxied through backend — API key stays server-side)
-  async geocode(address: string) {
-    return this.request<{
-      success: boolean;
-      lat?: number;
-      lng?: number;
-      formattedAddress?: string;
-      placeId?: string;
-      status?: string;
-      error?: string;
-    }>(`/geocode?address=${encodeURIComponent(address)}`);
   }
 }
 

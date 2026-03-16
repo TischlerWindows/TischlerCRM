@@ -30,13 +30,21 @@ function getEncryptionKey(): Buffer {
     return Buffer.from(envKey, 'hex');
   }
 
-  // Fallback: derive from JWT_SECRET (acceptable for dev, not ideal for prod)
+  // In production, ENCRYPTION_KEY is required — never fall back to JWT_SECRET.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'ENCRYPTION_KEY is required in production. Set it as a sealed Railway variable. ' +
+      'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+
+  // Dev fallback: derive from JWT_SECRET (never reaches production due to check above)
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('Neither ENCRYPTION_KEY nor JWT_SECRET is set. Cannot encrypt.');
   }
   console.warn(
-    '[crypto] ENCRYPTION_KEY not set — deriving from JWT_SECRET. Set ENCRYPTION_KEY in production.'
+    '[crypto] ENCRYPTION_KEY not set — deriving from JWT_SECRET for development only.'
   );
   return crypto.createHash('sha256').update(jwtSecret).digest();
 }

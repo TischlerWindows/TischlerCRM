@@ -14,7 +14,8 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { z } from 'zod';
-import { encrypt, decrypt, encryptIfPresent, decryptIfPresent } from '../crypto';
+import { encrypt, encryptIfPresent } from '../crypto';
+import { logAudit, extractIp } from '../audit';
 
 // ── Provider registry ─────────────────────────────────────────────
 // Defines which integrations the system knows about.  New providers
@@ -120,6 +121,44 @@ export async function integrationRoutes(app: FastifyInstance) {
     }
   });
 
+  // ── User's connected integrations ──
+  // IMPORTANT: registered BEFORE /:provider routes so "me" isn't treated as a provider name
+  app.get('/integrations/me/connections', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    try {
+      const connections = await prisma.userIntegration.findMany({
+        where: { userId: user.sub },
+        include: {
+          integration: {
+            select: { provider: true, displayName: true, category: true, enabled: true },
+          },
+        },
+        orderBy: { connectedAt: 'desc' },
+      });
+
+      // Strip tokens from the response
+      reply.send(
+        connections.map((c) => ({
+          id: c.id,
+          provider: c.integration.provider,
+          displayName: c.integration.displayName,
+          category: c.integration.category,
+          integrationEnabled: c.integration.enabled,
+          syncEnabled: c.syncEnabled,
+          lastSyncAt: c.lastSyncAt,
+          lastSyncStatus: c.lastSyncStatus,
+          externalEmail: c.externalEmail,
+          connectedAt: c.connectedAt,
+        }))
+      );
+    } catch (err: any) {
+      app.log.error(err, 'GET /integrations/me/connections failed');
+      reply.code(500).send({ error: 'Failed to load connections' });
+    }
+  });
+
   // ── Get one integration's public config ──
   app.get('/integrations/:provider', async (req, reply) => {
     try {
@@ -185,32 +224,21 @@ export async function integrationRoutes(app: FastifyInstance) {
         data,
       });
 
+      await logAudit({
+        actorId: user.sub,
+        action: 'UPDATE',
+        objectType: 'Integration',
+        objectId: existing.id,
+        objectName: existing.displayName,
+        before: { enabled: existing.enabled, hasApiKey: !!existing.apiKey, hasClientSecret: !!existing.clientSecret },
+        after: { enabled: updated.enabled, hasApiKey: !!updated.apiKey, hasClientSecret: !!updated.clientSecret },
+        ipAddress: extractIp(req),
+      });
+
       reply.send(sanitizeIntegration(updated));
     } catch (err: any) {
       app.log.error(err, 'PUT /integrations/:provider failed');
       reply.code(500).send({ error: 'Failed to update integration' });
-    }
-  });
-
-  // ── Get the *decrypted* API key for a provider (internal use only) ──
-  // The frontend should NOT call this directly — it's used by server-side
-  // route handlers that need the key to make API calls (e.g. geocoding).
-  app.get('/integrations/:provider/api-key', async (req, reply) => {
-    const user = req.user;
-    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
-
-    const { provider } = req.params as { provider: string };
-    try {
-      const row = await prisma.integration.findUnique({ where: { provider } });
-      if (!row) return reply.code(404).send({ error: 'Integration not found' });
-      if (!row.enabled) return reply.code(400).send({ error: 'Integration is not enabled' });
-      if (!row.apiKey) return reply.code(400).send({ error: 'No API key configured' });
-
-      const decryptedKey = decrypt(row.apiKey);
-      reply.send({ apiKey: decryptedKey });
-    } catch (err: any) {
-      app.log.error(err, 'GET /integrations/:provider/api-key failed');
-      reply.code(500).send({ error: 'Failed to retrieve API key' });
     }
   });
 
@@ -244,6 +272,17 @@ export async function integrationRoutes(app: FastifyInstance) {
         where: { integrationId: existing.id },
       });
 
+      await logAudit({
+        actorId: user.sub,
+        action: 'DELETE',
+        objectType: 'Integration',
+        objectId: existing.id,
+        objectName: existing.displayName,
+        before: { enabled: existing.enabled, hasApiKey: !!existing.apiKey, hasClientSecret: !!existing.clientSecret },
+        after: { enabled: false, hasApiKey: false, hasClientSecret: false },
+        ipAddress: extractIp(req),
+      });
+
       reply.code(204).send();
     } catch (err: any) {
       app.log.error(err, 'DELETE /integrations/:provider failed');
@@ -251,40 +290,4 @@ export async function integrationRoutes(app: FastifyInstance) {
     }
   });
 
-  // ── User's connected integrations ──
-  app.get('/integrations/me/connections', async (req, reply) => {
-    const user = req.user;
-    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
-
-    try {
-      const connections = await prisma.userIntegration.findMany({
-        where: { userId: user.sub },
-        include: {
-          integration: {
-            select: { provider: true, displayName: true, category: true, enabled: true },
-          },
-        },
-        orderBy: { connectedAt: 'desc' },
-      });
-
-      // Strip tokens from the response
-      reply.send(
-        connections.map((c) => ({
-          id: c.id,
-          provider: c.integration.provider,
-          displayName: c.integration.displayName,
-          category: c.integration.category,
-          integrationEnabled: c.integration.enabled,
-          syncEnabled: c.syncEnabled,
-          lastSyncAt: c.lastSyncAt,
-          lastSyncStatus: c.lastSyncStatus,
-          externalEmail: c.externalEmail,
-          connectedAt: c.connectedAt,
-        }))
-      );
-    } catch (err: any) {
-      app.log.error(err, 'GET /integrations/me/connections failed');
-      reply.code(500).send({ error: 'Failed to load connections' });
-    }
-  });
 }
