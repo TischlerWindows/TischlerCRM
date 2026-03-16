@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -35,6 +35,7 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { cn, evaluateFormulaForRecord } from '@/lib/utils';
+import AddressAutocomplete, { type ParsedAddress } from '@/components/address-autocomplete';
 
 // Custom dropdown for PicklistText that allows selected value to wrap
 function PicklistTextDropdown({
@@ -203,6 +204,7 @@ export default function DynamicForm({
   const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
+  const [googleMapsEnabled, setGoogleMapsEnabled] = useState(false);
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
@@ -350,6 +352,53 @@ export default function DynamicForm({
       setLookupRecordsCache(prev => ({ ...prev, ...newCache }));
     })();
   }, [object, layout]);
+
+  // Check if Google Maps integration is enabled (for address autocomplete)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const integration = await apiClient.getIntegration('google_maps');
+        if (!cancelled && integration?.enabled && integration?.hasApiKey) {
+          setGoogleMapsEnabled(true);
+        }
+      } catch {
+        // Integration not available — autocomplete simply won't appear
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Detect address field group in the current object
+  const ADDRESS_FIELD_MAP: Record<string, keyof ParsedAddress> = {
+    address: 'street',
+    city: 'city',
+    state: 'state',
+    zipCode: 'postalCode',
+    country: 'country',
+    latitude: 'lat',
+    longitude: 'lng',
+  };
+
+  const hasAddressFields = (() => {
+    if (!object) return false;
+    const apiNames = new Set(object.fields.map(f => f.apiName.replace(/^[A-Za-z]+__/, '')));
+    return apiNames.has('address') && apiNames.has('city') && apiNames.has('state');
+  })();
+
+  const handleAddressSelected = (addr: ParsedAddress) => {
+    if (!object) return;
+    for (const field of object.fields) {
+      const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+      const addrKey = ADDRESS_FIELD_MAP[stripped];
+      if (addrKey) {
+        const val = addr[addrKey];
+        if (val !== null && val !== undefined) {
+          handleFieldChange(field.apiName, typeof val === 'number' ? String(val) : val);
+        }
+      }
+    }
+  };
 
   if (!object || !layout) {
     return (
@@ -1676,8 +1725,20 @@ export default function DynamicForm({
         .filter((f): f is FieldDef => f !== undefined);
     }
 
+    // Show address autocomplete if this section contains address fields
+    const sectionFieldNames = new Set(
+      section.fields.map(f => f.apiName.replace(/^[A-Za-z]+__/, ''))
+    );
+    const showAutocomplete = googleMapsEnabled && hasAddressFields &&
+      sectionFieldNames.has('address') && sectionFieldNames.has('city');
+
     return (
       <div className="p-4 pt-0">
+        {showAutocomplete && (
+          <div className="mb-4">
+            <AddressAutocomplete onAddressSelected={handleAddressSelected} />
+          </div>
+        )}
         <div
           className={cn(
             'grid gap-4',

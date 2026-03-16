@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -11,6 +11,7 @@ import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from
 import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
+import LocationMapPreview from '@/components/location-map-preview';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -624,6 +625,22 @@ export default function RecordDetailPage({
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
             No page layout configured for this record.
+          </div>
+        )}
+
+        {/* Location Map Preview — shown when the record has lat/lng coordinates */}
+        {record.latitude && record.longitude &&
+          !isNaN(Number(record.latitude)) && !isNaN(Number(record.longitude)) && (
+          <div className="mt-6">
+            <LocationMapPreview
+              lat={Number(record.latitude)}
+              lng={Number(record.longitude)}
+              address={
+                [record.address, record.city, record.state, record.zipCode, record.country]
+                  .filter(Boolean)
+                  .join(', ')
+              }
+            />
           </div>
         )}
       </div>

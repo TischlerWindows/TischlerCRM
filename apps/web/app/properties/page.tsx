@@ -51,6 +51,9 @@ interface Property {
   city: string;
   state: string;
   zipCode: string;
+  country?: string;
+  latitude?: string;
+  longitude?: string;
   status: 'Active' | 'Inactive';
   contacts: string[];
   accounts: string[];
@@ -69,7 +72,8 @@ const AVAILABLE_COLUMNS = [
   { id: 'address', label: 'Address', defaultVisible: true },
   { id: 'city', label: 'City', defaultVisible: true },
   { id: 'state', label: 'State', defaultVisible: true },
-  { id: 'zipCode', label: 'Zip Code', defaultVisible: false },
+  { id: 'zipCode', label: 'Postal / Zip Code', defaultVisible: false },
+  { id: 'country', label: 'Country', defaultVisible: false },
   { id: 'status', label: 'Status', defaultVisible: true },
   { id: 'contacts', label: 'Contacts', defaultVisible: false },
   { id: 'accounts', label: 'Accounts', defaultVisible: false },

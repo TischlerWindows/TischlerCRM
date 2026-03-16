@@ -417,6 +417,34 @@ class ApiClient {
   async getMyConnections() {
     return this.request<any[]>('/integrations/me/connections');
   }
+
+  // Google Places (proxied through backend — API key never reaches the browser)
+  async placesAutocomplete(input: string, sessionToken: string) {
+    const params = new URLSearchParams({ input, sessionToken });
+    return this.request<{
+      predictions: Array<{
+        description: string;
+        place_id: string;
+        structured_formatting: { main_text: string; secondary_text: string };
+      }>;
+    }>(`/places/autocomplete?${params}`);
+  }
+
+  async placeDetails(placeId: string, sessionToken: string) {
+    const params = new URLSearchParams({ placeId, sessionToken });
+    return this.request<{
+      address: {
+        street: string;
+        city: string;
+        state: string;
+        postalCode: string;
+        country: string;
+        lat: number | null;
+        lng: number | null;
+        formattedAddress: string;
+      };
+    }>(`/places/details?${params}`);
+  }
 }
 
 // Export singleton instance

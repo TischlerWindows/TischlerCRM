@@ -24,6 +24,7 @@ import { rolesRoutes } from './routes/roles';
 import { auditLogRoutes } from './routes/audit-log';
 import { recycleBinRoutes } from './routes/recycle-bin';
 import { integrationRoutes } from './routes/integrations';
+import { placesRoutes } from './routes/places';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -270,6 +271,7 @@ export function buildApp() {
   app.register(auditLogRoutes);
   app.register(recycleBinRoutes);
   app.register(integrationRoutes);
+  app.register(placesRoutes);
 
   return app;
 }
