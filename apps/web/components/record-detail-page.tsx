@@ -330,6 +330,31 @@ export default function RecordDetailPage({
       return parts.length > 0 ? parts.join(', ') : '-';
     }
 
+    // LocationSearch — show map preview based on targetFields
+    if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
+      const tf = fieldDef.targetFields;
+      const lat = tf.lat ? Number(record[tf.lat]) : NaN;
+      const lng = tf.lng ? Number(record[tf.lng]) : NaN;
+      const addressParts = [
+        tf.street ? record[tf.street] : null,
+        tf.city ? record[tf.city] : null,
+        tf.state ? record[tf.state] : null,
+        tf.postalCode ? record[tf.postalCode] : null,
+        tf.country ? record[tf.country] : null,
+      ].filter(Boolean).join(', ');
+
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return (
+          <LocationMapPreview
+            lat={lat}
+            lng={lng}
+            address={addressParts || undefined}
+          />
+        );
+      }
+      return addressParts || '-';
+    }
+
     // Date → MM-DD-YYYY
     if (fieldType === 'Date' && typeof value === 'string') {
       const d = new Date(value + (value.includes('T') ? '' : 'T00:00:00'));
@@ -628,21 +653,6 @@ export default function RecordDetailPage({
           </div>
         )}
 
-        {/* Location Map Preview — shown when the record has lat/lng coordinates */}
-        {record.latitude && record.longitude &&
-          !isNaN(Number(record.latitude)) && !isNaN(Number(record.longitude)) && (
-          <div className="mt-6">
-            <LocationMapPreview
-              lat={Number(record.latitude)}
-              lng={Number(record.longitude)}
-              address={
-                [record.address, record.city, record.state, record.zipCode, record.country]
-                  .filter(Boolean)
-                  .join(', ')
-              }
-            />
-          </div>
-        )}
       </div>
 
       {/* Edit dialog — re-uses the SAME layout */}

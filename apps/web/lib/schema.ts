@@ -7,7 +7,8 @@ export type FieldType =
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
-  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser";
+  | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser"
+  | "LocationSearch";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -46,6 +47,7 @@ export function normalizeFieldType(raw: string): FieldType {
     compositetext: 'CompositeText',
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
+    locationsearch: 'LocationSearch',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }
@@ -99,6 +101,15 @@ export interface FieldDef {
     startingNumber: number;
   };
   staticUrl?: string;  // for URL fields: a fixed hyperlink instead of a fillable field
+  targetFields?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+    lat?: string;
+    lng?: string;
+  };
   subFields?: Array<{
     apiName: string;
     label: string;

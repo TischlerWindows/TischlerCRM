@@ -35,7 +35,7 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { cn, evaluateFormulaForRecord } from '@/lib/utils';
-import AddressAutocomplete, { type ParsedAddress } from '@/components/address-autocomplete';
+import AddressAutocomplete from '@/components/address-autocomplete';
 
 // Custom dropdown for PicklistText that allows selected value to wrap
 function PicklistTextDropdown({
@@ -204,7 +204,6 @@ export default function DynamicForm({
   const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
-  const [googleMapsEnabled, setGoogleMapsEnabled] = useState(false);
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
@@ -352,78 +351,6 @@ export default function DynamicForm({
       setLookupRecordsCache(prev => ({ ...prev, ...newCache }));
     })();
   }, [object, layout]);
-
-  // Check if Google Maps integration is enabled (for address autocomplete)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const integration = await apiClient.getIntegration('google_maps');
-        console.log('[AddressAutocomplete] Google Maps integration check:', {
-          enabled: integration?.enabled,
-          hasApiKey: integration?.hasApiKey,
-        });
-        if (!cancelled && integration?.enabled && integration?.hasApiKey) {
-          setGoogleMapsEnabled(true);
-        }
-      } catch (err) {
-        console.warn('[AddressAutocomplete] Could not check Google Maps integration:', err);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Strip object prefix from a field apiName (e.g. "Property__address" -> "address")
-  const stripPrefix = (name: string) => name.replace(/^[A-Za-z]+__/, '');
-
-  // Detect address field group in the current object
-  const ADDRESS_FIELD_MAP: Record<string, keyof ParsedAddress> = {
-    address: 'street',
-    city: 'city',
-    state: 'state',
-    zipCode: 'postalCode',
-    country: 'country',
-    latitude: 'lat',
-    longitude: 'lng',
-  };
-
-  const hasAddressFields = (() => {
-    if (!object) return false;
-    const stripped = new Set(object.fields.map(f => stripPrefix(f.apiName)));
-    // Also check label-based fallback (some schemas use labels like "Address", "City")
-    const labels = new Set(object.fields.map(f => f.label?.toLowerCase()));
-    const byApi = stripped.has('address') && stripped.has('city') && stripped.has('state');
-    const byLabel = labels.has('address') && labels.has('city');
-    return byApi || byLabel;
-  })();
-
-  // Map from stripped field apiName OR lowercase label -> address part
-  const resolveAddressKey = (field: { apiName: string; label?: string }): keyof ParsedAddress | undefined => {
-    const stripped = stripPrefix(field.apiName);
-    if (ADDRESS_FIELD_MAP[stripped]) return ADDRESS_FIELD_MAP[stripped];
-    const label = field.label?.toLowerCase() || '';
-    if (label === 'address' || label === 'street address' || label === 'street') return 'street';
-    if (label === 'city') return 'city';
-    if (label === 'state' || label === 'state/province') return 'state';
-    if (label.includes('zip') || label.includes('postal')) return 'postalCode';
-    if (label === 'country') return 'country';
-    if (label === 'latitude') return 'lat';
-    if (label === 'longitude') return 'lng';
-    return undefined;
-  };
-
-  const handleAddressSelected = (addr: ParsedAddress) => {
-    if (!object) return;
-    for (const field of object.fields) {
-      const addrKey = resolveAddressKey(field);
-      if (addrKey) {
-        const val = addr[addrKey];
-        if (val !== null && val !== undefined) {
-          handleFieldChange(field.apiName, typeof val === 'number' ? String(val) : val);
-        }
-      }
-    }
-  };
 
   if (!object || !layout) {
     return (
@@ -1317,6 +1244,24 @@ export default function DynamicForm({
         );
         break;
 
+      case 'LocationSearch':
+        inputElement = (
+          <AddressAutocomplete
+            disabled={isReadOnly}
+            onAddressSelected={(addr) => {
+              const targets = fieldDef.targetFields || {};
+              if (targets.street) handleFieldChange(targets.street, addr.street);
+              if (targets.city) handleFieldChange(targets.city, addr.city);
+              if (targets.state) handleFieldChange(targets.state, addr.state);
+              if (targets.postalCode) handleFieldChange(targets.postalCode, addr.postalCode);
+              if (targets.country) handleFieldChange(targets.country, addr.country);
+              if (targets.lat) handleFieldChange(targets.lat, String(addr.lat));
+              if (targets.lng) handleFieldChange(targets.lng, String(addr.lng));
+            }}
+          />
+        );
+        break;
+
       case 'Geolocation':
         const geoValue = value || {};
         inputElement = (
@@ -1750,25 +1695,8 @@ export default function DynamicForm({
         .filter((f): f is FieldDef => f !== undefined);
     }
 
-    // Show address autocomplete if this section contains address fields
-    const sectionFieldNames = new Set(
-      section.fields.map(f => stripPrefix(f.apiName))
-    );
-    const sectionLabels = new Set(
-      section.fields.map(f => (f.label || '').toLowerCase())
-    );
-    const sectionHasAddress =
-      (sectionFieldNames.has('address') && sectionFieldNames.has('city')) ||
-      (sectionLabels.has('address') && sectionLabels.has('city'));
-    const showAutocomplete = googleMapsEnabled && hasAddressFields && sectionHasAddress;
-
     return (
       <div className="p-4 pt-0">
-        {showAutocomplete && (
-          <div className="mb-4">
-            <AddressAutocomplete onAddressSelected={handleAddressSelected} />
-          </div>
-        )}
         <div
           className={cn(
             'grid gap-4',

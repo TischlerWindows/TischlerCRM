@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -44,7 +44,7 @@ interface FieldTypeOption {
   value: FieldType;
   label: string;
   description: string;
-  category: 'None' | 'System' | 'Relationship' | 'Standard';
+  category: 'None' | 'System' | 'Relationship' | 'Standard' | 'Integration';
   icon: any;
 }
 
@@ -84,6 +84,9 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Time', label: 'Time', description: 'Allows users to enter a local time. For example, "2:40 PM", "14:40", "14:40:00", and "14:40:50.600" are all valid times for this field.', category: 'Standard', icon: Clock },
   { value: 'URL', label: 'URL', description: 'Allows users to enter any valid website address. When users click on the field, the URL will open in a separate browser window.', category: 'Standard', icon: Globe },
   { value: 'Address', label: 'Address', description: 'Allows users to enter a street, city, state/province, zip/postal code, and country, or to search for an address with an external tool. When a user selects an address using the tool, the street, city, state/province, zip/postal code, and country are populated.', category: 'Standard', icon: MapPin },
+
+  // Integration
+  { value: 'LocationSearch', label: 'Location Search (Google Maps)', description: 'Google Places address autocomplete with map preview. Place on any page layout to auto-fill address fields when a location is selected. Requires the Google Maps integration to be configured.', category: 'Integration', icon: MapPin },
 ];
 
 export default function FieldsRelationships({ objectApiName }: FieldsRelationshipsProps) {
@@ -113,6 +116,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     relationshipName: '',
     lookupObject: '',
     staticUrl: '',
+    targetFields: {} as Record<string, string>,
   });
 
   const object = schema?.objects.find(o => o.apiName === objectApiName);
@@ -183,6 +187,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       relationshipName: '',
       lookupObject: '',
       staticUrl: '',
+      targetFields: {},
     });
   };
 
@@ -214,6 +219,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       relationshipName: cloned.relationshipName || '',
       lookupObject: cloned.lookupObject || '',
       staticUrl: cloned.staticUrl || '',
+      targetFields: cloned.targetFields ? { ...cloned.targetFields } : {},
     });
     setShowCreateDialog(true);
   };
@@ -289,6 +295,15 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     }
     if (t === 'URL' && formData.staticUrl) {
       newField.staticUrl = formData.staticUrl;
+    }
+    if (t === 'LocationSearch') {
+      const tf = formData.targetFields;
+      const cleaned = Object.fromEntries(
+        Object.entries(tf).filter(([, v]) => v)
+      );
+      if (Object.keys(cleaned).length > 0) {
+        newField.targetFields = cleaned as FieldDef['targetFields'];
+      }
     }
 
     if (editingField) {
@@ -499,6 +514,25 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
 
                     {/* Standard Fields */}
                     {FIELD_TYPES.filter(t => t.category === 'Standard').map((type) => {
+                      return (
+                        <button
+                          key={type.value}
+                          onClick={() => handleTypeSelect(type.value)}
+                          className="w-full flex items-start p-4 hover:bg-[#f0f1fa] transition-all text-left border-b border-gray-200 last:border-b-0"
+                        >
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900 mb-1">{type.label}</div>
+                            <div className="text-sm text-gray-600">{type.description}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    {/* Divider */}
+                    <div className="h-2 bg-gray-100"></div>
+
+                    {/* Integration Fields */}
+                    {FIELD_TYPES.filter(t => t.category === 'Integration').map((type) => {
                       return (
                         <button
                           key={type.value}
@@ -887,7 +921,61 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   )}
 
-                  {selectedType !== 'Formula' && selectedType !== 'RollupSummary' && selectedType !== 'AutoNumber' && (
+                  {selectedType === 'LocationSearch' && (() => {
+                    const textFields = fields.filter(f => f.type === 'Text' || f.type === 'TextArea');
+                    const numberFields = fields.filter(f => f.type === 'Number');
+                    const TARGET_SLOTS: Array<{ key: string; label: string; fields: typeof fields }> = [
+                      { key: 'street', label: 'Street / Address', fields: textFields },
+                      { key: 'city', label: 'City', fields: textFields },
+                      { key: 'state', label: 'State / Province', fields: textFields },
+                      { key: 'postalCode', label: 'Postal / Zip Code', fields: textFields },
+                      { key: 'country', label: 'Country', fields: textFields },
+                      { key: 'lat', label: 'Latitude', fields: numberFields },
+                      { key: 'lng', label: 'Longitude', fields: numberFields },
+                    ];
+                    return (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-1">Target Field Mapping</h4>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Choose which existing fields on this object should be filled when a user selects an address.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {TARGET_SLOTS.map(slot => (
+                            <div key={slot.key}>
+                              <Label htmlFor={`tf-${slot.key}`} className="text-xs">{slot.label}</Label>
+                              <select
+                                id={`tf-${slot.key}`}
+                                value={formData.targetFields[slot.key] || ''}
+                                onChange={(e) => setFormData(prev => ({
+                                  ...prev,
+                                  targetFields: { ...prev.targetFields, [slot.key]: e.target.value },
+                                }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                              >
+                                <option value="">-- None --</option>
+                                {slot.fields
+                                  .filter(f => f.apiName !== formData.apiName)
+                                  .sort((a, b) => a.label.localeCompare(b.label))
+                                  .map(f => (
+                                    <option key={f.apiName} value={f.apiName}>{f.label}</option>
+                                  ))}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <div className="flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-amber-800">
+                              The Google Maps integration must be configured in Settings &gt; Integrations for this field to work. Latitude and Longitude are optional but enable the map preview on the detail page.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {selectedType !== 'Formula' && selectedType !== 'RollupSummary' && selectedType !== 'AutoNumber' && selectedType !== 'LocationSearch' && (
                     <div>
                       <Label htmlFor="defaultValue">Default Value</Label>
                       <Input
