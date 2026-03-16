@@ -11,8 +11,8 @@ import path2 from "path";
 import fs from "fs";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { dirname } from "path";
-import { prisma as prisma14 } from "@crm/db/client";
-import { z as z9 } from "zod";
+import { prisma as prisma17 } from "@crm/db/client";
+import { z as z11 } from "zod";
 
 // src/auth.ts
 import crypto from "crypto";
@@ -677,11 +677,11 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
     where: { id: userId },
     include: {
       department: true,
-      profile: true
+      orgRole: true
     }
   });
   if (!user) return false;
-  if (!user.department && !user.profile) return true;
+  if (!user.department && !user.orgRole) return true;
   const deptRaw = user.department?.permissions || {};
   if (deptRaw.isAdmin) return true;
   const deptPerms = deptRaw.objectPermissions?.[objectApiName];
@@ -689,8 +689,8 @@ async function checkObjectPermission(userId, userRole, objectApiName, action) {
     return false;
   }
   if (deptPerms?.[action]) return true;
-  const profPerms = user.profile?.permissions?.objectPermissions?.[objectApiName];
-  if (profPerms?.[action]) return true;
+  const rolePerms = user.orgRole?.permissions?.objectPermissions?.[objectApiName];
+  if (rolePerms?.[action]) return true;
   return false;
 }
 async function recordRoutes(app2) {
@@ -2082,116 +2082,71 @@ async function preferenceRoutes(app2) {
   });
 }
 
-// src/routes/profiles.ts
-import { prisma as prisma11 } from "@crm/db/client";
+// src/routes/departments.ts
+import { prisma as prisma12 } from "@crm/db/client";
 import { z as z6 } from "zod";
-var profileSchema = z6.object({
-  name: z6.string().min(1),
-  description: z6.string().optional().nullable(),
-  permissions: z6.record(z6.any()).optional(),
-  isActive: z6.boolean().optional()
-});
-async function profileRoutes(app2) {
-  app2.get("/profiles", async (req, reply) => {
-    const profiles = await prisma11.profile.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { users: true } }
-      }
-    });
-    reply.send(profiles);
-  });
-  app2.get("/profiles/:id", async (req, reply) => {
-    const { id } = req.params;
-    const profile = await prisma11.profile.findUnique({
-      where: { id },
-      include: {
-        _count: { select: { users: true } },
-        users: {
-          select: { id: true, name: true, email: true, isActive: true },
-          take: 100
-        }
-      }
-    });
-    if (!profile) return reply.code(404).send({ error: "Profile not found" });
-    reply.send(profile);
-  });
-  app2.post("/profiles", async (req, reply) => {
-    const parsed = profileSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
-    const existing = await prisma11.profile.findUnique({ where: { name: parsed.data.name } });
-    if (existing) return reply.code(409).send({ error: `A profile named "${parsed.data.name}" already exists` });
-    const profile = await prisma11.profile.create({
+
+// src/audit.ts
+import { prisma as prisma11 } from "@crm/db/client";
+var SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+  "passwordHash",
+  "password",
+  "token",
+  "refreshToken",
+  "secret",
+  "apiKey",
+  "api_key",
+  "creditCard"
+]);
+function sanitize(obj) {
+  if (!obj) return void 0;
+  const cleaned = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (SENSITIVE_KEYS.has(key)) {
+      cleaned[key] = "[REDACTED]";
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+function extractIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const forwardedStr = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  return (forwardedStr ? forwardedStr.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";
+}
+async function logAudit(params) {
+  try {
+    await prisma11.auditLog.create({
       data: {
-        name: parsed.data.name,
-        description: parsed.data.description,
-        permissions: parsed.data.permissions || {},
-        isActive: parsed.data.isActive ?? true
+        actorId: params.actorId,
+        action: params.action,
+        objectType: params.objectType,
+        objectId: params.objectId,
+        objectName: params.objectName,
+        before: sanitize(params.before),
+        after: sanitize(params.after),
+        ipAddress: params.ipAddress
       }
     });
-    reply.code(201).send(profile);
-  });
-  app2.put("/profiles/:id", async (req, reply) => {
-    const { id } = req.params;
-    const parsed = profileSchema.partial().safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
-    const existing = await prisma11.profile.findUnique({ where: { id } });
-    if (!existing) return reply.code(404).send({ error: "Profile not found" });
-    if (parsed.data.name && parsed.data.name !== existing.name) {
-      const dup = await prisma11.profile.findUnique({ where: { name: parsed.data.name } });
-      if (dup) return reply.code(409).send({ error: `A profile named "${parsed.data.name}" already exists` });
-    }
-    const profile = await prisma11.profile.update({
-      where: { id },
-      data: parsed.data
-    });
-    reply.send(profile);
-  });
-  app2.delete("/profiles/:id", async (req, reply) => {
-    const { id } = req.params;
-    const existing = await prisma11.profile.findUnique({ where: { id } });
-    if (!existing) return reply.code(404).send({ error: "Profile not found" });
-    if (existing.isSystemProfile) {
-      return reply.code(403).send({ error: "Cannot delete a system profile" });
-    }
-    const userCount = await prisma11.user.count({ where: { profileId: id } });
-    if (userCount > 0) {
-      return reply.code(409).send({ error: `Cannot delete profile: ${userCount} users are assigned to it. Reassign them first.` });
-    }
-    await prisma11.profile.delete({ where: { id } });
-    reply.code(204).send();
-  });
-  app2.post("/profiles/:id/clone", async (req, reply) => {
-    const { id } = req.params;
-    const { name } = req.body;
-    if (!name) return reply.code(400).send({ error: "name is required for clone" });
-    const source = await prisma11.profile.findUnique({ where: { id } });
-    if (!source) return reply.code(404).send({ error: "Source profile not found" });
-    const clone = await prisma11.profile.create({
-      data: {
-        name,
-        description: `Cloned from ${source.name}`,
-        permissions: source.permissions,
-        isSystemProfile: false
-      }
-    });
-    reply.code(201).send(clone);
-  });
+  } catch (err) {
+    console.error("[Audit] Failed to write audit log:", err);
+  }
 }
 
 // src/routes/departments.ts
-import { prisma as prisma12 } from "@crm/db/client";
-import { z as z7 } from "zod";
-var departmentSchema = z7.object({
-  name: z7.string().min(1),
-  description: z7.string().optional().nullable(),
-  parentId: z7.string().optional().nullable(),
-  isActive: z7.boolean().optional(),
-  permissions: z7.any().optional()
+var departmentSchema = z6.object({
+  name: z6.string().min(1).max(200).trim(),
+  description: z6.string().max(1e3).optional().nullable(),
+  parentId: z6.string().uuid().optional().nullable(),
+  isActive: z6.boolean().optional(),
+  permissions: z6.any().optional()
 });
+var uuidParam = z6.object({ id: z6.string().uuid() });
 async function departmentRoutes(app2) {
   app2.get("/departments", async (req, reply) => {
     const departments = await prisma12.department.findMany({
+      where: { deletedAt: null },
       orderBy: { name: "asc" },
       include: {
         parent: { select: { id: true, name: true } },
@@ -2202,16 +2157,20 @@ async function departmentRoutes(app2) {
     reply.send(departments.map((d) => ({ ...d, permissions: d.permissions || {} })));
   });
   app2.get("/departments/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid department ID" });
+    const { id } = pp.data;
     const dept = await prisma12.department.findUnique({
       where: { id },
       include: {
         parent: { select: { id: true, name: true } },
         children: {
+          where: { deletedAt: null },
           select: { id: true, name: true, isActive: true },
           orderBy: { name: "asc" }
         },
         users: {
+          where: { deletedAt: null },
           select: { id: true, name: true, email: true, isActive: true, title: true },
           orderBy: { name: "asc" }
         },
@@ -2237,16 +2196,36 @@ async function departmentRoutes(app2) {
         _count: { select: { users: true } }
       }
     });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "CREATE",
+      objectType: "Department",
+      objectId: dept.id,
+      objectName: dept.name,
+      after: { name: dept.name, description: dept.description, parentId: dept.parentId },
+      ipAddress: extractIp(req)
+    });
     reply.code(201).send(dept);
   });
   app2.put("/departments/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid department ID" });
+    const { id } = pp.data;
     const parsed = departmentSchema.partial().safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
     const existing = await prisma12.department.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "Department not found" });
     if (parsed.data.parentId === id) {
       return reply.code(400).send({ error: "Department cannot be its own parent" });
+    }
+    const before = {};
+    const after = {};
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value !== void 0) {
+        before[key] = existing[key];
+        after[key] = value;
+      }
     }
     const dept = await prisma12.department.update({
       where: { id },
@@ -2256,42 +2235,87 @@ async function departmentRoutes(app2) {
         _count: { select: { users: true } }
       }
     });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "UPDATE",
+      objectType: "Department",
+      objectId: dept.id,
+      objectName: dept.name,
+      before,
+      after,
+      ipAddress: extractIp(req)
+    });
     reply.send(dept);
   });
   app2.delete("/departments/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid department ID" });
+    const { id } = pp.data;
     const existing = await prisma12.department.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "Department not found" });
-    const userCount = await prisma12.user.count({ where: { departmentId: id } });
+    if (existing.deletedAt) return reply.code(400).send({ error: "Department is already deleted" });
+    const userCount = await prisma12.user.count({ where: { departmentId: id, deletedAt: null } });
     if (userCount > 0) {
       return reply.code(409).send({ error: `Cannot delete department: ${userCount} users are assigned. Reassign them first.` });
     }
-    await prisma12.department.delete({ where: { id } });
+    const actorId = req.user.sub;
+    await prisma12.department.update({
+      where: { id },
+      data: { deletedAt: /* @__PURE__ */ new Date(), deletedById: actorId, isActive: false }
+    });
+    await logAudit({
+      actorId,
+      action: "DELETE",
+      objectType: "Department",
+      objectId: id,
+      objectName: existing.name,
+      before: { name: existing.name, description: existing.description, isActive: existing.isActive },
+      ipAddress: extractIp(req)
+    });
     reply.code(204).send();
   });
 }
 
 // src/routes/users-admin.ts
 import { prisma as prisma13 } from "@crm/db/client";
-import { z as z8 } from "zod";
-var createUserSchema = z8.object({
-  name: z8.string().min(1),
-  email: z8.string().email(),
-  password: z8.string().min(6),
-  profileId: z8.string().optional().nullable(),
-  departmentId: z8.string().optional().nullable(),
-  managerId: z8.string().optional().nullable(),
-  title: z8.string().optional().nullable(),
-  phone: z8.string().optional().nullable(),
-  mobilePhone: z8.string().optional().nullable(),
-  timezone: z8.string().optional().nullable(),
-  locale: z8.string().optional().nullable(),
-  isActive: z8.boolean().optional()
-});
-var updateUserSchema = createUserSchema.omit({ password: true, email: true }).partial();
+import { z as z7 } from "zod";
+var createUserSchema = z7.object({
+  name: z7.string().min(1).max(200).trim(),
+  email: z7.string().email().max(255).toLowerCase(),
+  password: z7.string().min(6).max(128),
+  roleId: z7.string().uuid().optional().nullable(),
+  departmentId: z7.string().uuid().optional().nullable(),
+  managerId: z7.string().uuid().optional().nullable(),
+  title: z7.string().max(200).optional().nullable(),
+  phone: z7.string().max(50).optional().nullable(),
+  mobilePhone: z7.string().max(50).optional().nullable(),
+  timezone: z7.string().max(100).optional().nullable(),
+  locale: z7.string().max(20).optional().nullable(),
+  isActive: z7.boolean().optional()
+}).strict();
+var updateUserSchema = z7.object({
+  name: z7.string().min(1).max(200).trim().optional(),
+  roleId: z7.string().uuid().optional().nullable(),
+  departmentId: z7.string().uuid().optional().nullable(),
+  managerId: z7.string().uuid().optional().nullable(),
+  title: z7.string().max(200).optional().nullable(),
+  phone: z7.string().max(50).optional().nullable(),
+  mobilePhone: z7.string().max(50).optional().nullable(),
+  timezone: z7.string().max(100).optional().nullable(),
+  locale: z7.string().max(20).optional().nullable(),
+  isActive: z7.boolean().optional()
+}).strict();
+var uuidParam2 = z7.object({ id: z7.string().uuid() });
+var listQuerySchema = z7.object({ includeDeleted: z7.enum(["true", "false"]).optional() });
+var roleSelect = { select: { id: true, name: true, label: true } };
 async function usersAdminRoutes(app2) {
   app2.get("/admin/users", async (req, reply) => {
+    const qParsed = listQuerySchema.safeParse(req.query);
+    const includeDeleted = qParsed.success && qParsed.data.includeDeleted === "true";
+    const where = includeDeleted ? {} : { deletedAt: null };
     const users = await prisma13.user.findMany({
+      where,
       orderBy: { name: "asc" },
       select: {
         id: true,
@@ -2303,7 +2327,8 @@ async function usersAdminRoutes(app2) {
         phone: true,
         lastLoginAt: true,
         createdAt: true,
-        profile: { select: { id: true, name: true } },
+        deletedAt: true,
+        orgRole: roleSelect,
         department: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true, email: true } }
       }
@@ -2311,7 +2336,9 @@ async function usersAdminRoutes(app2) {
     reply.send(users);
   });
   app2.get("/admin/users/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
     const user = await prisma13.user.findUnique({
       where: { id },
       select: {
@@ -2328,10 +2355,11 @@ async function usersAdminRoutes(app2) {
         lastLoginAt: true,
         createdAt: true,
         updatedAt: true,
-        profileId: true,
+        roleId: true,
         departmentId: true,
         managerId: true,
-        profile: { select: { id: true, name: true, permissions: true } },
+        deletedAt: true,
+        orgRole: { select: { id: true, name: true, label: true, permissions: true } },
         department: { select: { id: true, name: true } },
         manager: { select: { id: true, name: true, email: true } }
       }
@@ -2351,7 +2379,7 @@ async function usersAdminRoutes(app2) {
         name: parsed.data.name,
         passwordHash,
         role: "USER",
-        profileId: parsed.data.profileId,
+        roleId: parsed.data.roleId,
         departmentId: parsed.data.departmentId,
         managerId: parsed.data.managerId,
         title: parsed.data.title,
@@ -2367,18 +2395,38 @@ async function usersAdminRoutes(app2) {
         name: true,
         role: true,
         isActive: true,
-        profile: { select: { id: true, name: true } },
+        orgRole: roleSelect,
         department: { select: { id: true, name: true } }
       }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "CREATE",
+      objectType: "User",
+      objectId: user.id,
+      objectName: user.name || user.email,
+      after: { email: parsed.data.email, name: parsed.data.name, roleId: parsed.data.roleId, departmentId: parsed.data.departmentId },
+      ipAddress: extractIp(req)
     });
     reply.code(201).send(user);
   });
   app2.put("/admin/users/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
     const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
+    const before = {};
+    const after = {};
+    for (const [key, value] of Object.entries(parsed.data)) {
+      if (value !== void 0) {
+        before[key] = existing[key];
+        after[key] = value;
+      }
+    }
     const user = await prisma13.user.update({
       where: { id },
       data: parsed.data,
@@ -2389,56 +2437,108 @@ async function usersAdminRoutes(app2) {
         role: true,
         isActive: true,
         title: true,
-        profile: { select: { id: true, name: true } },
+        orgRole: roleSelect,
         department: { select: { id: true, name: true } }
       }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "UPDATE",
+      objectType: "User",
+      objectId: user.id,
+      objectName: user.name || user.email,
+      before,
+      after,
+      ipAddress: extractIp(req)
     });
     reply.send(user);
   });
   app2.post("/admin/users/:id/reset-password", async (req, reply) => {
-    const { id } = req.params;
-    const { password } = req.body;
-    if (!password || password.length < 6) {
-      return reply.code(400).send({ error: "Password must be at least 6 characters" });
-    }
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
+    const bodySchema = z7.object({ password: z7.string().min(6).max(128) });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Password must be at least 6 characters" });
     const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
-    const passwordHash = hashPassword(password);
+    const passwordHash = hashPassword(parsed.data.password);
     await prisma13.user.update({ where: { id }, data: { passwordHash } });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "RESET_PASSWORD",
+      objectType: "User",
+      objectId: id,
+      objectName: existing.name || existing.email,
+      ipAddress: extractIp(req)
+    });
     reply.send({ success: true });
   });
   app2.delete("/admin/users/:id", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
     const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
-    await prisma13.user.delete({ where: { id } });
+    if (existing.deletedAt) return reply.code(400).send({ error: "User is already deleted" });
+    const actorId = req.user.sub;
+    await prisma13.user.update({
+      where: { id },
+      data: { deletedAt: /* @__PURE__ */ new Date(), deletedById: actorId, isActive: false }
+    });
+    await logAudit({
+      actorId,
+      action: "DELETE",
+      objectType: "User",
+      objectId: id,
+      objectName: existing.name || existing.email,
+      before: { email: existing.email, name: existing.name, isActive: existing.isActive },
+      ipAddress: extractIp(req)
+    });
     reply.code(204).send();
   });
   app2.post("/admin/users/:id/freeze", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
     const existing = await prisma13.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: "User not found" });
+    const newActive = !existing.isActive;
     const user = await prisma13.user.update({
       where: { id },
-      data: { isActive: !existing.isActive },
+      data: { isActive: newActive },
       select: { id: true, isActive: true }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: newActive ? "UNFREEZE" : "FREEZE",
+      objectType: "User",
+      objectId: id,
+      objectName: existing.name || existing.email,
+      before: { isActive: existing.isActive },
+      after: { isActive: newActive },
+      ipAddress: extractIp(req)
     });
     reply.send(user);
   });
   app2.get("/admin/users/:id/permissions", async (req, reply) => {
-    const { id } = req.params;
+    const pp = uuidParam2.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const { id } = pp.data;
     const user = await prisma13.user.findUnique({
       where: { id },
       include: {
-        profile: true,
+        orgRole: true,
         department: true
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
-    const profilePerms = user.profile?.permissions || {};
-    const objectPerms = { ...profilePerms.objectPermissions || {} };
-    const appPerms = { ...profilePerms.appPermissions || {} };
-    const fieldPerms = { ...profilePerms.fieldPermissions || {} };
+    const rolePerms = user.orgRole?.permissions || {};
+    const objectPerms = { ...rolePerms.objectPermissions || {} };
+    const appPerms = { ...rolePerms.appPermissions || {} };
     const deptPerms = user.department?.permissions || {};
     if (deptPerms.isAdmin) {
       const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
@@ -2446,7 +2546,7 @@ async function usersAdminRoutes(app2) {
       for (const obj of customObjects) {
         objectPerms[obj.apiName] = Object.fromEntries(allActions.map((a) => [a, true]));
       }
-      const allAppPermKeys = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
+      const allAppPermKeys = ["manageUsers", "manageRoles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
       for (const p of allAppPermKeys) {
         appPerms[p] = true;
       }
@@ -2475,14 +2575,283 @@ async function usersAdminRoutes(app2) {
     }
     reply.send({
       userId: id,
-      profileName: user.profile?.name || "No Profile",
+      roleName: user.orgRole?.label || "No Role",
       departmentName: user.department?.name || "No Department",
       effectivePermissions: {
         objectPermissions: objectPerms,
-        appPermissions: appPerms,
-        fieldPermissions: fieldPerms
+        appPermissions: appPerms
       }
     });
+  });
+}
+
+// src/routes/roles.ts
+import { prisma as prisma14 } from "@crm/db/client";
+import { z as z8 } from "zod";
+var createRoleSchema = z8.object({
+  name: z8.string().min(1).max(100).trim(),
+  label: z8.string().min(1).max(200).trim(),
+  description: z8.string().max(1e3).optional().nullable(),
+  level: z8.number().int().min(1).max(99),
+  parentId: z8.string().uuid().optional().nullable(),
+  permissions: z8.record(z8.any()).optional(),
+  visibility: z8.record(z8.any()).optional()
+}).strict();
+var updateRoleSchema = createRoleSchema.partial().strict();
+var uuidParam3 = z8.object({ id: z8.string().uuid() });
+async function rolesRoutes(app2) {
+  app2.get("/admin/roles", async (req, reply) => {
+    const roles = await prisma14.role.findMany({
+      orderBy: [{ level: "asc" }, { name: "asc" }],
+      include: {
+        parent: { select: { id: true, name: true, label: true } },
+        children: { select: { id: true, name: true, label: true, level: true } },
+        _count: { select: { users: true } }
+      }
+    });
+    reply.send(roles);
+  });
+  app2.get("/admin/roles/:id", async (req, reply) => {
+    const paramParsed = uuidParam3.safeParse(req.params);
+    if (!paramParsed.success) return reply.code(400).send({ error: "Invalid role ID" });
+    const { id } = paramParsed.data;
+    const role = await prisma14.role.findUnique({
+      where: { id },
+      include: {
+        parent: { select: { id: true, name: true, label: true } },
+        children: { select: { id: true, name: true, label: true, level: true } },
+        users: {
+          select: { id: true, name: true, email: true, isActive: true },
+          take: 100
+        },
+        _count: { select: { users: true } }
+      }
+    });
+    if (!role) return reply.code(404).send({ error: "Role not found" });
+    reply.send(role);
+  });
+  app2.post("/admin/roles", async (req, reply) => {
+    const parsed = createRoleSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
+    const existing = await prisma14.role.findUnique({ where: { name: parsed.data.name } });
+    if (existing) return reply.code(409).send({ error: `A role named "${parsed.data.name}" already exists` });
+    const role = await prisma14.role.create({
+      data: {
+        name: parsed.data.name,
+        label: parsed.data.label,
+        description: parsed.data.description,
+        level: parsed.data.level,
+        parentId: parsed.data.parentId,
+        permissions: parsed.data.permissions || {},
+        visibility: parsed.data.visibility || {}
+      },
+      include: {
+        parent: { select: { id: true, name: true, label: true } },
+        _count: { select: { users: true } }
+      }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "CREATE",
+      objectType: "Role",
+      objectId: role.id,
+      objectName: role.label,
+      after: { name: role.name, label: role.label, level: role.level },
+      ipAddress: extractIp(req)
+    });
+    reply.code(201).send(role);
+  });
+  app2.put("/admin/roles/:id", async (req, reply) => {
+    const paramParsed = uuidParam3.safeParse(req.params);
+    if (!paramParsed.success) return reply.code(400).send({ error: "Invalid role ID" });
+    const { id } = paramParsed.data;
+    const parsed = updateRoleSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
+    const existing = await prisma14.role.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: "Role not found" });
+    if (parsed.data.name && parsed.data.name !== existing.name) {
+      const dup = await prisma14.role.findUnique({ where: { name: parsed.data.name } });
+      if (dup) return reply.code(409).send({ error: `A role named "${parsed.data.name}" already exists` });
+    }
+    if (parsed.data.parentId === id) {
+      return reply.code(400).send({ error: "Role cannot be its own parent" });
+    }
+    const role = await prisma14.role.update({
+      where: { id },
+      data: parsed.data,
+      include: {
+        parent: { select: { id: true, name: true, label: true } },
+        _count: { select: { users: true } }
+      }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "UPDATE",
+      objectType: "Role",
+      objectId: role.id,
+      objectName: role.label,
+      before: { name: existing.name, label: existing.label, level: existing.level },
+      after: { name: role.name, label: role.label, level: role.level },
+      ipAddress: extractIp(req)
+    });
+    reply.send(role);
+  });
+  app2.delete("/admin/roles/:id", async (req, reply) => {
+    const paramParsed = uuidParam3.safeParse(req.params);
+    if (!paramParsed.success) return reply.code(400).send({ error: "Invalid role ID" });
+    const { id } = paramParsed.data;
+    const existing = await prisma14.role.findUnique({ where: { id } });
+    if (!existing) return reply.code(404).send({ error: "Role not found" });
+    if (existing.isSystem) {
+      return reply.code(403).send({ error: "Cannot delete a system role" });
+    }
+    const userCount = await prisma14.user.count({ where: { roleId: id } });
+    if (userCount > 0) {
+      return reply.code(409).send({ error: `Cannot delete role: ${userCount} users are assigned. Reassign them first.` });
+    }
+    await prisma14.role.delete({ where: { id } });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "DELETE",
+      objectType: "Role",
+      objectId: id,
+      objectName: existing.label,
+      before: { name: existing.name, label: existing.label, level: existing.level },
+      ipAddress: extractIp(req)
+    });
+    reply.code(204).send();
+  });
+}
+
+// src/routes/audit-log.ts
+import { prisma as prisma15 } from "@crm/db/client";
+import { z as z9 } from "zod";
+var querySchema = z9.object({
+  actorId: z9.string().uuid().optional(),
+  objectType: z9.string().max(100).optional(),
+  objectId: z9.string().uuid().optional(),
+  action: z9.string().max(50).optional(),
+  from: z9.coerce.date().optional(),
+  to: z9.coerce.date().optional(),
+  page: z9.coerce.number().int().min(1).default(1),
+  pageSize: z9.coerce.number().int().min(1).max(200).default(50)
+});
+async function auditLogRoutes(app2) {
+  app2.get("/admin/audit-log", async (req, reply) => {
+    const parsed = querySchema.safeParse(req.query);
+    if (!parsed.success) return reply.code(400).send({ error: "Validation failed", details: parsed.error.flatten() });
+    const { actorId, objectType, objectId, action, from, to, page, pageSize } = parsed.data;
+    const where = {};
+    if (actorId) where.actorId = actorId;
+    if (objectType) where.objectType = objectType;
+    if (objectId) where.objectId = objectId;
+    if (action) where.action = action;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = from;
+      if (to) where.createdAt.lte = to;
+    }
+    const [items, total] = await Promise.all([
+      prisma15.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          actor: { select: { id: true, name: true, email: true } }
+        }
+      }),
+      prisma15.auditLog.count({ where })
+    ]);
+    reply.send({
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    });
+  });
+}
+
+// src/routes/recycle-bin.ts
+import { prisma as prisma16 } from "@crm/db/client";
+import { z as z10 } from "zod";
+var uuidParam4 = z10.object({ id: z10.string().uuid() });
+async function recycleBinRoutes(app2) {
+  app2.get("/admin/recycle-bin", async (req, reply) => {
+    const [deletedUsers, deletedDepartments] = await Promise.all([
+      prisma16.user.findMany({
+        where: { deletedAt: { not: null } },
+        orderBy: { deletedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          title: true,
+          deletedAt: true,
+          deletedBy: { select: { id: true, name: true, email: true } }
+        }
+      }),
+      prisma16.department.findMany({
+        where: { deletedAt: { not: null } },
+        orderBy: { deletedAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          deletedAt: true,
+          deletedBy: { select: { id: true, name: true, email: true } }
+        }
+      })
+    ]);
+    reply.send({ users: deletedUsers, departments: deletedDepartments });
+  });
+  app2.post("/admin/recycle-bin/users/:id/restore", async (req, reply) => {
+    const parsed = uuidParam4.safeParse(req.params);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid user ID" });
+    const user = await prisma16.user.findUnique({ where: { id: parsed.data.id } });
+    if (!user) return reply.code(404).send({ error: "User not found" });
+    if (!user.deletedAt) return reply.code(400).send({ error: "User is not deleted" });
+    const restored = await prisma16.user.update({
+      where: { id: parsed.data.id },
+      data: { deletedAt: null, deletedById: null, isActive: true },
+      select: { id: true, name: true, email: true, isActive: true }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "RESTORE",
+      objectType: "User",
+      objectId: restored.id,
+      objectName: restored.name || restored.email,
+      ipAddress: extractIp(req)
+    });
+    reply.send(restored);
+  });
+  app2.post("/admin/recycle-bin/departments/:id/restore", async (req, reply) => {
+    const parsed = uuidParam4.safeParse(req.params);
+    if (!parsed.success) return reply.code(400).send({ error: "Invalid department ID" });
+    const dept = await prisma16.department.findUnique({ where: { id: parsed.data.id } });
+    if (!dept) return reply.code(404).send({ error: "Department not found" });
+    if (!dept.deletedAt) return reply.code(400).send({ error: "Department is not deleted" });
+    const restored = await prisma16.department.update({
+      where: { id: parsed.data.id },
+      data: { deletedAt: null, deletedById: null, isActive: true },
+      select: { id: true, name: true }
+    });
+    const actorId = req.user.sub;
+    await logAudit({
+      actorId,
+      action: "RESTORE",
+      objectType: "Department",
+      objectId: restored.id,
+      objectName: restored.name,
+      ipAddress: extractIp(req)
+    });
+    reply.send(restored);
   });
 }
 
@@ -2501,18 +2870,18 @@ function buildApp() {
   }
   app2.get("/health", async () => ({ ok: true, version: "2026-03-09-v8-summary-perms" }));
   app2.post("/auth/signup", async (req, reply) => {
-    const schema = z9.object({
-      name: z9.string().min(1),
-      email: z9.string().email(),
-      password: z9.string().min(6)
+    const schema = z11.object({
+      name: z11.string().min(1),
+      email: z11.string().email(),
+      password: z11.string().min(6)
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const existing = await prisma14.user.findUnique({ where: { email: parsed.data.email } });
+    const existing = await prisma17.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: "Email already registered" });
     try {
       const passwordHash = hashPassword(parsed.data.password);
-      const user = await prisma14.user.create({
+      const user = await prisma17.user.create({
         data: {
           email: parsed.data.email,
           name: parsed.data.name,
@@ -2532,10 +2901,10 @@ function buildApp() {
     }
   });
   app2.post("/auth/login", async (req, reply) => {
-    const schema = z9.object({
-      email: z9.string().email(),
-      password: z9.string().min(6),
-      accountId: z9.string().uuid().optional().nullable()
+    const schema = z11.object({
+      email: z11.string().email(),
+      password: z11.string().min(6),
+      accountId: z11.string().uuid().optional().nullable()
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
@@ -2547,7 +2916,7 @@ function buildApp() {
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const ip = (forwardedIp ? forwardedIp.split(",")[0].trim() : void 0) || req.ip || req.socket?.remoteAddress || "unknown";
     const userAgent = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null;
-    await prisma14.loginEvent.create({
+    await prisma17.loginEvent.create({
       data: {
         userId: user.id,
         accountId: parsed.data.accountId ?? null,
@@ -2558,13 +2927,13 @@ function buildApp() {
     return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   });
   app2.get("/security/login-events", async (req, reply) => {
-    const querySchema = z9.object({
-      accountId: z9.string().uuid().optional(),
-      take: z9.coerce.number().int().min(1).max(500).optional()
+    const querySchema2 = z11.object({
+      accountId: z11.string().uuid().optional(),
+      take: z11.coerce.number().int().min(1).max(500).optional()
     });
-    const parsed = querySchema.safeParse(req.query);
+    const parsed = querySchema2.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const events = await prisma14.loginEvent.findMany({
+    const events = await prisma17.loginEvent.findMany({
       where: parsed.data.accountId ? { accountId: parsed.data.accountId } : void 0,
       take: parsed.data.take ?? 100,
       orderBy: { createdAt: "desc" },
@@ -2589,11 +2958,11 @@ function buildApp() {
   });
   app2.get("/me/permissions", async (req, reply) => {
     const userId = req.user.sub;
-    const user = await prisma14.user.findUnique({
+    const user = await prisma17.user.findUnique({
       where: { id: userId },
       include: {
         department: true,
-        profile: true
+        orgRole: true
       }
     });
     if (!user) return reply.code(404).send({ error: "User not found" });
@@ -2603,17 +2972,17 @@ function buildApp() {
     const deptAppPerms = deptRaw.appPermissions || {};
     const grantedObjPerms = {};
     const grantedAppPerms = {};
-    const profPerms = user.profile?.permissions || {};
-    if (profPerms.objectPermissions) {
-      for (const [obj, perms] of Object.entries(profPerms.objectPermissions)) {
+    const rolePerms = user.orgRole?.permissions || {};
+    if (rolePerms.objectPermissions) {
+      for (const [obj, perms] of Object.entries(rolePerms.objectPermissions)) {
         if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
         for (const [action, granted] of Object.entries(perms)) {
           if (granted) grantedObjPerms[obj][action] = true;
         }
       }
     }
-    if (profPerms.appPermissions) {
-      for (const [perm, granted] of Object.entries(profPerms.appPermissions)) {
+    if (rolePerms.appPermissions) {
+      for (const [perm, granted] of Object.entries(rolePerms.appPermissions)) {
         if (granted) grantedAppPerms[perm] = true;
       }
     }
@@ -2643,13 +3012,12 @@ function buildApp() {
     }
     if (isAdminDept || user.role === "ADMIN") {
       const allActions = ["read", "create", "edit", "delete", "viewAll", "modifyAll"];
-      const customObjects = await prisma14.customObject.findMany({ select: { apiName: true } });
-      const allObjectNames = customObjects.map((o) => o.apiName);
-      for (const obj of allObjectNames) {
-        objectPerms[obj] = Object.fromEntries(allActions.map((a) => [a, true]));
+      const customObjects = await prisma17.customObject.findMany({ select: { apiName: true } });
+      for (const obj of customObjects) {
+        objectPerms[obj.apiName] = Object.fromEntries(allActions.map((a) => [a, true]));
       }
-      const allAppPerms = ["manageUsers", "manageProfiles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
-      for (const p of allAppPerms) {
+      const allAppPermKeys = ["manageUsers", "manageRoles", "manageDepartments", "exportData", "importData", "manageReports", "manageDashboards", "viewSummary", "viewSetup", "customizeApplication", "manageSharing", "viewAllData", "modifyAllData"];
+      for (const p of allAppPermKeys) {
         appPerms[p] = true;
       }
     }
@@ -2657,7 +3025,7 @@ function buildApp() {
     const homePageLayoutId = deptRaw.homePageLayoutId;
     if (homePageLayoutId) {
       try {
-        const templatesSetting = await prisma14.setting.findUnique({ where: { key: "homeLayoutTemplates" } });
+        const templatesSetting = await prisma17.setting.findUnique({ where: { key: "homeLayoutTemplates" } });
         if (templatesSetting) {
           const templates = templatesSetting.value;
           const tpl = templates.find((t) => t.id === homePageLayoutId);
@@ -2669,7 +3037,7 @@ function buildApp() {
     reply.send({
       userId,
       departmentName: user.department?.name || null,
-      profileName: user.profile?.name || null,
+      roleName: user.orgRole?.label || null,
       role: user.role,
       objectPermissions: objectPerms,
       appPermissions: appPerms,
@@ -2677,14 +3045,14 @@ function buildApp() {
     });
   });
   app2.get("/accounts", async (req, reply) => {
-    const accounts = await prisma14.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
+    const accounts = await prisma17.account.findMany({ take: 50, orderBy: { createdAt: "desc" } });
     reply.send(accounts);
   });
-  const accountSchema = z9.object({ name: z9.string().min(1), domain: z9.string().optional().nullable(), ownerId: z9.string().uuid() });
+  const accountSchema = z11.object({ name: z11.string().min(1), domain: z11.string().optional().nullable(), ownerId: z11.string().uuid() });
   app2.post("/accounts", async (req, reply) => {
     const parsed = accountSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const created = await prisma14.account.create({ data: parsed.data });
+    const created = await prisma17.account.create({ data: parsed.data });
     reply.code(201).send(created);
   });
   const accountUpdate = accountSchema.partial();
@@ -2692,13 +3060,20 @@ function buildApp() {
     const id = req.params.id;
     const parsed = accountUpdate.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-    const updated = await prisma14.account.update({ where: { id }, data: parsed.data });
+    const updated = await prisma17.account.update({ where: { id }, data: parsed.data });
     reply.send(updated);
   });
   app2.delete("/accounts/:id", async (req, reply) => {
     const id = req.params.id;
-    await prisma14.account.delete({ where: { id } });
+    await prisma17.account.delete({ where: { id } });
     reply.code(204).send();
+  });
+  app2.addHook("onRequest", async (req, reply) => {
+    if (!req.routerPath?.startsWith("/admin")) return;
+    const user = req.user;
+    if (!user || user.role !== "ADMIN") {
+      return reply.code(403).send({ error: "Insufficient permissions." });
+    }
   });
   app2.register(objectRoutes);
   app2.register(fieldRoutes);
@@ -2709,14 +3084,16 @@ function buildApp() {
   app2.register(backupRoutes);
   app2.register(settingRoutes);
   app2.register(preferenceRoutes);
-  app2.register(profileRoutes);
   app2.register(departmentRoutes);
   app2.register(usersAdminRoutes);
+  app2.register(rolesRoutes);
+  app2.register(auditLogRoutes);
+  app2.register(recycleBinRoutes);
   return app2;
 }
 
 // src/ensure-core-objects.ts
-import { prisma as prisma15 } from "@crm/db/client";
+import { prisma as prisma18 } from "@crm/db/client";
 var CORE_OBJECTS = [
   {
     apiName: "Property",
@@ -2861,7 +3238,7 @@ var CORE_OBJECTS = [
 ];
 async function ensureCoreObjects() {
   console.log("[ensure-core-objects] Checking core objects...");
-  let systemUser = await prisma15.user.findFirst({ orderBy: { createdAt: "asc" } });
+  let systemUser = await prisma18.user.findFirst({ orderBy: { createdAt: "asc" } });
   if (!systemUser) {
     const crypto2 = await import("crypto");
     const ITERATIONS2 = 31e4;
@@ -2870,7 +3247,7 @@ async function ensureCoreObjects() {
     const salt = crypto2.randomBytes(16).toString("hex");
     const derived = crypto2.pbkdf2Sync("admin123", salt, ITERATIONS2, KEYLEN2, DIGEST2).toString("hex");
     const passwordHash = `pbkdf2$${ITERATIONS2}$${DIGEST2}$${salt}$${derived}`;
-    systemUser = await prisma15.user.create({
+    systemUser = await prisma18.user.create({
       data: {
         email: "admin@crm.local",
         passwordHash,
@@ -2883,7 +3260,7 @@ async function ensureCoreObjects() {
   let created = 0;
   let existed = 0;
   for (const objDef of CORE_OBJECTS) {
-    const existing = await prisma15.customObject.findFirst({
+    const existing = await prisma18.customObject.findFirst({
       where: { apiName: { equals: objDef.apiName, mode: "insensitive" } }
     });
     if (existing) {
@@ -2891,7 +3268,7 @@ async function ensureCoreObjects() {
       await ensureFields(existing.id, objDef.fields, systemUser.id);
       continue;
     }
-    const obj = await prisma15.customObject.create({
+    const obj = await prisma18.customObject.create({
       data: {
         apiName: objDef.apiName,
         label: objDef.label,
@@ -2910,11 +3287,11 @@ async function ensureCoreObjects() {
     `[ensure-core-objects] Done \u2014 ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
   );
   try {
-    const contactObj = await prisma15.customObject.findFirst({
+    const contactObj = await prisma18.customObject.findFirst({
       where: { apiName: { equals: "Contact", mode: "insensitive" } }
     });
     if (contactObj) {
-      await prisma15.customField.updateMany({
+      await prisma18.customField.updateMany({
         where: {
           objectId: contactObj.id,
           apiName: { in: ["firstName", "lastName"] },
@@ -2939,18 +3316,18 @@ async function ensureCoreObjects() {
       "serviceNumber",
       "installationNumber"
     ];
-    await prisma15.customField.updateMany({
+    await prisma18.customField.updateMany({
       where: {
         apiName: { in: autoNumberFieldNames },
         required: true
       },
       data: { required: false }
     });
-    const accountObj = await prisma15.customObject.findFirst({
+    const accountObj = await prisma18.customObject.findFirst({
       where: { apiName: { equals: "Account", mode: "insensitive" } }
     });
     if (accountObj) {
-      await prisma15.customField.updateMany({
+      await prisma18.customField.updateMany({
         where: {
           objectId: accountObj.id,
           apiName: "name",
@@ -2966,20 +3343,20 @@ async function ensureCoreObjects() {
 }
 async function syncSchemaObjectsToDb(userId) {
   try {
-    const schemaSetting = await prisma15.setting.findUnique({ where: { key: "orgSchema" } });
+    const schemaSetting = await prisma18.setting.findUnique({ where: { key: "orgSchema" } });
     if (!schemaSetting || !schemaSetting.value) return;
     const schema = schemaSetting.value;
     const objects = schema.objects || [];
     let synced = 0;
     for (const obj of objects) {
       if (!obj.apiName || obj.apiName === "Home") continue;
-      const existing = await prisma15.customObject.findFirst({
+      const existing = await prisma18.customObject.findFirst({
         where: { apiName: { equals: obj.apiName, mode: "insensitive" } }
       });
       if (existing) continue;
       const validApiName = /^[A-Z][A-Za-z0-9_]*$/.test(obj.apiName) ? obj.apiName : obj.apiName.charAt(0).toUpperCase() + obj.apiName.slice(1);
       try {
-        const dbObj = await prisma15.customObject.create({
+        const dbObj = await prisma18.customObject.create({
           data: {
             apiName: validApiName,
             label: obj.label || validApiName,
@@ -2996,7 +3373,7 @@ async function syncSchemaObjectsToDb(userId) {
         );
         for (const fieldDef of customFields) {
           try {
-            await prisma15.customField.create({
+            await prisma18.customField.create({
               data: {
                 objectId: dbObj.id,
                 apiName: fieldDef.apiName,
@@ -3029,11 +3406,11 @@ async function syncSchemaObjectsToDb(userId) {
 }
 async function ensureFields(objectId, fields, userId) {
   for (const fieldDef of fields) {
-    const existing = await prisma15.customField.findFirst({
+    const existing = await prisma18.customField.findFirst({
       where: { objectId, apiName: fieldDef.apiName }
     });
     if (existing) continue;
-    await prisma15.customField.create({
+    await prisma18.customField.create({
       data: {
         objectId,
         apiName: fieldDef.apiName,
@@ -3050,11 +3427,11 @@ async function ensureFields(objectId, fields, userId) {
   }
 }
 async function createDefaultLayout(objectId, userId) {
-  const layoutExists = await prisma15.pageLayout.findFirst({
+  const layoutExists = await prisma18.pageLayout.findFirst({
     where: { objectId, name: "Default Layout" }
   });
   if (layoutExists) return;
-  const layout = await prisma15.pageLayout.create({
+  const layout = await prisma18.pageLayout.create({
     data: {
       objectId,
       name: "Default Layout",
@@ -3064,14 +3441,14 @@ async function createDefaultLayout(objectId, userId) {
       modifiedById: userId
     }
   });
-  const tab = await prisma15.layoutTab.create({
+  const tab = await prisma18.layoutTab.create({
     data: {
       layoutId: layout.id,
       label: "Details",
       order: 0
     }
   });
-  const section = await prisma15.layoutSection.create({
+  const section = await prisma18.layoutSection.create({
     data: {
       tabId: tab.id,
       label: "Information",
@@ -3079,11 +3456,11 @@ async function createDefaultLayout(objectId, userId) {
       order: 0
     }
   });
-  const objFields = await prisma15.customField.findMany({ where: { objectId } });
+  const objFields = await prisma18.customField.findMany({ where: { objectId } });
   for (let i = 0; i < objFields.length; i++) {
     const field = objFields[i];
     if (field) {
-      await prisma15.layoutField.create({
+      await prisma18.layoutField.create({
         data: {
           sectionId: section.id,
           fieldId: field.id,
@@ -3096,235 +3473,266 @@ async function createDefaultLayout(objectId, userId) {
 }
 
 // src/ensure-user-management.ts
-import { prisma as prisma16 } from "@crm/db/client";
-var SEED_PROFILES = [
+import { prisma as prisma19 } from "@crm/db/client";
+var FULL_OBJ_PERMS = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
+var STD_OBJ_PERMS = { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false };
+var READ_ONLY_OBJ = { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false };
+var CORE_OBJECTS2 = ["Property", "Contact", "Account", "Product", "Lead", "Deal", "Project", "Service", "Quote", "Installation"];
+function buildObjPerms(template) {
+  return Object.fromEntries(CORE_OBJECTS2.map((o) => [o, { ...template }]));
+}
+var ALL_APP_PERMS_TRUE = {
+  manageUsers: true,
+  manageRoles: true,
+  manageDepartments: true,
+  exportData: true,
+  importData: true,
+  manageReports: true,
+  manageDashboards: true,
+  viewSummary: true,
+  viewSetup: true,
+  customizeApplication: true,
+  manageSharing: true,
+  viewAllData: true,
+  modifyAllData: true
+};
+var SEED_ROLES = [
   {
-    name: "System Administrator",
+    name: "system_administrator",
+    label: "System Administrator",
     description: "Full access to all features and settings",
-    isSystemProfile: true,
+    level: 1,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Product: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Project: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Service: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Installation: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true }
-      },
+      objectPermissions: buildObjPerms(FULL_OBJ_PERMS),
+      appPermissions: ALL_APP_PERMS_TRUE
+    },
+    visibility: {}
+  },
+  {
+    name: "executive",
+    label: "Executive",
+    description: "Full read access, limited write on all objects",
+    level: 2,
+    isSystem: false,
+    permissions: {
+      objectPermissions: Object.fromEntries(CORE_OBJECTS2.map((o) => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
+      appPermissions: { ...ALL_APP_PERMS_TRUE, customizeApplication: false, manageSharing: false }
+    },
+    visibility: {}
+  },
+  {
+    name: "manager",
+    label: "Manager",
+    description: "Standard access plus delete and viewAll",
+    level: 3,
+    isSystem: false,
+    permissions: {
+      objectPermissions: Object.fromEntries(CORE_OBJECTS2.map((o) => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
       appPermissions: {
-        manageUsers: true,
-        manageProfiles: true,
-        manageRoles: true,
+        manageUsers: false,
+        manageRoles: false,
+        manageDepartments: false,
         exportData: true,
         importData: true,
         manageReports: true,
         manageDashboards: true,
-        viewSetup: true,
-        customizeApplication: true,
-        manageSharing: true,
+        viewSummary: true,
+        viewSetup: false,
+        customizeApplication: false,
+        manageSharing: false,
         viewAllData: true,
-        modifyAllData: true
-      },
-      tabVisibility: {}
-    }
+        modifyAllData: false
+      }
+    },
+    visibility: {}
   },
   {
-    name: "Standard User",
+    name: "standard_employee",
+    label: "Standard Employee",
     description: "Standard access to core CRM features",
-    isSystemProfile: true,
+    level: 4,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Contact: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Account: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Deal: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Project: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Quote: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false },
-        Installation: { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false }
-      },
+      objectPermissions: buildObjPerms(STD_OBJ_PERMS),
       appPermissions: {
         manageUsers: false,
-        manageProfiles: false,
         manageRoles: false,
+        manageDepartments: false,
         exportData: true,
         importData: false,
         manageReports: true,
         manageDashboards: true,
+        viewSummary: true,
         viewSetup: false,
         customizeApplication: false,
         manageSharing: false,
         viewAllData: false,
         modifyAllData: false
-      },
-      tabVisibility: {}
-    }
+      }
+    },
+    visibility: {}
   },
   {
-    name: "Sales User",
+    name: "sales_user",
+    label: "Sales User",
     description: "Full access to sales objects: Leads, Deals, Contacts, Accounts",
-    isSystemProfile: false,
+    level: 4,
+    isSystem: false,
     permissions: {
       objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Property: { ...READ_ONLY_OBJ, viewAll: false },
         Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
         Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Product: READ_ONLY_OBJ,
+        Lead: { ...FULL_OBJ_PERMS },
+        Deal: { ...FULL_OBJ_PERMS },
+        Project: { ...READ_ONLY_OBJ, viewAll: false },
+        Service: { ...READ_ONLY_OBJ, viewAll: false },
         Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false }
+        Installation: { ...READ_ONLY_OBJ, viewAll: false }
       },
       appPermissions: {
         manageUsers: false,
-        manageProfiles: false,
         manageRoles: false,
+        manageDepartments: false,
         exportData: true,
         importData: false,
         manageReports: true,
         manageDashboards: true,
+        viewSummary: true,
         viewSetup: false,
         customizeApplication: false,
         manageSharing: false,
         viewAllData: false,
         modifyAllData: false
-      },
-      tabVisibility: {}
-    }
+      }
+    },
+    visibility: {}
   },
   {
-    name: "Marketing User",
+    name: "marketing_user",
+    label: "Marketing User",
     description: "Full access to Leads and Contacts; read-only Deals",
-    isSystemProfile: false,
+    level: 4,
+    isSystem: false,
     permissions: {
       objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
+        Property: { ...READ_ONLY_OBJ, viewAll: false },
         Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
         Account: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Lead: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true },
-        Deal: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Quote: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: false, modifyAll: false }
+        Product: READ_ONLY_OBJ,
+        Lead: { ...FULL_OBJ_PERMS },
+        Deal: { ...READ_ONLY_OBJ, viewAll: false },
+        Project: { ...READ_ONLY_OBJ, viewAll: false },
+        Service: { ...READ_ONLY_OBJ, viewAll: false },
+        Quote: { ...READ_ONLY_OBJ, viewAll: false },
+        Installation: { ...READ_ONLY_OBJ, viewAll: false }
       },
       appPermissions: {
         manageUsers: false,
-        manageProfiles: false,
         manageRoles: false,
+        manageDepartments: false,
         exportData: true,
         importData: true,
         manageReports: true,
         manageDashboards: true,
+        viewSummary: true,
         viewSetup: false,
         customizeApplication: false,
         manageSharing: false,
         viewAllData: false,
         modifyAllData: false
-      },
-      tabVisibility: {}
-    }
+      }
+    },
+    visibility: {}
   },
   {
-    name: "Read Only",
+    name: "read_only",
+    label: "Read Only",
     description: "Read-only access to all objects",
-    isSystemProfile: true,
+    level: 5,
+    isSystem: true,
     permissions: {
-      objectPermissions: {
-        Property: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Contact: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Account: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Product: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Lead: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Deal: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Project: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Service: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Quote: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false },
-        Installation: { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false }
-      },
+      objectPermissions: buildObjPerms(READ_ONLY_OBJ),
       appPermissions: {
         manageUsers: false,
-        manageProfiles: false,
         manageRoles: false,
+        manageDepartments: false,
         exportData: true,
         importData: false,
         manageReports: false,
         manageDashboards: false,
+        viewSummary: true,
         viewSetup: false,
         customizeApplication: false,
         manageSharing: false,
         viewAllData: true,
         modifyAllData: false
-      },
-      tabVisibility: {}
-    }
+      }
+    },
+    visibility: {}
   },
   {
-    name: "Minimum Access",
-    description: "No object access \u2014 minimal base profile",
-    isSystemProfile: true,
+    name: "contractor",
+    label: "Contractor",
+    description: "Minimal base access",
+    level: 5,
+    isSystem: true,
     permissions: {
       objectPermissions: {},
       appPermissions: {
         manageUsers: false,
-        manageProfiles: false,
         manageRoles: false,
+        manageDepartments: false,
         exportData: false,
         importData: false,
         manageReports: false,
         manageDashboards: false,
+        viewSummary: false,
         viewSetup: false,
         customizeApplication: false,
         manageSharing: false,
         viewAllData: false,
         modifyAllData: false
-      },
-      tabVisibility: {}
-    }
+      }
+    },
+    visibility: {}
   }
 ];
 async function ensureUserManagement() {
-  console.log("[UserMgmt] Ensuring profiles...");
-  for (const profile of SEED_PROFILES) {
-    const existing = await prisma16.profile.findUnique({ where: { name: profile.name } });
+  console.log("[UserMgmt] Ensuring roles...");
+  for (const roleDef of SEED_ROLES) {
+    const existing = await prisma19.role.findUnique({ where: { name: roleDef.name } });
     if (!existing) {
-      await prisma16.profile.create({ data: profile });
-      console.log(`[UserMgmt] Created profile: ${profile.name}`);
+      await prisma19.role.create({ data: roleDef });
+      console.log(`[UserMgmt] Created role: ${roleDef.label}`);
     }
   }
-  const adminProfile = await prisma16.profile.findUnique({ where: { name: "System Administrator" } });
-  if (adminProfile) {
-    const adminsWithoutProfile = await prisma16.user.findMany({
-      where: { role: "ADMIN", profileId: null }
+  const adminRole = await prisma19.role.findUnique({ where: { name: "system_administrator" } });
+  if (adminRole) {
+    const adminsWithoutRole = await prisma19.user.findMany({
+      where: { role: "ADMIN", roleId: null }
     });
-    for (const admin of adminsWithoutProfile) {
-      await prisma16.user.update({
+    for (const admin of adminsWithoutRole) {
+      await prisma19.user.update({
         where: { id: admin.id },
-        data: { profileId: adminProfile.id }
+        data: { roleId: adminRole.id }
       });
-      console.log(`[UserMgmt] Assigned System Administrator profile to ${admin.email}`);
+      console.log(`[UserMgmt] Assigned System Administrator role to ${admin.email}`);
     }
   }
-  const standardProfile = await prisma16.profile.findUnique({ where: { name: "Standard User" } });
-  if (standardProfile) {
-    const usersWithoutProfile = await prisma16.user.findMany({
-      where: { profileId: null }
+  const standardRole = await prisma19.role.findUnique({ where: { name: "standard_employee" } });
+  if (standardRole) {
+    const usersWithoutRole = await prisma19.user.findMany({
+      where: { roleId: null }
     });
-    for (const user of usersWithoutProfile) {
-      await prisma16.user.update({
+    for (const user of usersWithoutRole) {
+      await prisma19.user.update({
         where: { id: user.id },
-        data: { profileId: standardProfile.id }
+        data: { roleId: standardRole.id }
       });
-      console.log(`[UserMgmt] Assigned Standard User profile to ${user.email}`);
+      console.log(`[UserMgmt] Assigned Standard Employee role to ${user.email}`);
     }
   }
   console.log("[UserMgmt] User management setup complete.");
