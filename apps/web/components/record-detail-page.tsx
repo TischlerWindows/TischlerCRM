@@ -207,14 +207,18 @@ export default function RecordDetailPage({
     // Render the map preview by reading the mapped target fields from the record.
     if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
       const tf = fieldDef.targetFields;
-      const lat = tf.lat ? Number(record[tf.lat]) : NaN;
-      const lng = tf.lng ? Number(record[tf.lng]) : NaN;
+      const resolve = (key: string | undefined) => {
+        if (!key) return undefined;
+        return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
+      };
+      const lat = Number(resolve(tf.lat));
+      const lng = Number(resolve(tf.lng));
       const addressParts = [
-        tf.street ? record[tf.street] : null,
-        tf.city ? record[tf.city] : null,
-        tf.state ? record[tf.state] : null,
-        tf.postalCode ? record[tf.postalCode] : null,
-        tf.country ? record[tf.country] : null,
+        resolve(tf.street),
+        resolve(tf.city),
+        resolve(tf.state),
+        resolve(tf.postalCode),
+        resolve(tf.country),
       ].filter(Boolean).join(', ');
 
       if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
