@@ -38,7 +38,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div
         className={cn(
           'flex-1 overflow-y-auto bg-brand-light transition-[margin-left] duration-200 ease-in-out',
-          collapsed ? 'ml-[60px]' : 'ml-[260px]'
+          collapsed ? 'ml-[20px]' : 'ml-[260px]'
         )}
       >
         <SettingsBreadcrumb />

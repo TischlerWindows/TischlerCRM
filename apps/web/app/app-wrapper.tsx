@@ -229,13 +229,15 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
           </Link>
         </div>
 
-        {/* Center: Search */}
-        <div className="flex-1 max-w-xl mx-4">
-          <UniversalSearch
-            inputClassName="!bg-white/10 !border-white/20 !text-white !placeholder-white/50 focus:!bg-white/20 focus:!border-white/40 focus:!ring-white/30"
-            iconClassName="!text-white/50"
-          />
-        </div>
+        {/* Center: Search (hidden on settings pages — settings has its own sidebar search) */}
+        {!pathname?.startsWith('/settings') && (
+          <div className="flex-1 max-w-xl mx-4">
+            <UniversalSearch
+              inputClassName="!bg-white/10 !border-white/20 !text-white !placeholder-white/50 focus:!bg-white/20 focus:!border-white/40 focus:!ring-white/30"
+              iconClassName="!text-white/50"
+            />
+          </div>
+        )}
 
         {/* Right: Utilities */}
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -283,8 +285,8 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      {/* Tab Navigation Row — Salesforce-style app launcher tabs */}
-      {isLoaded && (
+      {/* Tab Navigation Row — Salesforce-style app launcher tabs (hidden on settings pages) */}
+      {isLoaded && !pathname?.startsWith('/settings') && (
         <nav className="bg-white border-b border-gray-200 px-4 flex items-center justify-between sticky top-[48px] z-40 h-[40px]">
           <div className="flex items-center gap-0 overflow-x-auto flex-1 h-full scrollbar-hide">
             {filteredTabs.map((item) => {
