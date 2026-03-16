@@ -201,9 +201,35 @@ export default function RecordDetailPage({
     if (typeof value === 'string' && value.startsWith('{')) {
       try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
-    if (value === null || value === undefined || value === '') return '-';
-
     const fieldType = fieldDef?.type;
+
+    // LocationSearch is a virtual widget — it has no stored value of its own.
+    // Render the map preview by reading the mapped target fields from the record.
+    if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
+      const tf = fieldDef.targetFields;
+      const lat = tf.lat ? Number(record[tf.lat]) : NaN;
+      const lng = tf.lng ? Number(record[tf.lng]) : NaN;
+      const addressParts = [
+        tf.street ? record[tf.street] : null,
+        tf.city ? record[tf.city] : null,
+        tf.state ? record[tf.state] : null,
+        tf.postalCode ? record[tf.postalCode] : null,
+        tf.country ? record[tf.country] : null,
+      ].filter(Boolean).join(', ');
+
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return (
+          <LocationMapPreview
+            lat={lat}
+            lng={lng}
+            address={addressParts || undefined}
+          />
+        );
+      }
+      return addressParts || '-';
+    }
+
+    if (value === null || value === undefined || value === '') return '-';
 
     // Lookup → clickable link showing resolved label (not raw UUID)
     if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
@@ -331,31 +357,6 @@ export default function RecordDetailPage({
     if (fieldType === 'Address' && typeof value === 'object') {
       const parts = [value.street, value.city, value.state, value.postalCode, value.country].filter(Boolean);
       return parts.length > 0 ? parts.join(', ') : '-';
-    }
-
-    // LocationSearch — show map preview based on targetFields
-    if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
-      const tf = fieldDef.targetFields;
-      const lat = tf.lat ? Number(record[tf.lat]) : NaN;
-      const lng = tf.lng ? Number(record[tf.lng]) : NaN;
-      const addressParts = [
-        tf.street ? record[tf.street] : null,
-        tf.city ? record[tf.city] : null,
-        tf.state ? record[tf.state] : null,
-        tf.postalCode ? record[tf.postalCode] : null,
-        tf.country ? record[tf.country] : null,
-      ].filter(Boolean).join(', ');
-
-      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-        return (
-          <LocationMapPreview
-            lat={lat}
-            lng={lng}
-            address={addressParts || undefined}
-          />
-        );
-      }
-      return addressParts || '-';
     }
 
     // Date → MM-DD-YYYY
