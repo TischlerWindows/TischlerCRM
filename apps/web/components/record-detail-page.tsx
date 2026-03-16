@@ -11,6 +11,7 @@ import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from
 import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
+import RecordMap from '@/components/record-map';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -626,6 +627,32 @@ export default function RecordDetailPage({
             No page layout configured for this record.
           </div>
         )}
+
+        {/* Google Maps — auto-renders if an Address field has data and Google Maps is enabled */}
+        {record && objectDef && (() => {
+          // Find all Address fields in the schema for this object
+          const addressFields = (objectDef.fields || []).filter(
+            (f: FieldDef) => normalizeFieldType(f.type) === 'Address'
+          );
+          if (addressFields.length === 0) return null;
+
+          return addressFields.map((field: FieldDef) => {
+            // Try to resolve the address value from the record
+            let addrValue = record[field.apiName] || record[field.apiName.replace(/^[A-Za-z]+__/, '')];
+            if (typeof addrValue === 'string') {
+              try { addrValue = JSON.parse(addrValue); } catch { /* keep as string */ }
+            }
+            if (!addrValue) return null;
+
+            return (
+              <RecordMap
+                key={field.apiName}
+                address={addrValue}
+                label={field.label || 'Location'}
+              />
+            );
+          });
+        })()}
       </div>
 
       {/* Edit dialog — re-uses the SAME layout */}

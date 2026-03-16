@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Save, Building2, Globe, Phone, Mail, MapPin } from 'lucide-react';
+import { Save, Building2, Globe, Phone, Mail, MapPin, Settings2 } from 'lucide-react';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsContentCard } from '@/components/settings/settings-content-card';
 import { apiClient } from '@/lib/api-client';
@@ -112,8 +112,9 @@ export default function CompanySettingsPage() {
   return (
     <div>
       <SettingsPageHeader
+        icon={Settings2}
         title="Company Settings"
-        description="Configure your organization's basic information"
+        subtitle="Configure your organization's basic information"
       />
 
       <div className="p-6 space-y-6">

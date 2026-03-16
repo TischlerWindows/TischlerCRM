@@ -13,6 +13,7 @@ import {
   Settings2,
   ArrowRight,
   Home,
+  Plug,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -60,6 +61,7 @@ export default function SettingsPage() {
     { title: 'Recycle Bin', icon: Trash2, href: '/settings/recycle-bin', description: 'Restore deleted records', color: '#da291c' },
     { title: 'Security', icon: Lock, href: '/settings/security', description: 'Login history and access monitoring', color: '#059669' },
     { title: 'Backups', icon: Database, href: '/settings/backups', description: 'Database snapshots and restore', color: '#d97706' },
+    { title: 'Integrations', icon: Plug, href: '/settings/integrations', description: 'Connect Google Maps, Dropbox, Outlook & more', color: '#4285F4' },
   ];
 
   return (
