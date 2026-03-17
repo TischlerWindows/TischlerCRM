@@ -42,6 +42,7 @@ export function SettingsFilterBar({
             value={searchValue || ''}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
+            autoComplete="off"
             className="w-full py-2.5 pl-10 pr-4 border border-gray-200 rounded-[10px] text-[13px] bg-gray-50/50 outline-none focus:border-brand-navy focus:bg-white focus:shadow-[0_0_0_3px_rgba(21,31,109,0.08)] transition-all"
           />
         </div>
