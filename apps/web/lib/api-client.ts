@@ -58,6 +58,14 @@ class ApiClient {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
       let errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
 
+      // Parse Zod-style validation errors (fieldErrors / formErrors)
+      if (!errorData.error && errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
+        const fieldMsgs = Object.entries(errorData.fieldErrors)
+          .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(', ')}`)
+          .join('; ');
+        if (fieldMsgs) errorMessage = `Validation failed: ${fieldMsgs}`;
+      }
+
       // On 401 (expired/invalid token), clear stale credentials and redirect
       // to login so the user can re-authenticate instead of seeing empty pages.
       // Guard against redirect loop: don't redirect if we're already on /login.

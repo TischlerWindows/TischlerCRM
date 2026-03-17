@@ -106,7 +106,11 @@ export async function usersAdminRoutes(app: FastifyInstance) {
 
   app.post('/admin/users', async (req, reply) => {
     const parsed = createUserSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      const msgs = Object.entries(flat.fieldErrors).map(([f, m]) => `${f}: ${(m as string[]).join(', ')}`);
+      return reply.code(400).send({ error: msgs.join('; ') || 'Validation error', details: flat });
+    }
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: 'Email already registered' });
     const passwordHash = hashPassword(parsed.data.password);
@@ -157,7 +161,11 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const parsed = updateUserSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) {
+      const flat = parsed.error.flatten();
+      const msgs = Object.entries(flat.fieldErrors).map(([f, m]) => `${f}: ${(m as string[]).join(', ')}`);
+      return reply.code(400).send({ error: msgs.join('; ') || 'Validation error', details: flat });
+    }
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: 'User not found' });
 
