@@ -253,6 +253,11 @@ export function buildApp() {
   // Admin route guard — enforce crm-security Pillar 4
   app.addHook('onRequest', async (req, reply) => {
     if (!req.routerPath?.startsWith('/admin')) return;
+    // Allow cron secret auth for scheduled backup endpoint
+    if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
+      const env = loadEnv();
+      if (env.BACKUP_CRON_SECRET && req.headers['x-cron-secret'] === env.BACKUP_CRON_SECRET) return;
+    }
     if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions.' });
     }
