@@ -61,6 +61,28 @@ export async function preloadLookupRecords(objectType: string): Promise<void> {
 }
 
 /**
+ * Extract a display string from a CompositeText value (an object with
+ * name-like sub-fields such as salutation, firstName, lastName — possibly
+ * prefixed with the object/field API name).
+ */
+function resolveCompositeTextValue(obj: any): string | null {
+  if (!obj || typeof obj !== 'object') return null;
+  const keys = Object.keys(obj);
+  const findVal = (pattern: string) => {
+    const k = keys.find(k => k.toLowerCase().includes(pattern));
+    return k ? obj[k] : undefined;
+  };
+  const salutation = obj.salutation || findVal('salutation');
+  const firstName = obj.firstName || findVal('firstname');
+  const lastName = obj.lastName || findVal('lastname');
+  const parts = [salutation, firstName, lastName].filter(Boolean);
+  if (parts.length > 0) return parts.join(' ');
+  // Fallback: join all string values
+  const allStringVals = Object.values(obj).filter(v => typeof v === 'string' && v) as string[];
+  return allStringVals.length > 0 ? allStringVals.join(' ') : null;
+}
+
+/**
  * Get display name for a lookup field value (resolves ID to name)
  * Synchronous — reads from the in-memory cache. If cache is not yet populated,
  * kicks off background fetch and returns the raw value. Re-render after cache
@@ -95,15 +117,18 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
   if (record) {
     // Return appropriate display field based on object type
     if (objectType === 'Contact') {
-      const name = record.name;
-      if (name && typeof name === 'object') {
-        const parts = [name.salutation, name.firstName, name.lastName].filter(Boolean);
-        if (parts.length > 0) return parts.join(' ');
+      // Check both unprefixed and prefixed name fields
+      const nameObj = record.name || record.Contact__name;
+      if (nameObj && typeof nameObj === 'object') {
+        const resolved = resolveCompositeTextValue(nameObj);
+        if (resolved) return resolved;
       }
-      if (record.firstName || record.lastName) {
-        return `${record.firstName || ''} ${record.lastName || ''}`.trim();
+      const fn = record.firstName || record.Contact__firstName;
+      const ln = record.lastName || record.Contact__lastName;
+      if (fn || ln) {
+        return `${fn || ''} ${ln || ''}`.trim();
       }
-      return record.contactNumber || record.email || stringValue;
+      return record.contactNumber || record.Contact__contactNumber || record.email || record.Contact__email || stringValue;
     }
     if (objectType === 'Account') {
       return record.accountName || record.Account__accountName || record.accountNumber || stringValue;
@@ -138,11 +163,23 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
     // Generic fallback - look for any name or number field
     const keys = Object.keys(record);
     const anyNameField = keys.find(k => k.toLowerCase().includes('name') && record[k]);
-    if (anyNameField) return String(record[anyNameField]);
+    if (anyNameField) {
+      const nameVal = record[anyNameField];
+      if (typeof nameVal === 'object' && nameVal !== null) {
+        const resolved = resolveCompositeTextValue(nameVal);
+        if (resolved) return resolved;
+      }
+      return String(nameVal);
+    }
     const anyNumberField = keys.find(k => k.toLowerCase().includes('number') && record[k]);
     if (anyNumberField) return String(record[anyNumberField]);
     
-    return record.name || record.label || record.title || stringValue;
+    const fallbackName = record.name || record.label || record.title;
+    if (fallbackName && typeof fallbackName === 'object') {
+      const resolved = resolveCompositeTextValue(fallbackName);
+      if (resolved) return resolved;
+    }
+    return fallbackName ? String(fallbackName) : stringValue;
   }
   
   return stringValue;

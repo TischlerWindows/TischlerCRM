@@ -469,7 +469,27 @@ export default function DynamicForm({
       return `${record[firstNameKey || ''] || ''} ${record[lastNameKey || ''] || ''}`.trim();
     }
     const nameKey = keys.find((key) => key.toLowerCase().endsWith('__name'));
-    if (nameKey && record[nameKey]) return record[nameKey];
+    if (nameKey && record[nameKey]) {
+      const nameVal = record[nameKey];
+      if (typeof nameVal === 'object' && nameVal !== null) {
+        // CompositeText: extract display text from the object
+        const nameKeys = Object.keys(nameVal);
+        const findVal = (pattern: string) => {
+          const k = nameKeys.find(nk => nk.toLowerCase().includes(pattern));
+          return k ? nameVal[k] : undefined;
+        };
+        const parts = [
+          nameVal.salutation || findVal('salutation'),
+          nameVal.firstName || findVal('firstname'),
+          nameVal.lastName || findVal('lastname'),
+        ].filter(Boolean);
+        if (parts.length > 0) return parts.join(' ');
+        // Fallback: join all string values
+        const allStringVals = Object.values(nameVal).filter(v => typeof v === 'string' && v);
+        if (allStringVals.length > 0) return allStringVals.join(' ');
+      }
+      return String(nameVal);
+    }
     const accountKey = keys.find((key) => key.toLowerCase().endsWith('__accountname'));
     if (accountKey && record[accountKey]) return record[accountKey];
     const propertyKey = keys.find((key) => key.toLowerCase().endsWith('__propertynumber'));
@@ -479,7 +499,25 @@ export default function DynamicForm({
     
     // Final fallback - use any "name" or "number" field
     const anyNameField = keys.find((key) => key.toLowerCase().includes('name') && record[key]);
-    if (anyNameField && record[anyNameField]) return String(record[anyNameField]);
+    if (anyNameField && record[anyNameField]) {
+      const val = record[anyNameField];
+      if (typeof val === 'object' && val !== null) {
+        const objKeys = Object.keys(val);
+        const findVal = (pattern: string) => {
+          const k = objKeys.find(nk => nk.toLowerCase().includes(pattern));
+          return k ? val[k] : undefined;
+        };
+        const parts = [
+          val.salutation || findVal('salutation'),
+          val.firstName || findVal('firstname'),
+          val.lastName || findVal('lastname'),
+        ].filter(Boolean);
+        if (parts.length > 0) return parts.join(' ');
+        const allStringVals = Object.values(val).filter(v => typeof v === 'string' && v);
+        if (allStringVals.length > 0) return (allStringVals as string[]).join(' ');
+      }
+      return String(val);
+    }
     const anyNumberField = keys.find((key) => key.toLowerCase().includes('number') && record[key]);
     if (anyNumberField && record[anyNumberField]) return String(record[anyNumberField]);
     
