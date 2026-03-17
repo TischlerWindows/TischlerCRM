@@ -357,10 +357,21 @@ export default function RecordDetailPage({
       );
     }
 
-    // Address (object)
+    // Address (object) — show map preview when lat/lng are available
     if (fieldType === 'Address' && typeof value === 'object') {
       const parts = [value.street, value.city, value.state, value.postalCode, value.country].filter(Boolean);
-      return parts.length > 0 ? parts.join(', ') : '-';
+      const addressText = parts.length > 0 ? parts.join(', ') : '-';
+      const lat = Number(value.lat);
+      const lng = Number(value.lng);
+      if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        return (
+          <div className="space-y-2">
+            <span>{addressText}</span>
+            <LocationMapPreview lat={lat} lng={lng} address={addressText !== '-' ? addressText : undefined} />
+          </div>
+        );
+      }
+      return addressText;
     }
 
     // Date → MM-DD-YYYY

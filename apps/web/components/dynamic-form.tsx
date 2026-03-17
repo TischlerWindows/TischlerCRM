@@ -1231,6 +1231,24 @@ export default function DynamicForm({
         const addressValue = value || {};
         inputElement = (
           <div className="space-y-2 border border-gray-300 rounded-lg p-3">
+            {!isReadOnly && (
+              <AddressAutocomplete
+                disabled={isReadOnly}
+                placeholder="Search for an address..."
+                onAddressSelected={(addr) => {
+                  handleFieldChange(fieldDef.apiName, {
+                    ...addressValue,
+                    street: addr.street,
+                    city: addr.city,
+                    state: addr.state,
+                    postalCode: addr.postalCode,
+                    country: addr.country,
+                    lat: addr.lat,
+                    lng: addr.lng,
+                  });
+                }}
+              />
+            )}
             <Input
               placeholder="Street"
               value={addressValue.street || ''}
