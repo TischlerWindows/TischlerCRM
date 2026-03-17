@@ -141,7 +141,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           )}
         >
           <Briefcase className="w-[18px] h-[18px] flex-shrink-0 text-gray-600" />
-          <span className="text-[13px] font-medium">Object Manager</span>
+          <span className="text-sm font-medium">Object Manager</span>
         </Link>
       </div>
 
@@ -186,7 +186,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                     title="Coming soon"
                   >
                     <item.icon className="flex-shrink-0 w-[18px] h-[18px] text-gray-300" />
-                    <span className="text-[13px] text-gray-400">{item.name}</span>
+                    <span className="text-sm text-gray-400">{item.name}</span>
                   </div>
                 );
               }
@@ -199,7 +199,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                     'flex items-center gap-2.5 rounded-lg transition-all duration-150 my-0.5 px-3 py-2',
                     active
                       ? 'bg-[#ede9f5] text-[#151f6d] font-semibold shadow-[inset_3px_0_0_#da291c]'
-                      : 'text-gray-800 hover:bg-gray-100 hover:text-gray-900'
+                      : 'text-gray-800 font-medium hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
                   <item.icon
@@ -208,7 +208,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                       active ? 'text-[#151f6d]' : 'text-gray-500'
                     )}
                   />
-                  <span className="text-[13px]">{item.name}</span>
+                  <span className="text-sm">{item.name}</span>
                 </Link>
               );
             })}
