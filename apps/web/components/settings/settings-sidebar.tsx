@@ -136,11 +136,11 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           className={cn(
             'flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 transition-all duration-150',
             isActive('/object-manager')
-              ? 'bg-[#ede9f5] text-gray-900 font-semibold shadow-[inset_3px_0_0_#da291c]'
-              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              ? 'bg-[#ede9f5] text-[#151f6d] font-semibold shadow-[inset_3px_0_0_#da291c]'
+              : 'bg-gray-50 text-gray-800 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
-          <Briefcase className="w-[18px] h-[18px] flex-shrink-0 text-gray-500" />
+          <Briefcase className="w-[18px] h-[18px] flex-shrink-0 text-gray-600" />
           <span className="text-[13px] font-medium">Object Manager</span>
         </Link>
       </div>
@@ -198,14 +198,14 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                   className={cn(
                     'flex items-center gap-2.5 rounded-lg transition-all duration-150 my-0.5 px-3 py-2',
                     active
-                      ? 'bg-[#ede9f5] text-gray-900 font-semibold shadow-[inset_3px_0_0_#da291c]'
-                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      ? 'bg-[#ede9f5] text-[#151f6d] font-semibold shadow-[inset_3px_0_0_#da291c]'
+                      : 'text-gray-800 hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
                   <item.icon
                     className={cn(
                       'flex-shrink-0 w-[18px] h-[18px]',
-                      active ? 'text-gray-700' : 'text-gray-400'
+                      active ? 'text-[#151f6d]' : 'text-gray-500'
                     )}
                   />
                   <span className="text-[13px]">{item.name}</span>
