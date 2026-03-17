@@ -557,6 +557,11 @@ interface Summary {
     totalPerUnit: string;
     totalPerPosition: string;
   };
+  quoteTotals: {
+    euroWindows: { full: string; pct: string; final: string; finalAdj: string };
+    doubleHung: { full: string; pct: string; final: string; finalAdj: string };
+    euroDoors: { full: string; pct: string; final: string; finalAdj: string };
+  };
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -760,6 +765,11 @@ export default function SummaryPage() {
       magneticContact: {
         totalPerUnit: '',
         totalPerPosition: ''
+      },
+      quoteTotals: {
+        euroWindows: { full: '', pct: '', final: '', finalAdj: '' },
+        doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
+        euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
@@ -2148,10 +2158,11 @@ export default function SummaryPage() {
                                   <td className="px-6 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
                                   <td className="px-6 py-3 text-right text-gray-700">{fmt(euroWindowSqFt)}</td>
                                   <td className="px-6 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
+                                  {['full','pct','final','finalAdj'].map(f => (
+                                    <td key={`ew-${f}`} className="px-2 py-1">
+                                      <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    </td>
+                                  ))}
                                 </tr>
                                 <tr className="hover:bg-gray-50">
                                   <td className="px-6 py-3 font-medium text-gray-900">Double Hung</td>
@@ -2159,10 +2170,11 @@ export default function SummaryPage() {
                                   <td className="px-6 py-3 text-right text-gray-400">—</td>
                                   <td className="px-6 py-3 text-right text-gray-400">—</td>
                                   <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
+                                  {['full','pct','final','finalAdj'].map(f => (
+                                    <td key={`dh-${f}`} className="px-2 py-1">
+                                      <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    </td>
+                                  ))}
                                 </tr>
                                 <tr className="hover:bg-gray-50">
                                   <td className="px-6 py-3 font-medium text-gray-900">Euro Doors</td>
@@ -2170,10 +2182,11 @@ export default function SummaryPage() {
                                   <td className="px-6 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
                                   <td className="px-6 py-3 text-right text-gray-700">{fmt(doorSqFt)}</td>
                                   <td className="px-6 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
+                                  {['full','pct','final','finalAdj'].map(f => (
+                                    <td key={`ed-${f}`} className="px-2 py-1">
+                                      <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    </td>
+                                  ))}
                                 </tr>
                                 <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                                   <td className="px-6 py-3 text-gray-900">Grand Total</td>
@@ -2181,10 +2194,11 @@ export default function SummaryPage() {
                                   <td className="px-6 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
                                   <td className="px-6 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
                                   <td className="px-6 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">—</td>
+                                  {['full','pct','final','finalAdj'].map(f => {
+                                    const qt = editingSummary.quoteTotals;
+                                    const sum = (parseFloat(qt?.euroWindows?.[f as keyof typeof qt.euroWindows] || '0') || 0) + (parseFloat(qt?.doubleHung?.[f as keyof typeof qt.doubleHung] || '0') || 0) + (parseFloat(qt?.euroDoors?.[f as keyof typeof qt.euroDoors] || '0') || 0);
+                                    return <td key={`gt-${f}`} className="px-6 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
+                                  })}
                                 </tr>
                               </>
                             );
