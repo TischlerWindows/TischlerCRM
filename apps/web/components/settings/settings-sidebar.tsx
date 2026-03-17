@@ -98,10 +98,10 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
   // When collapsed, render only a thin expand strip
   if (collapsed) {
     return (
-      <aside className="fixed top-12 bottom-0 left-0 z-40 w-[20px] flex items-start justify-center pt-4 transition-[width] duration-200 ease-in-out bg-[#151f6d]">
+      <aside className="fixed top-12 bottom-0 left-0 z-40 w-[20px] flex items-start justify-center pt-4 transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200">
         <button
           onClick={onToggleCollapse}
-          className="flex items-center justify-center w-5 h-8 rounded-r-md bg-white/10 text-white/50 hover:bg-white/20 hover:text-white transition-all"
+          className="flex items-center justify-center w-5 h-8 rounded-r-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all"
           title="Expand sidebar"
         >
           <ChevronRight className="w-3.5 h-3.5" />
@@ -112,18 +112,17 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
 
   return (
     <aside
-      className="fixed top-12 bottom-0 left-0 z-40 flex flex-col w-[260px] transition-[width] duration-200 ease-in-out"
-      style={{ background: 'linear-gradient(180deg, #151f6d 0%, #0f1754 100%)' }}
+      className="fixed top-12 bottom-0 left-0 z-40 flex flex-col w-[260px] transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200"
     >
       {/* Header */}
-      <div className="flex items-start justify-between border-b border-white/10 px-5 py-5 pb-3">
+      <div className="flex items-start justify-between border-b border-gray-200 px-5 py-5 pb-3">
         <div>
-          <h2 className="text-base font-bold text-white">Settings</h2>
-          <p className="text-[11px] text-white/45 mt-0.5">Configure your CRM</p>
+          <h2 className="text-base font-bold text-gray-900">Settings</h2>
+          <p className="text-[11px] text-gray-400 mt-0.5">Configure your CRM</p>
         </div>
         <button
           onClick={onToggleCollapse}
-          className="flex items-center justify-center rounded-md bg-white/8 text-white/40 hover:bg-white/15 hover:text-white/80 transition-all flex-shrink-0 w-7 h-7 mt-0.5"
+          className="flex items-center justify-center rounded-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all flex-shrink-0 w-7 h-7 mt-0.5"
           title="Collapse sidebar"
         >
           <ChevronLeft className="w-3.5 h-3.5" />
@@ -137,11 +136,11 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           className={cn(
             'flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 transition-all duration-150',
             isActive('/object-manager')
-              ? 'bg-white/[0.14] text-white font-semibold shadow-[inset_3px_0_0_#da291c]'
-              : 'bg-white/[0.08] text-white/80 hover:bg-white/[0.14] hover:text-white'
+              ? 'bg-[#ede9f5] text-gray-900 font-semibold shadow-[inset_3px_0_0_#da291c]'
+              : 'bg-gray-50 text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
-          <Briefcase className="w-[18px] h-[18px] flex-shrink-0" />
+          <Briefcase className="w-[18px] h-[18px] flex-shrink-0 text-gray-500" />
           <span className="text-[13px] font-medium">Object Manager</span>
         </Link>
       </div>
@@ -149,18 +148,18 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
       {/* Search */}
       <div className="px-3 py-3">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/35" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
             type="text"
             placeholder="Search settings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white/10 border border-white/8 rounded-lg py-2 pl-9 pr-3 text-[13px] text-white placeholder:text-white/35 outline-none focus:bg-white/15 focus:border-white/20 transition-colors"
+            className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-gray-300 transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               ×
             </button>
@@ -172,7 +171,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
       <nav className="flex-1 overflow-y-auto px-2 pb-5">
         {filteredGroups.map((group) => (
           <div key={group.title}>
-            <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-white/35">
+            <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
               {group.title}
             </div>
 
@@ -186,8 +185,8 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                     className="flex items-center gap-2.5 rounded-lg opacity-40 cursor-not-allowed my-0.5 px-3 py-2"
                     title="Coming soon"
                   >
-                    <item.icon className="flex-shrink-0 w-[18px] h-[18px]" style={{ color: 'rgba(255,255,255,0.5)' }} />
-                    <span className="text-[13px] text-white/50">{item.name}</span>
+                    <item.icon className="flex-shrink-0 w-[18px] h-[18px] text-gray-300" />
+                    <span className="text-[13px] text-gray-400">{item.name}</span>
                   </div>
                 );
               }
@@ -199,14 +198,14 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                   className={cn(
                     'flex items-center gap-2.5 rounded-lg transition-all duration-150 my-0.5 px-3 py-2',
                     active
-                      ? 'bg-white/[0.14] text-white font-semibold shadow-[inset_3px_0_0_#da291c]'
-                      : 'text-white/65 hover:bg-white/[0.08] hover:text-white/90'
+                      ? 'bg-[#ede9f5] text-gray-900 font-semibold shadow-[inset_3px_0_0_#da291c]'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
                   <item.icon
                     className={cn(
                       'flex-shrink-0 w-[18px] h-[18px]',
-                      active ? 'opacity-100' : 'opacity-60'
+                      active ? 'text-gray-700' : 'text-gray-400'
                     )}
                   />
                   <span className="text-[13px]">{item.name}</span>
