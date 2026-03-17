@@ -115,6 +115,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     picklistPosition: 'left' as 'left' | 'right',
     relationshipName: '',
     lookupObject: '',
+    lookupField: '',
     staticUrl: '',
     targetFields: {} as Record<string, string>,
   });
@@ -155,6 +156,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       type,
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' ? formData.picklistValues : [],
       lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
+      lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
       relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
@@ -186,6 +188,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       picklistPosition: 'left' as 'left' | 'right',
       relationshipName: '',
       lookupObject: '',
+      lookupField: '',
       staticUrl: '',
       targetFields: {},
     });
@@ -218,6 +221,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       picklistPosition: (cloned as any).picklistPosition || 'left',
       relationshipName: cloned.relationshipName || '',
       lookupObject: cloned.lookupObject || '',
+      lookupField: cloned.lookupField || '',
       staticUrl: cloned.staticUrl || '',
       targetFields: cloned.targetFields ? { ...cloned.targetFields } : {},
     });
@@ -289,6 +293,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     if (t === 'Lookup' || t === 'ExternalLookup' || t === 'PicklistLookup') {
       newField.relationshipName = formData.relationshipName;
       newField.lookupObject = formData.lookupObject;
+      if (formData.lookupField) newField.lookupField = formData.lookupField;
     }
     if (t === 'LookupUser') {
       newField.lookupObject = 'User';
@@ -707,40 +712,67 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                   )}
 
                   {(selectedType === 'Lookup' || selectedType === 'ExternalLookup') && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="lookupObject">Related To (Object)</Label>
-                        <select
-                          id="lookupObject"
-                          value={formData.lookupObject}
-                          onChange={(e) => {
-                            const selectedObj = schema?.objects.find(o => o.apiName === e.target.value);
-                            setFormData({
-                              ...formData,
-                              lookupObject: e.target.value,
-                              relationshipName: selectedObj?.pluralLabel || selectedObj?.label || e.target.value,
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
-                        >
-                          <option value="">-- Select Object --</option>
-                          {schema?.objects
-                            .filter(o => o.apiName !== objectApiName)
-                            .sort((a, b) => a.label.localeCompare(b.label))
-                            .map(o => (
-                              <option key={o.apiName} value={o.apiName}>{o.label}</option>
-                            ))}
-                        </select>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="lookupObject">Related To (Object)</Label>
+                          <select
+                            id="lookupObject"
+                            value={formData.lookupObject}
+                            onChange={(e) => {
+                              const selectedObj = schema?.objects.find(o => o.apiName === e.target.value);
+                              setFormData({
+                                ...formData,
+                                lookupObject: e.target.value,
+                                lookupField: '',
+                                relationshipName: selectedObj?.pluralLabel || selectedObj?.label || e.target.value,
+                              });
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                          >
+                            <option value="">-- Select Object --</option>
+                            {schema?.objects
+                              .filter(o => o.apiName !== objectApiName)
+                              .sort((a, b) => a.label.localeCompare(b.label))
+                              .map(o => (
+                                <option key={o.apiName} value={o.apiName}>{o.label}</option>
+                              ))}
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor="relationshipName">Relationship Name</Label>
+                          <Input
+                            id="relationshipName"
+                            value={formData.relationshipName}
+                            onChange={(e) => setFormData({ ...formData, relationshipName: e.target.value })}
+                            placeholder="e.g., account"
+                          />
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="relationshipName">Relationship Name</Label>
-                        <Input
-                          id="relationshipName"
-                          value={formData.relationshipName}
-                          onChange={(e) => setFormData({ ...formData, relationshipName: e.target.value })}
-                          placeholder="e.g., account"
-                        />
-                      </div>
+                      {formData.lookupObject && (
+                        <div>
+                          <Label htmlFor="lookupField">Lookup Field</Label>
+                          <select
+                            id="lookupField"
+                            value={formData.lookupField}
+                            onChange={(e) => setFormData({ ...formData, lookupField: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                          >
+                            <option value="">-- Use Default (Name) --</option>
+                            {schema?.objects
+                              .find(o => o.apiName === formData.lookupObject)
+                              ?.fields
+                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'PicklistLookup')
+                              .sort((a, b) => a.label.localeCompare(b.label))
+                              .map(f => (
+                                <option key={f.apiName} value={f.apiName}>{f.label} ({f.type})</option>
+                              ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Choose which field from the related object to display. Defaults to the Name field if not set.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -828,6 +860,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                               setFormData({
                                 ...formData,
                                 lookupObject: e.target.value,
+                                lookupField: '',
                                 relationshipName: selectedObj?.pluralLabel || selectedObj?.label || e.target.value,
                               });
                             }}
@@ -852,6 +885,30 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                           />
                         </div>
                       </div>
+                      {formData.lookupObject && (
+                        <div>
+                          <Label htmlFor="lookupFieldPL">Lookup Field</Label>
+                          <select
+                            id="lookupFieldPL"
+                            value={formData.lookupField}
+                            onChange={(e) => setFormData({ ...formData, lookupField: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                          >
+                            <option value="">-- Use Default (Name) --</option>
+                            {schema?.objects
+                              .find(o => o.apiName === formData.lookupObject)
+                              ?.fields
+                              .filter(f => f.type !== 'Lookup' && f.type !== 'ExternalLookup' && f.type !== 'LookupUser' && f.type !== 'PicklistLookup')
+                              .sort((a, b) => a.label.localeCompare(b.label))
+                              .map(f => (
+                                <option key={f.apiName} value={f.apiName}>{f.label} ({f.type})</option>
+                              ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Choose which field from the related object to display. Defaults to the Name field if not set.
+                          </p>
+                        </div>
+                      )}
                       <div>
                         <Label htmlFor="picklistPosition">Picklist Position</Label>
                         <select

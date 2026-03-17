@@ -76,6 +76,7 @@ export interface FieldDef {
   picklistDependencies?: PicklistDependencyRule[]; // conditional visibility for picklist values
   formulaExpr?: string;        // for formula fields
   lookupObject?: string;       // target object for lookup fields
+  lookupField?: string;        // which field on the target object to display
   relationshipName?: string;   // name to display for relationship
   dependentValues?: { [controllingValue: string]: string[] }; // dependent picklist values
   relationship?: {
