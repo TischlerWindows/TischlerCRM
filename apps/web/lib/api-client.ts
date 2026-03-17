@@ -346,6 +346,17 @@ class ApiClient {
     return this.request<any>(`/admin/backups/${backupId}/restore`, { method: 'POST' });
   }
 
+  async getBackupStatus() {
+    return this.request<{
+      usingDedicatedDb: boolean;
+      totalBackups: number;
+      totalSizeMB: string;
+      daily: { count: number; maxRetained: number; lastBackup: string | null };
+      weekly: { count: number; maxRetained: number; lastBackup: string | null };
+      manual: { count: number; maxRetained: number; lastBackup: string | null };
+    }>('/admin/backup/status');
+  }
+
   // Settings (org-level)
   async getSettings() {
     return this.request<Record<string, any>>('/settings');

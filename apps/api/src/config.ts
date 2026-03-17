@@ -15,6 +15,8 @@ const EnvSchema = z.object({
   PORT: z.string().optional().default('4000'),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
+  BACKUP_DATABASE_URL: z.string().optional(),
+  BACKUP_CRON_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

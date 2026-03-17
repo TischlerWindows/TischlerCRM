@@ -138,6 +138,8 @@ export function buildApp() {
     if (req.routerPath && req.routerPath.startsWith('/auth')) return;
     if (req.routerPath === '/health') return;
     if (req.routerPath === '/places/static-map') return; // auth handled in route via query token
+    // Allow cron secret auth for scheduled backup endpoint
+    if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
       return reply.code(401).send({ error: 'Missing bearer token' });
