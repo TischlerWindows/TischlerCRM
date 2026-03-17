@@ -540,6 +540,9 @@ interface Summary {
   jobType: string;
   estimator: string;
   date: string;
+  address: string;
+  quoteType: 'first' | 'requote' | '';
+  requoteDescription: string;
   rows: SummaryRow[];
   doorRows: DoorRow[];
   shadeBoxesNoSideTrim: {
@@ -584,6 +587,7 @@ export default function SummaryPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
+  const [activePage, setActivePage] = useState<1 | 2>(1);
   const router = useRouter();
 
   useEffect(() => {
@@ -668,6 +672,9 @@ export default function SummaryPage() {
       jobType: '',
       estimator: '',
       date: '',
+      address: '',
+      quoteType: '',
+      requoteDescription: '',
       rows: [{
         id: Date.now().toString(),
         tusPosition: '',
@@ -1933,12 +1940,39 @@ export default function SummaryPage() {
                   onClick={() => {
                     setShowNewSummary(false);
                     setEditingSummary(null);
+                    setActivePage(1);
                   }}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
+            </div>
+
+            {/* Page Tabs */}
+            <div className="border-b border-gray-200 px-6 print:hidden">
+              <nav className="flex gap-4">
+                <button
+                  onClick={() => setActivePage(1)}
+                  className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                    activePage === 1
+                      ? 'border-brand-navy text-brand-navy'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Page 1 — Data Entry
+                </button>
+                <button
+                  onClick={() => setActivePage(2)}
+                  className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                    activePage === 2
+                      ? 'border-brand-navy text-brand-navy'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Page 2 — Project Summary
+                </button>
+              </nav>
             </div>
             
             {/* Print Header */}
@@ -1950,6 +1984,122 @@ export default function SummaryPage() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+
+              {/* ===== PAGE 2 — Project Summary ===== */}
+              {activePage === 2 && (
+                <div className="max-w-3xl mx-auto space-y-8">
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Project Summary</h3>
+                      <p className="text-sm text-gray-500 mt-1">Overview information pulled from the data entry sheet</p>
+                    </div>
+                    <div className="p-6 space-y-5">
+                      {/* Row 1: Date + Opportunity # */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.date ? new Date(editingSummary.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Opportunity #</label>
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.opportunityNumber || '—'}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Project Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
+                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                          {editingSummary.name || '—'}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Name on Page 1</p>
+                      </div>
+
+                      {/* Row 3: Address */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                        <input
+                          type="text"
+                          value={editingSummary.address}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, address: e.target.value })}
+                          maxLength={500}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                          placeholder="Enter project address"
+                        />
+                      </div>
+
+                      {/* Row 4: First Quote or Requote */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">First Quote or Requote</label>
+                        <div className="flex items-center gap-6">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="quoteType"
+                              value="first"
+                              checked={editingSummary.quoteType === 'first'}
+                              onChange={() => setEditingSummary({ ...editingSummary, quoteType: 'first', requoteDescription: '' })}
+                              className="w-4 h-4 text-brand-navy focus:ring-brand-navy/40 border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">First Quote</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="quoteType"
+                              value="requote"
+                              checked={editingSummary.quoteType === 'requote'}
+                              onChange={() => setEditingSummary({ ...editingSummary, quoteType: 'requote' })}
+                              className="w-4 h-4 text-brand-navy focus:ring-brand-navy/40 border-gray-300"
+                            />
+                            <span className="text-sm text-gray-700">Requote</span>
+                          </label>
+                        </div>
+                        {editingSummary.quoteType === 'requote' && (
+                          <div className="mt-3">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description of Changes</label>
+                            <textarea
+                              value={editingSummary.requoteDescription}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, requoteDescription: e.target.value })}
+                              rows={3}
+                              maxLength={2000}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                              placeholder="Describe what changed from the previous quote..."
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Row 5: Salesman + Estimator */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Salesman</label>
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.salesman || '—'}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Estimator</label>
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.estimator || '—'}
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ===== PAGE 1 — Data Entry (existing content) ===== */}
+              {activePage === 1 && (<>
               {/* Basic Info */}
               <div className="grid grid-cols-6 gap-3 print-summary-info">
                 <div>
@@ -2472,25 +2622,46 @@ export default function SummaryPage() {
                 </div>
               </div>
             
+              </>)}
+            </div>
+
             <div className="p-6 border-t border-gray-200 flex justify-between items-center print:hidden">
               <button
                 onClick={() => {
                   setShowNewSummary(false);
                   setEditingSummary(null);
+                  setActivePage(1);
                 }}
                 className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSaveSummary}
-                className="inline-flex items-center px-6 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
-              >
-                <Save className="w-4 h-4 mr-2" />
-                Save Summary
-              </button>
+              <div className="flex items-center gap-3">
+                {activePage === 1 && (
+                  <button
+                    onClick={() => setActivePage(2)}
+                    className="px-6 py-2 text-sm border border-brand-navy text-brand-navy rounded-lg hover:bg-brand-navy/5 transition-colors"
+                  >
+                    Next: Page 2 →
+                  </button>
+                )}
+                {activePage === 2 && (
+                  <button
+                    onClick={() => setActivePage(1)}
+                    className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    ← Back to Page 1
+                  </button>
+                )}
+                <button
+                  onClick={handleSaveSummary}
+                  className="inline-flex items-center px-6 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Summary
+                </button>
+              </div>
             </div>
-          </div>
         </div>
       </div>
     )}
