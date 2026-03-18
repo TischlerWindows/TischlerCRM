@@ -322,7 +322,7 @@ class ApiClient {
   }
   // Backups
   async createBackup() {
-    return this.request<any>('/admin/backup', { method: 'POST' });
+    return this.request<any>('/admin/backup', { method: 'POST', body: '{}' });
   }
 
   async getBackups() {
@@ -343,7 +343,7 @@ class ApiClient {
   }
 
   async restoreBackup(backupId: string) {
-    return this.request<any>(`/admin/backups/${backupId}/restore`, { method: 'POST' });
+    return this.request<any>(`/admin/backups/${backupId}/restore`, { method: 'POST', body: '{}' });
   }
 
   async getBackupStatus() {
