@@ -112,7 +112,6 @@ export function buildApp() {
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
 
     const user = await authenticate(parsed.data.email, parsed.data.password);
-    const ip = extractIp(req);
     const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
 
     if (!user) {
