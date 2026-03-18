@@ -2150,6 +2150,17 @@ export default function SummaryPage() {
                             const totalSqFt = euroWindowSqFt + doorSqFt;
                             const totalNet = euroWindowNet + doorNet;
 
+                            // Calculated summary rows
+                            const qtot = editingSummary.quoteTotals;
+                            const fullSum = (parseFloat(qtot?.euroWindows?.full || '0') || 0) + (parseFloat(qtot?.doubleHung?.full || '0') || 0) + (parseFloat(qtot?.euroDoors?.full || '0') || 0);
+                            const pctSum = (parseFloat(qtot?.euroWindows?.pct || '0') || 0) + (parseFloat(qtot?.doubleHung?.pct || '0') || 0) + (parseFloat(qtot?.euroDoors?.pct || '0') || 0);
+                            const finalSumVal = (parseFloat(qtot?.euroWindows?.final || '0') || 0) + (parseFloat(qtot?.doubleHung?.final || '0') || 0) + (parseFloat(qtot?.euroDoors?.final || '0') || 0);
+                            const finalAdjSumVal = (parseFloat(qtot?.euroWindows?.finalAdj || '0') || 0) + (parseFloat(qtot?.doubleHung?.finalAdj || '0') || 0) + (parseFloat(qtot?.euroDoors?.finalAdj || '0') || 0);
+                            const fullCalc = totalNet * fullSum;
+                            const discCalc = pctSum * fullCalc;
+                            const finalCalc = totalNet ? finalSumVal / totalNet : 0;
+                            const finalAdjCalc = totalNet ? finalAdjSumVal / totalNet : 0;
+
                             return (
                               <>
                                 <tr className="hover:bg-gray-50">
@@ -2199,6 +2210,33 @@ export default function SummaryPage() {
                                     const sum = (parseFloat(qt?.euroWindows?.[f as keyof typeof qt.euroWindows] || '0') || 0) + (parseFloat(qt?.doubleHung?.[f as keyof typeof qt.doubleHung] || '0') || 0) + (parseFloat(qt?.euroDoors?.[f as keyof typeof qt.euroDoors] || '0') || 0);
                                     return <td key={`gt-${f}`} className="px-6 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
                                   })}
+                                </tr>
+
+                                {/* ── Separated Calculated Rows ── */}
+                                <tr><td colSpan={9} className="py-1" /></tr>
+                                <tr className="border-t-2 border-gray-400 bg-blue-50/60">
+                                  <td className="px-6 py-3 font-semibold text-gray-900">Full</td>
+                                  <td colSpan={3} />
+                                  <td className="px-6 py-3 text-right font-semibold text-gray-900">{fullCalc ? `€${fmt(fullCalc)}` : '—'}</td>
+                                  <td colSpan={4} />
+                                </tr>
+                                <tr className="bg-blue-50/60">
+                                  <td className="px-6 py-3 font-semibold text-gray-900">Disc</td>
+                                  <td colSpan={3} />
+                                  <td className="px-6 py-3 text-right font-semibold text-gray-900">{discCalc ? `€${fmt(discCalc)}` : '—'}</td>
+                                  <td colSpan={4} />
+                                </tr>
+                                <tr className="bg-blue-50/60">
+                                  <td className="px-6 py-3 font-semibold text-gray-900">Final</td>
+                                  <td colSpan={3} />
+                                  <td className="px-6 py-3 text-right font-semibold text-gray-900">{finalCalc ? fmt(finalCalc) : '—'}</td>
+                                  <td colSpan={4} />
+                                </tr>
+                                <tr className="bg-blue-50/60 border-b-2 border-gray-400">
+                                  <td className="px-6 py-3 font-semibold text-gray-900">Final W/ Adj</td>
+                                  <td colSpan={3} />
+                                  <td className="px-6 py-3 text-right font-semibold text-gray-900">{finalAdjCalc ? fmt(finalAdjCalc) : '—'}</td>
+                                  <td colSpan={4} />
                                 </tr>
                               </>
                             );
