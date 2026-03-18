@@ -162,39 +162,41 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col h-full">
       <SettingsPageHeader
-        icon={<Users className="w-5 h-5 text-[#151f6d]" />}
+        icon={Users}
         title="Users"
         subtitle="Manage team members, profiles, and account access"
         action={{
           label: 'New User',
-          icon: <Plus className="w-4 h-4" />,
+          icon: Plus,
           onClick: () => setShowNewModal(true),
         }}
       />
 
       <SettingsFilterBar
-        search={search}
-        onSearch={setSearch}
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search users…"
         filters={[
           {
-            label: 'All Departments',
             value: deptFilter,
             onChange: setDeptFilter,
-            options: departments.map(d => ({ label: d.name, value: d.id })),
+            options: [
+              { label: 'All Departments', value: '' },
+              ...departments.map(d => ({ label: d.name, value: d.id })),
+            ],
           },
           {
-            label: 'All Statuses',
             value: statusFilter,
             onChange: setStatusFilter,
             options: [
+              { label: 'All Statuses', value: '' },
               { label: 'Active', value: 'active' },
               { label: 'Invite Pending', value: 'pending' },
               { label: 'Frozen', value: 'frozen' },
             ],
           },
         ]}
-        resultCount={filtered.length}
-        resultLabel="users"
+        resultCount={`${filtered.length} user${filtered.length !== 1 ? 's' : ''}`}
       />
 
       <SettingsContentCard>

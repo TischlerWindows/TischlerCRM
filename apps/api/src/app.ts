@@ -284,10 +284,11 @@ export function buildApp() {
 
   // ── Auth guard hook ───────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
-    if (req.routerPath && req.routerPath.startsWith('/auth')) return;
-    if (req.routerPath === '/health') return;
-    if (req.routerPath === '/places/static-map') return;
-    if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
+    const routeUrl = req.routeOptions?.url;
+    if (routeUrl?.startsWith('/auth')) return;
+    if (routeUrl === '/health') return;
+    if (routeUrl === '/places/static-map') return;
+    if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -336,8 +337,8 @@ export function buildApp() {
 
   // ── Admin route guard ─────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
-    if (!req.routerPath?.startsWith('/admin')) return;
-    if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
+    if (!req.routeOptions?.url?.startsWith('/admin')) return;
+    if (req.routeOptions?.url === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
       const env = loadEnv();
       if (env.BACKUP_CRON_SECRET && req.headers['x-cron-secret'] === env.BACKUP_CRON_SECRET) return;
     }
