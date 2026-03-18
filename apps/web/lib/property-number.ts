@@ -491,7 +491,7 @@ export function getPropertyPrefix(address: {
   const iso3 = country ? COUNTRY_TO_ISO3[country] : undefined;
   if (iso3 === 'USA') {
     const stateCode = US_STATE_CODES[state];
-    return stateCode || 'US';
+    return stateCode || 'UNK';
   }
 
   // Non-US: return the ISO alpha-3 code
@@ -504,7 +504,7 @@ export function getPropertyPrefix(address: {
     if (allCodes.has(upper)) {
       if (upper === 'USA') {
         const stateCode = US_STATE_CODES[state];
-        return stateCode || 'US';
+        return stateCode || 'UNK';
       }
       return upper;
     }
