@@ -160,6 +160,16 @@ export default function DynamicForm({
               data[stripped] = field.defaultValue;
             }
           }
+          // Default Address fields to country = 'United States' so the
+          // property-number generator can derive a valid prefix.
+          if (field.type === 'Address' && data[field.apiName] === undefined) {
+            const addrDefault = { street: '', city: '', state: '', postalCode: '', country: 'United States' };
+            data[field.apiName] = addrDefault;
+            const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+            if (stripped !== field.apiName && data[stripped] === undefined) {
+              data[stripped] = addrDefault;
+            }
+          }
         }
       }
 
