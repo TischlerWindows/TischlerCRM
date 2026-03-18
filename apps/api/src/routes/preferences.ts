@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 export async function preferenceRoutes(app: FastifyInstance) {
@@ -52,7 +53,7 @@ export async function preferenceRoutes(app: FastifyInstance) {
 
     const pref = await prisma.userPreference.upsert({
       where: { userId_key: { userId, key } },
-      create: { userId, key, value: parsed.data.value as any },
+      create: { id: generateId('UserPreference'), userId, key, value: parsed.data.value as any },
       update: { value: parsed.data.value as any },
     });
 
@@ -93,7 +94,7 @@ export async function preferenceRoutes(app: FastifyInstance) {
     for (const [key, value] of entries) {
       const pref = await prisma.userPreference.upsert({
         where: { userId_key: { userId, key } },
-        create: { userId, key, value },
+        create: { id: generateId('UserPreference'), userId, key, value },
         update: { value },
       });
       results[pref.key] = pref.value;

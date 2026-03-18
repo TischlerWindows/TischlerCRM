@@ -1,4 +1,5 @@
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 
 /**
  * Core CRM object definitions that must always exist in the database.
@@ -175,6 +176,7 @@ export async function ensureCoreObjects(): Promise<void> {
 
     systemUser = await prisma.user.create({
       data: {
+        id: generateId('User'),
         email: 'admin@crm.local',
         passwordHash,
         name: 'System Admin',
@@ -202,6 +204,7 @@ export async function ensureCoreObjects(): Promise<void> {
     // Object doesn't exist — create it
     const obj = await prisma.customObject.create({
       data: {
+        id: generateId('CustomObject'),
         apiName: objDef.apiName,
         label: objDef.label,
         pluralLabel: objDef.pluralLabel,
@@ -319,6 +322,7 @@ async function syncSchemaObjectsToDb(userId: string): Promise<void> {
       try {
         const dbObj = await prisma.customObject.create({
           data: {
+            id: generateId('CustomObject'),
             apiName: validApiName,
             label: obj.label || validApiName,
             pluralLabel: obj.pluralLabel || obj.label || validApiName,
@@ -340,6 +344,7 @@ async function syncSchemaObjectsToDb(userId: string): Promise<void> {
           try {
             await prisma.customField.create({
               data: {
+                id: generateId('CustomField'),
                 objectId: dbObj.id,
                 apiName: fieldDef.apiName,
                 label: fieldDef.label || fieldDef.apiName,
@@ -394,6 +399,7 @@ async function ensureFields(objectId: string, fields: FieldDef[], userId: string
 
     await prisma.customField.create({
       data: {
+        id: generateId('CustomField'),
         objectId,
         apiName: fieldDef.apiName,
         label: fieldDef.label,
@@ -417,6 +423,7 @@ async function createDefaultLayout(objectId: string, userId: string): Promise<vo
 
   const layout = await prisma.pageLayout.create({
     data: {
+      id: generateId('PageLayout'),
       objectId,
       name: 'Default Layout',
       layoutType: 'edit',
@@ -428,6 +435,7 @@ async function createDefaultLayout(objectId: string, userId: string): Promise<vo
 
   const tab = await prisma.layoutTab.create({
     data: {
+      id: generateId('LayoutTab'),
       layoutId: layout.id,
       label: 'Details',
       order: 0,
@@ -436,6 +444,7 @@ async function createDefaultLayout(objectId: string, userId: string): Promise<vo
 
   const section = await prisma.layoutSection.create({
     data: {
+      id: generateId('LayoutSection'),
       tabId: tab.id,
       label: 'Information',
       columns: 2,
@@ -449,6 +458,7 @@ async function createDefaultLayout(objectId: string, userId: string): Promise<vo
     if (field) {
       await prisma.layoutField.create({
         data: {
+          id: generateId('LayoutField'),
           sectionId: section.id,
           fieldId: field.id,
           column: i % 2,

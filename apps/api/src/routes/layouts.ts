@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const layoutFieldSchema = z.object({
@@ -134,6 +135,7 @@ export async function layoutRoutes(app: FastifyInstance) {
 
     const layout = await prisma.pageLayout.create({
       data: {
+        id: generateId('PageLayout'),
         objectId: object.id,
         name: parsed.data.name,
         layoutType: parsed.data.layoutType,
@@ -142,10 +144,12 @@ export async function layoutRoutes(app: FastifyInstance) {
         modifiedById: userId,
         tabs: {
           create: parsed.data.tabs.map((tab) => ({
+            id: generateId('LayoutTab'),
             label: tab.label,
             order: tab.order,
             sections: {
               create: tab.sections.map((section) => ({
+                id: generateId('LayoutSection'),
                 label: section.label,
                 columns: section.columns,
                 order: section.order,
@@ -153,6 +157,7 @@ export async function layoutRoutes(app: FastifyInstance) {
                   create: section.fields.map((field) => {
                     const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName)!;
                     return {
+                      id: generateId('LayoutField'),
                       fieldId: fieldDef.id,
                       column: field.column,
                       order: field.order,
@@ -248,10 +253,12 @@ export async function layoutRoutes(app: FastifyInstance) {
         ...(parsed.data.tabs && {
           tabs: {
             create: parsed.data.tabs.map((tab) => ({
+              id: generateId('LayoutTab'),
               label: tab.label,
               order: tab.order,
               sections: {
                 create: tab.sections.map((section) => ({
+                  id: generateId('LayoutSection'),
                   label: section.label,
                   columns: section.columns,
                   order: section.order,
@@ -261,6 +268,7 @@ export async function layoutRoutes(app: FastifyInstance) {
                         (f) => f.apiName === field.fieldApiName
                       )!;
                       return {
+                        id: generateId('LayoutField'),
                         fieldId: fieldDef.id,
                         column: field.column,
                         order: field.order,

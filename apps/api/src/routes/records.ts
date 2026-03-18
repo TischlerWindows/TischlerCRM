@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -148,9 +149,9 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.send(records);
   });
 
-  // Get single record
+  // Get single record — accepts either a standardized recordId or a UUID
   app.get('/objects/:apiName/records/:recordId', async (req, reply) => {
-    const { apiName, recordId } = req.params as { apiName: string; recordId: string };
+    const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
 
     const userId = req.user!.sub;
     const userRole = req.user!.role;
@@ -166,10 +167,7 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     const record = await prisma.record.findFirst({
-      where: {
-        id: recordId,
-        objectId: object.id,
-      },
+      where: { id: idParam, objectId: object.id },
       include: {
         pageLayout: {
           select: {
@@ -321,12 +319,22 @@ export async function recordRoutes(app: FastifyInstance) {
     // survives regardless of format (localStorage IDs are NOT UUIDs).
     // Also set the FK column when the value happens to be a valid UUID.
     // Use normalizedData which includes stripped keys + auto-generated numbers.
-    const isValidUuid = pageLayoutId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageLayoutId);
+    let recordIdValue: string;
+    try {
+      recordIdValue = generateRecordId(apiName);
+    } catch {
+      registerRecordIdPrefix(apiName);
+      recordIdValue = generateRecordId(apiName);
+    }
+
+    const isValidLayout = pageLayoutId && /^[0-9]{3}[A-Za-z0-9]{12}$/.test(pageLayoutId);
+
     const record = await prisma.record.create({
       data: {
+        id: recordIdValue,
         objectId: object.id,
         data: { ...normalizedData, ...(pageLayoutId ? { _pageLayoutId: pageLayoutId } : {}) },
-        ...(isValidUuid ? { pageLayoutId } : {}),
+        ...(isValidLayout ? { pageLayoutId } : {}),
         createdById: userId,
         modifiedById: userId,
       },
@@ -351,9 +359,8 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.code(201).send(record);
   });
 
-  // Update record
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {
-    const { apiName, recordId } = req.params as { apiName: string; recordId: string };
+    const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
     const body = req.body as Record<string, any>;
     const updateData = body.data || body;
 
@@ -375,25 +382,19 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({
-      where: {
-        id: recordId,
-        objectId: object.id,
-      },
-    });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
-    // Merge existing data with new data
     const mergedData = {
       ...(existingRecord.data as Record<string, any>),
       ...updateData,
     };
 
     const record = await prisma.record.update({
-      where: { id: recordId },
+      where: { id: existingRecord.id },
       data: {
         data: mergedData,
         modifiedById: userId,
@@ -411,7 +412,7 @@ export async function recordRoutes(app: FastifyInstance) {
             id: true,
             name: true,
             email: true,
-            },
+          },
         },
       },
     });
@@ -419,9 +420,8 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.send(record);
   });
 
-  // Delete record
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
-    const { apiName, recordId } = req.params as { apiName: string; recordId: string };
+    const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
 
     const userId = req.user!.sub;
     const userRole = req.user!.role;
@@ -436,19 +436,14 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({
-      where: {
-        id: recordId,
-        objectId: object.id,
-      },
-    });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
     await prisma.record.delete({
-      where: { id: recordId },
+      where: { id: existingRecord.id },
     });
 
     reply.code(204).send();

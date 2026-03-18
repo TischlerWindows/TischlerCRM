@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
 import { loadEnv } from './config';
@@ -63,6 +64,7 @@ export function buildApp() {
       const passwordHash = hashPassword(parsed.data.password);
       const user = await prisma.user.create({
         data: {
+          id: generateId('User'),
           email: parsed.data.email,
           name: parsed.data.name,
           passwordHash,
@@ -88,7 +90,7 @@ export function buildApp() {
     const schema = z.object({
       email: z.string().email(),
       password: z.string().min(6),
-      accountId: z.string().uuid().optional().nullable(),
+      accountId: z.string().min(1).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
@@ -102,6 +104,7 @@ export function buildApp() {
     const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
     await prisma.loginEvent.create({
       data: {
+        id: generateId('LoginEvent'),
         userId: user.id,
         accountId: parsed.data.accountId ?? null,
         ip,
@@ -117,7 +120,7 @@ export function buildApp() {
       return reply.code(403).send({ error: 'Insufficient permissions' });
     }
     const querySchema = z.object({
-      accountId: z.string().uuid().optional(),
+      accountId: z.string().min(1).optional(),
       take: z.coerce.number().int().min(1).max(500).optional(),
     });
     const parsed = querySchema.safeParse(req.query);

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const createFieldSchema = z.object({
@@ -75,6 +76,7 @@ export async function fieldRoutes(app: FastifyInstance) {
 
     const field = await prisma.customField.create({
       data: {
+        id: generateId('CustomField'),
         objectId: object.id,
         apiName: parsed.data.apiName,
         label: parsed.data.label,

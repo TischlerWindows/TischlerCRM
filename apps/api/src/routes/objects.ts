@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const createObjectSchema = z.object({
@@ -110,7 +111,13 @@ export async function objectRoutes(app: FastifyInstance) {
 
     const object = await prisma.customObject.create({
       data: {
-        ...parsed.data,
+        id: generateId('CustomObject'),
+        apiName: parsed.data.apiName,
+        label: parsed.data.label,
+        pluralLabel: parsed.data.pluralLabel,
+        description: parsed.data.description,
+        enableHistory: parsed.data.enableHistory,
+        enableSearch: parsed.data.enableSearch,
         createdById: userId,
         modifiedById: userId,
       },

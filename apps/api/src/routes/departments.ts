@@ -1,17 +1,18 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { logAudit, extractIp } from '../audit';
 
 const departmentSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   description: z.string().max(1000).optional().nullable(),
-  parentId: z.string().uuid().optional().nullable(),
+  parentId: z.string().min(1).optional().nullable(),
   isActive: z.boolean().optional(),
   permissions: z.any().optional(),
 });
 
-const uuidParam = z.object({ id: z.string().uuid() });
+const idParam = z.object({ id: z.string().min(1) });
 
 export async function departmentRoutes(app: FastifyInstance) {
   app.get('/departments', async (req, reply) => {
@@ -28,7 +29,7 @@ export async function departmentRoutes(app: FastifyInstance) {
   });
 
   app.get('/departments/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid department ID' });
     const { id } = pp.data;
     const dept = await prisma.department.findUnique({
@@ -57,6 +58,7 @@ export async function departmentRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
     const dept = await prisma.department.create({
       data: {
+        id: generateId('Department'),
         name: parsed.data.name,
         description: parsed.data.description,
         parentId: parsed.data.parentId,
@@ -84,7 +86,7 @@ export async function departmentRoutes(app: FastifyInstance) {
   });
 
   app.put('/departments/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid department ID' });
     const { id } = pp.data;
     const parsed = departmentSchema.partial().safeParse(req.body);
@@ -129,7 +131,7 @@ export async function departmentRoutes(app: FastifyInstance) {
   });
 
   app.delete('/departments/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid department ID' });
     const { id } = pp.data;
     const existing = await prisma.department.findUnique({ where: { id } });

@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const dashboardSchema = z.object({
@@ -69,12 +70,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       const dashboard = await prisma.dashboard.create({
         data: {
+          id: generateId('Dashboard'),
           name,
           description,
           createdById: userId,
           modifiedById: userId,
           widgets: {
             create: widgets.map((widget: any) => ({
+              id: generateId('DashboardWidget'),
               type: widget.type,
               title: widget.title,
               dataSource: widget.dataSource,
@@ -170,6 +173,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
           widgets: {
             deleteMany: {}, // Delete all existing widgets
             create: widgets.map((widget: any) => ({
+              id: generateId('DashboardWidget'),
               type: widget.type,
               title: widget.title,
               dataSource: widget.dataSource,
@@ -302,6 +306,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
         const widget = await prisma.dashboardWidget.create({
           data: {
+            id: generateId('DashboardWidget'),
             dashboardId: id,
             type,
             title,

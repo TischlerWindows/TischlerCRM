@@ -8,6 +8,11 @@
       "import": "./dist/client.js",
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./record-id": {
+      "import": "./dist/record-id.js",
+      "types": "./dist/record-id.d.ts",
+      "default": "./dist/record-id.js"
     }
   },
   "scripts": {

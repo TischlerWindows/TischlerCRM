@@ -13,6 +13,7 @@
 
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { encrypt, encryptIfPresent } from '../crypto';
 import { logAudit, extractIp } from '../audit';
@@ -63,6 +64,7 @@ async function seedProviders() {
     await prisma.integration.upsert({
       where: { provider: def.provider },
       create: {
+        id: generateId('Integration'),
         provider: def.provider,
         displayName: def.displayName,
         description: def.description,

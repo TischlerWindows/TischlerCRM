@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 export async function settingRoutes(app: FastifyInstance) {
@@ -43,7 +44,7 @@ export async function settingRoutes(app: FastifyInstance) {
 
       const setting = await prisma.setting.upsert({
         where: { key },
-        create: { key, value: parsed.data.value as any },
+        create: { id: generateId('Setting'), key, value: parsed.data.value as any },
         update: { value: parsed.data.value as any },
       });
 
