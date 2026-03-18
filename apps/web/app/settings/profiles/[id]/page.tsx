@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -82,8 +82,8 @@ function parsePerms(raw: any): PermsState {
   return { objects, app };
 }
 
-export default function ProfileRecordPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ProfileRecordPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
 
   const [profile, setProfile] = useState<Profile | null>(null);

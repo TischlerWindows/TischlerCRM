@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -42,8 +42,8 @@ function InviteBadge({ status }: { status: string }) {
   return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${cls}`}>{label}</span>;
 }
 
-export default function UserRecordPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function UserRecordPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const router = useRouter();
 
   const [user, setUser] = useState<UserDetail | null>(null);
