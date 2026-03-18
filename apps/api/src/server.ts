@@ -11,12 +11,14 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 import { buildApp } from './app';
 import { ensureCoreObjects } from './ensure-core-objects';
 import { ensureUserManagement } from './ensure-user-management';
+import { runPendingMigrations } from './run-migrations';
 
 const port = Number(process.env.PORT || 4000);
 const app = buildApp();
 
-// Ensure all core CRM objects exist in the database before accepting traffic
-ensureCoreObjects()
+// Run raw SQL migrations first, then seed data, then start listening
+runPendingMigrations()
+  .then(() => ensureCoreObjects())
   .then(() => ensureUserManagement())
   .then(() => {
     return app.listen({ port, host: '0.0.0.0' });
