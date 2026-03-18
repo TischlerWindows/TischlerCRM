@@ -368,6 +368,29 @@ export async function backupRoutes(app: FastifyInstance) {
 
       const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
+      // Get current user ID for remapping orphaned foreign keys
+      const currentUserId = req.user!.sub;
+
+      // Collect all existing user IDs so we can remap createdById / lastModifiedById
+      // that reference users no longer in the database
+      const existingUsers = await prisma.user.findMany({ select: { id: true } });
+      const validUserIds = new Set(existingUsers.map((u: { id: string }) => u.id));
+
+      const remapUserIds = (rows: any[]) =>
+        rows.map((row: any) => {
+          const patched = { ...row };
+          if (patched.createdById && !validUserIds.has(patched.createdById)) {
+            patched.createdById = currentUserId;
+          }
+          if (patched.lastModifiedById && !validUserIds.has(patched.lastModifiedById)) {
+            patched.lastModifiedById = currentUserId;
+          }
+          if (patched.userId && !validUserIds.has(patched.userId)) {
+            patched.userId = currentUserId;
+          }
+          return patched;
+        });
+
       // Restore in correct order (respects foreign key constraints)
       // 1. Delete existing data (reverse dependency order)
       await prisma.$transaction([
@@ -388,20 +411,22 @@ export async function backupRoutes(app: FastifyInstance) {
       ]);
 
       // 2. Re-insert data (forward dependency order)
+      // All rows with createdById / lastModifiedById / userId are remapped
+      // so orphaned user references point to the current restoring user.
       if (data.settings?.length) {
         await prisma.setting.createMany({ data: data.settings, skipDuplicates: true });
       }
       if (data.objects?.length) {
-        await prisma.customObject.createMany({ data: data.objects, skipDuplicates: true });
+        await prisma.customObject.createMany({ data: remapUserIds(data.objects), skipDuplicates: true });
       }
       if (data.fields?.length) {
-        await prisma.customField.createMany({ data: data.fields, skipDuplicates: true });
+        await prisma.customField.createMany({ data: remapUserIds(data.fields), skipDuplicates: true });
       }
       if (data.relationships?.length) {
         await prisma.relationship.createMany({ data: data.relationships, skipDuplicates: true });
       }
       if (data.layouts?.length) {
-        await prisma.pageLayout.createMany({ data: data.layouts, skipDuplicates: true });
+        await prisma.pageLayout.createMany({ data: remapUserIds(data.layouts), skipDuplicates: true });
       }
       if (data.layoutTabs?.length) {
         await prisma.layoutTab.createMany({ data: data.layoutTabs, skipDuplicates: true });
@@ -413,13 +438,13 @@ export async function backupRoutes(app: FastifyInstance) {
         await prisma.layoutField.createMany({ data: data.layoutFields, skipDuplicates: true });
       }
       if (data.records?.length) {
-        await prisma.record.createMany({ data: data.records, skipDuplicates: true });
+        await prisma.record.createMany({ data: remapUserIds(data.records), skipDuplicates: true });
       }
       if (data.reports?.length) {
-        await prisma.report.createMany({ data: data.reports, skipDuplicates: true });
+        await prisma.report.createMany({ data: remapUserIds(data.reports), skipDuplicates: true });
       }
       if (data.dashboards?.length) {
-        await prisma.dashboard.createMany({ data: data.dashboards, skipDuplicates: true });
+        await prisma.dashboard.createMany({ data: remapUserIds(data.dashboards), skipDuplicates: true });
       }
 
       reply.send({ success: true, message: 'Database restored from backup' });
