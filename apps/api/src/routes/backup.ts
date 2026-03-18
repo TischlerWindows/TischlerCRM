@@ -371,48 +371,57 @@ export async function backupRoutes(app: FastifyInstance) {
       // Get current user ID for remapping orphaned foreign keys
       const currentUserId = req.user!.sub;
 
-      // Restore in correct order (respects foreign key constraints)
+      // -----------------------------------------------------------
+      // 0. Ensure EVERY user ID referenced anywhere in backup exists
+      // -----------------------------------------------------------
+      const USER_FK_FIELDS = ['createdById', 'modifiedById', 'lastModifiedById', 'userId', 'actorId', 'deletedById'];
 
-      // 0. Ensure all users referenced in the backup exist in the database.
-      //    Upsert each inside try/catch so unique-constraint collisions
-      //    (e.g. same name/email under a different id) are silently skipped.
-      //    Any remaining orphan FKs are caught by remapUserIds below.
-      if (data.users?.length) {
-        for (const u of data.users) {
-          try {
-            await prisma.user.upsert({
-              where: { id: u.id },
-              update: {},  // don't overwrite existing users
-              create: {
-                id: u.id,
-                name: u.name || 'Restored User',
-                email: u.email || `restored-${u.id}@placeholder.local`,
-                passwordHash: u.passwordHash || '',
-                role: u.role || 'USER',
-                isActive: u.isActive ?? true,
-              },
-            });
-          } catch (_e) {
-            // Unique constraint on email or other conflict — skip
+      // Scan all backup tables and collect every referenced user ID
+      const referencedUserIds = new Set<string>();
+      for (const tableName of Object.keys(data)) {
+        const rows = data[tableName];
+        if (!Array.isArray(rows)) continue;
+        for (const row of rows) {
+          for (const field of USER_FK_FIELDS) {
+            if (row[field]) referencedUserIds.add(row[field]);
           }
         }
       }
 
-      // Now collect valid user IDs (after upserts) for remapping any remaining orphans
+      // Find which referenced user IDs are missing from the database
       const existingUsers = await prisma.user.findMany({ select: { id: true } });
-      const validUserIds = new Set(existingUsers.map((u: { id: string }) => u.id));
+      const existingIds = new Set(existingUsers.map((u: { id: string }) => u.id));
+      const missingIds = [...referencedUserIds].filter(uid => !existingIds.has(uid));
 
+      // Create placeholder users for every missing ID
+      for (const uid of missingIds) {
+        try {
+          await prisma.user.create({
+            data: {
+              id: uid,
+              email: `restored-${uid.substring(0, 8)}-${Date.now()}@placeholder.local`,
+              name: 'Restored User',
+              passwordHash: '',
+              role: 'USER',
+            },
+          });
+        } catch (_e) {
+          // Collision — already exists under a different query path, ignore
+        }
+      }
+
+      // Refresh valid IDs after creates
+      const freshUsers = await prisma.user.findMany({ select: { id: true } });
+      const validUserIds = new Set(freshUsers.map((u: { id: string }) => u.id));
+
+      // Generic remapper: any user FK that STILL doesn't exist → currentUserId
       const remapUserIds = (rows: any[]) =>
         rows.map((row: any) => {
           const patched = { ...row };
-          if (patched.createdById && !validUserIds.has(patched.createdById)) {
-            patched.createdById = currentUserId;
-          }
-          if (patched.lastModifiedById && !validUserIds.has(patched.lastModifiedById)) {
-            patched.lastModifiedById = currentUserId;
-          }
-          if (patched.userId && !validUserIds.has(patched.userId)) {
-            patched.userId = currentUserId;
+          for (const field of USER_FK_FIELDS) {
+            if (patched[field] && !validUserIds.has(patched[field])) {
+              patched[field] = currentUserId;
+            }
           }
           return patched;
         });
