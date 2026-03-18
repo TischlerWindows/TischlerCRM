@@ -371,8 +371,47 @@ export async function backupRoutes(app: FastifyInstance) {
       // Get current user ID for remapping orphaned foreign keys
       const currentUserId = req.user!.sub;
 
-      // Collect all existing user IDs so we can remap createdById / lastModifiedById
-      // that reference users no longer in the database
+      // Restore in correct order (respects foreign key constraints)
+
+      // 0. Ensure all users referenced in the backup exist in the database.
+      //    First restore roles & departments so user FKs are valid,
+      //    then upsert backup users so all createdById references resolve.
+      if (data.roles?.length) {
+        for (const r of data.roles) {
+          await prisma.role.upsert({
+            where: { id: r.id },
+            update: {},
+            create: { id: r.id, name: r.name || 'Restored Role', label: r.label || r.name || 'Restored Role', level: r.level ?? 0, permissions: r.permissions || {} },
+          });
+        }
+      }
+      if (data.departments?.length) {
+        for (const d of data.departments) {
+          await prisma.department.upsert({
+            where: { id: d.id },
+            update: {},
+            create: { id: d.id, name: d.name || 'Restored Department' },
+          });
+        }
+      }
+      if (data.users?.length) {
+        for (const u of data.users) {
+          await prisma.user.upsert({
+            where: { id: u.id },
+            update: {},  // don't overwrite existing users
+            create: {
+              id: u.id,
+              name: u.name || 'Restored User',
+              email: u.email || `restored-${u.id}@placeholder.local`,
+              passwordHash: u.passwordHash || '',
+              role: u.role || 'USER',
+              isActive: u.isActive ?? true,
+            },
+          });
+        }
+      }
+
+      // Now collect valid user IDs (after upserts) for remapping any remaining orphans
       const existingUsers = await prisma.user.findMany({ select: { id: true } });
       const validUserIds = new Set(existingUsers.map((u: { id: string }) => u.id));
 
@@ -391,7 +430,6 @@ export async function backupRoutes(app: FastifyInstance) {
           return patched;
         });
 
-      // Restore in correct order (respects foreign key constraints)
       // 1. Delete existing data (reverse dependency order)
       await prisma.$transaction([
         prisma.auditLog.deleteMany(),
@@ -407,7 +445,6 @@ export async function backupRoutes(app: FastifyInstance) {
         prisma.dashboard.deleteMany(),
         prisma.report.deleteMany(),
         prisma.setting.deleteMany(),
-        // Note: Users, Roles, Departments are NOT deleted — we keep current user management intact
       ]);
 
       // 2. Re-insert data (forward dependency order)
