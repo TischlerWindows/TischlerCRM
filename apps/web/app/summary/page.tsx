@@ -2174,8 +2174,8 @@ export default function SummaryPage() {
                                 {/* Calculated Totals headers — separated by thick border */}
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Final</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Final W/ Adj</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">Final W/ Adj</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -2193,8 +2193,8 @@ export default function SummaryPage() {
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? `€${fmt(ewCalc.full)}` : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.disc ? `€${fmt(ewCalc.disc)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
                               </tr>
                               {/* Double Hung */}
                               <tr className="hover:bg-gray-50">
@@ -2210,8 +2210,8 @@ export default function SummaryPage() {
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? `€${fmt(dhCalc.full)}` : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.disc ? `€${fmt(dhCalc.disc)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-green-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-purple-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
                               </tr>
                               {/* Euro Doors */}
                               <tr className="hover:bg-gray-50">
@@ -2227,8 +2227,8 @@ export default function SummaryPage() {
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? `€${fmt(edCalc.full)}` : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.disc ? `€${fmt(edCalc.disc)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
                               </tr>
                               {/* Grand Total */}
                               <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
@@ -2244,8 +2244,8 @@ export default function SummaryPage() {
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
                               </tr>
                             </tbody>
                           </table>
