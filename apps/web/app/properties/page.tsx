@@ -465,11 +465,13 @@ export default function PropertiesPage() {
       normalizedData[cleanKey] = value;
     });
     
-    // Derive country & state from the address field (object from AddressAutocomplete)
-    // or from the standalone city/state/country fields
+    // Derive country & state from the composite Address field or the standalone text fields.
+    // The composite Address object has { street, city, state, postalCode, country }.
+    // The standalone fields are Property__city, Property__state, Property__zipCode (no country).
     const addr = normalizedData.address;
-    const addrCountry = (typeof addr === 'object' && addr?.country) ? addr.country : (normalizedData.country || '');
-    const addrState = (typeof addr === 'object' && addr?.state) ? addr.state : (normalizedData.state || '');
+    const isAddrObj = typeof addr === 'object' && addr !== null;
+    const addrCountry = (isAddrObj && addr.country) || normalizedData.country || '';
+    const addrState = (isAddrObj && addr.state) || normalizedData.state || '';
 
     const prefix = getPropertyPrefix({ country: addrCountry, state: addrState });
     const allExistingNumbers = properties.map(p => p.propertyNumber);

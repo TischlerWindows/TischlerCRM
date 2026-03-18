@@ -444,9 +444,8 @@ export function getPropertyPrefix(address: {
   if (!country && !state) return 'UNK';
 
   // Check if it's a US address
-  const iso3 = COUNTRY_TO_ISO3[country];
+  const iso3 = country ? COUNTRY_TO_ISO3[country] : undefined;
   if (iso3 === 'USA') {
-    // Use the US state code
     const stateCode = US_STATE_CODES[state];
     return stateCode || 'US';
   }
@@ -455,14 +454,23 @@ export function getPropertyPrefix(address: {
   if (iso3) return iso3;
 
   // The value might already be an ISO alpha-3 code (e.g. "USA", "GBR")
-  const upper = country.toUpperCase();
-  const allCodes = new Set(Object.values(COUNTRY_TO_ISO3));
-  if (allCodes.has(upper)) {
-    if (upper === 'USA') {
-      const stateCode = US_STATE_CODES[state];
-      return stateCode || 'US';
+  if (country) {
+    const upper = country.toUpperCase();
+    const allCodes = new Set(Object.values(COUNTRY_TO_ISO3));
+    if (allCodes.has(upper)) {
+      if (upper === 'USA') {
+        const stateCode = US_STATE_CODES[state];
+        return stateCode || 'US';
+      }
+      return upper;
     }
-    return upper;
+  }
+
+  // No country found — if the state matches a known US state, infer US.
+  // This handles schemas that have a state field but no country field.
+  if (state) {
+    const stateCode = US_STATE_CODES[state];
+    if (stateCode) return stateCode;
   }
 
   return 'UNK';
