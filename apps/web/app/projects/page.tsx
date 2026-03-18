@@ -39,7 +39,6 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Project {
   id: string;
-  recordId?: string;
   projectNumber: string;
   projectName: string;
   status: string;
@@ -440,7 +439,7 @@ export default function ProjectsPage() {
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/projects/${result.recordId || result.id}`);
+      router.push(`/projects/${result.id}`);
     } catch (error) {
       console.error('Failed to create project:', error);
       throw error;
@@ -689,18 +688,18 @@ export default function ProjectsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => (
-                  <tr key={project.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/projects/${project.recordId || project.id}`)}>
+                  <tr key={project.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/projects/${project.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'projectNumber' ? (
-                            <Link href={`/projects/${project.recordId || project.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/projects/${project.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {project.projectNumber}
                             </Link>
                           ) : column.id === 'projectName' ? (
-                            <Link href={`/projects/${project.recordId || project.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/projects/${project.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {project.projectName}
                             </Link>
                           ) : column.id === 'status' ? (
@@ -732,7 +731,7 @@ export default function ProjectsPage() {
                             {canEditProject && (
                             <button
                               onClick={() => {
-                                router.push(`/projects/${project.recordId || project.id}`);
+                                router.push(`/projects/${project.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

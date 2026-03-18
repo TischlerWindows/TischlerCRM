@@ -11,8 +11,7 @@ datasource db {
 // User Management
 // ============================================
 model User {
-  id           String   @id @default(uuid())
-  recordId     String?  @unique
+  id           String   @id
   email        String   @unique
   passwordHash String?
   name         String?
@@ -77,7 +76,7 @@ model User {
 // ============================================
 
 model Role {
-  id          String   @id @default(uuid())
+  id          String   @id
   name        String   @unique
   label       String
   description String?
@@ -98,7 +97,7 @@ model Role {
 }
 
 model Department {
-  id          String       @id @default(uuid())
+  id          String       @id
   name        String       @unique
   description String?
   parentId    String?
@@ -121,7 +120,7 @@ model Department {
 }
 
 model AuditLog {
-  id         String   @id @default(uuid())
+  id         String   @id
   actorId    String
   actor      User     @relation("AuditActor", fields: [actorId], references: [id])
   action     String
@@ -142,7 +141,7 @@ model AuditLog {
 
 
 model LoginEvent {
-  id         String   @id @default(uuid())
+  id         String   @id
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     String
   accountId  String?
@@ -160,7 +159,7 @@ model LoginEvent {
 // ============================================
 
 model CustomObject {
-  id              String   @id @default(uuid())
+  id              String   @id
   apiName         String   @unique
   label           String
   pluralLabel     String
@@ -187,7 +186,7 @@ model CustomObject {
 }
 
 model CustomField {
-  id              String   @id @default(uuid())
+  id              String   @id
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   
@@ -240,7 +239,7 @@ model CustomField {
 }
 
 model Relationship {
-  id                String   @id @default(uuid())
+  id                String   @id
   
   parentObject      CustomObject @relation("ParentObject", fields: [parentObjectId], references: [id], onDelete: Cascade)
   parentObjectId    String
@@ -267,7 +266,7 @@ model Relationship {
 // ============================================
 
 model PageLayout {
-  id              String   @id @default(uuid())
+  id              String   @id
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   
@@ -291,7 +290,7 @@ model PageLayout {
 }
 
 model LayoutTab {
-  id              String   @id @default(uuid())
+  id              String   @id
   layout          PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
   layoutId        String
   
@@ -304,7 +303,7 @@ model LayoutTab {
 }
 
 model LayoutSection {
-  id              String   @id @default(uuid())
+  id              String   @id
   tab             LayoutTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
   tabId           String
   
@@ -318,7 +317,7 @@ model LayoutSection {
 }
 
 model LayoutField {
-  id              String   @id @default(uuid())
+  id              String   @id
   section         LayoutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   sectionId       String
   
@@ -337,8 +336,7 @@ model LayoutField {
 // ============================================
 
 model Record {
-  id              String   @id @default(uuid())
-  recordId        String?  @unique
+  id              String   @id
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   
@@ -368,7 +366,7 @@ model Record {
 // ============================================
 
 model Report {
-  id              String   @id @default(uuid())
+  id              String   @id
   name            String
   description     String?
   objectType      String   // properties, contacts, accounts, etc.
@@ -408,7 +406,7 @@ model Report {
 }
 
 model ReportFolder {
-  id              String   @id @default(uuid())
+  id              String   @id
   name            String
   description     String?
   parentId        String?
@@ -438,7 +436,7 @@ model ReportFolder {
 // ============================================
 
 model Dashboard {
-  id              String   @id @default(uuid())
+  id              String   @id
   name            String
   description     String?
   
@@ -463,7 +461,7 @@ model Dashboard {
 }
 
 model DashboardWidget {
-  id              String   @id @default(uuid())
+  id              String   @id
   dashboard       Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
   dashboardId     String
   
@@ -492,14 +490,14 @@ model DashboardWidget {
 // ============================================
 
 model Setting {
-  id        String   @id @default(uuid())
+  id        String   @id
   key       String   @unique
   value     Json
   updatedAt DateTime @updatedAt
 }
 
 model UserPreference {
-  id        String   @id @default(uuid())
+  id        String   @id
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   key       String
@@ -516,7 +514,7 @@ model UserPreference {
 
 // Org-level integration configuration (admin-managed)
 model Integration {
-  id              String    @id @default(uuid())
+  id              String    @id
   provider        String    @unique  // e.g. "google_maps", "dropbox", "outlook"
   displayName     String               // Human-readable name
   description     String?
@@ -547,7 +545,7 @@ model Integration {
 
 // Per-user integration connection (OAuth tokens, sync state)
 model UserIntegration {
-  id              String    @id @default(uuid())
+  id              String    @id
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          String
   integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)

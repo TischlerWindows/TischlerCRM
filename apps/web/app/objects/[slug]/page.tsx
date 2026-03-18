@@ -347,7 +347,7 @@ export default function CustomObjectRecordsPage() {
         setRecords(updatedRecords);
         setShowDynamicForm(false);
         setTimeout(() => {
-          router.push(`/objects/${slug}/${result.recordId || result.id}`);
+          router.push(`/objects/${slug}/${result.id}`);
         }, 200);
       }
     } catch (error) {
@@ -680,14 +680,14 @@ export default function CustomObjectRecordsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/objects/${slug}/${record.recordId || record.id}`)}>
+                  <tr key={record.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/objects/${slug}/${record.id}`)}>
                     {visibleColumns.map((columnId, index) => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {index === 0 ? (
-                            <Link href={`/objects/${slug}/${record.recordId || record.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/objects/${slug}/${record.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {getFieldValue(record, column.id)}
                             </Link>
                           ) : (
@@ -708,7 +708,7 @@ export default function CustomObjectRecordsPage() {
                           <div className="py-1">
                             {canEdit && <button
                               onClick={() => {
-                                router.push(`/objects/${slug}/${record.recordId || record.id}`);
+                                router.push(`/objects/${slug}/${record.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

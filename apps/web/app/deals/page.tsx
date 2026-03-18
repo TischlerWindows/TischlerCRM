@@ -39,7 +39,6 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Deal {
   id: string;
-  recordId?: string;
   dealNumber: string;
   dealName: string;
   accountName: string;
@@ -459,7 +458,7 @@ export default function DealsPage() {
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/deals/${result.recordId || result.id}`);
+      router.push(`/deals/${result.id}`);
     } catch (error) {
       console.error('Failed to create deal:', error);
       throw error;
@@ -703,18 +702,18 @@ export default function DealsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredDeals.map((deal) => (
-                  <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/deals/${deal.recordId || deal.id}`)}>
+                  <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/deals/${deal.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'dealNumber' ? (
-                            <Link href={`/deals/${deal.recordId || deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/deals/${deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {deal.dealNumber}
                             </Link>
                           ) : column.id === 'dealName' ? (
-                            <Link href={`/deals/${deal.recordId || deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/deals/${deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {deal.dealName}
                             </Link>
                           ) : column.id === 'stage' ? (
@@ -746,7 +745,7 @@ export default function DealsPage() {
                             {canEditDeal && (
                             <button
                               onClick={() => {
-                                router.push(`/deals/${deal.recordId || deal.id}`);
+                                router.push(`/deals/${deal.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

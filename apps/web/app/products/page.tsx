@@ -40,7 +40,6 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Product {
   id: string;
-  recordId?: string;
   recordTypeId?: string;
   pageLayoutId?: string;
   productCode: string;
@@ -483,7 +482,7 @@ export default function ProductsPage() {
       setShowDynamicForm(false);
       
       setTimeout(() => {
-        router.push(`/products/${result.recordId || result.id}`);
+        router.push(`/products/${result.id}`);
       }, 200);
     } catch (error) {
       console.error('Failed to create product:', error);
@@ -739,18 +738,18 @@ export default function ProductsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/products/${product.recordId || product.id}`)}>
+                  <tr key={product.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/products/${product.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'productCode' ? (
-                            <Link href={`/products/${product.recordId || product.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/products/${product.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {product.productCode}
                             </Link>
                           ) : column.id === 'productName' ? (
-                            <Link href={`/products/${product.recordId || product.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/products/${product.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {product.productName}
                             </Link>
                           ) : column.id === 'unitPrice' ? (
@@ -774,7 +773,7 @@ export default function ProductsPage() {
                             {canEditProduct && (
                             <button
                               onClick={() => {
-                                router.push(`/products/${product.recordId || product.id}`);
+                                router.push(`/products/${product.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

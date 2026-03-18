@@ -1,4 +1,5 @@
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 
 const FULL_OBJ_PERMS = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
 const STD_OBJ_PERMS = { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false };
@@ -175,7 +176,7 @@ export async function ensureUserManagement() {
   for (const roleDef of SEED_ROLES) {
     const existing = await prisma.role.findUnique({ where: { name: roleDef.name } });
     if (!existing) {
-      await prisma.role.create({ data: roleDef });
+      await prisma.role.create({ data: { id: generateId('Role'), ...roleDef } });
       console.log(`[UserMgmt] Created role: ${roleDef.label}`);
     }
   }

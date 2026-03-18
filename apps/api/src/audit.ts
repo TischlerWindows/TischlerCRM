@@ -1,4 +1,5 @@
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { FastifyRequest } from 'fastify';
 
 const SENSITIVE_KEYS = new Set([
@@ -45,6 +46,7 @@ export async function logAudit(params: {
   try {
     await prisma.auditLog.create({
       data: {
+        id: generateId('AuditLog'),
         actorId: params.actorId,
         action: params.action,
         objectType: params.objectType,

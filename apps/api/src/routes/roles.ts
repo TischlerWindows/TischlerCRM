@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { logAudit, extractIp } from '../audit';
 
@@ -8,13 +9,13 @@ const createRoleSchema = z.object({
   label: z.string().min(1).max(200).trim(),
   description: z.string().max(1000).optional().nullable(),
   level: z.number().int().min(1).max(99),
-  parentId: z.string().uuid().optional().nullable(),
+  parentId: z.string().min(1).optional().nullable(),
   permissions: z.record(z.any()).optional(),
   visibility: z.record(z.any()).optional(),
 }).strict();
 
 const updateRoleSchema = createRoleSchema.partial().strict();
-const uuidParam = z.object({ id: z.string().uuid() });
+const idParam = z.object({ id: z.string().min(1) });
 
 export async function rolesRoutes(app: FastifyInstance) {
   app.get('/admin/roles', async (req, reply) => {
@@ -30,7 +31,7 @@ export async function rolesRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/roles/:id', async (req, reply) => {
-    const paramParsed = uuidParam.safeParse(req.params);
+    const paramParsed = idParam.safeParse(req.params);
     if (!paramParsed.success) return reply.code(400).send({ error: 'Invalid role ID' });
     const { id } = paramParsed.data;
     const role = await prisma.role.findUnique({
@@ -58,6 +59,7 @@ export async function rolesRoutes(app: FastifyInstance) {
 
     const role = await prisma.role.create({
       data: {
+        id: generateId('Role'),
         name: parsed.data.name,
         label: parsed.data.label,
         description: parsed.data.description,
@@ -87,7 +89,7 @@ export async function rolesRoutes(app: FastifyInstance) {
   });
 
   app.put('/admin/roles/:id', async (req, reply) => {
-    const paramParsed = uuidParam.safeParse(req.params);
+    const paramParsed = idParam.safeParse(req.params);
     if (!paramParsed.success) return reply.code(400).send({ error: 'Invalid role ID' });
     const { id } = paramParsed.data;
     const parsed = updateRoleSchema.safeParse(req.body);
@@ -130,7 +132,7 @@ export async function rolesRoutes(app: FastifyInstance) {
   });
 
   app.delete('/admin/roles/:id', async (req, reply) => {
-    const paramParsed = uuidParam.safeParse(req.params);
+    const paramParsed = idParam.safeParse(req.params);
     if (!paramParsed.success) return reply.code(400).send({ error: 'Invalid role ID' });
     const { id } = paramParsed.data;
     const existing = await prisma.role.findUnique({ where: { id } });

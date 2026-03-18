@@ -40,7 +40,6 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Contact {
   id: string;
-  recordId?: string;
   contactNumber: string;
   name: Record<string, any> | null;
   firstName: string;
@@ -498,7 +497,7 @@ export default function ContactsPage() {
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
       await fetchContacts();
-      router.push(`/contacts/${createdRecord.recordId || createdRecord.id}`);
+      router.push(`/contacts/${createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create contact:', error);
       throw error;
@@ -807,7 +806,7 @@ export default function ContactsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredContacts.map((contact) => (
-                  <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contacts/${contact.recordId}`)}>
+                  <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contacts/${contact.id}`)}>
                     <td className="px-6 py-4 w-12">
                       <input
                         type="checkbox"
@@ -822,7 +821,7 @@ export default function ContactsPage() {
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'contactNumber' ? (
-                            <Link href={`/contacts/${contact.recordId}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/contacts/${contact.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {contact.contactNumber}
                             </Link>
                           ) : column.id === 'name' ? (
@@ -839,7 +838,7 @@ export default function ContactsPage() {
                                 });
                               if (parts.length === 0) return <span className="text-gray-400">-</span>;
                               return (
-                                <Link href={`/contacts/${contact.recordId}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                                <Link href={`/contacts/${contact.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                                   {parts.map(p => p.value).join(' ')}
                                 </Link>
                               );
@@ -875,7 +874,7 @@ export default function ContactsPage() {
                             {canEditContact && (
                             <button
                               onClick={() => {
-                                router.push(`/contacts/${contact.recordId}`);
+                                router.push(`/contacts/${contact.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

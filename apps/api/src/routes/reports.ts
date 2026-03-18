@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
 const reportSchema = z.object({
@@ -126,7 +127,19 @@ export async function reportRoutes(app: FastifyInstance) {
 
       const report = await prisma.report.create({
         data: {
-          ...data,
+          id: generateId('Report'),
+          name: data.name,
+          description: data.description,
+          objectType: data.objectType,
+          format: data.format,
+          fields: data.fields,
+          filters: data.filters,
+          groupBy: data.groupBy,
+          sortBy: data.sortBy,
+          sortOrder: data.sortOrder,
+          isPrivate: data.isPrivate,
+          isFavorite: data.isFavorite,
+          folderId: data.folderId,
           sharedWith: data.sharedWith || [],
           createdById: userId,
           modifiedById: userId,
@@ -391,6 +404,7 @@ export async function reportRoutes(app: FastifyInstance) {
 
     const folder = await prisma.reportFolder.create({
       data: {
+        id: generateId('ReportFolder'),
         name,
         description,
         parentId,

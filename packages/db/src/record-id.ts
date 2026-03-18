@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 
 const RECORD_ID_PREFIXES: Record<string, string> = {
+  // Domain objects (001–011)
   Property: '001',
   Contact: '002',
   Account: '003',
@@ -12,6 +13,28 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   Quote: '009',
   Installation: '010',
   User: '011',
+
+  // System / infrastructure models (012–030)
+  Role: '012',
+  Department: '013',
+  AuditLog: '014',
+  LoginEvent: '015',
+  CustomObject: '016',
+  CustomField: '017',
+  Relationship: '018',
+  PageLayout: '019',
+  LayoutTab: '020',
+  LayoutSection: '021',
+  LayoutField: '022',
+  Record: '023',
+  Report: '024',
+  ReportFolder: '025',
+  Dashboard: '026',
+  DashboardWidget: '027',
+  Setting: '028',
+  UserPreference: '029',
+  Integration: '030',
+  UserIntegration: '031',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -31,19 +54,22 @@ function generateBase62Suffix(length: number): string {
  *
  * Format: 3-char numeric prefix + 12-char base62 suffix = 15 characters.
  *
- * Core objects have fixed prefixes (001–011). Custom objects receive a
- * dynamically assigned prefix starting at 012.
+ * Every Prisma model has a fixed prefix. Custom objects created at runtime
+ * receive a dynamically assigned prefix via registerRecordIdPrefix().
  */
-export function generateRecordId(objectApiName: string): string {
-  const prefix = RECORD_ID_PREFIXES[objectApiName];
+export function generateRecordId(modelName: string): string {
+  const prefix = RECORD_ID_PREFIXES[modelName];
   if (!prefix) {
     throw new Error(
-      `No record ID prefix registered for object "${objectApiName}". ` +
+      `No record ID prefix registered for "${modelName}". ` +
       `Register it with registerRecordIdPrefix() first.`
     );
   }
   return prefix + generateBase62Suffix(SUFFIX_LENGTH);
 }
+
+/** Alias for generateRecordId — shorter name for use in prisma.*.create() calls. */
+export const generateId = generateRecordId;
 
 /**
  * Register a prefix for a custom (user-created) object at runtime.
@@ -55,7 +81,6 @@ export function registerRecordIdPrefix(objectApiName: string): string {
   }
   const nextNum = Math.max(
     ...Object.values(RECORD_ID_PREFIXES).map((p) => parseInt(p, 10)),
-    11,
   ) + 1;
   const prefix = String(nextNum).padStart(3, '0');
   RECORD_ID_PREFIXES[objectApiName] = prefix;
@@ -71,15 +96,8 @@ export function getRecordIdPrefix(objectApiName: string): string | undefined {
 
 /**
  * Detect whether a string looks like a standardized record ID (15 alphanumeric
- * chars starting with a 3-digit prefix) vs a UUID.
+ * chars starting with a 3-digit prefix).
  */
 export function isRecordId(value: string): boolean {
   return /^[0-9]{3}[A-Za-z0-9]{12}$/.test(value);
-}
-
-/**
- * Detect whether a string is a UUID v4 (has dashes).
- */
-export function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
-import { generateRecordId, registerRecordIdPrefix, isRecordId } from '@crm/db/record-id';
+import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -166,12 +166,8 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const whereClause = isRecordId(idParam)
-      ? { recordId: idParam, objectId: object.id }
-      : { id: idParam, objectId: object.id };
-
     const record = await prisma.record.findFirst({
-      where: whereClause,
+      where: { id: idParam, objectId: object.id },
       include: {
         pageLayout: {
           select: {
@@ -323,23 +319,22 @@ export async function recordRoutes(app: FastifyInstance) {
     // survives regardless of format (localStorage IDs are NOT UUIDs).
     // Also set the FK column when the value happens to be a valid UUID.
     // Use normalizedData which includes stripped keys + auto-generated numbers.
-    const isValidUuid = pageLayoutId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageLayoutId);
-
-    // Generate standardized recordId (e.g. "001aB3xY9zK2mN")
-    let recordId: string;
+    let recordIdValue: string;
     try {
-      recordId = generateRecordId(apiName);
+      recordIdValue = generateRecordId(apiName);
     } catch {
       registerRecordIdPrefix(apiName);
-      recordId = generateRecordId(apiName);
+      recordIdValue = generateRecordId(apiName);
     }
+
+    const isValidLayout = pageLayoutId && /^[0-9]{3}[A-Za-z0-9]{12}$/.test(pageLayoutId);
 
     const record = await prisma.record.create({
       data: {
+        id: recordIdValue,
         objectId: object.id,
-        recordId,
         data: { ...normalizedData, ...(pageLayoutId ? { _pageLayoutId: pageLayoutId } : {}) },
-        ...(isValidUuid ? { pageLayoutId } : {}),
+        ...(isValidLayout ? { pageLayoutId } : {}),
         createdById: userId,
         modifiedById: userId,
       },
@@ -364,7 +359,6 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.code(201).send(record);
   });
 
-  // Update record — accepts either a standardized recordId or a UUID
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
     const body = req.body as Record<string, any>;
@@ -388,11 +382,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const whereClause = isRecordId(idParam)
-      ? { recordId: idParam, objectId: object.id }
-      : { id: idParam, objectId: object.id };
-
-    const existingRecord = await prisma.record.findFirst({ where: whereClause });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -430,7 +420,6 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.send(record);
   });
 
-  // Delete record — accepts either a standardized recordId or a UUID
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
 
@@ -447,11 +436,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const whereClause = isRecordId(idParam)
-      ? { recordId: idParam, objectId: object.id }
-      : { id: idParam, objectId: object.id };
-
-    const existingRecord = await prisma.record.findFirst({ where: whereClause });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });

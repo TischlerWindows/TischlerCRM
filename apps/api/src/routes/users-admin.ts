@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
-import { generateRecordId } from '@crm/db/record-id';
+import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { hashPassword } from '../auth';
 import { logAudit, extractIp } from '../audit';
@@ -9,9 +9,9 @@ const createUserSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   email: z.string().email().max(255).toLowerCase(),
   password: z.string().min(6).max(128),
-  roleId: z.string().uuid().optional().nullable(),
-  departmentId: z.string().uuid().optional().nullable(),
-  managerId: z.string().uuid().optional().nullable(),
+  roleId: z.string().min(1).optional().nullable(),
+  departmentId: z.string().min(1).optional().nullable(),
+  managerId: z.string().min(1).optional().nullable(),
   title: z.string().max(200).optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   mobilePhone: z.string().max(50).optional().nullable(),
@@ -22,9 +22,9 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   name: z.string().min(1).max(200).trim().optional(),
-  roleId: z.string().uuid().optional().nullable(),
-  departmentId: z.string().uuid().optional().nullable(),
-  managerId: z.string().uuid().optional().nullable(),
+  roleId: z.string().min(1).optional().nullable(),
+  departmentId: z.string().min(1).optional().nullable(),
+  managerId: z.string().min(1).optional().nullable(),
   title: z.string().max(200).optional().nullable(),
   phone: z.string().max(50).optional().nullable(),
   mobilePhone: z.string().max(50).optional().nullable(),
@@ -33,7 +33,7 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
 }).strict();
 
-const uuidParam = z.object({ id: z.string().uuid() });
+const idParam = z.object({ id: z.string().min(1) });
 const listQuerySchema = z.object({ includeDeleted: z.enum(['true', 'false']).optional() });
 
 const roleSelect = { select: { id: true, name: true, label: true } };
@@ -73,7 +73,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/users/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const user = await prisma.user.findUnique({
@@ -118,11 +118,11 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const systemRole = await resolveSystemRole(parsed.data.roleId);
     const user = await prisma.user.create({
       data: {
+        id: generateId('User'),
         email: parsed.data.email,
         name: parsed.data.name,
         passwordHash,
         role: systemRole,
-        recordId: generateRecordId('User'),
         roleId: parsed.data.roleId,
         departmentId: parsed.data.departmentId,
         managerId: parsed.data.managerId,
@@ -159,7 +159,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.put('/admin/users/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const parsed = updateUserSchema.safeParse(req.body);
@@ -217,7 +217,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/users/:id/reset-password', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const bodySchema = z.object({ password: z.string().min(6).max(128) });
@@ -243,7 +243,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.delete('/admin/users/:id', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const existing = await prisma.user.findUnique({ where: { id } });
@@ -270,7 +270,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/users/:id/freeze', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const existing = await prisma.user.findUnique({ where: { id } });
@@ -299,7 +299,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/users/:id/permissions', async (req, reply) => {
-    const pp = uuidParam.safeParse(req.params);
+    const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
     const { id } = pp.data;
     const user = await prisma.user.findUnique({

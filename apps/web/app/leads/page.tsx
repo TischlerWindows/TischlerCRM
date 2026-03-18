@@ -39,7 +39,6 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Lead {
   id: string;
-  recordId?: string;
   leadNumber: string;
   contactName: string;
   createdBy: string;
@@ -471,7 +470,7 @@ export default function LeadsPage() {
       setSelectedLayoutId(null);
       
       setTimeout(() => {
-        router.push(`/leads/${result.recordId || result.id}`);
+        router.push(`/leads/${result.id}`);
       }, 200);
     } catch (error) {
       console.error('Failed to create lead:', error);
@@ -722,18 +721,18 @@ export default function LeadsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/leads/${lead.recordId}`)}>
+                  <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/leads/${lead.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'leadNumber' ? (
-                          <Link href={`/leads/${lead.recordId}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                          <Link href={`/leads/${lead.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {lead.leadNumber}
                           </Link>
                         ) : column.id === 'contactName' ? (
-                          <Link href={`/leads/${lead.recordId}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                          <Link href={`/leads/${lead.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {formatColumnValue(lead, 'contactName')}
                           </Link>
                         ) : column.id === 'stage' ? (
@@ -765,7 +764,7 @@ export default function LeadsPage() {
                             {canEditLead && (
                             <button
                               onClick={() => {
-                                router.push(`/leads/${lead.recordId}`);
+                                router.push(`/leads/${lead.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
