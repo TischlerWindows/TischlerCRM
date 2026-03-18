@@ -87,309 +87,6 @@ const CONTACT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields
   }
 ];
 
-const ACCOUNT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: string[] }> = [
-  {
-    label: 'Account Information',
-    columns: 2,
-    fields: [
-      'Account Name',
-      'Parent Account',
-      'Account #',
-      'Phone',
-      'Account Type',
-      'Email',
-      'Description',
-      'Website'
-    ]
-  },
-  {
-    label: 'Address Information',
-    columns: 2,
-    fields: [
-      'Shipping Address',
-      'Billing Address'
-    ]
-  },
-  {
-    label: 'System Information',
-    columns: 2,
-    fields: [
-      'Created By',
-      'Last Modified By'
-    ]
-  },
-  {
-    label: 'Custom Links',
-    columns: 2,
-    fields: [
-      'Google Maps',
-      'Google News',
-      'Google Search'
-    ]
-  }
-];
-
-const PRODUCT_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: string[] }> = [
-  {
-    label: 'Product Information',
-    columns: 2,
-    fields: [
-      'Product Name',
-      'Product Family',
-      'Product Code',
-      'Active',
-      'Product Currency'
-    ]
-  },
-  {
-    label: 'Description Information',
-    columns: 1,
-    fields: [
-      'Product Description'
-    ]
-  },
-  {
-    label: 'System Information',
-    columns: 2,
-    fields: [
-      'Created By',
-      'Last Modified By'
-    ]
-  }
-];
-
-const LEAD_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: string[] }> = [
-  {
-    label: 'Lead Information',
-    columns: 2,
-    fields: [
-      'Lead Status',
-      'Lead Type',
-      'Lead Owner',
-      'Lead Source',
-      'Competitors',
-      'Close Date',
-      'Confidence Level',
-      'Type of Sale',
-      'Single Sales Objective'
-    ]
-  },
-  {
-    label: 'Contact Information',
-    columns: 2,
-    fields: [
-      'Name',
-      'Account',
-      'Primary Email',
-      'Secondary Email',
-      'Primary Phone',
-      'Secondary Phone',
-      'Property Address'
-    ]
-  },
-  {
-    label: 'Buying Influences',
-    columns: 2,
-    fields: [
-      'Role',
-      'Mode',
-      'Rating',
-      'Degrees of Influence',
-      'Buying Influence',
-      'Base Coverage'
-    ]
-  },
-  {
-    label: 'Summary',
-    columns: 1,
-    fields: [
-      'Summary of Position: Strengths',
-      'Summary of Position: Red Flags',
-      'Actions',
-      'Lead Notes'
-    ]
-  },
-  {
-    label: 'Sharepoint Files',
-    columns: 1,
-    fields: [
-      'Sharepoint Files'
-    ]
-  },
-  {
-    label: 'System Information',
-    columns: 2,
-    fields: [
-      'Created By',
-      'Last Modified By',
-      'Lead Number'
-    ]
-  }
-];
-
-const DEAL_LAYOUT_SECTIONS: Array<{ label: string; columns: 1 | 2 | 3; fields: string[] }> = [
-  {
-    label: 'Contact Information',
-    columns: 2,
-    fields: [
-      'Deal Name',
-      'Architect Firm',
-      'Architect',
-      'Contractor Company',
-      'Contractor',
-      'Quote Account',
-      'Quote Contact',
-      'Quote Email',
-      'Quote Phone',
-      'Secondary Quote Phone',
-      'Deal Owner'
-    ]
-  },
-  {
-    label: 'Deal Information',
-    columns: 2,
-    fields: [
-      'Deal Number',
-      'Property Address',
-      'Estimated Contract Date',
-      'Product Required Onsite',
-      'Quote Due',
-      'Stage',
-      'Competitors',
-      'Probability',
-      'Amount',
-      'Quote Budget',
-      'Plans Dated',
-      'Shared Opportunity',
-      'Deal Notes',
-      'Korn Priority'
-    ]
-  },
-  {
-    label: 'Estimating Information',
-    columns: 2,
-    fields: [
-      'Estimators',
-      'Status',
-      'Priority/Next Job',
-      'Estimating Notes'
-    ]
-  },
-  {
-    label: 'Quote Specifications',
-    columns: 2,
-    fields: [
-      'Site Measurements',
-      'High Altitude',
-      'New Construction',
-      'Renovation',
-      'Waterfront Exposure',
-      'Product Specifications',
-      'Delivery Requirements',
-      'Delivery Notes',
-      'Reference for Unit Dimensions',
-      'Wind Load Speed MPH',
-      'Wind Speed Reference'
-    ]
-  },
-  {
-    label: 'Product Specifications',
-    columns: 2,
-    fields: [
-      'Wood Type',
-      'Finish Specifications',
-      'Wood Notes',
-      'Final Finish',
-      'Glass Type',
-      'Alternative Glass',
-      'Glass Notes',
-      'Spacer Bars',
-      'Window Hardware',
-      'Hardware Finish Notes',
-      'Hinge Finish Specification',
-      'Finials',
-      'Finial Type',
-      'Security'
-    ]
-  },
-  {
-    label: 'Windows',
-    columns: 2,
-    fields: [
-      'Window Type',
-      'Fixed Options',
-      'Window Type Notes',
-      'Single, Double & Triple Hung Windows',
-      'Single/Double Hung Notes',
-      'Sill',
-      'Sill Notes'
-    ]
-  },
-  {
-    label: 'Doors',
-    columns: 2,
-    fields: [
-      'Door Options',
-      'Inswing Door Threshold',
-      'Outswing Door Threshold',
-      'Lift and Slide Doors Striker Bolts',
-      'Door Option Notes',
-      'Entry Door'
-    ]
-  },
-  {
-    label: 'Accessories and Add-ons',
-    columns: 2,
-    fields: [
-      'Roll Screens',
-      'Roll Screen Location',
-      'Screens',
-      'Screen Location',
-      'Mesh Type',
-      'Roll Shades',
-      'Shades Location',
-      'Add-on Products',
-      'Add-on Locations',
-      'Wood Exterior Trim and Casing'
-    ]
-  },
-  {
-    label: 'Installation',
-    columns: 2,
-    fields: [
-      'Installation',
-      'Required Installation Scope/Notes'
-    ]
-  },
-  {
-    label: 'Revisions',
-    columns: 2,
-    fields: [
-      'Start Date',
-      'Finish Date',
-      'Revision'
-    ]
-  },
-  {
-    label: 'General Notes',
-    columns: 1,
-    fields: [
-      'General Notes',
-      'Korn Notes',
-      'Loss Reason',
-      'Loss Notes'
-    ]
-  },
-  {
-    label: 'System Information',
-    columns: 2,
-    fields: [
-      'Created By',
-      'Last Modified By'
-    ]
-  }
-];
-
 export interface SchemaService {
   loadSchema(): Promise<OrgSchema>;
   saveSchema(schema: OrgSchema): Promise<void>;
@@ -402,10 +99,6 @@ export interface SchemaService {
 }
 
 class LocalStorageSchemaService implements SchemaService {
-  private normalizeSectionLabel(label: string): string {
-    return label.replace(/\s*\(.*?\)\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
-  }
-
   async loadSchema(): Promise<OrgSchema> {
     // Try to load from API first
     try {
@@ -966,91 +659,11 @@ class LocalStorageSchemaService implements SchemaService {
   }
 
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
-    const property = schema.objects.find((obj) => obj.apiName === 'Property');
-    if (!property) return schema;
-
-    const hasLayout = property.pageLayouts?.some((layout) => layout.name === 'Property - Wood Template');
-
-    // If the layout already exists, leave it alone — don't rebuild or override
-    // record type assignments. Users may have customized layouts in the Page Editor.
-    if (hasLayout) {
-      return schema;
-    }
-
-    const fieldMap = new Map(property.fields.map((field) => [field.label, field.apiName]));
-    const missing = new Set<string>();
-
-    const sections = PROPERTY_WOOD_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const apiName = fieldMap.get(label) || property.fields.find((f) => f.apiName === label)?.apiName;
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
-      return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
-      };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Property fields for Wood template:', Array.from(missing));
-    }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Property - Wood Template',
-      layoutType: 'create',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = property.recordTypes.map((recordType, index) => {
-      if (property.defaultRecordTypeId && recordType.id === property.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      if (!property.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
-    });
-
-    // Only add the layout when it doesn't already exist
-    const updatedObjects = schema.objects.map((obj) =>
-      obj.apiName === 'Property'
-        ? {
-            ...obj,
-            pageLayouts: [...(obj.pageLayouts || []), layout],
-            recordTypes: updatedRecordTypes,
-            updatedAt: new Date().toISOString()
-          }
-        : obj
-    );
-
-    return {
-      ...schema,
-      objects: updatedObjects,
-      updatedAt: new Date().toISOString()
-    };
+    // No-op: Hard-coded template layouts are no longer auto-injected.
+    // The universal ensureAllObjectsHavePopulatedLayout method will
+    // generate a layout if the object has none. Users may delete
+    // templates via the Page Editor without them reappearing.
+    return schema;
   }
 
   private ensureContactTemplateLayout(schema: OrgSchema): OrgSchema {
@@ -1064,8 +677,6 @@ class LocalStorageSchemaService implements SchemaService {
   private ensureAccountTemplateLayout(schema: OrgSchema): OrgSchema {
     const account = schema.objects.find((obj) => obj.apiName === 'Account');
     if (!account) return schema;
-
-    const hasLayout = account.pageLayouts?.some((layout) => layout.name === 'Account - Default Template');
 
     const requiredFields: FieldDef[] = [];
 
@@ -1108,136 +719,26 @@ class LocalStorageSchemaService implements SchemaService {
       ? [...account.fields, ...requiredFields]
       : account.fields;
 
-    const ensureAddressFieldsInLayout = (layout: any) => {
-      if (!layout?.tabs?.length) return layout;
-      const tabs = layout.tabs.map((tab: any, tabIndex: number) => {
-        if (tabIndex !== 0 || !tab.sections?.length) return tab;
-        const sections = tab.sections.map((section: any) => {
-          if (section.label !== 'Address Information') return section;
-          const existing = new Set(section.fields?.map((f: any) => f.apiName) || []);
-          const nextFields = [...(section.fields || [])];
-          if (!existing.has('Account__shippingAddress')) {
-            nextFields.push({
-              apiName: 'Account__shippingAddress',
-              column: nextFields.length % section.columns,
-              order: nextFields.length
-            });
-          }
-          if (!existing.has('Account__billingAddress')) {
-            nextFields.push({
-              apiName: 'Account__billingAddress',
-              column: nextFields.length % section.columns,
-              order: nextFields.length
-            });
-          }
-          return { ...section, fields: nextFields };
-        });
-        return { ...tab, sections };
-      });
-      return { ...layout, tabs };
-    };
-
-    const fieldMap = new Map(mergedFields.map((field) => [field.label, field.apiName]));
-    const missing = new Set<string>();
-
-    const aliasMap = new Map<string, string>([
-      ['Account #', 'Account Number'],
-      ['Email', 'Primary Email'],
-      ['Phone', 'Primary Phone']
-    ]);
-
-    const sections = ACCOUNT_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const labelKey = aliasMap.get(label) || label;
-          const apiName = fieldMap.get(labelKey) || mergedFields.find((f) => f.apiName === label)?.apiName;
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
+    // Only ensure required fields exist on the object.
+    // Hard-coded template layouts are no longer auto-injected;
+    // ensureAllObjectsHavePopulatedLayout will generate a layout if needed.
+    if (requiredFields.length > 0) {
       return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
-      };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Account fields for default template:', Array.from(missing));
-    }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Account - Default Template',
-      layoutType: 'edit',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = account.recordTypes.map((recordType, index) => {
-      if (account.defaultRecordTypeId && recordType.id === account.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      if (!account.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
-    });
-
-    const updatedObjects = schema.objects.map((obj) => {
-      if (obj.apiName !== 'Account') return obj;
-
-      if (hasLayout) {
-        // Layout already exists — only ensure required fields are on the object,
-        // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
-        if (requiredFields.length > 0) {
-          return {
-            ...obj,
-            fields: mergedFields,
-            updatedAt: new Date().toISOString()
-          };
-        }
-        return obj;
-      }
-
-      return {
-        ...obj,
-        fields: mergedFields,
-        pageLayouts: [...(obj.pageLayouts || []), layout],
-        recordTypes: updatedRecordTypes,
+        ...schema,
+        objects: schema.objects.map((obj) =>
+          obj.apiName === 'Account'
+            ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
+            : obj
+        ),
         updatedAt: new Date().toISOString()
       };
-    });
-
-    return {
-      ...schema,
-      objects: updatedObjects,
-      updatedAt: new Date().toISOString()
-    };
+    }
+    return schema;
   }
 
   private ensureProductTemplateLayout(schema: OrgSchema): OrgSchema {
     const product = schema.objects.find((obj) => obj.apiName === 'Product');
     if (!product) return schema;
-
-    const hasLayout = product.pageLayouts?.some((layout) => layout.name === 'Product - Default Template');
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
@@ -1271,134 +772,26 @@ class LocalStorageSchemaService implements SchemaService {
       ? [...product.fields, ...requiredFields]
       : product.fields;
 
-    const ensureDescriptionFieldInLayout = (layout: any) => {
-      if (!layout?.tabs?.length) return layout;
-      const tabs = layout.tabs.map((tab: any, tabIndex: number) => {
-        if (tabIndex !== 0 || !tab.sections?.length) return tab;
-        const sections = tab.sections.map((section: any) => {
-          if (this.normalizeSectionLabel(section.label) !== 'Description Information') return section;
-          const existing = new Set(section.fields?.map((f: any) => f.apiName) || []);
-          const nextFields = [...(section.fields || [])];
-          if (!existing.has('Product__description')) {
-            nextFields.push({
-              apiName: 'Product__description',
-              column: nextFields.length % section.columns,
-              order: nextFields.length
-            });
-          }
-          return { ...section, fields: nextFields };
-        });
-        return { ...tab, sections };
-      });
-      return { ...layout, tabs };
-    };
-
-    if (hasLayout) {
-      // Layout already exists — only ensure required fields are on the object,
-      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
-      if (requiredFields.length > 0) {
-        return {
-          ...schema,
-          objects: schema.objects.map((obj) =>
-            obj.apiName === 'Product'
-              ? {
-                  ...obj,
-                  fields: mergedFields,
-                  updatedAt: new Date().toISOString()
-                }
-              : obj
-          ),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return schema;
-    }
-
-    const fieldMap = new Map(mergedFields.map((field) => [field.label, field.apiName]));
-    const missing = new Set<string>();
-
-    const aliasMap = new Map<string, string>([
-      ['Product Family', 'Product Family'],
-      ['Product Description', 'Product Description']
-    ]);
-
-    const sections = PRODUCT_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const labelKey = aliasMap.get(label) || label;
-          const apiName = fieldMap.get(labelKey) || mergedFields.find((f) => f.apiName === label)?.apiName;
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
+    // Only ensure required fields exist on the object.
+    // Hard-coded template layouts are no longer auto-injected;
+    // ensureAllObjectsHavePopulatedLayout will generate a layout if needed.
+    if (requiredFields.length > 0) {
       return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
+        ...schema,
+        objects: schema.objects.map((obj) =>
+          obj.apiName === 'Product'
+            ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
+            : obj
+        ),
+        updatedAt: new Date().toISOString()
       };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Product fields for default template:', Array.from(missing));
     }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Product - Default Template',
-      layoutType: 'edit',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = product.recordTypes.map((recordType, index) => {
-      if (product.defaultRecordTypeId && recordType.id === product.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      if (!product.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
-    });
-
-    return {
-      ...schema,
-      objects: schema.objects.map((obj) =>
-        obj.apiName === 'Product'
-          ? {
-              ...obj,
-              fields: mergedFields,
-              pageLayouts: [...(obj.pageLayouts || []), layout],
-              recordTypes: updatedRecordTypes,
-              updatedAt: new Date().toISOString()
-            }
-          : obj
-      ),
-      updatedAt: new Date().toISOString()
-    };
+    return schema;
   }
 
   private ensureLeadTemplateLayout(schema: OrgSchema): OrgSchema {
     const lead = schema.objects.find((obj) => obj.apiName === 'Lead');
     if (!lead) return schema;
-
-    const hasLayout = lead.pageLayouts?.some((layout) => layout.name === 'Lead - Default Template');
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
@@ -1598,167 +991,26 @@ class LocalStorageSchemaService implements SchemaService {
       ? [...lead.fields, ...requiredFields]
       : lead.fields;
 
-    const aliasMap = new Map<string, string>([
-      ['Lead Status', 'Status'],
-      ['Name', 'Name']
-    ]);
-
-    const resolveApiName = (label: string) => {
-      const labelKey = aliasMap.get(label) || label;
-      const fieldMap = new Map(mergedFields.map((field) => [field.label, field.apiName]));
-      return fieldMap.get(labelKey) || mergedFields.find((f) => f.apiName === label)?.apiName;
-    };
-
-    const applyTemplateToLayout = (layout: any) => {
-      if (!layout?.tabs?.length) return layout;
-      const tabs = layout.tabs.map((tab: any, tabIndex: number) => {
-        if (tabIndex !== 0 || !tab.sections?.length) return tab;
-        const sectionMap = new Map(
-          tab.sections.map((section: any) => [this.normalizeSectionLabel(section.label), section])
-        );
-
-        const updatedSections = LEAD_LAYOUT_SECTIONS.map((templateSection, sectionIndex) => {
-          const key = this.normalizeSectionLabel(templateSection.label);
-          const existingSection = sectionMap.get(key);
-          const baseSection = existingSection || {
-            id: generateId(),
-            label: templateSection.label,
-            columns: templateSection.columns,
-            order: sectionIndex,
-            fields: []
-          };
-
-          const existingApi = new Set((baseSection.fields || []).map((f: any) => f.apiName));
-          const nextFields = [...(baseSection.fields || [])];
-
-          templateSection.fields.forEach((label, index) => {
-            const apiName = resolveApiName(label);
-            if (!apiName) return;
-            if (!existingApi.has(apiName)) {
-              nextFields.push({
-                apiName,
-                column: index % templateSection.columns,
-                order: nextFields.length
-              });
-            }
-          });
-
-          return {
-            ...baseSection,
-            label: this.normalizeSectionLabel(templateSection.label),
-            columns: templateSection.columns,
-            order: sectionIndex,
-            fields: nextFields
-          };
-        });
-
-        return {
-          ...tab,
-          sections: updatedSections
-        };
-      });
-
-      return { ...layout, tabs };
-    };
-
-    if (hasLayout) {
-      // Layout already exists — only ensure required fields are on the object,
-      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
-      if (requiredFields.length > 0) {
-        return {
-          ...schema,
-          objects: schema.objects.map((obj) =>
-            obj.apiName === 'Lead'
-              ? {
-                  ...obj,
-                  fields: mergedFields,
-                  updatedAt: new Date().toISOString()
-                }
-              : obj
-          ),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return schema;
-    }
-
-    const missing = new Set<string>();
-    const sections = LEAD_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const apiName = resolveApiName(label);
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
+    // Only ensure required fields exist on the object.
+    // Hard-coded template layouts are no longer auto-injected;
+    // ensureAllObjectsHavePopulatedLayout will generate a layout if needed.
+    if (requiredFields.length > 0) {
       return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
+        ...schema,
+        objects: schema.objects.map((obj) =>
+          obj.apiName === 'Lead'
+            ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
+            : obj
+        ),
+        updatedAt: new Date().toISOString()
       };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Lead fields for default template:', Array.from(missing));
     }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Lead - Default Template',
-      layoutType: 'edit',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = lead.recordTypes.map((recordType, index) => {
-      if (lead.defaultRecordTypeId && recordType.id === lead.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      if (!lead.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
-    });
-
-    return {
-      ...schema,
-      objects: schema.objects.map((obj) =>
-        obj.apiName === 'Lead'
-          ? {
-              ...obj,
-              fields: mergedFields,
-              pageLayouts: [...(obj.pageLayouts || []), layout],
-              recordTypes: updatedRecordTypes,
-              updatedAt: new Date().toISOString()
-            }
-          : obj
-      ),
-      updatedAt: new Date().toISOString()
-    };
+    return schema;
   }
 
   private ensureDealTemplateLayout(schema: OrgSchema): OrgSchema {
     const deal = schema.objects.find((obj) => obj.apiName === 'Deal');
     if (!deal) return schema;
-
-    const hasLayout = deal.pageLayouts?.some((layout) => layout.name === 'Deal - Default Template');
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
@@ -2403,154 +1655,21 @@ class LocalStorageSchemaService implements SchemaService {
       ? [...deal.fields, ...requiredFields]
       : deal.fields;
 
-    const resolveApiName = (label: string) => {
-      const fieldMap = new Map(mergedFields.map((field) => [field.label, field.apiName]));
-      return fieldMap.get(label) || mergedFields.find((f) => f.apiName === label)?.apiName;
-    };
-
-    const applyTemplateToLayout = (layout: any) => {
-      if (!layout?.tabs?.length) return layout;
-      const tabs = layout.tabs.map((tab: any, tabIndex: number) => {
-        if (tabIndex !== 0 || !tab.sections?.length) return tab;
-        const sectionMap = new Map(
-          tab.sections.map((section: any) => [this.normalizeSectionLabel(section.label), section])
-        );
-
-        const updatedSections = DEAL_LAYOUT_SECTIONS.map((templateSection, sectionIndex) => {
-          const key = this.normalizeSectionLabel(templateSection.label);
-          const existingSection = sectionMap.get(key);
-          const baseSection = existingSection || {
-            id: generateId(),
-            label: templateSection.label,
-            columns: templateSection.columns,
-            order: sectionIndex,
-            fields: []
-          };
-
-          const existingApi = new Set((baseSection.fields || []).map((f: any) => f.apiName));
-          const nextFields = [...(baseSection.fields || [])];
-
-          templateSection.fields.forEach((label, index) => {
-            const apiName = resolveApiName(label);
-            if (!apiName) return;
-            if (!existingApi.has(apiName)) {
-              nextFields.push({
-                apiName,
-                column: index % templateSection.columns,
-                order: nextFields.length
-              });
-            }
-          });
-
-          return {
-            ...baseSection,
-            label: this.normalizeSectionLabel(templateSection.label),
-            columns: templateSection.columns,
-            order: sectionIndex,
-            fields: nextFields
-          };
-        });
-
-        return {
-          ...tab,
-          sections: updatedSections
-        };
-      });
-
-      return { ...layout, tabs };
-    };
-
-    if (hasLayout) {
-      // Layout already exists — only ensure required fields are on the object,
-      // but do NOT modify any layouts. Users may have customized layouts in the Page Editor.
-      if (requiredFields.length > 0) {
-        return {
-          ...schema,
-          objects: schema.objects.map((obj) =>
-            obj.apiName === 'Deal'
-              ? {
-                  ...obj,
-                  fields: mergedFields,
-                  updatedAt: new Date().toISOString()
-                }
-              : obj
-          ),
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return schema;
-    }
-
-    const missing = new Set<string>();
-    const sections = DEAL_LAYOUT_SECTIONS.map((section, sectionIndex) => {
-      const sectionFields = section.fields
-        .map((label, index) => {
-          const apiName = resolveApiName(label);
-          if (!apiName) {
-            missing.add(label);
-            return null;
-          }
-          return {
-            apiName,
-            column: index % section.columns,
-            order: index
-          };
-        })
-        .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
-
+    // Only ensure required fields exist on the object.
+    // Hard-coded template layouts are no longer auto-injected;
+    // ensureAllObjectsHavePopulatedLayout will generate a layout if needed.
+    if (requiredFields.length > 0) {
       return {
-        id: generateId(),
-        label: section.label,
-        columns: section.columns,
-        order: sectionIndex,
-        fields: sectionFields
+        ...schema,
+        objects: schema.objects.map((obj) =>
+          obj.apiName === 'Deal'
+            ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
+            : obj
+        ),
+        updatedAt: new Date().toISOString()
       };
-    });
-
-    if (missing.size > 0) {
-      console.warn('[Schema] Missing Deal fields for default template:', Array.from(missing));
     }
-
-    const layoutId = generateId();
-    const layout = {
-      id: layoutId,
-      name: 'Deal - Default Template',
-      layoutType: 'edit',
-      tabs: [
-        {
-          id: generateId(),
-          label: 'Details',
-          order: 0,
-          sections
-        }
-      ]
-    };
-
-    const updatedRecordTypes = deal.recordTypes.map((recordType, index) => {
-      if (deal.defaultRecordTypeId && recordType.id === deal.defaultRecordTypeId) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      if (!deal.defaultRecordTypeId && index === 0) {
-        return { ...recordType, pageLayoutId: layoutId };
-      }
-      return recordType;
-    });
-
-    return {
-      ...schema,
-      objects: schema.objects.map((obj) =>
-        obj.apiName === 'Deal'
-          ? {
-              ...obj,
-              fields: mergedFields,
-              pageLayouts: [...(obj.pageLayouts || []), layout],
-              recordTypes: updatedRecordTypes,
-              updatedAt: new Date().toISOString()
-            }
-          : obj
-      ),
-      updatedAt: new Date().toISOString()
-    };
+    return schema;
   }
 
   async saveSchema(schema: OrgSchema): Promise<void> {
