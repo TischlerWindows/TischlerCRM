@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, Copy, Check } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, Copy, Check, Mail, KeyRound } from 'lucide-react';
 import { apiClient, UserRow, CreateUserInput, InviteStatus } from '@/lib/api-client';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
@@ -60,6 +60,8 @@ export default function UsersPage() {
 
   const [showNewModal, setShowNewModal] = useState(false);
   const [newForm, setNewForm] = useState<CreateUserInput>({ name: '', email: '' });
+  const [creationMode, setCreationMode] = useState<'invite' | 'password'>('invite');
+  const [tempPassword, setTempPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [newUserResult, setNewUserResult] = useState<{ inviteUrl?: string; inviteSent: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -101,10 +103,15 @@ export default function UsersPage() {
 
   async function handleCreate() {
     if (!newForm.name || !newForm.email) return;
+    if (creationMode === 'password' && tempPassword.length < 8) return;
     setSaving(true);
     setError(null);
     try {
-      const result = await apiClient.createUser(newForm);
+      const payload: CreateUserInput = { ...newForm };
+      if (creationMode === 'password') {
+        payload.password = tempPassword;
+      }
+      const result = await apiClient.createUser(payload);
       setNewUserResult({ inviteUrl: result.inviteUrl, inviteSent: result.inviteSent });
       await load();
     } catch (e: any) {
@@ -156,6 +163,8 @@ export default function UsersPage() {
     setShowNewModal(false);
     setNewUserResult(null);
     setNewForm({ name: '', email: '' });
+    setCreationMode('invite');
+    setTempPassword('');
     setCopied(false);
   }
 
@@ -332,7 +341,11 @@ export default function UsersPage() {
             {newUserResult ? (
               <div>
                 <h2 className="text-lg font-bold text-[#151f6d] mb-3">User Created</h2>
-                {newUserResult.inviteSent ? (
+                {creationMode === 'password' ? (
+                  <p className="text-sm text-gray-600 mb-5">
+                    User account created with a temporary password. They will be required to change it on first login.
+                  </p>
+                ) : newUserResult.inviteSent ? (
                   <p className="text-sm text-gray-600 mb-5">
                     An invite email has been sent. The user can set their password using the link in the email.
                   </p>
@@ -390,9 +403,60 @@ export default function UsersPage() {
                     placeholder="jane@company.com"
                   />
                 </div>
-                <p className="text-xs text-gray-400 mb-5">
-                  An invite link will be generated to set their password. You can configure profile, department, and other details on their record page.
-                </p>
+                <div className="mb-5">
+                  <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Account Setup Method
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setCreationMode('invite'); setTempPassword(''); }}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        creationMode === 'invite'
+                          ? 'border-[#151f6d] bg-[#f0eeff] text-[#151f6d]'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Mail className="w-4 h-4" />
+                      Send Invite Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCreationMode('password')}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        creationMode === 'password'
+                          ? 'border-[#151f6d] bg-[#f0eeff] text-[#151f6d]'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      Set Temp Password
+                    </button>
+                  </div>
+                </div>
+                {creationMode === 'password' && (
+                  <div className="mb-5">
+                    <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400 mb-1.5">
+                      Temporary Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={tempPassword}
+                      onChange={e => setTempPassword(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#151f6d]/20 focus:border-[#151f6d]"
+                      placeholder="Min. 8 characters"
+                      minLength={8}
+                    />
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      The user will be required to change this password on first login.
+                    </p>
+                  </div>
+                )}
+                {creationMode === 'invite' && (
+                  <p className="text-xs text-gray-400 mb-5">
+                    An invite link will be generated to set their password. You can configure profile, department, and other details on their record page.
+                  </p>
+                )}
                 <div className="flex gap-3 justify-end">
                   <button
                     onClick={closeNewModal}
@@ -402,10 +466,10 @@ export default function UsersPage() {
                   </button>
                   <button
                     onClick={handleCreate}
-                    disabled={saving || !newForm.name || !newForm.email}
+                    disabled={saving || !newForm.name || !newForm.email || (creationMode === 'password' && tempPassword.length < 8)}
                     className="px-5 py-2.5 text-sm bg-[#151f6d] text-white rounded-lg hover:bg-[#1c2b99] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {saving ? 'Creating…' : 'Create & Send Invite'}
+                    {saving ? 'Creating…' : creationMode === 'password' ? 'Create User' : 'Create & Send Invite'}
                   </button>
                 </div>
               </div>

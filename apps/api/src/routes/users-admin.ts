@@ -20,6 +20,7 @@ const createUserSchema = z.object({
   managerId:    z.string().min(1).optional().nullable(),
   timezone:     z.string().max(100).optional().nullable(),
   locale:       z.string().max(20).optional().nullable(),
+  password:     z.string().min(8).max(128).optional(),
 }).strict();
 
 const updateUserSchema = z.object({
@@ -142,7 +143,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     });
   });
 
-  // ── Create user (invite flow) ────────────────────────────────────────────
+  // ── Create user (invite flow or manual password) ─────────────────────────
   app.post('/admin/users', async (req, reply) => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -154,39 +155,71 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
     if (existing) return reply.code(409).send({ error: 'Email already registered' });
 
-    const inviteToken = crypto.randomBytes(32).toString('hex');
-    const inviteTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const systemRole = await resolveSystemRole(parsed.data.profileId);
     const actorId = (req as any).user.sub;
+    const isManualPassword = !!parsed.data.password;
+
+    const commonData = {
+      id: generateId('User'),
+      email: parsed.data.email,
+      name: parsed.data.name,
+      role: systemRole,
+      title: parsed.data.title ?? null,
+      phone: parsed.data.phone ?? null,
+      mobilePhone: parsed.data.mobilePhone ?? null,
+      nickname: parsed.data.nickname ?? null,
+      alias: parsed.data.alias ?? null,
+      profileId: parsed.data.profileId ?? null,
+      departmentId: parsed.data.departmentId ?? null,
+      managerId: parsed.data.managerId ?? null,
+      timezone: parsed.data.timezone ?? 'America/New_York',
+      locale: parsed.data.locale ?? 'en_US',
+      isActive: true,
+      createdById: actorId,
+    };
+
+    const userSelect = {
+      id: true, email: true, name: true, role: true, isActive: true,
+      title: true, phone: true, createdAt: true,
+      profile: profileSelect,
+      department: { select: { id: true, name: true } },
+    } as const;
+
+    if (isManualPassword) {
+      const user = await prisma.user.create({
+        data: {
+          ...commonData,
+          passwordHash: hashPassword(parsed.data.password!),
+          mustChangePassword: true,
+        },
+        select: userSelect,
+      });
+
+      await logAudit({
+        actorId,
+        action: 'CREATE',
+        objectType: 'User',
+        objectId: user.id,
+        objectName: user.name ?? user.email,
+        after: { email: parsed.data.email, name: parsed.data.name, profileId: parsed.data.profileId, manualPassword: true },
+        ipAddress: extractIp(req),
+      });
+
+      return reply.code(201).send({ user, inviteSent: false });
+    }
+
+    // Invite flow (existing behavior)
+    const inviteToken = crypto.randomBytes(32).toString('hex');
+    const inviteTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const user = await prisma.user.create({
       data: {
-        id: generateId('User'),
-        email: parsed.data.email,
-        name: parsed.data.name,
-        role: systemRole,
-        title: parsed.data.title ?? null,
-        phone: parsed.data.phone ?? null,
-        mobilePhone: parsed.data.mobilePhone ?? null,
-        nickname: parsed.data.nickname ?? null,
-        alias: parsed.data.alias ?? null,
-        profileId: parsed.data.profileId ?? null,
-        departmentId: parsed.data.departmentId ?? null,
-        managerId: parsed.data.managerId ?? null,
-        timezone: parsed.data.timezone ?? 'America/New_York',
-        locale: parsed.data.locale ?? 'en_US',
-        isActive: true,
+        ...commonData,
         inviteToken,
         inviteTokenExpiry,
         inviteSentAt: new Date(),
-        createdById: actorId,
       },
-      select: {
-        id: true, email: true, name: true, role: true, isActive: true,
-        title: true, phone: true, createdAt: true,
-        profile: profileSelect,
-        department: { select: { id: true, name: true } },
-      },
+      select: userSelect,
     });
 
     const inviteUrl = buildInviteUrl(inviteToken);
@@ -299,6 +332,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
       where: { id },
       data: {
         passwordHash: hashPassword(parsed.data.password),
+        mustChangePassword: true,
         inviteToken: null,
         inviteTokenExpiry: null,
         inviteAcceptedAt: existing.inviteAcceptedAt ?? new Date(),
@@ -378,7 +412,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
 
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: 'User not found' });
-    if (existing.deletedAt) return reply.code(400).send({ error: 'User is already deleted' });
+    if (existing.deletedAt) return reply.code(204).send();
 
     const actorId = (req as any).user.sub;
     await prisma.user.update({

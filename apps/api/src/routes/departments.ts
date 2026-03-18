@@ -2,14 +2,14 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
-import { logAudit, extractIp } from '../audit';
+import { logAudit, extractIp } from '../audit.js';
 
 const departmentSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   description: z.string().max(1000).optional().nullable(),
   parentId: z.string().min(1).optional().nullable(),
   isActive: z.boolean().optional(),
-});
+}).strict();
 
 const idParam = z.object({ id: z.string().min(1) });
 
@@ -52,9 +52,10 @@ export async function departmentRoutes(app: FastifyInstance) {
     reply.send(dept);
   });
 
-  app.post('/departments', async (req, reply) => {
+  app.post('/admin/departments', async (req, reply) => {
     const parsed = departmentSchema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid department data', details: parsed.error.flatten() });
+    if (!req.user) return reply.code(401).send({ error: 'Unauthorized' });
     const dept = await prisma.department.create({
       data: {
         id: generateId('Department'),
@@ -69,7 +70,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = req.user!.sub;
+    const actorId = (req.user as any).sub;
     await logAudit({
       actorId,
       action: 'CREATE',
@@ -83,12 +84,12 @@ export async function departmentRoutes(app: FastifyInstance) {
     reply.code(201).send(dept);
   });
 
-  app.put('/departments/:id', async (req, reply) => {
+  app.put('/admin/departments/:id', async (req, reply) => {
     const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid department ID' });
     const { id } = pp.data;
     const parsed = departmentSchema.partial().safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid department data', details: parsed.error.flatten() });
     const existing = await prisma.department.findUnique({ where: { id } });
     if (!existing) return reply.code(404).send({ error: 'Department not found' });
     if (parsed.data.parentId === id) {
@@ -104,6 +105,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       }
     }
 
+    if (!req.user) return reply.code(401).send({ error: 'Unauthorized' });
     const dept = await prisma.department.update({
       where: { id },
       data: parsed.data,
@@ -113,7 +115,7 @@ export async function departmentRoutes(app: FastifyInstance) {
       },
     });
 
-    const actorId = req.user!.sub;
+    const actorId = (req.user as any).sub;
     await logAudit({
       actorId,
       action: 'UPDATE',
@@ -128,7 +130,7 @@ export async function departmentRoutes(app: FastifyInstance) {
     reply.send(dept);
   });
 
-  app.delete('/departments/:id', async (req, reply) => {
+  app.delete('/admin/departments/:id', async (req, reply) => {
     const pp = idParam.safeParse(req.params);
     if (!pp.success) return reply.code(400).send({ error: 'Invalid department ID' });
     const { id } = pp.data;
@@ -141,7 +143,8 @@ export async function departmentRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: `Cannot delete department: ${userCount} users are assigned. Reassign them first.` });
     }
 
-    const actorId = req.user!.sub;
+    if (!req.user) return reply.code(401).send({ error: 'Unauthorized' });
+    const actorId = (req.user as any).sub;
     await prisma.department.update({
       where: { id },
       data: { deletedAt: new Date(), deletedById: actorId, isActive: false },

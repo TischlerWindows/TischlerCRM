@@ -4,8 +4,14 @@ import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { logAudit, extractIp } from '../audit.js';
 
-const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies'] as const;
-const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'] as const;
+const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'] as const;
+const APP_KEYS = [
+  'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
+  'exportData','importData',
+  'viewReports','manageReports','manageDashboards',
+  'viewSummary','viewSetup','viewAuditLog',
+  'customizeApplication','viewAllData','modifyAllData',
+] as const;
 
 const objectPermSchema = z.object({
   create:    z.boolean(),
@@ -60,18 +66,24 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   app.get('/admin/profiles/:id', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
     const profile = await prisma.profile.findUnique({
       where: { id },
       include: { _count: { select: { users: true } } },
     });
-    if (!profile) return reply.status(404).send({ error: 'Profile not found' });
+    if (!profile) return reply.code(404).send({ error: 'Profile not found' });
     return reply.send(profile);
   });
 
   app.get('/admin/profiles/:id/members', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
-    const includeInactive = (req.query as any).includeInactive === 'true';
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
+    const querySchema = z.object({ includeInactive: z.enum(['true', 'false']).optional() });
+    const qp = querySchema.safeParse(req.query);
+    const includeInactive = qp.success && qp.data.includeInactive === 'true';
     const whereActive = includeInactive ? {} : { isActive: true };
     const members = await prisma.user.findMany({
       where: { profileId: id, deletedAt: null, ...whereActive },
@@ -86,9 +98,11 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/profiles', async (req, reply) => {
-    const data = createProfileSchema.parse(req.body);
+    const parsed = createProfileSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid profile data', details: parsed.error.flatten() });
+    const data = parsed.data;
     const existing = await prisma.profile.findUnique({ where: { name: data.name } });
-    if (existing) return reply.status(409).send({ error: 'A profile with that name already exists' });
+    if (existing) return reply.code(409).send({ error: 'A profile with that name already exists' });
 
     const permissions = data.permissions ? applyImplications(data.permissions) : defaultPerms();
     const profile = await prisma.profile.create({
@@ -111,15 +125,26 @@ export async function profilesRoutes(app: FastifyInstance) {
       after: profile as any,
       ipAddress: extractIp(req),
     });
-    return reply.status(201).send(profile);
+    return reply.code(201).send(profile);
   });
 
   app.put('/admin/profiles/:id', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
-    const data = updateProfileSchema.parse(req.body);
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
+    const parsed = updateProfileSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid profile data', details: parsed.error.flatten() });
+    const data = parsed.data;
     const existing = await prisma.profile.findUnique({ where: { id } });
-    if (!existing) return reply.status(404).send({ error: 'Profile not found' });
-    if (existing.isSystem) return reply.status(403).send({ error: 'System profiles cannot be modified' });
+    if (!existing) return reply.code(404).send({ error: 'Profile not found' });
+    if (existing.isSystem) {
+      if (data.label !== undefined || data.description !== undefined) {
+        return reply.code(403).send({ error: 'System profile name and description cannot be modified' });
+      }
+      if (data.grantsAdminAccess !== undefined) {
+        return reply.code(403).send({ error: 'System profile admin access cannot be modified' });
+      }
+    }
     const updated = await prisma.profile.update({ where: { id }, data });
     await logAudit({
       actorId: (req as any).user.sub,
@@ -135,11 +160,14 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   app.put('/admin/profiles/:id/permissions', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
     const existing = await prisma.profile.findUnique({ where: { id } });
-    if (!existing) return reply.status(404).send({ error: 'Profile not found' });
-    if (existing.isSystem) return reply.status(403).send({ error: 'System profile permissions cannot be modified' });
-    const permissions = applyImplications(permissionsSchema.parse(req.body));
+    if (!existing) return reply.code(404).send({ error: 'Profile not found' });
+    const parsed = permissionsSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Invalid permissions data', details: parsed.error.flatten() });
+    const permissions = applyImplications(parsed.data);
     const updated = await prisma.profile.update({ where: { id }, data: { permissions } });
     await logAudit({
       actorId: (req as any).user.sub,
@@ -155,9 +183,11 @@ export async function profilesRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/profiles/:id/clone', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
     const source = await prisma.profile.findUnique({ where: { id } });
-    if (!source) return reply.status(404).send({ error: 'Profile not found' });
+    if (!source) return reply.code(404).send({ error: 'Profile not found' });
     const clone = await prisma.profile.create({
       data: {
         id: generateId('Profile'),
@@ -178,19 +208,21 @@ export async function profilesRoutes(app: FastifyInstance) {
       after: clone as any,
       ipAddress: extractIp(req),
     });
-    return reply.status(201).send(clone);
+    return reply.code(201).send(clone);
   });
 
   app.delete('/admin/profiles/:id', async (req, reply) => {
-    const { id } = idParam.parse(req.params);
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid profile ID' });
+    const { id } = pp.data;
     const existing = await prisma.profile.findUnique({
       where: { id },
       include: { _count: { select: { users: true } } },
     });
-    if (!existing) return reply.status(404).send({ error: 'Profile not found' });
-    if (existing.isSystem) return reply.status(403).send({ error: 'System profiles cannot be deleted' });
+    if (!existing) return reply.code(404).send({ error: 'Profile not found' });
+    if (existing.isSystem) return reply.code(403).send({ error: 'System profiles cannot be deleted' });
     if (existing._count.users > 0) {
-      return reply.status(409).send({ error: `Cannot delete profile with ${existing._count.users} assigned user(s). Reassign them first.` });
+      return reply.code(409).send({ error: `Cannot delete profile with ${existing._count.users} assigned user(s). Reassign them first.` });
     }
     await prisma.profile.delete({ where: { id } });
     await logAudit({
@@ -202,6 +234,6 @@ export async function profilesRoutes(app: FastifyInstance) {
       before: existing as any,
       ipAddress: extractIp(req),
     });
-    return reply.status(204).send();
+    return reply.code(204).send();
   });
 }

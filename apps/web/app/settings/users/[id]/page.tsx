@@ -4,11 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ChevronLeft, User, Mail, Phone, Shield, Building2,
+  ChevronLeft, User, Phone, Building2,
   Lock, Unlock, Trash2, RefreshCw, Send, Save, X,
   Clock, AlertCircle, CheckCircle,
 } from 'lucide-react';
-import { apiClient, type UserDetail, type LoginEventRow, type UpdateUserInput } from '@/lib/api-client';
+import { apiClient, type UserDetail, type LoginEventRow, type UpdateUserInput, type Profile, type UserRow } from '@/lib/api-client';
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -17,10 +17,14 @@ const TIMEZONES = [
 ];
 
 const LOCALES = [
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'en-GB', label: 'English (UK)' },
-  { value: 'de-DE', label: 'German' },
-  { value: 'de-CH', label: 'German (Swiss)' },
+  { value: 'en_US', label: 'English (US)' },
+  { value: 'en_GB', label: 'English (UK)' },
+  { value: 'de_DE', label: 'German' },
+  { value: 'de_CH', label: 'German (Swiss)' },
+  { value: 'fr_FR', label: 'French' },
+  { value: 'es_ES', label: 'Spanish' },
+  { value: 'it_IT', label: 'Italian' },
+  { value: 'pt_BR', label: 'Portuguese (Brazil)' },
 ];
 
 type Tab = 'details' | 'login-history';
@@ -73,6 +77,13 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   const [formAlias, setFormAlias] = useState('');
   const [formTimezone, setFormTimezone] = useState('');
   const [formLocale, setFormLocale] = useState('');
+  const [formProfileId, setFormProfileId] = useState('');
+  const [formDepartmentId, setFormDepartmentId] = useState('');
+  const [formManagerId, setFormManagerId] = useState('');
+
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [allUsers, setAllUsers] = useState<UserRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +99,9 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
       setFormAlias(u.alias ?? '');
       setFormTimezone(u.timezone ?? '');
       setFormLocale(u.locale ?? '');
+      setFormProfileId(u.profile?.id ?? '');
+      setFormDepartmentId(u.department?.id ?? '');
+      setFormManagerId(u.manager?.id ?? '');
       setDirty(false);
 
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -105,6 +119,18 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    Promise.all([
+      apiClient.getProfiles().catch(() => [] as Profile[]),
+      apiClient.get<{ id: string; name: string }[]>('/departments').catch(() => []),
+      apiClient.getUsers().catch(() => [] as UserRow[]),
+    ]).then(([p, d, u]) => {
+      setProfiles(p);
+      setDepartments(d);
+      setAllUsers(u);
+    });
+  }, []);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -137,6 +163,9 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
         alias: formAlias || null,
         timezone: formTimezone || null,
         locale: formLocale || null,
+        profileId: formProfileId || null,
+        departmentId: formDepartmentId || null,
+        managerId: formManagerId || null,
       };
       await apiClient.updateUser(id, data);
       setSuccess('User saved');
@@ -395,34 +424,24 @@ export default function UserRecordPage({ params }: { params: { id: string } }) {
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Profile">
-                    <div className="flex items-center gap-2">
-                      {user.profile ? (
-                        <Link href={`/settings/profiles/${user.profile.id}`} className="text-sm text-[#151f6d] hover:underline flex items-center gap-1">
-                          <Shield className="w-3.5 h-3.5" /> {user.profile.label}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-gray-400">—</span>
-                      )}
-                    </div>
+                    <select value={formProfileId} onChange={e => { setFormProfileId(e.target.value); markDirty(); }} className={inputCls}>
+                      <option value="">— None —</option>
+                      {profiles.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    </select>
                   </Field>
                   <Field label="Department">
-                    <span className="text-sm text-gray-700">{user.department?.name ?? '—'}</span>
+                    <select value={formDepartmentId} onChange={e => { setFormDepartmentId(e.target.value); markDirty(); }} className={inputCls}>
+                      <option value="">— None —</option>
+                      {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
                   </Field>
                   <Field label="Manager">
-                    {user.manager ? (
-                      <Link href={`/settings/users/${user.manager.id}`} className="text-sm text-[#151f6d] hover:underline">
-                        {user.manager.name ?? user.manager.email}
-                      </Link>
-                    ) : (
-                      <span className="text-sm text-gray-400">—</span>
-                    )}
+                    <select value={formManagerId} onChange={e => { setFormManagerId(e.target.value); markDirty(); }} className={inputCls}>
+                      <option value="">— None —</option>
+                      {allUsers.filter(u => u.id !== id).map(u => <option key={u.id} value={u.id}>{u.name ?? u.email}</option>)}
+                    </select>
                   </Field>
                 </div>
-                {isAdmin && (
-                  <p className="text-xs text-gray-400 mt-3">
-                    To change profile, department, or manager, use the Users admin panel.
-                  </p>
-                )}
               </div>
 
               {/* Locale */}

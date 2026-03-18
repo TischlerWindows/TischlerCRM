@@ -5,13 +5,21 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Shield, Lock, Users, Check, X, ChevronLeft,
-  Copy, Trash2, Save, AlertCircle,
+  Copy, Trash2, Save, AlertCircle, UserPlus, UserMinus,
 } from 'lucide-react';
 import { apiClient, type Profile } from '@/lib/api-client';
 
-const CORE_OBJECTS = [
-  'Property', 'Contact', 'Account', 'Product',
-  'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation',
+const OBJECT_MAP: { key: string; label: string }[] = [
+  { key: 'properties',    label: 'Property' },
+  { key: 'contacts',      label: 'Contact' },
+  { key: 'companies',     label: 'Account' },
+  { key: 'products',      label: 'Product' },
+  { key: 'leads',         label: 'Lead' },
+  { key: 'deals',         label: 'Deal' },
+  { key: 'projects',      label: 'Project' },
+  { key: 'service',       label: 'Service' },
+  { key: 'quotes',        label: 'Quote' },
+  { key: 'installations', label: 'Installation' },
 ];
 
 const OBJ_PERM_COLS: { key: string; label: string; width: string }[] = [
@@ -23,16 +31,20 @@ const OBJ_PERM_COLS: { key: string; label: string; width: string }[] = [
   { key: 'modifyAll', label: 'Modify All', width: 'w-24' },
 ];
 
-const APP_PERMS = [
+const APP_PERMS: { key: string; label: string; desc: string }[] = [
   { key: 'manageUsers',           label: 'Manage Users',            desc: 'Create, edit, and deactivate user accounts' },
   { key: 'manageProfiles',        label: 'Manage Profiles',         desc: 'Create and edit profiles and permissions' },
   { key: 'manageDepartments',     label: 'Manage Departments',      desc: 'Create and manage department hierarchy' },
+  { key: 'manageIntegrations',    label: 'Manage Integrations',     desc: 'Configure third-party integrations and API keys' },
+  { key: 'manageCompanySettings', label: 'Manage Company Settings', desc: 'Edit company-wide settings and preferences' },
   { key: 'exportData',            label: 'Export Data',             desc: 'Export records and reports to CSV/Excel' },
   { key: 'importData',            label: 'Import Data',             desc: 'Bulk import records from file' },
-  { key: 'manageReports',         label: 'Manage Reports',          desc: 'Create and share reports' },
+  { key: 'viewReports',           label: 'View Reports',            desc: 'View report data and dashboards' },
+  { key: 'manageReports',         label: 'Manage Reports',          desc: 'Create, edit, and share reports' },
   { key: 'manageDashboards',      label: 'Manage Dashboards',       desc: 'Create and configure dashboards' },
   { key: 'viewSummary',           label: 'View Summary',            desc: 'View pipeline and business summary' },
   { key: 'viewSetup',             label: 'View Setup',              desc: 'Access settings and configuration pages' },
+  { key: 'viewAuditLog',          label: 'View Audit Log',          desc: 'View system audit trail and user actions' },
   { key: 'customizeApplication',  label: 'Customize Application',   desc: 'Modify object layouts and custom fields' },
   { key: 'viewAllData',           label: 'View All Data',           desc: 'Override record sharing — see everything' },
   { key: 'modifyAllData',         label: 'Modify All Data',         desc: 'Override record sharing — edit everything' },
@@ -56,7 +68,7 @@ function emptyObjPerm(): ObjPerms {
 
 function emptyPerms(): PermsState {
   return {
-    objects: Object.fromEntries(CORE_OBJECTS.map(o => [o, emptyObjPerm()])),
+    objects: Object.fromEntries(OBJECT_MAP.map(o => [o.key, emptyObjPerm()])),
     app: Object.fromEntries(APP_PERMS.map(p => [p.key, false])),
   };
 }
@@ -64,9 +76,9 @@ function emptyPerms(): PermsState {
 function parsePerms(raw: any): PermsState {
   if (!raw || typeof raw !== 'object') return emptyPerms();
   const objects: Record<string, ObjPerms> = {};
-  for (const obj of CORE_OBJECTS) {
-    const src = raw.objects?.[obj] ?? {};
-    objects[obj] = {
+  for (const obj of OBJECT_MAP) {
+    const src = raw.objects?.[obj.key] ?? {};
+    objects[obj.key] = {
       read:      !!src.read,
       create:    !!src.create,
       edit:      !!src.edit,
@@ -101,6 +113,10 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
   const [formGrantsAdmin, setFormGrantsAdmin] = useState(false);
   const [perms, setPerms] = useState<PermsState>(emptyPerms());
 
+  const [allUsers, setAllUsers] = useState<{ id: string; name: string | null; email: string; profileId: string | null }[]>([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [assigningUser, setAssigningUser] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -133,8 +149,41 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
   }, [id]);
 
   useEffect(() => {
-    if (tab === 'members') loadMembers();
+    if (tab === 'members') {
+      loadMembers();
+      apiClient.getUsers().then(users => setAllUsers(users as any[])).catch(() => {});
+    }
   }, [tab, loadMembers]);
+
+  const availableUsers = allUsers.filter(u => u.profileId !== id && !members.some(m => m.id === u.id));
+
+  const handleAssignUser = async (userId: string) => {
+    setAssigningUser(true);
+    try {
+      await apiClient.updateUser(userId, { profileId: id } as any);
+      setShowAddUser(false);
+      await loadMembers();
+      const refreshed = await apiClient.getUsers();
+      setAllUsers(refreshed as any[]);
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to assign user');
+    } finally {
+      setAssigningUser(false);
+    }
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    try {
+      await apiClient.updateUser(userId, { profileId: null } as any);
+      await loadMembers();
+      const refreshed = await apiClient.getUsers();
+      setAllUsers(refreshed as any[]);
+      await load();
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to remove user');
+    }
+  };
 
   const markDirty = () => setDirty(true);
 
@@ -162,7 +211,7 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
     setPerms(prev => ({
       ...prev,
       objects: Object.fromEntries(
-        CORE_OBJECTS.map(o => [o, { read: value, create: value, edit: value, delete: value, viewAll: value, modifyAll: value }])
+        OBJECT_MAP.map(o => [o.key, { read: value, create: value, edit: value, delete: value, viewAll: value, modifyAll: value }])
       ),
     }));
     markDirty();
@@ -343,7 +392,13 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
         <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-base font-semibold text-gray-900">{profile.label}</h1>
-            <p className="text-[11px] text-gray-400">{profile.isSystem ? 'System profile — name and structure are locked' : 'Profile · Permissions'}</p>
+            <p className="text-[11px] text-gray-400">
+              {profile.grantsAdminAccess
+                ? 'System administrator — full access'
+                : profile.isSystem
+                  ? 'System profile — name is locked, permissions can be edited'
+                  : 'Profile · Permissions'}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {dirty && <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>}
@@ -395,16 +450,27 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
           {/* ── Object Permissions ── */}
           {tab === 'objects' && (
             <div>
+              {profile.grantsAdminAccess && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800 font-medium">
+                    This profile grants full administrator access. All permissions are automatically enabled and cannot be modified.
+                  </p>
+                </div>
+              )}
+              {profile.isSystem && !profile.grantsAdminAccess && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                  <Lock className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    This is a system profile. Its name is locked, but permissions can be edited.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm text-gray-500">
                   Set CRUD and data visibility for each CRM module.
-                  {profile.grantsAdminAccess && (
-                    <span className="ml-2 text-amber-600 font-medium">
-                      Admin access grants full permissions to all objects.
-                    </span>
-                  )}
                 </p>
-                {!profile.isSystem && (
+                {!profile.grantsAdminAccess && (
                   <div className="flex gap-2">
                     <button onClick={() => setAllObj(true)} className="px-2.5 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 font-medium">Grant All</button>
                     <button onClick={() => setAllObj(false)} className="px-2.5 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100 font-medium">Revoke All</button>
@@ -424,16 +490,16 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {CORE_OBJECTS.map(obj => (
-                      <tr key={obj} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-2.5 text-sm font-medium text-gray-800">{obj}</td>
+                    {OBJECT_MAP.map(obj => (
+                      <tr key={obj.key} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-2.5 text-sm font-medium text-gray-800">{obj.label}</td>
                         {OBJ_PERM_COLS.map(col => {
-                          const checked = perms.objects[obj]?.[col.key as keyof ObjPerms] ?? false;
+                          const checked = profile.grantsAdminAccess ? true : (perms.objects[obj.key]?.[col.key as keyof ObjPerms] ?? false);
                           return (
                             <td key={col.key} className="px-2 py-2.5 text-center">
                               <button
-                                onClick={() => !profile.isSystem && toggleObjPerm(obj, col.key as keyof ObjPerms)}
-                                disabled={profile.isSystem}
+                                onClick={() => !profile.grantsAdminAccess && toggleObjPerm(obj.key, col.key as keyof ObjPerms)}
+                                disabled={profile.grantsAdminAccess}
                                 className={`w-6 h-6 rounded border inline-flex items-center justify-center transition-colors ${
                                   checked
                                     ? 'bg-[#151f6d] border-[#151f6d] text-white'
@@ -459,9 +525,25 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
           {/* ── App Permissions ── */}
           {tab === 'app' && (
             <div>
+              {profile.grantsAdminAccess && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800 font-medium">
+                    This profile grants full administrator access. All permissions are automatically enabled and cannot be modified.
+                  </p>
+                </div>
+              )}
+              {profile.isSystem && !profile.grantsAdminAccess && (
+                <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+                  <Lock className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-700">
+                    This is a system profile. Its name is locked, but permissions can be edited.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm text-gray-500">Administrative and application-level access.</p>
-                {!profile.isSystem && (
+                {!profile.grantsAdminAccess && (
                   <div className="flex gap-2">
                     <button onClick={() => setAllApp(true)} className="px-2.5 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 font-medium">Grant All</button>
                     <button onClick={() => setAllApp(false)} className="px-2.5 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100 font-medium">Revoke All</button>
@@ -470,12 +552,12 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 {APP_PERMS.map(({ key, label, desc }) => {
-                  const checked = perms.app[key] ?? false;
+                  const checked = profile.grantsAdminAccess ? true : (perms.app[key] ?? false);
                   return (
                     <button
                       key={key}
-                      onClick={() => !profile.isSystem && toggleAppPerm(key)}
-                      disabled={profile.isSystem}
+                      onClick={() => !profile.grantsAdminAccess && toggleAppPerm(key)}
+                      disabled={profile.grantsAdminAccess}
                       className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-left transition-colors ${
                         checked
                           ? 'bg-[#151f6d]/5 border-[#151f6d]/30'
@@ -501,9 +583,40 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
           {/* ── Members ── */}
           {tab === 'members' && (
             <div>
-              <p className="text-sm text-gray-500 mb-3">
-                {profile._count?.users ?? 0} user{(profile._count?.users ?? 0) !== 1 ? 's' : ''} assigned to this profile.
-              </p>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-gray-500">
+                  {members.length} user{members.length !== 1 ? 's' : ''} assigned to this profile.
+                </p>
+                <button
+                  onClick={() => setShowAddUser(!showAddUser)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#151f6d] text-white rounded-lg hover:bg-[#1c2b99] transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Assign User
+                </button>
+              </div>
+
+              {showAddUser && (
+                <div className="mb-4 bg-white rounded-xl border border-gray-200 p-4">
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Select a user to assign</label>
+                  {availableUsers.length === 0 ? (
+                    <p className="text-sm text-gray-400">No unassigned users available.</p>
+                  ) : (
+                    <select
+                      className="w-full max-w-sm text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#151f6d]/30"
+                      defaultValue=""
+                      disabled={assigningUser}
+                      onChange={e => { if (e.target.value) handleAssignUser(e.target.value); }}
+                    >
+                      <option value="" disabled>Choose user…</option>
+                      {availableUsers.map(u => (
+                        <option key={u.id} value={u.id}>{u.name ?? u.email} ({u.email})</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
               {membersLoading ? (
                 <div className="text-sm text-gray-400 py-8 text-center">Loading members…</div>
               ) : members.length === 0 ? (
@@ -518,6 +631,7 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
                         <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Name</th>
                         <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Email</th>
                         <th className="text-center px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500">Status</th>
+                        <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-gray-500 w-24"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -535,6 +649,16 @@ export default function ProfileRecordPage({ params }: { params: { id: string } }
                             }`}>
                               {m.isActive ? 'Active' : 'Frozen'}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleRemoveUser(m.id)}
+                              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                              title="Remove from profile"
+                            >
+                              <UserMinus className="w-3 h-3" />
+                              Remove
+                            </button>
                           </td>
                         </tr>
                       ))}

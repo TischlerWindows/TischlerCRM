@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
-import { authenticate, signJwt, verifyJwt, hashPassword } from './auth.js';
+import { authenticate, signJwt, verifyJwt, hashPassword, verifyPassword } from './auth.js';
 import { logAudit, extractIp } from './audit.js';
 import { loadEnv } from './config.js';
 import * as notifications from './notifications.js';
@@ -147,7 +147,14 @@ export function buildApp() {
       },
     });
 
-    return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    const response: Record<string, unknown> = {
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+    };
+    if (user.mustChangePassword) {
+      response.mustChangePassword = true;
+    }
+    return reply.send(response);
   });
 
   // ── Auth: accept invite ───────────────────────────────────────────────────
@@ -257,6 +264,61 @@ export function buildApp() {
     return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   });
 
+  // ── Auth: change password (requires valid JWT) ────────────────────────────
+  app.post('/auth/change-password', async (req, reply) => {
+    const ip = extractIp(req);
+    if (!checkRateLimit(`change-password:${ip}`, 10, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: 'Too many requests. Try again later.' });
+    }
+
+    // Manual auth check since /auth/* routes bypass the onRequest hook
+    const auth = req.headers.authorization;
+    if (!auth || !auth.startsWith('Bearer ')) {
+      return reply.code(401).send({ error: 'Missing bearer token' });
+    }
+    const env = loadEnv();
+    const payload = verifyJwt(auth.slice('Bearer '.length).trim(), env.JWT_SECRET);
+    if (!payload) return reply.code(401).send({ error: 'Invalid token' });
+
+    const body = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8).max(128),
+    }).safeParse(req.body);
+    if (!body.success) return reply.code(400).send({ error: 'Current password and new password (min 8 chars) are required.' });
+
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, name: true, passwordHash: true, mustChangePassword: true, isActive: true, deletedAt: true },
+    });
+    if (!user || !user.passwordHash || !user.isActive || user.deletedAt) {
+      return reply.code(400).send({ error: 'Cannot change password for this account.' });
+    }
+
+    if (!verifyPassword(body.data.currentPassword, user.passwordHash)) {
+      return reply.code(401).send({ error: 'Current password is incorrect.' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(body.data.newPassword),
+        mustChangePassword: false,
+      },
+    });
+
+    await logAudit({
+      actorId: user.id,
+      action: 'UPDATE',
+      objectType: 'User',
+      objectId: user.id,
+      objectName: user.name ?? user.email,
+      after: { event: 'password_changed' } as any,
+      ipAddress: ip,
+    });
+
+    return reply.send({ success: true });
+  });
+
   // ── Security: login history (admin-only) ──────────────────────────────────
   app.get('/security/login-events', async (req, reply) => {
     if (!req.user || req.user.role !== 'ADMIN') {
@@ -303,10 +365,13 @@ export function buildApp() {
     // takes effect immediately without waiting for the JWT to expire
     const account = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { isActive: true, deletedAt: true },
+      select: { isActive: true, deletedAt: true, mustChangePassword: true },
     });
     if (!account || !account.isActive || account.deletedAt) {
       return reply.code(401).send({ error: 'Account is inactive or has been removed.' });
+    }
+    if (account.mustChangePassword && routeUrl !== '/auth/change-password') {
+      return reply.code(403).send({ error: 'Password change required', code: 'MUST_CHANGE_PASSWORD' });
     }
 
     req.user = payload as any;
@@ -321,8 +386,14 @@ export function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies'];
-    const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'];
+    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'];
+    const APP_KEYS = [
+      'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
+      'exportData','importData',
+      'viewReports','manageReports','manageDashboards',
+      'viewSummary','viewSetup','viewAuditLog',
+      'customizeApplication','viewAllData','modifyAllData',
+    ];
 
     // ADMIN users get full access regardless of profile
     if (user.role === 'ADMIN') {

@@ -42,6 +42,7 @@ model User {
   lastLoginAt DateTime?
   timezone    String?   @default("America/New_York")
   locale      String?   @default("en_US")
+  mustChangePassword Boolean @default(false)
 
   // Identity fields
   nickname String?

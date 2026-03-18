@@ -6,16 +6,15 @@ import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth } = useAuth();
-  const [email, setEmail] = useState('test@example.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,21 +22,14 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${apiBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Login failed');
-      }
-
-      const data = await res.json();
+      const data = await apiClient.login(email, password);
       if (data.token && data.user) {
         setAuth(data.token, data.user);
-        router.push('/');
+        if (data.mustChangePassword) {
+          router.push('/auth/change-password');
+        } else {
+          router.push('/');
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

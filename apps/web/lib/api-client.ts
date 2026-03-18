@@ -48,6 +48,7 @@ export interface CreateUserInput {
   managerId?: string | null;
   timezone?: string | null;
   locale?: string | null;
+  password?: string;
 }
 
 export type UpdateUserInput = Partial<CreateUserInput & { isActive: boolean }>;
@@ -216,7 +217,7 @@ class ApiClient {
 
   // Auth endpoints
   async login(email: string, password: string) {
-    const result = await this.request<{ token: string; user: any }>('/auth/login', {
+    const result = await this.request<{ token: string; user: any; mustChangePassword?: boolean }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
@@ -226,6 +227,10 @@ class ApiClient {
 
   logout() {
     this.setToken(null);
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {
+    return this.post('/auth/change-password', { currentPassword, newPassword });
   }
 
   // ── Users (admin) ───────────────────────────────────────────────────────
