@@ -374,40 +374,27 @@ export async function backupRoutes(app: FastifyInstance) {
       // Restore in correct order (respects foreign key constraints)
 
       // 0. Ensure all users referenced in the backup exist in the database.
-      //    First restore roles & departments so user FKs are valid,
-      //    then upsert backup users so all createdById references resolve.
-      if (data.roles?.length) {
-        for (const r of data.roles) {
-          await prisma.role.upsert({
-            where: { id: r.id },
-            update: {},
-            create: { id: r.id, name: r.name || 'Restored Role', label: r.label || r.name || 'Restored Role', level: r.level ?? 0, permissions: r.permissions || {} },
-          });
-        }
-      }
-      if (data.departments?.length) {
-        for (const d of data.departments) {
-          await prisma.department.upsert({
-            where: { id: d.id },
-            update: {},
-            create: { id: d.id, name: d.name || 'Restored Department' },
-          });
-        }
-      }
+      //    Upsert each inside try/catch so unique-constraint collisions
+      //    (e.g. same name/email under a different id) are silently skipped.
+      //    Any remaining orphan FKs are caught by remapUserIds below.
       if (data.users?.length) {
         for (const u of data.users) {
-          await prisma.user.upsert({
-            where: { id: u.id },
-            update: {},  // don't overwrite existing users
-            create: {
-              id: u.id,
-              name: u.name || 'Restored User',
-              email: u.email || `restored-${u.id}@placeholder.local`,
-              passwordHash: u.passwordHash || '',
-              role: u.role || 'USER',
-              isActive: u.isActive ?? true,
-            },
-          });
+          try {
+            await prisma.user.upsert({
+              where: { id: u.id },
+              update: {},  // don't overwrite existing users
+              create: {
+                id: u.id,
+                name: u.name || 'Restored User',
+                email: u.email || `restored-${u.id}@placeholder.local`,
+                passwordHash: u.passwordHash || '',
+                role: u.role || 'USER',
+                isActive: u.isActive ?? true,
+              },
+            });
+          } catch (_e) {
+            // Unique constraint on email or other conflict — skip
+          }
         }
       }
 
