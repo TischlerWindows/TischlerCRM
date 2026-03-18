@@ -41,6 +41,7 @@ import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
+import { getPropertyPrefix, generatePropertyNumber } from '@/lib/property-number';
 
 interface Property {
   id: string;
@@ -464,15 +465,15 @@ export default function PropertiesPage() {
       normalizedData[cleanKey] = value;
     });
     
-    const existingNumbers = properties
-      .map(p => p.propertyNumber)
-      .filter(num => num.startsWith('P-'))
-      .map(num => parseInt(num.replace('P-', ''), 10))
-      .filter(num => !isNaN(num));
-    
-    const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const nextNumber = maxNumber + 1;
-    const propertyNumber = `P-${String(nextNumber).padStart(3, '0')}`;
+    // Derive country & state from the address field (object from AddressAutocomplete)
+    // or from the standalone city/state/country fields
+    const addr = normalizedData.address;
+    const addrCountry = (typeof addr === 'object' && addr?.country) ? addr.country : (normalizedData.country || '');
+    const addrState = (typeof addr === 'object' && addr?.state) ? addr.state : (normalizedData.state || '');
+
+    const prefix = getPropertyPrefix({ country: addrCountry, state: addrState });
+    const allExistingNumbers = properties.map(p => p.propertyNumber);
+    const propertyNumber = generatePropertyNumber(prefix, allExistingNumbers);
     
     const today = new Date().toISOString().split('T')[0];
     const currentUserName = user?.name || user?.email || 'System';
