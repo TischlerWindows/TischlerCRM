@@ -2132,10 +2132,10 @@ export default function SummaryPage() {
                     const qtot = editingSummary.quoteTotals;
                     const p = (s: string | undefined) => parseFloat(s || '0') || 0;
 
-                    // Per-category calculated values: Full = net * full, Disc = pct * full, Final = final / net, FinalAdj = finalAdj / net
+                    // Per-category calculated values: all are input / Net Euro
                     const calcRow = (net: number, cat: { full: string; pct: string; final: string; finalAdj: string } | undefined) => {
-                      const full = net * p(cat?.full);
-                      const disc = p(cat?.pct) * full;
+                      const full = net ? p(cat?.full) / net : 0;
+                      const disc = net ? p(cat?.pct) / net : 0;
                       const final_ = net ? p(cat?.final) / net : 0;
                       const finalAdj = net ? p(cat?.finalAdj) / net : 0;
                       return { full, disc, final: final_, finalAdj };
