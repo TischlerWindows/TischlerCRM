@@ -2152,131 +2152,103 @@ export default function SummaryPage() {
                     };
 
                     return (
-                      <div className="flex items-start gap-6 mt-6">
-                        {/* Left: Quote Totals */}
-                        <div className="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg shadow-sm">
-                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
-                            <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
-                            <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
-                          </div>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL W/ ADJ.</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                                <tr className="hover:bg-gray-50">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Euro Windows</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmt(euroWindowSqFt)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
-                                  {['full','pct','final','finalAdj'].map(f => (
-                                    <td key={`ew-${f}`} className="px-2 py-1">
-                                      <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
-                                    </td>
-                                  ))}
-                                </tr>
-                                <tr className="hover:bg-gray-50">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Double Hung</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">—</td>
-                                  {['full','pct','final','finalAdj'].map(f => (
-                                    <td key={`dh-${f}`} className="px-2 py-1">
-                                      <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
-                                    </td>
-                                  ))}
-                                </tr>
-                                <tr className="hover:bg-gray-50">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Euro Doors</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{fmt(doorSqFt)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
-                                  {['full','pct','final','finalAdj'].map(f => (
-                                    <td key={`ed-${f}`} className="px-2 py-1">
-                                      <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
-                                    </td>
-                                  ))}
-                                </tr>
-                                <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                                  <td className="px-6 py-3 text-gray-900">Grand Total</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
-                                  {['full','pct','final','finalAdj'].map(f => {
-                                    const qt = editingSummary.quoteTotals;
-                                    const sum = (parseFloat(qt?.euroWindows?.[f as keyof typeof qt.euroWindows] || '0') || 0) + (parseFloat(qt?.doubleHung?.[f as keyof typeof qt.doubleHung] || '0') || 0) + (parseFloat(qt?.euroDoors?.[f as keyof typeof qt.euroDoors] || '0') || 0);
-                                    return <td key={`gt-${f}`} className="px-6 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
-                                  })}
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                      <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
+                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                          <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
+                          <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
-
-                        {/* Right: Calculated Totals */}
-                        <div className="w-auto shrink-0 bg-white border border-gray-200 rounded-lg shadow-sm">
-                          <div className="bg-blue-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
-                            <h3 className="text-lg font-semibold text-gray-900">Calculated Totals</h3>
-                            <p className="text-sm text-gray-500 mt-1">Derived from Net € &amp; quote inputs</p>
-                          </div>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="bg-blue-50/60 border-b border-gray-200">
-                                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Disc</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Final</th>
-                                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Final W/ Adj</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-100">
-                                <tr className="hover:bg-blue-50/30">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Euro Windows</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{ewCalc.full ? `€${fmt(ewCalc.full)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{ewCalc.disc ? `€${fmt(ewCalc.disc)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
-                                </tr>
-                                <tr className="hover:bg-blue-50/30">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Double Hung</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">{dhCalc.full ? `€${fmt(dhCalc.full)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">{dhCalc.disc ? `€${fmt(dhCalc.disc)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-400">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
-                                </tr>
-                                <tr className="hover:bg-blue-50/30">
-                                  <td className="px-6 py-3 font-medium text-gray-900">Euro Doors</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{edCalc.full ? `€${fmt(edCalc.full)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{edCalc.disc ? `€${fmt(edCalc.disc)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-700">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
-                                </tr>
-                                <tr className="bg-blue-50/60 font-semibold border-t-2 border-gray-300">
-                                  <td className="px-6 py-3 text-gray-900">Grand Total</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
-                                  <td className="px-6 py-3 text-right text-gray-900">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-50 border-b border-gray-200">
+                                {/* Quote Totals headers */}
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL W/ ADJ.</th>
+                                {/* Calculated Totals headers — separated by thick border */}
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Final</th>
+                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Final W/ Adj</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {/* Euro Windows */}
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-900">Euro Windows</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmt(euroWindowSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
+                                {['full','pct','final','finalAdj'].map(f => (
+                                  <td key={`ew-${f}`} className="px-1 py-1">
+                                    <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  </td>
+                                ))}
+                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? `€${fmt(ewCalc.full)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.disc ? `€${fmt(ewCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
+                              </tr>
+                              {/* Double Hung */}
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                {['full','pct','final','finalAdj'].map(f => (
+                                  <td key={`dh-${f}`} className="px-1 py-1">
+                                    <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  </td>
+                                ))}
+                                <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? `€${fmt(dhCalc.full)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.disc ? `€${fmt(dhCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
+                              </tr>
+                              {/* Euro Doors */}
+                              <tr className="hover:bg-gray-50">
+                                <td className="px-4 py-3 font-medium text-gray-900">Euro Doors</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmt(doorSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
+                                {['full','pct','final','finalAdj'].map(f => (
+                                  <td key={`ed-${f}`} className="px-1 py-1">
+                                    <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  </td>
+                                ))}
+                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? `€${fmt(edCalc.full)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.disc ? `€${fmt(edCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
+                              </tr>
+                              {/* Grand Total */}
+                              <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                <td className="px-4 py-3 text-gray-900">Grand Total</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
+                                {['full','pct','final','finalAdj'].map(f => {
+                                  const qt = editingSummary.quoteTotals;
+                                  const sum = (parseFloat(qt?.euroWindows?.[f as keyof typeof qt.euroWindows] || '0') || 0) + (parseFloat(qt?.doubleHung?.[f as keyof typeof qt.doubleHung] || '0') || 0) + (parseFloat(qt?.euroDoors?.[f as keyof typeof qt.euroDoors] || '0') || 0);
+                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
+                                })}
+                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     );
