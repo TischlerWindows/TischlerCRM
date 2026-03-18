@@ -19,52 +19,69 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Role & Department assignments
-  roleId       String?
-  orgRole      Role?       @relation(fields: [roleId], references: [id], onDelete: SetNull)
-  departmentId String?
-  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
-  managerId    String?
-  manager      User?       @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
-  directReports User[]    @relation("UserManager")
+  // Profile & Department assignments
+  profileId     String?
+  profile       Profile?    @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  managerId     String?
+  manager       User?       @relation("UserManager", fields: [managerId], references: [id], onDelete: SetNull)
+  directReports User[]      @relation("UserManager")
 
   // Soft delete
   deletedAt    DateTime?
   deletedById  String?
-  deletedBy    User?       @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
-  deletedUsers User[]      @relation("UserDeletedBy")
+  deletedBy    User?     @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedUsers User[]    @relation("UserDeletedBy")
 
   // Extended user fields
-  title        String?
-  phone        String?
-  mobilePhone  String?
-  isActive     Boolean  @default(true)
-  lastLoginAt  DateTime?
-  timezone     String?  @default("America/New_York")
-  locale       String?  @default("en_US")
+  title       String?
+  phone       String?
+  mobilePhone String?
+  isActive    Boolean   @default(true)
+  lastLoginAt DateTime?
+  timezone    String?   @default("America/New_York")
+  locale      String?   @default("en_US")
 
-  createdObjects      CustomObject[]  @relation("CreatedObjects")
-  modifiedObjects     CustomObject[]  @relation("ModifiedObjects")
-  createdFields       CustomField[]   @relation("CreatedFields")
-  modifiedFields      CustomField[]   @relation("ModifiedFields")
-  createdLayouts      PageLayout[]    @relation("CreatedLayouts")
-  modifiedLayouts     PageLayout[]    @relation("ModifiedLayouts")
-  createdRecords      Record[]        @relation("CreatedRecords")
-  modifiedRecords     Record[]        @relation("ModifiedRecords")
-  createdReports      Report[]        @relation("CreatedReports")
-  modifiedReports     Report[]        @relation("ModifiedReports")
-  createdFolders      ReportFolder[]  @relation("CreatedFolders")
-  modifiedFolders     ReportFolder[]  @relation("ModifiedFolders")
-  createdDashboards   Dashboard[]     @relation("CreatedDashboards")
-  modifiedDashboards  Dashboard[]     @relation("ModifiedDashboards")
-  loginEvents         LoginEvent[]
-  preferences         UserPreference[]
-  auditLogs           AuditLog[]      @relation("AuditActor")
-  deletedDepartments  Department[]    @relation("DepartmentDeletedBy")
-  userIntegrations    UserIntegration[]
-  configuredIntegrations Integration[] @relation("IntegrationConfiguredBy")
+  // Identity fields
+  nickname String?
+  alias    String?
 
-  @@index([roleId])
+  // Invite & onboarding
+  createdById       String?
+  createdBy         User?     @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByUsers    User[]    @relation("UserCreatedBy")
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  inviteSentAt      DateTime?
+  inviteAcceptedAt  DateTime?
+
+  // Self-service password reset
+  passwordResetToken       String?   @unique
+  passwordResetTokenExpiry DateTime?
+
+  createdObjects         CustomObject[]    @relation("CreatedObjects")
+  modifiedObjects        CustomObject[]    @relation("ModifiedObjects")
+  createdFields          CustomField[]     @relation("CreatedFields")
+  modifiedFields         CustomField[]     @relation("ModifiedFields")
+  createdLayouts         PageLayout[]      @relation("CreatedLayouts")
+  modifiedLayouts        PageLayout[]      @relation("ModifiedLayouts")
+  createdRecords         Record[]          @relation("CreatedRecords")
+  modifiedRecords        Record[]          @relation("ModifiedRecords")
+  createdReports         Report[]          @relation("CreatedReports")
+  modifiedReports        Report[]          @relation("ModifiedReports")
+  createdFolders         ReportFolder[]    @relation("CreatedFolders")
+  modifiedFolders        ReportFolder[]    @relation("ModifiedFolders")
+  createdDashboards      Dashboard[]       @relation("CreatedDashboards")
+  modifiedDashboards     Dashboard[]       @relation("ModifiedDashboards")
+  loginEvents            LoginEvent[]
+  preferences            UserPreference[]
+  auditLogs              AuditLog[]        @relation("AuditActor")
+  deletedDepartments     Department[]      @relation("DepartmentDeletedBy")
+  userIntegrations       UserIntegration[]
+  configuredIntegrations Integration[]     @relation("IntegrationConfiguredBy")
+
+  @@index([profileId])
   @@index([departmentId])
   @@index([managerId])
   @@index([isActive])
@@ -72,28 +89,21 @@ model User {
 }
 
 // ============================================
-// Roles, Departments & Audit
+// Profiles, Departments & Audit
 // ============================================
 
-model Role {
-  id          String   @id
-  name        String   @unique
-  label       String
-  description String?
-  level       Int
-  parentId    String?
-  parent      Role?    @relation("RoleHierarchy", fields: [parentId], references: [id])
-  children    Role[]   @relation("RoleHierarchy")
-  permissions Json     @default("{}")
-  visibility  Json     @default("{}")
-  isSystem    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+model Profile {
+  id                String   @id
+  name              String   @unique
+  label             String
+  description       String?
+  permissions       Json     @default("{}")
+  isSystem          Boolean  @default(false)
+  grantsAdminAccess Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  users       User[]
-
-  @@index([parentId])
-  @@index([level])
+  users User[]
 }
 
 model Department {
@@ -104,16 +114,15 @@ model Department {
   parent      Department?  @relation("DepartmentHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children    Department[] @relation("DepartmentHierarchy")
   isActive    Boolean      @default(true)
-  permissions Json         @default("{}")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   // Soft delete
-  deletedAt    DateTime?
-  deletedById  String?
-  deletedBy    User?     @relation("DepartmentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedAt   DateTime?
+  deletedById String?
+  deletedBy   User?     @relation("DepartmentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
 
-  users       User[]
+  users User[]
 
   @@index([parentId])
   @@index([deletedAt])
@@ -138,16 +147,15 @@ model AuditLog {
   @@index([createdAt])
 }
 
-
-
 model LoginEvent {
-  id         String   @id
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  accountId  String?
-  ip         String
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  id        String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  accountId String?
+  ip        String
+  userAgent String?
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([accountId])
@@ -159,79 +167,79 @@ model LoginEvent {
 // ============================================
 
 model CustomObject {
-  id              String   @id
-  apiName         String   @unique
-  label           String
-  pluralLabel     String
-  description     String?
-  isCustom        Boolean  @default(true)
-  isActive        Boolean  @default(true)
-  enableHistory   Boolean  @default(false)
-  enableSearch    Boolean  @default(true)
-  
-  createdBy       User     @relation("CreatedObjects", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedObjects", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String  @id
+  apiName       String  @unique
+  label         String
+  pluralLabel   String
+  description   String?
+  isCustom      Boolean @default(true)
+  isActive      Boolean @default(true)
+  enableHistory Boolean @default(false)
+  enableSearch  Boolean @default(true)
 
-  fields          CustomField[]
-  pageLayouts     PageLayout[]
-  records         Record[]
-  relationships   Relationship[] @relation("ParentObject")
-  childRelations  Relationship[] @relation("ChildObject")
+  createdBy    User     @relation("CreatedObjects", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedObjects", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  fields         CustomField[]
+  pageLayouts    PageLayout[]
+  records        Record[]
+  relationships  Relationship[] @relation("ParentObject")
+  childRelations Relationship[] @relation("ChildObject")
 
   @@index([apiName])
 }
 
 model CustomField {
-  id              String   @id
-  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
-  objectId        String
-  
-  apiName         String
-  label           String
-  type            String   // Text, Number, Currency, Date, DateTime, Checkbox, Picklist, etc.
-  description     String?
-  helpText        String?
-  
-  // Field constraints
-  required        Boolean  @default(false)
-  unique          Boolean  @default(false)
-  readOnly        Boolean  @default(false)
-  
-  // Length/Size constraints
-  maxLength       Int?
-  minLength       Int?
-  
-  // Number constraints
-  scale           Int?     // Decimal places
-  precision       Int?     // Total digits
-  min             Float?
-  max             Float?
-  
-  // Picklist values (JSON array)
-  picklistValues  Json?
-  
-  // Default value
-  defaultValue    String?
-  
-  // Relationship info (for Lookup fields)
-  relationshipId  String?  @unique
-  
-  isCustom        Boolean  @default(true)
-  isActive        Boolean  @default(true)
-  
-  createdBy       User     @relation("CreatedFields", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedFields", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id       String       @id
+  object   CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId String
 
-  relationship    Relationship? @relation("FieldRelationship")
-  layoutFields    LayoutField[]
+  apiName     String
+  label       String
+  type        String // Text, Number, Currency, Date, DateTime, Checkbox, Picklist, etc.
+  description String?
+  helpText    String?
+
+  // Field constraints
+  required Boolean @default(false)
+  unique   Boolean @default(false)
+  readOnly Boolean @default(false)
+
+  // Length/Size constraints
+  maxLength Int?
+  minLength Int?
+
+  // Number constraints
+  scale     Int? // Decimal places
+  precision Int? // Total digits
+  min       Float?
+  max       Float?
+
+  // Picklist values (JSON array)
+  picklistValues Json?
+
+  // Default value
+  defaultValue String?
+
+  // Relationship info (for Lookup fields)
+  relationshipId String? @unique
+
+  isCustom Boolean @default(true)
+  isActive Boolean @default(true)
+
+  createdBy    User     @relation("CreatedFields", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedFields", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  relationship Relationship? @relation("FieldRelationship")
+  layoutFields LayoutField[]
 
   @@unique([objectId, apiName])
   @@index([objectId])
@@ -239,23 +247,23 @@ model CustomField {
 }
 
 model Relationship {
-  id                String   @id
-  
-  parentObject      CustomObject @relation("ParentObject", fields: [parentObjectId], references: [id], onDelete: Cascade)
-  parentObjectId    String
-  
-  childObject       CustomObject @relation("ChildObject", fields: [childObjectId], references: [id], onDelete: Cascade)
-  childObjectId     String
-  
-  field             CustomField @relation("FieldRelationship", fields: [fieldId], references: [id], onDelete: Cascade)
-  fieldId           String      @unique
-  
-  relationshipName  String
-  type              String      // Lookup, MasterDetail
-  cascadeDelete     Boolean     @default(false)
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id String @id
+
+  parentObject   CustomObject @relation("ParentObject", fields: [parentObjectId], references: [id], onDelete: Cascade)
+  parentObjectId String
+
+  childObject   CustomObject @relation("ChildObject", fields: [childObjectId], references: [id], onDelete: Cascade)
+  childObjectId String
+
+  field   CustomField @relation("FieldRelationship", fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId String      @unique
+
+  relationshipName String
+  type             String // Lookup, MasterDetail
+  cascadeDelete    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([parentObjectId])
   @@index([childObjectId])
@@ -266,66 +274,66 @@ model Relationship {
 // ============================================
 
 model PageLayout {
-  id              String   @id
-  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
-  objectId        String
-  
-  name            String
-  layoutType      String   // 'edit' (used for both create and edit now)
-  isDefault       Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  
-  createdBy       User     @relation("CreatedLayouts", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedLayouts", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id       String       @id
+  object   CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId String
 
-  tabs            LayoutTab[]
-  records         Record[]
+  name       String
+  layoutType String // 'edit' (used for both create and edit now)
+  isDefault  Boolean @default(false)
+  isActive   Boolean @default(true)
+
+  createdBy    User     @relation("CreatedLayouts", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedLayouts", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tabs    LayoutTab[]
+  records Record[]
 
   @@index([objectId])
   @@index([layoutType])
 }
 
 model LayoutTab {
-  id              String   @id
-  layout          PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
-  layoutId        String
-  
-  label           String
-  order           Int      @default(0)
-  
-  sections        LayoutSection[]
+  id       String     @id
+  layout   PageLayout @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  layoutId String
+
+  label String
+  order Int    @default(0)
+
+  sections LayoutSection[]
 
   @@index([layoutId])
 }
 
 model LayoutSection {
-  id              String   @id
-  tab             LayoutTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
-  tabId           String
-  
-  label           String
-  columns         Int      @default(2)
-  order           Int      @default(0)
-  
-  fields          LayoutField[]
+  id    String    @id
+  tab   LayoutTab @relation(fields: [tabId], references: [id], onDelete: Cascade)
+  tabId String
+
+  label   String
+  columns Int    @default(2)
+  order   Int    @default(0)
+
+  fields LayoutField[]
 
   @@index([tabId])
 }
 
 model LayoutField {
-  id              String   @id
-  section         LayoutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-  sectionId       String
-  
-  field           CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
-  fieldId         String
-  
-  column          Int      @default(0)
-  order           Int      @default(0)
+  id        String        @id
+  section   LayoutSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  sectionId String
+
+  field   CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  fieldId String
+
+  column Int @default(0)
+  order  Int @default(0)
 
   @@index([sectionId])
   @@index([fieldId])
@@ -336,24 +344,24 @@ model LayoutField {
 // ============================================
 
 model Record {
-  id              String   @id
-  object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
-  objectId        String
-  
+  id       String       @id
+  object   CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
+  objectId String
+
   // Page layout used to create/edit this record
-  pageLayout      PageLayout? @relation(fields: [pageLayoutId], references: [id], onDelete: SetNull)
-  pageLayoutId    String?
-  
+  pageLayout   PageLayout? @relation(fields: [pageLayoutId], references: [id], onDelete: SetNull)
+  pageLayoutId String?
+
   // Store all field values as JSON
-  data            Json     @default("{}")
-  
+  data Json @default("{}")
+
   // System fields
-  createdBy       User     @relation("CreatedRecords", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedRecords", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdBy    User     @relation("CreatedRecords", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedRecords", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([objectId])
   @@index([pageLayoutId])
@@ -366,36 +374,36 @@ model Record {
 // ============================================
 
 model Report {
-  id              String   @id
-  name            String
-  description     String?
-  objectType      String   // properties, contacts, accounts, etc.
-  format          String   // tabular, summary, matrix
-  
+  id          String  @id
+  name        String
+  description String?
+  objectType  String // properties, contacts, accounts, etc.
+  format      String // tabular, summary, matrix
+
   // Report configuration
-  fields          Json     // Array of field names to display
-  filters         Json     // Array of filter objects
-  groupBy         String?  // Field to group by (for summary/matrix)
-  sortBy          String?  // Field to sort by
-  sortOrder       String?  // asc or desc
-  
+  fields    Json // Array of field names to display
+  filters   Json // Array of filter objects
+  groupBy   String? // Field to group by (for summary/matrix)
+  sortBy    String? // Field to sort by
+  sortOrder String? // asc or desc
+
   // Permissions and sharing
-  isStandard      Boolean  @default(false)
-  isPrivate       Boolean  @default(false)
-  sharedWith      Json?    // Array of user emails/IDs
-  isFavorite      Boolean  @default(false)
-  
+  isStandard Boolean @default(false)
+  isPrivate  Boolean @default(false)
+  sharedWith Json? // Array of user emails/IDs
+  isFavorite Boolean @default(false)
+
   // Folder organization
-  folderId        String?
-  folder          ReportFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  
+  folderId String?
+  folder   ReportFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   // Audit fields
-  createdBy       User     @relation("CreatedReports", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedReports", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdBy    User     @relation("CreatedReports", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedReports", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([objectType])
   @@index([format])
@@ -406,26 +414,26 @@ model Report {
 }
 
 model ReportFolder {
-  id              String   @id
-  name            String
-  description     String?
-  parentId        String?
-  parent          ReportFolder? @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children        ReportFolder[] @relation("FolderHierarchy")
-  
-  // Permissions
-  isPrivate       Boolean  @default(false)
-  sharedWith      Json?    // Array of user emails/IDs
-  
-  // Audit fields
-  createdBy       User     @relation("CreatedFolders", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedFolders", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String         @id
+  name        String
+  description String?
+  parentId    String?
+  parent      ReportFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    ReportFolder[] @relation("FolderHierarchy")
 
-  reports         Report[]
+  // Permissions
+  isPrivate  Boolean @default(false)
+  sharedWith Json? // Array of user emails/IDs
+
+  // Audit fields
+  createdBy    User     @relation("CreatedFolders", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedFolders", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  reports Report[]
 
   @@index([createdById])
   @@index([parentId])
@@ -436,24 +444,24 @@ model ReportFolder {
 // ============================================
 
 model Dashboard {
-  id              String   @id
-  name            String
-  description     String?
-  
-  // Permissions and sharing
-  isPrivate       Boolean  @default(false)
-  isFavorite      Boolean  @default(false)
-  sharedWith      Json?    // Array of user emails/IDs
-  
-  // Audit fields
-  createdBy       User     @relation("CreatedDashboards", fields: [createdById], references: [id])
-  createdById     String
-  modifiedBy      User     @relation("ModifiedDashboards", fields: [modifiedById], references: [id])
-  modifiedById    String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String  @id
+  name        String
+  description String?
 
-  widgets         DashboardWidget[]
+  // Permissions and sharing
+  isPrivate  Boolean @default(false)
+  isFavorite Boolean @default(false)
+  sharedWith Json? // Array of user emails/IDs
+
+  // Audit fields
+  createdBy    User     @relation("CreatedDashboards", fields: [createdById], references: [id])
+  createdById  String
+  modifiedBy   User     @relation("ModifiedDashboards", fields: [modifiedById], references: [id])
+  modifiedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  widgets DashboardWidget[]
 
   @@index([createdById])
   @@index([isFavorite])
@@ -461,26 +469,26 @@ model Dashboard {
 }
 
 model DashboardWidget {
-  id              String   @id
-  dashboard       Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
-  dashboardId     String
-  
-  type            String   // 'vertical-bar', 'horizontal-bar', 'line', 'donut', 'metric', etc.
-  title           String
-  reportId        String?  // Optional reference to a Report
-  dataSource      String   // Object type (e.g., 'accounts', 'contacts')
-  
+  id          String    @id
+  dashboard   Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  dashboardId String
+
+  type       String // 'vertical-bar', 'horizontal-bar', 'line', 'donut', 'metric', etc.
+  title      String
+  reportId   String? // Optional reference to a Report
+  dataSource String // Object type (e.g., 'accounts', 'contacts')
+
   // Widget configuration stored as JSON
-  config          Json     @default("{}")
-  
+  config Json @default("{}")
+
   // Position and size (grid coordinates)
-  positionX       Int      @default(0)
-  positionY       Int      @default(0)
-  width           Int      @default(4)
-  height          Int      @default(2)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  positionX Int @default(0)
+  positionY Int @default(0)
+  width     Int @default(4)
+  height    Int @default(2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([dashboardId])
 }
@@ -514,27 +522,27 @@ model UserPreference {
 
 // Org-level integration configuration (admin-managed)
 model Integration {
-  id              String    @id
-  provider        String    @unique  // e.g. "google_maps", "dropbox", "outlook"
-  displayName     String               // Human-readable name
-  description     String?
-  category        String    @default("general") // "maps", "storage", "calendar", "email"
-  enabled         Boolean   @default(false)
+  id          String  @id
+  provider    String  @unique // e.g. "google_maps", "dropbox", "outlook"
+  displayName String // Human-readable name
+  description String?
+  category    String  @default("general") // "maps", "storage", "calendar", "email"
+  enabled     Boolean @default(false)
 
   // Org-level credentials (encrypted at rest)
-  apiKey          String?   // Encrypted — for simple API-key integrations (e.g. Google Maps)
-  clientId        String?   // OAuth app client ID
-  clientSecret    String?   // Encrypted — OAuth app client secret
+  apiKey       String? // Encrypted — for simple API-key integrations (e.g. Google Maps)
+  clientId     String? // OAuth app client ID
+  clientSecret String? // Encrypted — OAuth app client secret
 
   // Configuration
-  config          Json      @default("{}")  // Provider-specific settings (sync intervals, scopes, etc.)
-  webhookUrl      String?
+  config     Json    @default("{}") // Provider-specific settings (sync intervals, scopes, etc.)
+  webhookUrl String?
 
   // Audit
-  configuredById  String?
-  configuredBy    User?     @relation("IntegrationConfiguredBy", fields: [configuredById], references: [id], onDelete: SetNull)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  configuredById String?
+  configuredBy   User?    @relation("IntegrationConfiguredBy", fields: [configuredById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   userIntegrations UserIntegration[]
 
@@ -545,24 +553,24 @@ model Integration {
 
 // Per-user integration connection (OAuth tokens, sync state)
 model UserIntegration {
-  id              String    @id
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId          String
-  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  integrationId   String
+  id            String      @id
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  integrationId String
 
   // OAuth tokens (encrypted at rest)
-  accessToken     String?   // Encrypted
-  refreshToken    String?   // Encrypted
-  tokenExpiresAt  DateTime?
-  scopes          String?   // Comma-separated granted scopes
+  accessToken    String? // Encrypted
+  refreshToken   String? // Encrypted
+  tokenExpiresAt DateTime?
+  scopes         String? // Comma-separated granted scopes
 
   // Sync state
-  syncEnabled     Boolean   @default(true)
-  lastSyncAt      DateTime?
-  lastSyncStatus  String?   // "success", "error", "partial"
-  lastSyncError   String?
-  syncCursor      String?   // Provider-specific delta/cursor token for incremental sync
+  syncEnabled    Boolean   @default(true)
+  lastSyncAt     DateTime?
+  lastSyncStatus String? // "success", "error", "partial"
+  lastSyncError  String?
+  syncCursor     String? // Provider-specific delta/cursor token for incremental sync
 
   // Connection metadata
   externalAccountId String? // Provider's user/account ID

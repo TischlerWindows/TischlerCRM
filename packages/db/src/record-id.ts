@@ -15,7 +15,7 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   User: '011',
 
   // System / infrastructure models (012–030)
-  Role: '012',
+  Profile: '012',
   Department: '013',
   AuditLog: '014',
   LoginEvent: '015',
