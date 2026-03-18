@@ -93,9 +93,14 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-brand-dark/70 uppercase tracking-wider mb-1.5">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-brand-dark/70 uppercase tracking-wider">
+                Password
+              </label>
+              <Link href="/auth/forgot-password" className="text-xs text-brand-navy hover:underline font-medium">
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               value={password}
@@ -116,19 +121,9 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 text-center">
-          <p className="text-sm text-brand-dark/60">
-            Don't have an account?{' '}
-            <Link href="/signup" className="text-brand-navy hover:text-brand-red font-semibold transition-colors">
-              Sign up
-            </Link>
-          </p>
-        </div>
-
-        <div className="mt-5 pt-5 border-t border-gray-100 text-xs text-brand-dark/40 space-y-0.5">
-          <p className="font-medium text-brand-dark/50 mb-1">Demo credentials:</p>
-          <p>test@example.com / password123</p>
-        </div>
+        <p className="mt-5 text-xs text-center text-brand-dark/40">
+          Contact your administrator to access TischlerCRM.
+        </p>
       </div>
     </div>
   );

@@ -42,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Administration',
     items: [
       { name: 'Users', href: '/settings/users', icon: Users },
-      { name: 'Roles', href: '/settings/roles', icon: Shield },
+      { name: 'Profiles', href: '/settings/profiles', icon: Shield },
       { name: 'Departments', href: '/settings/departments', icon: Building2 },
       { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
       { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },

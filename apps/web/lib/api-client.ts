@@ -2,6 +2,106 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
+// ── TypeScript interfaces ─────────────────────────────────────────────────
+
+export type InviteStatus = 'PENDING' | 'EXPIRED' | 'ACCEPTED' | 'LEGACY' | 'NOT_SENT';
+
+export interface UserRow {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+  title: string | null;
+  phone: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  profile: { id: string; name: string; label: string } | null;
+  department: { id: string; name: string } | null;
+  inviteStatus: InviteStatus;
+}
+
+export interface UserDetail extends UserRow {
+  nickname: string | null;
+  alias: string | null;
+  mobilePhone: string | null;
+  timezone: string | null;
+  locale: string | null;
+  manager: { id: string; name: string | null; email: string } | null;
+  createdBy: { id: string; name: string | null } | null;
+  inviteAcceptedAt: string | null;
+  inviteSentAt: string | null;
+  lastModifiedBy: { id: string; name: string | null } | null;
+  lastModifiedAt: string | null;
+}
+
+export interface CreateUserInput {
+  name: string;
+  email: string;
+  title?: string | null;
+  phone?: string | null;
+  mobilePhone?: string | null;
+  nickname?: string | null;
+  alias?: string | null;
+  profileId?: string | null;
+  departmentId?: string | null;
+  managerId?: string | null;
+  timezone?: string | null;
+  locale?: string | null;
+}
+
+export type UpdateUserInput = Partial<CreateUserInput & { isActive: boolean }>;
+
+export interface LoginEventRow {
+  id: string;
+  userId: string;
+  ip: string;
+  userAgent: string | null;
+  createdAt: string;
+  success: boolean;
+  user?: { id: string; name: string | null; email: string };
+}
+
+export type ObjectPerm = {
+  create: boolean;
+  read: boolean;
+  edit: boolean;
+  delete: boolean;
+  viewAll: boolean;
+  modifyAll: boolean;
+};
+export type ProfileObjects = Record<string, ObjectPerm>;
+export type ProfileApp = Record<string, boolean>;
+export interface ProfilePermissions {
+  objects: ProfileObjects;
+  app: ProfileApp;
+}
+
+export interface Profile {
+  id: string;
+  name: string;
+  label: string;
+  description: string | null;
+  isSystem: boolean;
+  grantsAdminAccess: boolean;
+  permissions: ProfilePermissions;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { users: number };
+}
+
+export interface CreateProfileInput {
+  name: string;
+  label: string;
+  description?: string | null;
+  permissions?: ProfilePermissions;
+}
+export interface UpdateProfileInput {
+  label?: string;
+  description?: string | null;
+  grantsAdminAccess?: boolean;
+}
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -124,17 +224,92 @@ class ApiClient {
     return result;
   }
 
-  async signup(name: string, email: string, password: string) {
-    const result = await this.request<{ token: string; user: any }>('/auth/signup', {
-      method: 'POST',
-      body: JSON.stringify({ name, email, password }),
-    });
-    this.setToken(result.token);
-    return result;
-  }
-
   logout() {
     this.setToken(null);
+  }
+
+  // ── Users (admin) ───────────────────────────────────────────────────────
+  async getUsers(params?: { includeDeleted?: boolean }): Promise<UserRow[]> {
+    const q = params?.includeDeleted ? '?includeDeleted=true' : '';
+    return this.get(`/admin/users${q}`);
+  }
+
+  async getUser(id: string): Promise<UserDetail> {
+    return this.get(`/admin/users/${id}`);
+  }
+
+  async createUser(data: CreateUserInput): Promise<{ user: UserRow; inviteUrl?: string; inviteSent: boolean }> {
+    return this.post('/admin/users', data);
+  }
+
+  async updateUser(id: string, data: UpdateUserInput): Promise<UserDetail> {
+    return this.put(`/admin/users/${id}`, data);
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    return this.delete(`/admin/users/${id}`);
+  }
+
+  async freezeUser(id: string): Promise<UserRow> {
+    return this.post(`/admin/users/${id}/freeze`);
+  }
+
+  async adminSetUserPassword(id: string, newPassword: string): Promise<void> {
+    return this.post(`/admin/users/${id}/reset-password`, { password: newPassword });
+  }
+
+  async resendUserInvite(id: string): Promise<{ inviteUrl?: string; inviteSent: boolean }> {
+    return this.post(`/admin/users/${id}/resend-invite`);
+  }
+
+  async getUserLoginHistory(id: string): Promise<LoginEventRow[]> {
+    return this.get(`/security/login-events?userId=${id}`);
+  }
+
+  // ── Profiles (admin) ────────────────────────────────────────────────────
+  async getProfiles(): Promise<Profile[]> {
+    return this.get('/admin/profiles');
+  }
+
+  async getProfile(id: string): Promise<Profile> {
+    return this.get(`/admin/profiles/${id}`);
+  }
+
+  async createProfile(data: CreateProfileInput): Promise<Profile> {
+    return this.post('/admin/profiles', data);
+  }
+
+  async updateProfile(id: string, data: UpdateProfileInput): Promise<Profile> {
+    return this.put(`/admin/profiles/${id}`, data);
+  }
+
+  async updateProfilePermissions(id: string, permissions: ProfilePermissions): Promise<Profile> {
+    return this.put(`/admin/profiles/${id}/permissions`, permissions);
+  }
+
+  async cloneProfile(id: string): Promise<Profile> {
+    return this.post(`/admin/profiles/${id}/clone`);
+  }
+
+  async deleteProfile(id: string): Promise<void> {
+    return this.delete(`/admin/profiles/${id}`);
+  }
+
+  async getProfileMembers(id: string): Promise<UserRow[]> {
+    return this.get(`/admin/profiles/${id}/members`);
+  }
+
+  // ── Public auth (no token required) ────────────────────────────────────
+  async acceptInvite(token: string, password: string): Promise<{ token: string; user: { id: string; name: string | null; email: string; role: string } }> {
+    return this.post('/auth/accept-invite', { token, password });
+  }
+
+  async forgotPassword(email: string): Promise<{ success: boolean }> {
+    return this.post('/auth/forgot-password', { email });
+  }
+
+  async resetPassword(token: string, password: string): Promise<{ token: string; user: { id: string; name: string | null; email: string; role: string } }> {
+    return this.post('/auth/reset-password', { token, password });
   }
 
   // Health check

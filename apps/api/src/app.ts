@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import serveStatic from '@fastify/static';
 import path from 'path';
 import fs from 'fs';
@@ -34,6 +35,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // ── Simple in-memory rate limiter (resets on restart) ─────────────────────
+// TODO (M-1): replace with @fastify/rate-limit + Redis before horizontal scaling
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
@@ -48,15 +50,39 @@ function checkRateLimit(key: string, maxRequests: number, windowMs: number): boo
   return true;
 }
 
+function getFrontendUrl(): string {
+  // M-4: use dedicated FRONTEND_URL; fall back to stripping /api from NEXT_PUBLIC_API_URL
+  return (
+    process.env.FRONTEND_URL ??
+    (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/api\/?$/, '')
+  );
+}
+
 function buildInviteUrl(inviteToken: string): string {
-  const frontendUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
-    .replace(/\/api\/?$/, '');
-  return `${frontendUrl}/auth/accept-invite?token=${inviteToken}`;
+  return `${getFrontendUrl()}/auth/accept-invite?token=${inviteToken}`;
 }
 
 export function buildApp() {
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
-  app.register(cors, { origin: true });
+  // H-1: bodyLimit set to 10 KB (was incorrectly 10 MB)
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 });
+
+  // H-2: security headers — must be registered before CORS
+  app.register(helmet, { contentSecurityPolicy: false });
+
+  // H-3: explicit CORS origin whitelist — never reflect arbitrary origins
+  const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  app.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+      cb(new Error('Not allowed by CORS'), false);
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+  });
 
   // Serve Next.js static files (if built)
   const nextStaticPath = path.join(__dirname, '../../web/.next/static');
@@ -72,6 +98,11 @@ export function buildApp() {
 
   // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
+    // C-3: rate-limit login attempts per IP
+    const ip = extractIp(req);
+    if (!checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000)) {
+      return reply.status(429).send({ error: 'Too many requests. Try again later.' });
+    }
     const schema = z.object({
       email: z.string().email(),
       password: z.string().min(1),
@@ -185,9 +216,7 @@ export function buildApp() {
         data: { passwordResetToken: resetToken, passwordResetTokenExpiry: resetExpiry },
       });
 
-      const frontendUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
-        .replace(/\/api\/?$/, '');
-      const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+      const resetUrl = `${getFrontendUrl()}/auth/reset-password?token=${resetToken}`;
       await notifications.sendPasswordResetEmail(user, resetUrl);
     })().catch(err => app.log.error(err));
   });
@@ -269,6 +298,17 @@ export function buildApp() {
     const env = loadEnv();
     const payload = verifyJwt(bearerToken, env.JWT_SECRET);
     if (!payload) return reply.code(401).send({ error: 'Invalid token' });
+
+    // C-2: verify the account is still active on every request so freeze/delete
+    // takes effect immediately without waiting for the JWT to expire
+    const account = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { isActive: true, deletedAt: true },
+    });
+    if (!account || !account.isActive || account.deletedAt) {
+      return reply.code(401).send({ error: 'Account is inactive or has been removed.' });
+    }
+
     req.user = payload as any;
   });
 

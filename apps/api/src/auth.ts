@@ -68,7 +68,11 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
   if (parts.length !== 3) return null;
   const [h, p, s] = parts as [string, string, string];
   const expectedSig = base64urlBuffer(crypto.createHmac('sha256', secret).update(`${h}.${p}`).digest());
-  if (expectedSig !== s) return null;
+  // Use timing-safe comparison to prevent signature oracle attacks (M-3)
+  const expectedBuf = Buffer.from(expectedSig);
+  const actualBuf = Buffer.from(s);
+  if (expectedBuf.length !== actualBuf.length) return null;
+  if (!crypto.timingSafeEqual(expectedBuf, actualBuf)) return null;
   try {
     const payload = JSON.parse(Buffer.from(p, 'base64').toString('utf8')) as JwtPayload;
     if (payload.exp < Math.floor(Date.now() / 1000)) return null;
@@ -79,7 +83,10 @@ export function verifyJwt(token: string, secret: string): JwtPayload | null {
 }
 
 export async function authenticate(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  // C-1: filter out frozen and soft-deleted accounts at query level
+  const user = await prisma.user.findFirst({
+    where: { email, isActive: true, deletedAt: null },
+  });
   if (!user || !user.passwordHash) return null;
   return verifyPassword(password, user.passwordHash) ? user : null;
 }

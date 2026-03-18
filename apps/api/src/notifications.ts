@@ -1,6 +1,15 @@
 import { prisma } from '@crm/db/client';
 import { decrypt } from './crypto.js';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 interface NotifyUser {
   id: string;
   name: string | null;
@@ -43,12 +52,13 @@ export async function sendInviteEmail(
 ): Promise<{ sent: boolean; inviteUrl: string }> {
   const token = await getOutlookToken();
   if (!token) return { sent: false, inviteUrl };
+  const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
       token,
       user.email,
       'You have been invited to TischlerCRM',
-      `<p>Hello ${user.name ?? user.email},</p>
+      `<p>Hello ${displayName},</p>
        <p>You have been added to TischlerCRM. Click the link below to set your password and log in.</p>
        <p><a href="${inviteUrl}">${inviteUrl}</a></p>
        <p>This link expires in 7 days.</p>`
@@ -65,12 +75,13 @@ export async function sendPasswordResetEmail(
 ): Promise<{ sent: boolean; resetUrl: string }> {
   const token = await getOutlookToken();
   if (!token) return { sent: false, resetUrl };
+  const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
       token,
       user.email,
       'Reset your TischlerCRM password',
-      `<p>Hello ${user.name ?? user.email},</p>
+      `<p>Hello ${displayName},</p>
        <p>A password reset was requested for your account. Click the link below to set a new password.</p>
        <p><a href="${resetUrl}">${resetUrl}</a></p>
        <p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`

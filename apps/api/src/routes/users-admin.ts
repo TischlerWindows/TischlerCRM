@@ -66,8 +66,10 @@ function computeInviteStatus(user: {
 }
 
 function buildInviteUrl(inviteToken: string): string {
-  const frontendUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
-    .replace(/\/api\/?$/, '');
+  // M-4: use FRONTEND_URL; fall back to stripping /api from NEXT_PUBLIC_API_URL
+  const frontendUrl =
+    process.env.FRONTEND_URL ??
+    (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000').replace(/\/api\/?$/, '');
   return `${frontendUrl}/auth/accept-invite?token=${inviteToken}`;
 }
 

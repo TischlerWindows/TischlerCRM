@@ -38,8 +38,9 @@ const createProfileSchema = z.object({
 }).strict();
 
 const updateProfileSchema = z.object({
-  label:       z.string().min(1).max(200).trim().optional(),
-  description: z.string().max(1000).optional().nullable(),
+  label:             z.string().min(1).max(200).trim().optional(),
+  description:       z.string().max(1000).optional().nullable(),
+  grantsAdminAccess: z.boolean().optional(),
 }).strict();
 
 const idParam = z.object({ id: z.string().min(1) });
