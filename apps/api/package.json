@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "dotenv -e .env -- tsx watch src/server.ts",
     "build": "esbuild src/server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
-    "start": "prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate && node dist/server.js",
+    "start": "node dist/server.js",
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --format=cjs --outfile=dist/lambda.cjs",
     "package:lambda": "mkdir -p dist/lambda && copy dist\\lambda.cjs dist\\lambda\\index.js && powershell Compress-Archive -Path dist\\lambda\\index.js -DestinationPath dist\\lambda.zip -Force",
     "typecheck": "tsc -p tsconfig.json --noEmit",
