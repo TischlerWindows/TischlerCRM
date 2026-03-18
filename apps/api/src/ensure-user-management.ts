@@ -1,213 +1,165 @@
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 
-const FULL_OBJ_PERMS = { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: true };
-const STD_OBJ_PERMS = { read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false };
-const READ_ONLY_OBJ = { read: true, create: false, edit: false, delete: false, viewAll: true, modifyAll: false };
-const NO_OBJ_PERMS = { read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false };
+// ── Permission building blocks ─────────────────────────────────────────────
+const FULL  = { create:true,  read:true, edit:true,  delete:true,  viewAll:true,  modifyAll:true  };
+const STD   = { create:true,  read:true, edit:true,  delete:false, viewAll:false, modifyAll:false };
+const READ  = { create:false, read:true, edit:false, delete:false, viewAll:true,  modifyAll:false };
+const NONE  = { create:false, read:false,edit:false, delete:false, viewAll:false, modifyAll:false };
 
-const CORE_OBJECTS = ['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation'];
+const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies'] as const;
+const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'] as const;
 
-function buildObjPerms(template: Record<string, boolean>) {
-  return Object.fromEntries(CORE_OBJECTS.map(o => [o, { ...template }]));
+function makePerms(
+  obj: Record<string, typeof FULL>,
+  app: Record<string, boolean>
+) {
+  return { objects: obj, app };
 }
 
-const ALL_APP_PERMS_TRUE: Record<string, boolean> = {
-  manageUsers: true, manageRoles: true, manageDepartments: true,
-  exportData: true, importData: true, manageReports: true,
-  manageDashboards: true, viewSummary: true, viewSetup: true,
-  customizeApplication: true, manageSharing: true, viewAllData: true, modifyAllData: true,
-};
+function allObj(template: typeof FULL) {
+  return Object.fromEntries(OBJECTS.map(o => [o, { ...template }]));
+}
 
-const SEED_ROLES = [
+function allApp(value: boolean) {
+  return Object.fromEntries(APP_KEYS.map(k => [k, value]));
+}
+
+// ── Seed profile definitions ───────────────────────────────────────────────
+const SEED_PROFILES = [
   {
     name: 'system_administrator',
     label: 'System Administrator',
-    description: 'Full access to all features and settings',
-    level: 1,
+    description: 'Full access to all system features and records.',
     isSystem: true,
-    permissions: {
-      objectPermissions: buildObjPerms(FULL_OBJ_PERMS),
-      appPermissions: ALL_APP_PERMS_TRUE,
-    },
-    visibility: {},
+    grantsAdminAccess: true,
+    permissions: makePerms(allObj(FULL), allApp(true)),
   },
   {
     name: 'executive',
     label: 'Executive',
-    description: 'Full read access, limited write on all objects',
-    level: 2,
+    description: 'Full read access across all objects with broad write access.',
     isSystem: false,
-    permissions: {
-      objectPermissions: Object.fromEntries(CORE_OBJECTS.map(o => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
-      appPermissions: { ...ALL_APP_PERMS_TRUE, customizeApplication: false, manageSharing: false },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(
+      Object.fromEntries(OBJECTS.map(o => [o, { read:true, create:true, edit:true, delete:true, viewAll:true, modifyAll:false }])),
+      { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:true, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
+    ),
   },
   {
     name: 'manager',
     label: 'Manager',
-    description: 'Standard access plus delete and viewAll',
-    level: 3,
+    description: 'Standard access plus delete and viewAll on all objects.',
     isSystem: false,
-    permissions: {
-      objectPermissions: Object.fromEntries(CORE_OBJECTS.map(o => [o, { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false }])),
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: true, importData: true, manageReports: true,
-        manageDashboards: true, viewSummary: true, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: true, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(
+      Object.fromEntries(OBJECTS.map(o => [o, { read:true, create:true, edit:true, delete:true, viewAll:true, modifyAll:false }])),
+      { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
+    ),
   },
   {
     name: 'standard_employee',
     label: 'Standard Employee',
-    description: 'Standard access to core CRM features',
-    level: 4,
-    isSystem: true,
-    permissions: {
-      objectPermissions: buildObjPerms(STD_OBJ_PERMS),
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: true, importData: false, manageReports: true,
-        manageDashboards: true, viewSummary: true, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    description: 'Standard access for general staff.',
+    isSystem: false,
+    grantsAdminAccess: false,
+    permissions: makePerms(
+      { leads:STD, deals:STD, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:STD, installations:NONE, properties:{...READ,viewAll:false}, contacts:STD, companies:STD },
+      allApp(false)
+    ),
   },
   {
     name: 'sales_user',
     label: 'Sales User',
-    description: 'Full access to sales objects: Leads, Deals, Contacts, Accounts',
-    level: 4,
+    description: 'Full access to sales objects: Leads, Deals, Contacts, Companies.',
     isSystem: false,
-    permissions: {
-      objectPermissions: {
-        Property: { ...READ_ONLY_OBJ, viewAll: false },
-        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Account: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Product: READ_ONLY_OBJ,
-        Lead: { ...FULL_OBJ_PERMS },
-        Deal: { ...FULL_OBJ_PERMS },
-        Project: { ...READ_ONLY_OBJ, viewAll: false },
-        Service: { ...READ_ONLY_OBJ, viewAll: false },
-        Quote: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Installation: { ...READ_ONLY_OBJ, viewAll: false },
-      },
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: true, importData: false, manageReports: true,
-        manageDashboards: true, viewSummary: true, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(
+      { leads:FULL, deals:FULL, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...STD,delete:true,viewAll:true}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,delete:true,viewAll:true} },
+      { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
+    ),
   },
   {
     name: 'marketing_user',
     label: 'Marketing User',
-    description: 'Full access to Leads and Contacts; read-only Deals',
-    level: 4,
+    description: 'Full access to Leads and Contacts; read-only Deals.',
     isSystem: false,
-    permissions: {
-      objectPermissions: {
-        Property: { ...READ_ONLY_OBJ, viewAll: false },
-        Contact: { read: true, create: true, edit: true, delete: true, viewAll: true, modifyAll: false },
-        Account: { read: true, create: true, edit: true, delete: false, viewAll: true, modifyAll: false },
-        Product: READ_ONLY_OBJ,
-        Lead: { ...FULL_OBJ_PERMS },
-        Deal: { ...READ_ONLY_OBJ, viewAll: false },
-        Project: { ...READ_ONLY_OBJ, viewAll: false },
-        Service: { ...READ_ONLY_OBJ, viewAll: false },
-        Quote: { ...READ_ONLY_OBJ, viewAll: false },
-        Installation: { ...READ_ONLY_OBJ, viewAll: false },
-      },
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: true, importData: true, manageReports: true,
-        manageDashboards: true, viewSummary: true, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(
+      { leads:FULL, deals:{...READ,viewAll:false}, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...READ,viewAll:false}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,viewAll:true} },
+      { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
+    ),
   },
   {
     name: 'read_only',
     label: 'Read Only',
-    description: 'Read-only access to all objects',
-    level: 5,
+    description: 'Read-only access to all objects.',
     isSystem: true,
-    permissions: {
-      objectPermissions: buildObjPerms(READ_ONLY_OBJ),
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: true, importData: false, manageReports: false,
-        manageDashboards: false, viewSummary: true, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: true, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(allObj(READ), { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }),
   },
   {
     name: 'contractor',
     label: 'Contractor',
-    description: 'Minimal base access',
-    level: 5,
+    description: 'Minimal base access.',
     isSystem: true,
-    permissions: {
-      objectPermissions: {},
-      appPermissions: {
-        manageUsers: false, manageRoles: false, manageDepartments: false,
-        exportData: false, importData: false, manageReports: false,
-        manageDashboards: false, viewSummary: false, viewSetup: false,
-        customizeApplication: false, manageSharing: false, viewAllData: false, modifyAllData: false,
-      },
-    },
-    visibility: {},
+    grantsAdminAccess: false,
+    permissions: makePerms(allObj(NONE), allApp(false)),
   },
 ];
 
 export async function ensureUserManagement() {
-  console.log('[UserMgmt] Ensuring roles...');
+  console.log('[UserMgmt] Ensuring profiles...');
 
-  for (const roleDef of SEED_ROLES) {
-    const existing = await prisma.role.findUnique({ where: { name: roleDef.name } });
+  for (const profileDef of SEED_PROFILES) {
+    const existing = await prisma.profile.findUnique({ where: { name: profileDef.name } });
     if (!existing) {
-      await prisma.role.create({ data: { id: generateId('Role'), ...roleDef } });
-      console.log(`[UserMgmt] Created role: ${roleDef.label}`);
+      await prisma.profile.create({
+        data: {
+          id: generateId('Profile'),
+          name: profileDef.name,
+          label: profileDef.label,
+          description: profileDef.description,
+          isSystem: profileDef.isSystem,
+          grantsAdminAccess: profileDef.grantsAdminAccess,
+          permissions: profileDef.permissions,
+        },
+      });
+      console.log(`[UserMgmt] Created profile: ${profileDef.label}`);
+    } else if (profileDef.grantsAdminAccess && !existing.grantsAdminAccess) {
+      // Ensure grantsAdminAccess is set correctly even if profile already existed
+      await prisma.profile.update({ where: { name: profileDef.name }, data: { grantsAdminAccess: true } });
+      console.log(`[UserMgmt] Updated grantsAdminAccess for: ${profileDef.label}`);
     }
   }
 
-  // Assign System Administrator role to admin users without a role
-  const adminRole = await prisma.role.findUnique({ where: { name: 'system_administrator' } });
-  if (adminRole) {
-    const adminsWithoutRole = await prisma.user.findMany({
-      where: { role: 'ADMIN', roleId: null },
+  // Assign System Administrator profile to admin users without a profile
+  const adminProfile = await prisma.profile.findUnique({ where: { name: 'system_administrator' } });
+  if (adminProfile) {
+    const adminsWithoutProfile = await prisma.user.findMany({
+      where: { role: 'ADMIN', profileId: null },
     });
-    for (const admin of adminsWithoutRole) {
+    for (const admin of adminsWithoutProfile) {
       await prisma.user.update({
         where: { id: admin.id },
-        data: { roleId: adminRole.id },
+        data: { profileId: adminProfile.id },
       });
-      console.log(`[UserMgmt] Assigned System Administrator role to ${admin.email}`);
+      console.log(`[UserMgmt] Assigned System Administrator profile to ${admin.email}`);
     }
   }
 
-  // Assign Standard Employee role to non-admin users without a role
-  const standardRole = await prisma.role.findUnique({ where: { name: 'standard_employee' } });
-  if (standardRole) {
-    const usersWithoutRole = await prisma.user.findMany({
-      where: { roleId: null, role: { not: 'ADMIN' } },
+  // Assign Standard Employee profile to non-admin users without a profile
+  const standardProfile = await prisma.profile.findUnique({ where: { name: 'standard_employee' } });
+  if (standardProfile) {
+    const usersWithoutProfile = await prisma.user.findMany({
+      where: { profileId: null, role: { not: 'ADMIN' } },
     });
-    for (const user of usersWithoutRole) {
+    for (const user of usersWithoutProfile) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { roleId: standardRole.id },
+        data: { profileId: standardProfile.id },
       });
-      console.log(`[UserMgmt] Assigned Standard Employee role to ${user.email}`);
+      console.log(`[UserMgmt] Assigned Standard Employee profile to ${user.email}`);
     }
   }
 

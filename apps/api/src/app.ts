@@ -5,33 +5,57 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import crypto from 'crypto';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
-import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
-import { loadEnv } from './config';
-import { objectRoutes } from './routes/objects';
-import { fieldRoutes } from './routes/fields';
-import { layoutRoutes } from './routes/layouts';
-import { recordRoutes } from './routes/records';
-import { reportRoutes } from './routes/reports';
-import { dashboardRoutes } from './routes/dashboards';
-import { backupRoutes } from './routes/backup';
-import { settingRoutes } from './routes/settings';
-import { preferenceRoutes } from './routes/preferences';
-import { departmentRoutes } from './routes/departments';
-import { usersAdminRoutes } from './routes/users-admin';
-import { rolesRoutes } from './routes/roles';
-import { auditLogRoutes } from './routes/audit-log';
-import { recycleBinRoutes } from './routes/recycle-bin';
-import { integrationRoutes } from './routes/integrations';
-import { placesRoutes } from './routes/places';
+import { authenticate, signJwt, verifyJwt, hashPassword } from './auth.js';
+import { logAudit, extractIp } from './audit.js';
+import { loadEnv } from './config.js';
+import * as notifications from './notifications.js';
+import { objectRoutes } from './routes/objects.js';
+import { fieldRoutes } from './routes/fields.js';
+import { layoutRoutes } from './routes/layouts.js';
+import { recordRoutes } from './routes/records.js';
+import { reportRoutes } from './routes/reports.js';
+import { dashboardRoutes } from './routes/dashboards.js';
+import { backupRoutes } from './routes/backup.js';
+import { settingRoutes } from './routes/settings.js';
+import { preferenceRoutes } from './routes/preferences.js';
+import { departmentRoutes } from './routes/departments.js';
+import { usersAdminRoutes } from './routes/users-admin.js';
+import { profilesRoutes } from './routes/profiles.js';
+import { auditLogRoutes } from './routes/audit-log.js';
+import { recycleBinRoutes } from './routes/recycle-bin.js';
+import { integrationRoutes } from './routes/integrations.js';
+import { placesRoutes } from './routes/places.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// ── Simple in-memory rate limiter (resets on restart) ─────────────────────
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  const entry = rateLimitStore.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (entry.count >= maxRequests) return false;
+  entry.count++;
+  return true;
+}
+
+function buildInviteUrl(inviteToken: string): string {
+  const frontendUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
+    .replace(/\/api\/?$/, '');
+  return `${frontendUrl}/auth/accept-invite?token=${inviteToken}`;
+}
+
 export function buildApp() {
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 }); // 10MB body limit for large schema payloads
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
   app.register(cors, { origin: true });
 
   // Serve Next.js static files (if built)
@@ -43,65 +67,45 @@ export function buildApp() {
     });
   }
 
-  // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v8-summary-perms' }));
+  // ── Health check ──────────────────────────────────────────────────────────
+  app.get('/health', async () => ({ ok: true, version: '2026-03-18-user-management' }));
 
-  // Auth: signup
-  app.post('/auth/signup', async (req, reply) => {
-    const schema = z.object({
-      name: z.string().min(1),
-      email: z.string().email(),
-      password: z.string().min(6),
-    });
-    const parsed = schema.safeParse(req.body);
-    if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
-
-    // Check if user already exists
-    const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-    if (existing) return reply.code(409).send({ error: 'Email already registered' });
-
-    try {
-      const passwordHash = hashPassword(parsed.data.password);
-      const user = await prisma.user.create({
-        data: {
-          id: generateId('User'),
-          email: parsed.data.email,
-          name: parsed.data.name,
-          passwordHash,
-          role: 'USER',
-        },
-      });
-
-      const env = loadEnv();
-      const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-
-      return reply.code(201).send({
-        token,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
-      });
-    } catch (err) {
-      app.log.error(err);
-      return reply.code(500).send({ error: 'Signup failed' });
-    }
-  });
-
-  // Auth: login -> JWT
+  // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
     const schema = z.object({
       email: z.string().email(),
-      password: z.string().min(6),
+      password: z.string().min(1),
       accountId: z.string().min(1).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+
     const user = await authenticate(parsed.data.email, parsed.data.password);
-    if (!user) return reply.code(401).send({ error: 'Invalid credentials' });
+    const ip = extractIp(req);
+    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+
+    if (!user) {
+      // Record failed login attempt if user exists
+      const userByEmail = await prisma.user.findFirst({
+        where: { email: parsed.data.email.toLowerCase() },
+      });
+      if (userByEmail) {
+        await prisma.loginEvent.create({
+          data: {
+            id: generateId('LoginEvent'),
+            userId: userByEmail.id,
+            ip,
+            userAgent,
+            success: false,
+          },
+        }).catch(() => {});
+      }
+      return reply.code(401).send({ error: 'Invalid credentials' });
+    }
+
     const env = loadEnv();
     const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
-    const ip = (forwardedIp ? forwardedIp.split(',')[0].trim() : undefined) || req.ip || req.socket?.remoteAddress || 'unknown';
-    const userAgent = typeof req.headers['user-agent'] === 'string' ? req.headers['user-agent'] : null;
+
     await prisma.loginEvent.create({
       data: {
         id: generateId('LoginEvent'),
@@ -109,154 +113,191 @@ export function buildApp() {
         accountId: parsed.data.accountId ?? null,
         ip,
         userAgent,
+        success: true,
       },
     });
+
     return reply.send({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
   });
 
-  // Security: login history (admin-only)
+  // ── Auth: accept invite ───────────────────────────────────────────────────
+  app.post('/auth/accept-invite', async (req, reply) => {
+    const ip = extractIp(req);
+    if (!checkRateLimit(`accept-invite:${ip}`, 10, 15 * 60 * 1000)) {
+      return reply.status(429).send({ error: 'Too many requests. Try again later.' });
+    }
+
+    const body = z.object({ token: z.string().min(1), password: z.string().min(8).max(128) }).parse(req.body);
+    const user = await prisma.user.findFirst({
+      where: { inviteToken: body.token, inviteTokenExpiry: { gt: new Date() }, deletedAt: null },
+    });
+    if (!user) return reply.status(400).send({ error: 'This invite link is invalid or has expired.' });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(body.password),
+        inviteToken: null,
+        inviteTokenExpiry: null,
+        inviteSentAt: null,
+        inviteAcceptedAt: new Date(),
+        isActive: true,
+      },
+    });
+
+    await logAudit({
+      actorId: user.id,
+      action: 'UPDATE',
+      objectType: 'User',
+      objectId: user.id,
+      objectName: user.name ?? user.email,
+      after: { event: 'invite_accepted' } as any,
+      ipAddress: ip,
+    });
+
+    const env = loadEnv();
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  });
+
+  // ── Auth: forgot password ─────────────────────────────────────────────────
+  app.post('/auth/forgot-password', async (req, reply) => {
+    const ip = extractIp(req);
+    if (!checkRateLimit(`forgot-password:${ip}`, 5, 15 * 60 * 1000)) {
+      return reply.status(429).send({ error: 'Too many requests. Try again later.' });
+    }
+
+    const body = z.object({ email: z.string().email() }).parse(req.body);
+    // Always respond immediately to prevent email enumeration
+    reply.send({ success: true });
+
+    // Fire-and-forget
+    (async () => {
+      const user = await prisma.user.findFirst({
+        where: { email: body.email.toLowerCase(), deletedAt: null },
+      });
+      if (!user) return;
+
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpiry = new Date(Date.now() + 60 * 60 * 1000);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: resetToken, passwordResetTokenExpiry: resetExpiry },
+      });
+
+      const frontendUrl = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000')
+        .replace(/\/api\/?$/, '');
+      const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+      await notifications.sendPasswordResetEmail(user, resetUrl);
+    })().catch(err => app.log.error(err));
+  });
+
+  // ── Auth: reset password ──────────────────────────────────────────────────
+  app.post('/auth/reset-password', async (req, reply) => {
+    const ip = extractIp(req);
+    if (!checkRateLimit(`reset-password:${ip}`, 10, 15 * 60 * 1000)) {
+      return reply.status(429).send({ error: 'Too many requests. Try again later.' });
+    }
+
+    const body = z.object({ token: z.string().min(1), password: z.string().min(8).max(128) }).parse(req.body);
+    const user = await prisma.user.findFirst({
+      where: { passwordResetToken: body.token, passwordResetTokenExpiry: { gt: new Date() }, deletedAt: null },
+    });
+    if (!user) return reply.status(400).send({ error: 'This reset link is invalid or has expired.' });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashPassword(body.password),
+        passwordResetToken: null,
+        passwordResetTokenExpiry: null,
+      },
+    });
+
+    await logAudit({
+      actorId: user.id,
+      action: 'UPDATE',
+      objectType: 'User',
+      objectId: user.id,
+      objectName: user.name ?? user.email,
+      after: { event: 'password_reset' } as any,
+      ipAddress: ip,
+    });
+
+    const env = loadEnv();
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  });
+
+  // ── Security: login history (admin-only) ──────────────────────────────────
   app.get('/security/login-events', async (req, reply) => {
     if (!req.user || req.user.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Insufficient permissions' });
     }
     const querySchema = z.object({
+      userId:    z.string().min(1).optional(),
       accountId: z.string().min(1).optional(),
-      take: z.coerce.number().int().min(1).max(500).optional(),
+      take:      z.coerce.number().int().min(1).max(500).optional(),
     });
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) return reply.code(400).send(parsed.error.flatten());
+
+    const userId = parsed.data.userId ?? parsed.data.accountId;
     const events = await prisma.loginEvent.findMany({
-      where: parsed.data.accountId ? { accountId: parsed.data.accountId } : undefined,
+      where: userId ? { userId } : undefined,
       take: parsed.data.take ?? 100,
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, email: true, name: true, role: true } },
       },
     });
-    reply.send(events);
+    return reply.send(events);
   });
 
-  // Auth guard hook
+  // ── Auth guard hook ───────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
     if (req.routerPath && req.routerPath.startsWith('/auth')) return;
     if (req.routerPath === '/health') return;
-    if (req.routerPath === '/places/static-map') return; // auth handled in route via query token
-    // Allow cron secret auth for scheduled backup endpoint
+    if (req.routerPath === '/places/static-map') return;
     if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
+
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
       return reply.code(401).send({ error: 'Missing bearer token' });
     }
-    const token = auth.slice('Bearer '.length).trim();
+    const bearerToken = auth.slice('Bearer '.length).trim();
     const env = loadEnv();
-    const payload = verifyJwt(token, env.JWT_SECRET);
+    const payload = verifyJwt(bearerToken, env.JWT_SECRET);
     if (!payload) return reply.code(401).send({ error: 'Invalid token' });
     req.user = payload as any;
   });
 
-  // ── Current user's effective permissions ──
+  // ── Current user's effective permissions ─────────────────────────────────
   app.get('/me/permissions', async (req, reply) => {
     const userId = req.user!.sub;
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        department: true,
-        orgRole: true,
-      },
+      include: { profile: true },
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const deptRaw = (user.department?.permissions as any) || {};
-    const isAdminDept = !!deptRaw.isAdmin;
-    const deptObjPerms: Record<string, Record<string, boolean>> = deptRaw.objectPermissions || {};
-    const deptAppPerms: Record<string, boolean> = deptRaw.appPermissions || {};
+    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies'];
+    const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'];
 
-    const grantedObjPerms: Record<string, Record<string, boolean>> = {};
-    const grantedAppPerms: Record<string, boolean> = {};
-
-    // Role grants (replaces old Profile grants)
-    const rolePerms = (user.orgRole?.permissions as any) || {};
-    if (rolePerms.objectPermissions) {
-      for (const [obj, perms] of Object.entries(rolePerms.objectPermissions as Record<string, Record<string, boolean>>)) {
-        if (!grantedObjPerms[obj]) grantedObjPerms[obj] = {};
-        for (const [action, granted] of Object.entries(perms)) {
-          if (granted) grantedObjPerms[obj][action] = true;
-        }
-      }
-    }
-    if (rolePerms.appPermissions) {
-      for (const [perm, granted] of Object.entries(rolePerms.appPermissions as Record<string, boolean>)) {
-        if (granted) grantedAppPerms[perm] = true;
-      }
+    // ADMIN users get full access regardless of profile
+    if (user.role === 'ADMIN') {
+      return reply.send({
+        objects: Object.fromEntries(OBJECTS.map(o => [o, { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true }])),
+        app: Object.fromEntries(APP_KEYS.map(k => [k, true])),
+      });
     }
 
-    // Merge: department restrictions are the CEILING.
-    const objectPerms: Record<string, Record<string, boolean>> = {};
-    const allObjKeys = new Set([...Object.keys(deptObjPerms), ...Object.keys(grantedObjPerms)]);
-    for (const obj of allObjKeys) {
-      objectPerms[obj] = {};
-      const deptObj = deptObjPerms[obj] || {};
-      const grantedObj = grantedObjPerms[obj] || {};
-      const allActions = new Set([...Object.keys(deptObj), ...Object.keys(grantedObj)]);
-      for (const action of allActions) {
-        if (user.department && obj in deptObjPerms && action in deptObj && !deptObj[action]) {
-          objectPerms[obj][action] = false;
-        } else {
-          objectPerms[obj][action] = !!(deptObj[action] || grantedObj[action]);
-        }
-      }
-    }
-
-    const appPerms: Record<string, boolean> = {};
-    const allAppKeys = new Set([...Object.keys(deptAppPerms), ...Object.keys(grantedAppPerms)]);
-    for (const perm of allAppKeys) {
-      if (user.department && perm in deptAppPerms && !deptAppPerms[perm]) {
-        appPerms[perm] = false;
-      } else {
-        appPerms[perm] = !!(deptAppPerms[perm] || grantedAppPerms[perm]);
-      }
-    }
-
-    if (isAdminDept || user.role === 'ADMIN') {
-      const allActions = ['read', 'create', 'edit', 'delete', 'viewAll', 'modifyAll'];
-      const customObjects = await prisma.customObject.findMany({ select: { apiName: true } });
-      for (const obj of customObjects) {
-        objectPerms[obj.apiName] = Object.fromEntries(allActions.map(a => [a, true]));
-      }
-      const allAppPermKeys = ['manageUsers', 'manageRoles', 'manageDepartments', 'exportData', 'importData', 'manageReports', 'manageDashboards', 'viewSummary', 'viewSetup', 'customizeApplication', 'manageSharing', 'viewAllData', 'modifyAllData'];
-      for (const p of allAppPermKeys) {
-        appPerms[p] = true;
-      }
-    }
-
-    let homePageLayout: any = null;
-    const homePageLayoutId = deptRaw.homePageLayoutId;
-    if (homePageLayoutId) {
-      try {
-        const templatesSetting = await prisma.setting.findUnique({ where: { key: 'homeLayoutTemplates' } });
-        if (templatesSetting) {
-          const templates = templatesSetting.value as any[];
-          const tpl = templates.find((t: any) => t.id === homePageLayoutId);
-          if (tpl?.layout) homePageLayout = tpl.layout;
-        }
-      } catch { /* ignore */ }
-    }
-
-    reply.send({
-      userId,
-      departmentName: user.department?.name || null,
-      roleName: user.orgRole?.label || null,
-      role: user.role,
-      objectPermissions: objectPerms,
-      appPermissions: appPerms,
-      homePageLayout,
-    });
+    return reply.send(user.profile?.permissions ?? {});
   });
 
-  // Admin route guard — enforce crm-security Pillar 4
+  // ── Admin route guard ─────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
     if (!req.routerPath?.startsWith('/admin')) return;
-    // Allow cron secret auth for scheduled backup endpoint
     if (req.routerPath === '/admin/backup/scheduled' && req.headers['x-cron-secret']) {
       const env = loadEnv();
       if (env.BACKUP_CRON_SECRET && req.headers['x-cron-secret'] === env.BACKUP_CRON_SECRET) return;
@@ -266,7 +307,7 @@ export function buildApp() {
     }
   });
 
-  // Register API routes
+  // ── Register API routes ───────────────────────────────────────────────────
   app.register(objectRoutes);
   app.register(fieldRoutes);
   app.register(layoutRoutes);
@@ -278,7 +319,7 @@ export function buildApp() {
   app.register(preferenceRoutes);
   app.register(departmentRoutes);
   app.register(usersAdminRoutes);
-  app.register(rolesRoutes);
+  app.register(profilesRoutes);
   app.register(auditLogRoutes);
   app.register(recycleBinRoutes);
   app.register(integrationRoutes);

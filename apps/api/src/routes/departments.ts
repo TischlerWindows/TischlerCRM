@@ -9,7 +9,6 @@ const departmentSchema = z.object({
   description: z.string().max(1000).optional().nullable(),
   parentId: z.string().min(1).optional().nullable(),
   isActive: z.boolean().optional(),
-  permissions: z.any().optional(),
 });
 
 const idParam = z.object({ id: z.string().min(1) });
@@ -25,7 +24,7 @@ export async function departmentRoutes(app: FastifyInstance) {
         _count: { select: { users: true } },
       },
     });
-    reply.send(departments.map((d: any) => ({ ...d, permissions: d.permissions || {} })));
+    reply.send(departments);
   });
 
   app.get('/departments/:id', async (req, reply) => {
@@ -63,7 +62,6 @@ export async function departmentRoutes(app: FastifyInstance) {
         description: parsed.data.description,
         parentId: parsed.data.parentId,
         isActive: parsed.data.isActive ?? true,
-        permissions: parsed.data.permissions || {},
       },
       include: {
         parent: { select: { id: true, name: true } },

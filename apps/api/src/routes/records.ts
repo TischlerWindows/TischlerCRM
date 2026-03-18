@@ -16,32 +16,18 @@ async function checkObjectPermission(
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      department: true,
-      orgRole: true,
+      profile: true,
     },
   });
   if (!user) return false;
 
-  // If user has no department or role — no permissions configured yet, allow access
-  if (!user.department && !user.orgRole) return true;
+  // If user has no profile — no permissions configured yet, allow access
+  if (!user.profile) return true;
 
-  // Admin departments have full access to every object
-  const deptRaw = (user.department?.permissions as any) || {};
-  if (deptRaw.isAdmin) return true;
-
-  // Department restrictions are the CEILING
-  // If department explicitly sets this action to false, deny regardless of other sources
-  const deptPerms = deptRaw.objectPermissions?.[objectApiName];
-  if (user.department && deptPerms && action in deptPerms && !deptPerms[action]) {
-    return false; // department explicitly denied — cannot be overridden
-  }
-
-  // Check if any source grants the permission
-  if (deptPerms?.[action]) return true;
-
-  // Check role permissions
-  const rolePerms = (user.orgRole?.permissions as any)?.objectPermissions?.[objectApiName];
-  if (rolePerms?.[action]) return true;
+  // Check profile object permissions
+  const profilePerms = (user.profile?.permissions as any) || {};
+  const objPerms = profilePerms?.objects?.[objectApiName];
+  if (objPerms?.[action]) return true;
 
   return false;
 }
