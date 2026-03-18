@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm -r --parallel run dev",
-    "start": "pnpm --filter=api start",
+    "start": "pnpm --filter @crm/db run prisma:push:deploy && pnpm --filter=api start",
     "start:web": "pnpm --filter=web start",
     "start:api": "pnpm --filter @crm/db run prisma:push:deploy && pnpm --filter=api start",
     "lint": "pnpm -r run lint",

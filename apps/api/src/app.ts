@@ -44,7 +44,7 @@ export function buildApp() {
   }
 
   // Health check endpoint for Railway
-  app.get('/health', async () => ({ ok: true, version: '2026-03-09-v8-summary-perms' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-18-v9-backup-restore' }));
 
   // Auth: signup
   app.post('/auth/signup', async (req, reply) => {
