@@ -3,6 +3,7 @@ import { apiClient } from './api-client';
 
 export interface RecordData {
   id: string;
+  recordId?: string | null;
   objectId: string;
   pageLayoutId?: string;
   data: Record<string, any>;
@@ -134,6 +135,7 @@ class RecordsService {
 
     return {
       id: record.id,
+      recordId: record.recordId || record.id,
       ...stripped,
       createdBy: record.createdBy?.name || record.createdBy?.email || 'Unknown',
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',

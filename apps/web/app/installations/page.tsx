@@ -39,6 +39,7 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Installation {
   id: string;
+  recordId?: string;
   installationNumber: string;
   installationName: string;
   accountName: string;
@@ -412,7 +413,7 @@ export default function InstallationsPage() {
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/installations/${result.id}`);
+      router.push(`/installations/${result.recordId || result.id}`);
     } catch (error) {
       console.error('Failed to create installation:', error);
       throw error;
@@ -652,15 +653,15 @@ export default function InstallationsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredInstallations.map((installation) => (
-                  <tr key={installation.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/installations/${installation.id}`)}>
+                  <tr key={installation.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/installations/${installation.recordId || installation.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'installationNumber' ? (
-                            <Link href={`/installations/${installation.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/installations/${installation.recordId || installation.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {installation.installationNumber}
                           </Link>
                         ) : column.id === 'installationName' ? (
-                          <Link href={`/installations/${installation.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                          <Link href={`/installations/${installation.recordId || installation.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {installation.installationName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -690,7 +691,7 @@ export default function InstallationsPage() {
                             {canEditInstallation && (
                             <button
                               onClick={() => {
-                                router.push(`/installations/${installation.id}`);
+                                router.push(`/installations/${installation.recordId || installation.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

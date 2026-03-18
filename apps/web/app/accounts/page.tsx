@@ -40,6 +40,7 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Account {
   id: string;
+  recordId?: string;
   recordTypeId?: string;
   pageLayoutId?: string;
   accountNumber: string;
@@ -469,7 +470,7 @@ export default function AccountsPage() {
 
       setShowDynamicForm(false);
       await fetchAccounts();
-      router.push(`/accounts/${createdRecord.id}`);
+      router.push(`/accounts/${createdRecord.recordId || createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create account:', error);
       throw error;
@@ -723,18 +724,18 @@ export default function AccountsPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAccounts.map((account) => (
-                  <tr key={account.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/accounts/${account.id}`)}>
+                  <tr key={account.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/accounts/${account.recordId || account.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'accountName' ? (
-                            <Link href={`/accounts/${account.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/accounts/${account.recordId || account.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {account.accountName}
                             </Link>
                           ) : column.id === 'accountNumber' ? (
-                            <Link href={`/accounts/${account.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/accounts/${account.recordId || account.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {account.accountNumber}
                             </Link>
                           ) : column.id === 'status' ? (
@@ -764,7 +765,7 @@ export default function AccountsPage() {
                             {canEditAccount && (
                             <button
                               onClick={() => {
-                                router.push(`/accounts/${account.id}`);
+                                router.push(`/accounts/${account.recordId || account.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

@@ -39,6 +39,7 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Quote {
   id: string;
+  recordId?: string;
   quoteNumber: string;
   quoteName: string;
   accountName: string;
@@ -419,7 +420,7 @@ export default function QuotesPage() {
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/quotes/${result.id}`);
+      router.push(`/quotes/${result.recordId || result.id}`);
     } catch (error) {
       console.error('Failed to create quote:', error);
       throw error;
@@ -661,15 +662,15 @@ export default function QuotesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredQuotes.map((quote) => (
-                  <tr key={quote.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/quotes/${quote.id}`)}>
+                  <tr key={quote.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/quotes/${quote.recordId || quote.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'quoteNumber' ? (
-                            <Link href={`/quotes/${quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/quotes/${quote.recordId || quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {quote.quoteNumber}
                           </Link>
                         ) : column.id === 'quoteName' ? (
-                          <Link href={`/quotes/${quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                          <Link href={`/quotes/${quote.recordId || quote.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {quote.quoteName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -699,7 +700,7 @@ export default function QuotesPage() {
                             {canEditQuote && (
                             <button
                               onClick={() => {
-                                router.push(`/quotes/${quote.id}`);
+                                router.push(`/quotes/${quote.recordId || quote.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

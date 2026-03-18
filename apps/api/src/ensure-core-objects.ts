@@ -1,4 +1,5 @@
 import { prisma } from '@crm/db/client';
+import { generateRecordId } from '@crm/db/record-id';
 
 /**
  * Core CRM object definitions that must always exist in the database.
@@ -179,6 +180,7 @@ export async function ensureCoreObjects(): Promise<void> {
         passwordHash,
         name: 'System Admin',
         role: 'ADMIN',
+        recordId: generateRecordId('User'),
       },
     });
     console.log('[ensure-core-objects] Created system admin user');

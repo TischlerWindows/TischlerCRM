@@ -12,6 +12,7 @@ datasource db {
 // ============================================
 model User {
   id           String   @id @default(uuid())
+  recordId     String?  @unique
   email        String   @unique
   passwordHash String?
   name         String?
@@ -337,6 +338,7 @@ model LayoutField {
 
 model Record {
   id              String   @id @default(uuid())
+  recordId        String?  @unique
   object          CustomObject @relation(fields: [objectId], references: [id], onDelete: Cascade)
   objectId        String
   

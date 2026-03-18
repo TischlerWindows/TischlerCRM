@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
+import { generateRecordId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { hashPassword } from '../auth';
 import { logAudit, extractIp } from '../audit';
@@ -121,6 +122,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         name: parsed.data.name,
         passwordHash,
         role: systemRole,
+        recordId: generateRecordId('User'),
         roleId: parsed.data.roleId,
         departmentId: parsed.data.departmentId,
         managerId: parsed.data.managerId,

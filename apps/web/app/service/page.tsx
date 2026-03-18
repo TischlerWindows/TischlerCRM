@@ -39,6 +39,7 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 
 interface Service {
   id: string;
+  recordId?: string;
   serviceNumber: string;
   serviceName: string;
   accountName: string;
@@ -429,7 +430,7 @@ export default function ServicePage() {
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/service/${result.id}`);
+      router.push(`/service/${result.recordId || result.id}`);
     } catch (error) {
       console.error('Failed to create service:', error);
       throw error;
@@ -674,15 +675,15 @@ export default function ServicePage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredServices.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/service/${service.id}`)}>
+                  <tr key={service.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/service/${service.recordId || service.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                         {column.id === 'serviceNumber' ? (
-                            <Link href={`/service/${service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/service/${service.recordId || service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {service.serviceNumber}
                           </Link>
                         ) : column.id === 'serviceName' ? (
-                          <Link href={`/service/${service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                          <Link href={`/service/${service.recordId || service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                             {service.serviceName}
                           </Link>
                         ) : column.id === 'status' ? (
@@ -720,7 +721,7 @@ export default function ServicePage() {
                             {canEditService && (
                             <button
                               onClick={() => {
-                                router.push(`/service/${service.id}`);
+                                router.push(`/service/${service.recordId || service.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

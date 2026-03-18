@@ -45,6 +45,7 @@ import { getPropertyPrefix, generatePropertyNumber } from '@/lib/property-number
 
 interface Property {
   id: string;
+  recordId?: string;
   recordTypeId?: string;
   pageLayoutId?: string;
   propertyNumber: string;
@@ -504,7 +505,7 @@ export default function PropertiesPage() {
       await fetchProperties();
       
       // Redirect to the newly created property's detail page
-      router.push(`/properties/${createdRecord.id}`);
+      router.push(`/properties/${createdRecord.recordId || createdRecord.id}`);
     } catch (error) {
       console.error('Failed to create property:', error);
       throw error;
@@ -760,18 +761,18 @@ export default function PropertiesPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProperties.map((property) => (
-                  <tr key={property.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/properties/${property.id}`)}>
+                  <tr key={property.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/properties/${property.recordId || property.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
                           {column.id === 'propertyNumber' ? (
-                            <Link href={`/properties/${property.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            <Link href={`/properties/${property.recordId || property.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
                               {property.propertyNumber}
                             </Link>
                           ) : column.id === 'address' ? (
-                            <Link href={`/properties/${property.id}`} className="text-brand-navy hover:text-brand-dark hover:underline">
+                            <Link href={`/properties/${property.recordId || property.id}`} className="text-brand-navy hover:text-brand-dark hover:underline">
                               {formatColumnValue(property, column.id)}
                             </Link>
                           ) : column.id === 'status' ? (
@@ -801,7 +802,7 @@ export default function PropertiesPage() {
                             {canEditProperty && (
                             <button
                               onClick={() => {
-                                router.push(`/properties/${property.id}`);
+                                router.push(`/properties/${property.recordId || property.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"

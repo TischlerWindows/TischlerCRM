@@ -6,6 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { prisma } from '@crm/db/client';
+import { generateRecordId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { authenticate, signJwt, verifyJwt, hashPassword } from './auth';
 import { loadEnv } from './config';
@@ -67,6 +68,7 @@ export function buildApp() {
           name: parsed.data.name,
           passwordHash,
           role: 'USER',
+          recordId: generateRecordId('User'),
         },
       });
 
@@ -75,7 +77,7 @@ export function buildApp() {
 
       return reply.code(201).send({
         token,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: user.id, recordId: user.recordId, email: user.email, name: user.name, role: user.role },
       });
     } catch (err) {
       app.log.error(err);
