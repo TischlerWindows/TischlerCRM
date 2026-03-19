@@ -883,7 +883,6 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
-      ...(field.rowSpan > 1 ? { minHeight: `${field.rowSpan * 60 + (field.rowSpan - 1) * 16}px` } : {}),
     };
 
     return (
@@ -895,7 +894,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           }
         }}
         style={style}
-        className={`p-3 border rounded bg-gray-50 relative group cursor-move ${
+        className={`p-3 border rounded bg-gray-50 relative group cursor-move h-full ${
           selectedElement?.type === 'field' && selectedElement?.id === field.id
             ? 'border-blue-500 border-2 shadow-md'
             : 'border-gray-300'
@@ -1043,10 +1042,17 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                 ? `calc(${field.colSpan * 100}% + ${(field.colSpan - 1) * 16}px)` // 16px = gap-4
                 : undefined;
               const spacerPx = fieldSpacers[idx] || 0;
+              // rowSpan > 1: field must occupy the full height of the spanned rows
+              // Each row = EDITOR_ROW_HEIGHT (76px = 60px card + 16px gap).
+              // Total height = N rows minus the trailing gap: N*76 - 16
+              const spanHeight = field.rowSpan > 1
+                ? field.rowSpan * 76 - 16
+                : undefined;
               return (
                 <div key={field.id} style={{
                   ...(spanWidth ? { width: spanWidth, position: 'relative' as const, zIndex: 2 } : {}),
                   ...(spacerPx > 0 ? { marginTop: spacerPx } : {}),
+                  ...(spanHeight ? { height: spanHeight } : {}),
                 }}>
                   <SortableFieldInSection field={field} fieldDef={fieldDef} sectionColumns={sectionColumns} />
                 </div>
