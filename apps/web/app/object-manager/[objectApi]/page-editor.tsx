@@ -921,14 +921,14 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                 {fieldDef.required && <span className="text-red-500">*</span>}
               </div>
               <div className="text-xs text-gray-500">{fieldDef.type}</div>
-              {(field.colSpan > 1 || field.rowSpan > 1) && (
-                <div className="text-xs text-blue-600 font-medium">
-                  span {field.colSpan}×{field.rowSpan}
-                </div>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {(field.colSpan > 1 || field.rowSpan > 1) && (
+              <span className="text-xs text-blue-600 font-medium whitespace-nowrap">
+                {field.colSpan}×{field.rowSpan}
+              </span>
+            )}
             {fieldDef.visibleIf && fieldDef.visibleIf.length > 0 && (
               <div 
                 className="p-1 bg-orange-500 rounded flex-shrink-0"
