@@ -654,7 +654,7 @@ export default function RecordDetailPage({
                               return { ...entry, gridRow: currentRow, colSpan: cs, rowSpan: rs };
                             });
                             return (
-                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gap: '1.5rem' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
                                 {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
                                   const value = getRecordValue(layoutField.apiName, fieldDef);
                                   return (

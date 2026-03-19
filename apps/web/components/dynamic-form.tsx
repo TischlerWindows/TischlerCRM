@@ -1818,6 +1818,7 @@ export default function DynamicForm({
           style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${section.columns}, 1fr)`,
+            gridAutoRows: 'minmax(60px, auto)',
             gap: '1rem',
           }}
         >
