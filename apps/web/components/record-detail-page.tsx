@@ -638,21 +638,37 @@ export default function RecordDetailPage({
                             const allFields = section.fields
                               .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
                               .filter((e) => e.fieldDef != null);
-                            const sorted = [...allFields].sort(
-                              (a, b) => a.layoutField.column - b.layoutField.column || a.layoutField.order - b.layoutField.order
-                            );
-                            const colRows: Map<number, number> = new Map();
-                            const placed = sorted.map((entry) => {
-                              const f = entry.layoutField;
-                              const cs = (f as any).colSpan ?? 1;
-                              const rs = (f as any).rowSpan ?? 1;
-                              const currentRow = colRows.get(f.column) ?? 1;
-                              for (let c = f.column; c < Math.min(f.column + cs, section.columns); c++) {
-                                const cr = colRows.get(c) ?? 1;
-                                colRows.set(c, Math.max(cr, currentRow) + rs);
+                            // Grid-cell occupation: spanning fields only push down overlapping fields
+                            const occupied = new Set<string>();
+                            const colGroups: typeof allFields[] = [];
+                            for (let c = 0; c < section.columns; c++) {
+                              colGroups[c] = allFields
+                                .filter(e => e.layoutField.column === c)
+                                .sort((a, b) => a.layoutField.order - b.layoutField.order);
+                            }
+                            const placed: (typeof allFields[0] & { gridRow: number; colSpan: number; rowSpan: number })[] = [];
+                            for (let c = 0; c < section.columns; c++) {
+                              for (const entry of colGroups[c]) {
+                                const f = entry.layoutField;
+                                const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
+                                const rs = (f as any).rowSpan ?? 1;
+                                let row = 1;
+                                search: while (true) {
+                                  for (let dr = 0; dr < rs; dr++) {
+                                    for (let dc = 0; dc < cs; dc++) {
+                                      if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
+                                    }
+                                  }
+                                  break;
+                                }
+                                placed.push({ ...entry, gridRow: row, colSpan: cs, rowSpan: rs });
+                                for (let dr = 0; dr < rs; dr++) {
+                                  for (let dc = 0; dc < cs; dc++) {
+                                    occupied.add(`${row + dr},${f.column + dc}`);
+                                  }
+                                }
                               }
-                              return { ...entry, gridRow: currentRow, colSpan: cs, rowSpan: rs };
-                            });
+                            }
                             return (
                               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
                                 {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {

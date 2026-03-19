@@ -1794,21 +1794,36 @@ export default function DynamicForm({
       );
     }
 
-    // Spanning mode: assign each field a grid row by walking each column's order
-    // Build row assignments per column
-    const colRows: Map<number, number> = new Map(); // current row counter per column
-    const sortedFields = [...gridFields].sort((a, b) => a.column - b.column || a.order - b.order);
-
+    // Spanning mode: place fields using grid-cell occupation so that
+    // spanning fields only push down fields that actually overlap.
+    const occupied = new Set<string>();
     type PlacedField = typeof gridFields[0] & { gridRow: number };
     const placed: PlacedField[] = [];
 
-    for (const f of sortedFields) {
-      const currentRow = colRows.get(f.column) ?? 1;
-      placed.push({ ...f, gridRow: currentRow });
-      // Advance row counter for all columns this field spans
-      for (let c = f.column; c < f.column + f.colSpan; c++) {
-        const cr = colRows.get(c) ?? 1;
-        colRows.set(c, Math.max(cr, currentRow) + f.rowSpan);
+    // Group by column, preserving order within each column
+    const colGroups: (typeof gridFields[0])[][] = [];
+    for (let c = 0; c < section.columns; c++) {
+      colGroups[c] = gridFields.filter(f => f.column === c).sort((a, b) => a.order - b.order);
+    }
+    for (let c = 0; c < section.columns; c++) {
+      for (const f of (colGroups[c] || [])) {
+        const cs = Math.min(f.colSpan, section.columns - f.column);
+        const rs = f.rowSpan;
+        let row = 1; // CSS grid is 1-based
+        search: while (true) {
+          for (let dr = 0; dr < rs; dr++) {
+            for (let dc = 0; dc < cs; dc++) {
+              if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
+            }
+          }
+          break;
+        }
+        placed.push({ ...f, gridRow: row });
+        for (let dr = 0; dr < rs; dr++) {
+          for (let dc = 0; dc < cs; dc++) {
+            occupied.add(`${row + dr},${f.column + dc}`);
+          }
+        }
       }
     }
 

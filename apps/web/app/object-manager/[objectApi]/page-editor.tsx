@@ -1087,16 +1087,31 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       columnArrays[i] = sectionFields.filter((f) => f.column === i);
     }
 
-    // Compute grid-row placement using same algorithm as renderer
-    // so spanning fields push adjacent column fields down
-    const colRowCounters: number[] = new Array(section.columns).fill(0);
+    // Compute grid-row placement using grid-cell occupation so that
+    // spanning fields only push down fields that actually overlap,
+    // not all fields below in the target column.
+    const occupied = new Set<string>(); // "row,col" strings
     const fieldGridRow = new Map<string, number>(); // field.id → 0-based grid row
-    const sorted = [...sectionFields].sort((a, b) => a.column - b.column || a.order - b.order);
-    for (const f of sorted) {
-      const row = colRowCounters[f.column];
-      fieldGridRow.set(f.id, row);
-      for (let c = f.column; c < Math.min(f.column + f.colSpan, section.columns); c++) {
-        colRowCounters[c] = Math.max(colRowCounters[c], row) + f.rowSpan;
+    for (let c = 0; c < section.columns; c++) {
+      for (const f of columnArrays[c]) {
+        const cs = Math.min(f.colSpan, section.columns - f.column);
+        const rs = f.rowSpan;
+        let row = 0;
+        // Find the first row where all cells for this field are free
+        search: while (true) {
+          for (let dr = 0; dr < rs; dr++) {
+            for (let dc = 0; dc < cs; dc++) {
+              if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
+            }
+          }
+          break;
+        }
+        fieldGridRow.set(f.id, row);
+        for (let dr = 0; dr < rs; dr++) {
+          for (let dc = 0; dc < cs; dc++) {
+            occupied.add(`${row + dr},${f.column + dc}`);
+          }
+        }
       }
     }
 
