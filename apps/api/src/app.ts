@@ -63,8 +63,9 @@ function buildInviteUrl(inviteToken: string): string {
 }
 
 export function buildApp() {
-  // H-1: bodyLimit set to 10 KB (was incorrectly 10 MB)
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 });
+  // H-1: bodyLimit — the settings endpoint stores the full OrgSchema as a single
+  // JSON blob which can easily reach several MB with many objects/layouts.
+  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
 
   // H-2: security headers — must be registered before CORS
   app.register(helmet, { contentSecurityPolicy: false });
