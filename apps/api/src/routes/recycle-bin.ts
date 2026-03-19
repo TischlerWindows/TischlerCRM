@@ -3,7 +3,7 @@ import { prisma } from '@crm/db/client';
 import { z } from 'zod';
 import { logAudit, extractIp } from '../audit';
 
-const uuidParam = z.object({ id: z.string().uuid() });
+const idParam = z.object({ id: z.string().min(1) });
 
 export async function recycleBinRoutes(app: FastifyInstance) {
   app.get('/admin/recycle-bin', async (req, reply) => {
@@ -37,7 +37,7 @@ export async function recycleBinRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/recycle-bin/users/:id/restore', async (req, reply) => {
-    const parsed = uuidParam.safeParse(req.params);
+    const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid user ID' });
 
     const user = await prisma.user.findUnique({ where: { id: parsed.data.id } });
@@ -64,7 +64,7 @@ export async function recycleBinRoutes(app: FastifyInstance) {
   });
 
   app.post('/admin/recycle-bin/departments/:id/restore', async (req, reply) => {
-    const parsed = uuidParam.safeParse(req.params);
+    const parsed = idParam.safeParse(req.params);
     if (!parsed.success) return reply.code(400).send({ error: 'Invalid department ID' });
 
     const dept = await prisma.department.findUnique({ where: { id: parsed.data.id } });
