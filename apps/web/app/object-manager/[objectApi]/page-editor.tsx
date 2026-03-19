@@ -71,6 +71,8 @@ interface CanvasField {
   sectionId: string;
   column: number;
   order: number;
+  colSpan: number;
+  rowSpan: number;
 }
 
 interface CanvasSection {
@@ -312,6 +314,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           sectionId: targetSectionId,
           column: targetColumn,
           order: maxOrder + 1,
+          colSpan: 1,
+          rowSpan: 1,
         };
         setFields([...fields, newField]);
         markDirty();
@@ -381,6 +385,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         sectionId: targetSectionId,
         column: targetColumn,
         order: insertOrder,
+        colSpan: 1,
+        rowSpan: 1,
       };
       
       setFields([...fields, newField]);
@@ -567,6 +573,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                   apiName: f.fieldApiName,
                   column: f.column,
                   order: f.order,
+                  colSpan: f.colSpan > 1 ? f.colSpan : undefined,
+                  rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
                 };
                 if (!fieldDef) return base;
                 const { apiName, ...rest } = fieldDef;
@@ -745,6 +753,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             sectionId,
             column: field.column,
             order: field.order,
+            colSpan: (field as any).colSpan ?? 1,
+            rowSpan: (field as any).rowSpan ?? 1,
           });
         });
       });
@@ -873,6 +883,11 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                 {fieldDef.required && <span className="text-red-500">*</span>}
               </div>
               <div className="text-xs text-gray-500">{fieldDef.type}</div>
+              {(field.colSpan > 1 || field.rowSpan > 1) && (
+                <div className="text-xs text-blue-600 font-medium">
+                  span {field.colSpan}×{field.rowSpan}
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1064,6 +1079,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             sectionId,
             column: field.column,
             order: field.order,
+            colSpan: (field as any).colSpan ?? 1,
+            rowSpan: (field as any).rowSpan ?? 1,
           });
         });
       });
@@ -1555,6 +1572,45 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                             <span className="text-xs text-gray-500">Required:</span>
                             <div className="font-medium">
                               {fieldDef.required ? 'Yes' : 'No'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Span Controls */}
+                        <div className="space-y-3 mb-4 pb-4 border-b">
+                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Span</div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">Columns</Label>
+                              <select
+                                value={field!.colSpan}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setFields(fields.map(f => f.id === field!.id ? { ...f, colSpan: val } : f));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                              >
+                                {Array.from({ length: sections.find(s => s.id === field!.sectionId)?.columns || 1 }, (_, i) => (
+                                  <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">Rows</Label>
+                              <select
+                                value={field!.rowSpan}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  setFields(fields.map(f => f.id === field!.id ? { ...f, rowSpan: val } : f));
+                                  setHasUnsavedChanges(true);
+                                }}
+                                className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                              >
+                                {[1, 2, 3, 4, 5, 6].map(n => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                              </select>
                             </div>
                           </div>
                         </div>

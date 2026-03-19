@@ -7,6 +7,8 @@ const layoutFieldSchema = z.object({
   fieldApiName: z.string(),
   column: z.number(),
   order: z.number(),
+  colSpan: z.number().min(1).max(3).optional(),
+  rowSpan: z.number().min(1).max(6).optional(),
 });
 
 const layoutSectionSchema = z.object({
@@ -161,6 +163,8 @@ export async function layoutRoutes(app: FastifyInstance) {
                       fieldId: fieldDef.id,
                       column: field.column,
                       order: field.order,
+                      colSpan: field.colSpan ?? 1,
+                      rowSpan: field.rowSpan ?? 1,
                     };
                   }),
                 },
@@ -272,6 +276,8 @@ export async function layoutRoutes(app: FastifyInstance) {
                         fieldId: fieldDef.id,
                         column: field.column,
                         order: field.order,
+                        colSpan: field.colSpan ?? 1,
+                        rowSpan: field.rowSpan ?? 1,
                       };
                     }),
                   },

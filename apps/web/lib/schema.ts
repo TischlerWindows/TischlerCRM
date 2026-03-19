@@ -173,6 +173,8 @@ export type PageField = {
   apiName: string;
   column: number;
   order: number;
+  colSpan?: number;
+  rowSpan?: number;
 } & Partial<Omit<FieldDef, 'apiName'>>;
 
 export interface PageTab {

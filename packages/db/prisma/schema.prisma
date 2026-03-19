@@ -333,8 +333,10 @@ model LayoutField {
   field   CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   fieldId String
 
-  column Int @default(0)
-  order  Int @default(0)
+  column  Int @default(0)
+  order   Int @default(0)
+  colSpan Int @default(1)
+  rowSpan Int @default(1)
 
   @@index([sectionId])
   @@index([fieldId])

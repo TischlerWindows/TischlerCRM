@@ -1742,28 +1742,93 @@ export default function DynamicForm({
 
   // Helper to render a single section's content (shared between wizard and normal modes)
   const renderSectionContent = (section: typeof currentTab.sections[0]) => {
-    const columnArrays: FieldDef[][] = [];
-    for (let i = 0; i < section.columns; i++) {
-      columnArrays[i] = section.fields
-        .filter((f) => f.column === i)
-        .sort((a, b) => a.order - b.order)
-        .map((f) => getFieldDef(f.apiName, f))
-        .filter((f): f is FieldDef => f !== undefined);
+    // Build flat list of fields with their grid placement
+    const gridFields: { fieldDef: FieldDef; column: number; order: number; colSpan: number; rowSpan: number }[] = [];
+    for (const f of section.fields) {
+      const fd = getFieldDef(f.apiName, f);
+      if (fd) {
+        gridFields.push({
+          fieldDef: fd,
+          column: f.column,
+          order: f.order,
+          colSpan: (f as any).colSpan ?? 1,
+          rowSpan: (f as any).rowSpan ?? 1,
+        });
+      }
+    }
+
+    // Check if any field uses spanning
+    const hasSpanning = gridFields.some(f => f.colSpan > 1 || f.rowSpan > 1);
+
+    if (!hasSpanning) {
+      // Original column-based rendering (no spanning — keeps existing behavior)
+      const columnArrays: FieldDef[][] = [];
+      for (let i = 0; i < section.columns; i++) {
+        columnArrays[i] = gridFields
+          .filter((f) => f.column === i)
+          .sort((a, b) => a.order - b.order)
+          .map((f) => f.fieldDef);
+      }
+
+      return (
+        <div className="p-4 pt-0">
+          <div
+            className={cn(
+              'grid gap-4',
+              section.columns === 1 && 'grid-cols-1',
+              section.columns === 2 && 'grid-cols-1 md:grid-cols-2',
+              section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+            )}
+          >
+            {columnArrays.map((columnFields, colIndex) => (
+              <div key={`col-${colIndex}`} className="flex flex-col gap-4">
+                {columnFields.map((fieldDef) => renderField(fieldDef))}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Spanning mode: assign each field a grid row by walking each column's order
+    // Build row assignments per column
+    const colRows: Map<number, number> = new Map(); // current row counter per column
+    const sortedFields = [...gridFields].sort((a, b) => a.column - b.column || a.order - b.order);
+
+    type PlacedField = typeof gridFields[0] & { gridRow: number };
+    const placed: PlacedField[] = [];
+
+    for (const f of sortedFields) {
+      const currentRow = colRows.get(f.column) ?? 1;
+      placed.push({ ...f, gridRow: currentRow });
+      // Advance row counter for all columns this field spans
+      for (let c = f.column; c < f.column + f.colSpan; c++) {
+        const cr = colRows.get(c) ?? 1;
+        colRows.set(c, Math.max(cr, currentRow) + f.rowSpan);
+      }
     }
 
     return (
       <div className="p-4 pt-0">
         <div
-          className={cn(
-            'grid gap-4',
-            section.columns === 1 && 'grid-cols-1',
-            section.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-            section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-          )}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${section.columns}, 1fr)`,
+            gap: '1rem',
+          }}
         >
-          {columnArrays.map((columnFields, colIndex) => (
-            <div key={`col-${colIndex}`} className="flex flex-col gap-4">
-              {columnFields.map((fieldDef) => renderField(fieldDef))}
+          {placed.map((f) => (
+            <div
+              key={f.fieldDef.apiName}
+              style={{
+                gridColumn: `${f.column + 1} / span ${Math.min(f.colSpan, section.columns - f.column)}`,
+                gridRow: `${f.gridRow} / span ${f.rowSpan}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div className="w-full">{renderField(f.fieldDef)}</div>
             </div>
           ))}
         </div>
