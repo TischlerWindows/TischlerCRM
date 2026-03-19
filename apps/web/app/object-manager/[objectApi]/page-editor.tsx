@@ -1009,11 +1009,13 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     columnIndex,
     columnFields,
     sectionColumns,
+    fieldSpacers,
   }: {
     sectionId: string;
     columnIndex: number;
     columnFields: CanvasField[];
     sectionColumns: number;
+    fieldSpacers: number[];
   }) => {
     const { setNodeRef, isOver } = useDroppable({
       id: `${sectionId}-col-${columnIndex}`,
@@ -1034,14 +1036,18 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       >
         <SortableContext items={columnFields.map(f => f.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-4">
-            {columnFields.map((field) => {
+            {columnFields.map((field, idx) => {
               const fieldDef = getFieldDef(field.fieldApiName);
               if (!fieldDef) return null;
               const spanWidth = field.colSpan > 1 && sectionColumns > 1
                 ? `calc(${field.colSpan * 100}% + ${(field.colSpan - 1) * 16}px)` // 16px = gap-4
                 : undefined;
+              const spacerPx = fieldSpacers[idx] || 0;
               return (
-                <div key={field.id} style={spanWidth ? { width: spanWidth, position: 'relative', zIndex: 2 } : undefined}>
+                <div key={field.id} style={{
+                  ...(spanWidth ? { width: spanWidth, position: 'relative' as const, zIndex: 2 } : {}),
+                  ...(spacerPx > 0 ? { marginTop: spacerPx } : {}),
+                }}>
                   <SortableFieldInSection field={field} fieldDef={fieldDef} sectionColumns={sectionColumns} />
                 </div>
               );
@@ -1057,6 +1063,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     );
   };
 
+  // Approximate height of a single field card + gap (p-3 borders + content ≈ 60px, gap = 16px)
+  const EDITOR_ROW_HEIGHT = 76;
+
   const DroppableSection = ({
     section,
   }: {
@@ -1070,6 +1079,33 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     const columnArrays: CanvasField[][] = [];
     for (let i = 0; i < section.columns; i++) {
       columnArrays[i] = sectionFields.filter((f) => f.column === i);
+    }
+
+    // Compute grid-row placement using same algorithm as renderer
+    // so spanning fields push adjacent column fields down
+    const colRowCounters: number[] = new Array(section.columns).fill(0);
+    const fieldGridRow = new Map<string, number>(); // field.id → 0-based grid row
+    const sorted = [...sectionFields].sort((a, b) => a.column - b.column || a.order - b.order);
+    for (const f of sorted) {
+      const row = colRowCounters[f.column];
+      fieldGridRow.set(f.id, row);
+      for (let c = f.column; c < Math.min(f.column + f.colSpan, section.columns); c++) {
+        colRowCounters[c] = Math.max(colRowCounters[c], row) + f.rowSpan;
+      }
+    }
+
+    // For each column, compute spacer pixels before each field
+    const allColumnSpacers: number[][] = [];
+    for (let c = 0; c < section.columns; c++) {
+      const spacers: number[] = [];
+      let naturalRow = 0;
+      for (const f of columnArrays[c]) {
+        const gridRow = fieldGridRow.get(f.id) ?? naturalRow;
+        const gap = gridRow - naturalRow;
+        spacers.push(gap > 0 ? gap * EDITOR_ROW_HEIGHT : 0);
+        naturalRow = gridRow + f.rowSpan;
+      }
+      allColumnSpacers.push(spacers);
     }
 
     return (
@@ -1088,6 +1124,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               columnIndex={columnIndex}
               columnFields={columnFields}
               sectionColumns={section.columns}
+              fieldSpacers={allColumnSpacers[columnIndex] || []}
             />
           ))}
         </div>
