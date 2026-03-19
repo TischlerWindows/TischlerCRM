@@ -1041,7 +1041,10 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               const spanWidth = field.colSpan > 1 && sectionColumns > 1
                 ? `calc(${field.colSpan * 100}% + ${(field.colSpan - 1) * 16}px)` // 16px = gap-4
                 : undefined;
-              const spacerPx = fieldSpacers[idx] || 0;
+              const rawSpacer = fieldSpacers[idx] || 0;
+              // space-y-4 adds 16px between siblings; inline marginTop replaces it.
+              // Add the 16px back for non-first fields so rows stay aligned.
+              const spacerPx = rawSpacer > 0 && idx > 0 ? rawSpacer + 16 : rawSpacer;
               // rowSpan > 1: field must occupy the full height of the spanned rows
               // Each row = EDITOR_ROW_HEIGHT (76px = 60px card + 16px gap).
               // Total height = N rows minus the trailing gap: N*76 - 16
