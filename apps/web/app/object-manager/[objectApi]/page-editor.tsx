@@ -132,6 +132,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [showPicklistDependencyEditor, setShowPicklistDependencyEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [resizingField, setResizingField] = useState<{ id: string; dir: 'col' | 'row' | 'both'; startX: number; startY: number; startColSpan: number; startRowSpan: number; sectionCols: number } | null>(null);
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
   const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -148,6 +149,43 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
   // Get all objects for filtering
   const allObjects = schema?.objects || [];
+
+  // Mouse-drag resize handler for field spanning
+  useEffect(() => {
+    if (!resizingField) return;
+    const COL_WIDTH = 200; // approximate px per grid column
+    const ROW_HEIGHT = 60; // approximate px per grid row
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - resizingField.startX;
+      const dy = e.clientY - resizingField.startY;
+      let newColSpan = resizingField.startColSpan;
+      let newRowSpan = resizingField.startRowSpan;
+
+      if (resizingField.dir === 'col' || resizingField.dir === 'both') {
+        newColSpan = Math.max(1, Math.min(resizingField.sectionCols, resizingField.startColSpan + Math.round(dx / COL_WIDTH)));
+      }
+      if (resizingField.dir === 'row' || resizingField.dir === 'both') {
+        newRowSpan = Math.max(1, Math.min(6, resizingField.startRowSpan + Math.round(dy / ROW_HEIGHT)));
+      }
+
+      setFields(prev => prev.map(f =>
+        f.id === resizingField.id ? { ...f, colSpan: newColSpan, rowSpan: newRowSpan } : f
+      ));
+    };
+
+    const handleMouseUp = () => {
+      setResizingField(null);
+      setHasUnsavedChanges(true);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingField]);
   
   useEffect(() => {
     if (objectApiName !== 'Home') return;
@@ -805,7 +843,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     );
   };
 
-  const SortableFieldInSection = ({ field, fieldDef }: { field: CanvasField; fieldDef: FieldDef }) => {
+  const SortableFieldInSection = ({ field, fieldDef, sectionColumns }: { field: CanvasField; fieldDef: FieldDef; sectionColumns: number }) => {
     const {
       attributes,
       listeners,
@@ -841,10 +879,11 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [isOver]);
 
-    const style = {
+    const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
       opacity: isDragging ? 0.5 : 1,
+      ...(field.rowSpan > 1 ? { minHeight: `${field.rowSpan * 60 + (field.rowSpan - 1) * 16}px` } : {}),
     };
 
     return (
@@ -927,6 +966,40 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             </button>
           </div>
         </div>
+        {/* Right-edge resize handle (colSpan) */}
+        {sectionColumns > 1 && (
+          <div
+            className="absolute top-0 right-0 w-2 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-r transition-opacity"
+            title="Drag to stretch columns"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setResizingField({ id: field.id, dir: 'col', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+            }}
+          />
+        )}
+        {/* Bottom-edge resize handle (rowSpan) */}
+        <div
+          className="absolute bottom-0 left-0 h-2 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-b transition-opacity"
+          title="Drag to stretch rows"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setResizingField({ id: field.id, dir: 'row', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+          }}
+        />
+        {/* Corner resize handle (both) */}
+        {sectionColumns > 1 && (
+          <div
+            className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-blue-500 rounded-br transition-opacity z-10"
+            title="Drag to stretch both"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setResizingField({ id: field.id, dir: 'both', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+            }}
+          />
+        )}
       </div>
     );
   };
@@ -935,10 +1008,12 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     sectionId,
     columnIndex,
     columnFields,
+    sectionColumns,
   }: {
     sectionId: string;
     columnIndex: number;
     columnFields: CanvasField[];
+    sectionColumns: number;
   }) => {
     const { setNodeRef, isOver } = useDroppable({
       id: `${sectionId}-col-${columnIndex}`,
@@ -955,14 +1030,20 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             ? 'bg-green-100 border-2 border-green-400 border-dashed' 
             : 'bg-gray-50 border-2 border-transparent'
         }`}
+        style={{ overflow: 'visible' }}
       >
         <SortableContext items={columnFields.map(f => f.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-4">
             {columnFields.map((field) => {
               const fieldDef = getFieldDef(field.fieldApiName);
               if (!fieldDef) return null;
+              const spanWidth = field.colSpan > 1 && sectionColumns > 1
+                ? `calc(${field.colSpan * 100}% + ${(field.colSpan - 1) * 16}px)` // 16px = gap-4
+                : undefined;
               return (
-                <SortableFieldInSection key={field.id} field={field} fieldDef={fieldDef} />
+                <div key={field.id} style={spanWidth ? { width: spanWidth, position: 'relative', zIndex: 2 } : undefined}>
+                  <SortableFieldInSection field={field} fieldDef={fieldDef} sectionColumns={sectionColumns} />
+                </div>
               );
             })}
             {columnFields.length === 0 && (
@@ -1006,6 +1087,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               sectionId={section.id}
               columnIndex={columnIndex}
               columnFields={columnFields}
+              sectionColumns={section.columns}
             />
           ))}
         </div>
@@ -1576,44 +1658,25 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                           </div>
                         </div>
 
-                        {/* Span Controls */}
-                        <div className="space-y-3 mb-4 pb-4 border-b">
-                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Span</div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">Columns</Label>
-                              <select
-                                value={field!.colSpan}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setFields(fields.map(f => f.id === field!.id ? { ...f, colSpan: val } : f));
-                                  setHasUnsavedChanges(true);
-                                }}
-                                className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
-                              >
-                                {Array.from({ length: sections.find(s => s.id === field!.sectionId)?.columns || 1 }, (_, i) => (
-                                  <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">Rows</Label>
-                              <select
-                                value={field!.rowSpan}
-                                onChange={(e) => {
-                                  const val = Number(e.target.value);
-                                  setFields(fields.map(f => f.id === field!.id ? { ...f, rowSpan: val } : f));
-                                  setHasUnsavedChanges(true);
-                                }}
-                                className="w-full mt-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
-                              >
-                                {[1, 2, 3, 4, 5, 6].map(n => (
-                                  <option key={n} value={n}>{n}</option>
-                                ))}
-                              </select>
-                            </div>
+                        {/* Span info — drag edges of the field card to resize */}
+                        {(field!.colSpan > 1 || field!.rowSpan > 1) && (
+                          <div className="mb-4 pb-4 border-b">
+                            <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-1">Span</div>
+                            <div className="text-sm">{field!.colSpan} col × {field!.rowSpan} row</div>
+                            <div className="text-xs text-gray-400 mt-1">Drag field edges to resize</div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-2 text-xs h-7"
+                              onClick={() => {
+                                setFields(fields.map(f => f.id === field!.id ? { ...f, colSpan: 1, rowSpan: 1 } : f));
+                                setHasUnsavedChanges(true);
+                              }}
+                            >
+                              Reset to 1×1
+                            </Button>
                           </div>
-                        </div>
+                        )}
 
                         {/* Visibility Rules Section */}
                         <div className="space-y-2">
