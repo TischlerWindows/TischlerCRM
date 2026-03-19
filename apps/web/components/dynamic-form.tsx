@@ -960,7 +960,7 @@ export default function DynamicForm({
     setCollapsedSections(newCollapsed);
   };
 
-  const renderField = (fieldDef: FieldDef) => {
+  const renderField = (fieldDef: FieldDef, stretch?: boolean) => {
     // Check if field should be visible based on visibility rules
     const isVisible = evaluateVisibility(fieldDef.visibleIf, formData, visibilityCtx);
     if (!isVisible) {
@@ -1718,7 +1718,7 @@ export default function DynamicForm({
     }
 
     return (
-      <div key={fieldDef.apiName} className="flex flex-col space-y-1">
+      <div key={fieldDef.apiName} className={cn("flex flex-col space-y-1", stretch && "flex-1")}>
         {fieldDef.type !== ('Checkbox' as FieldType) && (
           <Label htmlFor={fieldDef.apiName} className="flex items-center gap-2">
             <Icon className="h-4 w-4 text-gray-400" />
@@ -1728,7 +1728,11 @@ export default function DynamicForm({
             </span>
           </Label>
         )}
-        {inputElement}
+        {stretch ? (
+          <div className="flex-1 flex flex-col [&>*]:flex-1 [&>select]:h-auto [&>textarea]:h-auto [&>input]:h-auto [&>div]:flex-1">
+            {inputElement}
+          </div>
+        ) : inputElement}
         {error && <span className="text-xs text-red-500">{error}</span>}
         {!error && fieldDef.helpText && (
           <span className="text-xs text-gray-500">{fieldDef.helpText}</span>
@@ -1824,11 +1828,12 @@ export default function DynamicForm({
                 gridColumn: `${f.column + 1} / span ${Math.min(f.colSpan, section.columns - f.column)}`,
                 gridRow: `${f.gridRow} / span ${f.rowSpan}`,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                flexDirection: 'column',
               }}
             >
-              <div className="w-full">{renderField(f.fieldDef)}</div>
+              <div className="w-full" style={f.rowSpan > 1 ? { flex: 1, display: 'flex', flexDirection: 'column' } : undefined}>
+                {renderField(f.fieldDef, f.rowSpan > 1)}
+              </div>
             </div>
           ))}
         </div>

@@ -663,13 +663,15 @@ export default function RecordDetailPage({
                                       style={{
                                         gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
                                         gridRow: `${gridRow} / span ${rowSpan}`,
+                                        display: 'flex',
+                                        flexDirection: 'column',
                                       }}
                                     >
                                       <dt className="text-sm font-medium text-gray-700">
                                         {fieldDef.label}
                                         {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
                                       </dt>
-                                      <dd className="mt-1 text-sm text-gray-900">
+                                      <dd className="mt-1 text-sm text-gray-900" style={rowSpan > 1 ? { flex: 1 } : undefined}>
                                         {renderValue(layoutField.apiName, value, fieldDef)}
                                       </dd>
                                     </div>
