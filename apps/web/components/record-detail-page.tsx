@@ -579,6 +579,11 @@ export default function RecordDetailPage({
                       .filter((entry) => entry.fieldDef != null);
                   }
 
+                  // Check if any field uses spanning
+                  const hasSpanning = section.fields.some(
+                    (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
+                  );
+
                   // Determine if every field in this section is empty
                   const allFieldsEmpty = columnArrays.every((col) =>
                     col.every(({ layoutField, fieldDef }) => {
@@ -628,6 +633,51 @@ export default function RecordDetailPage({
 
                       {!isCollapsed && (
                         <div className="p-6">
+                          {hasSpanning ? (() => {
+                            // Spanning mode: CSS grid with explicit row/col placement
+                            const allFields = section.fields
+                              .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+                              .filter((e) => e.fieldDef != null);
+                            const sorted = [...allFields].sort(
+                              (a, b) => a.layoutField.column - b.layoutField.column || a.layoutField.order - b.layoutField.order
+                            );
+                            const colRows: Map<number, number> = new Map();
+                            const placed = sorted.map((entry) => {
+                              const f = entry.layoutField;
+                              const cs = (f as any).colSpan ?? 1;
+                              const rs = (f as any).rowSpan ?? 1;
+                              const currentRow = colRows.get(f.column) ?? 1;
+                              for (let c = f.column; c < Math.min(f.column + cs, section.columns); c++) {
+                                const cr = colRows.get(c) ?? 1;
+                                colRows.set(c, Math.max(cr, currentRow) + rs);
+                              }
+                              return { ...entry, gridRow: currentRow, colSpan: cs, rowSpan: rs };
+                            });
+                            return (
+                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gap: '1.5rem' }}>
+                                {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
+                                  const value = getRecordValue(layoutField.apiName, fieldDef);
+                                  return (
+                                    <div
+                                      key={layoutField.apiName}
+                                      style={{
+                                        gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
+                                        gridRow: `${gridRow} / span ${rowSpan}`,
+                                      }}
+                                    >
+                                      <dt className="text-sm font-medium text-gray-700">
+                                        {fieldDef.label}
+                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                      </dt>
+                                      <dd className="mt-1 text-sm text-gray-900">
+                                        {renderValue(layoutField.apiName, value, fieldDef)}
+                                      </dd>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })() : (
                           <div
                             className={`grid gap-6 ${
                               section.columns === 1
@@ -658,6 +708,7 @@ export default function RecordDetailPage({
                               </div>
                             ))}
                           </div>
+                          )}
                         </div>
                       )}
                     </div>
