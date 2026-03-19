@@ -142,9 +142,15 @@ class ApiClient {
     const url = `${this.baseUrl}${endpoint}`;
     
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
       ...options.headers,
     };
+
+    // Only set Content-Type for requests that carry a body;
+    // sending it on bodiless DELETE/GET causes Fastify to try
+    // to parse the empty body as JSON → 400 Bad Request.
+    if (options.body) {
+      (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    }
 
     if (this.token) {
       (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
