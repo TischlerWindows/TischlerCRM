@@ -9,6 +9,16 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from '@/lib/utils';
 import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
+import { evaluateVisibility } from '@/lib/field-visibility';
+import {
+  getFormattingEffectsForField,
+  getFormattingEffectsForSection,
+} from '@/lib/layout-formatting';
+import {
+  badgePillClass,
+  fieldHighlightWrapperClass,
+  labelPresentationClassName,
+} from '@/lib/layout-presentation';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
@@ -146,7 +156,8 @@ export default function RecordDetailPage({
 
     // Self-contained path: use enriched layout field data directly
     if (layoutField && layoutField.type && layoutField.label) {
-      const { column, order, ...fieldProps } = layoutField;
+      const { column, order, presentation: _pres, colSpan: _cs, rowSpan: _rs, ...fieldProps } =
+        layoutField;
       const def = {
         id: fieldProps.id || apiName,
         ...fieldProps,
@@ -513,6 +524,8 @@ export default function RecordDetailPage({
   const title = getRecordTitle();
   const subtitle = getRecordSubtitle();
 
+  const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
+
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
@@ -568,6 +581,13 @@ export default function RecordDetailPage({
             {pageLayout.tabs.map((tab, ti) => (
               <div key={ti}>
                 {tab.sections.map((section, si) => {
+                  if (section.showInRecord === false) return null;
+                  if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return null;
+                  const sectionFx = pageLayout
+                    ? getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData)
+                    : null;
+                  if (sectionFx?.hidden) return null;
+
                   // Column-based layout: group fields by column, sorted by
                   // order within each column (same approach as DynamicForm).
                   const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
@@ -576,7 +596,21 @@ export default function RecordDetailPage({
                       .filter((f) => f.column === c)
                       .sort((a, b) => a.order - b.order)
                       .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
-                      .filter((entry) => entry.fieldDef != null);
+                      .filter((entry) => entry.fieldDef != null)
+                      .filter(({ layoutField, fieldDef }) => {
+                        if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
+                          return false;
+                        }
+                        const fFx = pageLayout
+                          ? getFormattingEffectsForField(
+                              pageLayout,
+                              layoutField.apiName,
+                              layoutVisibilityData
+                            )
+                          : null;
+                        if (fFx?.hidden) return false;
+                        return true;
+                      });
                   }
 
                   // Check if any field uses spanning
@@ -592,8 +626,6 @@ export default function RecordDetailPage({
                     })
                   );
 
-                  // Completely hide sections that are admin-hidden or have no data
-                  if (section.showInRecord === false) return null;
                   if (allFieldsEmpty) return null;
 
                   const sectionKey = `${ti}-${si}`;
@@ -623,7 +655,14 @@ export default function RecordDetailPage({
                         onClick={toggleSection}
                         className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
                       >
-                        <h3 className="font-medium text-gray-900">{section.label}</h3>
+                        <div className="text-left">
+                          <h3 className="font-medium text-gray-900">{section.label}</h3>
+                          {section.description ? (
+                            <p className="text-xs text-gray-500 mt-0.5 font-normal">
+                              {section.description}
+                            </p>
+                          ) : null}
+                        </div>
                         {isCollapsed ? (
                           <ChevronRight className="h-4 w-4 text-gray-500" />
                         ) : (
@@ -637,7 +676,20 @@ export default function RecordDetailPage({
                             // Spanning mode: CSS grid with explicit row/col placement
                             const allFields = section.fields
                               .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
-                              .filter((e) => e.fieldDef != null);
+                              .filter((e) => e.fieldDef != null)
+                              .filter(({ layoutField, fieldDef }) => {
+                                if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
+                                  return false;
+                                }
+                                const fx = pageLayout
+                                  ? getFormattingEffectsForField(
+                                      pageLayout,
+                                      layoutField.apiName,
+                                      layoutVisibilityData
+                                    )
+                                  : null;
+                                return !fx?.hidden;
+                              });
                             // Grid-cell occupation: spanning fields only push down overlapping fields
                             const occupied = new Set<string>();
                             const colGroups: typeof allFields[] = [];
@@ -673,6 +725,18 @@ export default function RecordDetailPage({
                               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
                                 {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
                                   const value = getRecordValue(layoutField.apiName, fieldDef);
+                                  const fFx = pageLayout
+                                    ? getFormattingEffectsForField(
+                                        pageLayout,
+                                        layoutField.apiName,
+                                        layoutVisibilityData
+                                      )
+                                    : null;
+                                  const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                                  const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                                  const labelCn = labelPresentationClassName(
+                                    layoutField.presentation
+                                  );
                                   return (
                                     <div
                                       key={layoutField.apiName}
@@ -682,13 +746,23 @@ export default function RecordDetailPage({
                                         display: 'flex',
                                         flexDirection: 'column',
                                       }}
+                                      className={hl || undefined}
                                     >
-                                      <dt className="text-sm font-medium text-gray-700">
+                                      <dt className={`text-sm ${labelCn}`}>
                                         {fieldDef.label}
                                         {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                        {fFx?.readOnly ? (
+                                          <span className="ml-2 text-xs font-normal text-gray-400">
+                                            (read-only)
+                                          </span>
+                                        ) : null}
                                       </dt>
-                                      <dd className="mt-1 text-sm text-gray-900" style={rowSpan > 1 ? { flex: 1 } : undefined}>
+                                      <dd
+                                        className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
+                                        style={rowSpan > 1 ? { flex: 1 } : undefined}
+                                      >
                                         {renderValue(layoutField.apiName, value, fieldDef)}
+                                        {badgeC ? <span className={badgeC}>Status</span> : null}
                                       </dd>
                                     </div>
                                   );
@@ -709,16 +783,34 @@ export default function RecordDetailPage({
                               <div key={`col-${colIdx}`} className="flex flex-col gap-4">
                                 {colFields.map(({ layoutField, fieldDef }) => {
                                   const value = getRecordValue(layoutField.apiName, fieldDef);
+                                  const fFx = pageLayout
+                                    ? getFormattingEffectsForField(
+                                        pageLayout,
+                                        layoutField.apiName,
+                                        layoutVisibilityData
+                                      )
+                                    : null;
+                                  const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                                  const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                                  const labelCn = labelPresentationClassName(
+                                    layoutField.presentation
+                                  );
                                   return (
-                                    <div key={layoutField.apiName}>
-                                      <dt className="text-sm font-medium text-gray-700">
+                                    <div key={layoutField.apiName} className={hl || undefined}>
+                                      <dt className={`text-sm ${labelCn}`}>
                                         {fieldDef.label}
                                         {fieldDef.required && (
                                           <span className="text-red-500 ml-1">*</span>
                                         )}
+                                        {fFx?.readOnly ? (
+                                          <span className="ml-2 text-xs font-normal text-gray-400">
+                                            (read-only)
+                                          </span>
+                                        ) : null}
                                       </dt>
-                                      <dd className="mt-1 text-sm text-gray-900">
+                                      <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
                                         {renderValue(layoutField.apiName, value, fieldDef)}
+                                        {badgeC ? <span className={badgeC}>Status</span> : null}
                                       </dd>
                                     </div>
                                   );

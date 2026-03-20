@@ -1,28 +1,94 @@
 import { FastifyInstance } from 'fastify';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 
+const conditionOpSchema = z.enum([
+  '==',
+  '!=',
+  '>',
+  '<',
+  '>=',
+  '<=',
+  'IN',
+  'INCLUDES',
+  'CONTAINS',
+  'STARTS_WITH',
+]);
+
+const conditionExprSchema = z.object({
+  left: z.string(),
+  op: conditionOpSchema,
+  right: z.any(),
+});
+
+const formattingRuleTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('field'), fieldApiName: z.string() }),
+  z.object({ kind: z.literal('section'), sectionId: z.string() }),
+]);
+
+const formattingRuleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  active: z.boolean(),
+  order: z.number(),
+  when: z.array(conditionExprSchema),
+  target: formattingRuleTargetSchema,
+  effects: z.object({
+    hidden: z.boolean().optional(),
+    readOnly: z.boolean().optional(),
+    badge: z.enum(['success', 'warning', 'destructive']).optional(),
+    highlightToken: z
+      .enum(['none', 'subtle', 'attention', 'positive', 'critical'])
+      .optional(),
+  }),
+});
+
+const fieldPresentationSchema = z
+  .object({
+    labelBold: z.boolean().optional(),
+    labelColorToken: z
+      .enum(['default', 'brand', 'muted', 'danger', 'success'])
+      .optional(),
+  })
+  .strict();
+
 const layoutFieldSchema = z.object({
+  id: z.string().optional(),
   fieldApiName: z.string(),
   column: z.number(),
   order: z.number(),
   colSpan: z.number().min(1).max(3).optional(),
   rowSpan: z.number().min(1).max(6).optional(),
+  presentation: fieldPresentationSchema.optional(),
 });
 
 const layoutSectionSchema = z.object({
+  id: z.string().optional(),
   label: z.string(),
   columns: z.number().min(1).max(3),
   order: z.number(),
+  showInRecord: z.boolean().optional(),
+  showInTemplate: z.boolean().optional(),
+  visibleIf: z.array(conditionExprSchema).optional(),
+  description: z.string().max(500).optional().nullable(),
   fields: z.array(layoutFieldSchema),
 });
 
 const layoutTabSchema = z.object({
+  id: z.string().optional(),
   label: z.string(),
   order: z.number(),
   sections: z.array(layoutSectionSchema),
 });
+
+const extensionsObjectSchema = z
+  .object({
+    formattingRules: z.array(formattingRuleSchema).optional(),
+    version: z.number().optional(),
+  })
+  .passthrough();
 
 const createLayoutSchema = z.object({
   objectApiName: z.string(),
@@ -30,9 +96,26 @@ const createLayoutSchema = z.object({
   layoutType: z.string(),
   isDefault: z.boolean().optional(),
   tabs: z.array(layoutTabSchema),
+  extensions: extensionsObjectSchema.optional(),
+  formattingRules: z.array(formattingRuleSchema).optional(),
 });
 
 const updateLayoutSchema = createLayoutSchema.omit({ objectApiName: true }).partial();
+
+function buildExtensionsJson(
+  extensions?: z.infer<typeof extensionsObjectSchema>,
+  formattingRules?: z.infer<typeof formattingRuleSchema>[]
+): Prisma.InputJsonValue | undefined {
+  const base =
+    extensions && typeof extensions === 'object'
+      ? ({ ...extensions } as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+  if (formattingRules && formattingRules.length > 0) {
+    base.formattingRules = formattingRules;
+  }
+  if (Object.keys(base).length === 0) return undefined;
+  return base as Prisma.InputJsonValue;
+}
 
 export async function layoutRoutes(app: FastifyInstance) {
   // Get all layouts for an object
@@ -129,11 +212,15 @@ export async function layoutRoutes(app: FastifyInstance) {
         for (const field of section.fields) {
           const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
           if (!fieldDef) {
-            return reply.code(400).send({ error: `Field "${field.fieldApiName}" not found on object "${apiName}"` });
+            return reply
+              .code(400)
+              .send({ error: `Field "${field.fieldApiName}" not found on object "${apiName}"` });
           }
         }
       }
     }
+
+    const extensionsJson = buildExtensionsJson(parsed.data.extensions, parsed.data.formattingRules);
 
     const layout = await prisma.pageLayout.create({
       data: {
@@ -144,27 +231,37 @@ export async function layoutRoutes(app: FastifyInstance) {
         isDefault: parsed.data.isDefault ?? false,
         createdById: userId,
         modifiedById: userId,
+        ...(extensionsJson !== undefined ? { extensions: extensionsJson } : {}),
         tabs: {
           create: parsed.data.tabs.map((tab) => ({
-            id: generateId('LayoutTab'),
+            id: tab.id ?? generateId('LayoutTab'),
             label: tab.label,
             order: tab.order,
             sections: {
               create: tab.sections.map((section) => ({
-                id: generateId('LayoutSection'),
+                id: section.id ?? generateId('LayoutSection'),
                 label: section.label,
                 columns: section.columns,
                 order: section.order,
+                showInRecord: section.showInRecord ?? true,
+                showInTemplate: section.showInTemplate ?? true,
+                ...(section.visibleIf && section.visibleIf.length > 0
+                  ? { visibleIf: section.visibleIf as Prisma.InputJsonValue }
+                  : {}),
+                description: section.description ?? null,
                 fields: {
                   create: section.fields.map((field) => {
                     const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName)!;
                     return {
-                      id: generateId('LayoutField'),
+                      id: field.id ?? generateId('LayoutField'),
                       fieldId: fieldDef.id,
                       column: field.column,
                       order: field.order,
                       colSpan: field.colSpan ?? 1,
                       rowSpan: field.rowSpan ?? 1,
+                      ...(field.presentation && Object.keys(field.presentation).length > 0
+                        ? { presentation: field.presentation as Prisma.InputJsonValue }
+                        : {}),
                     };
                   }),
                 },
@@ -235,49 +332,67 @@ export async function layoutRoutes(app: FastifyInstance) {
           for (const field of section.fields) {
             const fieldDef = existingLayout.object.fields.find((f) => f.apiName === field.fieldApiName);
             if (!fieldDef) {
-              return reply.code(400).send({ error: `Field "${field.fieldApiName}" not found on this object` });
+              return reply
+                .code(400)
+                .send({ error: `Field "${field.fieldApiName}" not found on this object` });
             }
           }
         }
       }
     }
 
-    // Delete existing tabs (cascade will delete sections and fields)
-    await prisma.layoutTab.deleteMany({
-      where: { layoutId },
-    });
+    if (parsed.data.tabs) {
+      await prisma.layoutTab.deleteMany({
+        where: { layoutId },
+      });
+    }
+
+    const extensionsJson =
+      parsed.data.extensions !== undefined || parsed.data.formattingRules !== undefined
+        ? buildExtensionsJson(parsed.data.extensions, parsed.data.formattingRules)
+        : undefined;
 
     const layout = await prisma.pageLayout.update({
       where: { id: layoutId },
       data: {
-        name: parsed.data.name,
-        layoutType: parsed.data.layoutType,
-        isDefault: parsed.data.isDefault,
+        ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+        ...(parsed.data.layoutType !== undefined ? { layoutType: parsed.data.layoutType } : {}),
+        ...(parsed.data.isDefault !== undefined ? { isDefault: parsed.data.isDefault } : {}),
         modifiedById: userId,
+        ...(extensionsJson !== undefined ? { extensions: extensionsJson } : {}),
         ...(parsed.data.tabs && {
           tabs: {
             create: parsed.data.tabs.map((tab) => ({
-              id: generateId('LayoutTab'),
+              id: tab.id ?? generateId('LayoutTab'),
               label: tab.label,
               order: tab.order,
               sections: {
                 create: tab.sections.map((section) => ({
-                  id: generateId('LayoutSection'),
+                  id: section.id ?? generateId('LayoutSection'),
                   label: section.label,
                   columns: section.columns,
                   order: section.order,
+                  showInRecord: section.showInRecord ?? true,
+                  showInTemplate: section.showInTemplate ?? true,
+                  ...(section.visibleIf && section.visibleIf.length > 0
+                    ? { visibleIf: section.visibleIf as Prisma.InputJsonValue }
+                    : {}),
+                  description: section.description ?? null,
                   fields: {
                     create: section.fields.map((field) => {
                       const fieldDef = existingLayout.object.fields.find(
                         (f) => f.apiName === field.fieldApiName
                       )!;
                       return {
-                        id: generateId('LayoutField'),
+                        id: field.id ?? generateId('LayoutField'),
                         fieldId: fieldDef.id,
                         column: field.column,
                         order: field.order,
                         colSpan: field.colSpan ?? 1,
                         rowSpan: field.rowSpan ?? 1,
+                        ...(field.presentation && Object.keys(field.presentation).length > 0
+                          ? { presentation: field.presentation as Prisma.InputJsonValue }
+                          : {}),
                       };
                     }),
                   },

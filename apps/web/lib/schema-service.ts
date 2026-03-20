@@ -646,6 +646,7 @@ class LocalStorageSchemaService implements SchemaService {
               return {
                 ...rest,
                 ...pf,
+                presentation: pf.presentation,
                 type: normalizeFieldType(fieldDef.type),
                 lookupObject: fieldDef.lookupObject,
                 relationshipName: fieldDef.relationshipName,

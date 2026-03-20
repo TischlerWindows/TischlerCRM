@@ -134,18 +134,43 @@ export interface RecordType {
   pageLayoutId?: string;
 }
 
+/** Allowlisted label colors — mapped to Tailwind in `layout-presentation.ts` */
+export type LabelColorToken = 'default' | 'brand' | 'muted' | 'danger' | 'success';
+
+/** Layout-scoped field label styling (not stored on FieldDef) */
+export interface PageFieldPresentation {
+  labelBold?: boolean;
+  labelColorToken?: LabelColorToken;
+}
+
+export type FormattingRuleTarget =
+  | { kind: 'field'; fieldApiName: string }
+  | { kind: 'section'; sectionId: string };
+
+export type FieldHighlightToken = 'none' | 'subtle' | 'attention' | 'positive' | 'critical';
+
+/** Layout-level conditional formatting (first matching active rule wins — see spec) */
 export interface FormattingRule {
   id: string;
   name: string;
   active: boolean;
-  when: string; // boolean expr using field apiNames
+  /** Lower values run first */
+  order: number;
+  when: ConditionExpr[];
+  target: FormattingRuleTarget;
   effects: {
     hidden?: boolean;
     readOnly?: boolean;
-    badge?: "success" | "warning" | "destructive";
-    className?: string;
-    icon?: string;
+    badge?: 'success' | 'warning' | 'destructive';
+    highlightToken?: FieldHighlightToken;
   };
+}
+
+/** Persisted JSON on `PageLayout` (database); mirrors top-level `formattingRules` when synced */
+export interface PageLayoutExtensions {
+  formattingRules?: FormattingRule[];
+  version?: number;
+  [key: string]: unknown;
 }
 
 export interface PageSection {
@@ -154,6 +179,8 @@ export interface PageSection {
   columns: 1 | 2 | 3;
   order: number;
   fields: PageField[];
+  /** Shown under the section title in form/detail when supported */
+  description?: string;
   visibleIf?: ConditionExpr[];
   /** When false, the section is completely hidden on the record detail view */
   showInRecord?: boolean;
@@ -175,6 +202,7 @@ export type PageField = {
   order: number;
   colSpan?: number;
   rowSpan?: number;
+  presentation?: PageFieldPresentation;
 } & Partial<Omit<FieldDef, 'apiName'>>;
 
 export interface PageTab {
@@ -190,6 +218,8 @@ export interface PageLayout {
   layoutType: 'create' | 'edit'; // New Record vs Existing Record
   tabs: PageTab[];
   formattingRules?: FormattingRule[];
+  /** Optional DB mirror / forward-compatible bag */
+  extensions?: PageLayoutExtensions;
 }
 
 export interface ObjectDef {

@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
   pointerWithin,
   KeyboardSensor,
   PointerSensor,
@@ -17,7 +16,6 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -25,13 +23,39 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useSchemaStore } from '@/lib/schema-store';
-import { FieldDef, PageLayout, PageTab, PageSection, FieldType, ConditionExpr, PicklistDependencyRule } from '@/lib/schema';
+import {
+  FieldDef,
+  PageLayout,
+  FieldType,
+  PicklistDependencyRule,
+  FormattingRule,
+  LabelColorToken,
+} from '@/lib/schema';
 import { getSetting } from '@/lib/preferences';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { labelPresentationClassName } from '@/lib/layout-presentation';
 import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
 import { PicklistDependencyEditor } from '@/components/picklist-dependency-editor';
+import { LayoutListView } from './page-editor/layout-list-view';
+import { LayoutPreviewDialog } from './page-editor/layout-preview-dialog';
+import { FormattingRulesDialog } from './page-editor/formatting-rules-dialog';
+import { buildPageLayoutFromCanvas } from './page-editor/build-page-layout';
+import type {
+  CanvasField,
+  CanvasSection,
+  CanvasTab,
+  ColumnCount,
+  DraggedField,
+} from './page-editor/types';
 import {
   Plus,
   Trash2,
@@ -53,44 +77,6 @@ import {
 
 interface PageEditorProps {
   objectApiName: string;
-}
-
-type ColumnCount = 1 | 2 | 3;
-
-interface DraggedField {
-  id: string;
-  label: string;
-  apiName: string;
-  type: FieldType;
-  required: boolean;
-}
-
-interface CanvasField {
-  id: string;
-  fieldApiName: string;
-  sectionId: string;
-  column: number;
-  order: number;
-  colSpan: number;
-  rowSpan: number;
-}
-
-interface CanvasSection {
-  id: string;
-  label: string;
-  tabId: string;
-  columns: ColumnCount;
-  order: number;
-  collapsed: boolean;
-  visibleIf?: ConditionExpr[];
-  showInRecord: boolean;
-  showInTemplate: boolean;
-}
-
-interface CanvasTab {
-  id: string;
-  label: string;
-  order: number;
 }
 
 export default function PageEditor({ objectApiName }: PageEditorProps) {
@@ -135,6 +121,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [resizingField, setResizingField] = useState<{ id: string; dir: 'col' | 'row' | 'both'; startX: number; startY: number; startColSpan: number; startRowSpan: number; sectionCols: number } | null>(null);
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
   const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
+  const [formattingRules, setFormattingRules] = useState<FormattingRule[]>([]);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
+  const [showFormattingRulesDialog, setShowFormattingRulesDialog] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -586,44 +575,15 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       return;
     }
 
-    // Convert canvas state to PageLayout
-    const pageLayout: PageLayout = {
-      id: editingLayoutId || `layout-${Date.now()}`,
-      name: layoutName,
-      layoutType: 'edit',
-      tabs: tabs.map((tab) => ({
-        id: tab.id,
-        label: tab.label,
-        order: tab.order,
-        sections: sections
-          .filter((s) => s.tabId === tab.id)
-          .map((section) => ({
-            id: section.id,
-            label: section.label,
-            columns: section.columns,
-            order: section.order,
-            fields: fields
-              .filter((f) => f.sectionId === section.id)
-              .map((f) => {
-                // Embed full FieldDef so layouts are self-contained
-                const fieldDef = object.fields.find((fd) => fd.apiName === f.fieldApiName);
-                const base = {
-                  apiName: f.fieldApiName,
-                  column: f.column,
-                  order: f.order,
-                  colSpan: f.colSpan > 1 ? f.colSpan : undefined,
-                  rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
-                };
-                if (!fieldDef) return base;
-                const { apiName, ...rest } = fieldDef;
-                return { ...rest, ...base };
-              }),
-            visibleIf: section.visibleIf,
-            showInRecord: section.showInRecord,
-            showInTemplate: section.showInTemplate,
-          })),
-      })),
-    };
+    const pageLayout: PageLayout = buildPageLayoutFromCanvas({
+      editingLayoutId,
+      layoutName,
+      tabs,
+      sections,
+      fields,
+      objectFields: object.fields,
+      formattingRules,
+    });
 
     // Update object with new page layout
     const existingLayouts = object.pageLayouts || [];
@@ -731,81 +691,6 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     }
   };
 
-  const loadLayout = (layoutId: string) => {
-    if (!object) return;
-
-    const layout = object.pageLayouts?.find((l) => l.id === layoutId);
-
-    if (!layout) {
-      // Reset to default
-      setTabs([{ id: 'tab-1', label: 'General Information', order: 0 }]);
-      setSections([
-        {
-          id: 'section-1',
-          label: 'Basic Details',
-          tabId: 'tab-1',
-          columns: 2,
-          order: 0,
-          collapsed: false,
-          showInRecord: true,
-          showInTemplate: true,
-        },
-      ]);
-      setFields([]);
-      setActiveTab('tab-1');
-      return;
-    }
-
-    // Convert PageLayout to canvas state
-    const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
-      id: `tab-${idx + 1}`,
-      label: tab.label,
-      order: tab.order,
-    }));
-
-    const newSections: CanvasSection[] = [];
-    const newFields: CanvasField[] = [];
-    let sectionCounter = 1;
-    let fieldCounter = 1;
-
-    layout.tabs.forEach((tab, tabIdx) => {
-      const tabId = `tab-${tabIdx + 1}`;
-      tab.sections.forEach((section) => {
-        const sectionId = `section-${sectionCounter++}`;
-        newSections.push({
-          id: sectionId,
-          label: section.label,
-          tabId,
-          columns: section.columns,
-          order: section.order,
-          collapsed: false,
-          visibleIf: section.visibleIf,
-          showInRecord: section.showInRecord !== false,
-          showInTemplate: section.showInTemplate !== false,
-        });
-
-        section.fields.forEach((field) => {
-          newFields.push({
-            id: `field-${fieldCounter++}`,
-            fieldApiName: field.apiName,
-            sectionId,
-            column: field.column,
-            order: field.order,
-            colSpan: (field as any).colSpan ?? 1,
-            rowSpan: (field as any).rowSpan ?? 1,
-          });
-        });
-      });
-    });
-
-    setTabs(newTabs);
-    setSections(newSections);
-    setFields(newFields);
-    setActiveTab(newTabs[0]?.id || 'tab-1');
-  };
-
-
-
   const getFieldDef = (apiName: string): FieldDef | undefined => {
     return allFields.find((f) => f.apiName === apiName);
   };
@@ -843,7 +728,15 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     );
   };
 
-  const SortableFieldInSection = ({ field, fieldDef, sectionColumns }: { field: CanvasField; fieldDef: FieldDef; sectionColumns: number }) => {
+  const SortableFieldInSection = ({
+    field,
+    fieldDef,
+    sectionColumns,
+  }: {
+    field: CanvasField;
+    fieldDef: FieldDef;
+    sectionColumns: number;
+  }) => {
     const {
       attributes,
       listeners,
@@ -916,7 +809,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               <GripVertical className="w-4 h-4 text-gray-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium flex items-center gap-1">
+              <div
+                className={`text-sm flex items-center gap-1 ${labelPresentationClassName(field.presentation)}`}
+              >
                 {fieldDef.label}
                 {fieldDef.required && <span className="text-red-500">*</span>}
               </div>
@@ -1160,9 +1055,26 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     .filter((s) => s.tabId === activeTab)
     .sort((a, b) => a.order - b.order);
 
+  const previewPageLayout = useMemo(
+    () =>
+      object
+        ? buildPageLayoutFromCanvas({
+            editingLayoutId,
+            layoutName,
+            tabs,
+            sections,
+            fields,
+            objectFields: object.fields,
+            formattingRules,
+          })
+        : null,
+    [editingLayoutId, layoutName, tabs, sections, fields, object, formattingRules]
+  );
+
   const createNewLayout = () => {
     setEditingLayoutId(null);
     setLayoutName('Page Layout');
+    setFormattingRules([]);
     setTabs([{ id: 'tab-1', label: 'General Information', order: 0 }]);
     setSections([
       {
@@ -1172,6 +1084,8 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         columns: 2,
         order: 0,
         collapsed: false,
+        showInRecord: true,
+        showInTemplate: true,
       },
     ]);
     setFields([]);
@@ -1186,6 +1100,11 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
     setEditingLayoutId(layoutId);
     setLayoutName(layout.name || 'Page Layout');
+    setFormattingRules(
+      layout.formattingRules?.length
+        ? layout.formattingRules
+        : ((layout.extensions?.formattingRules as FormattingRule[] | undefined) ?? [])
+    );
 
     // Convert PageLayout to canvas state
     const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
@@ -1210,6 +1129,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
           columns: section.columns,
           order: section.order,
           collapsed: false,
+          description: section.description,
           visibleIf: section.visibleIf,
           showInRecord: section.showInRecord !== false,
           showInTemplate: section.showInTemplate !== false,
@@ -1224,6 +1144,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             order: field.order,
             colSpan: (field as any).colSpan ?? 1,
             rowSpan: (field as any).rowSpan ?? 1,
+            presentation: field.presentation,
           });
         });
       });
@@ -1254,86 +1175,14 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
 
   if (viewMode === 'list') {
     const existingLayouts = object?.pageLayouts || [];
-    
     return (
-      <div className="p-6">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2">Page Layouts</h2>
-          <p className="text-gray-600">
-            Manage page layouts for {object?.label}. Page layouts control which fields appear on
-            forms and their arrangement.
-          </p>
-        </div>
-
-        <div className="mb-6">
-          <Button onClick={createNewLayout} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create New Layout
-          </Button>
-        </div>
-
-        {existingLayouts.length === 0 ? (
-          <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-            <Layout className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Page Layouts</h3>
-            <p className="text-gray-600 mb-4">
-              Create your first page layout to define how forms appear for this object.
-            </p>
-            <Button onClick={createNewLayout} variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Layout
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {existingLayouts.map((layout) => (
-              <div
-                key={layout.id}
-                className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h3 className="font-semibold text-lg">{layout.name}</h3>
-                  </div>
-                </div>
-
-                <div className="text-sm text-gray-600 mb-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Layout className="h-4 w-4" />
-                    <span>{layout.tabs.length} tab{layout.tabs.length !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Grid2x2 className="h-4 w-4" />
-                    <span>
-                      {layout.tabs.reduce((sum, tab) => sum + tab.sections.length, 0)} section
-                      {layout.tabs.reduce((sum, tab) => sum + tab.sections.length, 0) !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => editExistingLayout(layout.id)}
-                    className="flex-1"
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteLayout(layout.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <LayoutListView
+        objectLabel={object?.label}
+        layouts={existingLayouts}
+        onCreate={createNewLayout}
+        onEdit={editExistingLayout}
+        onDelete={deleteLayout}
+      />
     );
   }
 
@@ -1372,7 +1221,20 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setShowFormattingRulesDialog(true)}
+            >
+              Rules ({formattingRules.length})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setShowPreviewDialog(true)}
+            >
               <Eye className="h-4 w-4 mr-2" />
               Preview
             </Button>
@@ -1593,7 +1455,22 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                       })}
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div>
+                    <Label>Description (optional)</Label>
+                    <Input
+                      value={sections.find((s) => s.id === selectedElement.id)?.description ?? ''}
+                      placeholder="Shown under the section title in forms"
+                      onChange={(e) => {
+                        setSections((prev) =>
+                          prev.map((s) =>
+                            s.id === selectedElement.id
+                              ? { ...s, description: e.target.value }
+                              : s
+                          )
+                        );
+                        markDirty();
+                      }}
+                    />
                   </div>
                   <div className="flex items-center gap-2 pt-2">
                     <input
@@ -1739,6 +1616,71 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
                           </div>
                         )}
 
+                        <div className="space-y-3 mb-4 pb-4 border-b">
+                          <div className="text-xs text-gray-500 font-semibold uppercase tracking-wide">
+                            Label appearance
+                          </div>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-gray-300"
+                              checked={!!field!.presentation?.labelBold}
+                              onChange={(e) => {
+                                const checked = e.target.checked;
+                                setFields(
+                                  fields.map((f) =>
+                                    f.id === field!.id
+                                      ? {
+                                          ...f,
+                                          presentation: {
+                                            ...f.presentation,
+                                            labelBold: checked || undefined,
+                                          },
+                                        }
+                                      : f
+                                  )
+                                );
+                                markDirty();
+                              }}
+                            />
+                            Bold label
+                          </label>
+                          <div>
+                            <Label>Label color</Label>
+                            <Select
+                              value={field!.presentation?.labelColorToken ?? 'default'}
+                              onValueChange={(v) => {
+                                const token = v as LabelColorToken;
+                                setFields(
+                                  fields.map((f) =>
+                                    f.id === field!.id
+                                      ? {
+                                          ...f,
+                                          presentation: {
+                                            ...f.presentation,
+                                            labelColorToken: token === 'default' ? undefined : token,
+                                          },
+                                        }
+                                      : f
+                                  )
+                                );
+                                markDirty();
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="default">Default</SelectItem>
+                                <SelectItem value="brand">Brand</SelectItem>
+                                <SelectItem value="muted">Muted</SelectItem>
+                                <SelectItem value="danger">Danger</SelectItem>
+                                <SelectItem value="success">Success</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
                         {/* Visibility Rules Section */}
                         <div className="space-y-2">
                           <Button
@@ -1817,7 +1759,12 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
               <Save className="h-4 w-4 mr-2" />
               Save Layout
             </Button>
-            <Button variant="outline" className="w-full">
+            <Button
+              variant="outline"
+              className="w-full"
+              type="button"
+              onClick={() => setShowPreviewDialog(true)}
+            >
               <Eye className="h-4 w-4 mr-2" />
               Preview Form
             </Button>
@@ -1835,6 +1782,26 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
         </div>
         </div>
       </div>
+
+      <LayoutPreviewDialog
+        open={showPreviewDialog}
+        onOpenChange={setShowPreviewDialog}
+        pageLayout={previewPageLayout}
+        allFields={allFields}
+        objectLabel={object.label}
+      />
+
+      <FormattingRulesDialog
+        open={showFormattingRulesDialog}
+        onOpenChange={setShowFormattingRulesDialog}
+        rules={formattingRules}
+        onApply={(next) => {
+          setFormattingRules(next);
+          markDirty();
+        }}
+        sections={sections.map((s) => ({ id: s.id, label: s.label }))}
+        objectFields={object.fields}
+      />
 
       {/* Unsaved Changes Dialog */}
       {showUnsavedDialog && (

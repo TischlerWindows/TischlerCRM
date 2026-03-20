@@ -284,6 +284,9 @@ model PageLayout {
   isDefault  Boolean @default(false)
   isActive   Boolean @default(true)
 
+  /// Layout-level JSON: formattingRules, version, forward-compatible keys
+  extensions Json?
+
   createdBy    User     @relation("CreatedLayouts", fields: [createdById], references: [id])
   createdById  String
   modifiedBy   User     @relation("ModifiedLayouts", fields: [modifiedById], references: [id])
@@ -320,6 +323,11 @@ model LayoutSection {
   columns Int    @default(2)
   order   Int    @default(0)
 
+  showInRecord   Boolean @default(true)
+  showInTemplate Boolean @default(true)
+  visibleIf      Json?
+  description    String?
+
   fields LayoutField[]
 
   @@index([tabId])
@@ -337,6 +345,9 @@ model LayoutField {
   order   Int @default(0)
   colSpan Int @default(1)
   rowSpan Int @default(1)
+
+  /// { labelBold?, labelColorToken? } — see PageFieldPresentation
+  presentation Json?
 
   @@index([sectionId])
   @@index([fieldId])
