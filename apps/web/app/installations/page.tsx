@@ -238,6 +238,9 @@ export default function InstallationsPage() {
       const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = installationObject?.fields?.find(f => f.apiName === `Installation__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

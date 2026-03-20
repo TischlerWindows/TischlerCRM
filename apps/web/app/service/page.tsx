@@ -376,6 +376,9 @@ export default function ServicePage() {
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

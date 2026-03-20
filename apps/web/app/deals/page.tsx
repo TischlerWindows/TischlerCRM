@@ -405,6 +405,9 @@ export default function DealsPage() {
       return `${value}%`;
     }
     
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

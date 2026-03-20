@@ -450,6 +450,9 @@ export default function PropertiesPage() {
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = propertyObject?.fields?.find(f => f.apiName === `Property__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

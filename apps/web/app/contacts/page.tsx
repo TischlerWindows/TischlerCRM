@@ -343,6 +343,9 @@ export default function ContactsPage() {
       }
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = contactObject?.fields?.find(f => f.apiName === `Contact__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

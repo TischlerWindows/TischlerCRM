@@ -201,6 +201,7 @@ export async function placesRoutes(app: FastifyInstance) {
       reply
         .header('Content-Type', res.headers.get('content-type') || 'image/png')
         .header('Cache-Control', 'public, max-age=86400')
+        .header('Cross-Origin-Resource-Policy', 'cross-origin')
         .send(buffer);
     } catch (err: any) {
       app.log.error(err, 'Static Maps proxy failed');

@@ -414,6 +414,9 @@ export default function LeadsPage() {
       return `$${value.toLocaleString()}`;
     }
     
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = leadObject?.fields?.find(f => f.apiName === `Lead__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 

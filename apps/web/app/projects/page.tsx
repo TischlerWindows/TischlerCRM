@@ -312,6 +312,9 @@ export default function ProjectsPage() {
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     if (columnId === 'budget') return `$${Number(value).toLocaleString()}`;
+    // Route remaining values through formatFieldValue for field-type-aware display
+    const schemaFieldFinal = projectObject?.fields?.find(f => f.apiName === `Project__${columnId}` || f.apiName === columnId);
+    if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 
