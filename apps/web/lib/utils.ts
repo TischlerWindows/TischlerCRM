@@ -418,6 +418,12 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
     return value.filter(Boolean).join(', ') || '-';
   }
 
+  // Multi-select values stored as semicolon-separated strings → display with commas
+  if (typeof value === 'string' && value.includes(';') &&
+      (fieldType === 'MultiPicklist' || fieldType === 'MultiSelectPicklist')) {
+    return value.split(';').map(s => s.trim()).filter(Boolean).join(', ') || '-';
+  }
+
   // Handle primitives
   return String(value);
 }
