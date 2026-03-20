@@ -373,7 +373,9 @@ export async function recordRoutes(app: FastifyInstance) {
           select: { data: true },
         });
         let maxNum = 0;
-        const prefixRegex = new RegExp(`^${prefix}-?(\\d+)$`);
+        const prefixRegex = field.apiName === 'propertyNumber'
+          ? /^[A-Za-z]+-?(\d+)$/   // property numbers: global sequence across all prefixes
+          : new RegExp(`^${prefix}-?(\\d+)$`);
         for (const rec of existing) {
           const recData = rec.data as Record<string, any> | null;
           if (!recData) continue;
@@ -383,7 +385,8 @@ export async function recordRoutes(app: FastifyInstance) {
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        normalizedData[field.apiName] = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+        const padWidth = field.apiName === 'propertyNumber' ? 4 : 3;
+        normalizedData[field.apiName] = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
       }
     }
 

@@ -522,25 +522,26 @@ export function getPropertyPrefix(address: {
 
 /**
  * Generate the next property number for a given prefix by scanning
- * existing property numbers.
+ * existing property numbers. The numeric sequence is global across
+ * ALL prefixes so every property gets a unique number.
  *
  * @param prefix  The prefix (e.g. "NY", "GBR")
- * @param existingNumbers  Array of all current propertyNumber strings
- * @returns e.g. "NY-003"
+ * @param existingNumbers  Array of ALL current propertyNumber strings (all prefixes)
+ * @returns e.g. "NY0002"
  */
 export function generatePropertyNumber(
   prefix: string,
   existingNumbers: string[],
 ): string {
-  // Find all numbers that share this prefix
-  const regex = new RegExp(`^${prefix}-?(\\d+)$`, 'i');
+  // Extract the numeric portion from ALL existing property numbers regardless of prefix
+  const globalRegex = /^[A-Za-z]+-?(\d+)$/;
   const nums = existingNumbers
     .map((n) => {
-      const m = n.match(regex);
+      const m = n.match(globalRegex);
       return m ? parseInt(m[1]!, 10) : NaN;
     })
     .filter((n) => !isNaN(n));
 
   const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-  return `${prefix}${String(next).padStart(3, '0')}`;
+  return `${prefix}${String(next).padStart(4, '0')}`;
 }
