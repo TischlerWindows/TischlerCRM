@@ -386,13 +386,13 @@ export default function QuotesPage() {
       // Generate unique quote number
       const existingNumbers = quotes
         .map(q => q.quoteNumber)
-        .filter(num => num.startsWith('QTE-'))
-        .map(num => parseInt(num.replace('QTE-', ''), 10))
+        .filter(num => num.startsWith('QTE'))
+        .map(num => parseInt(num.replace(/^QTE-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const quoteNumber = `QTE-${String(nextNumber).padStart(3, '0')}`;
+      const quoteNumber = `QTE${String(nextNumber).padStart(3, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const validUntil = new Date();

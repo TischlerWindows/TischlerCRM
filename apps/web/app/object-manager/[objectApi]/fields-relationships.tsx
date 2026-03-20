@@ -416,24 +416,37 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleEditField(field)}
-                        className="text-brand-navy hover:text-brand-dark mr-4"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteField(field.apiName)}
-                        disabled={!field.custom}
-                        className={`${
-                          field.custom
-                            ? 'text-red-600 hover:text-red-900 cursor-pointer'
-                            : 'text-gray-300 cursor-not-allowed'
-                        }`}
-                        title={field.custom ? 'Delete field' : 'System fields cannot be deleted'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {(() => {
+                        const AUTO_NUMBER_FIELDS = new Set([
+                          'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+                          'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
+                          'serviceNumber', 'installationNumber',
+                        ]);
+                        const stripped = field.apiName.replace(/^\w+__/, '');
+                        const isAutoNumber = AUTO_NUMBER_FIELDS.has(stripped) || field.type === 'AutoNumber';
+                        const canEdit = !isAutoNumber;
+                        const canDelete = field.custom && !isAutoNumber;
+                        return (
+                          <>
+                            <button
+                              onClick={() => canEdit && handleEditField(field)}
+                              disabled={!canEdit}
+                              className={canEdit ? 'text-brand-navy hover:text-brand-dark mr-4' : 'text-gray-300 cursor-not-allowed mr-4'}
+                              title={!canEdit ? 'Auto-number fields cannot be edited' : undefined}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => canDelete && handleDeleteField(field.apiName)}
+                              disabled={!canDelete}
+                              className={canDelete ? 'text-red-600 hover:text-red-900 cursor-pointer' : 'text-gray-300 cursor-not-allowed'}
+                              title={isAutoNumber ? 'Auto-number fields cannot be deleted' : (field.custom ? 'Delete field' : 'System fields cannot be deleted')}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

@@ -373,16 +373,17 @@ export async function recordRoutes(app: FastifyInstance) {
           select: { data: true },
         });
         let maxNum = 0;
+        const prefixRegex = new RegExp(`^${prefix}-?(\\d+)$`);
         for (const rec of existing) {
           const recData = rec.data as Record<string, any> | null;
           if (!recData) continue;
           const val = recData[field.apiName];
-          if (typeof val === 'string' && val.startsWith(`${prefix}-`)) {
-            const num = parseInt(val.replace(`${prefix}-`, ''), 10);
-            if (!isNaN(num) && num > maxNum) maxNum = num;
+          if (typeof val === 'string') {
+            const m = val.match(prefixRegex);
+            if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        normalizedData[field.apiName] = `${prefix}-${String(maxNum + 1).padStart(3, '0')}`;
+        normalizedData[field.apiName] = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
       }
     }
 
@@ -498,9 +499,21 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
+    // Strip auto-number fields — these are system-generated and must not be overwritten.
+    const AUTO_NUMBER_FIELDS = new Set([
+      'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+      'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
+      'serviceNumber', 'installationNumber',
+    ]);
+    const sanitizedUpdate = { ...updateData };
+    for (const key of Object.keys(sanitizedUpdate)) {
+      const stripped = key.replace(/^\w+__/, '');
+      if (AUTO_NUMBER_FIELDS.has(stripped)) delete sanitizedUpdate[key];
+    }
+
     const mergedData = {
       ...(existingRecord.data as Record<string, any>),
-      ...updateData,
+      ...sanitizedUpdate,
     };
 
     const record = await prisma.record.update({

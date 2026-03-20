@@ -533,7 +533,7 @@ export function generatePropertyNumber(
   existingNumbers: string[],
 ): string {
   // Find all numbers that share this prefix
-  const regex = new RegExp(`^${prefix}-(\\d+)$`, 'i');
+  const regex = new RegExp(`^${prefix}-?(\\d+)$`, 'i');
   const nums = existingNumbers
     .map((n) => {
       const m = n.match(regex);
@@ -542,5 +542,5 @@ export function generatePropertyNumber(
     .filter((n) => !isNaN(n));
 
   const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
-  return `${prefix}-${String(next).padStart(3, '0')}`;
+  return `${prefix}${String(next).padStart(3, '0')}`;
 }

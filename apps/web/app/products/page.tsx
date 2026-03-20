@@ -450,13 +450,13 @@ export default function ProductsPage() {
       
       const existingNumbers = products
         .map(p => p.productCode)
-        .filter(code => code.startsWith('PROD-'))
-        .map(code => parseInt(code.replace('PROD-', ''), 10))
+        .filter(code => code.startsWith('PROD'))
+        .map(code => parseInt(code.replace(/^PROD-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const productCode = `PROD-${String(nextNumber).padStart(3, '0')}`;
+      const productCode = `PROD${String(nextNumber).padStart(3, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'System';

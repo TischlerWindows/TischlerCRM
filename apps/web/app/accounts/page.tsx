@@ -451,12 +451,12 @@ export default function AccountsPage() {
     
     const existingNumbers = accounts
       .map(a => a.accountNumber)
-      .filter(num => num.startsWith('A-'))
-      .map(num => parseInt(num.replace('A-', ''), 10))
+      .filter(num => num.startsWith('A'))
+      .map(num => parseInt(num.replace(/^A-?/, ''), 10))
       .filter(num => !isNaN(num));
     
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const accountNumber = `A-${String(maxNumber + 1).padStart(3, '0')}`;
+    const accountNumber = `A${String(maxNumber + 1).padStart(3, '0')}`;
     
     const recordData = {
       ...normalizedData,

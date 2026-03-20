@@ -437,13 +437,13 @@ export default function LeadsPage() {
       // Generate unique lead number
       const existingNumbers = leads
         .map(l => l.leadNumber)
-        .filter(num => num.startsWith('LEAD-'))
-        .map(num => parseInt(num.replace('LEAD-', ''), 10))
+        .filter(num => num.startsWith('LEAD'))
+        .map(num => parseInt(num.replace(/^LEAD-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const leadNumber = `LEAD-${String(nextNumber).padStart(3, '0')}`;
+      const leadNumber = `LEAD${String(nextNumber).padStart(3, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';

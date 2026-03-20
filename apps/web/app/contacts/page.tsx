@@ -475,9 +475,9 @@ export default function ContactsPage() {
   }, [contacts, searchTerm, sidebarFilter, filterConditions, sortColumn, sortDirection]);
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
-    const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C-')).map(num => parseInt(num.replace('C-', ''), 10)).filter(num => !isNaN(num));
+    const existingNumbers = contacts.map(c => c.contactNumber).filter(num => num?.startsWith('C')).map(num => parseInt(num.replace(/^C-?/, ''), 10)).filter(num => !isNaN(num));
     const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
-    const contactNumber = `C-${String(maxNumber + 1).padStart(3, '0')}`;
+    const contactNumber = `C${String(maxNumber + 1).padStart(3, '0')}`;
 
     // Normalize: strip object prefix from keys
     const normalizedData: Record<string, any> = {};

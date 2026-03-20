@@ -428,13 +428,13 @@ export default function DealsPage() {
       // Generate unique deal number
       const existingNumbers = deals
         .map(d => d.dealNumber)
-        .filter(num => num.startsWith('DEAL-'))
-        .map(num => parseInt(num.replace('DEAL-', ''), 10))
+        .filter(num => num.startsWith('DEAL'))
+        .map(num => parseInt(num.replace(/^DEAL-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const dealNumber = `DEAL-${String(nextNumber).padStart(3, '0')}`;
+      const dealNumber = `DEAL${String(nextNumber).padStart(3, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';

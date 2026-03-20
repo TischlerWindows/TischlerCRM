@@ -399,13 +399,13 @@ export default function ServicePage() {
       // Generate unique service number
       const existingNumbers = services
         .map(s => s.serviceNumber)
-        .filter(num => num.startsWith('SRV-'))
-        .map(num => parseInt(num.replace('SRV-', ''), 10))
+        .filter(num => num.startsWith('SRV'))
+        .map(num => parseInt(num.replace(/^SRV-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const serviceNumber = `SRV-${String(nextNumber).padStart(3, '0')}`;
+      const serviceNumber = `SRV${String(nextNumber).padStart(3, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
