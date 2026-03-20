@@ -1300,10 +1300,24 @@ export default function DynamicForm({
         );
         break;
 
-      case 'LocationSearch':
+      case 'LocationSearch': {
+        // Build display value from saved target fields if the field's own value is empty
+        let locationValue = value as string | undefined;
+        if (!locationValue && fieldDef.targetFields) {
+          const tf = fieldDef.targetFields;
+          const parts = [
+            formData[tf.street ?? ''],
+            formData[tf.city ?? ''],
+            formData[tf.state ?? ''],
+            formData[tf.postalCode ?? ''],
+            formData[tf.country ?? ''],
+          ].filter(Boolean);
+          if (parts.length > 0) locationValue = parts.join(', ');
+        }
         inputElement = (
           <AddressAutocomplete
             disabled={isReadOnly}
+            value={locationValue || ''}
             onAddressSelected={(addr) => {
               const targets = fieldDef.targetFields || {};
               if (targets.street) handleFieldChange(targets.street, addr.street);
@@ -1313,10 +1327,13 @@ export default function DynamicForm({
               if (targets.country) handleFieldChange(targets.country, addr.country);
               if (targets.lat) handleFieldChange(targets.lat, String(addr.lat));
               if (targets.lng) handleFieldChange(targets.lng, String(addr.lng));
+              // Persist the formatted address in the field's own value
+              handleFieldChange(fieldDef.apiName, addr.formattedAddress);
             }}
           />
         );
         break;
+      }
 
       case 'Geolocation':
         const geoValue = value || {};

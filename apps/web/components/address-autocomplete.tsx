@@ -29,14 +29,23 @@ interface AddressAutocompleteProps {
   onAddressSelected: (address: ParsedAddress) => void;
   disabled?: boolean;
   placeholder?: string;
+  value?: string;
 }
 
 export default function AddressAutocomplete({
   onAddressSelected,
   disabled = false,
   placeholder = 'Search for an address...',
+  value,
 }: AddressAutocompleteProps) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(value ?? '');
+
+  // Sync external value into the input when it changes (e.g. on record load)
+  useEffect(() => {
+    if (value !== undefined && value !== query) {
+      setQuery(value);
+    }
+  }, [value]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
