@@ -1,296 +1,73 @@
 ﻿'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Users, Building2, Lightbulb, Target, Briefcase, X } from 'lucide-react';
+import { Search, Database, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { recordsService } from '@/lib/records-service';
+import { apiClient, type GlobalSearchResult } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 
-interface SearchResult {
-  id: string;
-  type: 'property' | 'account' | 'contact' | 'lead' | 'deal' | 'project';
-  title: string;
-  subtitle: string;
-  url: string;
-  matchedFields: string[];
-}
-
-const typeConfig = {
-  property: {
-    icon: MapPin,
-    label: 'Property',
-    color: 'text-brand-navy',
-    bgColor: 'bg-[#f0f1fa]',
-  },
-  account: {
-    icon: Building2,
-    label: 'Account',
-    color: 'text-brand-navy',
-    bgColor: 'bg-[#f0f1fa]',
-  },
-  contact: {
-    icon: Users,
-    label: 'Contact',
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-  },
-  lead: {
-    icon: Lightbulb,
-    label: 'Lead',
-    color: 'text-yellow-600',
-    bgColor: 'bg-yellow-50',
-  },
-  deal: {
-    icon: Target,
-    label: 'Deal',
-    color: 'text-red-600',
-    bgColor: 'bg-red-50',
-  },
-  project: {
-    icon: Briefcase,
-    label: 'Project',
-    color: 'text-brand-navy',
-    bgColor: 'bg-[#f0f1fa]',
-  },
+// Known dedicated routes — apiName → URL prefix (without trailing slash)
+const DEDICATED_ROUTES: Record<string, string> = {
+  Property: '/properties',
+  Account: '/accounts',
+  Contact: '/contacts',
+  Lead: '/leads',
+  Deal: '/deals',
+  Project: '/projects',
+  Product: '/products',
+  Installation: '/installations',
+  Quote: '/quotes',
+  Service: '/service',
 };
+
+function getRecordUrl(objectApiName: string, recordId: string): string {
+  const prefix = DEDICATED_ROUTES[objectApiName];
+  if (prefix) return `${prefix}/${recordId}`;
+  return `/objects/${objectApiName}/${recordId}`;
+}
 
 export default function UniversalSearch({ inputClassName, iconClassName }: { inputClassName?: string; iconClassName?: string }) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<GlobalSearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const { schema } = useSchemaStore();
 
-  // Map search result types to schema object apiNames
-  const typeToApiName: Record<string, string> = {
-    property: 'Property', account: 'Account', contact: 'Contact',
-    lead: 'Lead', deal: 'Deal', project: 'Project',
-  };
+  // Build dynamic placeholder from search-enabled objects
+  const searchEnabledLabels = (schema?.objects ?? [])
+    .filter(o => o.searchConfig?.enabled)
+    .map(o => (o.pluralLabel || o.label || o.apiName).toLowerCase());
 
-  // Resolve display label from schema (falls back to typeConfig default)
-  const getTypeLabel = (type: string): string => {
-    const apiName = typeToApiName[type];
-    if (apiName && schema) {
-      const obj = schema.objects.find(o => o.apiName === apiName);
-      if (obj) return obj.label;
-    }
-    return typeConfig[type as keyof typeof typeConfig]?.label || type;
-  };
+  const placeholder = searchEnabledLabels.length > 0
+    ? `Search ${searchEnabledLabels.join(', ')}…`
+    : 'Search…';
 
-  // Search across all record types
   const performSearch = async (query: string) => {
     if (!query.trim()) {
       setResults([]);
       return;
     }
-
-    const lowerQuery = query.toLowerCase();
-    const allResults: SearchResult[] = [];
-
-    // Fetch all record types in parallel from API
-    const [rawProperties, rawAccounts, rawContacts, rawLeads, rawDeals, rawProjects] = await Promise.all([
-      recordsService.getRecords('Property'),
-      recordsService.getRecords('Account'),
-      recordsService.getRecords('Contact'),
-      recordsService.getRecords('Lead'),
-      recordsService.getRecords('Deal'),
-      recordsService.getRecords('Project'),
-    ]);
-
-    const properties = rawProperties.map(r => ({ id: r.id, ...r.data }));
-    const accounts = rawAccounts.map(r => ({ id: r.id, ...r.data }));
-    const contacts = rawContacts.map(r => ({ id: r.id, ...r.data }));
-    const leads = rawLeads.map(r => ({ id: r.id, ...r.data }));
-    const deals = rawDeals.map(r => ({ id: r.id, ...r.data }));
-    const projects = rawProjects.map(r => ({ id: r.id, ...r.data }));
-
-    // Search Properties
-    properties.forEach((property: any) => {
-      const matchedFields: string[] = [];
-      const searchableFields = {
-        propertyNumber: property.propertyNumber,
-        address: property.address,
-        city: property.city,
-        state: property.state,
-        zipCode: property.zipCode,
-        status: property.status,
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: property.id,
-          type: 'property',
-          title: property.propertyNumber,
-          subtitle: `${property.address}, ${property.city}, ${property.state}`,
-          url: `/properties/${property.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    // Search Accounts
-    accounts.forEach((account: any) => {
-      const matchedFields: string[] = [];
-      const searchableFields = {
-        name: account.name,
-        domain: account.domain,
-        industry: account.industry,
-        type: account.type,
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: account.id,
-          type: 'account',
-          title: account.name,
-          subtitle: account.domain || account.industry || 'Account',
-          url: `/accounts/${account.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    // Search Contacts
-    contacts.forEach((contact: any) => {
-      const matchedFields: string[] = [];
-      const fullName = `${contact.firstName} ${contact.lastName}`;
-      const searchableFields = {
-        name: fullName,
-        email: contact.email,
-        phone: contact.phone,
-        title: contact.title,
-        company: contact.company,
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: contact.id,
-          type: 'contact',
-          title: fullName,
-          subtitle: contact.email || contact.title || 'Contact',
-          url: `/contacts/${contact.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    // Search Leads
-    leads.forEach((lead: any) => {
-      const matchedFields: string[] = [];
-      const fullName = `${lead.firstName} ${lead.lastName}`;
-      const searchableFields = {
-        name: fullName,
-        email: lead.email,
-        company: lead.company,
-        status: lead.status,
-        source: lead.source,
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: lead.id,
-          type: 'lead',
-          title: fullName,
-          subtitle: lead.company || lead.email || 'Lead',
-          url: `/leads/${lead.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    // Search Deals
-    deals.forEach((deal: any) => {
-      const matchedFields: string[] = [];
-      const searchableFields = {
-        name: deal.name,
-        accountName: deal.accountName,
-        stage: deal.stage,
-        amount: deal.amount?.toString(),
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: deal.id,
-          type: 'deal',
-          title: deal.name,
-          subtitle: `${deal.accountName} - ${deal.stage}`,
-          url: `/deals/${deal.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    // Search Projects
-    projects.forEach((project: any) => {
-      const matchedFields: string[] = [];
-      const searchableFields = {
-        name: project.name,
-        status: project.status,
-        client: project.client,
-        type: project.type,
-      };
-
-      Object.entries(searchableFields).forEach(([field, value]) => {
-        if (value && String(value).toLowerCase().includes(lowerQuery)) {
-          matchedFields.push(field);
-        }
-      });
-
-      if (matchedFields.length > 0) {
-        allResults.push({
-          id: project.id,
-          type: 'project',
-          title: project.name,
-          subtitle: project.client || project.status || 'Project',
-          url: `/projects/${project.id}`,
-          matchedFields,
-        });
-      }
-    });
-
-    setResults(allResults);
+    setIsLoading(true);
+    try {
+      const { results: r } = await apiClient.globalSearch(query);
+      setResults(r);
+    } catch {
+      setResults([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle search with debounce
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       performSearch(searchTerm);
-    }, 200);
-
+    }, 250);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
@@ -301,32 +78,27 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
         setIsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen && searchTerm) {
       setIsOpen(true);
       return;
     }
-
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+        setSelectedIndex(prev => (prev < results.length - 1 ? prev + 1 : prev));
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
         break;
       case 'Enter':
         e.preventDefault();
-        if (results[selectedIndex]) {
-          handleSelect(results[selectedIndex]);
-        }
+        if (results[selectedIndex]) handleSelect(results[selectedIndex]);
         break;
       case 'Escape':
         setIsOpen(false);
@@ -335,8 +107,8 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
     }
   };
 
-  const handleSelect = (result: SearchResult) => {
-    router.push(result.url);
+  const handleSelect = (result: GlobalSearchResult) => {
+    router.push(getRecordUrl(result.objectApiName, result.id));
     setSearchTerm('');
     setResults([]);
     setIsOpen(false);
@@ -350,10 +122,16 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
     inputRef.current?.focus();
   };
 
+  // Group results by object type for display
+  const grouped = results.reduce<Record<string, GlobalSearchResult[]>>((acc, r) => {
+    (acc[r.objectApiName] ??= []).push(r);
+    return acc;
+  }, {});
+
   return (
     <div ref={searchRef} className="relative flex-1 max-w-2xl">
       <div className="relative">
-        <Search className={cn("absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400", iconClassName)} />
+        <Search className={cn('absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400', iconClassName)} />
         <input
           ref={inputRef}
           type="text"
@@ -365,10 +143,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
           }}
           onFocus={() => searchTerm && setIsOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder={`Search ${['Property', 'Account', 'Contact', 'Lead', 'Deal', 'Project'].map(api => {
-            const obj = schema?.objects.find(o => o.apiName === api);
-            return (obj?.pluralLabel || obj?.label || api + 's').toLowerCase();
-          }).join(', ')}...`}
+          placeholder={placeholder}
           className={cn(
             'w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 bg-white dark:bg-gray-800 dark:text-white text-sm',
             inputClassName
@@ -389,67 +164,68 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
       {/* Search Results Dropdown */}
       {isOpen && searchTerm && (
         <div className="absolute top-full mt-2 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-96 overflow-y-auto z-50">
-          {results.length === 0 ? (
+          {isLoading ? (
             <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-              No results found for "{searchTerm}"
+              Searching…
+            </div>
+          ) : results.length === 0 ? (
+            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              No results found for &quot;{searchTerm}&quot;
             </div>
           ) : (
             <div className="py-2">
               <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 {results.length} {results.length === 1 ? 'result' : 'results'}
               </div>
-              {results.map((result, index) => {
-                const config = typeConfig[result.type];
-                const Icon = config.icon;
-                const isSelected = index === selectedIndex;
-
+              {Object.entries(grouped).map(([objectApi, items]) => {
+                const label = items[0]?.objectPluralLabel || objectApi;
                 return (
-                  <button
-                    key={`${result.type}-${result.id}`}
-                    onClick={() => handleSelect(result)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className={cn(
-                      'w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors',
-                      isSelected
-                        ? 'bg-[#f0f1fa] dark:bg-brand-navy-dark/20'
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-                        config.bgColor,
-                        'dark:bg-opacity-20'
-                      )}
-                    >
-                      <Icon className={cn('w-5 h-5', config.color)} />
+                  <div key={objectApi}>
+                    <div className="px-3 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                      {label}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {result.title}
-                        </span>
-                        <span
+                    {items.map((result) => {
+                      const globalIdx = results.indexOf(result);
+                      const isSelected = globalIdx === selectedIndex;
+                      return (
+                        <button
+                          key={`${result.objectApiName}-${result.id}`}
+                          onClick={() => handleSelect(result)}
+                          onMouseEnter={() => setSelectedIndex(globalIdx)}
                           className={cn(
-                            'text-xs px-2 py-0.5 rounded-full',
-                            config.bgColor,
-                            config.color,
-                            'dark:bg-opacity-20'
+                            'w-full flex items-start gap-3 px-3 py-2.5 text-left transition-colors',
+                            isSelected
+                              ? 'bg-[#f0f1fa] dark:bg-brand-navy-dark/20'
+                              : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                           )}
                         >
-                          {getTypeLabel(result.type)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                        {result.subtitle}
-                      </p>
-                      {result.matchedFields.length > 0 && (
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                          Matches: {result.matchedFields.join(', ')}
-                        </p>
-                      )}
-                    </div>
-                  </button>
+                          <div className="w-8 h-8 rounded-lg bg-[#f0f1fa] dark:bg-brand-navy-dark/20 flex items-center justify-center flex-shrink-0">
+                            <Database className="w-4 h-4 text-brand-navy" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {result.title}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f1fa] text-brand-navy dark:bg-opacity-20">
+                                {result.objectLabel}
+                              </span>
+                            </div>
+                            {result.subtitle && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                                {result.subtitle}
+                              </p>
+                            )}
+                            {result.matchedFields.length > 0 && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Matched: {result.matchedFields.join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
             </div>

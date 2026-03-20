@@ -202,6 +202,17 @@ export interface ObjectDef {
   recordTypes: RecordType[];
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
+  /** Global search configuration — which fields are searched and how results display */
+  searchConfig?: {
+    /** Whether this object appears in the universal search bar */
+    enabled: boolean;
+    /** Field apiNames to match the search query against */
+    searchableFields: string[];
+    /** Field apiName used as the result title (e.g. "name") */
+    titleField?: string;
+    /** Field apiNames shown as the result subtitle */
+    subtitleFields?: string[];
+  };
   searchLayouts?: {
     defaultFields: string[];
     lookupDialogFields: string[];

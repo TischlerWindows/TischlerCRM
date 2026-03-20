@@ -33,6 +33,81 @@ async function checkObjectPermission(
 }
 
 export async function recordRoutes(app: FastifyInstance) {
+  // ── Global search across all search-enabled objects ──────────────────
+  app.get('/search', async (req, reply) => {
+    const { q } = req.query as { q?: string };
+    if (!q || !q.trim()) return reply.send({ results: [] });
+
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+
+    // Load the OrgSchema from the settings table
+    const schemaSetting = await prisma.setting.findUnique({ where: { key: 'tces-object-manager-schema' } });
+    if (!schemaSetting) return reply.send({ results: [] });
+
+    const orgSchema = schemaSetting.value as any;
+    const objects: any[] = orgSchema?.objects ?? [];
+    const searchTerm = q.trim().toLowerCase();
+
+    // Collect search-enabled objects
+    const enabledObjects = objects.filter(o => o.searchConfig?.enabled && o.searchConfig.searchableFields?.length > 0);
+    if (enabledObjects.length === 0) return reply.send({ results: [] });
+
+    // Search each enabled object in parallel
+    const resultPromises = enabledObjects.map(async (objDef) => {
+      const allowed = await checkObjectPermission(userId, userRole, objDef.apiName, 'read');
+      if (!allowed) return [];
+
+      const customObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: objDef.apiName, mode: 'insensitive' } },
+      });
+      if (!customObj) return [];
+
+      const records = await prisma.record.findMany({
+        where: { objectId: customObj.id },
+        take: 50,
+      });
+
+      const config = objDef.searchConfig;
+      const searchFields: string[] = config.searchableFields;
+      const titleField: string = config.titleField || searchFields[0] || '';
+      const subtitleFields: string[] = config.subtitleFields || [];
+
+      const matched: any[] = [];
+      for (const record of records) {
+        const data = record.data as Record<string, any>;
+        const matchedFields: string[] = [];
+        for (const fieldApi of searchFields) {
+          const val = data[fieldApi];
+          if (val != null && String(val).toLowerCase().includes(searchTerm)) {
+            matchedFields.push(fieldApi);
+          }
+        }
+        if (matchedFields.length > 0) {
+          matched.push({
+            id: record.id,
+            objectApiName: objDef.apiName,
+            objectLabel: objDef.label,
+            objectPluralLabel: objDef.pluralLabel || objDef.label,
+            title: data[titleField] ?? record.id,
+            subtitle: subtitleFields
+              .map(f => data[f])
+              .filter(Boolean)
+              .join(' · ') || '',
+            matchedFields,
+          });
+        }
+        if (matched.length >= 10) break;
+      }
+      return matched;
+    });
+
+    const groups = await Promise.all(resultPromises);
+    const results = groups.flat().slice(0, 25);
+
+    return reply.send({ results });
+  });
+
   // Search records (registered before /:recordId to avoid being swallowed by the param route)
   app.get('/objects/:apiName/records/search', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };

@@ -103,6 +103,16 @@ export interface UpdateProfileInput {
   grantsAdminAccess?: boolean;
 }
 
+export interface GlobalSearchResult {
+  id: string;
+  objectApiName: string;
+  objectLabel: string;
+  objectPluralLabel: string;
+  title: string;
+  subtitle: string;
+  matchedFields: string[];
+}
+
 interface ApiResponse<T> {
   data?: T;
   error?: string;
@@ -233,6 +243,11 @@ class ApiClient {
 
   logout() {
     this.setToken(null);
+  }
+
+  // ── Global search ────────────────────────────────────────────────────────
+  async globalSearch(q: string): Promise<{ results: GlobalSearchResult[] }> {
+    return this.get(`/search?q=${encodeURIComponent(q)}`);
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<{ success: boolean }> {

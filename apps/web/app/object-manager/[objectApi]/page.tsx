@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import PageEditor from './page-editor';
 import HomeLayoutEditor from './home-layout-editor';
 import FieldsRelationships from './fields-relationships';
+import SearchSettings from './search-settings';
 
 const SIDEBAR_SECTIONS = [
   // Data Model
@@ -80,6 +81,14 @@ const SIDEBAR_SECTIONS = [
     icon: Square,
     description: 'Compact view configuration',
     category: 'Layouts & UI'
+  },
+  { 
+    id: 'search-settings', 
+    label: 'Search Settings', 
+    icon: SearchIcon,
+    description: 'Configure global search for this object',
+    category: 'Layouts & UI',
+    featured: true
   },
   { 
     id: 'conditional-formatting', 
@@ -384,7 +393,11 @@ export default function ObjectDetailPage() {
             </div>
           )}
 
-          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && (
+          {activeSection === 'search-settings' && (
+            <SearchSettings objectApiName={objectApi} />
+          )}
+
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
