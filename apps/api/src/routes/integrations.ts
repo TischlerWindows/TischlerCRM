@@ -35,7 +35,8 @@ const PROVIDER_REGISTRY: ProviderDef[] = [
   {
     provider: 'google_maps',
     displayName: 'Google Maps',
-    description: 'Geocode addresses and display interactive maps on account and contact records.',
+    description:
+      'Address search (Places API) and static map previews on records require this key. In Google Cloud, enable Places API and Maps Static API, with billing enabled.',
     category: 'maps',
     authType: 'api_key',
   },

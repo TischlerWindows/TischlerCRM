@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExternalLink, MapPin } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 interface LocationMapPreviewProps {
   lat: number;
@@ -14,13 +15,21 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function LocationMapPreview({ lat, lng, address, className }: LocationMapPreviewProps) {
   const [imgError, setImgError] = useState(false);
+  const [staticMapUrl, setStaticMapUrl] = useState('');
   const googleMapsQuery = address || `${lat},${lng}`;
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(googleMapsQuery)}`;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  const staticMapUrl = token
-    ? `${API_BASE}/places/static-map?lat=${lat}&lng=${lng}&zoom=15&size=600x300&token=${encodeURIComponent(token)}`
-    : '';
+  useEffect(() => {
+    const token = apiClient.getToken() ?? localStorage.getItem('auth_token');
+    if (!token) {
+      setStaticMapUrl('');
+      return;
+    }
+    setImgError(false);
+    setStaticMapUrl(
+      `${API_BASE}/places/static-map?lat=${lat}&lng=${lng}&zoom=15&size=600x300&token=${encodeURIComponent(token)}`
+    );
+  }, [lat, lng]);
 
   return (
     <div className={className}>

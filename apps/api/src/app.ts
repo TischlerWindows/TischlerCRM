@@ -348,9 +348,14 @@ export function buildApp() {
   // ── Auth guard hook ───────────────────────────────────────────────────────
   app.addHook('onRequest', async (req, reply) => {
     const routeUrl = req.routeOptions?.url;
+    // <img src=".../places/static-map?..."> has no Authorization header; the handler
+    // accepts token in the query. Use raw URL pathname so we always bypass Bearer
+    // auth even if routeOptions.url is unset in edge cases.
+    const pathOnly = (req.url ?? '').split('?')[0] ?? '';
+    if (pathOnly === '/places/static-map' || routeUrl === '/places/static-map') return;
+
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
-    if (routeUrl === '/places/static-map') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
 
     const auth = req.headers.authorization;

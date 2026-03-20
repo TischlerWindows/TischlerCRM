@@ -189,7 +189,11 @@ export async function placesRoutes(app: FastifyInstance) {
       const res = await fetch(url);
 
       if (!res.ok) {
-        app.log.warn({ status: res.status }, 'Static Maps API returned non-OK status');
+        const contentType = res.headers.get('content-type') || '';
+        app.log.warn(
+          { status: res.status, contentType },
+          'Static Maps API returned non-OK status (enable Maps Static API and billing for this key)'
+        );
         return reply.code(502).send({ error: 'Google Static Maps API error' });
       }
 
