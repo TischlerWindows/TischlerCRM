@@ -34,6 +34,40 @@ async function checkObjectPermission(
 
 export async function recordRoutes(app: FastifyInstance) {
   // ── Global search across all search-enabled objects ──────────────────
+
+  // Record data keys may omit the "ObjectName__" prefix, so try both
+  function resolveDataValue(data: Record<string, any>, fieldApi: string): unknown {
+    if (fieldApi in data) return data[fieldApi];
+    // Strip "ObjectName__" prefix → short key
+    const short = fieldApi.replace(/^[^_]+__/, '');
+    if (short in data) return data[short];
+    return undefined;
+  }
+
+  // Flatten a value to searchable strings (handles composite objects like Address)
+  function flattenValue(val: unknown): string {
+    if (val == null) return '';
+    if (typeof val === 'object') {
+      return Object.values(val as Record<string, unknown>)
+        .filter(v => v != null && typeof v !== 'object')
+        .map(v => String(v))
+        .join(' ');
+    }
+    return String(val);
+  }
+
+  // Build a display-friendly string from a data value
+  function displayValue(val: unknown): string {
+    if (val == null) return '';
+    if (typeof val === 'object') {
+      return Object.values(val as Record<string, unknown>)
+        .filter(v => v != null && v !== '')
+        .map(v => String(v))
+        .join(', ');
+    }
+    return String(val);
+  }
+
   app.get('/search', async (req, reply) => {
     const { q } = req.query as { q?: string };
     if (!q || !q.trim()) return reply.send({ results: [] });
@@ -49,12 +83,12 @@ export async function recordRoutes(app: FastifyInstance) {
     const objects: any[] = orgSchema?.objects ?? [];
     const searchTerm = q.trim().toLowerCase();
 
-    // Collect search-enabled objects
-    const enabledObjects = objects.filter(o => o.searchConfig?.enabled && o.searchConfig.searchableFields?.length > 0);
+    // Collect search-enabled objects (if searchableFields is empty, search all text values)
+    const enabledObjects = objects.filter((o: any) => o.searchConfig?.enabled);
     if (enabledObjects.length === 0) return reply.send({ results: [] });
 
     // Search each enabled object in parallel
-    const resultPromises = enabledObjects.map(async (objDef) => {
+    const resultPromises = enabledObjects.map(async (objDef: any) => {
       const allowed = await checkObjectPermission(userId, userRole, objDef.apiName, 'read');
       if (!allowed) return [];
 
@@ -69,32 +103,47 @@ export async function recordRoutes(app: FastifyInstance) {
       });
 
       const config = objDef.searchConfig;
-      const searchFields: string[] = config.searchableFields;
+      const searchFields: string[] = config.searchableFields ?? [];
       const titleField: string = config.titleField || searchFields[0] || '';
       const subtitleFields: string[] = config.subtitleFields || [];
 
       const matched: any[] = [];
       for (const record of records) {
         const data = record.data as Record<string, any>;
-        const matchedFields: string[] = [];
-        for (const fieldApi of searchFields) {
-          const val = data[fieldApi];
-          if (val != null && String(val).toLowerCase().includes(searchTerm)) {
-            matchedFields.push(fieldApi);
+        let hitFields: string[] = [];
+
+        if (searchFields.length > 0) {
+          // Search only the configured fields
+          for (const fieldApi of searchFields) {
+            const raw = resolveDataValue(data, fieldApi);
+            const text = flattenValue(raw);
+            if (text && text.toLowerCase().includes(searchTerm)) {
+              hitFields.push(fieldApi);
+            }
+          }
+        } else {
+          // No specific fields configured — search all values
+          for (const [key, raw] of Object.entries(data)) {
+            const text = flattenValue(raw);
+            if (text && text.toLowerCase().includes(searchTerm)) {
+              hitFields.push(key);
+            }
           }
         }
-        if (matchedFields.length > 0) {
+
+        if (hitFields.length > 0) {
+          const titleVal = resolveDataValue(data, titleField);
           matched.push({
             id: record.id,
             objectApiName: objDef.apiName,
             objectLabel: objDef.label,
             objectPluralLabel: objDef.pluralLabel || objDef.label,
-            title: data[titleField] ?? record.id,
+            title: displayValue(titleVal) || record.id,
             subtitle: subtitleFields
-              .map(f => data[f])
+              .map(f => displayValue(resolveDataValue(data, f)))
               .filter(Boolean)
               .join(' · ') || '',
-            matchedFields,
+            matchedFields: hitFields,
           });
         }
         if (matched.length >= 10) break;
