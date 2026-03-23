@@ -159,24 +159,21 @@ export default function PageEditor({ objectApiName, initialLayoutId }: PageEdito
           tabId,
           columns: section.columns || 2,
           order: section.order,
-          collapsed: section.collapsed || false,
+          collapsed: false,
+          description: section.description,
+          visibleIf: section.visibleIf,
           showInRecord: section.showInRecord !== false,
           showInTemplate: section.showInTemplate !== false,
-          visibleIf: section.visibleIf,
         });
         section.fields.forEach((f) => {
           newFields.push({
-            id: `field-${fieldCounter++}`,
-            apiName: f.apiName,
-            label: f.label || f.apiName,
-            type: f.type || 'Text',
+            id: `placed-${fieldCounter++}-${f.apiName}`,
+            fieldApiName: f.apiName,
             sectionId,
-            column: f.column ?? 0,
+            column: f.column,
             order: f.order,
-            required: f.required || false,
-            readOnly: f.readOnly || false,
-            colSpan: f.colSpan,
-            rowSpan: f.rowSpan,
+            colSpan: (f as any).colSpan ?? 1,
+            rowSpan: (f as any).rowSpan ?? 1,
             presentation: f.presentation,
           });
         });
