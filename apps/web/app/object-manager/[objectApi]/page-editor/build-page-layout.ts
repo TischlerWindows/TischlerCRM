@@ -58,6 +58,12 @@ export function buildPageLayoutFromCanvas(params: {
             columns: section.columns,
             order: section.order,
             description: section.description,
+            ...(section.layoutRowId != null && section.layoutRowId !== ''
+              ? { layoutRowId: section.layoutRowId }
+              : {}),
+            ...(section.rowWeight != null && section.rowWeight > 0
+              ? { rowWeight: section.rowWeight }
+              : {}),
             fields: fields
               .filter((f) => f.sectionId === section.id)
               .map((f) => {

@@ -250,9 +250,11 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   applyLayoutPreset: (presetId) => {
     get().pushUndo();
-    const { sections, activeTabId } = get();
-    const tabSections = sections.filter((s) => s.tabId === activeTabId);
-    const baseOrder = tabSections.length;
+    const { sections, fields, widgets, activeTabId } = get();
+    const removedIds = new Set(
+      sections.filter((s) => s.tabId === activeTabId).map((s) => s.id),
+    );
+    const keptSections = sections.filter((s) => s.tabId !== activeTabId);
     const specs = getPresetSections(presetId);
     const ts = Date.now();
     const newSections: CanvasSection[] = specs.map((spec, i) => ({
@@ -260,12 +262,20 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       label: spec.label,
       tabId: activeTabId,
       columns: spec.columns,
-      order: baseOrder + i,
+      order: i,
       collapsed: false,
       showInRecord: true,
       showInTemplate: true,
+      layoutRowId: spec.layoutRowId,
+      rowWeight: spec.rowWeight,
     }));
-    set({ sections: [...sections, ...newSections], hasUnsavedChanges: true });
+    set({
+      sections: [...keptSections, ...newSections],
+      fields: fields.filter((f) => !removedIds.has(f.sectionId)),
+      widgets: widgets.filter((w) => !removedIds.has(w.sectionId)),
+      selectedElement: null,
+      hasUnsavedChanges: true,
+    });
   },
 
   // Fields
@@ -357,6 +367,8 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
           visibleIf: section.visibleIf,
           showInRecord: section.showInRecord !== false,
           showInTemplate: section.showInTemplate !== false,
+          layoutRowId: section.layoutRowId,
+          rowWeight: section.rowWeight,
         });
 
         section.fields.forEach((f) => {

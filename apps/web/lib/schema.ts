@@ -300,6 +300,13 @@ export interface PageSection {
   showInRecord?: boolean;
   /** When false, the section is hidden in the create/edit form template */
   showInTemplate?: boolean;
+  /**
+   * Sections with the same id render side-by-side in one row (builder + runtime).
+   * Omit or use unique ids per row for full-width stacked sections.
+   */
+  layoutRowId?: string;
+  /** Flex grow weight within the row (default 1). */
+  rowWeight?: number;
 }
 
 /**

@@ -65,7 +65,7 @@ export function FieldPalette({
   }, [availableFields, searchTerm]);
 
   return (
-    <div className="w-64 border-r bg-white flex flex-col h-full shadow-sm">
+    <div className="w-full min-w-0 border-r bg-white flex flex-col h-full shadow-sm">
       {/* Tab switcher */}
       <div className="flex border-b">
         <button
