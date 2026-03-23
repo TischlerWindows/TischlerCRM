@@ -1003,7 +1003,7 @@ export default function FlowBuilderPage() {
 
   // Load flow elements
   useEffect(() => {
-    if (flow) setElements(flow.elements);
+    if (flow) setElements(flow.elements.map(e => ({ ...e, connectors: (e.connectors || []).filter(Boolean) })));
   }, [flowId]);
 
   const selectedElement = selectedElementId ? elements.find(e => e.id === selectedElementId) : null;
@@ -1051,7 +1051,7 @@ export default function FlowBuilderPage() {
     if (connectingFromId) {
       updatedElements = updatedElements.map(e =>
         e.id === connectingFromId
-          ? { ...e, connectors: [...e.connectors, { id: `conn_${Date.now().toString(36)}`, targetElementId: newId }] }
+          ? { ...e, connectors: [...(e.connectors || []), { id: `conn_${Date.now().toString(36)}`, targetElementId: newId }] }
           : e
       );
     }
@@ -1077,7 +1077,7 @@ export default function FlowBuilderPage() {
         .filter(e => e.id !== elementId)
         .map(e => ({
           ...e,
-          connectors: e.connectors.filter(c => c.targetElementId !== elementId),
+          connectors: (e.connectors || []).filter(c => c && c.targetElementId !== elementId),
         }));
     });
     setSelectedElementId(null);
@@ -1162,8 +1162,10 @@ export default function FlowBuilderPage() {
   // Collect all connections
   const connections: { fromId: string; toId: string; label?: string }[] = [];
   for (const el of elements) {
-    for (const conn of el.connectors) {
-      connections.push({ fromId: el.id, toId: conn.targetElementId, label: conn.label });
+    for (const conn of (el.connectors || [])) {
+      if (conn?.targetElementId) {
+        connections.push({ fromId: el.id, toId: conn.targetElementId, label: conn.label });
+      }
     }
   }
 
