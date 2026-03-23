@@ -17,6 +17,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { FieldDef, WidgetType } from '@/lib/schema';
 import type { CanvasField, CanvasWidget, DraggedItem } from './types';
 import { useEditorStore } from './editor-store';
+import { EditorDragUiContext } from './editor-drag-ui-context';
 
 interface ResizeState {
   id: string;
@@ -28,12 +29,54 @@ interface ResizeState {
   sectionCols: number;
 }
 
-const DEFAULT_WIDGET_CONFIGS: Record<string, any> = {
+const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, any> = {
   RelatedList: { type: 'RelatedList', relatedObjectApiName: '', relationshipFieldApiName: '', displayColumns: [] },
   ActivityFeed: { type: 'ActivityFeed', maxItems: 10 },
   FileFolder: { type: 'FileFolder', provider: 'dropbox' },
   CustomComponent: { type: 'CustomComponent', componentId: '' },
+  Spacer: { type: 'Spacer', minHeightPx: 32 },
 };
+
+/** Placed canvas widget id: `widget-<timestamp>-<type>` — not palette `widget-new-*` */
+function isCanvasWidgetId(id: string): boolean {
+  return id.startsWith('widget-') && !id.startsWith('widget-new-');
+}
+
+function maxOrderInColumn(
+  sectionId: string,
+  column: number,
+  fields: CanvasField[],
+  widgets: CanvasWidget[],
+): number {
+  const orders = [
+    ...fields.filter((f) => f.sectionId === sectionId && f.column === column).map((f) => f.order),
+    ...widgets.filter((w) => w.sectionId === sectionId && w.column === column).map((w) => w.order),
+  ];
+  return orders.length > 0 ? Math.max(...orders) : -1;
+}
+
+type ColumnRow = { id: string; order: number };
+
+function columnRowsSorted(
+  sectionId: string,
+  column: number,
+  fields: CanvasField[],
+  widgets: CanvasWidget[],
+  excludeId: string,
+): ColumnRow[] {
+  const rows: ColumnRow[] = [];
+  for (const f of fields) {
+    if (f.sectionId === sectionId && f.column === column && f.id !== excludeId) {
+      rows.push({ id: f.id, order: f.order });
+    }
+  }
+  for (const w of widgets) {
+    if (w.sectionId === sectionId && w.column === column && w.id !== excludeId) {
+      rows.push({ id: w.id, order: w.order });
+    }
+  }
+  return rows.sort((a, b) => a.order - b.order);
+}
 
 export function DndContextWrapper({
   children,
@@ -45,10 +88,12 @@ export function DndContextWrapper({
   onSave: () => void;
 }) {
   const fields = useEditorStore((s) => s.fields);
+  const widgets = useEditorStore((s) => s.widgets);
   const addField = useEditorStore((s) => s.addField);
   const setFields = useEditorStore((s) => s.setFields);
+  const setWidgets = useEditorStore((s) => s.setWidgets);
   const addWidget = useEditorStore((s) => s.addWidget);
-  const updateField = useEditorStore((s) => s.updateField);
+  const addHighlightField = useEditorStore((s) => s.addHighlightField);
   const markDirty = useEditorStore((s) => s.markDirty);
   const deleteField = useEditorStore((s) => s.deleteField);
   const deleteWidget = useEditorStore((s) => s.deleteWidget);
@@ -67,10 +112,8 @@ export function DndContextWrapper({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // ── Phase 0C: Resize handler using approximate viewport measurement ──
   useEffect(() => {
     if (!resizingField) return;
-    // Approximate col width based on typical canvas width
     const canvasEl = document.querySelector('[data-editor-canvas]');
     const canvasWidth = canvasEl?.clientWidth ?? 800;
     const COL_WIDTH = (canvasWidth - 80) / (resizingField.sectionCols + resizingField.startColSpan);
@@ -112,7 +155,6 @@ export function DndContextWrapper({
     };
   }, [resizingField, fields, setFields, markDirty]);
 
-  // Listen for custom resize events from canvas-field
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
@@ -123,22 +165,17 @@ export function DndContextWrapper({
     return () => window.removeEventListener('field-resize-start', handler);
   }, [pushUndo]);
 
-  // ── Phase 6E: Keyboard shortcuts ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl+S → save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         onSave();
       }
-      // Ctrl+Z → undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         undo();
       }
-      // Delete → remove selected element
       if (e.key === 'Delete' && selectedElement) {
-        // Only delete if not focused in an input
         const tag = (e.target as HTMLElement)?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         if (selectedElement.type === 'field') {
@@ -149,7 +186,6 @@ export function DndContextWrapper({
           setSelectedElement(null);
         }
       }
-      // Escape → deselect
       if (e.key === 'Escape') {
         setSelectedElement(null);
       }
@@ -158,7 +194,6 @@ export function DndContextWrapper({
     return () => window.removeEventListener('keydown', handler);
   }, [onSave, undo, selectedElement, deleteField, deleteWidget, setSelectedElement]);
 
-  // ── Drag handlers ──
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       const activeId = event.active.id.toString();
@@ -196,9 +231,18 @@ export function DndContextWrapper({
           widgetType,
           label: widgetType,
         });
+      } else if (isCanvasWidgetId(activeId)) {
+        const w = widgets.find((x) => x.id === activeId);
+        if (w) {
+          setDraggedItem({
+            id: w.id,
+            widgetType: w.widgetType,
+            label: w.widgetType,
+          });
+        }
       }
     },
-    [fields, getFieldDef],
+    [fields, widgets, getFieldDef],
   );
 
   const handleDragOver = useCallback((event: DragOverEvent) => {
@@ -219,16 +263,20 @@ export function DndContextWrapper({
       const activeId = active.id.toString();
       const targetId = over.id.toString();
 
-      // Drop into column zone
+      if (targetId === 'layout-highlight-drop') {
+        if (activeId.startsWith('field-')) {
+          const fieldApiName = activeId.replace('field-', '');
+          addHighlightField(fieldApiName);
+        }
+        return;
+      }
+
       if (targetId.includes('-col-')) {
         const colMatch = targetId.match(/^(.+)-col-(\d+)$/);
         if (!colMatch) return;
         const targetSectionId = colMatch[1];
-        const targetColumn = parseInt(colMatch[2]);
-        const columnFields = fields.filter(
-          (f) => f.sectionId === targetSectionId && f.column === targetColumn,
-        );
-        const maxOrder = columnFields.length > 0 ? Math.max(...columnFields.map((f) => f.order)) : -1;
+        const targetColumn = parseInt(colMatch[2], 10);
+        const maxOrder = maxOrderInColumn(targetSectionId, targetColumn, fields, widgets);
 
         if (activeId.startsWith('field-')) {
           const fieldApiName = activeId.replace('field-', '');
@@ -262,95 +310,133 @@ export function DndContextWrapper({
             rowSpan: 1,
             config: DEFAULT_WIDGET_CONFIGS[widgetType],
           });
-        }
-        return;
-      }
-
-      // Drop on existing placed field
-      if (targetId.startsWith('placed-')) {
-        const overField = fields.find((f) => f.id === targetId);
-        if (!overField) return;
-
-        const targetSectionId = overField.sectionId;
-        const targetColumn = overField.column;
-        const columnFields = fields
-          .filter((f) => f.sectionId === targetSectionId && f.column === targetColumn && f.id !== activeId)
-          .sort((a, b) => a.order - b.order);
-        const overIdx = columnFields.findIndex((f) => f.id === targetId);
-
-        let newOrder = overField.order;
-        if (dropSide === 'bottom') {
-          newOrder =
-            overIdx < columnFields.length - 1
-              ? (overField.order + columnFields[overIdx + 1].order) / 2
-              : overField.order + 1;
-        } else {
-          newOrder =
-            overIdx > 0
-              ? (columnFields[overIdx - 1].order + overField.order) / 2
-              : overField.order - 1;
-        }
-
-        if (activeId.startsWith('field-')) {
-          const fieldApiName = activeId.replace('field-', '');
-          addField({
-            id: `placed-${Date.now()}-${fieldApiName}`,
-            fieldApiName,
-            sectionId: targetSectionId,
-            column: targetColumn,
-            order: newOrder,
-            colSpan: 1,
-            rowSpan: 1,
-          });
-        } else if (activeId.startsWith('placed-')) {
-          setFields(
-            fields.map((f) =>
-              f.id === activeId
-                ? { ...f, sectionId: targetSectionId, column: targetColumn, order: newOrder }
-                : f,
+        } else if (isCanvasWidgetId(activeId)) {
+          setWidgets(
+            widgets.map((w) =>
+              w.id === activeId
+                ? { ...w, sectionId: targetSectionId, column: targetColumn, order: maxOrder + 1 }
+                : w,
             ),
           );
           markDirty();
         }
+        return;
+      }
+
+      const overField = fields.find((f) => f.id === targetId);
+      const overWidget = widgets.find((w) => w.id === targetId);
+      if (!overField && !overWidget) return;
+
+      const targetSectionId = overField?.sectionId ?? overWidget!.sectionId;
+      const targetColumn = overField?.column ?? overWidget!.column;
+      const overOrder = overField?.order ?? overWidget!.order;
+
+      const columnItems = columnRowsSorted(targetSectionId, targetColumn, fields, widgets, activeId);
+      const overIdx = columnItems.findIndex((r) => r.id === targetId);
+      if (overIdx < 0) return;
+
+      let newOrder = overOrder;
+      if (dropSide === 'bottom') {
+        newOrder =
+          overIdx < columnItems.length - 1
+            ? (overOrder + columnItems[overIdx + 1].order) / 2
+            : overOrder + 1;
+      } else {
+        newOrder =
+          overIdx > 0 ? (columnItems[overIdx - 1].order + overOrder) / 2 : overOrder - 1;
+      }
+
+      if (activeId.startsWith('field-')) {
+        const fieldApiName = activeId.replace('field-', '');
+        addField({
+          id: `placed-${Date.now()}-${fieldApiName}`,
+          fieldApiName,
+          sectionId: targetSectionId,
+          column: targetColumn,
+          order: newOrder,
+          colSpan: 1,
+          rowSpan: 1,
+        });
+      } else if (activeId.startsWith('placed-')) {
+        setFields(
+          fields.map((f) =>
+            f.id === activeId
+              ? { ...f, sectionId: targetSectionId, column: targetColumn, order: newOrder }
+              : f,
+          ),
+        );
+        markDirty();
+      } else if (activeId.startsWith('widget-new-')) {
+        const widgetType = activeId.replace('widget-new-', '') as WidgetType;
+        addWidget({
+          id: `widget-${Date.now()}-${widgetType}`,
+          widgetType,
+          sectionId: targetSectionId,
+          column: targetColumn,
+          order: newOrder,
+          colSpan: 1,
+          rowSpan: 1,
+          config: DEFAULT_WIDGET_CONFIGS[widgetType],
+        });
+      } else if (isCanvasWidgetId(activeId)) {
+        setWidgets(
+          widgets.map((w) =>
+            w.id === activeId
+              ? { ...w, sectionId: targetSectionId, column: targetColumn, order: newOrder }
+              : w,
+          ),
+        );
+        markDirty();
       }
     },
-    [fields, dropSide, addField, setFields, addWidget, markDirty, pushUndo],
+    [
+      fields,
+      widgets,
+      dropSide,
+      addField,
+      setFields,
+      setWidgets,
+      addWidget,
+      addHighlightField,
+      markDirty,
+      pushUndo,
+    ],
   );
 
-  // Expose overId and dropSide to children via context
-  return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-      autoScroll
-    >
-      <DndOverlayDropSideTracker overId={overId} onDropSideChange={setDropSide} />
-      {/* Pass overId/dropSide down via data attribute so children can read */}
-      <div data-over-id={overId || ''} data-drop-side={dropSide || ''}>
-        {children}
-      </div>
+  const dragUiValue = React.useMemo(() => ({ overId, dropSide }), [overId, dropSide]);
 
-      {/* Phase 6A: Semi-transparent drag overlay card */}
-      <DragOverlay>
-        {draggedItem ? (
-          <div className="p-2 bg-white/90 border-2 border-brand-navy rounded-lg shadow-lg backdrop-blur-sm">
-            <div className="font-medium text-sm">
-              {'apiName' in draggedItem ? draggedItem.label : draggedItem.widgetType}
+  return (
+    <EditorDragUiContext.Provider value={dragUiValue}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+        autoScroll
+      >
+        <DndOverlayDropSideTracker overId={overId} onDropSideChange={setDropSide} />
+        <div data-over-id={overId || ''} data-drop-side={dropSide || ''}>
+          {children}
+        </div>
+
+        <DragOverlay>
+          {draggedItem ? (
+            <div className="p-2 bg-white/90 border-2 border-brand-navy rounded-lg shadow-lg backdrop-blur-sm">
+              <div className="font-medium text-sm">
+                {'apiName' in draggedItem ? draggedItem.label : draggedItem.widgetType}
+              </div>
+              {'type' in draggedItem && (
+                <div className="text-xs text-gray-500">{(draggedItem as { type?: string }).type}</div>
+              )}
             </div>
-            {'type' in draggedItem && (
-              <div className="text-xs text-gray-500">{(draggedItem as any).type}</div>
-            )}
-          </div>
-        ) : null}
-      </DragOverlay>
-    </DndContext>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    </EditorDragUiContext.Provider>
   );
 }
 
-/** Track which side of the hovered field the cursor is on */
 function DndOverlayDropSideTracker({
   overId,
   onDropSideChange,
@@ -359,14 +445,22 @@ function DndOverlayDropSideTracker({
   onDropSideChange: (side: 'top' | 'bottom' | null) => void;
 }) {
   useEffect(() => {
-    if (!overId || !overId.startsWith('placed-')) {
+    const isSortableTarget =
+      !!overId &&
+      (overId.startsWith('placed-') || isCanvasWidgetId(overId));
+    if (!isSortableTarget) {
       onDropSideChange(null);
       return;
     }
 
     const handler = (e: MouseEvent) => {
-      // Find the element being hovered by looking for the sortable node
-      const el = document.querySelector(`[data-id="${overId}"]`) as HTMLElement | null;
+      const safe =
+        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+          ? CSS.escape(overId)
+          : overId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      const el = document.querySelector(
+        `[data-editor-sortable-id="${safe}"]`,
+      ) as HTMLElement | null;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const y = e.clientY - rect.top;

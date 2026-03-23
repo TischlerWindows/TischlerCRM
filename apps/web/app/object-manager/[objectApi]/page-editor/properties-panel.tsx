@@ -555,6 +555,26 @@ export function PropertiesPanel({
                         />
                       </div>
                     )}
+
+                    {widget.config.type === 'Spacer' && (
+                      <div>
+                        <Label>Min height (px)</Label>
+                        <Input
+                          type="number"
+                          min={8}
+                          max={400}
+                          value={widget.config.minHeightPx ?? 32}
+                          onChange={(e) =>
+                            updateWidget(widget.id, {
+                              config: {
+                                ...widget.config,
+                                minHeightPx: Math.max(8, parseInt(e.target.value, 10) || 32),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );

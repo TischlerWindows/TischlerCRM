@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import React from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { FieldDef } from '@/lib/schema';
 import type { CanvasField, CanvasSection as CanvasSectionType, CanvasWidget } from './types';
 import { CanvasFieldCard } from './canvas-field';
 import { CanvasWidgetCard } from './canvas-widget';
 import { useEditorStore } from './editor-store';
+import { SectionColumnDropTarget } from './section-column-drop-target';
+import { useEditorDragUi } from './editor-drag-ui-context';
 import {
   ChevronRight,
   ChevronDown,
@@ -16,8 +17,11 @@ import {
   ArrowDown,
   Eye,
   Plus,
-  GripVertical,
 } from 'lucide-react';
+
+type GridPackingItem =
+  | { kind: 'field'; id: string; column: number; order: number; colSpan: number; rowSpan: number }
+  | { kind: 'widget'; id: string; column: number; order: number; colSpan: number; rowSpan: number };
 
 export function CanvasSectionComponent({
   section,
@@ -26,8 +30,6 @@ export function CanvasSectionComponent({
   getFieldDef,
   isFirst,
   isLast,
-  overId,
-  dropSide,
 }: {
   section: CanvasSectionType;
   sectionFields: CanvasField[];
@@ -35,43 +37,52 @@ export function CanvasSectionComponent({
   getFieldDef: (apiName: string) => FieldDef | undefined;
   isFirst: boolean;
   isLast: boolean;
-  overId: string | null;
-  dropSide: 'top' | 'bottom' | null;
 }) {
+  const { overId, dropSide } = useEditorDragUi();
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const deleteSection = useEditorStore((s) => s.deleteSection);
   const moveSection = useEditorStore((s) => s.moveSection);
   const toggleSectionCollapsed = useEditorStore((s) => s.toggleSectionCollapsed);
 
-  // Droppable for each column
-  const columnDroppables = Array.from({ length: section.columns }, (_, i) => {
-    const { setNodeRef, isOver } = useDroppable({
-      id: `${section.id}-col-${i}`,
-      data: { sectionId: section.id, columnIndex: i },
-    });
-    return { setNodeRef, isOver };
-  });
-
-  // Sort fields by order
   const sortedFields = [...sectionFields].sort((a, b) => a.order - b.order);
 
-  // Build occupied-cell map for CSS grid placement
   const occupied = new Set<string>();
-  const fieldGridRow = new Map<string, number>();
-  const columnArrays: CanvasField[][] = [];
+  const itemGridRow = new Map<string, number>();
+
+  const columnItems: GridPackingItem[][] = [];
   for (let c = 0; c < section.columns; c++) {
-    columnArrays[c] = sortedFields.filter((f) => f.column === c);
+    const fieldItems: GridPackingItem[] = sortedFields
+      .filter((f) => f.column === c)
+      .map((f) => ({
+        kind: 'field' as const,
+        id: f.id,
+        column: f.column,
+        order: f.order,
+        colSpan: f.colSpan,
+        rowSpan: f.rowSpan,
+      }));
+    const widgetItems: GridPackingItem[] = sectionWidgets
+      .filter((w) => w.column === c)
+      .map((w) => ({
+        kind: 'widget' as const,
+        id: w.id,
+        column: w.column,
+        order: w.order,
+        colSpan: w.colSpan,
+        rowSpan: w.rowSpan,
+      }));
+    columnItems[c] = [...fieldItems, ...widgetItems].sort((a, b) => a.order - b.order);
   }
 
   for (let c = 0; c < section.columns; c++) {
-    for (const f of columnArrays[c]) {
-      const cs = Math.min(f.colSpan, section.columns - f.column);
-      const rs = f.rowSpan;
+    for (const item of columnItems[c]) {
+      const cs = Math.min(item.colSpan, section.columns - item.column);
+      const rs = item.rowSpan;
       let row = 0;
       search: while (true) {
         for (let dr = 0; dr < rs; dr++) {
           for (let dc = 0; dc < cs; dc++) {
-            if (occupied.has(`${row + dr},${f.column + dc}`)) {
+            if (occupied.has(`${row + dr},${item.column + dc}`)) {
               row++;
               continue search;
             }
@@ -79,24 +90,41 @@ export function CanvasSectionComponent({
         }
         break;
       }
-      fieldGridRow.set(f.id, row);
+      itemGridRow.set(item.id, row);
       for (let dr = 0; dr < rs; dr++) {
         for (let dc = 0; dc < cs; dc++) {
-          occupied.add(`${row + dr},${f.column + dc}`);
+          occupied.add(`${row + dr},${item.column + dc}`);
         }
       }
     }
   }
 
-  // All item IDs for SortableContext
   const allItemIds = [...sortedFields.map((f) => f.id), ...sectionWidgets.map((w) => w.id)];
+
+  const renderColumnDropStripe = () => (
+    <div className="grid gap-3 mt-2" style={{ gridTemplateColumns: `repeat(${section.columns}, 1fr)` }}>
+      {Array.from({ length: section.columns }, (_, colIdx) => (
+        <SectionColumnDropTarget key={`drop-${section.id}-col-${colIdx}`} sectionId={section.id} columnIndex={colIdx}>
+          {({ setNodeRef, isOver }) => (
+            <div
+              ref={setNodeRef}
+              className={`min-h-[40px] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
+                isOver ? 'border-teal-400 bg-teal-50' : 'border-transparent hover:border-gray-200'
+              }`}
+            >
+              {isOver && <span className="text-xs text-teal-600">Drop here</span>}
+            </div>
+          )}
+        </SectionColumnDropTarget>
+      ))}
+    </div>
+  );
 
   return (
     <div
       className="group border rounded-xl bg-white shadow-sm overflow-hidden"
       onClick={() => setSelectedElement({ type: 'section', id: section.id })}
     >
-      {/* Section header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50/80 border-b border-l-4 border-l-brand-navy">
         <div className="flex items-center gap-2">
           <button onClick={(e) => { e.stopPropagation(); toggleSectionCollapsed(section.id); }}>
@@ -145,7 +173,6 @@ export function CanvasSectionComponent({
         </div>
       </div>
 
-      {/* Section body — CSS Grid */}
       {!section.collapsed && (
         <div className="p-4">
           <SortableContext items={allItemIds} strategy={verticalListSortingStrategy}>
@@ -156,74 +183,65 @@ export function CanvasSectionComponent({
                 gridAutoRows: 'minmax(60px, auto)',
               }}
             >
-              {/* Render fields with grid placement */}
               {sortedFields.map((field) => {
                 const fieldDef = getFieldDef(field.fieldApiName);
                 if (!fieldDef) return null;
+                const rowStart = itemGridRow.get(field.id) ?? 0;
                 return (
                   <CanvasFieldCard
                     key={field.id}
                     field={field}
                     fieldDef={fieldDef}
                     sectionColumns={section.columns}
+                    gridRowStart={rowStart}
                     isOver={overId === field.id}
                     dropSide={overId === field.id ? dropSide : null}
                   />
                 );
               })}
 
-              {/* Render widgets */}
-              {sectionWidgets.map((widget) => (
-                <CanvasWidgetCard
-                  key={widget.id}
-                  widget={widget}
-                  sectionColumns={section.columns}
-                />
-              ))}
+              {sectionWidgets.map((widget) => {
+                const rowStart = itemGridRow.get(widget.id) ?? 0;
+                return (
+                  <CanvasWidgetCard
+                    key={widget.id}
+                    widget={widget}
+                    sectionColumns={section.columns}
+                    gridRowStart={rowStart}
+                    isOver={overId === widget.id}
+                    dropSide={overId === widget.id ? dropSide : null}
+                  />
+                );
+              })}
 
-              {/* Empty column drop zones */}
               {sortedFields.length === 0 && sectionWidgets.length === 0 && (
                 <>
                   {Array.from({ length: section.columns }, (_, colIdx) => (
-                    <div
+                    <SectionColumnDropTarget
                       key={`empty-${section.id}-col-${colIdx}`}
-                      ref={columnDroppables[colIdx]?.setNodeRef}
-                      className={`min-h-[80px] p-4 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
-                        columnDroppables[colIdx]?.isOver
-                          ? 'border-teal-400 bg-teal-50'
-                          : 'border-gray-200 bg-gray-50/50'
-                      }`}
+                      sectionId={section.id}
+                      columnIndex={colIdx}
                     >
-                      <div className="text-center text-gray-400 text-xs">
-                        <Plus className="h-5 w-5 mx-auto mb-1" />
-                        Drag fields or widgets here
-                      </div>
-                    </div>
+                      {({ setNodeRef, isOver }) => (
+                        <div
+                          ref={setNodeRef}
+                          className={`min-h-[80px] p-4 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
+                            isOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 bg-gray-50/50'
+                          }`}
+                        >
+                          <div className="text-center text-gray-400 text-xs">
+                            <Plus className="h-5 w-5 mx-auto mb-1" />
+                            Drag fields or widgets here
+                          </div>
+                        </div>
+                      )}
+                    </SectionColumnDropTarget>
                   ))}
                 </>
               )}
             </div>
 
-            {/* Column drop zones when there ARE fields (hidden behind grid) */}
-            {(sortedFields.length > 0 || sectionWidgets.length > 0) && (
-              <div className="grid gap-3 mt-2" style={{ gridTemplateColumns: `repeat(${section.columns}, 1fr)` }}>
-                {Array.from({ length: section.columns }, (_, colIdx) => (
-                  <div
-                    key={`drop-${section.id}-col-${colIdx}`}
-                    ref={columnDroppables[colIdx]?.setNodeRef}
-                    className={`min-h-[40px] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
-                      columnDroppables[colIdx]?.isOver
-                        ? 'border-teal-400 bg-teal-50'
-                        : 'border-transparent hover:border-gray-200'
-                    }`}
-                  >
-                    {columnDroppables[colIdx]?.isOver && (
-                      <span className="text-xs text-teal-600">Drop here</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            {(sortedFields.length > 0 || sectionWidgets.length > 0) && renderColumnDropStripe()}
           </SortableContext>
         </div>
       )}

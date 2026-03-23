@@ -19,6 +19,7 @@ interface Snapshot {
   sections: CanvasSection[];
   fields: CanvasField[];
   widgets: CanvasWidget[];
+  highlightFields: string[];
 }
 
 export interface EditorState {
@@ -33,6 +34,8 @@ export interface EditorState {
   selectedElement: SelectedElement;
   layoutName: string;
   editingLayoutId: string | null;
+  /** Field API names for record header highlights (max ~6 in UI) */
+  highlightFields: string[];
   formattingRules: FormattingRule[];
   hasUnsavedChanges: boolean;
 
@@ -65,6 +68,12 @@ export interface EditorState {
   addWidget: (widget: CanvasWidget) => void;
   updateWidget: (id: string, updates: Partial<CanvasWidget>) => void;
   deleteWidget: (id: string) => void;
+  setWidgets: (widgets: CanvasWidget[]) => void;
+
+  // Highlights (layout-level)
+  setHighlightFields: (apiNames: string[]) => void;
+  addHighlightField: (apiName: string) => void;
+  removeHighlightField: (apiName: string) => void;
 
   // Actions — formatting
   setFormattingRules: (rules: FormattingRule[]) => void;
@@ -105,6 +114,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   selectedElement: null,
   layoutName: 'Page Layout',
   editingLayoutId: null,
+  highlightFields: [],
   formattingRules: [],
   hasUnsavedChanges: false,
   undoStack: [],
@@ -203,10 +213,27 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
   },
 
   updateSectionColumns: (id, cols) => {
-    set((s) => ({
-      sections: s.sections.map((sec) => (sec.id === id ? { ...sec, columns: cols } : sec)),
-      hasUnsavedChanges: true,
-    }));
+    set((s) => {
+      const maxCol = cols - 1;
+      const nextFields = s.fields.map((f) => {
+        if (f.sectionId !== id) return f;
+        const column = Math.min(f.column, maxCol);
+        const colSpan = Math.min(f.colSpan, cols - column);
+        return { ...f, column, colSpan: Math.max(1, colSpan) };
+      });
+      const nextWidgets = s.widgets.map((w) => {
+        if (w.sectionId !== id) return w;
+        const column = Math.min(w.column, maxCol);
+        const colSpan = Math.min(w.colSpan, cols - column);
+        return { ...w, column, colSpan: Math.max(1, colSpan) };
+      });
+      return {
+        sections: s.sections.map((sec) => (sec.id === id ? { ...sec, columns: cols } : sec)),
+        fields: nextFields,
+        widgets: nextWidgets,
+        hasUnsavedChanges: true,
+      };
+    });
   },
 
   toggleSectionCollapsed: (id) => {
@@ -249,6 +276,28 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   deleteWidget: (id) => {
     set((s) => ({ widgets: s.widgets.filter((w) => w.id !== id), hasUnsavedChanges: true }));
+  },
+
+  setWidgets: (widgets) => set({ widgets, hasUnsavedChanges: true }),
+
+  setHighlightFields: (apiNames) =>
+    set({ highlightFields: apiNames.slice(0, 8), hasUnsavedChanges: true }),
+
+  addHighlightField: (apiName) => {
+    set((s) => {
+      if (s.highlightFields.includes(apiName) || s.highlightFields.length >= 6) return s;
+      return {
+        highlightFields: [...s.highlightFields, apiName],
+        hasUnsavedChanges: true,
+      };
+    });
+  },
+
+  removeHighlightField: (apiName) => {
+    set((s) => ({
+      highlightFields: s.highlightFields.filter((a) => a !== apiName),
+      hasUnsavedChanges: true,
+    }));
   },
 
   // Formatting rules
@@ -324,6 +373,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     set({
       editingLayoutId: layout.id,
       layoutName: layout.name || 'Page Layout',
+      highlightFields: [...(layout.highlightFields || [])].slice(0, 6),
       tabs: newTabs.length ? newTabs : DEFAULT_TABS,
       sections: newSections,
       fields: newFields,
@@ -358,6 +408,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       selectedElement: null,
       layoutName: 'Page Layout',
       editingLayoutId: null,
+      highlightFields: [],
       formattingRules: [],
       hasUnsavedChanges: false,
       undoStack: [],
@@ -368,12 +419,13 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   // Undo
   pushUndo: () => {
-    const { tabs, sections, fields, widgets, undoStack } = get();
+    const { tabs, sections, fields, widgets, highlightFields, undoStack } = get();
     const snapshot: Snapshot = {
       tabs: structuredClone(tabs),
       sections: structuredClone(sections),
       fields: structuredClone(fields),
       widgets: structuredClone(widgets),
+      highlightFields: [...highlightFields],
     };
     set({ undoStack: [...undoStack.slice(-29), snapshot] });
   },
@@ -387,6 +439,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       sections: prev.sections,
       fields: prev.fields,
       widgets: prev.widgets,
+      highlightFields: [...(prev.highlightFields ?? [])],
       undoStack: undoStack.slice(0, -1),
       hasUnsavedChanges: true,
     });

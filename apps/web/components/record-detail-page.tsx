@@ -648,6 +648,32 @@ export default function RecordDetailPage({
               )}
             </div>
           </div>
+
+          {pageLayout?.highlightFields && pageLayout.highlightFields.length > 0 ? (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                {objectDef?.label ?? 'Record'}
+              </div>
+              <div className="flex flex-wrap gap-x-8 gap-y-3">
+                {pageLayout.highlightFields.map((apiName) => {
+                  const fd = getFieldDef(apiName);
+                  if (!fd) return null;
+                  if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
+                  const fFx = getFormattingEffectsForField(pageLayout, apiName, layoutVisibilityData);
+                  if (fFx?.hidden) return null;
+                  const raw = getRecordValue(apiName, fd);
+                  return (
+                    <div key={apiName} className="min-w-[100px] max-w-[220px]">
+                      <div className="text-xs text-gray-500">{fd.label}</div>
+                      <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
+                        {renderValue(apiName, raw, fd)}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Layout-driven field rendering */}

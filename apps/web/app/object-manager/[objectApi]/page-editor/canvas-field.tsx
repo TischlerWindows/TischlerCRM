@@ -13,12 +13,15 @@ export function CanvasFieldCard({
   field,
   fieldDef,
   sectionColumns,
+  gridRowStart,
   isOver,
   dropSide,
 }: {
   field: CanvasField;
   fieldDef: FieldDef;
   sectionColumns: number;
+  /** 0-based row from packing algorithm (matches dynamic-form) */
+  gridRowStart: number;
   isOver: boolean;
   dropSide: 'top' | 'bottom' | null;
 }) {
@@ -43,7 +46,7 @@ export function CanvasFieldCard({
     transition,
     opacity: isDragging ? 0.5 : 1,
     gridColumn: `${field.column + 1} / span ${Math.min(field.colSpan, sectionColumns - field.column)}`,
-    gridRow: `span ${field.rowSpan}`,
+    gridRow: `${gridRowStart + 1} / span ${field.rowSpan}`,
   };
 
   const isSelected =
@@ -53,6 +56,7 @@ export function CanvasFieldCard({
     <div
       ref={setNodeRef}
       style={style}
+      data-editor-sortable-id={field.id}
       className={`p-3 border rounded-lg bg-white relative group cursor-move transition-shadow ${
         isSelected
           ? 'border-brand-navy border-2 shadow-md ring-1 ring-brand-navy/20'

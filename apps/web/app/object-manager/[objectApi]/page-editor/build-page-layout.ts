@@ -10,6 +10,7 @@ export function buildPageLayoutFromCanvas(params: {
   widgets?: CanvasWidget[];
   objectFields: FieldDef[];
   formattingRules: FormattingRule[];
+  highlightFields?: string[];
 }): PageLayout {
   const {
     editingLayoutId,
@@ -20,6 +21,7 @@ export function buildPageLayoutFromCanvas(params: {
     widgets = [],
     objectFields,
     formattingRules,
+    highlightFields = [],
   } = params;
 
   const fieldMap = new Map(objectFields.map((f) => [f.apiName, f]));
@@ -28,6 +30,7 @@ export function buildPageLayoutFromCanvas(params: {
     id: editingLayoutId || `layout-${Date.now()}`,
     name: layoutName,
     layoutType: 'edit',
+    highlightFields: highlightFields.length > 0 ? highlightFields.slice(0, 6) : undefined,
     tabs: tabs.map((tab) => ({
       id: tab.id,
       label: tab.label,

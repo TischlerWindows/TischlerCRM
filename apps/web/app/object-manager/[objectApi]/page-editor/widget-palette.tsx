@@ -11,6 +11,7 @@ import {
   Activity,
   FolderOpen,
   Component,
+  Minus,
 } from 'lucide-react';
 
 export const WIDGET_PALETTE_TYPES: {
@@ -22,6 +23,7 @@ export const WIDGET_PALETTE_TYPES: {
   { type: 'ActivityFeed', label: 'Activity Feed', icon: Activity },
   { type: 'FileFolder', label: 'File Folder', icon: FolderOpen },
   { type: 'CustomComponent', label: 'Custom Component', icon: Component },
+  { type: 'Spacer', label: 'Spacer', icon: Minus },
 ];
 
 export function DraggableWidgetPaletteCard({

@@ -23,6 +23,7 @@ import { CanvasSectionComponent } from '../canvas-section';
 import { PropertiesPanel } from '../properties-panel';
 import { UnsavedChangesDialog } from '../unsaved-changes-dialog';
 import { DndContextWrapper } from '../dnd-context-wrapper';
+import { LayoutHighlightsStrip } from '../layout-highlights-strip';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, X } from 'lucide-react';
 
@@ -44,6 +45,7 @@ export default function PageEditorFullPage() {
   const editingLayoutId = useEditorStore((s) => s.editingLayoutId);
   const layoutName = useEditorStore((s) => s.layoutName);
   const formattingRules = useEditorStore((s) => s.formattingRules);
+  const highlightFields = useEditorStore((s) => s.highlightFields);
   const hasUnsavedChanges = useEditorStore((s) => s.hasUnsavedChanges);
 
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
@@ -162,9 +164,20 @@ export default function PageEditorFullPage() {
             widgets,
             objectFields: object.fields,
             formattingRules,
+            highlightFields,
           })
         : null,
-    [editingLayoutId, layoutName, tabs, sections, fields, widgets, object, formattingRules],
+    [
+      editingLayoutId,
+      layoutName,
+      tabs,
+      sections,
+      fields,
+      widgets,
+      object,
+      formattingRules,
+      highlightFields,
+    ],
   );
 
   // Save handler
@@ -184,6 +197,7 @@ export default function PageEditorFullPage() {
       widgets,
       objectFields: object.fields,
       formattingRules,
+      highlightFields,
     });
 
     const existingLayouts = object.pageLayouts || [];
@@ -331,6 +345,9 @@ export default function PageEditorFullPage() {
             }}
           >
             <div className="p-6">
+              {objectApiName !== 'Home' && (
+                <LayoutHighlightsStrip objectFields={object.fields} />
+              )}
               {/* Phase 6C: Navy pill tabs */}
               <div className="flex gap-2 mb-5 items-center">
                 {tabs.map((tab) => (
@@ -379,8 +396,6 @@ export default function PageEditorFullPage() {
                       getFieldDef={getFieldDef}
                       isFirst={idx === 0}
                       isLast={idx === activeSections.length - 1}
-                      overId={null}
-                      dropSide={null}
                     />
                   </div>
                 ))}
