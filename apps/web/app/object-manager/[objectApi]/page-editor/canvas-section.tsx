@@ -93,7 +93,7 @@ export function CanvasSectionComponent({
 
   return (
     <div
-      className="border rounded-xl bg-white shadow-sm overflow-hidden"
+      className="group border rounded-xl bg-white shadow-sm overflow-hidden"
       onClick={() => setSelectedElement({ type: 'section', id: section.id })}
     >
       {/* Section header */}
@@ -196,7 +196,7 @@ export function CanvasSectionComponent({
                     >
                       <div className="text-center text-gray-400 text-xs">
                         <Plus className="h-5 w-5 mx-auto mb-1" />
-                        Drop here
+                        Drag fields or widgets here
                       </div>
                     </div>
                   ))}

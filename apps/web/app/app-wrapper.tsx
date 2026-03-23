@@ -371,7 +371,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                             onClick={() => {
                               setShowSetupMenu(false);
                               router.push(
-                                `/object-manager/${encodeURIComponent(recordSetup.objectApiName)}?section=page-editor&layoutId=${encodeURIComponent(recordSetup.pageLayoutId)}`
+                                `/object-manager/${encodeURIComponent(recordSetup.objectApiName)}/page-editor/${encodeURIComponent(recordSetup.pageLayoutId)}`
                               );
                             }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"

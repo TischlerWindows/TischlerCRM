@@ -28,7 +28,11 @@ export function EditorToolbar({
       {/* Top row */}
       <div className="px-4 py-2 flex items-center gap-3 border-b border-gray-100">
         <button
-          onClick={() => router.push(`/object-manager/${objectApiName}?section=page-editor`)}
+          onClick={() =>
+            router.push(
+              `/object-manager/${encodeURIComponent(objectApiName)}?section=page-editor`
+            )
+          }
           className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-navy transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />

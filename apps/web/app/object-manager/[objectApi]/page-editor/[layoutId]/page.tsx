@@ -224,6 +224,42 @@ export default function PageEditorFullPage() {
     }
   };
 
+  const saveLayoutRef = useRef(saveLayout);
+  saveLayoutRef.current = saveLayout;
+
+  // Phase 6E: keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        void saveLayoutRef.current();
+        return;
+      }
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
+        return;
+      }
+      if (e.key === 'Escape') {
+        useEditorStore.getState().setSelectedElement(null);
+        return;
+      }
+      if (e.key === 'Delete') {
+        const sel = useEditorStore.getState().selectedElement;
+        if (!sel || (sel.type !== 'field' && sel.type !== 'widget')) return;
+        const st = useEditorStore.getState();
+        if (sel.type === 'field') st.deleteField(sel.id);
+        else st.deleteWidget(sel.id);
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useEditorStore.getState().undo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Visibility rule handlers
   const handleSaveVisibilityRules = async (conditions: any[]) => {
     if (!selectedElement || selectedElement.type !== 'field' || !object) return;

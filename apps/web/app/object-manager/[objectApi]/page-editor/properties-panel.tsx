@@ -60,7 +60,7 @@ export function PropertiesPanel({
   const getFieldDef = (apiName: string) => allFields.find((f) => f.apiName === apiName);
 
   return (
-    <div className="w-80 border-l bg-white flex flex-col h-full">
+    <div className="w-80 border-l bg-white flex flex-col h-full shadow-sm">
       <div className="p-4 border-b">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
           Properties

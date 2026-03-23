@@ -1854,7 +1854,8 @@ export default function DynamicForm({
               'grid gap-4',
               section.columns === 1 && 'grid-cols-1',
               section.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-              section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+              section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+              section.columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
             )}
           >
             {columnArrays.map((columnEntries, colIndex) => (
@@ -2149,7 +2150,8 @@ export default function DynamicForm({
                           'grid gap-x-8 gap-y-3',
                           section.columns === 1 && 'grid-cols-1',
                           section.columns === 2 && 'grid-cols-1 md:grid-cols-2',
-                          section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                          section.columns === 3 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
+                          section.columns === 4 && 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
                         )}
                       >
                         {columnArrays.map((columnFields, colIndex) => (

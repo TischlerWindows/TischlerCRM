@@ -622,7 +622,7 @@ export default function RecordDetailPage({
                     <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
                     <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
                       <Link
-                        href={`/object-manager/${objectApiName}`}
+                        href={`/object-manager/${encodeURIComponent(objectApiName)}`}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                         onClick={() => setShowAdminMenu(false)}
                       >
@@ -632,7 +632,7 @@ export default function RecordDetailPage({
                       </Link>
                       {pageLayout && (
                         <Link
-                          href={`/object-manager/${objectApiName}?section=page-editor&layoutId=${pageLayout.id}`}
+                          href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}`}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setShowAdminMenu(false)}
                         >
@@ -850,8 +850,10 @@ export default function RecordDetailPage({
                               section.columns === 1
                                 ? 'grid-cols-1'
                                 : section.columns === 2
-                                ? 'grid-cols-1 md:grid-cols-2'
-                                : 'grid-cols-1 md:grid-cols-3'
+                                  ? 'grid-cols-1 md:grid-cols-2'
+                                  : section.columns === 4
+                                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+                                    : 'grid-cols-1 md:grid-cols-3'
                             }`}
                           >
                             {columnArrays.map((colFields, colIdx) => (

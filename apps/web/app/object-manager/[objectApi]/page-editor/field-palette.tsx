@@ -3,15 +3,9 @@
 import React, { useMemo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Input } from '@/components/ui/input';
-import type { FieldDef, WidgetType } from '@/lib/schema';
-import {
-  GripVertical,
-  Search as SearchIcon,
-  LayoutGrid,
-  Activity,
-  FolderOpen,
-  Component,
-} from 'lucide-react';
+import type { FieldDef } from '@/lib/schema';
+import { GripVertical, Search as SearchIcon } from 'lucide-react';
+import { WidgetPaletteGrid } from './widget-palette';
 
 /* ──────────── Draggable Field Card ──────────── */
 
@@ -48,43 +42,6 @@ function DraggableField({ field }: { field: FieldDef }) {
   );
 }
 
-/* ──────────── Draggable Widget Card ──────────── */
-
-const WIDGET_TYPES: { type: WidgetType; label: string; icon: React.ElementType }[] = [
-  { type: 'RelatedList', label: 'Related List', icon: LayoutGrid },
-  { type: 'ActivityFeed', label: 'Activity Feed', icon: Activity },
-  { type: 'FileFolder', label: 'File Folder', icon: FolderOpen },
-  { type: 'CustomComponent', label: 'Custom Component', icon: Component },
-];
-
-function DraggableWidgetCard({ wt }: { wt: (typeof WIDGET_TYPES)[number] }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `widget-new-${wt.type}`,
-    data: { widgetType: wt.type },
-  });
-
-  const Icon = wt.icon;
-  const style: React.CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="p-3 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50/50 cursor-grab active:cursor-grabbing hover:border-blue-500 hover:bg-blue-50 transition-colors"
-    >
-      <div className="flex items-center gap-2">
-        <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />
-        <span className="text-sm font-medium text-blue-900">{wt.label}</span>
-      </div>
-    </div>
-  );
-}
-
 /* ──────────── Field Palette ──────────── */
 
 export function FieldPalette({
@@ -108,7 +65,7 @@ export function FieldPalette({
   }, [availableFields, searchTerm]);
 
   return (
-    <div className="w-64 border-r bg-white flex flex-col h-full">
+    <div className="w-64 border-r bg-white flex flex-col h-full shadow-sm">
       {/* Tab switcher */}
       <div className="flex border-b">
         <button
@@ -167,14 +124,7 @@ export function FieldPalette({
             </div>
           </>
         ) : (
-          <div className="space-y-2">
-            <p className="text-xs text-gray-500 mb-3">
-              Drag widgets onto the canvas to add them to your layout.
-            </p>
-            {WIDGET_TYPES.map((wt) => (
-              <DraggableWidgetCard key={wt.type} wt={wt} />
-            ))}
-          </div>
+          <WidgetPaletteGrid />
         )}
       </div>
     </div>

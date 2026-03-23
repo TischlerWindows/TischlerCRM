@@ -107,6 +107,57 @@ export function LayoutPreviewDialog({
                       .sort((a, b) => a.order - b.order);
                   }
 
+                  const renderFieldPreview = (pf: PageField) => {
+                    const fieldDef = getFieldDefForPreview(pf.apiName, allFields, pf);
+                    if (!fieldDef) return null;
+                    if (!evaluateVisibility(fieldDef.visibleIf, data)) return null;
+                    const fFx = getFormattingEffectsForField(pageLayout, pf.apiName, data);
+                    if (fFx?.hidden) return null;
+
+                    const highlight = fieldHighlightWrapperClass(fFx?.highlightToken);
+                    const badge = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                    const labelClass = labelPresentationClassName(pf.presentation);
+                    const raw = data[pf.apiName];
+                    const display = formatSampleValue(raw);
+
+                    return (
+                      <div
+                        key={pf.apiName}
+                        className={`${highlight ? `${highlight} p-2` : ''}`.trim()}
+                      >
+                        <dt className={`text-sm ${labelClass}`}>
+                          {fieldDef.label}
+                          {fieldDef.required ? (
+                            <span className="text-red-500 ml-0.5">*</span>
+                          ) : null}
+                          {fFx?.readOnly ? (
+                            <span className="ml-2 text-xs font-normal text-gray-400">
+                              (read-only)
+                            </span>
+                          ) : null}
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-800 flex flex-wrap items-center gap-2">
+                          <span>{display}</span>
+                          {badge ? <span className={badge}>Rule</span> : null}
+                        </dd>
+                      </div>
+                    );
+                  };
+
+                  const hasSpanning = section.fields.some(
+                    (f) => ((f as { colSpan?: number }).colSpan ?? 1) > 1 ||
+                      ((f as { rowSpan?: number }).rowSpan ?? 1) > 1
+                  );
+
+                  const gridColsClass =
+                    section.columns === 1
+                      ? 'grid-cols-1'
+                      : section.columns === 2
+                        ? 'grid-cols-1 sm:grid-cols-2'
+                        : section.columns === 4
+                          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+                          : 'grid-cols-1 sm:grid-cols-3';
+
                   return (
                     <div
                       key={section.id}
@@ -119,60 +170,97 @@ export function LayoutPreviewDialog({
                         ) : null}
                       </div>
                       <div className="p-4">
-                        <div
-                          className={`grid gap-4 ${
-                            section.columns === 1
-                              ? 'grid-cols-1'
-                              : section.columns === 2
-                                ? 'grid-cols-1 sm:grid-cols-2'
-                                : 'grid-cols-1 sm:grid-cols-3'
-                          }`}
-                        >
-                          {columnArrays.map((colFields, colIdx) => (
-                            <div key={colIdx} className="flex flex-col gap-3">
-                              {colFields.map((pf) => {
-                                const fieldDef = getFieldDefForPreview(pf.apiName, allFields, pf);
-                                if (!fieldDef) return null;
-                                if (!evaluateVisibility(fieldDef.visibleIf, data)) return null;
-                                const fFx = getFormattingEffectsForField(
-                                  pageLayout,
-                                  pf.apiName,
-                                  data
-                                );
-                                if (fFx?.hidden) return null;
-
-                                const highlight = fieldHighlightWrapperClass(fFx?.highlightToken);
-                                const badge = fFx?.badge ? badgePillClass(fFx.badge) : '';
-                                const labelClass = labelPresentationClassName(pf.presentation);
-                                const raw = data[pf.apiName];
-                                const display = formatSampleValue(raw);
-
+                        {hasSpanning ? (() => {
+                          const placed: Array<{
+                            pf: PageField;
+                            gridRow: number;
+                            colSpan: number;
+                            rowSpan: number;
+                          }> = [];
+                          const occupied = new Set<string>();
+                          const colGroups: PageField[][] = [];
+                          for (let c = 0; c < section.columns; c++) {
+                            colGroups[c] = section.fields
+                              .filter((f) => f.column === c)
+                              .sort((a, b) => a.order - b.order);
+                          }
+                          for (let c = 0; c < section.columns; c++) {
+                            for (const pf of colGroups[c] || []) {
+                              const cs = Math.min(
+                                (pf as { colSpan?: number }).colSpan ?? 1,
+                                section.columns - pf.column
+                              );
+                              const rs = (pf as { rowSpan?: number }).rowSpan ?? 1;
+                              let row = 1;
+                              search: while (true) {
+                                for (let dr = 0; dr < rs; dr++) {
+                                  for (let dc = 0; dc < cs; dc++) {
+                                    if (occupied.has(`${row + dr},${pf.column + dc}`)) {
+                                      row++;
+                                      continue search;
+                                    }
+                                  }
+                                }
+                                break;
+                              }
+                              placed.push({ pf, gridRow: row, colSpan: cs, rowSpan: rs });
+                              for (let dr = 0; dr < rs; dr++) {
+                                for (let dc = 0; dc < cs; dc++) {
+                                  occupied.add(`${row + dr},${pf.column + dc}`);
+                                }
+                              }
+                            }
+                          }
+                          return (
+                            <div
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: `repeat(${section.columns}, 1fr)`,
+                                gridAutoRows: 'minmax(60px, auto)',
+                                gap: '1rem',
+                              }}
+                            >
+                              {placed.map(({ pf, gridRow, colSpan, rowSpan }) => {
+                                const inner = renderFieldPreview(pf);
+                                if (!inner) return null;
                                 return (
                                   <div
                                     key={pf.apiName}
-                                    className={`${highlight ? `${highlight} p-2` : ''}`.trim()}
+                                    style={{
+                                      gridColumn: `${pf.column + 1} / span ${Math.min(colSpan, section.columns - pf.column)}`,
+                                      gridRow: `${gridRow} / span ${rowSpan}`,
+                                    }}
                                   >
-                                    <dt className={`text-sm ${labelClass}`}>
-                                      {fieldDef.label}
-                                      {fieldDef.required ? (
-                                        <span className="text-red-500 ml-0.5">*</span>
-                                      ) : null}
-                                      {fFx?.readOnly ? (
-                                        <span className="ml-2 text-xs font-normal text-gray-400">
-                                          (read-only)
-                                        </span>
-                                      ) : null}
-                                    </dt>
-                                    <dd className="mt-1 text-sm text-gray-800 flex flex-wrap items-center gap-2">
-                                      <span>{display}</span>
-                                      {badge ? <span className={badge}>Rule</span> : null}
-                                    </dd>
+                                    {inner}
                                   </div>
                                 );
                               })}
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })() : (
+                          <div className={`grid gap-4 ${gridColsClass}`}>
+                            {columnArrays.map((colFields, colIdx) => (
+                              <div key={colIdx} className="flex flex-col gap-3">
+                                {colFields.map((pf) => renderFieldPreview(pf))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {(section.widgets && section.widgets.length > 0) ? (
+                          <div className="mt-4 space-y-2 border-t border-dashed border-blue-200 pt-3">
+                            {section.widgets.map((w) => (
+                              <div
+                                key={w.id}
+                                className="p-3 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/40 text-sm text-blue-900"
+                              >
+                                <span className="font-medium">Widget:</span> {w.widgetType}
+                                {w.config && 'label' in w.config && w.config.label
+                                  ? ` — ${w.config.label}`
+                                  : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   );
