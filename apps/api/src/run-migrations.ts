@@ -12,6 +12,18 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_must_change_password',
     sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "mustChangePassword" BOOLEAN NOT NULL DEFAULT false`,
   },
+  {
+    name: 'add_layout_field_col_span',
+    sql: `ALTER TABLE "LayoutField" ADD COLUMN IF NOT EXISTS "colSpan" INTEGER NOT NULL DEFAULT 1`,
+  },
+  {
+    name: 'add_layout_field_row_span',
+    sql: `ALTER TABLE "LayoutField" ADD COLUMN IF NOT EXISTS "rowSpan" INTEGER NOT NULL DEFAULT 1`,
+  },
+  {
+    name: 'add_layout_field_presentation',
+    sql: `ALTER TABLE "LayoutField" ADD COLUMN IF NOT EXISTS "presentation" JSONB`,
+  },
 ];
 
 export async function runPendingMigrations() {
