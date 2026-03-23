@@ -19,6 +19,11 @@ import {
 import type { FieldDef, PageField, PageLayout } from '@/lib/schema';
 import { normalizeFieldType } from '@/lib/schema';
 import { buildSampleRecordFromFields } from './layout-sample-data';
+import {
+  resolveTabCanvasItems,
+  gridItemStyle,
+  TAB_GRID_COLUMNS,
+} from '@/lib/tab-canvas-grid';
 
 function getFieldDefForPreview(
   apiName: string,
@@ -119,8 +124,29 @@ export function LayoutPreviewDialog({
               <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
                 {tab.label}
               </h3>
-              <div className="space-y-4">
-                {tab.sections.map((section) => {
+              <div
+                className="grid gap-4"
+                style={{ gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))` }}
+              >
+                {resolveTabCanvasItems(tab).map((item) => {
+                  if (item.kind === 'widget') {
+                    const w = item.widget;
+                    return (
+                      <div
+                        key={w.id}
+                        className="border border-dashed border-blue-200 rounded-lg bg-blue-50/40 p-4 text-sm text-blue-900 min-w-0"
+                        style={gridItemStyle({
+                          gridColumn: w.gridColumn ?? 1,
+                          gridColumnSpan: w.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                          gridRow: w.gridRow ?? 1,
+                          gridRowSpan: w.gridRowSpan ?? 1,
+                        })}
+                      >
+                        <span className="font-medium">Widget:</span> {w.widgetType}
+                      </div>
+                    );
+                  }
+                  const section = item.section;
                   if (section.showInTemplate === false) return null;
                   if (!evaluateVisibility(section.visibleIf, data)) return null;
                   const sFx = getFormattingEffectsForSection(pageLayout, section.id, data);
@@ -187,7 +213,13 @@ export function LayoutPreviewDialog({
                   return (
                     <div
                       key={section.id}
-                      className="border border-gray-200 rounded-lg bg-white overflow-hidden"
+                      className="border border-gray-200 rounded-lg bg-white overflow-hidden min-w-0"
+                      style={gridItemStyle({
+                        gridColumn: section.gridColumn ?? 1,
+                        gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                        gridRow: section.gridRow ?? 1,
+                        gridRowSpan: section.gridRowSpan ?? 1,
+                      })}
                     >
                       <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                         <div className="font-medium text-gray-900">{section.label}</div>

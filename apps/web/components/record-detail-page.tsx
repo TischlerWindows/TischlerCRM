@@ -19,7 +19,11 @@ import {
   fieldHighlightWrapperClass,
   labelPresentationClassName,
 } from '@/lib/layout-presentation';
-import { groupSectionsIntoRows } from '@/lib/group-section-rows';
+import {
+  resolveTabCanvasItems,
+  gridItemStyle,
+  TAB_GRID_COLUMNS,
+} from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
@@ -720,15 +724,40 @@ export default function RecordDetailPage({
                 );
                 return !allFieldsEmpty;
               });
-              const rows = groupSectionsIntoRows(eligible);
+              const isSectionShown = (section: (typeof tab.sections)[0]) =>
+                eligible.some((s) => s.id === section.id);
+
+              const items = resolveTabCanvasItems(tab);
+              const visibleItems = items.filter((item) => {
+                if (item.kind === 'widget') return true;
+                return isSectionShown(item.section);
+              });
+
               return (
-              <div key={ti}>
-                {tab.widgets && tab.widgets.length > 0 ? (
-                  <LayoutWidgetsInline widgets={tab.widgets} />
-                ) : null}
-                {rows.map((row, ri) => (
-                  <div key={`${ti}-row-${ri}`} className="flex flex-wrap gap-6 items-stretch mb-6">
-                    {row.map((section) => {
+              <div
+                key={ti}
+                className="grid gap-4 mb-6"
+                style={{ gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))` }}
+              >
+                {visibleItems.map((item) => {
+                  if (item.kind === 'widget') {
+                    const g = item.widget;
+                    return (
+                      <div
+                        key={g.id}
+                        className="min-w-0"
+                        style={gridItemStyle({
+                          gridColumn: g.gridColumn ?? 1,
+                          gridColumnSpan: g.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                          gridRow: g.gridRow ?? 1,
+                          gridRowSpan: g.gridRowSpan ?? 1,
+                        })}
+                      >
+                        <LayoutWidgetsInline widgets={[g]} />
+                      </div>
+                    );
+                  }
+                  const section = item.section;
                   // Column-based layout: group fields by column, sorted by
                   // order within each column (same approach as DynamicForm).
                   const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
@@ -760,7 +789,6 @@ export default function RecordDetailPage({
                   );
 
                   const sectionKey = `${ti}-${section.id}`;
-                  const w = section.rowWeight ?? 1;
                   const isCollapsed = sectionToggles[sectionKey] === false;
 
                   const toggleSection = () => {
@@ -783,13 +811,13 @@ export default function RecordDetailPage({
                   return (
                     <div
                       key={section.id}
-                      className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-[200px] flex-1"
-                      style={{
-                        flexGrow: w,
-                        flexShrink: 1,
-                        flexBasis: 0,
-                        minWidth: 'min(100%, 220px)',
-                      }}
+                      className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
+                      style={gridItemStyle({
+                        gridColumn: section.gridColumn ?? 1,
+                        gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                        gridRow: section.gridRow ?? 1,
+                        gridRowSpan: section.gridRowSpan ?? 1,
+                      })}
                     >
                       <button
                         type="button"
@@ -967,8 +995,6 @@ export default function RecordDetailPage({
                     </div>
                   );
                 })}
-                  </div>
-                ))}
               </div>
               );
             })}

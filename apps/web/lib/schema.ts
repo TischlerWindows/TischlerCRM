@@ -282,6 +282,11 @@ export interface PageWidget {
   colSpan?: number;
   rowSpan?: number;
   config: WidgetConfig;
+  /** Tab canvas placement (12-column grid); omit when widget is inside a section only */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
 }
 
 // ── Page layout sections ───────────────────────────────────────
@@ -307,6 +312,14 @@ export interface PageSection {
   layoutRowId?: string;
   /** Flex grow weight within the row (default 1). */
   rowWeight?: number;
+  /**
+   * Tab canvas placement (12-column grid). Legacy layouts without these fields are inferred at load
+   * from `layoutRowId` + `rowWeight` (see `normalizeCanvasTabGrids` / `resolveTabCanvasItems`).
+   */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
 }
 
 /**

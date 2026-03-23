@@ -21,7 +21,11 @@ import {
   getFormattingEffectsForSection,
 } from '@/lib/layout-formatting';
 import { labelPresentationClassName } from '@/lib/layout-presentation';
-import { groupSectionsIntoRows } from '@/lib/group-section-rows';
+import {
+  resolveTabCanvasItems,
+  gridItemStyle,
+  TAB_GRID_COLUMNS,
+} from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
@@ -2054,15 +2058,14 @@ export default function DynamicForm({
         </div>
       )}
 
-      {/* Sections — normal mode (all sections shown); layoutRowId groups side-by-side */}
+      {/* Sections + tab widgets — 12-column tab canvas */}
       {!showReview && !isWizardMode && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {currentTab.widgets && currentTab.widgets.length > 0 ? (
-            <LayoutWidgetsInline widgets={currentTab.widgets} />
-          ) : null}
           {(() => {
-            const sorted = [...currentTab.sections].sort((a, b) => a.order - b.order);
-            const visible = sorted.filter((section) => {
+            const items = resolveTabCanvasItems(currentTab);
+            const filtered = items.filter((item) => {
+              if (item.kind === 'widget') return true;
+              const section = item.section;
               const isSectionVisible = evaluateVisibility(section.visibleIf, formData, visibilityCtx);
               if (!isSectionVisible) return false;
               if (section.showInTemplate === false) return false;
@@ -2075,22 +2078,43 @@ export default function DynamicForm({
               if (secFx?.hidden) return false;
               return true;
             });
-            const rows = groupSectionsIntoRows(visible);
-            return rows.map((row, ri) => (
-              <div key={`row-${ri}`} className="flex flex-wrap gap-4 items-stretch">
-                {row.map((section) => {
+            return (
+              <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))`,
+                }}
+              >
+                {filtered.map((item) => {
+                  if (item.kind === 'widget') {
+                    const g = item.widget;
+                    return (
+                      <div
+                        key={g.id}
+                        className="min-w-0"
+                        style={gridItemStyle({
+                          gridColumn: g.gridColumn ?? 1,
+                          gridColumnSpan: g.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                          gridRow: g.gridRow ?? 1,
+                          gridRowSpan: g.gridRowSpan ?? 1,
+                        })}
+                      >
+                        <LayoutWidgetsInline widgets={[g]} />
+                      </div>
+                    );
+                  }
+                  const section = item.section;
                   const isCollapsed = collapsedSections.has(section.id);
-                  const w = section.rowWeight ?? 1;
                   return (
                     <div
                       key={section.id}
-                      className="bg-white rounded-lg border border-gray-200 min-w-[200px] flex-1"
-                      style={{
-                        flexGrow: w,
-                        flexShrink: 1,
-                        flexBasis: 0,
-                        minWidth: 'min(100%, 220px)',
-                      }}
+                      className="bg-white rounded-lg border border-gray-200 min-w-0"
+                      style={gridItemStyle({
+                        gridColumn: section.gridColumn ?? 1,
+                        gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                        gridRow: section.gridRow ?? 1,
+                        gridRowSpan: section.gridRowSpan ?? 1,
+                      })}
                     >
                       <button
                         type="button"
@@ -2117,7 +2141,7 @@ export default function DynamicForm({
                   );
                 })}
               </div>
-            ));
+            );
           })()}
         </div>
       )}

@@ -19,18 +19,17 @@ import { buildPageLayoutFromCanvas } from '../build-page-layout';
 import { useEditorStore } from '../editor-store';
 import { EditorToolbar } from '../editor-toolbar';
 import { FieldPalette } from '../field-palette';
-import { CanvasSectionComponent } from '../canvas-section';
 import { PropertiesPanel } from '../properties-panel';
 import { UnsavedChangesDialog } from '../unsaved-changes-dialog';
 import { DndContextWrapper } from '../dnd-context-wrapper';
-import { LayoutHighlightsStrip } from '../layout-highlights-strip';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Plus, Trash2, X } from 'lucide-react';
 import { getObjectListHref } from '@/lib/object-list-routes';
-import { groupSectionsIntoRows } from '@/lib/group-section-rows';
 import { useEditorSidePanels } from '../use-editor-side-panels';
-import { TabRootWidgetArea } from '../tab-root-widget-area';
-import { SectionRowWeightHandle } from '../section-row-weight-handle';
+import { RecordHeaderChrome } from '../record-header-chrome';
+import { NewLayoutTemplateModal } from '../new-layout-template-modal';
+import { TabCanvasGridEditor } from '../tab-canvas-grid-editor';
+import type { LayoutPresetId } from '../layout-presets';
 
 export default function PageEditorFullPage() {
   const params = useParams();
@@ -61,6 +60,7 @@ export default function PageEditorFullPage() {
   const addSection = useEditorStore((s) => s.addSection);
   const loadLayout = useEditorStore((s) => s.loadLayout);
   const reset = useEditorStore((s) => s.reset);
+  const applyLayoutPreset = useEditorStore((s) => s.applyLayoutPreset);
   const markSaved = useEditorStore((s) => s.markSaved);
   const setFormattingRules = useEditorStore((s) => s.setFormattingRules);
   const markDirty = useEditorStore((s) => s.markDirty);
@@ -74,6 +74,7 @@ export default function PageEditorFullPage() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const [unsavedDialogSaving, setUnsavedDialogSaving] = useState(false);
+  const [newLayoutTemplateGate, setNewLayoutTemplateGate] = useState(layoutId === 'new');
 
   const sidePanels = useEditorSidePanels();
 
@@ -85,6 +86,11 @@ export default function PageEditorFullPage() {
 
   useEffect(() => {
     didLoad.current = false;
+  }, [layoutId]);
+
+  useEffect(() => {
+    if (layoutId === 'new') setNewLayoutTemplateGate(true);
+    else setNewLayoutTemplateGate(false);
   }, [layoutId]);
 
   useEffect(() => {
@@ -182,11 +188,6 @@ export default function PageEditorFullPage() {
     .filter((s) => s.tabId === activeTabId)
     .sort((a, b) => a.order - b.order);
 
-  const sectionRows = useMemo(
-    () => groupSectionsIntoRows(activeSections),
-    [activeSections],
-  );
-
   const tabWidgetsForActive = useMemo(
     () =>
       widgets
@@ -194,6 +195,28 @@ export default function PageEditorFullPage() {
         .sort((a, b) => a.order - b.order),
     [widgets, activeTabId],
   );
+
+  const tabCanvasPlacements = useMemo(() => {
+    type P = { kind: 'section' | 'widget'; id: string };
+    const list: P[] = [
+      ...activeSections.map((s) => ({ kind: 'section' as const, id: s.id })),
+      ...tabWidgetsForActive.map((w) => ({ kind: 'widget' as const, id: w.id })),
+    ];
+    const gridOf = (p: P) => {
+      if (p.kind === 'section') {
+        const s = sections.find((x) => x.id === p.id);
+        return { r: s?.gridRow ?? 1, c: s?.gridColumn ?? 1 };
+      }
+      const w = widgets.find((x) => x.id === p.id);
+      return { r: w?.gridRow ?? 1, c: w?.gridColumn ?? 1 };
+    };
+    return list.sort((a, b) => {
+      const ga = gridOf(a);
+      const gb = gridOf(b);
+      if (ga.r !== gb.r) return ga.r - gb.r;
+      return ga.c - gb.c;
+    });
+  }, [activeSections, tabWidgetsForActive, sections, widgets]);
 
   const layoutAssignmentNote = useMemo(() => {
     if (!object?.recordTypes?.length) return null;
@@ -447,21 +470,9 @@ export default function PageEditorFullPage() {
             />
           )}
 
-          {/* Phase 6A: Canvas with dot-grid background */}
-          <div
-            className="min-w-0 flex-1 overflow-y-auto"
-            data-editor-canvas
-            style={{
-              backgroundColor: '#f8f9fa',
-              backgroundImage:
-                'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-              backgroundSize: '20px 20px',
-            }}
-          >
-            <div className="p-6">
-              {objectApiName !== 'Home' && (
-                <LayoutHighlightsStrip objectFields={object.fields} />
-              )}
+          <div className="min-w-0 flex-1 overflow-y-auto bg-gray-100" data-editor-canvas>
+            <div className={`p-6 ${newLayoutTemplateGate && layoutId === 'new' ? 'pointer-events-none opacity-40' : ''}`}>
+              {objectApiName !== 'Home' && <RecordHeaderChrome objectLabel={object.label} />}
               {/* Phase 6C: Navy pill tabs */}
               <div className="flex gap-2 mb-5 items-center">
                 {tabs.map((tab) => (
@@ -499,58 +510,16 @@ export default function PageEditorFullPage() {
                 </button>
               </div>
 
-              {objectApiName !== 'Home' && (
-                <TabRootWidgetArea activeTabId={activeTabId} tabWidgets={tabWidgetsForActive} />
-              )}
-
-              {/* Sections (grouped by layoutRowId into horizontal rows) */}
               <div className="space-y-4">
-                {sectionRows.map((row, rowIdx) => (
-                  <div
-                    key={`row-${rowIdx}`}
-                    className="flex flex-wrap gap-1 items-stretch"
-                  >
-                    {row.map((section, si) => {
-                      const idx = activeSections.findIndex((s) => s.id === section.id);
-                      const w = section.rowWeight ?? 1;
-                      const prev = si > 0 ? row[si - 1] : null;
-                      const showResize =
-                        si > 0 &&
-                        section.layoutRowId &&
-                        prev?.layoutRowId === section.layoutRowId;
-                      return (
-                        <React.Fragment key={section.id}>
-                          {showResize ? (
-                            <SectionRowWeightHandle
-                              leftSectionId={prev!.id}
-                              rightSectionId={section.id}
-                            />
-                          ) : null}
-                          <div
-                            className="group min-w-[200px] flex-1"
-                            style={{
-                              flexGrow: w,
-                              flexShrink: 1,
-                              flexBasis: 0,
-                              minWidth: 'min(100%, 200px)',
-                            }}
-                          >
-                            <CanvasSectionComponent
-                              section={section}
-                              sectionFields={fields.filter((f) => f.sectionId === section.id)}
-                              sectionWidgets={widgets.filter(
-                                (w) => w.sectionId && w.sectionId === section.id,
-                              )}
-                              getFieldDef={getFieldDef}
-                              isFirst={idx === 0}
-                              isLast={idx === activeSections.length - 1}
-                            />
-                          </div>
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
-                ))}
+                <TabCanvasGridEditor
+                  tabId={activeTabId}
+                  placements={tabCanvasPlacements}
+                  sections={sections}
+                  widgets={widgets}
+                  fields={fields}
+                  getFieldDef={getFieldDef}
+                  activeSectionsOrdered={activeSections}
+                />
 
                 <Button
                   onClick={addSection}
@@ -609,6 +578,14 @@ export default function PageEditorFullPage() {
       </div>
 
       {/* ─── Dialogs ─── */}
+
+      <NewLayoutTemplateModal
+        open={layoutId === 'new' && newLayoutTemplateGate}
+        onChoose={(presetId: LayoutPresetId) => {
+          applyLayoutPreset(presetId);
+          setNewLayoutTemplateGate(false);
+        }}
+      />
 
       <LayoutPreviewDialog
         open={showPreviewDialog}
