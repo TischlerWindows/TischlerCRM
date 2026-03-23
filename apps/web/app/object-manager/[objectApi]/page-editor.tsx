@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -77,9 +77,10 @@ import {
 
 interface PageEditorProps {
   objectApiName: string;
+  initialLayoutId?: string | null;
 }
 
-export default function PageEditor({ objectApiName }: PageEditorProps) {
+export default function PageEditor({ objectApiName, initialLayoutId }: PageEditorProps) {
   const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
@@ -124,6 +125,70 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
   const [formattingRules, setFormattingRules] = useState<FormattingRule[]>([]);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showFormattingRulesDialog, setShowFormattingRulesDialog] = useState(false);
+  const didAutoOpen = useRef(false);
+
+  // Auto-open a specific layout when navigated with ?layoutId=...
+  useEffect(() => {
+    if (didAutoOpen.current || !initialLayoutId || !object) return;
+    const layout = object.pageLayouts?.find((l) => l.id === initialLayoutId);
+    if (!layout) return;
+    didAutoOpen.current = true;
+    setEditingLayoutId(initialLayoutId);
+    setLayoutName(layout.name || 'Page Layout');
+    setFormattingRules(
+      layout.formattingRules?.length
+        ? layout.formattingRules
+        : ((layout.extensions?.formattingRules as FormattingRule[] | undefined) ?? [])
+    );
+    const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
+      id: `tab-${idx + 1}`,
+      label: tab.label,
+      order: tab.order,
+    }));
+    const newSections: CanvasSection[] = [];
+    const newFields: CanvasField[] = [];
+    let sectionCounter = 1;
+    let fieldCounter = 1;
+    layout.tabs.forEach((tab, ti) => {
+      const tabId = `tab-${ti + 1}`;
+      tab.sections.forEach((section) => {
+        const sectionId = `section-${sectionCounter++}`;
+        newSections.push({
+          id: sectionId,
+          label: section.label,
+          tabId,
+          columns: section.columns || 2,
+          order: section.order,
+          collapsed: section.collapsed || false,
+          showInRecord: section.showInRecord !== false,
+          showInTemplate: section.showInTemplate !== false,
+          visibleIf: section.visibleIf,
+        });
+        section.fields.forEach((f) => {
+          newFields.push({
+            id: `field-${fieldCounter++}`,
+            apiName: f.apiName,
+            label: f.label || f.apiName,
+            type: f.type || 'Text',
+            sectionId,
+            column: f.column ?? 0,
+            order: f.order,
+            required: f.required || false,
+            readOnly: f.readOnly || false,
+            colSpan: f.colSpan,
+            rowSpan: f.rowSpan,
+            presentation: f.presentation,
+          });
+        });
+      });
+    });
+    setTabs(newTabs.length ? newTabs : [{ id: 'tab-1', label: 'General Information', order: 0 }]);
+    setSections(newSections);
+    setFields(newFields);
+    setActiveTab(newTabs[0]?.id || 'tab-1');
+    setHasUnsavedChanges(false);
+    setViewMode('editor');
+  }, [initialLayoutId, object]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),

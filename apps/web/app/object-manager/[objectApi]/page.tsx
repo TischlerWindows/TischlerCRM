@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Database, 
@@ -142,10 +142,12 @@ const SIDEBAR_SECTIONS = [
 export default function ObjectDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const objectApi = params.objectApi as string;
   const { schema, loading, setSelectedObject } = useSchemaStore();
-  const [activeSection, setActiveSection] = useState('details');
+  const [activeSection, setActiveSection] = useState(() => searchParams.get('section') || 'details');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const initialLayoutId = searchParams.get('layoutId');
 
   useEffect(() => {
     setSelectedObject(objectApi);
@@ -384,7 +386,7 @@ export default function ObjectDetailPage() {
 
           {activeSection === 'page-editor' && objectApi !== 'Home' && (
             <div className="h-[calc(100vh-200px)]">
-              <PageEditor objectApiName={objectApi} />
+              <PageEditor objectApiName={objectApi} initialLayoutId={initialLayoutId} />
             </div>
           )}
 

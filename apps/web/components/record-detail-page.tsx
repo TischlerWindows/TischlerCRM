@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
@@ -57,6 +57,8 @@ export default function RecordDetailPage({
 
   const canEdit = canAccess(objectApiName, 'edit');
   const canDelete = canAccess(objectApiName, 'delete');
+  const { hasAppPermission } = usePermissions();
+  const canCustomize = hasAppPermission('customizeApplication');
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
@@ -64,6 +66,7 @@ export default function RecordDetailPage({
   const [showEditForm, setShowEditForm] = useState(false);
   // Tracks which sections the user has manually toggled open/closed
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
   // Counter bumped after lookup records finish loading to trigger re-render
   const [lookupTick, setLookupTick] = useState(0);
 
@@ -580,6 +583,45 @@ export default function RecordDetailPage({
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </button>
+              )}
+              {canCustomize && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowAdminMenu(prev => !prev)}
+                  className="inline-flex items-center px-2.5 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500"
+                  title="Page setup"
+                >
+                  <Settings className="w-4 h-4" />
+                  <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                </button>
+                {showAdminMenu && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
+                    <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
+                      <Link
+                        href={`/object-manager/${objectApiName}`}
+                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                        onClick={() => setShowAdminMenu(false)}
+                      >
+                        <Database className="w-4 h-4 text-gray-400" />
+                        Edit Object
+                        <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
+                      </Link>
+                      {pageLayout && (
+                        <Link
+                          href={`/object-manager/${objectApiName}?section=page-layouts&layoutId=${pageLayout.id}`}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setShowAdminMenu(false)}
+                        >
+                          <Edit className="w-4 h-4 text-gray-400" />
+                          Edit Page Layout
+                          <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
+                        </Link>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
               )}
             </div>
           </div>
