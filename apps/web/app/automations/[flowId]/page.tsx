@@ -256,7 +256,11 @@ function ElementConfigPanel({
   };
 
   return (
-    <div className="absolute right-0 top-0 bottom-0 w-96 bg-white border-l border-gray-200 shadow-xl z-20 flex flex-col">
+    <div className={cn(
+      "absolute right-0 top-0 bottom-0 bg-white border-l border-gray-200 shadow-xl z-20 flex flex-col",
+      element.type === 'update-records' || element.type === 'get-records' || element.type === 'create-record' || element.type === 'delete-records'
+        ? 'w-[480px]' : 'w-96'
+    )}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -594,48 +598,255 @@ function ElementConfigPanel({
           </>
         )}
 
-        {/* UPDATE RECORDS */}
-        {element.type === 'update-records' && (
+        {/* UPDATE RECORDS — Salesforce-style */}
+        {element.type === 'update-records' && (() => {
+          const findMode = element.config.findMode || 'trigger-record';
+          const conditionLogic = element.config.conditionLogic || 'all';
+          const selectedObj = objects.find(o => o.apiName === (element.config.objectApiName || flow.objectApiName));
+          const objFields = selectedObj?.fields || [];
+          const triggerObj = objects.find(o => o.apiName === flow.objectApiName);
+          const triggerObjLabel = triggerObj?.label || flow.objectApiName || 'record';
+
+          return (
           <>
+            {/* API Name */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Object</label>
-              <select
-                value={element.config.objectApiName || ''}
-                onChange={e => updateConfig('objectApiName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              >
-                <option value="">Select object…</option>
-                {objects.map(o => <option key={o.apiName} value={o.apiName}>{o.label}</option>)}
-              </select>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                <span className="text-red-500">*</span> API Name
+              </label>
+              <input
+                value={element.config.apiName || element.label.replace(/\s+/g, '_')}
+                onChange={e => updateConfig('apiName', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+              />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Filter (find records to update)</label>
-              {(element.config.filters || []).map((f: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 mb-2">
-                  <input value={f.field||''} onChange={e => { const u=[...(element.config.filters||[])]; u[i]={...f,field:e.target.value}; updateConfig('filters',u); }} placeholder="Field" className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs" />
-                  <select value={f.op||'=='} onChange={e => { const u=[...(element.config.filters||[])]; u[i]={...f,op:e.target.value}; updateConfig('filters',u); }} className="px-2 py-1.5 border border-gray-300 rounded text-xs">
-                    <option value="==">Equals</option><option value="!=">Not Equal</option>
+
+            {/* How to find records */}
+            <div className="border-t border-gray-200 pt-4">
+              <label className="block text-xs font-bold text-gray-900 mb-1">
+                <span className="text-red-500">*</span> How to Find Records to Update and Set Their Values
+              </label>
+              <div className="space-y-2 mt-2">
+                {flow.type === 'record-triggered' && (
+                  <>
+                    <label className="flex items-start gap-2 p-2 rounded-lg border border-transparent hover:border-gray-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`findMode-${element.id}`}
+                        checked={findMode === 'trigger-record'}
+                        onChange={() => updateConfig('findMode', 'trigger-record')}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm text-gray-700">Use the {triggerObjLabel.toLowerCase()} record that triggered the flow</span>
+                    </label>
+                    <label className="flex items-start gap-2 p-2 rounded-lg border border-transparent hover:border-gray-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`findMode-${element.id}`}
+                        checked={findMode === 'related-record'}
+                        onChange={() => updateConfig('findMode', 'related-record')}
+                        className="mt-0.5"
+                      />
+                      <span className="text-sm text-gray-700">Update records related to the {triggerObjLabel.toLowerCase()} record that triggered the flow</span>
+                    </label>
+                  </>
+                )}
+                <label className="flex items-start gap-2 p-2 rounded-lg border border-transparent hover:border-gray-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`findMode-${element.id}`}
+                    checked={findMode === 'ids-from-collection'}
+                    onChange={() => updateConfig('findMode', 'ids-from-collection')}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm text-gray-700">Use the IDs and all field values from a record or record collection</span>
+                </label>
+                <label className="flex items-start gap-2 p-2 rounded-lg border border-transparent hover:border-gray-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`findMode-${element.id}`}
+                    checked={findMode === 'specify-conditions'}
+                    onChange={() => updateConfig('findMode', 'specify-conditions')}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm text-gray-700">Specify conditions to identify records, and set fields individually</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Object selector — for specify-conditions and related-record modes */}
+            {(findMode === 'specify-conditions' || findMode === 'related-record') && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <span className="text-red-500">*</span> Object
+                </label>
+                <select
+                  value={element.config.objectApiName || flow.objectApiName || ''}
+                  onChange={e => updateConfig('objectApiName', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                >
+                  <option value="">Select object…</option>
+                  {objects.map(o => <option key={o.apiName} value={o.apiName}>{o.label}</option>)}
+                </select>
+              </div>
+            )}
+
+            {/* Record variable — for ids-from-collection mode */}
+            {findMode === 'ids-from-collection' && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  <span className="text-red-500">*</span> Record or Record Collection
+                </label>
+                <input
+                  value={element.config.recordVariable || ''}
+                  onChange={e => updateConfig('recordVariable', e.target.value)}
+                  placeholder="e.g. GetRecords.records"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">Reference the output of a Get Records or other element.</p>
+              </div>
+            )}
+
+            {/* Filter Conditions — for specify-conditions and trigger/related modes */}
+            {(findMode === 'trigger-record' || findMode === 'related-record' || findMode === 'specify-conditions') && (
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-xs font-bold text-gray-900 mb-2">Set Filter Conditions</label>
+
+                {/* Condition logic */}
+                <div className="mb-3">
+                  <label className="block text-[11px] text-gray-500 mb-1">Condition Requirements to Update Record</label>
+                  <select
+                    value={conditionLogic}
+                    onChange={e => updateConfig('conditionLogic', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value="all">All Conditions Are Met (AND)</option>
+                    <option value="any">Any Condition Is Met (OR)</option>
+                    <option value="none">No conditions — update all matching records</option>
                   </select>
-                  <input value={f.value||''} onChange={e => { const u=[...(element.config.filters||[])]; u[i]={...f,value:e.target.value}; updateConfig('filters',u); }} placeholder="Value" className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs" />
-                  <button onClick={() => updateConfig('filters',(element.config.filters||[]).filter((_:any,j:number)=>j!==i))} className="text-gray-400 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
                 </div>
-              ))}
-              <button onClick={() => updateConfig('filters',[...(element.config.filters||[]),{field:'',op:'==',value:''}])} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus className="w-3 h-3" /> Add Filter</button>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Field Updates</label>
-              {(element.config.fieldValues || []).map((fv: any, i: number) => (
-                <div key={i} className="flex items-center gap-2 mb-2">
-                  <input value={fv.field||''} onChange={e => { const u=[...(element.config.fieldValues||[])]; u[i]={...fv,field:e.target.value}; updateConfig('fieldValues',u); }} placeholder="Field" className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs" />
-                  <span className="text-gray-400">=</span>
-                  <input value={fv.value||''} onChange={e => { const u=[...(element.config.fieldValues||[])]; u[i]={...fv,value:e.target.value}; updateConfig('fieldValues',u); }} placeholder="Value" className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs" />
-                  <button onClick={() => updateConfig('fieldValues',(element.config.fieldValues||[]).filter((_:any,j:number)=>j!==i))} className="text-gray-400 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
-                </div>
-              ))}
-              <button onClick={() => updateConfig('fieldValues',[...(element.config.fieldValues||[]),{field:'',value:''}])} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus className="w-3 h-3" /> Add Field Update</button>
+
+                {/* Condition rows */}
+                {conditionLogic !== 'none' && (
+                  <div className="space-y-2">
+                    {(element.config.filters || []).map((f: any, i: number) => (
+                      <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase">
+                            {i === 0 ? 'Row' : conditionLogic === 'any' ? 'OR Row' : 'AND Row'}
+                          </span>
+                          <button
+                            onClick={() => updateConfig('filters', (element.config.filters || []).filter((_: any, j: number) => j !== i))}
+                            className="text-gray-400 hover:text-red-500"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-0.5">Field</label>
+                            <select
+                              value={f.field || ''}
+                              onChange={e => { const u = [...(element.config.filters || [])]; u[i] = { ...f, field: e.target.value }; updateConfig('filters', u); }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="">Select…</option>
+                              {objFields.map(fd => <option key={fd.apiName} value={fd.apiName}>{fd.label}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-0.5">Operator</label>
+                            <select
+                              value={f.op || '=='}
+                              onChange={e => { const u = [...(element.config.filters || [])]; u[i] = { ...f, op: e.target.value }; updateConfig('filters', u); }}
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="==">Equals</option>
+                              <option value="!=">Does Not Equal</option>
+                              <option value=">">Greater Than</option>
+                              <option value="<">Less Than</option>
+                              <option value=">=">Greater or Equal</option>
+                              <option value="<=">Less or Equal</option>
+                              <option value="CONTAINS">Contains</option>
+                              <option value="STARTS_WITH">Starts With</option>
+                              <option value="IS_NULL">Is Null</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-0.5">Value</label>
+                            <input
+                              value={f.value || ''}
+                              onChange={e => { const u = [...(element.config.filters || [])]; u[i] = { ...f, value: e.target.value }; updateConfig('filters', u); }}
+                              placeholder="Value"
+                              className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => updateConfig('filters', [...(element.config.filters || []), { field: '', op: '==', value: '' }])}
+                      className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-1"
+                    >
+                      <Plus className="w-3 h-3" /> Add Condition
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Set Field Values */}
+            <div className="border-t border-gray-200 pt-4">
+              <label className="block text-xs font-bold text-gray-900 mb-2">
+                Set Field Values for the {selectedObj?.label || triggerObjLabel} Record
+              </label>
+              <div className="space-y-2">
+                {(element.config.fieldValues || []).map((fv: any, i: number) => (
+                  <div key={i} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Field Assignment</span>
+                      <button
+                        onClick={() => updateConfig('fieldValues', (element.config.fieldValues || []).filter((_: any, j: number) => j !== i))}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-0.5">Field</label>
+                        <select
+                          value={fv.field || ''}
+                          onChange={e => { const u = [...(element.config.fieldValues || [])]; u[i] = { ...fv, field: e.target.value }; updateConfig('fieldValues', u); }}
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        >
+                          <option value="">Select…</option>
+                          {objFields.map(fd => <option key={fd.apiName} value={fd.apiName}>{fd.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-0.5">Value</label>
+                        <input
+                          value={fv.value || ''}
+                          onChange={e => { const u = [...(element.config.fieldValues || [])]; u[i] = { ...fv, value: e.target.value }; updateConfig('fieldValues', u); }}
+                          placeholder="Value"
+                          className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => updateConfig('fieldValues', [...(element.config.fieldValues || []), { field: '', value: '' }])}
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-1"
+                >
+                  <Plus className="w-3 h-3" /> Add Field Value
+                </button>
+              </div>
             </div>
           </>
-        )}
+          );
+        })()}
 
         {/* SEND EMAIL */}
         {element.type === 'send-email' && (
