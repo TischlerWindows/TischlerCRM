@@ -22,6 +22,7 @@ import {
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
+import { useRecordSetupContext } from '@/lib/record-setup-context';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -59,6 +60,7 @@ export default function RecordDetailPage({
   const canDelete = canAccess(objectApiName, 'delete');
   const { hasAppPermission } = usePermissions();
   const canCustomize = hasAppPermission('customizeApplication');
+  const { setRecordSetupContext } = useRecordSetupContext();
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
@@ -123,6 +125,27 @@ export default function RecordDetailPage({
   };
 
   const pageLayout = resolveLayout();
+
+  useEffect(() => {
+    if (!record || !objectDef) {
+      setRecordSetupContext(null);
+      return;
+    }
+    setRecordSetupContext({
+      objectApiName,
+      pageLayoutId: pageLayout?.id ?? null,
+    });
+  }, [
+    objectApiName,
+    record,
+    objectDef,
+    pageLayout?.id,
+    setRecordSetupContext,
+  ]);
+
+  useEffect(() => {
+    return () => setRecordSetupContext(null);
+  }, [setRecordSetupContext]);
 
   // ── Preload lookup target records so IDs resolve to labels ──────────
   useEffect(() => {

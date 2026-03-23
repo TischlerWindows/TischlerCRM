@@ -228,12 +228,63 @@ export interface PageLayoutExtensions {
   [key: string]: unknown;
 }
 
+// ── Widget system ──────────────────────────────────────────────
+
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder';
+
+export interface RelatedListConfig {
+  type: 'RelatedList';
+  relatedObjectApiName: string;
+  relationshipFieldApiName: string;
+  displayColumns: string[];
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  maxRows?: number;
+  label?: string;
+}
+
+export interface CustomComponentConfig {
+  type: 'CustomComponent';
+  componentId: string;
+  props?: Record<string, unknown>;
+}
+
+export interface ActivityFeedConfig {
+  type: 'ActivityFeed';
+  maxItems?: number;
+}
+
+export interface FileFolderConfig {
+  type: 'FileFolder';
+  provider: 'dropbox' | 'google-drive' | 'local';
+  folderId?: string;
+}
+
+export type WidgetConfig =
+  | RelatedListConfig
+  | CustomComponentConfig
+  | ActivityFeedConfig
+  | FileFolderConfig;
+
+export interface PageWidget {
+  id: string;
+  widgetType: WidgetType;
+  column: number;
+  order: number;
+  colSpan?: number;
+  rowSpan?: number;
+  config: WidgetConfig;
+}
+
+// ── Page layout sections ───────────────────────────────────────
+
 export interface PageSection {
   id: string;
   label: string;
-  columns: 1 | 2 | 3;
+  columns: 1 | 2 | 3 | 4;
   order: number;
   fields: PageField[];
+  widgets?: PageWidget[];
   /** Shown under the section title in form/detail when supported */
   description?: string;
   visibleIf?: ConditionExpr[];

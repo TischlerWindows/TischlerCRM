@@ -1,5 +1,5 @@
-import type { FieldDef, FormattingRule, PageLayout } from '@/lib/schema';
-import type { CanvasField, CanvasSection, CanvasTab } from './types';
+import type { FieldDef, FormattingRule, PageLayout, PageWidget } from '@/lib/schema';
+import type { CanvasField, CanvasSection, CanvasTab, CanvasWidget } from './types';
 
 export function buildPageLayoutFromCanvas(params: {
   editingLayoutId: string | null;
@@ -7,6 +7,7 @@ export function buildPageLayoutFromCanvas(params: {
   tabs: CanvasTab[];
   sections: CanvasSection[];
   fields: CanvasField[];
+  widgets?: CanvasWidget[];
   objectFields: FieldDef[];
   formattingRules: FormattingRule[];
 }): PageLayout {
@@ -16,6 +17,7 @@ export function buildPageLayoutFromCanvas(params: {
     tabs,
     sections,
     fields,
+    widgets = [],
     objectFields,
     formattingRules,
   } = params;
@@ -32,35 +34,58 @@ export function buildPageLayoutFromCanvas(params: {
       order: tab.order,
       sections: sections
         .filter((s) => s.tabId === tab.id)
-        .map((section) => ({
-          id: section.id,
-          label: section.label,
-          columns: section.columns,
-          order: section.order,
-          description: section.description,
-          fields: fields
-            .filter((f) => f.sectionId === section.id)
-            .map((f) => {
-              const fieldDef = fieldMap.get(f.fieldApiName);
-              const base = {
-                apiName: f.fieldApiName,
-                column: f.column,
-                order: f.order,
-                colSpan: f.colSpan > 1 ? f.colSpan : undefined,
-                rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
-                presentation:
-                  f.presentation && Object.keys(f.presentation).length > 0
-                    ? f.presentation
-                    : undefined,
-              };
-              if (!fieldDef) return base;
-              const { apiName, ...rest } = fieldDef;
-              return { ...rest, ...base };
-            }),
-          visibleIf: section.visibleIf,
-          showInRecord: section.showInRecord,
-          showInTemplate: section.showInTemplate,
-        })),
+        .map((section) => {
+          const sectionWidgets = widgets
+            .filter((w) => w.sectionId === section.id)
+            .map(
+              (w): PageWidget => ({
+                id: w.id,
+                widgetType: w.widgetType,
+                column: w.column,
+                order: w.order,
+                colSpan: w.colSpan > 1 ? w.colSpan : undefined,
+                rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
+                config: w.config,
+              }),
+            );
+
+          return {
+            id: section.id,
+            label: section.label,
+            columns: section.columns,
+            order: section.order,
+            description: section.description,
+            fields: fields
+              .filter((f) => f.sectionId === section.id)
+              .map((f) => {
+                const fieldDef = fieldMap.get(f.fieldApiName);
+                const cleanPresentation =
+                  f.presentation &&
+                  Object.values(f.presentation).some((v) => v !== undefined)
+                    ? Object.fromEntries(
+                        Object.entries(f.presentation).filter(
+                          ([, v]) => v !== undefined,
+                        ),
+                      )
+                    : undefined;
+                const base = {
+                  apiName: f.fieldApiName,
+                  column: f.column,
+                  order: f.order,
+                  colSpan: f.colSpan > 1 ? f.colSpan : undefined,
+                  rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
+                  presentation: cleanPresentation,
+                };
+                if (!fieldDef) return base;
+                const { apiName, ...rest } = fieldDef;
+                return { ...rest, ...base };
+              }),
+            widgets: sectionWidgets.length > 0 ? sectionWidgets : undefined,
+            visibleIf: section.visibleIf,
+            showInRecord: section.showInRecord,
+            showInTemplate: section.showInTemplate,
+          };
+        }),
     })),
     formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
   };

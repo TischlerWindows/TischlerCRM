@@ -148,10 +148,15 @@ export default function ObjectDetailPage() {
   const [activeSection, setActiveSection] = useState(() => searchParams.get('section') || 'details');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const initialLayoutId = searchParams.get('layoutId');
+  const sectionParam = searchParams.get('section');
 
   useEffect(() => {
     setSelectedObject(objectApi);
   }, [objectApi, setSelectedObject]);
+
+  useEffect(() => {
+    setActiveSection(sectionParam || 'details');
+  }, [sectionParam]);
 
   const object = schema?.objects.find(obj => obj.apiName === objectApi);
   const sidebarSections = objectApi === 'Home'
