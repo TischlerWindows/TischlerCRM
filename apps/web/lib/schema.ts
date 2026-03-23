@@ -230,7 +230,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer';
 
 export interface RelatedListConfig {
   type: 'RelatedList';
@@ -260,11 +260,19 @@ export interface FileFolderConfig {
   folderId?: string;
 }
 
+/** Layout-only blank vertical space (builder + preview) */
+export interface SpacerConfig {
+  type: 'Spacer';
+  /** Minimum height in CSS pixels */
+  minHeightPx?: number;
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
   | ActivityFeedConfig
-  | FileFolderConfig;
+  | FileFolderConfig
+  | SpacerConfig;
 
 export interface PageWidget {
   id: string;
@@ -323,6 +331,8 @@ export interface PageLayout {
   name: string;
   layoutType: 'create' | 'edit'; // New Record vs Existing Record
   tabs: PageTab[];
+  /** Up to ~6 field API names shown in record header highlights strip */
+  highlightFields?: string[];
   formattingRules?: FormattingRule[];
   /** Optional DB mirror / forward-compatible bag */
   extensions?: PageLayoutExtensions;

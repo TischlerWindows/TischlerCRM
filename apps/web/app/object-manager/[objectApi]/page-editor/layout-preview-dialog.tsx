@@ -87,6 +87,32 @@ export function LayoutPreviewDialog({
           <span className="font-medium">Show in Record Template</span> and field/section rules.
         </p>
 
+        {pageLayout.highlightFields && pageLayout.highlightFields.length > 0 ? (
+          <div className="mb-6 rounded-lg border border-gray-200 bg-gray-50/90 px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+              Highlights
+            </div>
+            <dl className="flex flex-wrap gap-x-6 gap-y-2">
+              {pageLayout.highlightFields.map((apiName) => {
+                const fieldDef = getFieldDefForPreview(apiName, allFields);
+                if (!fieldDef) return null;
+                if (!evaluateVisibility(fieldDef.visibleIf, data)) return null;
+                const fFx = getFormattingEffectsForField(pageLayout, apiName, data);
+                if (fFx?.hidden) return null;
+                const raw = data[apiName];
+                const display = formatSampleValue(raw);
+                const labelClass = labelPresentationClassName();
+                return (
+                  <div key={apiName} className="min-w-[100px]">
+                    <dt className={`text-xs text-gray-500 ${labelClass}`}>{fieldDef.label}</dt>
+                    <dd className="mt-0.5 text-sm text-gray-900">{display}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+        ) : null}
+
         <div className="space-y-8">
           {pageLayout.tabs.map((tab) => (
             <div key={tab.id}>
@@ -248,17 +274,28 @@ export function LayoutPreviewDialog({
                         )}
                         {(section.widgets && section.widgets.length > 0) ? (
                           <div className="mt-4 space-y-2 border-t border-dashed border-blue-200 pt-3">
-                            {section.widgets.map((w) => (
-                              <div
-                                key={w.id}
-                                className="p-3 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/40 text-sm text-blue-900"
-                              >
-                                <span className="font-medium">Widget:</span> {w.widgetType}
-                                {w.config && 'label' in w.config && w.config.label
-                                  ? ` — ${w.config.label}`
-                                  : null}
-                              </div>
-                            ))}
+                            {section.widgets.map((w) =>
+                              w.widgetType === 'Spacer' && w.config?.type === 'Spacer' ? (
+                                <div
+                                  key={w.id}
+                                  className="rounded-md border border-dashed border-gray-300 bg-gray-50/80 text-xs text-gray-400 flex items-center justify-center"
+                                  style={{ minHeight: w.config.minHeightPx ?? 32 }}
+                                  aria-hidden
+                                >
+                                  Spacer
+                                </div>
+                              ) : (
+                                <div
+                                  key={w.id}
+                                  className="p-3 rounded-lg border-2 border-dashed border-blue-300 bg-blue-50/40 text-sm text-blue-900"
+                                >
+                                  <span className="font-medium">Widget:</span> {w.widgetType}
+                                  {w.config && 'label' in w.config && w.config.label
+                                    ? ` — ${w.config.label}`
+                                    : null}
+                                </div>
+                              ),
+                            )}
                           </div>
                         ) : null}
                       </div>

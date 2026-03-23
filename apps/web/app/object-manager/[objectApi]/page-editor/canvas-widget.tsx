@@ -12,6 +12,7 @@ import {
   Activity,
   FolderOpen,
   Component,
+  Minus,
 } from 'lucide-react';
 
 const WIDGET_ICONS: Record<string, React.ElementType> = {
@@ -19,6 +20,7 @@ const WIDGET_ICONS: Record<string, React.ElementType> = {
   ActivityFeed: Activity,
   FileFolder: FolderOpen,
   CustomComponent: Component,
+  Spacer: Minus,
 };
 
 const WIDGET_LABELS: Record<string, string> = {
@@ -26,14 +28,21 @@ const WIDGET_LABELS: Record<string, string> = {
   ActivityFeed: 'Activity Feed',
   FileFolder: 'File Folder',
   CustomComponent: 'Custom Component',
+  Spacer: 'Spacer',
 };
 
 export function CanvasWidgetCard({
   widget,
   sectionColumns,
+  gridRowStart,
+  isOver,
+  dropSide,
 }: {
   widget: CanvasWidget;
   sectionColumns: number;
+  gridRowStart: number;
+  isOver: boolean;
+  dropSide: 'top' | 'bottom' | null;
 }) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
@@ -58,7 +67,7 @@ export function CanvasWidgetCard({
     transition,
     opacity: isDragging ? 0.5 : 1,
     gridColumn: `${widget.column + 1} / span ${Math.min(widget.colSpan, sectionColumns - widget.column)}`,
-    gridRow: `span ${widget.rowSpan}`,
+    gridRow: `${gridRowStart + 1} / span ${widget.rowSpan}`,
   };
 
   const isSelected =
@@ -77,6 +86,9 @@ export function CanvasWidgetCard({
     if (widget.config.type === 'CustomComponent') {
       return widget.config.componentId || 'Not configured';
     }
+    if (widget.config.type === 'Spacer') {
+      return widget.config.minHeightPx ? `${widget.config.minHeightPx}px tall` : 'Blank space';
+    }
     return '';
   })();
 
@@ -84,6 +96,7 @@ export function CanvasWidgetCard({
     <div
       ref={setNodeRef}
       style={style}
+      data-editor-sortable-id={widget.id}
       className={`p-3 border-2 border-dashed rounded-lg relative group cursor-move transition-all ${
         isSelected
           ? 'border-blue-500 bg-blue-50 shadow-md'
@@ -94,6 +107,12 @@ export function CanvasWidgetCard({
         setSelectedElement({ type: 'widget', id: widget.id });
       }}
     >
+      {isOver && dropSide === 'top' && (
+        <div className="absolute -top-1 left-0 right-0 h-1.5 bg-teal-400 rounded-full z-10 shadow-[0_0_6px_rgba(20,184,166,0.4)]" />
+      )}
+      {isOver && dropSide === 'bottom' && (
+        <div className="absolute -bottom-1 left-0 right-0 h-1.5 bg-teal-400 rounded-full z-10 shadow-[0_0_6px_rgba(20,184,166,0.4)]" />
+      )}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
