@@ -91,3 +91,19 @@ export async function sendPasswordResetEmail(
     return { sent: false, resetUrl };
   }
 }
+
+/** Send an email triggered by a workflow rule */
+export async function sendWorkflowEmail(
+  to: string,
+  subject: string,
+  body: string
+): Promise<{ sent: boolean }> {
+  const token = await getOutlookToken();
+  if (!token) return { sent: false };
+  try {
+    await sendViaMsGraph(token, to, subject, body);
+    return { sent: true };
+  } catch {
+    return { sent: false };
+  }
+}

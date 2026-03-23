@@ -126,6 +126,61 @@ export interface ValidationRule {
   condition: string; // boolean expression using field apiNames
 }
 
+// ── Workflow automation types (Salesforce-style) ────────────────────
+
+/** When the workflow rule should be evaluated */
+export type WorkflowTriggerType =
+  | 'onCreate'                       // only when a record is created
+  | 'onCreateOrEdit'                 // when created OR any time it's edited
+  | 'onCreateOrEditToMeetCriteria';  // created / edited AND criteria newly met
+
+/** The kind of action to execute when a workflow rule fires */
+export type WorkflowActionType = 'FieldUpdate' | 'EmailAlert' | 'Task';
+
+/** Update a field on the triggering record */
+export interface FieldUpdateAction {
+  type: 'FieldUpdate';
+  fieldApiName: string;      // field to update
+  value: any;                // literal value OR formula expression
+  useFormula?: boolean;      // when true, `value` is a formula expression string
+}
+
+/** Send an email alert */
+export interface EmailAlertAction {
+  type: 'EmailAlert';
+  toField?: string;          // field apiName containing the recipient email
+  toAddress?: string;        // static email address (fallback)
+  subject: string;           // email subject (supports {{fieldApiName}} merge tokens)
+  body: string;              // email HTML body (supports {{fieldApiName}} merge tokens)
+}
+
+/** Create a follow-up task */
+export interface TaskAction {
+  type: 'Task';
+  subject: string;           // task subject (supports {{fieldApiName}} merge tokens)
+  assignToField?: string;    // field apiName whose value is assigned the task
+  assignToUserId?: string;   // static user ID (fallback)
+  dueInDays?: number;        // due date = trigger date + N days
+  priority?: 'High' | 'Normal' | 'Low';
+  description?: string;
+}
+
+export type WorkflowAction = FieldUpdateAction | EmailAlertAction | TaskAction;
+
+/** A single workflow rule attached to an object */
+export interface WorkflowRule {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  triggerType: WorkflowTriggerType;
+  conditions: ConditionExpr[];   // all must be true (AND logic)
+  actions: WorkflowAction[];
+  order?: number;                // execution order (lower = first)
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface RecordType {
   id: string;
   name: string;
@@ -232,6 +287,7 @@ export interface ObjectDef {
   recordTypes: RecordType[];
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
+  workflowRules?: WorkflowRule[];
   /** Global search configuration — which fields are searched and how results display */
   searchConfig?: {
     /** Whether this object appears in the universal search bar */

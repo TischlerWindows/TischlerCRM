@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { z } from 'zod';
+import { runWorkflows } from '../workflow-engine.js';
 
 // ── Permission helper ──────────────────────────────────────────────
 async function checkObjectPermission(
@@ -471,6 +472,18 @@ export async function recordRoutes(app: FastifyInstance) {
     });
 
     reply.code(201).send(record);
+
+    // Fire workflow rules asynchronously (don't block the response)
+    runWorkflows({
+      objectApiName: apiName,
+      recordId: record.id,
+      newData: record.data as Record<string, any>,
+      oldData: null,
+      userId,
+      objectId: object.id,
+      isCreate: true,
+      logger: req.log,
+    }).catch(err => req.log.error({ err }, 'Workflow execution error (create)'));
   });
 
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {
@@ -544,6 +557,18 @@ export async function recordRoutes(app: FastifyInstance) {
     });
 
     reply.send(record);
+
+    // Fire workflow rules asynchronously (don't block the response)
+    runWorkflows({
+      objectApiName: apiName,
+      recordId: record.id,
+      newData: record.data as Record<string, any>,
+      oldData: existingRecord.data as Record<string, any> | null,
+      userId,
+      objectId: object.id,
+      isCreate: false,
+      logger: req.log,
+    }).catch(err => req.log.error({ err }, 'Workflow execution error (update)'));
   });
 
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
