@@ -27,6 +27,11 @@ export interface CanvasWidget {
   colSpan: number;
   rowSpan: number;
   config: WidgetConfig;
+  /** Tab canvas grid (when sectionId is empty) */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
 }
 
 export interface CanvasSection {
@@ -44,6 +49,11 @@ export interface CanvasSection {
   layoutRowId?: string;
   /** Flex weight within row (default 1) */
   rowWeight?: number;
+  /** Tab canvas 12-column grid */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
 }
 
 export interface CanvasTab {
@@ -73,4 +83,6 @@ export type SelectedElement =
   | { type: 'section'; id: string }
   | { type: 'field'; id: string }
   | { type: 'widget'; id: string }
+  /** Record header highlight fields (configure in Properties) */
+  | { type: 'highlights' }
   | null;

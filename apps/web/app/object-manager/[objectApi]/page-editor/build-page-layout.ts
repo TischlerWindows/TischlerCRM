@@ -44,6 +44,10 @@ export function buildPageLayoutFromCanvas(params: {
             colSpan: w.colSpan > 1 ? w.colSpan : undefined,
             rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
             config: w.config,
+            ...(w.gridColumn != null ? { gridColumn: w.gridColumn } : {}),
+            ...(w.gridColumnSpan != null ? { gridColumnSpan: w.gridColumnSpan } : {}),
+            ...(w.gridRow != null ? { gridRow: w.gridRow } : {}),
+            ...(w.gridRowSpan != null ? { gridRowSpan: w.gridRowSpan } : {}),
           }),
         );
 
@@ -67,6 +71,10 @@ export function buildPageLayoutFromCanvas(params: {
                 colSpan: w.colSpan > 1 ? w.colSpan : undefined,
                 rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
                 config: w.config,
+                ...(w.gridColumn != null ? { gridColumn: w.gridColumn } : {}),
+                ...(w.gridColumnSpan != null ? { gridColumnSpan: w.gridColumnSpan } : {}),
+                ...(w.gridRow != null ? { gridRow: w.gridRow } : {}),
+                ...(w.gridRowSpan != null ? { gridRowSpan: w.gridRowSpan } : {}),
               }),
             );
 
@@ -82,6 +90,10 @@ export function buildPageLayoutFromCanvas(params: {
             ...(section.rowWeight != null && section.rowWeight > 0
               ? { rowWeight: section.rowWeight }
               : {}),
+            ...(section.gridColumn != null ? { gridColumn: section.gridColumn } : {}),
+            ...(section.gridColumnSpan != null ? { gridColumnSpan: section.gridColumnSpan } : {}),
+            ...(section.gridRow != null ? { gridRow: section.gridRow } : {}),
+            ...(section.gridRowSpan != null ? { gridRowSpan: section.gridRowSpan } : {}),
             fields: fields
               .filter((f) => f.sectionId === section.id)
               .map((f) => {

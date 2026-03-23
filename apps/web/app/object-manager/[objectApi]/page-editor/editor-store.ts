@@ -15,6 +15,7 @@ import type {
 } from './types';
 import type { LayoutPresetId } from './layout-presets';
 import { getPresetSections } from './layout-presets';
+import { normalizeCanvasTabGrids } from '@/lib/tab-canvas-grid';
 
 interface Snapshot {
   tabs: CanvasTab[];
@@ -59,10 +60,11 @@ export interface EditorState {
   moveSection: (id: string, dir: 'up' | 'down') => void;
   updateSectionColumns: (id: string, cols: ColumnCount) => void;
   toggleSectionCollapsed: (id: string) => void;
-  adjustAdjacentRowWeights: (
+  /** Resize shared border between two sections on the same grid row (12-col canvas). */
+  adjustAdjacentGridSpans: (
     leftSectionId: string,
     rightSectionId: string,
-    deltaLeft: number,
+    deltaLeftSpan: number,
   ) => void;
   /** Append preset sections to the active tab (undoable). */
   applyLayoutPreset: (presetId: LayoutPresetId) => void;
@@ -83,6 +85,7 @@ export interface EditorState {
   setHighlightFields: (apiNames: string[]) => void;
   addHighlightField: (apiName: string) => void;
   removeHighlightField: (apiName: string) => void;
+  moveHighlightField: (index: number, dir: 'up' | 'down') => void;
 
   // Actions — formatting
   setFormattingRules: (rules: FormattingRule[]) => void;
@@ -110,6 +113,10 @@ const DEFAULT_SECTIONS: CanvasSection[] = [
     collapsed: false,
     showInRecord: true,
     showInTemplate: true,
+    gridRow: 1,
+    gridColumn: 1,
+    gridColumnSpan: 12,
+    gridRowSpan: 1,
   },
 ];
 
@@ -168,8 +175,18 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   // Sections
   addSection: () => {
-    const { sections, activeTabId } = get();
+    const { sections, widgets, activeTabId } = get();
     const tabSections = sections.filter((s) => s.tabId === activeTabId);
+    const tabWids = widgets.filter((w) => w.tabId === activeTabId && !w.sectionId);
+    let maxRowEnd = 0;
+    for (const s of tabSections) {
+      const end = (s.gridRow ?? 1) + (s.gridRowSpan ?? 1) - 1;
+      if (end > maxRowEnd) maxRowEnd = end;
+    }
+    for (const w of tabWids) {
+      const end = (w.gridRow ?? 1) + (w.gridRowSpan ?? 1) - 1;
+      if (end > maxRowEnd) maxRowEnd = end;
+    }
     const newSection: CanvasSection = {
       id: `section-${Date.now()}`,
       label: `New Section ${tabSections.length + 1}`,
@@ -179,6 +196,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       collapsed: false,
       showInRecord: true,
       showInTemplate: true,
+      gridRow: maxRowEnd + 1,
+      gridColumn: 1,
+      gridColumnSpan: 12,
+      gridRowSpan: 1,
     };
     set({ sections: [...sections, newSection], hasUnsavedChanges: true });
   },
@@ -190,20 +211,28 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }));
   },
 
-  /** Adjust flex weights for two adjacent sections in the same row (sum preserved). */
-  adjustAdjacentRowWeights: (leftSectionId: string, rightSectionId: string, deltaLeft: number) => {
+  adjustAdjacentGridSpans: (leftSectionId: string, rightSectionId: string, deltaLeftSpan: number) => {
     set((s) => {
       const left = s.sections.find((sec) => sec.id === leftSectionId);
       const right = s.sections.find((sec) => sec.id === rightSectionId);
-      if (!left || !right || left.layoutRowId !== right.layoutRowId) return s;
-      const wL = Math.max(1, (left.rowWeight ?? 1) + deltaLeft);
-      const sum = (left.rowWeight ?? 1) + (right.rowWeight ?? 1);
-      const wR = Math.max(1, sum - wL);
-      const wL2 = sum - wR;
+      if (!left || !right) return s;
+      const rowL = left.gridRow ?? 1;
+      const rowR = right.gridRow ?? 1;
+      if (rowL !== rowR) return s;
+      const lCol = left.gridColumn ?? 1;
+      const lSpan = left.gridColumnSpan ?? 12;
+      const rCol = right.gridColumn ?? 1;
+      if (lCol + lSpan !== rCol) return s;
+      const rSpan = right.gridColumnSpan ?? 12;
+      const newL = Math.max(1, Math.min(lSpan + rSpan - 1, lSpan + deltaLeftSpan));
+      const newR = lSpan + rSpan - newL;
+      if (newR < 1) return s;
       return {
         sections: s.sections.map((sec) => {
-          if (sec.id === leftSectionId) return { ...sec, rowWeight: wL2 };
-          if (sec.id === rightSectionId) return { ...sec, rowWeight: wR };
+          if (sec.id === leftSectionId) return { ...sec, gridColumnSpan: newL };
+          if (sec.id === rightSectionId) {
+            return { ...sec, gridColumn: lCol + newL, gridColumnSpan: newR };
+          }
           return sec;
         }),
         hasUnsavedChanges: true,
@@ -294,6 +323,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       showInTemplate: true,
       layoutRowId: spec.layoutRowId,
       rowWeight: spec.rowWeight,
+      gridColumn: spec.gridColumn,
+      gridColumnSpan: spec.gridColumnSpan,
+      gridRow: spec.gridRow,
+      gridRowSpan: spec.gridRowSpan,
     }));
     set({
       sections: [...keptSections, ...newSections],
@@ -364,6 +397,18 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }));
   },
 
+  moveHighlightField: (index, dir) => {
+    set((s) => {
+      const arr = [...s.highlightFields];
+      const j = dir === 'up' ? index - 1 : index + 1;
+      if (j < 0 || j >= arr.length) return s;
+      const t = arr[index];
+      arr[index] = arr[j];
+      arr[j] = t;
+      return { highlightFields: arr, hasUnsavedChanges: true };
+    });
+  },
+
   // Formatting rules
   setFormattingRules: (rules) => set({ formattingRules: rules, hasUnsavedChanges: true }),
 
@@ -400,6 +445,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
           showInTemplate: section.showInTemplate !== false,
           layoutRowId: section.layoutRowId,
           rowWeight: section.rowWeight,
+          gridColumn: section.gridColumn,
+          gridColumnSpan: section.gridColumnSpan,
+          gridRow: section.gridRow,
+          gridRowSpan: section.gridRowSpan,
         });
 
         section.fields.forEach((f) => {
@@ -444,9 +493,17 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
             colSpan: w.colSpan ?? 1,
             rowSpan: w.rowSpan ?? 1,
             config: w.config,
+            gridColumn: w.gridColumn,
+            gridColumnSpan: w.gridColumnSpan,
+            gridRow: w.gridRow,
+            gridRowSpan: w.gridRowSpan,
           });
         });
       }
+    });
+
+    newTabs.forEach((tab) => {
+      normalizeCanvasTabGrids(newSections, newWidgets, tab.id);
     });
 
     const formattingRules =
@@ -484,6 +541,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
           collapsed: false,
           showInRecord: true,
           showInTemplate: true,
+          gridRow: 1,
+          gridColumn: 1,
+          gridColumnSpan: 12,
+          gridRowSpan: 1,
         },
       ],
       fields: [],

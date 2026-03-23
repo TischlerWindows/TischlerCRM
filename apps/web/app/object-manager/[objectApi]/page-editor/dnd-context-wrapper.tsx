@@ -20,6 +20,8 @@ import type { FieldDef, WidgetType } from '@/lib/schema';
 import type { CanvasField, CanvasWidget, DraggedItem } from './types';
 import { useEditorStore } from './editor-store';
 import { EditorDragUiContext } from './editor-drag-ui-context';
+import { RECORD_HEADER_DROP_ID } from './record-header-chrome';
+import { TAB_GRID_COLUMNS } from '@/lib/tab-canvas-grid';
 
 interface ResizeState {
   id: string;
@@ -106,12 +108,26 @@ function columnRowsSorted(
   return rows.sort((a, b) => a.order - b.order);
 }
 
-const TAB_ROOT_SUFFIX = '-tab-root';
+function maxTabCanvasRowEnd(
+  tabSections: { gridRow?: number; gridRowSpan?: number }[],
+  tabRootWidgets: { gridRow?: number; gridRowSpan?: number }[],
+): number {
+  let max = 0;
+  for (const s of tabSections) {
+    const end = (s.gridRow ?? 1) + (s.gridRowSpan ?? 1) - 1;
+    if (end > max) max = end;
+  }
+  for (const w of tabRootWidgets) {
+    const end = (w.gridRow ?? 1) + (w.gridRowSpan ?? 1) - 1;
+    if (end > max) max = end;
+  }
+  return max;
+}
 
-/** Prefer highlights strip when pointer is inside it so drops are not stolen by the canvas. */
+/** Prefer record header when pointer is inside it so drops are not stolen by the canvas. */
 const pageEditorCollisionDetection: CollisionDetection = (args) => {
   const within = pointerWithin(args);
-  const hi = within.find((c) => String(c.id) === 'layout-highlight-drop');
+  const hi = within.find((c) => String(c.id) === RECORD_HEADER_DROP_ID);
   if (hi) return [hi];
   return closestCenter(args);
 };
@@ -267,7 +283,7 @@ export function DndContextWrapper({
       const activeId = active.id.toString();
       const targetId = over.id.toString();
 
-      if (targetId === 'layout-highlight-drop') {
+      if (targetId === RECORD_HEADER_DROP_ID) {
         if (activeId.startsWith('field-')) {
           pushUndo();
           const fieldApiName = activeId.replace('field-', '');
@@ -282,8 +298,14 @@ export function DndContextWrapper({
         return;
       }
 
-      if (targetId.endsWith(TAB_ROOT_SUFFIX)) {
-        const targetTabId = targetId.slice(0, -TAB_ROOT_SUFFIX.length);
+      const tabCanvasMatch = targetId.match(/^tab-canvas-(.+)$/);
+      if (tabCanvasMatch) {
+        const targetTabId = tabCanvasMatch[1];
+        const tabSecs = sections.filter((s) => s.tabId === targetTabId);
+        const tabRoots = widgets.filter(
+          (w) => w.tabId === targetTabId && !w.sectionId && w.id !== activeId,
+        );
+        const maxR = maxTabCanvasRowEnd(tabSecs, tabRoots);
         const topOrder = orderForDropIntoTabRoot(targetTabId, widgets);
         if (activeId.startsWith('widget-new-')) {
           pushUndo();
@@ -298,6 +320,10 @@ export function DndContextWrapper({
             colSpan: 1,
             rowSpan: 1,
             config: DEFAULT_WIDGET_CONFIGS[widgetType],
+            gridRow: maxR + 1,
+            gridColumn: 1,
+            gridColumnSpan: TAB_GRID_COLUMNS,
+            gridRowSpan: 1,
           });
         } else if (isCanvasWidgetId(activeId)) {
           pushUndo();
@@ -310,6 +336,10 @@ export function DndContextWrapper({
                     sectionId: '',
                     column: 0,
                     order: topOrder,
+                    gridRow: maxR + 1,
+                    gridColumn: 1,
+                    gridColumnSpan: TAB_GRID_COLUMNS,
+                    gridRowSpan: 1,
                   }
                 : w,
             ),

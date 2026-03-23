@@ -15,6 +15,7 @@ import type { FieldDef, LabelColorToken, ObjectDef } from '@/lib/schema';
 import { labelPresentationClassName } from '@/lib/layout-presentation';
 import { useEditorStore } from './editor-store';
 import type { ColumnCount } from './types';
+import { TAB_GRID_COLUMNS } from '@/lib/tab-canvas-grid';
 import {
   Layout,
   Columns2,
@@ -56,6 +57,12 @@ export function PropertiesPanel({
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const setFields = useEditorStore((s) => s.setFields);
   const markDirty = useEditorStore((s) => s.markDirty);
+  const highlightFields = useEditorStore((s) => s.highlightFields);
+  const addHighlightField = useEditorStore((s) => s.addHighlightField);
+  const removeHighlightField = useEditorStore((s) => s.removeHighlightField);
+  const moveHighlightField = useEditorStore((s) => s.moveHighlightField);
+  const setHighlightFields = useEditorStore((s) => s.setHighlightFields);
+  const pushUndo = useEditorStore((s) => s.pushUndo);
 
   const getFieldDef = (apiName: string) => allFields.find((f) => f.apiName === apiName);
 
@@ -70,6 +77,114 @@ export function PropertiesPanel({
       <div className="flex-1 overflow-y-auto p-4">
         {selectedElement ? (
           <>
+            {/* ──── Record header highlights ──── */}
+            {selectedElement.type === 'highlights' && (
+              <div className="space-y-4">
+                <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                  Record header
+                </div>
+                <p className="text-xs text-gray-500">
+                  Up to 6 fields shown under the record title. Drag fields from the left list onto the
+                  header area, or add below.
+                </p>
+                <ul className="space-y-2 border rounded-md border-gray-200 divide-y divide-gray-100">
+                  {highlightFields.length === 0 ? (
+                    <li className="p-3 text-xs text-gray-400">No highlight fields</li>
+                  ) : (
+                    highlightFields.map((api, idx) => {
+                      const def = getFieldDef(api);
+                      return (
+                        <li
+                          key={api}
+                          className="flex items-center justify-between gap-2 p-2 text-sm"
+                        >
+                          <span>{def?.label ?? api}</span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-1"
+                              disabled={idx === 0}
+                              onClick={() => {
+                                pushUndo();
+                                moveHighlightField(idx, 'up');
+                              }}
+                            >
+                              ↑
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-1"
+                              disabled={idx >= highlightFields.length - 1}
+                              onClick={() => {
+                                pushUndo();
+                                moveHighlightField(idx, 'down');
+                              }}
+                            >
+                              ↓
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-1 text-red-600"
+                              onClick={() => {
+                                pushUndo();
+                                removeHighlightField(api);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+                <div>
+                  <Label className="text-xs">Add field</Label>
+                  <select
+                    className="mt-1 w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-sm"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      pushUndo();
+                      addHighlightField(v);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">Choose a field…</option>
+                    {objectFields
+                      .filter((f) => !highlightFields.includes(f.apiName))
+                      .sort((a, b) => a.label.localeCompare(b.label))
+                      .map((f) => (
+                        <option key={f.apiName} value={f.apiName}>
+                          {f.label}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                {highlightFields.length > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      pushUndo();
+                      setHighlightFields([]);
+                    }}
+                  >
+                    Clear all highlights
+                  </Button>
+                ) : null}
+              </div>
+            )}
+
             {/* ──── Tab Properties ──── */}
             {selectedElement.type === 'tab' && (
               <div>
@@ -122,6 +237,74 @@ export function PropertiesPanel({
                           )}
                         </Button>
                       ))}
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-gray-100 space-y-2">
+                    <div className="text-xs font-semibold text-gray-600">Position on tab canvas</div>
+                    <p className="text-[11px] text-gray-500">
+                      12-column grid. Sections and tab-level widgets share this canvas.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Row</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={section.gridRow ?? 1}
+                          onChange={(e) =>
+                            updateSection(section.id, {
+                              gridRow: Math.max(1, parseInt(e.target.value, 10) || 1),
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Column (1–12)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={TAB_GRID_COLUMNS}
+                          value={section.gridColumn ?? 1}
+                          onChange={(e) =>
+                            updateSection(section.id, {
+                              gridColumn: Math.min(
+                                TAB_GRID_COLUMNS,
+                                Math.max(1, parseInt(e.target.value, 10) || 1),
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Column span</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={TAB_GRID_COLUMNS}
+                          value={section.gridColumnSpan ?? TAB_GRID_COLUMNS}
+                          onChange={(e) =>
+                            updateSection(section.id, {
+                              gridColumnSpan: Math.min(
+                                TAB_GRID_COLUMNS,
+                                Math.max(1, parseInt(e.target.value, 10) || 1),
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Row span</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={section.gridRowSpan ?? 1}
+                          onChange={(e) =>
+                            updateSection(section.id, {
+                              gridRowSpan: Math.max(1, parseInt(e.target.value, 10) || 1),
+                            })
+                          }
+                        />
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -400,9 +583,79 @@ export function PropertiesPanel({
                       <span className="text-xs text-gray-500">Type:</span>
                       <div className="font-medium">{widget.widgetType}</div>
                       {!widget.sectionId ? (
-                        <p className="text-xs text-amber-700 mt-1">Placed in “Widgets for this tab” (above sections)</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Tab canvas widget — same 12-column grid as field sections.
+                        </p>
                       ) : null}
                     </div>
+
+                    {!widget.sectionId ? (
+                      <div className="space-y-2 border-t pt-3">
+                        <div className="text-xs font-semibold text-gray-600">Canvas position</div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs">Row</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={widget.gridRow ?? 1}
+                              onChange={(e) =>
+                                updateWidget(widget.id, {
+                                  gridRow: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Column</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={TAB_GRID_COLUMNS}
+                              value={widget.gridColumn ?? 1}
+                              onChange={(e) =>
+                                updateWidget(widget.id, {
+                                  gridColumn: Math.min(
+                                    TAB_GRID_COLUMNS,
+                                    Math.max(1, parseInt(e.target.value, 10) || 1),
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Column span</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={TAB_GRID_COLUMNS}
+                              value={widget.gridColumnSpan ?? TAB_GRID_COLUMNS}
+                              onChange={(e) =>
+                                updateWidget(widget.id, {
+                                  gridColumnSpan: Math.min(
+                                    TAB_GRID_COLUMNS,
+                                    Math.max(1, parseInt(e.target.value, 10) || 1),
+                                  ),
+                                })
+                              }
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Row span</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={widget.gridRowSpan ?? 1}
+                              onChange={(e) =>
+                                updateWidget(widget.id, {
+                                  gridRowSpan: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
 
                     {/* Related List config */}
                     {widget.config.type === 'RelatedList' && (

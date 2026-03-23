@@ -7,7 +7,7 @@ import { GripVertical } from 'lucide-react';
 const MOVE_PX = 28;
 
 /**
- * Drag horizontally to shift flex weight between two sections in the same layoutRowId row.
+ * Drag horizontally to change the shared border between two sections on the same grid row (12-col canvas).
  */
 export function SectionRowWeightHandle({
   leftSectionId,
@@ -16,7 +16,7 @@ export function SectionRowWeightHandle({
   leftSectionId: string;
   rightSectionId: string;
 }) {
-  const adjustAdjacentRowWeights = useEditorStore((s) => s.adjustAdjacentRowWeights);
+  const adjustAdjacentGridSpans = useEditorStore((s) => s.adjustAdjacentGridSpans);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const accRef = useRef(0);
 
@@ -29,11 +29,11 @@ export function SectionRowWeightHandle({
       const onMove = (ev: MouseEvent) => {
         accRef.current += ev.movementX;
         while (accRef.current >= MOVE_PX) {
-          adjustAdjacentRowWeights(leftSectionId, rightSectionId, 1);
+          adjustAdjacentGridSpans(leftSectionId, rightSectionId, 1);
           accRef.current -= MOVE_PX;
         }
         while (accRef.current <= -MOVE_PX) {
-          adjustAdjacentRowWeights(leftSectionId, rightSectionId, -1);
+          adjustAdjacentGridSpans(leftSectionId, rightSectionId, -1);
           accRef.current += MOVE_PX;
         }
       };
@@ -45,7 +45,7 @@ export function SectionRowWeightHandle({
       window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
-    [adjustAdjacentRowWeights, pushUndo, leftSectionId, rightSectionId],
+    [adjustAdjacentGridSpans, pushUndo, leftSectionId, rightSectionId],
   );
 
   return (
