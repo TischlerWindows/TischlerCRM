@@ -831,18 +831,20 @@ export default function ContactsPage() {
                             (() => {
                               const nameVal = contact.name;
                               if (!nameVal || typeof nameVal !== 'object') return <span className="text-gray-400">-</span>;
-                              // Extract sub-field values (try prefixed and unprefixed keys)
-                              const parts = Object.entries(nameVal as Record<string, any>)
-                                .filter(([, v]) => v && String(v).trim())
-                                .map(([k, v]) => {
-                                  // Derive a short label from the key
-                                  const label = k.replace(/^Contact__name_/, '').replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
-                                  return { label, value: String(v) };
-                                });
-                              if (parts.length === 0) return <span className="text-gray-400">-</span>;
+                              const obj = nameVal as Record<string, any>;
+                              const keys = Object.keys(obj);
+                              const findVal = (pattern: string) => {
+                                const k = keys.find(k => k.toLowerCase().includes(pattern));
+                                return k ? obj[k] : undefined;
+                              };
+                              const salutation = obj.salutation || findVal('salutation');
+                              const firstName = obj.firstName || findVal('firstname');
+                              const lastName = obj.lastName || findVal('lastname');
+                              const named = [salutation, firstName, lastName].filter(Boolean);
+                              if (named.length === 0) return <span className="text-gray-400">-</span>;
                               return (
                                 <Link href={`/contacts/${contact.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
-                                  {parts.map(p => p.value).join(' ')}
+                                  {named.join(' ')}
                                 </Link>
                               );
                             })()
