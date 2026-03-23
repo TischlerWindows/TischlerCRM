@@ -4,6 +4,20 @@
 
 This guide walks through deploying the CRM monorepo to Railway.
 
+## Branch and Environment Layout
+
+| Branch | Railway environment | Purpose |
+|---|---|---|
+| `develop` | None (local/CI only) | Day-to-day integration; feature PRs merge here |
+| `test-environment-branch` | **test environment** (Postgres-A9x6) | Staging: validate before production |
+| `main` | **production** (Postgres) | Live production |
+
+### Promotion flow
+
+1. **Feature work** happens on short-lived branches off `develop`, merged via PR.
+2. When a set of changes is ready for staging, merge `develop` into `test-environment-branch` and push. Railway test environment redeploys automatically.
+3. After the test environment is healthy (API boots, smoke tests pass), merge `test-environment-branch` into `main` via PR. Railway production redeploys.
+
 ## Prerequisites
 
 - Railway account (https://railway.app)
@@ -18,8 +32,8 @@ This guide walks through deploying the CRM monorepo to Railway.
 2. Click "New Project"
 3. Select "Deploy from GitHub"
 4. Authorize Railway to access your GitHub account
-5. Select the repository: `TCES` or `crm-monorepo`
-6. Select branch: `main`
+5. Select the repository
+6. Production deploys from `main`; test environment deploys from `test-environment-branch`
 
 ### 2. Configure Services
 
@@ -53,16 +67,21 @@ Railway automatically configures:
 - `PGUSER`
 - `PGPASSWORD`
 
-### 4. Run Database Migrations
+### 4. Database Migrations
 
-After deployment:
+Migrations run automatically on every API startup via the `start:api` script, which calls `prisma migrate deploy` before starting the server. This is idempotent — already-applied migrations are skipped.
 
-1. Connect to Railway Shell for the Backend service
-2. Run migrations:
-   ```bash
-   pnpm prisma db push
-   pnpm exec tsx apps/api/seed-full.ts
-   ```
+For a brand-new environment, you may also need to seed initial data:
+```bash
+pnpm exec tsx apps/api/seed-full.ts
+```
+
+To check migration status from your laptop (use the public Postgres URL from the Railway dashboard):
+```bash
+cd packages/db
+$env:DATABASE_URL="<DATABASE_PUBLIC_URL>"
+pnpm exec prisma migrate status
+```
 
 ### 5. Configure Custom Domains (Optional)
 

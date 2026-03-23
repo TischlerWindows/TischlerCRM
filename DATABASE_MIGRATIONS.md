@@ -33,21 +33,12 @@ These migration files are now part of your repo and can be deployed anywhere.
    - Go to API service → Variables
    - Add `DATABASE_URL` from PostgreSQL service
 
-2. **Run migrations on deploy:**
-   
-   Add to `apps/api/package.json` build command:
-   ```json
-   {
-     "scripts": {
-       "build": "pnpm prisma migrate deploy && pnpm build",
-       "start": "node dist/server.js"
-     }
-   }
-   ```
+2. **Migrations run automatically on startup.**
+   The root `start:api` script calls `prisma migrate deploy` before starting the API server. No manual build-command change is needed.
 
 3. **Deploy:**
    ```bash
-   git push  # Railway auto-deploys
+   git push  # Railway auto-deploys from the branch wired to each environment
    ```
 
 #### Option B: Vercel (API endpoint)
