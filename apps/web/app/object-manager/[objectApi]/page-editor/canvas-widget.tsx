@@ -35,12 +35,14 @@ export function CanvasWidgetCard({
   widget,
   sectionColumns,
   gridRowStart,
+  stackMode,
   isOver,
   dropSide,
 }: {
   widget: CanvasWidget;
   sectionColumns: number;
   gridRowStart: number;
+  stackMode?: boolean;
   isOver: boolean;
   dropSide: 'top' | 'bottom' | null;
 }) {
@@ -66,8 +68,12 @@ export function CanvasWidgetCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    gridColumn: `${widget.column + 1} / span ${Math.min(widget.colSpan, sectionColumns - widget.column)}`,
-    gridRow: `${gridRowStart + 1} / span ${widget.rowSpan}`,
+    ...(stackMode
+      ? {}
+      : {
+          gridColumn: `${widget.column + 1} / span ${Math.min(widget.colSpan, sectionColumns - widget.column)}`,
+          gridRow: `${gridRowStart + 1} / span ${widget.rowSpan}`,
+        }),
   };
 
   const isSelected =

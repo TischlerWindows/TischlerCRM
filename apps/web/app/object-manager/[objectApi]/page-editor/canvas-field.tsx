@@ -14,14 +14,17 @@ export function CanvasFieldCard({
   fieldDef,
   sectionColumns,
   gridRowStart,
+  stackMode,
   isOver,
   dropSide,
 }: {
   field: CanvasField;
   fieldDef: FieldDef;
   sectionColumns: number;
-  /** 0-based row from packing algorithm (matches dynamic-form) */
+  /** 0-based row from packing algorithm (CSS grid mode only) */
   gridRowStart: number;
+  /** Vertical column stack in section editor (no CSS grid placement) */
+  stackMode?: boolean;
   isOver: boolean;
   dropSide: 'top' | 'bottom' | null;
 }) {
@@ -45,8 +48,12 @@ export function CanvasFieldCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    gridColumn: `${field.column + 1} / span ${Math.min(field.colSpan, sectionColumns - field.column)}`,
-    gridRow: `${gridRowStart + 1} / span ${field.rowSpan}`,
+    ...(stackMode
+      ? {}
+      : {
+          gridColumn: `${field.column + 1} / span ${Math.min(field.colSpan, sectionColumns - field.column)}`,
+          gridRow: `${gridRowStart + 1} / span ${field.rowSpan}`,
+        }),
   };
 
   const isSelected =

@@ -5,14 +5,16 @@ import { Save } from 'lucide-react';
 
 export function UnsavedChangesDialog({
   open,
-  onCancel,
-  onDiscard,
-  onSave,
+  isSaving,
+  onKeepEditing,
+  onLeaveWithoutSaving,
+  onSaveAndLeave,
 }: {
   open: boolean;
-  onCancel: () => void;
-  onDiscard: () => void;
-  onSave: () => void;
+  isSaving?: boolean;
+  onKeepEditing: () => void;
+  onLeaveWithoutSaving: () => void;
+  onSaveAndLeave: () => void;
 }) {
   if (!open) return null;
 
@@ -20,32 +22,39 @@ export function UnsavedChangesDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold">Unsaved Changes</h3>
+          <h3 className="text-lg font-semibold">Save changes?</h3>
         </div>
         <div className="px-6 py-4">
           <p className="text-gray-600">
-            You have unsaved changes that will be lost. Would you like to save before leaving?
+            You have unsaved changes. Save before leaving, or leave without saving?
           </p>
         </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancel
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onKeepEditing}
+            disabled={isSaving}
+          >
+            Keep editing
           </Button>
           <Button
             variant="outline"
             size="sm"
-            onClick={onDiscard}
-            className="text-red-600 hover:text-red-700"
+            onClick={onLeaveWithoutSaving}
+            disabled={isSaving}
+            className="text-red-600 hover:text-red-700 border-red-200"
           >
-            Discard Changes
+            Leave without saving
           </Button>
           <Button
             size="sm"
-            onClick={onSave}
+            onClick={onSaveAndLeave}
+            disabled={isSaving}
             className="bg-brand-navy hover:bg-brand-navy/90 text-white"
           >
             <Save className="h-4 w-4 mr-2" />
-            Save &amp; Exit
+            {isSaving ? 'Saving…' : 'Save and leave'}
           </Button>
         </div>
       </div>

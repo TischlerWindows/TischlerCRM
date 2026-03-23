@@ -13,6 +13,8 @@ import type {
   ColumnCount,
   SelectedElement,
 } from './types';
+import type { LayoutPresetId } from './layout-presets';
+import { getPresetSections } from './layout-presets';
 
 interface Snapshot {
   tabs: CanvasTab[];
@@ -57,6 +59,8 @@ export interface EditorState {
   moveSection: (id: string, dir: 'up' | 'down') => void;
   updateSectionColumns: (id: string, cols: ColumnCount) => void;
   toggleSectionCollapsed: (id: string) => void;
+  /** Append preset sections to the active tab (undoable). */
+  applyLayoutPreset: (presetId: LayoutPresetId) => void;
 
   // Actions — fields
   addField: (field: CanvasField) => void;
@@ -242,6 +246,26 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
         sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec,
       ),
     }));
+  },
+
+  applyLayoutPreset: (presetId) => {
+    get().pushUndo();
+    const { sections, activeTabId } = get();
+    const tabSections = sections.filter((s) => s.tabId === activeTabId);
+    const baseOrder = tabSections.length;
+    const specs = getPresetSections(presetId);
+    const ts = Date.now();
+    const newSections: CanvasSection[] = specs.map((spec, i) => ({
+      id: `section-${ts}-${i}`,
+      label: spec.label,
+      tabId: activeTabId,
+      columns: spec.columns,
+      order: baseOrder + i,
+      collapsed: false,
+      showInRecord: true,
+      showInTemplate: true,
+    }));
+    set({ sections: [...sections, ...newSections], hasUnsavedChanges: true });
   },
 
   // Fields

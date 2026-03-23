@@ -19,9 +19,29 @@ import {
   Plus,
 } from 'lucide-react';
 
-type GridPackingItem =
-  | { kind: 'field'; id: string; column: number; order: number; colSpan: number; rowSpan: number }
-  | { kind: 'widget'; id: string; column: number; order: number; colSpan: number; rowSpan: number };
+type ColumnEntry =
+  | { kind: 'field'; field: CanvasField }
+  | { kind: 'widget'; widget: CanvasWidget };
+
+function entriesForColumn(
+  colIdx: number,
+  sectionFields: CanvasField[],
+  sectionWidgets: CanvasWidget[],
+): ColumnEntry[] {
+  const fields = sectionFields
+    .filter((f) => f.column === colIdx)
+    .sort((a, b) => a.order - b.order)
+    .map((field) => ({ kind: 'field' as const, field }));
+  const widgets = sectionWidgets
+    .filter((w) => w.column === colIdx)
+    .sort((a, b) => a.order - b.order)
+    .map((widget) => ({ kind: 'widget' as const, widget }));
+  return [...fields, ...widgets].sort((a, b) => {
+    const oa = a.kind === 'field' ? a.field.order : a.widget.order;
+    const ob = b.kind === 'field' ? b.field.order : b.widget.order;
+    return oa - ob;
+  });
+}
 
 export function CanvasSectionComponent({
   section,
@@ -44,81 +64,9 @@ export function CanvasSectionComponent({
   const moveSection = useEditorStore((s) => s.moveSection);
   const toggleSectionCollapsed = useEditorStore((s) => s.toggleSectionCollapsed);
 
-  const sortedFields = [...sectionFields].sort((a, b) => a.order - b.order);
+  const allItemIds = [...sectionFields.map((f) => f.id), ...sectionWidgets.map((w) => w.id)];
 
-  const occupied = new Set<string>();
-  const itemGridRow = new Map<string, number>();
-
-  const columnItems: GridPackingItem[][] = [];
-  for (let c = 0; c < section.columns; c++) {
-    const fieldItems: GridPackingItem[] = sortedFields
-      .filter((f) => f.column === c)
-      .map((f) => ({
-        kind: 'field' as const,
-        id: f.id,
-        column: f.column,
-        order: f.order,
-        colSpan: f.colSpan,
-        rowSpan: f.rowSpan,
-      }));
-    const widgetItems: GridPackingItem[] = sectionWidgets
-      .filter((w) => w.column === c)
-      .map((w) => ({
-        kind: 'widget' as const,
-        id: w.id,
-        column: w.column,
-        order: w.order,
-        colSpan: w.colSpan,
-        rowSpan: w.rowSpan,
-      }));
-    columnItems[c] = [...fieldItems, ...widgetItems].sort((a, b) => a.order - b.order);
-  }
-
-  for (let c = 0; c < section.columns; c++) {
-    for (const item of columnItems[c]) {
-      const cs = Math.min(item.colSpan, section.columns - item.column);
-      const rs = item.rowSpan;
-      let row = 0;
-      search: while (true) {
-        for (let dr = 0; dr < rs; dr++) {
-          for (let dc = 0; dc < cs; dc++) {
-            if (occupied.has(`${row + dr},${item.column + dc}`)) {
-              row++;
-              continue search;
-            }
-          }
-        }
-        break;
-      }
-      itemGridRow.set(item.id, row);
-      for (let dr = 0; dr < rs; dr++) {
-        for (let dc = 0; dc < cs; dc++) {
-          occupied.add(`${row + dr},${item.column + dc}`);
-        }
-      }
-    }
-  }
-
-  const allItemIds = [...sortedFields.map((f) => f.id), ...sectionWidgets.map((w) => w.id)];
-
-  const renderColumnDropStripe = () => (
-    <div className="grid gap-3 mt-2" style={{ gridTemplateColumns: `repeat(${section.columns}, 1fr)` }}>
-      {Array.from({ length: section.columns }, (_, colIdx) => (
-        <SectionColumnDropTarget key={`drop-${section.id}-col-${colIdx}`} sectionId={section.id} columnIndex={colIdx}>
-          {({ setNodeRef, isOver }) => (
-            <div
-              ref={setNodeRef}
-              className={`min-h-[40px] rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
-                isOver ? 'border-teal-400 bg-teal-50' : 'border-transparent hover:border-gray-200'
-              }`}
-            >
-              {isOver && <span className="text-xs text-teal-600">Drop here</span>}
-            </div>
-          )}
-        </SectionColumnDropTarget>
-      ))}
-    </div>
-  );
+  const hasContent = sectionFields.length > 0 || sectionWidgets.length > 0;
 
   return (
     <div
@@ -179,69 +127,74 @@ export function CanvasSectionComponent({
             <div
               className="grid gap-3"
               style={{
-                gridTemplateColumns: `repeat(${section.columns}, 1fr)`,
-                gridAutoRows: 'minmax(60px, auto)',
+                gridTemplateColumns: `repeat(${section.columns}, minmax(0, 1fr))`,
               }}
             >
-              {sortedFields.map((field) => {
-                const fieldDef = getFieldDef(field.fieldApiName);
-                if (!fieldDef) return null;
-                const rowStart = itemGridRow.get(field.id) ?? 0;
-                return (
-                  <CanvasFieldCard
-                    key={field.id}
-                    field={field}
-                    fieldDef={fieldDef}
-                    sectionColumns={section.columns}
-                    gridRowStart={rowStart}
-                    isOver={overId === field.id}
-                    dropSide={overId === field.id ? dropSide : null}
-                  />
-                );
-              })}
+              {Array.from({ length: section.columns }, (_, colIdx) => {
+                const entries = entriesForColumn(colIdx, sectionFields, sectionWidgets);
+                const colDropId = `${section.id}-col-${colIdx}`;
 
-              {sectionWidgets.map((widget) => {
-                const rowStart = itemGridRow.get(widget.id) ?? 0;
                 return (
-                  <CanvasWidgetCard
-                    key={widget.id}
-                    widget={widget}
-                    sectionColumns={section.columns}
-                    gridRowStart={rowStart}
-                    isOver={overId === widget.id}
-                    dropSide={overId === widget.id ? dropSide : null}
-                  />
-                );
-              })}
+                  <SectionColumnDropTarget key={colDropId} sectionId={section.id} columnIndex={colIdx}>
+                    {({ setNodeRef, isOver }) => (
+                      <div
+                        ref={setNodeRef}
+                        className={`flex flex-col gap-3 min-h-[200px] rounded-lg p-2 border-2 border-dashed transition-colors ${
+                          isOver
+                            ? 'border-teal-400 bg-teal-50/90 shadow-[inset_0_0_0_1px_rgba(20,184,166,0.25)]'
+                            : 'border-gray-200/90 bg-gray-50/40 hover:border-gray-300'
+                        }`}
+                      >
+                        {entries.map((entry) => {
+                          if (entry.kind === 'field') {
+                            const { field } = entry;
+                            const fieldDef = getFieldDef(field.fieldApiName);
+                            if (!fieldDef) return null;
+                            return (
+                              <CanvasFieldCard
+                                key={field.id}
+                                field={field}
+                                fieldDef={fieldDef}
+                                sectionColumns={section.columns}
+                                gridRowStart={0}
+                                stackMode
+                                isOver={overId === field.id}
+                                dropSide={overId === field.id ? dropSide : null}
+                              />
+                            );
+                          }
+                          const { widget } = entry;
+                          return (
+                            <CanvasWidgetCard
+                              key={widget.id}
+                              widget={widget}
+                              sectionColumns={section.columns}
+                              gridRowStart={0}
+                              stackMode
+                              isOver={overId === widget.id}
+                              dropSide={overId === widget.id ? dropSide : null}
+                            />
+                          );
+                        })}
 
-              {sortedFields.length === 0 && sectionWidgets.length === 0 && (
-                <>
-                  {Array.from({ length: section.columns }, (_, colIdx) => (
-                    <SectionColumnDropTarget
-                      key={`empty-${section.id}-col-${colIdx}`}
-                      sectionId={section.id}
-                      columnIndex={colIdx}
-                    >
-                      {({ setNodeRef, isOver }) => (
-                        <div
-                          ref={setNodeRef}
-                          className={`min-h-[80px] p-4 rounded-lg border-2 border-dashed transition-colors flex items-center justify-center ${
-                            isOver ? 'border-teal-400 bg-teal-50' : 'border-gray-200 bg-gray-50/50'
-                          }`}
-                        >
-                          <div className="text-center text-gray-400 text-xs">
-                            <Plus className="h-5 w-5 mx-auto mb-1" />
+                        {!hasContent && (
+                          <div className="flex-1 flex flex-col items-center justify-center text-center text-gray-400 text-xs min-h-[80px] py-4">
+                            <Plus className="h-5 w-5 mx-auto mb-1 opacity-60" />
                             Drag fields or widgets here
                           </div>
-                        </div>
-                      )}
-                    </SectionColumnDropTarget>
-                  ))}
-                </>
-              )}
-            </div>
+                        )}
 
-            {(sortedFields.length > 0 || sectionWidgets.length > 0) && renderColumnDropStripe()}
+                        {hasContent && entries.length === 0 && (
+                          <div className="flex-1 flex items-center justify-center text-xs text-gray-400 min-h-[100px] border border-dashed border-gray-200 rounded-md bg-white/50">
+                            Drop into this column
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </SectionColumnDropTarget>
+                );
+              })}
+            </div>
           </SortableContext>
         </div>
       )}
