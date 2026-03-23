@@ -148,10 +148,24 @@ export default function ObjectDetailPage() {
   const [activeSection, setActiveSection] = useState(() => searchParams.get('section') || 'details');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const initialLayoutId = searchParams.get('layoutId');
+  const sectionParam = searchParams.get('section');
 
   useEffect(() => {
     setSelectedObject(objectApi);
   }, [objectApi, setSelectedObject]);
+
+  useEffect(() => {
+    setActiveSection(sectionParam || 'details');
+  }, [sectionParam]);
+
+  // Phase 2E: legacy ?section=page-editor&layoutId= → full-page editor route
+  useEffect(() => {
+    if (sectionParam === 'page-editor' && initialLayoutId) {
+      router.replace(
+        `/object-manager/${encodeURIComponent(objectApi)}/page-editor/${encodeURIComponent(initialLayoutId)}`
+      );
+    }
+  }, [sectionParam, initialLayoutId, objectApi, router]);
 
   const object = schema?.objects.find(obj => obj.apiName === objectApi);
   const sidebarSections = objectApi === 'Home'
@@ -386,7 +400,13 @@ export default function ObjectDetailPage() {
 
           {activeSection === 'page-editor' && objectApi !== 'Home' && (
             <div className="h-[calc(100vh-200px)]">
-              <PageEditor objectApiName={objectApi} initialLayoutId={initialLayoutId} />
+              {sectionParam === 'page-editor' && initialLayoutId ? (
+                <div className="flex items-center justify-center h-full text-gray-600 text-sm">
+                  Opening page editor…
+                </div>
+              ) : (
+                <PageEditor objectApiName={objectApi} />
+              )}
             </div>
           )}
 

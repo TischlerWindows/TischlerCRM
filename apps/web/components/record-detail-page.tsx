@@ -22,6 +22,7 @@ import {
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
+import { useRecordSetupContext } from '@/lib/record-setup-context';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -59,6 +60,7 @@ export default function RecordDetailPage({
   const canDelete = canAccess(objectApiName, 'delete');
   const { hasAppPermission } = usePermissions();
   const canCustomize = hasAppPermission('customizeApplication');
+  const { setRecordSetupContext } = useRecordSetupContext();
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
@@ -123,6 +125,27 @@ export default function RecordDetailPage({
   };
 
   const pageLayout = resolveLayout();
+
+  useEffect(() => {
+    if (!record || !objectDef) {
+      setRecordSetupContext(null);
+      return;
+    }
+    setRecordSetupContext({
+      objectApiName,
+      pageLayoutId: pageLayout?.id ?? null,
+    });
+  }, [
+    objectApiName,
+    record,
+    objectDef,
+    pageLayout?.id,
+    setRecordSetupContext,
+  ]);
+
+  useEffect(() => {
+    return () => setRecordSetupContext(null);
+  }, [setRecordSetupContext]);
 
   // ── Preload lookup target records so IDs resolve to labels ──────────
   useEffect(() => {
@@ -599,7 +622,7 @@ export default function RecordDetailPage({
                     <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
                     <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
                       <Link
-                        href={`/object-manager/${objectApiName}`}
+                        href={`/object-manager/${encodeURIComponent(objectApiName)}`}
                         className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                         onClick={() => setShowAdminMenu(false)}
                       >
@@ -609,7 +632,7 @@ export default function RecordDetailPage({
                       </Link>
                       {pageLayout && (
                         <Link
-                          href={`/object-manager/${objectApiName}?section=page-editor&layoutId=${pageLayout.id}`}
+                          href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}`}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setShowAdminMenu(false)}
                         >
@@ -827,8 +850,10 @@ export default function RecordDetailPage({
                               section.columns === 1
                                 ? 'grid-cols-1'
                                 : section.columns === 2
-                                ? 'grid-cols-1 md:grid-cols-2'
-                                : 'grid-cols-1 md:grid-cols-3'
+                                  ? 'grid-cols-1 md:grid-cols-2'
+                                  : section.columns === 4
+                                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+                                    : 'grid-cols-1 md:grid-cols-3'
                             }`}
                           >
                             {columnArrays.map((colFields, colIdx) => (

@@ -1,6 +1,6 @@
-import type { FieldType, ConditionExpr, PageFieldPresentation } from '@/lib/schema';
+import type { FieldType, ConditionExpr, PageFieldPresentation, WidgetType, WidgetConfig } from '@/lib/schema';
 
-export type ColumnCount = 1 | 2 | 3;
+export type ColumnCount = 1 | 2 | 3 | 4;
 
 export interface CanvasField {
   id: string;
@@ -11,6 +11,17 @@ export interface CanvasField {
   colSpan: number;
   rowSpan: number;
   presentation?: PageFieldPresentation;
+}
+
+export interface CanvasWidget {
+  id: string;
+  widgetType: WidgetType;
+  sectionId: string;
+  column: number;
+  order: number;
+  colSpan: number;
+  rowSpan: number;
+  config: WidgetConfig;
 }
 
 export interface CanvasSection {
@@ -40,8 +51,17 @@ export interface DraggedField {
   required: boolean;
 }
 
+export interface DraggedWidget {
+  id: string;
+  widgetType: WidgetType;
+  label: string;
+}
+
+export type DraggedItem = DraggedField | DraggedWidget;
+
 export type SelectedElement =
   | { type: 'tab'; id: string }
   | { type: 'section'; id: string }
   | { type: 'field'; id: string }
+  | { type: 'widget'; id: string }
   | null;
