@@ -609,7 +609,7 @@ export default function RecordDetailPage({
                       </Link>
                       {pageLayout && (
                         <Link
-                          href={`/object-manager/${objectApiName}?section=page-layouts&layoutId=${pageLayout.id}`}
+                          href={`/object-manager/${objectApiName}?section=page-editor&layoutId=${pageLayout.id}`}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setShowAdminMenu(false)}
                         >
