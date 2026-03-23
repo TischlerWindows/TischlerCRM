@@ -31,15 +31,33 @@ export function buildPageLayoutFromCanvas(params: {
     name: layoutName,
     layoutType: 'edit',
     highlightFields: highlightFields.length > 0 ? highlightFields.slice(0, 6) : undefined,
-    tabs: tabs.map((tab) => ({
-      id: tab.id,
-      label: tab.label,
-      order: tab.order,
-      sections: sections
+    tabs: tabs.map((tab) => {
+      const tabCanvasWidgets = widgets
+        .filter((w) => w.tabId === tab.id && !w.sectionId)
+        .sort((a, b) => a.order - b.order)
+        .map(
+          (w): PageWidget => ({
+            id: w.id,
+            widgetType: w.widgetType,
+            column: w.column,
+            order: w.order,
+            colSpan: w.colSpan > 1 ? w.colSpan : undefined,
+            rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
+            config: w.config,
+          }),
+        );
+
+      return {
+        id: tab.id,
+        label: tab.label,
+        order: tab.order,
+        ...(tabCanvasWidgets.length > 0 ? { widgets: tabCanvasWidgets } : {}),
+        sections: sections
         .filter((s) => s.tabId === tab.id)
+        .sort((a, b) => a.order - b.order)
         .map((section) => {
           const sectionWidgets = widgets
-            .filter((w) => w.sectionId === section.id)
+            .filter((w) => w.sectionId && w.sectionId === section.id)
             .map(
               (w): PageWidget => ({
                 id: w.id,
@@ -95,7 +113,8 @@ export function buildPageLayoutFromCanvas(params: {
             showInTemplate: section.showInTemplate,
           };
         }),
-    })),
+      };
+    }),
     formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
   };
 }

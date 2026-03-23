@@ -20,6 +20,7 @@ import {
   labelPresentationClassName,
 } from '@/lib/layout-presentation';
 import { groupSectionsIntoRows } from '@/lib/group-section-rows';
+import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
@@ -722,6 +723,9 @@ export default function RecordDetailPage({
               const rows = groupSectionsIntoRows(eligible);
               return (
               <div key={ti}>
+                {tab.widgets && tab.widgets.length > 0 ? (
+                  <LayoutWidgetsInline widgets={tab.widgets} />
+                ) : null}
                 {rows.map((row, ri) => (
                   <div key={`${ti}-row-${ri}`} className="flex flex-wrap gap-6 items-stretch mb-6">
                     {row.map((section) => {

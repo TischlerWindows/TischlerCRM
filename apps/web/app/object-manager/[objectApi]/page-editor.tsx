@@ -46,6 +46,19 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     }
   };
 
+  const assignLayoutToRecordType = async (layoutId: string, recordTypeId: string) => {
+    if (!object) return;
+    const recordTypes = object.recordTypes.map((rt) =>
+      rt.id === recordTypeId ? { ...rt, pageLayoutId: layoutId } : rt,
+    );
+    try {
+      await updateObject(objectApiName, { recordTypes });
+    } catch (err) {
+      console.error('Failed to assign layout:', err);
+      alert('Failed to assign layout to record type.');
+    }
+  };
+
   return (
     <LayoutListView
       objectLabel={object?.label}
@@ -53,6 +66,9 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       onCreate={onCreate}
       onEdit={onEdit}
       onDelete={deleteLayout}
+      recordTypes={object?.recordTypes || []}
+      defaultRecordTypeId={object?.defaultRecordTypeId}
+      onAssignToRecordType={assignLayoutToRecordType}
     />
   );
 }
