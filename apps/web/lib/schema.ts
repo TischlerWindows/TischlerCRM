@@ -323,8 +323,83 @@ export interface SchemaVersion {
 export interface OrgSchema {
   version: number; // increment on save
   objects: ObjectDef[];
+  flows?: FlowDefinition[];
   updatedAt: string;
   createdBy?: string;
+}
+
+// ── Flow Builder types (Salesforce-style visual automations) ────────
+
+export type FlowType =
+  | 'record-triggered'   // Launches when a record is created/updated/deleted
+  | 'schedule-triggered' // Launches at a specified time/frequency
+  | 'screen'             // Interactive — guides users through screens
+  | 'autolaunched';      // Invoked by API, other flows, or processes
+
+export type FlowStatus = 'draft' | 'active' | 'inactive';
+
+export type FlowTriggerEvent = 'create' | 'update' | 'create_or_update' | 'delete';
+
+export interface FlowSchedule {
+  frequency: 'once' | 'daily' | 'weekly' | 'monthly';
+  startDate?: string;
+  time?: string;          // HH:mm
+  dayOfWeek?: number;     // 0-6 (Sun-Sat)
+  dayOfMonth?: number;    // 1-31
+}
+
+/** A node in the flow canvas */
+export type FlowElementType =
+  | 'start'
+  | 'assignment'        // Set variable / field values
+  | 'decision'          // If/else branching
+  | 'loop'              // Iterate over a collection
+  | 'get-records'       // Query records from an object
+  | 'create-record'     // Create a new record
+  | 'update-records'    // Update existing records
+  | 'delete-records'    // Delete records
+  | 'send-email'        // Send an email alert
+  | 'screen'            // Display a screen to the user
+  | 'subflow'           // Call another flow
+  | 'action';           // Apex/custom action placeholder
+
+export interface FlowElement {
+  id: string;
+  type: FlowElementType;
+  label: string;
+  description?: string;
+  position: { x: number; y: number };
+  config: Record<string, any>;         // Type-specific configuration
+  connectors: FlowConnector[];          // Outgoing edges
+}
+
+export interface FlowConnector {
+  id: string;
+  label?: string;
+  targetElementId: string;
+  isDefault?: boolean;                   // For decision: the "else" branch
+  condition?: ConditionExpr[];           // For decision branches
+}
+
+/** Top-level flow definition */
+export interface FlowDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  type: FlowType;
+  status: FlowStatus;
+  version: number;
+  // Record-triggered config
+  objectApiName?: string;
+  triggerEvent?: FlowTriggerEvent;
+  triggerConditions?: ConditionExpr[];
+  // Schedule-triggered config
+  schedule?: FlowSchedule;
+  // Canvas
+  elements: FlowElement[];
+  // Metadata
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type ConditionExpr = { 

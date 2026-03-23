@@ -69,7 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Automation',
     items: [
-      { name: 'Process Automation', href: '/settings/automation', icon: Zap, disabled: true },
+      { name: 'Process Automation', href: '/automations', icon: Zap },
     ],
   },
 ];

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
 import { recordsService } from './records-service';
@@ -51,6 +51,12 @@ export interface SchemaStore {
   addWorkflowRule: (objectApi: string, rule: Omit<WorkflowRule, 'id'>) => string;
   updateWorkflowRule: (objectApi: string, ruleId: string, updates: Partial<WorkflowRule>) => void;
   deleteWorkflowRule: (objectApi: string, ruleId: string) => void;
+
+  // Flow operations
+  addFlow: (flow: Omit<FlowDefinition, 'id' | 'createdAt' | 'updatedAt'>) => string;
+  updateFlow: (flowId: string, updates: Partial<FlowDefinition>) => void;
+  deleteFlow: (flowId: string) => void;
+  getFlow: (flowId: string) => FlowDefinition | undefined;
 
   // Schema versioning
   getVersionHistory: () => Promise<OrgSchema[]>;
@@ -824,6 +830,70 @@ export const useSchemaStore = create<SchemaStore>()(
 
         set({ schema: updatedSchema });
         schemaService.saveSchema(updatedSchema);
+      },
+
+      // Add flow
+      addFlow: (flowData) => {
+        const { schema } = get();
+        if (!schema) return '';
+
+        const flowId = generateId();
+        const now = new Date().toISOString();
+        const newFlow: FlowDefinition = {
+          ...flowData,
+          id: flowId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const updatedSchema = {
+          ...schema,
+          flows: [...(schema.flows || []), newFlow],
+          updatedAt: now,
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+        return flowId;
+      },
+
+      // Update flow
+      updateFlow: (flowId, updates) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const now = new Date().toISOString();
+        const updatedSchema = {
+          ...schema,
+          flows: (schema.flows || []).map(f =>
+            f.id === flowId ? { ...f, ...updates, updatedAt: now } : f
+          ),
+          updatedAt: now,
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Delete flow
+      deleteFlow: (flowId) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const updatedSchema = {
+          ...schema,
+          flows: (schema.flows || []).filter(f => f.id !== flowId),
+          updatedAt: new Date().toISOString(),
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Get flow
+      getFlow: (flowId) => {
+        const { schema } = get();
+        return schema?.flows?.find(f => f.id === flowId);
       },
 
       // Get version history
