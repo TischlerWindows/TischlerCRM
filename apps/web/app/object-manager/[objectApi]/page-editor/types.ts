@@ -16,6 +16,11 @@ export interface CanvasField {
 export interface CanvasWidget {
   id: string;
   widgetType: WidgetType;
+  /** Tab this widget belongs to */
+  tabId: string;
+  /**
+   * Section containing the widget; empty string = tab-level (not inside a section).
+   */
   sectionId: string;
   column: number;
   order: number;

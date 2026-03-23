@@ -22,6 +22,7 @@ import {
 } from '@/lib/layout-formatting';
 import { labelPresentationClassName } from '@/lib/layout-presentation';
 import { groupSectionsIntoRows } from '@/lib/group-section-rows';
+import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -2056,6 +2057,9 @@ export default function DynamicForm({
       {/* Sections — normal mode (all sections shown); layoutRowId groups side-by-side */}
       {!showReview && !isWizardMode && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {currentTab.widgets && currentTab.widgets.length > 0 ? (
+            <LayoutWidgetsInline widgets={currentTab.widgets} />
+          ) : null}
           {(() => {
             const sorted = [...currentTab.sections].sort((a, b) => a.order - b.order);
             const visible = sorted.filter((section) => {

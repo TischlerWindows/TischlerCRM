@@ -399,6 +399,9 @@ export function PropertiesPanel({
                     <div>
                       <span className="text-xs text-gray-500">Type:</span>
                       <div className="font-medium">{widget.widgetType}</div>
+                      {!widget.sectionId ? (
+                        <p className="text-xs text-amber-700 mt-1">Placed in “Widgets for this tab” (above sections)</p>
+                      ) : null}
                     </div>
 
                     {/* Related List config */}

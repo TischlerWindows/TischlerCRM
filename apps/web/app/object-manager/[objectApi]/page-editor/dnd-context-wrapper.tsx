@@ -5,6 +5,7 @@ import {
   DndContext,
   DragOverlay,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -12,6 +13,7 @@ import {
   DragStartEvent,
   DragEndEvent,
   DragOverEvent,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { FieldDef, WidgetType } from '@/lib/schema';
@@ -51,13 +53,37 @@ function orderForDropIntoColumn(
 ): number {
   const orders = [
     ...fields.filter((f) => f.sectionId === sectionId && f.column === column).map((f) => f.order),
-    ...widgets.filter((w) => w.sectionId === sectionId && w.column === column).map((w) => w.order),
+    ...widgets
+      .filter((w) => w.sectionId && w.sectionId === sectionId && w.column === column)
+      .map((w) => w.order),
   ];
   if (orders.length === 0) return 0;
   return Math.min(...orders) - 1;
 }
 
 type ColumnRow = { id: string; order: number };
+
+/** Tab-level widgets: sectionId === '' */
+function orderForDropIntoTabRoot(
+  tabId: string,
+  widgets: CanvasWidget[],
+): number {
+  const orders = widgets
+    .filter((w) => w.tabId === tabId && !w.sectionId)
+    .map((w) => w.order);
+  if (orders.length === 0) return 0;
+  return Math.min(...orders) - 1;
+}
+
+function tabRootWidgetsSorted(tabId: string, widgets: CanvasWidget[], excludeId: string): ColumnRow[] {
+  const rows: ColumnRow[] = [];
+  for (const w of widgets) {
+    if (w.tabId === tabId && !w.sectionId && w.id !== excludeId) {
+      rows.push({ id: w.id, order: w.order });
+    }
+  }
+  return rows.sort((a, b) => a.order - b.order);
+}
 
 function columnRowsSorted(
   sectionId: string,
@@ -73,12 +99,22 @@ function columnRowsSorted(
     }
   }
   for (const w of widgets) {
-    if (w.sectionId === sectionId && w.column === column && w.id !== excludeId) {
+    if (w.sectionId && w.sectionId === sectionId && w.column === column && w.id !== excludeId) {
       rows.push({ id: w.id, order: w.order });
     }
   }
   return rows.sort((a, b) => a.order - b.order);
 }
+
+const TAB_ROOT_SUFFIX = '-tab-root';
+
+/** Prefer highlights strip when pointer is inside it so drops are not stolen by the canvas. */
+const pageEditorCollisionDetection: CollisionDetection = (args) => {
+  const within = pointerWithin(args);
+  const hi = within.find((c) => String(c.id) === 'layout-highlight-drop');
+  if (hi) return [hi];
+  return closestCenter(args);
+};
 
 export function DndContextWrapper({
   children,
@@ -89,6 +125,7 @@ export function DndContextWrapper({
 }) {
   const fields = useEditorStore((s) => s.fields);
   const widgets = useEditorStore((s) => s.widgets);
+  const sections = useEditorStore((s) => s.sections);
   const addField = useEditorStore((s) => s.addField);
   const setFields = useEditorStore((s) => s.setFields);
   const setWidgets = useEditorStore((s) => s.setWidgets);
@@ -226,15 +263,58 @@ export function DndContextWrapper({
       setDropSide(null);
 
       if (!over) return;
-      pushUndo();
 
       const activeId = active.id.toString();
       const targetId = over.id.toString();
 
       if (targetId === 'layout-highlight-drop') {
         if (activeId.startsWith('field-')) {
+          pushUndo();
           const fieldApiName = activeId.replace('field-', '');
           addHighlightField(fieldApiName);
+        } else if (activeId.startsWith('placed-')) {
+          const pf = fields.find((f) => f.id === activeId);
+          if (pf) {
+            pushUndo();
+            addHighlightField(pf.fieldApiName);
+          }
+        }
+        return;
+      }
+
+      if (targetId.endsWith(TAB_ROOT_SUFFIX)) {
+        const targetTabId = targetId.slice(0, -TAB_ROOT_SUFFIX.length);
+        const topOrder = orderForDropIntoTabRoot(targetTabId, widgets);
+        if (activeId.startsWith('widget-new-')) {
+          pushUndo();
+          const widgetType = activeId.replace('widget-new-', '') as WidgetType;
+          addWidget({
+            id: `widget-${Date.now()}-${widgetType}`,
+            widgetType,
+            tabId: targetTabId,
+            sectionId: '',
+            column: 0,
+            order: topOrder,
+            colSpan: 1,
+            rowSpan: 1,
+            config: DEFAULT_WIDGET_CONFIGS[widgetType],
+          });
+        } else if (isCanvasWidgetId(activeId)) {
+          pushUndo();
+          setWidgets(
+            widgets.map((w) =>
+              w.id === activeId
+                ? {
+                    ...w,
+                    tabId: targetTabId,
+                    sectionId: '',
+                    column: 0,
+                    order: topOrder,
+                  }
+                : w,
+            ),
+          );
+          markDirty();
         }
         return;
       }
@@ -242,8 +322,10 @@ export function DndContextWrapper({
       if (targetId.includes('-col-')) {
         const colMatch = targetId.match(/^(.+)-col-(\d+)$/);
         if (!colMatch) return;
+        pushUndo();
         const targetSectionId = colMatch[1];
         const targetColumn = parseInt(colMatch[2], 10);
+        const targetTabId = sections.find((s) => s.id === targetSectionId)?.tabId ?? '';
         const topOrder = orderForDropIntoColumn(targetSectionId, targetColumn, fields, widgets);
 
         if (activeId.startsWith('field-')) {
@@ -271,6 +353,7 @@ export function DndContextWrapper({
           addWidget({
             id: `widget-${Date.now()}-${widgetType}`,
             widgetType,
+            tabId: targetTabId,
             sectionId: targetSectionId,
             column: targetColumn,
             order: topOrder,
@@ -282,7 +365,13 @@ export function DndContextWrapper({
           setWidgets(
             widgets.map((w) =>
               w.id === activeId
-                ? { ...w, sectionId: targetSectionId, column: targetColumn, order: topOrder }
+                ? {
+                    ...w,
+                    tabId: targetTabId,
+                    sectionId: targetSectionId,
+                    column: targetColumn,
+                    order: topOrder,
+                  }
                 : w,
             ),
           );
@@ -295,13 +384,65 @@ export function DndContextWrapper({
       const overWidget = widgets.find((w) => w.id === targetId);
       if (!overField && !overWidget) return;
 
+      if (overWidget && !overWidget.sectionId) {
+        const targetTabId = overWidget.tabId;
+        const columnItems = tabRootWidgetsSorted(targetTabId, widgets, activeId);
+        const overIdx = columnItems.findIndex((r) => r.id === targetId);
+        if (overIdx < 0) return;
+        pushUndo();
+        const overOrder = overWidget.order;
+        let newOrder = overOrder;
+        if (dropSide === 'bottom') {
+          newOrder =
+            overIdx < columnItems.length - 1
+              ? (overOrder + columnItems[overIdx + 1].order) / 2
+              : overOrder + 1;
+        } else {
+          newOrder =
+            overIdx > 0 ? (columnItems[overIdx - 1].order + overOrder) / 2 : overOrder - 1;
+        }
+        if (isCanvasWidgetId(activeId)) {
+          setWidgets(
+            widgets.map((w) =>
+              w.id === activeId
+                ? {
+                    ...w,
+                    tabId: targetTabId,
+                    sectionId: '',
+                    column: 0,
+                    order: newOrder,
+                  }
+                : w,
+            ),
+          );
+          markDirty();
+        } else if (activeId.startsWith('widget-new-')) {
+          const widgetType = activeId.replace('widget-new-', '') as WidgetType;
+          addWidget({
+            id: `widget-${Date.now()}-${widgetType}`,
+            widgetType,
+            tabId: targetTabId,
+            sectionId: '',
+            column: 0,
+            order: newOrder,
+            colSpan: 1,
+            rowSpan: 1,
+            config: DEFAULT_WIDGET_CONFIGS[widgetType],
+          });
+        }
+        return;
+      }
+
       const targetSectionId = overField?.sectionId ?? overWidget!.sectionId;
       const targetColumn = overField?.column ?? overWidget!.column;
       const overOrder = overField?.order ?? overWidget!.order;
+      const targetTabId = sections.find((s) => s.id === targetSectionId)?.tabId ?? '';
 
       const columnItems = columnRowsSorted(targetSectionId, targetColumn, fields, widgets, activeId);
       const overIdx = columnItems.findIndex((r) => r.id === targetId);
       if (overIdx < 0) return;
+
+      pushUndo();
 
       let newOrder = overOrder;
       if (dropSide === 'bottom') {
@@ -339,6 +480,7 @@ export function DndContextWrapper({
         addWidget({
           id: `widget-${Date.now()}-${widgetType}`,
           widgetType,
+          tabId: targetTabId,
           sectionId: targetSectionId,
           column: targetColumn,
           order: newOrder,
@@ -350,7 +492,13 @@ export function DndContextWrapper({
         setWidgets(
           widgets.map((w) =>
             w.id === activeId
-              ? { ...w, sectionId: targetSectionId, column: targetColumn, order: newOrder }
+              ? {
+                  ...w,
+                  tabId: targetTabId,
+                  sectionId: targetSectionId,
+                  column: targetColumn,
+                  order: newOrder,
+                }
               : w,
           ),
         );
@@ -360,6 +508,7 @@ export function DndContextWrapper({
     [
       fields,
       widgets,
+      sections,
       dropSide,
       addField,
       setFields,
@@ -377,7 +526,7 @@ export function DndContextWrapper({
     <EditorDragUiContext.Provider value={dragUiValue}>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={pageEditorCollisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

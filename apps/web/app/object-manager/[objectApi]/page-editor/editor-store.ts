@@ -59,6 +59,11 @@ export interface EditorState {
   moveSection: (id: string, dir: 'up' | 'down') => void;
   updateSectionColumns: (id: string, cols: ColumnCount) => void;
   toggleSectionCollapsed: (id: string) => void;
+  adjustAdjacentRowWeights: (
+    leftSectionId: string,
+    rightSectionId: string,
+    deltaLeft: number,
+  ) => void;
   /** Append preset sections to the active tab (undoable). */
   applyLayoutPreset: (presetId: LayoutPresetId) => void;
 
@@ -155,7 +160,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       tabs: remaining,
       sections: sections.filter((s) => s.tabId !== tabId),
       fields: fields.filter((f) => !sectionIds.has(f.sectionId)),
-      widgets: widgets.filter((w) => !sectionIds.has(w.sectionId)),
+      widgets: widgets.filter((w) => w.tabId !== tabId),
       activeTabId: activeTabId === tabId ? remaining[0]?.id || '' : activeTabId,
       hasUnsavedChanges: true,
     });
@@ -183,6 +188,27 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       sections: s.sections.map((sec) => (sec.id === id ? { ...sec, ...updates } : sec)),
       hasUnsavedChanges: true,
     }));
+  },
+
+  /** Adjust flex weights for two adjacent sections in the same row (sum preserved). */
+  adjustAdjacentRowWeights: (leftSectionId: string, rightSectionId: string, deltaLeft: number) => {
+    set((s) => {
+      const left = s.sections.find((sec) => sec.id === leftSectionId);
+      const right = s.sections.find((sec) => sec.id === rightSectionId);
+      if (!left || !right || left.layoutRowId !== right.layoutRowId) return s;
+      const wL = Math.max(1, (left.rowWeight ?? 1) + deltaLeft);
+      const sum = (left.rowWeight ?? 1) + (right.rowWeight ?? 1);
+      const wR = Math.max(1, sum - wL);
+      const wL2 = sum - wR;
+      return {
+        sections: s.sections.map((sec) => {
+          if (sec.id === leftSectionId) return { ...sec, rowWeight: wL2 };
+          if (sec.id === rightSectionId) return { ...sec, rowWeight: wR };
+          return sec;
+        }),
+        hasUnsavedChanges: true,
+      };
+    });
   },
 
   deleteSection: (id) => {
@@ -272,7 +298,11 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     set({
       sections: [...keptSections, ...newSections],
       fields: fields.filter((f) => !removedIds.has(f.sectionId)),
-      widgets: widgets.filter((w) => !removedIds.has(w.sectionId)),
+      widgets: widgets.filter((w) => {
+        if (w.tabId !== activeTabId) return true;
+        if (!w.sectionId) return true;
+        return !removedIds.has(w.sectionId);
+      }),
       selectedElement: null,
       hasUnsavedChanges: true,
     });
@@ -339,23 +369,24 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
   // Load an existing PageLayout into canvas state
   loadLayout: (layout) => {
-    const newTabs: CanvasTab[] = layout.tabs.map((tab, idx) => ({
-      id: `tab-${idx + 1}`,
-      label: tab.label,
-      order: tab.order,
-    }));
-
+    const newTabs: CanvasTab[] = [];
     const newSections: CanvasSection[] = [];
     const newFields: CanvasField[] = [];
     const newWidgets: CanvasWidget[] = [];
-    let sectionCounter = 1;
     let fieldCounter = 1;
     let widgetCounter = 1;
+    let sectionLoadCounter = 1;
 
     layout.tabs.forEach((tab, tabIdx) => {
-      const tabId = `tab-${tabIdx + 1}`;
+      const tabId = tab.id || `tab-${tabIdx + 1}`;
+      newTabs.push({
+        id: tabId,
+        label: tab.label,
+        order: tab.order,
+      });
+
       tab.sections.forEach((section) => {
-        const sectionId = `section-${sectionCounter++}`;
+        const sectionId = section.id || `section-load-${sectionLoadCounter++}`;
         newSections.push({
           id: sectionId,
           label: section.label,
@@ -387,8 +418,9 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
         if (section.widgets) {
           section.widgets.forEach((w) => {
             newWidgets.push({
-              id: `widget-${widgetCounter++}-${w.widgetType}`,
+              id: w.id || `widget-${widgetCounter++}-${w.widgetType}`,
               widgetType: w.widgetType,
+              tabId,
               sectionId,
               column: w.column,
               order: w.order,
@@ -399,6 +431,22 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
           });
         }
       });
+
+      if (tab.widgets?.length) {
+        tab.widgets.forEach((w) => {
+          newWidgets.push({
+            id: w.id || `widget-${widgetCounter++}-${w.widgetType}`,
+            widgetType: w.widgetType,
+            tabId,
+            sectionId: '',
+            column: w.column ?? 0,
+            order: w.order,
+            colSpan: w.colSpan ?? 1,
+            rowSpan: w.rowSpan ?? 1,
+            config: w.config,
+          });
+        });
+      }
     });
 
     const formattingRules =

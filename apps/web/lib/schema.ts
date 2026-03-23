@@ -331,6 +331,8 @@ export interface PageTab {
   label: string;
   order: number;
   sections: PageSection[];
+  /** Widgets on the tab canvas (not inside a section), e.g. related lists above the fold */
+  widgets?: PageWidget[];
 }
 
 export interface PageLayout {

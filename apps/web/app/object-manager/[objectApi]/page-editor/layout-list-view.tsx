@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import type { PageLayout } from '@/lib/schema';
+import type { PageLayout, RecordType } from '@/lib/schema';
 import { Grid2x2, Layout, Plus, Trash2 } from 'lucide-react';
 
 export function LayoutListView({
@@ -10,20 +11,29 @@ export function LayoutListView({
   onCreate,
   onEdit,
   onDelete,
+  recordTypes = [],
+  defaultRecordTypeId,
+  onAssignToRecordType,
 }: {
   objectLabel: string | undefined;
   layouts: PageLayout[];
   onCreate: () => void;
   onEdit: (layoutId: string) => void;
   onDelete: (layoutId: string) => void;
+  recordTypes?: RecordType[];
+  defaultRecordTypeId?: string;
+  onAssignToRecordType?: (layoutId: string, recordTypeId: string) => void | Promise<void>;
 }) {
+  const [assignKey, setAssignKey] = useState(0);
   return (
     <div className="p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold mb-2">Page Layouts</h2>
-        <p className="text-gray-600">
-          Manage page layouts for {objectLabel}. Layouts control fields on forms, presentation, and
-          conditional rules.
+        <p className="text-gray-600 max-w-3xl">
+          Layouts control record and form fields for{' '}
+          <strong className="font-medium">{objectLabel ?? 'this object'}</strong>.
+          Pick which layout each <strong className="font-medium">record type</strong> uses (that controls
+          new and existing records). List/table column layouts are separate where your app saves them per user.
         </p>
       </div>
 
@@ -75,6 +85,51 @@ export function LayoutListView({
                       : ''}
                   </span>
                 </div>
+                {recordTypes.length > 0 ? (
+                  <p className="text-xs text-gray-500 mt-2 leading-snug">
+                    <span className="font-medium text-gray-600">Record types: </span>
+                    {(() => {
+                      const assigned = recordTypes.filter((rt) => rt.pageLayoutId === layout.id);
+                      if (!assigned.length) return 'None — pick below to assign.';
+                      return assigned
+                        .map((r) =>
+                          r.id === defaultRecordTypeId ? `${r.name} (default)` : r.name,
+                        )
+                        .join(', ');
+                    })()}
+                  </p>
+                ) : null}
+                {recordTypes.length > 0 && onAssignToRecordType ? (
+                  <div className="mt-3 pt-2 border-t border-gray-100">
+                    <label
+                      className="block text-xs font-medium text-gray-700 mb-1"
+                      htmlFor={`assign-rt-${layout.id}-${assignKey}`}
+                    >
+                      Assign to record type
+                    </label>
+                    <select
+                      key={`assign-${layout.id}-${assignKey}`}
+                      id={`assign-rt-${layout.id}-${assignKey}`}
+                      className="w-full text-sm border border-gray-300 rounded-md px-2 py-2 bg-white"
+                      defaultValue=""
+                      onChange={async (e) => {
+                        const rtId = e.target.value;
+                        if (!rtId) return;
+                        await onAssignToRecordType(layout.id, rtId);
+                        setAssignKey((k) => k + 1);
+                        e.target.value = '';
+                      }}
+                    >
+                      <option value="">Set as layout for record type…</option>
+                      {recordTypes.map((rt) => (
+                        <option key={rt.id} value={rt.id}>
+                          {rt.name}
+                          {rt.id === defaultRecordTypeId ? ' (default)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex gap-2">
@@ -91,6 +146,8 @@ export function LayoutListView({
                   size="sm"
                   onClick={() => onDelete(layout.id)}
                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  aria-label={`Delete layout ${layout.name}`}
+                  title="Delete layout"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

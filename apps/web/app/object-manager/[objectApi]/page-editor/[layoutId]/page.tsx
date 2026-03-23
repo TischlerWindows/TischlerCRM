@@ -29,6 +29,8 @@ import { ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Plus, Trash
 import { getObjectListHref } from '@/lib/object-list-routes';
 import { groupSectionsIntoRows } from '@/lib/group-section-rows';
 import { useEditorSidePanels } from '../use-editor-side-panels';
+import { TabRootWidgetArea } from '../tab-root-widget-area';
+import { SectionRowWeightHandle } from '../section-row-weight-handle';
 
 export default function PageEditorFullPage() {
   const params = useParams();
@@ -184,6 +186,29 @@ export default function PageEditorFullPage() {
     () => groupSectionsIntoRows(activeSections),
     [activeSections],
   );
+
+  const tabWidgetsForActive = useMemo(
+    () =>
+      widgets
+        .filter((w) => w.tabId === activeTabId && !w.sectionId)
+        .sort((a, b) => a.order - b.order),
+    [widgets, activeTabId],
+  );
+
+  const layoutAssignmentNote = useMemo(() => {
+    if (!object?.recordTypes?.length) return null;
+    if (layoutId === 'new') {
+      return 'After you save, go back to Page Layouts and use “Assign to record type” so records use this layout.';
+    }
+    const assigned = object.recordTypes.filter((rt) => rt.pageLayoutId === layoutId);
+    if (assigned.length === 0) {
+      return 'Not linked to a record type yet — assign it from the Page Layouts list so it applies to records.';
+    }
+    const names = assigned.map((r) => r.name).join(', ');
+    const def = object.defaultRecordTypeId;
+    const hasDefault = !!(def && assigned.some((r) => r.id === def));
+    return `Used for: ${names}.${hasDefault ? ' Includes your default record type.' : ''}`;
+  }, [object, layoutId]);
 
   // Preview layout
   const previewPageLayout = useMemo(
@@ -382,6 +407,7 @@ export default function PageEditorFullPage() {
           objectManagerHref={objectManagerHref}
           objectListHref={objectListHref}
           objectListLabel={objectListLabel}
+          layoutAssignmentNote={layoutAssignmentNote}
         />
 
         <div className="flex flex-1 overflow-hidden min-h-0">
@@ -473,36 +499,54 @@ export default function PageEditorFullPage() {
                 </button>
               </div>
 
+              {objectApiName !== 'Home' && (
+                <TabRootWidgetArea activeTabId={activeTabId} tabWidgets={tabWidgetsForActive} />
+              )}
+
               {/* Sections (grouped by layoutRowId into horizontal rows) */}
               <div className="space-y-4">
                 {sectionRows.map((row, rowIdx) => (
                   <div
                     key={`row-${rowIdx}`}
-                    className="flex flex-wrap gap-4 items-stretch"
+                    className="flex flex-wrap gap-1 items-stretch"
                   >
-                    {row.map((section) => {
+                    {row.map((section, si) => {
                       const idx = activeSections.findIndex((s) => s.id === section.id);
                       const w = section.rowWeight ?? 1;
+                      const prev = si > 0 ? row[si - 1] : null;
+                      const showResize =
+                        si > 0 &&
+                        section.layoutRowId &&
+                        prev?.layoutRowId === section.layoutRowId;
                       return (
-                        <div
-                          key={section.id}
-                          className="group min-w-[200px] flex-1"
-                          style={{
-                            flexGrow: w,
-                            flexShrink: 1,
-                            flexBasis: 0,
-                            minWidth: 'min(100%, 200px)',
-                          }}
-                        >
-                          <CanvasSectionComponent
-                            section={section}
-                            sectionFields={fields.filter((f) => f.sectionId === section.id)}
-                            sectionWidgets={widgets.filter((w) => w.sectionId === section.id)}
-                            getFieldDef={getFieldDef}
-                            isFirst={idx === 0}
-                            isLast={idx === activeSections.length - 1}
-                          />
-                        </div>
+                        <React.Fragment key={section.id}>
+                          {showResize ? (
+                            <SectionRowWeightHandle
+                              leftSectionId={prev!.id}
+                              rightSectionId={section.id}
+                            />
+                          ) : null}
+                          <div
+                            className="group min-w-[200px] flex-1"
+                            style={{
+                              flexGrow: w,
+                              flexShrink: 1,
+                              flexBasis: 0,
+                              minWidth: 'min(100%, 200px)',
+                            }}
+                          >
+                            <CanvasSectionComponent
+                              section={section}
+                              sectionFields={fields.filter((f) => f.sectionId === section.id)}
+                              sectionWidgets={widgets.filter(
+                                (w) => w.sectionId && w.sectionId === section.id,
+                              )}
+                              getFieldDef={getFieldDef}
+                              isFirst={idx === 0}
+                              isLast={idx === activeSections.length - 1}
+                            />
+                          </div>
+                        </React.Fragment>
                       );
                     })}
                   </div>
