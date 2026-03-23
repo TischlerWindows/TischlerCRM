@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
-  pointerWithin,
+  closestCenter,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -42,7 +42,8 @@ function isCanvasWidgetId(id: string): boolean {
   return id.startsWith('widget-') && !id.startsWith('widget-new-');
 }
 
-function maxOrderInColumn(
+/** New drops onto a column surface go above existing items (smaller order = higher in stack). */
+function orderForDropIntoColumn(
   sectionId: string,
   column: number,
   fields: CanvasField[],
@@ -52,7 +53,8 @@ function maxOrderInColumn(
     ...fields.filter((f) => f.sectionId === sectionId && f.column === column).map((f) => f.order),
     ...widgets.filter((w) => w.sectionId === sectionId && w.column === column).map((w) => w.order),
   ];
-  return orders.length > 0 ? Math.max(...orders) : -1;
+  if (orders.length === 0) return 0;
+  return Math.min(...orders) - 1;
 }
 
 type ColumnRow = { id: string; order: number };
@@ -81,11 +83,9 @@ function columnRowsSorted(
 export function DndContextWrapper({
   children,
   getFieldDef,
-  onSave,
 }: {
   children: React.ReactNode;
   getFieldDef: (apiName: string) => FieldDef | undefined;
-  onSave: () => void;
 }) {
   const fields = useEditorStore((s) => s.fields);
   const widgets = useEditorStore((s) => s.widgets);
@@ -95,12 +95,7 @@ export function DndContextWrapper({
   const addWidget = useEditorStore((s) => s.addWidget);
   const addHighlightField = useEditorStore((s) => s.addHighlightField);
   const markDirty = useEditorStore((s) => s.markDirty);
-  const deleteField = useEditorStore((s) => s.deleteField);
-  const deleteWidget = useEditorStore((s) => s.deleteWidget);
-  const selectedElement = useEditorStore((s) => s.selectedElement);
-  const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const pushUndo = useEditorStore((s) => s.pushUndo);
-  const undo = useEditorStore((s) => s.undo);
 
   const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -164,35 +159,6 @@ export function DndContextWrapper({
     window.addEventListener('field-resize-start', handler);
     return () => window.removeEventListener('field-resize-start', handler);
   }, [pushUndo]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        onSave();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        undo();
-      }
-      if (e.key === 'Delete' && selectedElement) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (selectedElement.type === 'field') {
-          deleteField(selectedElement.id);
-          setSelectedElement(null);
-        } else if (selectedElement.type === 'widget') {
-          deleteWidget(selectedElement.id);
-          setSelectedElement(null);
-        }
-      }
-      if (e.key === 'Escape') {
-        setSelectedElement(null);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onSave, undo, selectedElement, deleteField, deleteWidget, setSelectedElement]);
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
@@ -276,7 +242,7 @@ export function DndContextWrapper({
         if (!colMatch) return;
         const targetSectionId = colMatch[1];
         const targetColumn = parseInt(colMatch[2], 10);
-        const maxOrder = maxOrderInColumn(targetSectionId, targetColumn, fields, widgets);
+        const topOrder = orderForDropIntoColumn(targetSectionId, targetColumn, fields, widgets);
 
         if (activeId.startsWith('field-')) {
           const fieldApiName = activeId.replace('field-', '');
@@ -285,7 +251,7 @@ export function DndContextWrapper({
             fieldApiName,
             sectionId: targetSectionId,
             column: targetColumn,
-            order: maxOrder + 1,
+            order: topOrder,
             colSpan: 1,
             rowSpan: 1,
           });
@@ -293,7 +259,7 @@ export function DndContextWrapper({
           setFields(
             fields.map((f) =>
               f.id === activeId
-                ? { ...f, sectionId: targetSectionId, column: targetColumn, order: maxOrder + 1 }
+                ? { ...f, sectionId: targetSectionId, column: targetColumn, order: topOrder }
                 : f,
             ),
           );
@@ -305,7 +271,7 @@ export function DndContextWrapper({
             widgetType,
             sectionId: targetSectionId,
             column: targetColumn,
-            order: maxOrder + 1,
+            order: topOrder,
             colSpan: 1,
             rowSpan: 1,
             config: DEFAULT_WIDGET_CONFIGS[widgetType],
@@ -314,7 +280,7 @@ export function DndContextWrapper({
           setWidgets(
             widgets.map((w) =>
               w.id === activeId
-                ? { ...w, sectionId: targetSectionId, column: targetColumn, order: maxOrder + 1 }
+                ? { ...w, sectionId: targetSectionId, column: targetColumn, order: topOrder }
                 : w,
             ),
           );
@@ -409,7 +375,7 @@ export function DndContextWrapper({
     <EditorDragUiContext.Provider value={dragUiValue}>
       <DndContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={closestCenter}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}

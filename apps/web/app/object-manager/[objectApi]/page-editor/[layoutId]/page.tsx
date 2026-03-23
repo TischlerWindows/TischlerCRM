@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'next/navigation';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting } from '@/lib/preferences';
 import type {
@@ -26,9 +26,11 @@ import { DndContextWrapper } from '../dnd-context-wrapper';
 import { LayoutHighlightsStrip } from '../layout-highlights-strip';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, X } from 'lucide-react';
+import { getObjectListHref } from '@/lib/object-list-routes';
 
 export default function PageEditorFullPage() {
   const params = useParams();
+  const router = useRouter();
   const objectApiName = params.objectApi as string;
   const layoutId = params.layoutId as string;
 
@@ -66,6 +68,8 @@ export default function PageEditorFullPage() {
   const [showSectionVisibilityEditor, setShowSectionVisibilityEditor] = useState(false);
   const [showPicklistDependencyEditor, setShowPicklistDependencyEditor] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
+  const [unsavedDialogSaving, setUnsavedDialogSaving] = useState(false);
 
   // Home special fields
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
@@ -73,9 +77,20 @@ export default function PageEditorFullPage() {
 
   const didLoad = useRef(false);
 
-  // Load layout on mount
   useEffect(() => {
-    if (didLoad.current || !object) return;
+    didLoad.current = false;
+  }, [layoutId]);
+
+  useEffect(() => {
+    return () => {
+      didLoad.current = false;
+    };
+  }, []);
+
+  // Load layout once per layoutId visit; do not reset when `object` reference updates (e.g. after save).
+  useEffect(() => {
+    if (!object) return;
+    if (didLoad.current) return;
     didLoad.current = true;
 
     if (layoutId === 'new') {
@@ -89,6 +104,16 @@ export default function PageEditorFullPage() {
       }
     }
   }, [layoutId, object, loadLayout, reset]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Load Home reports/dashboards
   useEffect(() => {
@@ -180,12 +205,11 @@ export default function PageEditorFullPage() {
     ],
   );
 
-  // Save handler
-  const saveLayout = async () => {
-    if (!object) return;
+  const performSave = async (silent: boolean): Promise<boolean> => {
+    if (!object) return false;
     if (!layoutName.trim()) {
-      alert('Please enter a layout name.');
-      return;
+      if (!silent) alert('Please enter a layout name.');
+      return false;
     }
 
     const pageLayout: PageLayout = buildPageLayoutFromCanvas({
@@ -230,23 +254,41 @@ export default function PageEditorFullPage() {
         pageLayouts: updatedLayouts,
         recordTypes: updatedRecordTypes,
       });
-      alert(`Layout "${layoutName}" saved successfully!`);
+      if (!silent) alert(`Layout "${layoutName}" saved successfully!`);
       markSaved();
+      return true;
     } catch (err) {
       console.error('Failed to save layout:', err);
-      alert('Failed to save layout. Please try again.');
+      if (!silent) alert('Failed to save layout. Please try again.');
+      return false;
     }
   };
 
-  const saveLayoutRef = useRef(saveLayout);
-  saveLayoutRef.current = saveLayout;
+  const performSaveRef = useRef(performSave);
+  performSaveRef.current = performSave;
+
+  const saveLayout = () => {
+    void performSave(false);
+  };
+
+  const requestNavigate = useCallback(
+    (href: string) => {
+      if (!useEditorStore.getState().hasUnsavedChanges) {
+        router.push(href);
+        return;
+      }
+      setPendingNavigationHref(href);
+      setShowUnsavedDialog(true);
+    },
+    [router],
+  );
 
   // Phase 6E: keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        void saveLayoutRef.current();
+        void performSaveRef.current(false);
         return;
       }
       const el = e.target as HTMLElement;
@@ -313,17 +355,24 @@ export default function PageEditorFullPage() {
     return <div className="p-6">Object not found</div>;
   }
 
+  const objectManagerHref = `/object-manager/${encodeURIComponent(objectApiName)}?section=page-editor`;
+  const objectListHref = getObjectListHref(objectApiName);
+  const objectListLabel = object.pluralLabel || object.label;
+
   const allObjects = schema?.objects || [];
 
   return (
-    <DndContextWrapper getFieldDef={getFieldDef} onSave={saveLayout}>
+    <DndContextWrapper getFieldDef={getFieldDef}>
       <div className="flex flex-col h-screen">
         {/* Phase 6A: Light minimal toolbar */}
         <EditorToolbar
-          objectApiName={objectApiName}
           onSave={saveLayout}
           onPreview={() => setShowPreviewDialog(true)}
           onOpenRules={() => setShowFormattingRulesDialog(true)}
+          onRequestNavigate={requestNavigate}
+          objectManagerHref={objectManagerHref}
+          objectListHref={objectListHref}
+          objectListLabel={objectListLabel}
         />
 
         <div className="flex flex-1 overflow-hidden">
@@ -450,14 +499,40 @@ export default function PageEditorFullPage() {
 
       <UnsavedChangesDialog
         open={showUnsavedDialog}
-        onCancel={() => setShowUnsavedDialog(false)}
-        onDiscard={() => {
+        isSaving={unsavedDialogSaving}
+        onKeepEditing={() => {
           setShowUnsavedDialog(false);
-          markSaved();
+          setPendingNavigationHref(null);
         }}
-        onSave={() => {
+        onLeaveWithoutSaving={() => {
+          const dest = pendingNavigationHref;
           setShowUnsavedDialog(false);
-          saveLayout();
+          setPendingNavigationHref(null);
+          if (layoutId === 'new') {
+            reset();
+          } else {
+            const layout = object.pageLayouts?.find((l) => l.id === layoutId);
+            if (layout) loadLayout(layout);
+            else reset();
+          }
+          markSaved();
+          if (dest) router.push(dest);
+        }}
+        onSaveAndLeave={() => {
+          void (async () => {
+            setUnsavedDialogSaving(true);
+            try {
+              const dest = pendingNavigationHref;
+              const ok = await performSave(true);
+              if (ok) {
+                setShowUnsavedDialog(false);
+                setPendingNavigationHref(null);
+                if (dest) router.push(dest);
+              }
+            } finally {
+              setUnsavedDialogSaving(false);
+            }
+          })();
         }}
       />
 
