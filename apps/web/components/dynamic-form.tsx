@@ -913,6 +913,17 @@ export default function DynamicForm({
       }
       case 'CompositeText': {
         if (typeof val === 'object' && val !== null) {
+          const keys = Object.keys(val);
+          const findVal = (pattern: string) => {
+            const k = keys.find(k => k.toLowerCase().includes(pattern));
+            return k ? val[k] : undefined;
+          };
+          const salutation = val.salutation || findVal('salutation');
+          const firstName = val.firstName || findVal('firstname');
+          const lastName = val.lastName || findVal('lastname');
+          const named = [salutation, firstName, lastName].filter(Boolean);
+          if (named.length > 0) return named.join(' ');
+          // Fallback for non-name composites
           const parts = Object.values(val).filter(Boolean);
           return parts.join(' ') || '—';
         }

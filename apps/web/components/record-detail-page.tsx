@@ -430,6 +430,16 @@ export default function RecordDetailPage({
     // Try composite name first
     const nameObj = record[`${objectApiName}__name`] || record.name;
     if (nameObj && typeof nameObj === 'object') {
+      const keys = Object.keys(nameObj);
+      const findVal = (pattern: string) => {
+        const k = keys.find(k => k.toLowerCase().includes(pattern));
+        return k ? nameObj[k] : undefined;
+      };
+      const salutation = nameObj.salutation || findVal('salutation');
+      const firstName = nameObj.firstName || findVal('firstname');
+      const lastName = nameObj.lastName || findVal('lastname');
+      const named = [salutation, firstName, lastName].filter(Boolean);
+      if (named.length > 0) return named.join(' ');
       const parts = Object.values(nameObj).filter(Boolean);
       if (parts.length > 0) return parts.join(' ');
     }
