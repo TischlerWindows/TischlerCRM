@@ -48,6 +48,7 @@ export function CanvasFieldCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    touchAction: 'none',
     ...(stackMode
       ? {}
       : {
@@ -64,7 +65,11 @@ export function CanvasFieldCard({
       ref={setNodeRef}
       style={style}
       data-editor-sortable-id={field.id}
-      className={`p-3 border rounded-lg bg-white relative group cursor-move transition-shadow ${
+      {...attributes}
+      {...listeners}
+      className={`p-3 border rounded-lg bg-white relative group cursor-grab active:cursor-grabbing transition-shadow ${
+        isDragging ? 'cursor-grabbing z-10' : ''
+      } ${
         isSelected
           ? 'border-brand-navy border-2 shadow-md ring-1 ring-brand-navy/20'
           : 'border-gray-200 hover:shadow-sm'
@@ -84,8 +89,8 @@ export function CanvasFieldCard({
 
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-            <GripVertical className="w-4 h-4 text-gray-400" />
+          <div className="text-gray-400 shrink-0 pointer-events-none" aria-hidden>
+            <GripVertical className="w-4 h-4" />
           </div>
           <div className="flex-1 min-w-0">
             <div
@@ -120,7 +125,9 @@ export function CanvasFieldCard({
             </div>
           )}
           <button
+            type="button"
             className="opacity-0 group-hover:opacity-100"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
               deleteField(field.id);
@@ -134,8 +141,9 @@ export function CanvasFieldCard({
       {/* Right-edge resize handle (colSpan) */}
       {sectionColumns > 1 && (
         <div
-          className="absolute top-0 right-0 w-2 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-r transition-opacity"
+          className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-gray-200/80 hover:bg-brand-navy/15 border-r border-dashed border-gray-300/90 rounded-r transition-opacity"
           title="Drag to stretch columns"
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => {
             e.stopPropagation();
             e.preventDefault();
@@ -156,8 +164,9 @@ export function CanvasFieldCard({
       )}
       {/* Bottom-edge resize handle (rowSpan) */}
       <div
-        className="absolute bottom-0 left-0 h-2 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-b transition-opacity"
+        className="absolute bottom-0 left-0 h-1.5 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-gray-200/80 hover:bg-brand-navy/15 border-t border-dashed border-gray-300/90 rounded-b transition-opacity"
         title="Drag to stretch rows"
+        onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => {
           e.stopPropagation();
           e.preventDefault();
@@ -178,8 +187,9 @@ export function CanvasFieldCard({
       {/* Corner resize handle */}
       {sectionColumns > 1 && (
         <div
-          className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-blue-500 rounded-br transition-opacity z-10"
+          className="absolute bottom-0 right-0 w-2.5 h-2.5 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-gray-200/90 hover:bg-brand-navy/20 border border-dashed border-gray-400/70 rounded-br transition-opacity z-10"
           title="Drag to stretch both"
+          onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => {
             e.stopPropagation();
             e.preventDefault();

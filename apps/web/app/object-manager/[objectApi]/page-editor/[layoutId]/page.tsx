@@ -25,8 +25,10 @@ import { UnsavedChangesDialog } from '../unsaved-changes-dialog';
 import { DndContextWrapper } from '../dnd-context-wrapper';
 import { LayoutHighlightsStrip } from '../layout-highlights-strip';
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Plus, Trash2, X } from 'lucide-react';
 import { getObjectListHref } from '@/lib/object-list-routes';
+import { groupSectionsIntoRows } from '@/lib/group-section-rows';
+import { useEditorSidePanels } from '../use-editor-side-panels';
 
 export default function PageEditorFullPage() {
   const params = useParams();
@@ -70,6 +72,8 @@ export default function PageEditorFullPage() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
   const [unsavedDialogSaving, setUnsavedDialogSaving] = useState(false);
+
+  const sidePanels = useEditorSidePanels();
 
   // Home special fields
   const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
@@ -175,6 +179,11 @@ export default function PageEditorFullPage() {
   const activeSections = sections
     .filter((s) => s.tabId === activeTabId)
     .sort((a, b) => a.order - b.order);
+
+  const sectionRows = useMemo(
+    () => groupSectionsIntoRows(activeSections),
+    [activeSections],
+  );
 
   // Preview layout
   const previewPageLayout = useMemo(
@@ -375,16 +384,46 @@ export default function PageEditorFullPage() {
           objectListLabel={objectListLabel}
         />
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left palette */}
-          <FieldPalette
-            availableFields={allFields}
-            totalFieldCount={object.fields.length}
-          />
+        <div className="flex flex-1 overflow-hidden min-h-0">
+          {/* Left palette — width / collapse */}
+          <div
+            className="relative flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-150"
+            style={{
+              width: sidePanels.leftCollapsed ? 40 : sidePanels.leftWidth,
+              minWidth: sidePanels.leftCollapsed ? 40 : undefined,
+            }}
+          >
+            <button
+              type="button"
+              title={sidePanels.leftCollapsed ? 'Show fields panel' : 'Hide fields panel'}
+              onClick={() => sidePanels.toggleLeftCollapsed()}
+              className="absolute right-0 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-l-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50"
+            >
+              {sidePanels.leftCollapsed ? (
+                <ChevronRight className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </button>
+            {!sidePanels.leftCollapsed && (
+              <FieldPalette
+                availableFields={allFields}
+                totalFieldCount={object.fields.length}
+              />
+            )}
+          </div>
+          {!sidePanels.leftCollapsed && (
+            <button
+              type="button"
+              aria-label="Resize fields panel"
+              onMouseDown={sidePanels.startResizeLeft}
+              className="w-1.5 shrink-0 cursor-col-resize border-r border-transparent bg-gray-200/80 hover:bg-brand-navy/20"
+            />
+          )}
 
           {/* Phase 6A: Canvas with dot-grid background */}
           <div
-            className="flex-1 overflow-y-auto"
+            className="min-w-0 flex-1 overflow-y-auto"
             data-editor-canvas
             style={{
               backgroundColor: '#f8f9fa',
@@ -434,18 +473,38 @@ export default function PageEditorFullPage() {
                 </button>
               </div>
 
-              {/* Sections */}
+              {/* Sections (grouped by layoutRowId into horizontal rows) */}
               <div className="space-y-4">
-                {activeSections.map((section, idx) => (
-                  <div key={section.id} className="group">
-                    <CanvasSectionComponent
-                      section={section}
-                      sectionFields={fields.filter((f) => f.sectionId === section.id)}
-                      sectionWidgets={widgets.filter((w) => w.sectionId === section.id)}
-                      getFieldDef={getFieldDef}
-                      isFirst={idx === 0}
-                      isLast={idx === activeSections.length - 1}
-                    />
+                {sectionRows.map((row, rowIdx) => (
+                  <div
+                    key={`row-${rowIdx}`}
+                    className="flex flex-wrap gap-4 items-stretch"
+                  >
+                    {row.map((section) => {
+                      const idx = activeSections.findIndex((s) => s.id === section.id);
+                      const w = section.rowWeight ?? 1;
+                      return (
+                        <div
+                          key={section.id}
+                          className="group min-w-[200px] flex-1"
+                          style={{
+                            flexGrow: w,
+                            flexShrink: 1,
+                            flexBasis: 0,
+                            minWidth: 'min(100%, 200px)',
+                          }}
+                        >
+                          <CanvasSectionComponent
+                            section={section}
+                            sectionFields={fields.filter((f) => f.sectionId === section.id)}
+                            sectionWidgets={widgets.filter((w) => w.sectionId === section.id)}
+                            getFieldDef={getFieldDef}
+                            isFirst={idx === 0}
+                            isLast={idx === activeSections.length - 1}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
 
@@ -461,17 +520,47 @@ export default function PageEditorFullPage() {
             </div>
           </div>
 
+          {!sidePanels.rightCollapsed && (
+            <button
+              type="button"
+              aria-label="Resize properties panel"
+              onMouseDown={sidePanels.startResizeRight}
+              className="w-1.5 shrink-0 cursor-col-resize border-l border-transparent bg-gray-200/80 hover:bg-brand-navy/20"
+            />
+          )}
           {/* Right properties panel */}
-          <PropertiesPanel
-            objectFields={object.fields}
-            allFields={allFields}
-            allObjects={allObjects}
-            onOpenFieldVisibility={() => setShowVisibilityEditor(true)}
-            onOpenSectionVisibility={() => setShowSectionVisibilityEditor(true)}
-            onOpenPicklistDependency={() => setShowPicklistDependencyEditor(true)}
-            onSave={saveLayout}
-            onPreview={() => setShowPreviewDialog(true)}
-          />
+          <div
+            className="relative flex shrink-0 flex-col border-l border-gray-200 bg-white transition-[width] duration-150"
+            style={{
+              width: sidePanels.rightCollapsed ? 40 : sidePanels.rightWidth,
+              minWidth: sidePanels.rightCollapsed ? 40 : undefined,
+            }}
+          >
+            <button
+              type="button"
+              title={sidePanels.rightCollapsed ? 'Show properties' : 'Hide properties'}
+              onClick={() => sidePanels.toggleRightCollapsed()}
+              className="absolute left-0 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-r-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50"
+            >
+              {sidePanels.rightCollapsed ? (
+                <ChevronLeft className="h-4 w-4" />
+              ) : (
+                <PanelRightClose className="h-4 w-4" />
+              )}
+            </button>
+            {!sidePanels.rightCollapsed && (
+              <PropertiesPanel
+                objectFields={object.fields}
+                allFields={allFields}
+                allObjects={allObjects}
+                onOpenFieldVisibility={() => setShowVisibilityEditor(true)}
+                onOpenSectionVisibility={() => setShowSectionVisibilityEditor(true)}
+                onOpenPicklistDependency={() => setShowPicklistDependencyEditor(true)}
+                onSave={saveLayout}
+                onPreview={() => setShowPreviewDialog(true)}
+              />
+            )}
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,7 @@ import {
   fieldHighlightWrapperClass,
   labelPresentationClassName,
 } from '@/lib/layout-presentation';
+import { groupSectionsIntoRows } from '@/lib/group-section-rows';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
@@ -679,16 +680,51 @@ export default function RecordDetailPage({
         {/* Layout-driven field rendering */}
         {pageLayout ? (
           <div className="space-y-6">
-            {pageLayout.tabs.map((tab, ti) => (
+            {pageLayout.tabs.map((tab, ti) => {
+              const sorted = [...tab.sections].sort((a, b) => a.order - b.order);
+              const eligible = sorted.filter((section) => {
+                if (section.showInRecord === false) return false;
+                if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return false;
+                const sectionFx = pageLayout
+                  ? getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData)
+                  : null;
+                if (sectionFx?.hidden) return false;
+                const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
+                for (let c = 0; c < section.columns; c++) {
+                  columnArrays[c] = section.fields
+                    .filter((f) => f.column === c)
+                    .sort((a, b) => a.order - b.order)
+                    .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+                    .filter((entry) => entry.fieldDef != null)
+                    .filter(({ layoutField, fieldDef }) => {
+                      if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
+                        return false;
+                      }
+                      const fFx = pageLayout
+                        ? getFormattingEffectsForField(
+                            pageLayout,
+                            layoutField.apiName,
+                            layoutVisibilityData
+                          )
+                        : null;
+                      if (fFx?.hidden) return false;
+                      return true;
+                    });
+                }
+                const allFieldsEmpty = columnArrays.every((col) =>
+                  col.every(({ layoutField, fieldDef }) => {
+                    const v = getRecordValue(layoutField.apiName, fieldDef);
+                    return v === undefined || v === null || v === '' || v === 'N/A';
+                  })
+                );
+                return !allFieldsEmpty;
+              });
+              const rows = groupSectionsIntoRows(eligible);
+              return (
               <div key={ti}>
-                {tab.sections.map((section, si) => {
-                  if (section.showInRecord === false) return null;
-                  if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return null;
-                  const sectionFx = pageLayout
-                    ? getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData)
-                    : null;
-                  if (sectionFx?.hidden) return null;
-
+                {rows.map((row, ri) => (
+                  <div key={`${ti}-row-${ri}`} className="flex flex-wrap gap-6 items-stretch mb-6">
+                    {row.map((section) => {
                   // Column-based layout: group fields by column, sorted by
                   // order within each column (same approach as DynamicForm).
                   const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
@@ -719,17 +755,8 @@ export default function RecordDetailPage({
                     (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
                   );
 
-                  // Determine if every field in this section is empty
-                  const allFieldsEmpty = columnArrays.every((col) =>
-                    col.every(({ layoutField, fieldDef }) => {
-                      const v = getRecordValue(layoutField.apiName, fieldDef);
-                      return v === undefined || v === null || v === '' || v === 'N/A';
-                    })
-                  );
-
-                  if (allFieldsEmpty) return null;
-
-                  const sectionKey = `${ti}-${si}`;
+                  const sectionKey = `${ti}-${section.id}`;
+                  const w = section.rowWeight ?? 1;
                   const isCollapsed = sectionToggles[sectionKey] === false;
 
                   const toggleSection = () => {
@@ -750,7 +777,16 @@ export default function RecordDetailPage({
                   };
 
                   return (
-                    <div key={si} className="bg-white rounded-lg border border-gray-200 overflow-hidden mb-6">
+                    <div
+                      key={section.id}
+                      className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-[200px] flex-1"
+                      style={{
+                        flexGrow: w,
+                        flexShrink: 1,
+                        flexBasis: 0,
+                        minWidth: 'min(100%, 220px)',
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={toggleSection}
@@ -927,8 +963,11 @@ export default function RecordDetailPage({
                     </div>
                   );
                 })}
+                  </div>
+                ))}
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">

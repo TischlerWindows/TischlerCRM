@@ -29,7 +29,7 @@ export function UnsavedChangesDialog({
             You have unsaved changes. Save before leaving, or leave without saving?
           </p>
         </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <div className="px-6 py-4 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:flex-wrap justify-center items-center gap-2">
           <Button
             variant="outline"
             size="sm"

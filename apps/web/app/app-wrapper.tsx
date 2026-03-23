@@ -25,6 +25,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
+import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -219,10 +220,21 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   };
 
   const canCustomize = hasAppPermission('customizeApplication');
+
+  const setupObjectTarget = useMemo(() => {
+    if (recordSetup?.objectApiName && recordSetup.objectApiName !== 'Home') {
+      return {
+        objectApiName: recordSetup.objectApiName,
+        pageLayoutId: recordSetup.pageLayoutId,
+      };
+    }
+    return resolveListViewObjectSetup(pathname, schema?.objects);
+  }, [recordSetup, pathname, schema?.objects]);
+
   const showEditObject =
-    canCustomize && recordSetup?.objectApiName && recordSetup.objectApiName !== 'Home';
+    canCustomize && !!setupObjectTarget?.objectApiName && setupObjectTarget.objectApiName !== 'Home';
   const showEditPage =
-    canCustomize && recordSetup?.objectApiName && !!recordSetup.pageLayoutId;
+    canCustomize && !!setupObjectTarget?.objectApiName && !!setupObjectTarget.pageLayoutId;
 
   if (!shouldShowHeadbar) {
     return <>{children}</>;
@@ -365,13 +377,13 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                     <>
                       <div className="border-t border-gray-200 my-1" />
                       <div className="py-1">
-                        {showEditPage && recordSetup?.pageLayoutId && (
+                        {showEditPage && setupObjectTarget?.pageLayoutId && (
                           <button
                             type="button"
                             onClick={() => {
                               setShowSetupMenu(false);
                               router.push(
-                                `/object-manager/${encodeURIComponent(recordSetup.objectApiName)}/page-editor/${encodeURIComponent(recordSetup.pageLayoutId)}`
+                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}/page-editor/${encodeURIComponent(setupObjectTarget.pageLayoutId!)}`
                               );
                             }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
@@ -381,13 +393,13 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                             <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
                           </button>
                         )}
-                        {showEditObject && (
+                        {showEditObject && setupObjectTarget && (
                           <button
                             type="button"
                             onClick={() => {
                               setShowSetupMenu(false);
                               router.push(
-                                `/object-manager/${encodeURIComponent(recordSetup!.objectApiName)}`
+                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}`
                               );
                             }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"

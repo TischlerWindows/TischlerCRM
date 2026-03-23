@@ -21,6 +21,7 @@ import {
   getFormattingEffectsForSection,
 } from '@/lib/layout-formatting';
 import { labelPresentationClassName } from '@/lib/layout-presentation';
+import { groupSectionsIntoRows } from '@/lib/group-section-rows';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -1069,7 +1070,7 @@ export default function DynamicForm({
             />
             <Label
               htmlFor={fieldDef.apiName}
-              className={cn('text-sm font-normal', labelPresentationClassName(layoutField?.presentation))}
+              className={cn('text-sm', labelPresentationClassName(layoutField?.presentation))}
             >
               {fieldDef.label}
               {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
@@ -1786,7 +1787,7 @@ export default function DynamicForm({
     return (
       <div key={fieldDef.apiName} className={cn("flex flex-col space-y-1", stretch && "flex-1")}>
         {fieldDef.type !== ('Checkbox' as FieldType) && (
-          <Label htmlFor={fieldDef.apiName} className="flex items-center gap-2">
+          <Label htmlFor={fieldDef.apiName} className="flex items-center gap-2 text-sm">
             <Icon className="h-4 w-4 text-gray-400" />
             <span className={labelPresentationClassName(layoutField?.presentation)}>
               {fieldDef.label}
@@ -2052,51 +2053,68 @@ export default function DynamicForm({
         </div>
       )}
 
-      {/* Sections — normal mode (all sections shown) */}
+      {/* Sections — normal mode (all sections shown); layoutRowId groups side-by-side */}
       {!showReview && !isWizardMode && (
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {currentTab.sections
-            .sort((a, b) => a.order - b.order)
-            .map((section) => {
+          {(() => {
+            const sorted = [...currentTab.sections].sort((a, b) => a.order - b.order);
+            const visible = sorted.filter((section) => {
               const isSectionVisible = evaluateVisibility(section.visibleIf, formData, visibilityCtx);
-              if (!isSectionVisible) return null;
-              if (section.showInTemplate === false) return null;
+              if (!isSectionVisible) return false;
+              if (section.showInTemplate === false) return false;
               const secFx = getFormattingEffectsForSection(
                 layout,
                 section.id,
                 formData,
-                visibilityCtx
+                visibilityCtx,
               );
-              if (secFx?.hidden) return null;
+              if (secFx?.hidden) return false;
+              return true;
+            });
+            const rows = groupSectionsIntoRows(visible);
+            return rows.map((row, ri) => (
+              <div key={`row-${ri}`} className="flex flex-wrap gap-4 items-stretch">
+                {row.map((section) => {
+                  const isCollapsed = collapsedSections.has(section.id);
+                  const w = section.rowWeight ?? 1;
+                  return (
+                    <div
+                      key={section.id}
+                      className="bg-white rounded-lg border border-gray-200 min-w-[200px] flex-1"
+                      style={{
+                        flexGrow: w,
+                        flexShrink: 1,
+                        flexBasis: 0,
+                        minWidth: 'min(100%, 220px)',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.id)}
+                        className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg"
+                      >
+                        <div className="text-left">
+                          <h3 className="text-lg font-semibold text-gray-900">{section.label}</h3>
+                          {section.description ? (
+                            <p className="text-xs text-gray-500 mt-0.5 font-normal">
+                              {section.description}
+                            </p>
+                          ) : null}
+                        </div>
+                        {isCollapsed ? (
+                          <ChevronRight className="h-5 w-5 text-gray-600" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-600" />
+                        )}
+                      </button>
 
-              const isCollapsed = collapsedSections.has(section.id);
-
-              return (
-                <div key={section.id} className="bg-white rounded-lg border border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(section.id)}
-                    className="w-full flex items-center justify-between p-4 bg-gray-100 hover:bg-gray-150 transition-colors rounded-t-lg"
-                  >
-                    <div className="text-left">
-                      <h3 className="text-lg font-semibold text-gray-900">{section.label}</h3>
-                      {section.description ? (
-                        <p className="text-xs text-gray-500 mt-0.5 font-normal">
-                          {section.description}
-                        </p>
-                      ) : null}
+                      {!isCollapsed && renderSectionContent(section)}
                     </div>
-                    {isCollapsed ? (
-                      <ChevronRight className="h-5 w-5 text-gray-600" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-gray-600" />
-                    )}
-                  </button>
-
-                  {!isCollapsed && renderSectionContent(section)}
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ));
+          })()}
         </div>
       )}
 

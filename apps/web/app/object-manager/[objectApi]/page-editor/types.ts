@@ -35,6 +35,10 @@ export interface CanvasSection {
   visibleIf?: ConditionExpr[];
   showInRecord: boolean;
   showInTemplate: boolean;
+  /** Group sections with the same id into one horizontal row */
+  layoutRowId?: string;
+  /** Flex weight within row (default 1) */
+  rowWeight?: number;
 }
 
 export interface CanvasTab {

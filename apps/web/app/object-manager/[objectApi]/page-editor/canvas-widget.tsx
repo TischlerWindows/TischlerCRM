@@ -68,6 +68,7 @@ export function CanvasWidgetCard({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    touchAction: 'none',
     ...(stackMode
       ? {}
       : {
@@ -103,7 +104,11 @@ export function CanvasWidgetCard({
       ref={setNodeRef}
       style={style}
       data-editor-sortable-id={widget.id}
-      className={`p-3 border-2 border-dashed rounded-lg relative group cursor-move transition-all ${
+      {...attributes}
+      {...listeners}
+      className={`p-3 border-2 border-dashed rounded-lg relative group cursor-grab active:cursor-grabbing transition-all ${
+        isDragging ? 'cursor-grabbing z-10' : ''
+      } ${
         isSelected
           ? 'border-blue-500 bg-blue-50 shadow-md'
           : 'border-blue-300 bg-blue-50/30 hover:bg-blue-50/60'
@@ -121,8 +126,8 @@ export function CanvasWidgetCard({
       )}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-            <GripVertical className="w-4 h-4 text-blue-400" />
+          <div className="text-blue-400 shrink-0 pointer-events-none" aria-hidden>
+            <GripVertical className="w-4 h-4" />
           </div>
           <Icon className="w-4 h-4 text-blue-600 flex-shrink-0" />
           <div className="flex-1 min-w-0">
@@ -133,7 +138,9 @@ export function CanvasWidgetCard({
           </div>
         </div>
         <button
+          type="button"
           className="opacity-0 group-hover:opacity-100"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             deleteWidget(widget.id);

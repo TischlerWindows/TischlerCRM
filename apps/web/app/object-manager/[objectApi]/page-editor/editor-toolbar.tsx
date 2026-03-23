@@ -35,27 +35,29 @@ export function EditorToolbar({
   return (
     <div className="border-b bg-white">
       {/* Top row */}
-      <div className="px-4 py-2 flex items-center gap-3 flex-wrap border-b border-gray-100">
-        <button
-          type="button"
-          onClick={() => onRequestNavigate(objectManagerHref)}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-navy transition-colors"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back to Object Manager
-        </button>
-        {objectListHref && objectListLabel ? (
+      <div className="px-4 py-2 flex items-start gap-3 flex-wrap border-b border-gray-100">
+        <div className="flex flex-col items-start gap-1">
           <button
             type="button"
-            onClick={() => onRequestNavigate(objectListHref)}
+            onClick={() => onRequestNavigate(objectManagerHref)}
             className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-navy transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
-            Back to {objectListLabel}
+            Back to Object Manager
           </button>
-        ) : null}
+          {objectListHref && objectListLabel ? (
+            <button
+              type="button"
+              onClick={() => onRequestNavigate(objectListHref)}
+              className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-navy transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back to {objectListLabel}
+            </button>
+          ) : null}
+        </div>
         {hasUnsavedChanges && (
-          <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>
+          <span className="text-xs text-amber-600 font-medium self-center">Unsaved changes</span>
         )}
       </div>
 
