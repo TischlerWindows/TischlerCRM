@@ -682,8 +682,12 @@ export default function RecordDetailPage({
                   );
 
                   // Determine if every field in this section is empty
+                  // Widget fields (DropboxFiles, LocationSearch) render content
+                  // independently of record data — never treat them as empty.
+                  const widgetTypes = new Set(['DropboxFiles', 'LocationSearch']);
                   const allFieldsEmpty = columnArrays.every((col) =>
                     col.every(({ layoutField, fieldDef }) => {
+                      if (widgetTypes.has(fieldDef.type)) return false;
                       const v = getRecordValue(layoutField.apiName, fieldDef);
                       return v === undefined || v === null || v === '' || v === 'N/A';
                     })
