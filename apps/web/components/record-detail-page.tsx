@@ -437,16 +437,23 @@ export default function RecordDetailPage({
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
     );
     const autoNumber = numberKey ? record[numberKey] : '';
-    // Find an address string
+    // Find the address — look for keys like 'address', 'Property__address', '*__address'
     const addrKey = Object.keys(record).find(
-      (k) => k.toLowerCase() === 'address' || k.toLowerCase().endsWith('__address')
+      (k) => {
+        const lk = k.toLowerCase();
+        return lk === 'address' || lk.endsWith('__address');
+      }
     );
     let addrStr = '';
     if (addrKey) {
-      const addr = record[addrKey];
+      let addr = record[addrKey];
+      // Auto-parse JSON strings
+      if (typeof addr === 'string' && addr.startsWith('{')) {
+        try { addr = JSON.parse(addr); } catch { /* not JSON */ }
+      }
       if (typeof addr === 'object' && addr !== null) {
-        // Composite address: grab street
-        addrStr = addr.street || addr.address || Object.values(addr).filter(Boolean).join(', ');
+        // Composite address: grab street (the primary line)
+        addrStr = addr.street || addr.address || addr.addressLine1 || '';
       } else if (typeof addr === 'string') {
         addrStr = addr;
       }
