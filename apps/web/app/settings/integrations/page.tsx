@@ -283,6 +283,10 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
         </span>
       </label>
 
+      {/* Hidden honeypot fields to absorb browser autofill */}
+      <input type="text" name="prevent_autofill_username" autoComplete="username" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+      <input type="password" name="prevent_autofill_password" autoComplete="current-password" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+
       {/* Credentials — API key vs OAuth */}
       {authType === 'api_key' ? (
         <div className="mb-4">
@@ -292,6 +296,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="new-password"
               placeholder={integration.hasApiKey ? '••••••••  (already set — enter new to replace)' : 'Paste your API key'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -317,6 +322,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              autoComplete="new-password"
               placeholder={integration.hasClientId ? '(already set — enter new to replace)' : 'OAuth Client ID'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -328,6 +334,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
                 type={showKey ? 'text' : 'password'}
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
+                autoComplete="new-password"
                 placeholder={integration.hasClientSecret ? '••••••••  (already set)' : 'OAuth Client Secret'}
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
               />
