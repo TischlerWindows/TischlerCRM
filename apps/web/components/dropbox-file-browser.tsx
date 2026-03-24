@@ -103,6 +103,8 @@ export function DropboxFileBrowser({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const folderEnsured = useRef(false);
+
   const loadFiles = useCallback(async () => {
     try {
       const s = await apiClient.getDropboxStatus();
@@ -111,6 +113,17 @@ export function DropboxFileBrowser({
       if (!s.enabled || !s.configured || !s.connected) {
         setEntries([]);
         return;
+      }
+
+      // Auto-create the record folder on first load
+      if (!folderEnsured.current) {
+        folderEnsured.current = true;
+        try {
+          await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+        } catch (e) {
+          // Non-fatal — folder may already exist or Dropbox may be temporarily unavailable
+          console.warn('[DropboxFileBrowser] ensure folder failed:', e);
+        }
       }
 
       try {
@@ -132,7 +145,7 @@ export function DropboxFileBrowser({
     } finally {
       setLoading(false);
     }
-  }, [objectApiName, recordId, subPath]);
+  }, [objectApiName, recordId, subPath, folderName]);
 
   useEffect(() => {
     setLoading(true);

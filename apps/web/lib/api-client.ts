@@ -716,6 +716,13 @@ class ApiClient {
     });
   }
 
+  async ensureDropboxFolder(objectApiName: string, recordId: string, folderName?: string) {
+    return this.request<{ created: boolean; path: string; exists?: boolean }>(
+      `/dropbox/ensure-folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`,
+      { method: 'POST', body: JSON.stringify({ folderName }) }
+    );
+  }
+
   async deleteDropboxFile(fileId: string) {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }

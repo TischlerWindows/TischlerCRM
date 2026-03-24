@@ -551,6 +551,34 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
   });
 
+  // ── Ensure record folder exists (auto-create on page load) ──
+  app.post('/dropbox/ensure-folder/:objectApiName/:recordId', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
+    const { folderName } = req.body as { folderName?: string };
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    const folderPath = buildFolderPath(objectApiName, recordId, folderName);
+
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', {
+        path: folderPath,
+        autorename: false,
+      });
+      reply.send({ created: true, path: folderPath });
+    } catch (err: any) {
+      // 409 conflict means the folder already exists — that's fine
+      if (err.message?.includes('409') || err.message?.includes('conflict')) {
+        return reply.send({ created: false, path: folderPath, exists: true });
+      }
+      app.log.error(err, 'Dropbox ensure folder failed');
+      reply.code(500).send({ error: 'Failed to ensure folder' });
+    }
+  });
+
   // ── Delete file or folder ──
   app.delete('/dropbox/file/:fileId', async (req, reply) => {
     const user = req.user;
