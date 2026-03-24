@@ -363,6 +363,7 @@ export function buildApp() {
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
+    if (routeUrl === '/dropbox/callback') return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
