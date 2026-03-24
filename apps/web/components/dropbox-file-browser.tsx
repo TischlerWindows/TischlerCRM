@@ -53,8 +53,13 @@ export function DropboxFileBrowser({
       }
 
       // Only fetch files if fully connected
-      const result = await apiClient.listDropboxFiles(objectApiName, recordId);
-      setFiles(result.files);
+      try {
+        const result = await apiClient.listDropboxFiles(objectApiName, recordId);
+        setFiles(result.files);
+      } catch (fileErr: any) {
+        console.error('[DropboxFileBrowser] file listing failed:', fileErr);
+        setError(fileErr.message || 'Failed to load files');
+      }
     } catch (err: any) {
       console.error('[DropboxFileBrowser] status check failed:', err);
       setError(err.message || 'Failed to load Dropbox status');
