@@ -73,52 +73,57 @@ async function getDropboxCredentials(): Promise<{ clientId: string; clientSecret
 
 /** Get a valid access token for the user, refreshing if expired. */
 async function getAccessToken(userId: string): Promise<string | null> {
-  const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
-  if (!integration) return null;
+  try {
+    const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+    if (!integration) return null;
 
-  const conn = await prisma.userIntegration.findFirst({
-    where: { userId, integrationId: integration.id },
-  });
-  if (!conn || !conn.accessToken) return null;
-
-  // Check if token is expired (with 5-min buffer)
-  if (conn.tokenExpiresAt && conn.tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
-    // Refresh the token
-    if (!conn.refreshToken) return null;
-    const creds = await getDropboxCredentials();
-    if (!creds) return null;
-
-    const refreshToken = decrypt(conn.refreshToken);
-    const resp = await fetch(DROPBOX_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: refreshToken,
-        client_id: creds.clientId,
-        client_secret: creds.clientSecret,
-      }),
+    const conn = await prisma.userIntegration.findFirst({
+      where: { userId, integrationId: integration.id },
     });
+    if (!conn || !conn.accessToken) return null;
 
-    if (!resp.ok) return null;
+    // Check if token is expired (with 5-min buffer)
+    if (conn.tokenExpiresAt && conn.tokenExpiresAt.getTime() < Date.now() + 5 * 60 * 1000) {
+      // Refresh the token
+      if (!conn.refreshToken) return null;
+      const creds = await getDropboxCredentials();
+      if (!creds) return null;
 
-    const data = await resp.json() as {
-      access_token: string;
-      expires_in: number;
-    };
+      const refreshToken = decrypt(conn.refreshToken);
+      const resp = await fetch(DROPBOX_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          client_id: creds.clientId,
+          client_secret: creds.clientSecret,
+        }),
+      });
 
-    await prisma.userIntegration.update({
-      where: { id: conn.id },
-      data: {
-        accessToken: encrypt(data.access_token),
-        tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
-      },
-    });
+      if (!resp.ok) return null;
 
-    return data.access_token;
+      const data = await resp.json() as {
+        access_token: string;
+        expires_in: number;
+      };
+
+      await prisma.userIntegration.update({
+        where: { id: conn.id },
+        data: {
+          accessToken: encrypt(data.access_token),
+          tokenExpiresAt: new Date(Date.now() + data.expires_in * 1000),
+        },
+      });
+
+      return data.access_token;
+    }
+
+    return decrypt(conn.accessToken);
+  } catch (err: any) {
+    console.error('[dropbox] Failed to get access token:', err.message);
+    return null;
   }
-
-  return decrypt(conn.accessToken);
 }
 
 /** Make an authenticated Dropbox API call. */
@@ -320,12 +325,24 @@ export async function dropboxRoutes(app: FastifyInstance) {
         where: { userId: user.sub, integrationId: integration.id },
       });
 
+      // Verify the stored token is actually decryptable
+      let connected = false;
+      if (conn?.accessToken) {
+        try {
+          decrypt(conn.accessToken);
+          connected = true;
+        } catch {
+          // Token can't be decrypted — treat as not connected
+          connected = false;
+        }
+      }
+
       reply.send({
         enabled: true,
         configured,
-        connected: !!conn,
-        externalEmail: conn?.externalEmail ?? null,
-        connectedAt: conn?.connectedAt ?? null,
+        connected,
+        externalEmail: connected ? (conn?.externalEmail ?? null) : null,
+        connectedAt: connected ? (conn?.connectedAt ?? null) : null,
       });
     } catch (err: any) {
       req.log.error(err, 'GET /dropbox/status failed');
