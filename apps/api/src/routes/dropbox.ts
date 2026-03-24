@@ -45,6 +45,15 @@ function buildFolderPath(objectApiName: string, recordId: string): string {
   return `${CRM_ROOT_FOLDER}/${objectApiName}/${recordId}`;
 }
 
+/** Return a small HTML page that posts a message to the opener window and closes itself. */
+function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
+  const data = JSON.stringify({ type: 'dropbox-oauth-result', status, reason });
+  return `<!DOCTYPE html><html><body><p>${status === 'connected' ? 'Connected! This window will close.' : 'Authorization failed.'}</p><script>
+if(window.opener){window.opener.postMessage(${data},'*');}
+setTimeout(function(){window.close();},1500);
+</script></body></html>`;
+}
+
 /** Get the org-level Dropbox credentials (clientId, clientSecret). */
 async function getDropboxCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
   const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
@@ -185,7 +194,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const frontendUrl = getFrontendUrl();
 
     if (oauthError || !code || !state) {
-      return reply.redirect(`${frontendUrl}/settings/integrations?dropbox=error&reason=${oauthError || 'missing_code'}`);
+      return reply.type('text/html').send(oauthResultPage('error', oauthError || 'missing_code'));
     }
 
     // Decode state to get userId
@@ -193,12 +202,12 @@ export async function dropboxRoutes(app: FastifyInstance) {
     try {
       stateData = JSON.parse(Buffer.from(state, 'base64url').toString());
     } catch {
-      return reply.redirect(`${frontendUrl}/settings/integrations?dropbox=error&reason=invalid_state`);
+      return reply.type('text/html').send(oauthResultPage('error', 'invalid_state'));
     }
 
     const creds = await getDropboxCredentials();
     if (!creds) {
-      return reply.redirect(`${frontendUrl}/settings/integrations?dropbox=error&reason=not_configured`);
+      return reply.type('text/html').send(oauthResultPage('error', 'not_configured'));
     }
 
     // Exchange authorization code for tokens
@@ -217,7 +226,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     if (!tokenResp.ok) {
       app.log.error(await tokenResp.text(), 'Dropbox token exchange failed');
-      return reply.redirect(`${frontendUrl}/settings/integrations?dropbox=error&reason=token_exchange`);
+      return reply.type('text/html').send(oauthResultPage('error', 'token_exchange'));
     }
 
     const tokenData = await tokenResp.json() as {
@@ -241,7 +250,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
     // Upsert the UserIntegration row
     const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
     if (!integration) {
-      return reply.redirect(`${frontendUrl}/settings/integrations?dropbox=error&reason=no_integration`);
+      return reply.type('text/html').send(oauthResultPage('error', 'no_integration'));
     }
 
     await prisma.userIntegration.upsert({
@@ -280,8 +289,8 @@ export async function dropboxRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    // Redirect back to the frontend with success
-    reply.redirect(`${frontendUrl}/settings/integrations?dropbox=connected`);
+    // Send a small HTML page that notifies the opener window and closes itself
+    reply.type('text/html').send(oauthResultPage('connected'));
   });
 
   // ── Connection status ──

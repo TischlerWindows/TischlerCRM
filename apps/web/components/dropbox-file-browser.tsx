@@ -69,7 +69,27 @@ export function DropboxFileBrowser({
   const handleConnect = async () => {
     try {
       const { url } = await apiClient.getDropboxConnectUrl();
-      window.location.href = url;
+      const popup = window.open(url, '_blank', 'noopener');
+      // Listen for the OAuth result from the popup
+      const onMessage = (e: MessageEvent) => {
+        if (e.data?.type === 'dropbox-oauth-result') {
+          window.removeEventListener('message', onMessage);
+          if (e.data.status === 'connected') {
+            loadFiles();
+          } else {
+            setError(`Dropbox authorization failed: ${e.data.reason || 'unknown error'}`);
+          }
+        }
+      };
+      window.addEventListener('message', onMessage);
+      // Fallback: if popup is closed without posting a message, refresh status
+      const check = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(check);
+          window.removeEventListener('message', onMessage);
+          loadFiles();
+        }
+      }, 1000);
     } catch (err: any) {
       setError(err.message || 'Failed to start Dropbox authorization');
     }
