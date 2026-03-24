@@ -49,6 +49,20 @@ function buildFolderPath(objectApiName: string, recordId: string, folderName?: s
   return `${CRM_ROOT_FOLDER}/${objectApiName}/${safe}`;
 }
 
+/** Default subfolder structure for Property records. */
+const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
+  { name: '0. Initial Bid Documents', children: ['Final Proposals', 'Salesman Documents'] },
+  { name: '1. Estimating', children: ['ACAD', 'Backup'] },
+  { name: '2. Contract Documents' },
+  { name: '3. Project Management', children: ['Factory Orders & Order Confirmations', 'Custom Project Orders (Lutron, Centor, etc.)', 'Important Correspondence'] },
+  { name: '4. AutoCad', children: ['Files from Architect', 'Presentations', 'Files from Factory', 'Shops & Drawings'] },
+  { name: '5. Installation', children: ['Install Quotes', 'Project Cost Tracking'] },
+  { name: '6. Service', children: ['Customer Worksheets', 'Customer Correspondence', 'Punch Lists', 'Annual Maintenance'] },
+  { name: '7. Final Shop Drawings' },
+  { name: '8. Photos', children: ['Finished Photos', 'Site Photos'] },
+  { name: '9. Project Accounting', children: ['Escrow Information', 'Contract Financial Summary'] },
+];
+
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
 function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
   const data = JSON.stringify({ type: 'dropbox-oauth-result', status, reason });
@@ -563,20 +577,46 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     const folderPath = buildFolderPath(objectApiName, recordId, folderName);
 
+    let created = false;
     try {
       await dropboxApi(accessToken, '/files/create_folder_v2', {
         path: folderPath,
         autorename: false,
       });
-      reply.send({ created: true, path: folderPath });
+      created = true;
     } catch (err: any) {
       // 409 conflict means the folder already exists — that's fine
-      if (err.message?.includes('409') || err.message?.includes('conflict')) {
-        return reply.send({ created: false, path: folderPath, exists: true });
+      if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+        app.log.error(err, 'Dropbox ensure folder failed');
+        return reply.code(500).send({ error: 'Failed to ensure folder' });
       }
-      app.log.error(err, 'Dropbox ensure folder failed');
-      reply.code(500).send({ error: 'Failed to ensure folder' });
     }
+
+    // Create subfolder structure for Property records
+    if (objectApiName === 'Property') {
+      const subfolders = PROPERTY_SUBFOLDERS;
+      // Build full list of paths: top-level + children
+      const paths: string[] = [];
+      for (const sf of subfolders) {
+        paths.push(`${folderPath}/${sf.name}`);
+        if (sf.children) {
+          for (const child of sf.children) {
+            paths.push(`${folderPath}/${sf.name}/${child}`);
+          }
+        }
+      }
+      // Create all subfolders (ignore conflicts for existing ones)
+      await Promise.allSettled(
+        paths.map(p =>
+          dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: p,
+            autorename: false,
+          }).catch(() => { /* folder already exists — ignore */ })
+        )
+      );
+    }
+
+    reply.send({ created, path: folderPath });
   });
 
   // ── Delete file or folder ──
