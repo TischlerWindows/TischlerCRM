@@ -96,7 +96,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     pathname?.startsWith('/dashboard') ||
     pathname?.includes('demo');
 
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup') && !pathname?.match(/^\/automations\/.+/);
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   // Always refresh schema from the API on mount / when user changes.
   // The persisted Zustand cache provides a value for the very first paint

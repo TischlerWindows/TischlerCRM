@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   Bell,
   WifiOff,
-  Zap,
   Plug,
   Search,
   ChevronLeft,
@@ -64,12 +63,6 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell, disabled: true },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
-    ],
-  },
-  {
-    title: 'Automation',
-    items: [
-      { name: 'Process Automation', href: '/automations', icon: Zap },
     ],
   },
 ];
