@@ -1836,13 +1836,14 @@ export default function DynamicForm({
     for (const f of section.fields) {
       const fd = getFieldDef(f.apiName, f);
       if (fd) {
+        const isDropbox = fd.type === ('DropboxFiles' as FieldType);
         gridFields.push({
           fieldDef: fd,
           pageField: f,
           column: f.column,
           order: f.order,
-          colSpan: (f as any).colSpan ?? 1,
-          rowSpan: (f as any).rowSpan ?? 1,
+          colSpan: isDropbox ? 2 : ((f as any).colSpan ?? 1),
+          rowSpan: isDropbox ? 2 : ((f as any).rowSpan ?? 1),
         });
       }
     }

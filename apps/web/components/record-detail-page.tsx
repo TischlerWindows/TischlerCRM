@@ -677,9 +677,10 @@ export default function RecordDetailPage({
                   }
 
                   // Check if any field uses spanning
+                  // Widget fields like DropboxFiles always span 2x2
                   const hasSpanning = section.fields.some(
                     (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
-                  );
+                  ) || columnArrays.some(col => col.some(({ fieldDef }) => fieldDef.type === 'DropboxFiles'));
 
                   // Determine if every field in this section is empty
                   // Widget fields (DropboxFiles, LocationSearch) render content
@@ -769,8 +770,9 @@ export default function RecordDetailPage({
                             for (let c = 0; c < section.columns; c++) {
                               for (const entry of colGroups[c]) {
                                 const f = entry.layoutField;
-                                const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
-                                const rs = (f as any).rowSpan ?? 1;
+                                const isDropbox = entry.fieldDef.type === 'DropboxFiles';
+                                const cs = Math.min(isDropbox ? 2 : ((f as any).colSpan ?? 1), section.columns - f.column);
+                                const rs = isDropbox ? 2 : ((f as any).rowSpan ?? 1);
                                 let row = 1;
                                 search: while (true) {
                                   for (let dr = 0; dr < rs; dr++) {
