@@ -218,6 +218,16 @@ export default function RecordDetailPage({
     }
     const fieldType = fieldDef?.type;
 
+    // DropboxFiles — render the file browser widget inline
+    if (fieldType === 'DropboxFiles' && params?.id) {
+      return (
+        <DropboxFileBrowser
+          objectApiName={objectApiName}
+          recordId={params.id as string}
+        />
+      );
+    }
+
     // LocationSearch is a virtual widget — it has no stored value of its own.
     // Render the map preview by reading the mapped target fields from the record.
     if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
@@ -885,9 +895,6 @@ export default function RecordDetailPage({
             No page layout configured for this record.
           </div>
         )}
-
-        {/* Dropbox file browser */}
-        <DropboxFileBrowser objectApiName={objectApiName} recordId={params?.id as string} />
 
       </div>
 

@@ -8,7 +8,8 @@ export type FieldType =
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser"
-  | "LocationSearch";
+  | "LocationSearch"
+  | "DropboxFiles";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -48,6 +49,7 @@ export function normalizeFieldType(raw: string): FieldType {
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
     locationsearch: 'LocationSearch',
+    dropboxfiles: 'DropboxFiles',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }
@@ -380,7 +382,8 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Time', value: 'Time', type: 'Time' },
   { label: 'URL', value: 'URL', type: 'URL' },
   { label: 'Address', value: 'Address', type: 'Address' },
-  { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' }
+  { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' },
+  { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' }
 ];
 
 // Helper to get field type categories
@@ -391,6 +394,7 @@ export const getFieldTypeCategory = (type: FieldType): string => {
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
   if (["Picklist", "MultiPicklist", "PicklistText"].includes(type)) return "Selection";
+  if (["DropboxFiles"].includes(type)) return "Integration";
   return "Other";
 };
 
@@ -424,6 +428,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     Time: "clock",
     URL: "link",
     Address: "map",
+    DropboxFiles: "cloud",
   };
   return icons[type] || "circle";
 };
