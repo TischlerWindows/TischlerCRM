@@ -22,6 +22,7 @@ import {
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
+import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
 
 interface RecordDetailPageProps {
   /** The schema apiName of the object, e.g. "Contact", "Property" */
@@ -884,6 +885,9 @@ export default function RecordDetailPage({
             No page layout configured for this record.
           </div>
         )}
+
+        {/* Dropbox file browser */}
+        <DropboxFileBrowser objectApiName={objectApiName} recordId={params?.id as string} />
 
       </div>
 

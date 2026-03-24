@@ -30,6 +30,7 @@ import { auditLogRoutes } from './routes/audit-log.js';
 import { recycleBinRoutes } from './routes/recycle-bin.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
+import { dropboxRoutes } from './routes/dropbox.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -83,6 +84,11 @@ export function buildApp() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: false,
+  });
+
+  // Allow raw binary uploads (used by Dropbox file upload)
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body);
   });
 
   // Serve Next.js static files (if built)
@@ -441,6 +447,7 @@ export function buildApp() {
   app.register(recycleBinRoutes);
   app.register(integrationRoutes);
   app.register(placesRoutes);
+  app.register(dropboxRoutes);
 
   return app;
 }

@@ -665,6 +665,69 @@ class ApiClient {
       };
     }>(`/places/details?${params}`);
   }
+
+  // ── Dropbox ────────────────────────────────────────────────────────────────
+
+  async getDropboxConnectUrl() {
+    return this.request<{ url: string }>('/dropbox/connect');
+  }
+
+  async getDropboxStatus() {
+    return this.request<{
+      enabled: boolean;
+      connected: boolean;
+      externalEmail: string | null;
+      connectedAt: string | null;
+    }>('/dropbox/status');
+  }
+
+  async disconnectDropbox() {
+    return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });
+  }
+
+  async listDropboxFiles(objectApiName: string, recordId: string) {
+    return this.request<{
+      connected: boolean;
+      files: Array<{
+        id: string;
+        name: string;
+        path: string;
+        size: number;
+        modifiedAt: string | null;
+      }>;
+    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`);
+  }
+
+  async getDropboxDownloadUrl(fileId: string) {
+    return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
+  }
+
+  async uploadDropboxFile(objectApiName: string, recordId: string, file: File) {
+    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?fileName=${encodeURIComponent(file.name)}`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/octet-stream',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: file,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return resp.json() as Promise<{
+      id: string;
+      name: string;
+      path: string;
+      size: number;
+      modifiedAt: string;
+    }>;
+  }
 }
 
 // Export singleton instance
