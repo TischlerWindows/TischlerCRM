@@ -262,6 +262,13 @@ export function DropboxFileBrowser({
     setSearchQuery('');
   };
 
+  const openInDropbox = async (entryPath?: string) => {
+    try {
+      await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+    } catch { /* non-fatal */ }
+    window.open(getDropboxWebUrl(entryPath), '_blank', 'noopener');
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
@@ -394,15 +401,13 @@ export function DropboxFileBrowser({
               <FolderPlus className="w-3.5 h-3.5" />
               New Folder
             </button>
-            <a
-              href={getDropboxWebUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => openInDropbox()}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
             >
               <ExternalLink className="w-3.5 h-3.5" />
               Open in Dropbox
-            </a>
+            </button>
           </div>
         </div>
 
@@ -583,15 +588,12 @@ export function DropboxFileBrowser({
                             <Download className="w-3.5 h-3.5" /> Download
                           </button>
                         )}
-                        <a
-                          href={getDropboxWebUrl(entry.path)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => setContextMenuId(null)}
+                        <button
+                          onClick={() => { openInDropbox(entry.path); setContextMenuId(null); }}
                           className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         >
                           <ExternalLink className="w-3.5 h-3.5" /> Open in Dropbox
-                        </a>
+                        </button>
                         <button
                           onClick={() => handleDelete(entry)}
                           className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
