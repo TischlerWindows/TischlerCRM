@@ -1842,7 +1842,7 @@ export default function DynamicForm({
           pageField: f,
           column: f.column,
           order: f.order,
-          colSpan: isDropbox ? 2 : ((f as any).colSpan ?? 1),
+          colSpan: isDropbox ? section.columns : ((f as any).colSpan ?? 1),
           rowSpan: isDropbox ? 2 : ((f as any).rowSpan ?? 1),
         });
       }

@@ -677,10 +677,11 @@ export default function RecordDetailPage({
                   }
 
                   // Check if any field uses spanning
-                  // Widget fields like DropboxFiles always span 2x2
+                  // Widget fields like DropboxFiles always span full width
+                  const hasDropboxWidget = columnArrays.some(col => col.some(({ fieldDef }) => fieldDef.type === 'DropboxFiles'));
                   const hasSpanning = section.fields.some(
                     (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
-                  ) || columnArrays.some(col => col.some(({ fieldDef }) => fieldDef.type === 'DropboxFiles'));
+                  ) || hasDropboxWidget;
 
                   // Determine if every field in this section is empty
                   // Widget fields (DropboxFiles, LocationSearch) render content
@@ -771,7 +772,7 @@ export default function RecordDetailPage({
                               for (const entry of colGroups[c]) {
                                 const f = entry.layoutField;
                                 const isDropbox = entry.fieldDef.type === 'DropboxFiles';
-                                const cs = Math.min(isDropbox ? 2 : ((f as any).colSpan ?? 1), section.columns - f.column);
+                                const cs = Math.min(isDropbox ? section.columns : ((f as any).colSpan ?? 1), section.columns - f.column);
                                 const rs = isDropbox ? 2 : ((f as any).rowSpan ?? 1);
                                 let row = 1;
                                 search: while (true) {
@@ -817,15 +818,17 @@ export default function RecordDetailPage({
                                       }}
                                       className={hl || undefined}
                                     >
-                                      <dt className={`text-sm ${labelCn}`}>
-                                        {fieldDef.label}
-                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
-                                        {fFx?.readOnly ? (
-                                          <span className="ml-2 text-xs font-normal text-gray-400">
-                                            (read-only)
-                                          </span>
-                                        ) : null}
-                                      </dt>
+                                      {fieldDef.type !== 'DropboxFiles' && (
+                                        <dt className={`text-sm ${labelCn}`}>
+                                          {fieldDef.label}
+                                          {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                          {fFx?.readOnly ? (
+                                            <span className="ml-2 text-xs font-normal text-gray-400">
+                                              (read-only)
+                                            </span>
+                                          ) : null}
+                                        </dt>
+                                      )}
                                       <dd
                                         className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
                                         style={rowSpan > 1 ? { flex: 1 } : undefined}
@@ -866,17 +869,19 @@ export default function RecordDetailPage({
                                   );
                                   return (
                                     <div key={layoutField.apiName} className={hl || undefined}>
-                                      <dt className={`text-sm ${labelCn}`}>
-                                        {fieldDef.label}
-                                        {fieldDef.required && (
-                                          <span className="text-red-500 ml-1">*</span>
-                                        )}
-                                        {fFx?.readOnly ? (
-                                          <span className="ml-2 text-xs font-normal text-gray-400">
-                                            (read-only)
-                                          </span>
-                                        ) : null}
-                                      </dt>
+                                      {fieldDef.type !== 'DropboxFiles' && (
+                                        <dt className={`text-sm ${labelCn}`}>
+                                          {fieldDef.label}
+                                          {fieldDef.required && (
+                                            <span className="text-red-500 ml-1">*</span>
+                                          )}
+                                          {fFx?.readOnly ? (
+                                            <span className="ml-2 text-xs font-normal text-gray-400">
+                                              (read-only)
+                                            </span>
+                                          ) : null}
+                                        </dt>
+                                      )}
                                       <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
                                         {renderValue(layoutField.apiName, value, fieldDef)}
                                         {badgeC ? <span className={badgeC}>Status</span> : null}
