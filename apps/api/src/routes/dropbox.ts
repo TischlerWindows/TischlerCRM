@@ -278,8 +278,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
     if (!integration || !integration.enabled) {
-      return reply.send({ enabled: false, connected: false });
+      return reply.send({ enabled: false, connected: false, configured: false });
     }
+
+    const configured = !!(integration.clientId && integration.clientSecret);
 
     const conn = await prisma.userIntegration.findFirst({
       where: { userId: user.sub, integrationId: integration.id },
@@ -287,6 +289,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     reply.send({
       enabled: true,
+      configured,
       connected: !!conn,
       externalEmail: conn?.externalEmail ?? null,
       connectedAt: conn?.connectedAt ?? null,

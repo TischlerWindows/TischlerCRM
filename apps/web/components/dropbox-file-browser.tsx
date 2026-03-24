@@ -12,6 +12,12 @@ type DropboxFile = {
   modifiedAt: string | null;
 };
 
+type DropboxStatus = {
+  enabled: boolean;
+  configured: boolean;
+  connected: boolean;
+};
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -27,7 +33,7 @@ export function DropboxFileBrowser({
   objectApiName: string;
   recordId: string;
 }) {
-  const [status, setStatus] = useState<{ enabled: boolean; connected: boolean } | null>(null);
+  const [status, setStatus] = useState<DropboxStatus | null>(null);
   const [files, setFiles] = useState<DropboxFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -37,22 +43,20 @@ export function DropboxFileBrowser({
 
   const loadFiles = useCallback(async () => {
     try {
-      const result = await apiClient.listDropboxFiles(objectApiName, recordId);
-      if (!result.connected) {
-        setStatus({ enabled: true, connected: false });
+      // Always check status first to know if integration is enabled/configured
+      const s = await apiClient.getDropboxStatus();
+      setStatus(s);
+
+      if (!s.enabled || !s.configured || !s.connected) {
         setFiles([]);
-      } else {
-        setStatus({ enabled: true, connected: true });
-        setFiles(result.files);
+        return;
       }
+
+      // Only fetch files if fully connected
+      const result = await apiClient.listDropboxFiles(objectApiName, recordId);
+      setFiles(result.files);
     } catch {
-      // If the list call fails, check status separately
-      try {
-        const s = await apiClient.getDropboxStatus();
-        setStatus(s);
-      } catch {
-        setStatus({ enabled: false, connected: false });
-      }
+      setStatus({ enabled: false, configured: false, connected: false });
     } finally {
       setLoading(false);
     }
@@ -66,8 +70,8 @@ export function DropboxFileBrowser({
     try {
       const { url } = await apiClient.getDropboxConnectUrl();
       window.location.href = url;
-    } catch {
-      setError('Failed to start Dropbox authorization');
+    } catch (err: any) {
+      setError(err.message || 'Failed to start Dropbox authorization');
     }
   };
 
@@ -162,7 +166,7 @@ export function DropboxFileBrowser({
       )}
 
       {/* Not connected */}
-      {!status.connected && (
+      {status.configured && !status.connected && (
         <div className="p-6 text-center">
           <CloudOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
           <p className="text-sm text-gray-500 mb-3">Connect Dropbox to attach files to this record</p>
@@ -172,6 +176,14 @@ export function DropboxFileBrowser({
           >
             Connect Dropbox
           </button>
+        </div>
+      )}
+
+      {/* Integration enabled but credentials not configured */}
+      {!status.configured && (
+        <div className="p-6 text-center">
+          <CloudOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">Dropbox integration is not fully configured. Ask an admin to add the Client ID and Secret in Connected Apps.</p>
         </div>
       )}
 

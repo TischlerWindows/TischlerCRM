@@ -675,6 +675,7 @@ class ApiClient {
   async getDropboxStatus() {
     return this.request<{
       enabled: boolean;
+      configured: boolean;
       connected: boolean;
       externalEmail: string | null;
       connectedAt: string | null;
