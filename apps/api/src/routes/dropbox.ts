@@ -594,26 +594,27 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     // Create subfolder structure for Property records
     if (objectApiName === 'Property') {
-      const subfolders = PROPERTY_SUBFOLDERS;
-      // Build full list of paths: top-level + children
-      const paths: string[] = [];
-      for (const sf of subfolders) {
-        paths.push(`${folderPath}/${sf.name}`);
+      const createFolder = async (p: string) => {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: p,
+            autorename: false,
+          });
+        } catch { /* folder already exists — ignore */ }
+      };
+
+      // Step 1: create all top-level folders sequentially
+      for (const sf of PROPERTY_SUBFOLDERS) {
+        await createFolder(`${folderPath}/${sf.name}`);
+      }
+      // Step 2: create all child folders sequentially
+      for (const sf of PROPERTY_SUBFOLDERS) {
         if (sf.children) {
           for (const child of sf.children) {
-            paths.push(`${folderPath}/${sf.name}/${child}`);
+            await createFolder(`${folderPath}/${sf.name}/${child}`);
           }
         }
       }
-      // Create all subfolders (ignore conflicts for existing ones)
-      await Promise.allSettled(
-        paths.map(p =>
-          dropboxApi(accessToken, '/files/create_folder_v2', {
-            path: p,
-            autorename: false,
-          }).catch(() => { /* folder already exists — ignore */ })
-        )
-      );
     }
 
     reply.send({ created, path: folderPath });
