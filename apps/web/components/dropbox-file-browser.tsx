@@ -66,9 +66,11 @@ function DropboxLogo({ className }: { className?: string }) {
 export function DropboxFileBrowser({
   objectApiName,
   recordId,
+  folderName,
 }: {
   objectApiName: string;
   recordId: string;
+  folderName?: string;
 }) {
   const [status, setStatus] = useState<DropboxStatus | null>(null);
   const [entries, setEntries] = useState<DropboxEntry[]>([]);
@@ -112,7 +114,7 @@ export function DropboxFileBrowser({
       }
 
       try {
-        const result = await apiClient.listDropboxFiles(objectApiName, recordId, subPath || undefined);
+        const result = await apiClient.listDropboxFiles(objectApiName, recordId, subPath || undefined, folderName);
         if (result.needsReauth) {
           setStatus({ ...s, connected: false, needsReauth: true });
           setEntries([]);
@@ -171,7 +173,7 @@ export function DropboxFileBrowser({
     try {
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file, subPath || undefined);
+        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file, subPath || undefined, folderName);
       }
       await loadFiles();
     } catch (err: any) {
@@ -209,7 +211,7 @@ export function DropboxFileBrowser({
     if (!newFolderName.trim()) return;
     setCreatingFolder(true);
     try {
-      await apiClient.createDropboxFolder(objectApiName, recordId, newFolderName.trim(), subPath || undefined);
+      await apiClient.createDropboxFolder(objectApiName, recordId, newFolderName.trim(), subPath || undefined, folderName);
       setNewFolderName('');
       setShowNewFolder(false);
       await loadFiles();
@@ -236,7 +238,8 @@ export function DropboxFileBrowser({
       const folderPath = entryPath.substring(0, entryPath.lastIndexOf('/'));
       return `https://www.dropbox.com/home${folderPath}`;
     }
-    const basePath = `/TischlerCRM/${objectApiName}/${recordId}`;
+    const pathName = folderName || recordId;
+    const basePath = `/TischlerCRM/${objectApiName}/${pathName}`;
     const full = currentPath.length > 0 ? `${basePath}/${currentPath.join('/')}` : basePath;
     return `https://www.dropbox.com/home${full}`;
   };

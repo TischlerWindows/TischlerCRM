@@ -686,8 +686,11 @@ class ApiClient {
     return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });
   }
 
-  async listDropboxFiles(objectApiName: string, recordId: string, subPath?: string) {
-    const params = subPath ? `?subPath=${encodeURIComponent(subPath)}` : '';
+  async listDropboxFiles(objectApiName: string, recordId: string, subPath?: string, folderName?: string) {
+    const p = new URLSearchParams();
+    if (subPath) p.set('subPath', subPath);
+    if (folderName) p.set('folderName', folderName);
+    const qs = p.toString() ? `?${p.toString()}` : '';
     return this.request<{
       connected: boolean;
       needsReauth?: boolean;
@@ -699,17 +702,17 @@ class ApiClient {
         modifiedAt: string | null;
         isFolder: boolean;
       }>;
-    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}${params}`);
+    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}${qs}`);
   }
 
   async getDropboxDownloadUrl(fileId: string) {
     return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
   }
 
-  async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string) {
+  async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string, folderName?: string) {
     return this.request<{ id: string; name: string; path: string }>(`/dropbox/folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`, {
       method: 'POST',
-      body: JSON.stringify({ name, subPath }),
+      body: JSON.stringify({ name, subPath, folderName }),
     });
   }
 
@@ -717,9 +720,11 @@ class ApiClient {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }
 
-  async uploadDropboxFile(objectApiName: string, recordId: string, file: File, subPath?: string) {
+  async uploadDropboxFile(objectApiName: string, recordId: string, file: File, subPath?: string, folderName?: string) {
     const fileName = subPath ? `${subPath}/${file.name}` : file.name;
-    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?fileName=${encodeURIComponent(fileName)}`;
+    const p = new URLSearchParams({ fileName });
+    if (folderName) p.set('folderName', folderName);
+    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?${p.toString()}`;
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const headers: HeadersInit = {
       'Content-Type': 'application/octet-stream',

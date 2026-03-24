@@ -208,11 +208,6 @@ export default function PageEditor({ objectApiName, initialLayoutId }: PageEdito
     const ROW_HEIGHT = 60; // approximate px per grid row
 
     const handleMouseMove = (e: MouseEvent) => {
-      // Prevent resizing widget fields with fixed spans (e.g. DropboxFiles)
-      const rField = fields.find(f => f.id === resizingField.id);
-      const rFieldDef = rField ? object.fields.find(f => f.apiName === rField.fieldApiName) : null;
-      if (rFieldDef?.type === 'DropboxFiles') return;
-
       const dx = e.clientX - resizingField.startX;
       const dy = e.clientY - resizingField.startY;
       let newColSpan = resizingField.startColSpan;
@@ -402,16 +397,14 @@ export default function PageEditor({ objectApiName, initialLayoutId }: PageEdito
       if (activeId.startsWith('field-')) {
         // Dragging a new field from palette
         const fieldApiName = activeId.replace('field-', '');
-        const fd = object.fields.find(f => f.apiName === fieldApiName);
-        const isWidget = fd?.type === 'DropboxFiles';
         const newField: CanvasField = {
           id: `placed-${Date.now()}-${fieldApiName}`,
           fieldApiName,
           sectionId: targetSectionId,
           column: targetColumn,
           order: maxOrder + 1,
-          colSpan: isWidget ? 2 : 1,
-          rowSpan: isWidget ? 2 : 1,
+          colSpan: 1,
+          rowSpan: 1,
         };
         setFields([...fields, newField]);
         markDirty();
@@ -475,16 +468,14 @@ export default function PageEditor({ objectApiName, initialLayoutId }: PageEdito
         }
       }
       
-      const fd2 = object.fields.find(f => f.apiName === fieldApiName);
-      const isWidget2 = fd2?.type === 'DropboxFiles';
       const newField: CanvasField = {
         id: `placed-${Date.now()}-${fieldApiName}`,
         fieldApiName,
         sectionId: targetSectionId,
         column: targetColumn,
         order: insertOrder,
-        colSpan: isWidget2 ? 2 : 1,
-        rowSpan: isWidget2 ? 2 : 1,
+        colSpan: 1,
+        rowSpan: 1,
       };
       
       setFields([...fields, newField]);
@@ -931,44 +922,39 @@ export default function PageEditor({ objectApiName, initialLayoutId }: PageEdito
             </button>
           </div>
         </div>
-        {/* Resize handles — hidden for fixed-span widget fields like DropboxFiles */}
-        {fieldDef.type !== 'DropboxFiles' && (
-          <>
-            {/* Right-edge resize handle (colSpan) */}
-            {sectionColumns > 1 && (
-              <div
-                className="absolute top-0 right-0 w-2 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-r transition-opacity"
-                title="Drag to stretch columns"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setResizingField({ id: field.id, dir: 'col', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
-                }}
-              />
-            )}
-            {/* Bottom-edge resize handle (rowSpan) */}
-            <div
-              className="absolute bottom-0 left-0 h-2 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-b transition-opacity"
-              title="Drag to stretch rows"
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setResizingField({ id: field.id, dir: 'row', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
-              }}
-            />
-            {/* Corner resize handle (both) */}
-            {sectionColumns > 1 && (
-              <div
-                className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-blue-500 rounded-br transition-opacity z-10"
-                title="Drag to stretch both"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  setResizingField({ id: field.id, dir: 'both', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
-                }}
-              />
-            )}
-          </>
+        {/* Right-edge resize handle (colSpan) */}
+        {sectionColumns > 1 && (
+          <div
+            className="absolute top-0 right-0 w-2 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-r transition-opacity"
+            title="Drag to stretch columns"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setResizingField({ id: field.id, dir: 'col', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+            }}
+          />
+        )}
+        {/* Bottom-edge resize handle (rowSpan) */}
+        <div
+          className="absolute bottom-0 left-0 h-2 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-blue-400 rounded-b transition-opacity"
+          title="Drag to stretch rows"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setResizingField({ id: field.id, dir: 'row', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+          }}
+        />
+        {/* Corner resize handle (both) */}
+        {sectionColumns > 1 && (
+          <div
+            className="absolute bottom-0 right-0 w-3 h-3 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-blue-500 rounded-br transition-opacity z-10"
+            title="Drag to stretch both"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              setResizingField({ id: field.id, dir: 'both', startX: e.clientX, startY: e.clientY, startColSpan: field.colSpan, startRowSpan: field.rowSpan, sectionCols: sectionColumns - field.column });
+            }}
+          />
         )}
       </div>
     );

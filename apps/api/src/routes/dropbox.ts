@@ -41,8 +41,12 @@ function getApiBaseUrl(): string {
 }
 
 /** Build the record folder path inside Dropbox. */
-function buildFolderPath(objectApiName: string, recordId: string): string {
-  return `${CRM_ROOT_FOLDER}/${objectApiName}/${recordId}`;
+function buildFolderPath(objectApiName: string, recordId: string, folderName?: string): string {
+  // Use folderName if provided (e.g. "6 Suburban Avenue (CT00001)"), otherwise fall back to recordId
+  const folder = folderName || recordId;
+  // Sanitize folder name: remove characters Dropbox doesn't allow
+  const safe = folder.replace(/[\\/:*?"<>|]/g, '_').trim();
+  return `${CRM_ROOT_FOLDER}/${objectApiName}/${safe}`;
 }
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
@@ -372,13 +376,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
-    const { subPath } = req.query as { subPath?: string };
+    const { subPath, folderName } = req.query as { subPath?: string; folderName?: string };
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) {
       return reply.send({ connected: false, files: [] });
     }
 
-    const basePath = buildFolderPath(objectApiName, recordId);
+    const basePath = buildFolderPath(objectApiName, recordId, folderName);
     const folderPath = subPath ? `${basePath}/${subPath}` : basePath;
 
     try {
@@ -459,10 +463,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
     // Read filename from query param, body comes as raw file content
-    const fileName = (req.query as { fileName?: string }).fileName;
+    const { fileName, folderName } = req.query as { fileName?: string; folderName?: string };
     if (!fileName) return reply.code(400).send({ error: 'fileName query parameter is required' });
 
-    const folderPath = buildFolderPath(objectApiName, recordId);
+    const folderPath = buildFolderPath(objectApiName, recordId, folderName);
     const filePath = `${folderPath}/${fileName}`;
 
     try {
@@ -516,15 +520,15 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
-    const { name, subPath } = req.body as { name: string; subPath?: string };
+    const { name, subPath, folderName } = req.body as { name: string; subPath?: string; folderName?: string };
     if (!name || !name.trim()) return reply.code(400).send({ error: 'Folder name is required' });
 
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
     const basePath = subPath
-      ? `${buildFolderPath(objectApiName, recordId)}/${subPath}`
-      : buildFolderPath(objectApiName, recordId);
+      ? `${buildFolderPath(objectApiName, recordId, folderName)}/${subPath}`
+      : buildFolderPath(objectApiName, recordId, folderName);
     const folderPath = `${basePath}/${name.trim()}`;
 
     try {

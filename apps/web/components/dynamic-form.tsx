@@ -49,7 +49,6 @@ import {
 } from 'lucide-react';
 import { cn, evaluateFormulaForRecord } from '@/lib/utils';
 import AddressAutocomplete from '@/components/address-autocomplete';
-import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
 
 // Custom dropdown for PicklistText that allows selected value to wrap
 function PicklistTextDropdown({
@@ -1783,16 +1782,7 @@ export default function DynamicForm({
       }
 
       default:
-        if (fieldDef.type === ('DropboxFiles' as FieldType) && recordData?.id) {
-          inputElement = (
-            <DropboxFileBrowser
-              objectApiName={objectApiName}
-              recordId={recordData.id}
-            />
-          );
-        } else {
-          inputElement = <Input {...commonProps} type="text" />;
-        }
+        inputElement = <Input {...commonProps} type="text" />;
     }
 
     return (
@@ -1836,14 +1826,13 @@ export default function DynamicForm({
     for (const f of section.fields) {
       const fd = getFieldDef(f.apiName, f);
       if (fd) {
-        const isDropbox = fd.type === ('DropboxFiles' as FieldType);
         gridFields.push({
           fieldDef: fd,
           pageField: f,
           column: f.column,
           order: f.order,
-          colSpan: isDropbox ? section.columns : ((f as any).colSpan ?? 1),
-          rowSpan: isDropbox ? 2 : ((f as any).rowSpan ?? 1),
+          colSpan: (f as any).colSpan ?? 1,
+          rowSpan: (f as any).rowSpan ?? 1,
         });
       }
     }

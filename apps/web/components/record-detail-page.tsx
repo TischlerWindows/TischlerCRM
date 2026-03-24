@@ -218,16 +218,6 @@ export default function RecordDetailPage({
     }
     const fieldType = fieldDef?.type;
 
-    // DropboxFiles — render the file browser widget inline
-    if (fieldType === 'DropboxFiles' && params?.id) {
-      return (
-        <DropboxFileBrowser
-          objectApiName={objectApiName}
-          recordId={params.id as string}
-        />
-      );
-    }
-
     // LocationSearch is a virtual widget — it has no stored value of its own.
     // Render the map preview by reading the mapped target fields from the record.
     if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
@@ -436,6 +426,34 @@ export default function RecordDetailPage({
     if (numberKey) return record[numberKey];
     // Fall back to name
     if (record.name && typeof record.name === 'string') return record.name;
+    return record.id;
+  };
+
+  /** Build a Dropbox folder name: "6 Suburban Avenue (CT00001)" */
+  const getDropboxFolderName = (): string => {
+    if (!record) return '';
+    // Find the auto-number (propertyNumber, contactNumber, etc.)
+    const numberKey = Object.keys(record).find(
+      (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
+    );
+    const autoNumber = numberKey ? record[numberKey] : '';
+    // Find an address string
+    const addrKey = Object.keys(record).find(
+      (k) => k.toLowerCase() === 'address' || k.toLowerCase().endsWith('__address')
+    );
+    let addrStr = '';
+    if (addrKey) {
+      const addr = record[addrKey];
+      if (typeof addr === 'object' && addr !== null) {
+        // Composite address: grab street
+        addrStr = addr.street || addr.address || Object.values(addr).filter(Boolean).join(', ');
+      } else if (typeof addr === 'string') {
+        addrStr = addr;
+      }
+    }
+    if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`;
+    if (addrStr) return addrStr;
+    if (autoNumber) return autoNumber;
     return record.id;
   };
 
@@ -677,19 +695,14 @@ export default function RecordDetailPage({
                   }
 
                   // Check if any field uses spanning
-                  // Widget fields like DropboxFiles always span full width
-                  const hasDropboxWidget = columnArrays.some(col => col.some(({ fieldDef }) => fieldDef.type === 'DropboxFiles'));
                   const hasSpanning = section.fields.some(
                     (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
-                  ) || hasDropboxWidget;
+                  );
 
                   // Determine if every field in this section is empty
-                  // Widget fields (DropboxFiles, LocationSearch) render content
-                  // independently of record data — never treat them as empty.
-                  const widgetTypes = new Set(['DropboxFiles', 'LocationSearch']);
                   const allFieldsEmpty = columnArrays.every((col) =>
                     col.every(({ layoutField, fieldDef }) => {
-                      if (widgetTypes.has(fieldDef.type)) return false;
+                      if (fieldDef.type === 'LocationSearch') return false;
                       const v = getRecordValue(layoutField.apiName, fieldDef);
                       return v === undefined || v === null || v === '' || v === 'N/A';
                     })
@@ -771,9 +784,8 @@ export default function RecordDetailPage({
                             for (let c = 0; c < section.columns; c++) {
                               for (const entry of colGroups[c]) {
                                 const f = entry.layoutField;
-                                const isDropbox = entry.fieldDef.type === 'DropboxFiles';
-                                const cs = Math.min(isDropbox ? section.columns : ((f as any).colSpan ?? 1), section.columns - f.column);
-                                const rs = isDropbox ? 2 : ((f as any).rowSpan ?? 1);
+                                const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
+                                const rs = (f as any).rowSpan ?? 1;
                                 let row = 1;
                                 search: while (true) {
                                   for (let dr = 0; dr < rs; dr++) {
@@ -818,30 +830,22 @@ export default function RecordDetailPage({
                                       }}
                                       className={hl || undefined}
                                     >
-                                      {fieldDef.type === 'DropboxFiles' ? (
-                                        <div className="w-full">
-                                          {renderValue(layoutField.apiName, value, fieldDef)}
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <dt className={`text-sm ${labelCn}`}>
-                                            {fieldDef.label}
-                                            {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
-                                            {fFx?.readOnly ? (
-                                              <span className="ml-2 text-xs font-normal text-gray-400">
-                                                (read-only)
-                                              </span>
-                                            ) : null}
-                                          </dt>
-                                          <dd
-                                            className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
-                                            style={rowSpan > 1 ? { flex: 1 } : undefined}
-                                          >
-                                            {renderValue(layoutField.apiName, value, fieldDef)}
-                                            {badgeC ? <span className={badgeC}>Status</span> : null}
-                                          </dd>
-                                        </>
-                                      )}
+                                      <dt className={`text-sm ${labelCn}`}>
+                                        {fieldDef.label}
+                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                        {fFx?.readOnly ? (
+                                          <span className="ml-2 text-xs font-normal text-gray-400">
+                                            (read-only)
+                                          </span>
+                                        ) : null}
+                                      </dt>
+                                      <dd
+                                        className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
+                                        style={rowSpan > 1 ? { flex: 1 } : undefined}
+                                      >
+                                        {renderValue(layoutField.apiName, value, fieldDef)}
+                                        {badgeC ? <span className={badgeC}>Status</span> : null}
+                                      </dd>
                                     </div>
                                   );
                                 })}
@@ -875,29 +879,21 @@ export default function RecordDetailPage({
                                   );
                                   return (
                                     <div key={layoutField.apiName} className={hl || undefined}>
-                                      {fieldDef.type === 'DropboxFiles' ? (
-                                        <div className="w-full">
-                                          {renderValue(layoutField.apiName, value, fieldDef)}
-                                        </div>
-                                      ) : (
-                                        <>
-                                          <dt className={`text-sm ${labelCn}`}>
-                                            {fieldDef.label}
-                                            {fieldDef.required && (
-                                              <span className="text-red-500 ml-1">*</span>
-                                            )}
-                                            {fFx?.readOnly ? (
-                                              <span className="ml-2 text-xs font-normal text-gray-400">
-                                                (read-only)
-                                              </span>
-                                            ) : null}
-                                          </dt>
-                                          <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                                            {renderValue(layoutField.apiName, value, fieldDef)}
-                                            {badgeC ? <span className={badgeC}>Status</span> : null}
-                                          </dd>
-                                        </>
-                                      )}
+                                      <dt className={`text-sm ${labelCn}`}>
+                                        {fieldDef.label}
+                                        {fieldDef.required && (
+                                          <span className="text-red-500 ml-1">*</span>
+                                        )}
+                                        {fFx?.readOnly ? (
+                                          <span className="ml-2 text-xs font-normal text-gray-400">
+                                            (read-only)
+                                          </span>
+                                        ) : null}
+                                      </dt>
+                                      <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
+                                        {renderValue(layoutField.apiName, value, fieldDef)}
+                                        {badgeC ? <span className={badgeC}>Status</span> : null}
+                                      </dd>
                                     </div>
                                   );
                                 })}
@@ -920,6 +916,17 @@ export default function RecordDetailPage({
         )}
 
       </div>
+
+      {/* Dropbox file browser — hardcoded at end of every record */}
+      {record && params?.id && (
+        <div className="max-w-6xl mx-auto px-6 pb-6">
+          <DropboxFileBrowser
+            objectApiName={objectApiName}
+            recordId={params.id as string}
+            folderName={getDropboxFolderName()}
+          />
+        </div>
+      )}
 
       {/* Edit dialog — re-uses the SAME layout */}
       {pageLayout && (
