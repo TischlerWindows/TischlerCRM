@@ -16,6 +16,7 @@ type DropboxStatus = {
   enabled: boolean;
   configured: boolean;
   connected: boolean;
+  needsReauth?: boolean;
 };
 
 function formatBytes(bytes: number): string {
@@ -55,6 +56,11 @@ export function DropboxFileBrowser({
       // Only fetch files if fully connected
       try {
         const result = await apiClient.listDropboxFiles(objectApiName, recordId);
+        if (result.needsReauth) {
+          setStatus({ ...s, connected: false, needsReauth: true });
+          setFiles([]);
+          return;
+        }
         setFiles(result.files);
       } catch (fileErr: any) {
         console.error('[DropboxFileBrowser] file listing failed:', fileErr);
@@ -205,12 +211,16 @@ export function DropboxFileBrowser({
       {status.configured && !status.connected && (
         <div className="p-6 text-center">
           <CloudOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 mb-3">Connect Dropbox to attach files to this record</p>
+          <p className="text-sm text-gray-500 mb-3">
+            {status.needsReauth
+              ? 'Dropbox permissions have changed. Please reconnect to grant the required access.'
+              : 'Connect Dropbox to attach files to this record'}
+          </p>
           <button
             onClick={handleConnect}
             className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
           >
-            Connect Dropbox
+            {status.needsReauth ? 'Reconnect Dropbox' : 'Connect Dropbox'}
           </button>
         </div>
       )}

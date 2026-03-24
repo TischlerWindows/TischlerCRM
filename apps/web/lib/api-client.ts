@@ -689,6 +689,7 @@ class ApiClient {
   async listDropboxFiles(objectApiName: string, recordId: string) {
     return this.request<{
       connected: boolean;
+      needsReauth?: boolean;
       files: Array<{
         id: string;
         name: string;

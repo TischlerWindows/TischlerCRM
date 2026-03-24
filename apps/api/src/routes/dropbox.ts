@@ -412,6 +412,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
       if (err.message?.includes('409') || err.message?.includes('not_found')) {
         return reply.send({ connected: true, files: [] });
       }
+      // Scope/permission errors mean the token needs to be re-issued with correct scopes
+      if (err.message?.includes('not permitted') || err.message?.includes('required scope') || err.message?.includes('insufficient_scope')) {
+        return reply.send({ connected: false, needsReauth: true, files: [] });
+      }
       app.log.error(err, 'Dropbox list files failed');
       reply.code(500).send({ error: 'Failed to list files' });
     }
