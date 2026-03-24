@@ -432,40 +432,47 @@ export default function RecordDetailPage({
   /** Build a Dropbox folder name: "6 Suburban Avenue (CT00001)" */
   const getDropboxFolderName = (): string => {
     if (!record) return '';
-
-    // Debug: log all record keys so we can trace address resolution
-    console.log('[DropboxFolder] record keys:', Object.keys(record));
-    console.log('[DropboxFolder] record.address:', record.address);
-    console.log('[DropboxFolder] record.Property__address:', record['Property__address']);
-
     // Find the auto-number (propertyNumber, contactNumber, etc.)
     const numberKey = Object.keys(record).find(
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
     );
     const autoNumber = numberKey ? record[numberKey] : '';
-    // Find the address — look for keys like 'address', 'Property__address', '*__address'
-    const addrKey = Object.keys(record).find(
-      (k) => {
+
+    // Try to find the street address from multiple possible sources:
+    // 1. street_address or property_address (standalone text fields)
+    // 2. address composite object's street sub-field
+    // 3. address as plain text string
+    let addrStr = '';
+
+    // Check standalone street address fields first
+    const streetKey = Object.keys(record).find((k) => {
+      const lk = k.toLowerCase();
+      return lk === 'street_address' || lk === 'property_address' ||
+             lk.endsWith('__street_address') || lk.endsWith('__property_address');
+    });
+    if (streetKey && typeof record[streetKey] === 'string' && record[streetKey]) {
+      addrStr = record[streetKey];
+    }
+
+    // Fall back to composite address object or plain address string
+    if (!addrStr) {
+      const addrKey = Object.keys(record).find((k) => {
         const lk = k.toLowerCase();
         return lk === 'address' || lk.endsWith('__address');
-      }
-    );
-    let addrStr = '';
-    if (addrKey) {
-      let addr = record[addrKey];
-      console.log('[DropboxFolder] found addrKey:', addrKey, 'value:', addr, 'type:', typeof addr);
-      // Auto-parse JSON strings
-      if (typeof addr === 'string' && addr.startsWith('{')) {
-        try { addr = JSON.parse(addr); } catch { /* not JSON */ }
-      }
-      if (typeof addr === 'object' && addr !== null) {
-        // Composite address: grab street (the primary line)
-        addrStr = addr.street || addr.address || addr.addressLine1 || '';
-      } else if (typeof addr === 'string') {
-        addrStr = addr;
+      });
+      if (addrKey) {
+        let addr = record[addrKey];
+        if (typeof addr === 'string' && addr.startsWith('{')) {
+          try { addr = JSON.parse(addr); } catch { /* not JSON */ }
+        }
+        if (typeof addr === 'object' && addr !== null) {
+          addrStr = addr.street || addr.address || addr.addressLine1 || '';
+        } else if (typeof addr === 'string' && addr) {
+          addrStr = addr;
+        }
       }
     }
-    console.log('[DropboxFolder] addrStr:', addrStr, 'autoNumber:', autoNumber);
+
     if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`;
     if (addrStr) return addrStr;
     if (autoNumber) return autoNumber;
