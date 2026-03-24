@@ -150,7 +150,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
-            type="text"
+            type="search"
             placeholder="Search settings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
