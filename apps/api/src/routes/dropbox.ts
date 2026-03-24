@@ -179,6 +179,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         response_type: 'code',
         token_access_type: 'offline', // get a refresh_token
         state,
+        scope: 'files.metadata.read files.metadata.write files.content.read files.content.write',
       });
 
       reply.send({ url: `${DROPBOX_AUTH_URL}?${params}` });
