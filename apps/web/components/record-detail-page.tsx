@@ -818,24 +818,30 @@ export default function RecordDetailPage({
                                       }}
                                       className={hl || undefined}
                                     >
-                                      {fieldDef.type !== 'DropboxFiles' && (
-                                        <dt className={`text-sm ${labelCn}`}>
-                                          {fieldDef.label}
-                                          {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
-                                          {fFx?.readOnly ? (
-                                            <span className="ml-2 text-xs font-normal text-gray-400">
-                                              (read-only)
-                                            </span>
-                                          ) : null}
-                                        </dt>
+                                      {fieldDef.type === 'DropboxFiles' ? (
+                                        <div className="w-full">
+                                          {renderValue(layoutField.apiName, value, fieldDef)}
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <dt className={`text-sm ${labelCn}`}>
+                                            {fieldDef.label}
+                                            {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                            {fFx?.readOnly ? (
+                                              <span className="ml-2 text-xs font-normal text-gray-400">
+                                                (read-only)
+                                              </span>
+                                            ) : null}
+                                          </dt>
+                                          <dd
+                                            className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
+                                            style={rowSpan > 1 ? { flex: 1 } : undefined}
+                                          >
+                                            {renderValue(layoutField.apiName, value, fieldDef)}
+                                            {badgeC ? <span className={badgeC}>Status</span> : null}
+                                          </dd>
+                                        </>
                                       )}
-                                      <dd
-                                        className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
-                                        style={rowSpan > 1 ? { flex: 1 } : undefined}
-                                      >
-                                        {renderValue(layoutField.apiName, value, fieldDef)}
-                                        {badgeC ? <span className={badgeC}>Status</span> : null}
-                                      </dd>
                                     </div>
                                   );
                                 })}
@@ -869,23 +875,29 @@ export default function RecordDetailPage({
                                   );
                                   return (
                                     <div key={layoutField.apiName} className={hl || undefined}>
-                                      {fieldDef.type !== 'DropboxFiles' && (
-                                        <dt className={`text-sm ${labelCn}`}>
-                                          {fieldDef.label}
-                                          {fieldDef.required && (
-                                            <span className="text-red-500 ml-1">*</span>
-                                          )}
-                                          {fFx?.readOnly ? (
-                                            <span className="ml-2 text-xs font-normal text-gray-400">
-                                              (read-only)
-                                            </span>
-                                          ) : null}
-                                        </dt>
+                                      {fieldDef.type === 'DropboxFiles' ? (
+                                        <div className="w-full">
+                                          {renderValue(layoutField.apiName, value, fieldDef)}
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <dt className={`text-sm ${labelCn}`}>
+                                            {fieldDef.label}
+                                            {fieldDef.required && (
+                                              <span className="text-red-500 ml-1">*</span>
+                                            )}
+                                            {fFx?.readOnly ? (
+                                              <span className="ml-2 text-xs font-normal text-gray-400">
+                                                (read-only)
+                                              </span>
+                                            ) : null}
+                                          </dt>
+                                          <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
+                                            {renderValue(layoutField.apiName, value, fieldDef)}
+                                            {badgeC ? <span className={badgeC}>Status</span> : null}
+                                          </dd>
+                                        </>
                                       )}
-                                      <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                                        {renderValue(layoutField.apiName, value, fieldDef)}
-                                        {badgeC ? <span className={badgeC}>Status</span> : null}
-                                      </dd>
                                     </div>
                                   );
                                 })}
