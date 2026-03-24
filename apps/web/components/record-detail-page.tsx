@@ -432,6 +432,12 @@ export default function RecordDetailPage({
   /** Build a Dropbox folder name: "6 Suburban Avenue (CT00001)" */
   const getDropboxFolderName = (): string => {
     if (!record) return '';
+
+    // Debug: log all record keys so we can trace address resolution
+    console.log('[DropboxFolder] record keys:', Object.keys(record));
+    console.log('[DropboxFolder] record.address:', record.address);
+    console.log('[DropboxFolder] record.Property__address:', record['Property__address']);
+
     // Find the auto-number (propertyNumber, contactNumber, etc.)
     const numberKey = Object.keys(record).find(
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
@@ -447,6 +453,7 @@ export default function RecordDetailPage({
     let addrStr = '';
     if (addrKey) {
       let addr = record[addrKey];
+      console.log('[DropboxFolder] found addrKey:', addrKey, 'value:', addr, 'type:', typeof addr);
       // Auto-parse JSON strings
       if (typeof addr === 'string' && addr.startsWith('{')) {
         try { addr = JSON.parse(addr); } catch { /* not JSON */ }
@@ -458,6 +465,7 @@ export default function RecordDetailPage({
         addrStr = addr;
       }
     }
+    console.log('[DropboxFolder] addrStr:', addrStr, 'autoNumber:', autoNumber);
     if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`;
     if (addrStr) return addrStr;
     if (autoNumber) return autoNumber;
