@@ -55,8 +55,10 @@ export function DropboxFileBrowser({
       // Only fetch files if fully connected
       const result = await apiClient.listDropboxFiles(objectApiName, recordId);
       setFiles(result.files);
-    } catch {
-      setStatus({ enabled: false, configured: false, connected: false });
+    } catch (err: any) {
+      console.error('[DropboxFileBrowser] status check failed:', err);
+      setError(err.message || 'Failed to load Dropbox status');
+      setStatus({ enabled: true, configured: false, connected: false });
     } finally {
       setLoading(false);
     }
@@ -141,7 +143,16 @@ export function DropboxFileBrowser({
   }
 
   // Integration not enabled at all
-  if (!status?.enabled) return null;
+  if (!status?.enabled) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-4 mt-4">
+        <div className="flex items-center gap-2 text-gray-400">
+          <CloudOff className="w-4 h-4" />
+          <span className="text-sm">Dropbox integration is not enabled</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="border border-gray-200 rounded-lg mt-4">
