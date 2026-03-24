@@ -101,7 +101,7 @@ export function buildApp() {
   }
 
   // ── Health check ──────────────────────────────────────────────────────────
-  app.get('/health', async () => ({ ok: true, version: '2026-03-24-dropbox-fix' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-24-v2' }));
 
   // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
