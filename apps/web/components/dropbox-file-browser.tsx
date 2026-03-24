@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api-client';
 import {
   FileText, Upload, Download, Loader2, CloudOff, FolderOpen, X, Trash2,
-  FolderPlus, Search, ChevronRight, ArrowLeft, MoreVertical, File,
+  FolderPlus, Search, ChevronRight, ArrowLeft, MoreVertical, File, ExternalLink,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -230,6 +230,17 @@ export function DropboxFileBrowser({
     setSearchQuery('');
   };
 
+  const getDropboxWebUrl = (entryPath?: string) => {
+    if (entryPath) {
+      // Entry path is the full Dropbox path like /TischlerCRM/deals/abc123/file.pdf
+      const folderPath = entryPath.substring(0, entryPath.lastIndexOf('/'));
+      return `https://www.dropbox.com/home${folderPath}`;
+    }
+    const basePath = `/TischlerCRM/${objectApiName}/${recordId}`;
+    const full = currentPath.length > 0 ? `${basePath}/${currentPath.join('/')}` : basePath;
+    return `https://www.dropbox.com/home${full}`;
+  };
+
   const handleBreadcrumb = (index: number) => {
     setCurrentPath(currentPath.slice(0, index + 1));
     setSearchQuery('');
@@ -367,6 +378,15 @@ export function DropboxFileBrowser({
               <FolderPlus className="w-3.5 h-3.5" />
               New Folder
             </button>
+            <a
+              href={getDropboxWebUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Open in Dropbox
+            </a>
           </div>
         </div>
 
@@ -547,6 +567,15 @@ export function DropboxFileBrowser({
                             <Download className="w-3.5 h-3.5" /> Download
                           </button>
                         )}
+                        <a
+                          href={getDropboxWebUrl(entry.path)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setContextMenuId(null)}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" /> Open in Dropbox
+                        </a>
                         <button
                           onClick={() => handleDelete(entry)}
                           className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
