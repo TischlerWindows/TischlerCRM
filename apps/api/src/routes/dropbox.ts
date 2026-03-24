@@ -276,24 +276,29 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const user = req.user;
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
-    if (!integration || !integration.enabled) {
-      return reply.send({ enabled: false, connected: false, configured: false });
+    try {
+      const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+      if (!integration || !integration.enabled) {
+        return reply.send({ enabled: false, connected: false, configured: false });
+      }
+
+      const configured = !!(integration.clientId && integration.clientSecret);
+
+      const conn = await prisma.userIntegration.findFirst({
+        where: { userId: user.sub, integrationId: integration.id },
+      });
+
+      reply.send({
+        enabled: true,
+        configured,
+        connected: !!conn,
+        externalEmail: conn?.externalEmail ?? null,
+        connectedAt: conn?.connectedAt ?? null,
+      });
+    } catch (err: any) {
+      req.log.error(err, 'GET /dropbox/status failed');
+      reply.send({ enabled: false, connected: false, configured: false });
     }
-
-    const configured = !!(integration.clientId && integration.clientSecret);
-
-    const conn = await prisma.userIntegration.findFirst({
-      where: { userId: user.sub, integrationId: integration.id },
-    });
-
-    reply.send({
-      enabled: true,
-      configured,
-      connected: !!conn,
-      externalEmail: conn?.externalEmail ?? null,
-      connectedAt: conn?.connectedAt ?? null,
-    });
   });
 
   // ── Disconnect ──
