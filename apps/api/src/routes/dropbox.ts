@@ -12,6 +12,7 @@
 import { FastifyInstance } from 'fastify';
 import { randomUUID } from 'crypto';
 import { prisma } from '@crm/db/client';
+import { generateId } from '@crm/db/record-id';
 import { encrypt, decrypt } from '../crypto';
 import { logAudit, extractIp } from '../audit';
 
