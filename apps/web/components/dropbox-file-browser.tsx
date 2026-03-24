@@ -2,14 +2,20 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api-client';
-import { FileText, Upload, Download, ExternalLink, Loader2, CloudOff, FolderOpen, X, Cloud } from 'lucide-react';
+import {
+  FileText, Upload, Download, Loader2, CloudOff, FolderOpen, X, Trash2,
+  FolderPlus, Search, ChevronRight, ArrowLeft, MoreVertical, File,
+} from 'lucide-react';
 
-type DropboxFile = {
+// ── Types ──────────────────────────────────────────────────────────
+
+type DropboxEntry = {
   id: string;
   name: string;
   path: string;
   size: number;
   modifiedAt: string | null;
+  isFolder: boolean;
 };
 
 type DropboxStatus = {
@@ -19,13 +25,43 @@ type DropboxStatus = {
   needsReauth?: boolean;
 };
 
+type SortField = 'name' | 'modifiedAt' | 'size';
+type SortDir = 'asc' | 'desc';
+
+// ── Helpers ────────────────────────────────────────────────────────
+
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return '—';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  }) + ', ' + d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+// Dropbox logo SVG
+function DropboxLogo({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 43.35 40.38" fill="#0061FF" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12.87 0L0 8.15l8.8 7.04L21.67 8.1zM0 22.23l12.87 8.15 8.8-7.09-12.87-7.1zM21.67 23.29l8.81 7.09 12.87-8.15-8.81-7.04zM43.35 8.15L30.48 0l-8.81 7.1 12.87 7.09zM21.7 24.91l-8.83 7.09-4.03-2.64v2.96l12.86 7.72 12.87-7.72v-2.96l-4.04 2.64z" />
+    </svg>
+  );
+}
+
+// ── Component ──────────────────────────────────────────────────────
 
 export function DropboxFileBrowser({
   objectApiName,
@@ -35,33 +71,54 @@ export function DropboxFileBrowser({
   recordId: string;
 }) {
   const [status, setStatus] = useState<DropboxStatus | null>(null);
-  const [files, setFiles] = useState<DropboxFile[]>([]);
+  const [entries, setEntries] = useState<DropboxEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [currentPath, setCurrentPath] = useState<string[]>([]);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [contextMenuId, setContextMenuId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const contextRef = useRef<HTMLDivElement>(null);
+
+  const subPath = currentPath.join('/');
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (contextRef.current && !contextRef.current.contains(e.target as Node)) {
+        setContextMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const loadFiles = useCallback(async () => {
     try {
-      // Always check status first to know if integration is enabled/configured
       const s = await apiClient.getDropboxStatus();
       setStatus(s);
 
       if (!s.enabled || !s.configured || !s.connected) {
-        setFiles([]);
+        setEntries([]);
         return;
       }
 
-      // Only fetch files if fully connected
       try {
-        const result = await apiClient.listDropboxFiles(objectApiName, recordId);
+        const result = await apiClient.listDropboxFiles(objectApiName, recordId, subPath || undefined);
         if (result.needsReauth) {
           setStatus({ ...s, connected: false, needsReauth: true });
-          setFiles([]);
+          setEntries([]);
           return;
         }
-        setFiles(result.files);
+        setEntries(result.files);
       } catch (fileErr: any) {
         console.error('[DropboxFileBrowser] file listing failed:', fileErr);
         setError(fileErr.message || 'Failed to load files');
@@ -73,9 +130,10 @@ export function DropboxFileBrowser({
     } finally {
       setLoading(false);
     }
-  }, [objectApiName, recordId]);
+  }, [objectApiName, recordId, subPath]);
 
   useEffect(() => {
+    setLoading(true);
     loadFiles();
   }, [loadFiles]);
 
@@ -83,7 +141,6 @@ export function DropboxFileBrowser({
     try {
       const { url } = await apiClient.getDropboxConnectUrl();
       const popup = window.open(url, '_blank', 'noopener');
-      // Listen for the OAuth result from the popup
       const onMessage = (e: MessageEvent) => {
         if (e.data?.type === 'dropbox-oauth-result') {
           window.removeEventListener('message', onMessage);
@@ -95,7 +152,6 @@ export function DropboxFileBrowser({
         }
       };
       window.addEventListener('message', onMessage);
-      // Fallback: if popup is closed without posting a message, refresh status
       const check = setInterval(() => {
         if (popup?.closed) {
           clearInterval(check);
@@ -112,11 +168,10 @@ export function DropboxFileBrowser({
     if (!fileList || fileList.length === 0) return;
     setUploading(true);
     setError(null);
-
     try {
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file);
+        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file, subPath || undefined);
       }
       await loadFiles();
     } catch (err: any) {
@@ -127,13 +182,57 @@ export function DropboxFileBrowser({
     }
   };
 
-  const handleDownload = async (file: DropboxFile) => {
+  const handleDownload = async (entry: DropboxEntry) => {
     try {
-      const { url } = await apiClient.getDropboxDownloadUrl(file.id);
+      const { url } = await apiClient.getDropboxDownloadUrl(entry.id);
       window.open(url, '_blank');
     } catch {
       setError('Failed to get download link');
     }
+  };
+
+  const handleDelete = async (entry: DropboxEntry) => {
+    if (!confirm(`Delete "${entry.name}"? This cannot be undone.`)) return;
+    setDeletingId(entry.id);
+    setContextMenuId(null);
+    try {
+      await apiClient.deleteDropboxFile(entry.id);
+      await loadFiles();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setCreatingFolder(true);
+    try {
+      await apiClient.createDropboxFolder(objectApiName, recordId, newFolderName.trim(), subPath || undefined);
+      setNewFolderName('');
+      setShowNewFolder(false);
+      await loadFiles();
+    } catch (err: any) {
+      setError(err.message || 'Failed to create folder');
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
+
+  const handleFolderOpen = (folder: DropboxEntry) => {
+    setCurrentPath([...currentPath, folder.name]);
+    setSearchQuery('');
+  };
+
+  const handleNavigateUp = () => {
+    setCurrentPath(currentPath.slice(0, -1));
+    setSearchQuery('');
+  };
+
+  const handleBreadcrumb = (index: number) => {
+    setCurrentPath(currentPath.slice(0, index + 1));
+    setSearchQuery('');
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -142,9 +241,53 @@ export function DropboxFileBrowser({
     handleUpload(e.dataTransfer.files);
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  // Filter & sort entries
+  const filteredEntries = entries
+    .filter(e => !searchQuery || e.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+      let cmp = 0;
+      switch (sortField) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'modifiedAt':
+          cmp = (a.modifiedAt || '').localeCompare(b.modifiedAt || '');
+          break;
+        case 'size':
+          cmp = a.size - b.size;
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+  const SortHeader = ({ field, label, className }: { field: SortField; label: string; className?: string }) => (
+    <th
+      className={`px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700 select-none ${className || ''}`}
+      onClick={() => handleSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {sortField === field && (
+          <span className="text-blue-600">{sortDir === 'asc' ? '▲' : '▼'}</span>
+        )}
+      </span>
+    </th>
+  );
+
+  // ── Loading state ──
   if (loading) {
     return (
-      <div className="border border-gray-200 rounded-lg p-4 mt-4">
+      <div className="border border-gray-200 rounded-lg p-6 mt-4">
         <div className="flex items-center gap-2 text-gray-500">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span className="text-sm">Loading Dropbox files…</span>
@@ -153,7 +296,7 @@ export function DropboxFileBrowser({
     );
   }
 
-  // Integration not enabled at all
+  // ── Not enabled ──
   if (!status?.enabled) {
     return (
       <div className="border border-gray-200 rounded-lg p-4 mt-4">
@@ -165,29 +308,115 @@ export function DropboxFileBrowser({
     );
   }
 
-  return (
-    <div className="border border-gray-200 rounded-lg mt-4">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-lg">
-        <div className="flex items-center gap-2">
-          <Cloud className="w-4 h-4 text-blue-600" />
-          <h3 className="text-sm font-semibold text-gray-700">Dropbox Files</h3>
+  // ── Not configured / not connected ──
+  if (!status.configured || !status.connected) {
+    return (
+      <div className="border border-gray-200 rounded-lg mt-4">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-lg">
+          <DropboxLogo className="w-5 h-5" />
+          <h3 className="text-sm font-semibold text-gray-700">Dropbox</h3>
         </div>
-        {status.connected && (
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded hover:bg-blue-100 transition disabled:opacity-50"
-          >
-            {uploading ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <Upload className="w-3 h-3" />
-            )}
-            Upload
-          </button>
-        )}
+        <div className="p-8 text-center">
+          <CloudOff className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          {!status.configured ? (
+            <p className="text-sm text-gray-500">Dropbox integration is not fully configured. Ask an admin to add the Client ID and Secret in Connected Apps.</p>
+          ) : (
+            <>
+              <p className="text-sm text-gray-500 mb-4">
+                {status.needsReauth
+                  ? 'Dropbox permissions have changed. Please reconnect to grant the required access.'
+                  : 'Connect your Dropbox account to attach files to this record.'}
+              </p>
+              <button
+                onClick={handleConnect}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-[#0061FF] rounded-lg hover:bg-[#004FC7] transition"
+              >
+                <DropboxLogo className="w-4 h-4 [&_path]:fill-white" />
+                {status.needsReauth ? 'Reconnect Dropbox' : 'Connect Dropbox'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
+    );
+  }
+
+  // ── Connected — full file browser ──
+  return (
+    <div className="border border-gray-200 rounded-lg mt-4 overflow-hidden">
+      {/* Header bar */}
+      <div className="bg-gray-50 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <DropboxLogo className="w-5 h-5" />
+            <h3 className="text-sm font-bold text-gray-800">Dropbox</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              Add Files
+            </button>
+            <button
+              onClick={() => { setShowNewFolder(true); setNewFolderName(''); }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
+              New Folder
+            </button>
+          </div>
+        </div>
+
+        {/* Search bar */}
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Search files..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 focus:outline-none"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Breadcrumb navigation */}
+      {currentPath.length > 0 && (
+        <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-100 text-sm">
+          <button
+            onClick={() => setCurrentPath([])}
+            className="text-blue-600 hover:underline font-medium"
+          >
+            Root
+          </button>
+          {currentPath.map((segment, i) => (
+            <span key={i} className="flex items-center gap-1">
+              <ChevronRight className="w-3 h-3 text-gray-400" />
+              {i === currentPath.length - 1 ? (
+                <span className="text-gray-700 font-medium">{segment}</span>
+              ) : (
+                <button
+                  onClick={() => handleBreadcrumb(i)}
+                  className="text-blue-600 hover:underline"
+                >
+                  {segment}
+                </button>
+              )}
+            </span>
+          ))}
+          <button
+            onClick={handleNavigateUp}
+            className="ml-auto text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3 h-3" /> Back
+          </button>
+        </div>
+      )}
 
       <input
         ref={fileInputRef}
@@ -197,7 +426,7 @@ export function DropboxFileBrowser({
         onChange={(e) => handleUpload(e.target.files)}
       />
 
-      {/* Error */}
+      {/* Error banner */}
       {error && (
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex items-center justify-between">
           <span className="text-xs text-red-700">{error}</span>
@@ -207,72 +436,139 @@ export function DropboxFileBrowser({
         </div>
       )}
 
-      {/* Not connected */}
-      {status.configured && !status.connected && (
-        <div className="p-6 text-center">
-          <CloudOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500 mb-3">
-            {status.needsReauth
-              ? 'Dropbox permissions have changed. Please reconnect to grant the required access.'
-              : 'Connect Dropbox to attach files to this record'}
-          </p>
+      {/* New folder inline form */}
+      {showNewFolder && (
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+          <FolderPlus className="w-4 h-4 text-blue-600 shrink-0" />
+          <input
+            autoFocus
+            type="text"
+            placeholder="Folder name"
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleCreateFolder();
+              if (e.key === 'Escape') setShowNewFolder(false);
+            }}
+            className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500/40 focus:outline-none"
+          />
           <button
-            onClick={handleConnect}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+            onClick={handleCreateFolder}
+            disabled={creatingFolder || !newFolderName.trim()}
+            className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {status.needsReauth ? 'Reconnect Dropbox' : 'Connect Dropbox'}
+            {creatingFolder ? 'Creating…' : 'Create'}
+          </button>
+          <button
+            onClick={() => setShowNewFolder(false)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Integration enabled but credentials not configured */}
-      {!status.configured && (
-        <div className="p-6 text-center">
-          <CloudOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">Dropbox integration is not fully configured. Ask an admin to add the Client ID and Secret in Connected Apps.</p>
-        </div>
-      )}
-
-      {/* Connected — file list or empty */}
-      {status.connected && (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          className={`min-h-[60px] transition ${dragOver ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : ''}`}
-        >
-          {files.length === 0 ? (
-            <div className="p-6 text-center">
-              <FolderOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">
-                No files yet. Drag &amp; drop or click Upload.
-              </p>
-            </div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {files.map((file) => (
-                <li
-                  key={file.id}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 group"
+      {/* File table / drag-drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`min-h-[120px] transition ${dragOver ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : 'bg-white'}`}
+      >
+        {filteredEntries.length === 0 ? (
+          <div className="p-10 text-center">
+            <FolderOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">
+              {searchQuery
+                ? 'No files match your search.'
+                : 'No files yet. Drag & drop or click Add Files.'}
+            </p>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                <SortHeader field="name" label="Name" className="pl-4" />
+                <SortHeader field="modifiedAt" label="Modified" />
+                <SortHeader field="size" label="Size" />
+                <th className="w-10" />
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEntries.map((entry) => (
+                <tr
+                  key={entry.id}
+                  className={`border-b border-gray-50 hover:bg-gray-50 group ${deletingId === entry.id ? 'opacity-50' : ''}`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <FileText className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{formatBytes(file.size)}</span>
-                  </div>
-                  <button
-                    onClick={() => handleDownload(file)}
-                    title="Download"
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-blue-600 transition"
-                  >
-                    <Download className="w-4 h-4" />
-                  </button>
-                </li>
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {entry.isFolder ? (
+                        <FolderOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                      ) : (
+                        <File className="w-4 h-4 text-gray-400 shrink-0" />
+                      )}
+                      {entry.isFolder ? (
+                        <button
+                          onClick={() => handleFolderOpen(entry)}
+                          className="text-sm text-blue-600 hover:underline truncate text-left"
+                        >
+                          {entry.name}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDownload(entry)}
+                          className="text-sm text-gray-700 hover:text-blue-600 truncate text-left"
+                        >
+                          {entry.name}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                    {entry.isFolder ? '—' : formatDate(entry.modifiedAt)}
+                  </td>
+                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                    {entry.isFolder ? '—' : formatBytes(entry.size)}
+                  </td>
+                  <td className="px-2 py-2.5 relative" ref={contextMenuId === entry.id ? contextRef : undefined}>
+                    <button
+                      onClick={() => setContextMenuId(contextMenuId === entry.id ? null : entry.id)}
+                      className="p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {contextMenuId === entry.id && (
+                      <div className="absolute right-2 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
+                        {!entry.isFolder && (
+                          <button
+                            onClick={() => { handleDownload(entry); setContextMenuId(null); }}
+                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(entry)}
+                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
               ))}
-            </ul>
-          )}
-        </div>
-      )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Footer with file count */}
+      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+        {entries.filter(e => !e.isFolder).length} file{entries.filter(e => !e.isFolder).length !== 1 ? 's' : ''}
+        {entries.filter(e => e.isFolder).length > 0 && `, ${entries.filter(e => e.isFolder).length} folder${entries.filter(e => e.isFolder).length !== 1 ? 's' : ''}`}
+        {currentPath.length > 0 && ` in /${currentPath.join('/')}`}
+      </div>
     </div>
   );
 }

@@ -372,17 +372,19 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
+    const { subPath } = req.query as { subPath?: string };
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) {
       return reply.send({ connected: false, files: [] });
     }
 
-    const folderPath = buildFolderPath(objectApiName, recordId);
+    const basePath = buildFolderPath(objectApiName, recordId);
+    const folderPath = subPath ? `${basePath}/${subPath}` : basePath;
 
     try {
       const result = await dropboxApi(accessToken, '/files/list_folder', {
         path: folderPath,
-        limit: 100,
+        limit: 200,
         include_media_info: false,
       }) as {
         entries: Array<{
@@ -396,17 +398,22 @@ export async function dropboxRoutes(app: FastifyInstance) {
         }>;
       };
 
-      const files = result.entries
-        .filter(e => e['.tag'] === 'file')
-        .map(e => ({
-          id: e.id,
-          name: e.name,
-          path: e.path_display,
-          size: e.size ?? 0,
-          modifiedAt: e.server_modified ?? e.client_modified ?? null,
-        }));
+      const entries = result.entries.map(e => ({
+        id: e.id,
+        name: e.name,
+        path: e.path_display,
+        size: e.size ?? 0,
+        modifiedAt: e.server_modified ?? e.client_modified ?? null,
+        isFolder: e['.tag'] === 'folder',
+      }));
 
-      reply.send({ connected: true, files });
+      // Sort: folders first, then by name
+      entries.sort((a, b) => {
+        if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      reply.send({ connected: true, files: entries });
     } catch (err: any) {
       // 409 path/not_found is normal — the folder doesn't exist yet
       if (err.message?.includes('409') || err.message?.includes('not_found')) {
@@ -500,6 +507,63 @@ export async function dropboxRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err, 'Dropbox upload error');
       reply.code(500).send({ error: 'Upload failed' });
+    }
+  });
+
+  // ── Create subfolder inside record folder ──
+  app.post('/dropbox/folder/:objectApiName/:recordId', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
+    const { name, subPath } = req.body as { name: string; subPath?: string };
+    if (!name || !name.trim()) return reply.code(400).send({ error: 'Folder name is required' });
+
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    const basePath = subPath
+      ? `${buildFolderPath(objectApiName, recordId)}/${subPath}`
+      : buildFolderPath(objectApiName, recordId);
+    const folderPath = `${basePath}/${name.trim()}`;
+
+    try {
+      const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+        path: folderPath,
+        autorename: false,
+      }) as { metadata: { id: string; name: string; path_display: string } };
+
+      reply.send({
+        id: result.metadata.id,
+        name: result.metadata.name,
+        path: result.metadata.path_display,
+      });
+    } catch (err: any) {
+      if (err.message?.includes('409') || err.message?.includes('conflict')) {
+        return reply.code(409).send({ error: 'A folder with that name already exists' });
+      }
+      app.log.error(err, 'Dropbox create folder failed');
+      reply.code(500).send({ error: 'Failed to create folder' });
+    }
+  });
+
+  // ── Delete file or folder ──
+  app.delete('/dropbox/file/:fileId', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { fileId } = req.params as { fileId: string };
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    try {
+      await dropboxApi(accessToken, '/files/delete_v2', {
+        path: fileId, // Dropbox accepts file/folder IDs
+      });
+      reply.code(204).send();
+    } catch (err: any) {
+      app.log.error(err, 'Dropbox delete failed');
+      reply.code(500).send({ error: 'Failed to delete' });
     }
   });
 }

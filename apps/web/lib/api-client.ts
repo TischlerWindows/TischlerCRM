@@ -686,7 +686,8 @@ class ApiClient {
     return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });
   }
 
-  async listDropboxFiles(objectApiName: string, recordId: string) {
+  async listDropboxFiles(objectApiName: string, recordId: string, subPath?: string) {
+    const params = subPath ? `?subPath=${encodeURIComponent(subPath)}` : '';
     return this.request<{
       connected: boolean;
       needsReauth?: boolean;
@@ -696,16 +697,29 @@ class ApiClient {
         path: string;
         size: number;
         modifiedAt: string | null;
+        isFolder: boolean;
       }>;
-    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`);
+    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}${params}`);
   }
 
   async getDropboxDownloadUrl(fileId: string) {
     return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
   }
 
-  async uploadDropboxFile(objectApiName: string, recordId: string, file: File) {
-    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?fileName=${encodeURIComponent(file.name)}`;
+  async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string) {
+    return this.request<{ id: string; name: string; path: string }>(`/dropbox/folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ name, subPath }),
+    });
+  }
+
+  async deleteDropboxFile(fileId: string) {
+    return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+  }
+
+  async uploadDropboxFile(objectApiName: string, recordId: string, file: File, subPath?: string) {
+    const fileName = subPath ? `${subPath}/${file.name}` : file.name;
+    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?fileName=${encodeURIComponent(fileName)}`;
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     const headers: HeadersInit = {
       'Content-Type': 'application/octet-stream',
