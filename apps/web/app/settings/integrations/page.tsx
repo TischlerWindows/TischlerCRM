@@ -292,6 +292,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="off"
               placeholder={integration.hasApiKey ? '••••••••  (already set — enter new to replace)' : 'Paste your API key'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -317,6 +318,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              autoComplete="off"
               placeholder={integration.hasClientId ? '(already set — enter new to replace)' : 'OAuth Client ID'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -328,6 +330,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
                 type={showKey ? 'text' : 'password'}
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
+                autoComplete="off"
                 placeholder={integration.hasClientSecret ? '••••••••  (already set)' : 'OAuth Client Secret'}
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
               />

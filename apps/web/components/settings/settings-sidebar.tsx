@@ -154,6 +154,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
             placeholder="Search settings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            autoComplete="off"
             className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-gray-300 transition-colors"
           />
           {searchQuery && (
