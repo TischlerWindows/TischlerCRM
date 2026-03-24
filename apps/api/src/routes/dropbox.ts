@@ -10,8 +10,8 @@
  */
 
 import { FastifyInstance } from 'fastify';
+import { randomUUID } from 'crypto';
 import { prisma } from '@crm/db/client';
-import { generateId } from '@crm/db/record-id';
 import { encrypt, decrypt } from '../crypto';
 import { logAudit, extractIp } from '../audit';
 
@@ -151,7 +151,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
       }
 
       // State parameter to prevent CSRF — encode userId + a random nonce
-      const nonce = generateId('dbx');
+      const nonce = randomUUID();
       const state = Buffer.from(JSON.stringify({ userId: user.sub, nonce })).toString('base64url');
 
       const callbackUrl = `${getApiBaseUrl()}/dropbox/callback`;
