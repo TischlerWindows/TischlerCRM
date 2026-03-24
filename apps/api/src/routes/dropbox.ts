@@ -48,10 +48,15 @@ async function getDropboxCredentials(): Promise<{ clientId: string; clientSecret
   if (!integration || !integration.enabled || !integration.clientId || !integration.clientSecret) {
     return null;
   }
-  return {
-    clientId: integration.clientId, // clientId is stored in plain text
-    clientSecret: decrypt(integration.clientSecret),
-  };
+  try {
+    return {
+      clientId: integration.clientId, // clientId is stored in plain text
+      clientSecret: decrypt(integration.clientSecret),
+    };
+  } catch (err: any) {
+    console.error('[dropbox] Failed to decrypt clientSecret:', err.message);
+    return null;
+  }
 }
 
 /** Get a valid access token for the user, refreshing if expired. */
@@ -139,26 +144,31 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const user = req.user;
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
-    const creds = await getDropboxCredentials();
-    if (!creds) {
-      return reply.code(400).send({ error: 'Dropbox integration is not configured. Ask an admin to set up the Client ID and Client Secret in Connected Apps.' });
+    try {
+      const creds = await getDropboxCredentials();
+      if (!creds) {
+        return reply.code(400).send({ error: 'Dropbox integration is not configured. Ask an admin to set up the Client ID and Client Secret in Connected Apps.' });
+      }
+
+      // State parameter to prevent CSRF — encode userId + a random nonce
+      const nonce = generateId('dbx');
+      const state = Buffer.from(JSON.stringify({ userId: user.sub, nonce })).toString('base64url');
+
+      const callbackUrl = `${getApiBaseUrl()}/dropbox/callback`;
+
+      const params = new URLSearchParams({
+        client_id: creds.clientId,
+        redirect_uri: callbackUrl,
+        response_type: 'code',
+        token_access_type: 'offline', // get a refresh_token
+        state,
+      });
+
+      reply.send({ url: `${DROPBOX_AUTH_URL}?${params}` });
+    } catch (err: any) {
+      req.log.error(err, 'GET /dropbox/connect failed');
+      reply.code(500).send({ error: 'Failed to start Dropbox authorization. Check server logs.' });
     }
-
-    // State parameter to prevent CSRF — encode userId + a random nonce
-    const nonce = generateId('dbx');
-    const state = Buffer.from(JSON.stringify({ userId: user.sub, nonce })).toString('base64url');
-
-    const callbackUrl = `${getApiBaseUrl()}/dropbox/callback`;
-
-    const params = new URLSearchParams({
-      client_id: creds.clientId,
-      redirect_uri: callbackUrl,
-      response_type: 'code',
-      token_access_type: 'offline', // get a refresh_token
-      state,
-    });
-
-    reply.send({ url: `${DROPBOX_AUTH_URL}?${params}` });
   });
 
   // ── OAuth: Callback (code → tokens) ──
@@ -282,7 +292,17 @@ export async function dropboxRoutes(app: FastifyInstance) {
         return reply.send({ enabled: false, connected: false, configured: false });
       }
 
-      const configured = !!(integration.clientId && integration.clientSecret);
+      // Check credentials are present AND decryptable
+      let configured = false;
+      if (integration.clientId && integration.clientSecret) {
+        try {
+          decrypt(integration.clientSecret);
+          configured = true;
+        } catch {
+          // Secret stored with a different key or in plaintext — treat as unconfigured
+          configured = false;
+        }
+      }
 
       const conn = await prisma.userIntegration.findFirst({
         where: { userId: user.sub, integrationId: integration.id },
