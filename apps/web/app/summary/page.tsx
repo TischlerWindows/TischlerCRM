@@ -563,6 +563,8 @@ interface Summary {
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
   product: string;
+  productType: string;
+  productTypeOptions: string[];
   woodType: string;
   finish: string;
   glassType: string;
@@ -779,6 +781,8 @@ export default function SummaryPage() {
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
       product: '',
+      productType: '',
+      productTypeOptions: [],
       woodType: '',
       finish: '',
       glassType: '',
@@ -2136,7 +2140,83 @@ export default function SummaryPage() {
                         <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Type on Page 1</p>
                       </div>
 
-                      {/* Row 2: Wood Type + Finish */}
+                      {/* Row 2: Product Type + Dependent Options */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+                        <select
+                          value={editingSummary.productType || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, productType: e.target.value, productTypeOptions: [] })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                        >
+                          <option value="">Select product type...</option>
+                          <option value="Double Hung Windows">Double Hung Windows</option>
+                          <option value="Inswing Windows">Inswing Windows</option>
+                          <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                          <option value="Swing Doors">Swing Doors</option>
+                          <option value="Lift Rolling Door">Lift Rolling Door</option>
+                        </select>
+                      </div>
+
+                      {editingSummary.productType && (() => {
+                        const optionsMap: Record<string, string[]> = {
+                          'Double Hung Windows': [
+                            '59 mm Sash',
+                            '66 mm Sash',
+                            '72 mm Sash',
+                            'Concealed Balance',
+                            'Weight and Chain Balance',
+                          ],
+                          'Inswing Windows': [
+                            'Concealed Corrosion Resistant',
+                          ],
+                          'Flush Outswing Windows': [
+                            'Corrosion Resistant Rough Hardware',
+                            'Hinge Finials',
+                          ],
+                          'Swing Doors': [
+                            'Siegenia Rough Hardware',
+                            'KFV Rough Hardware',
+                            'Hinge Finials',
+                            'Bronze Threshold',
+                          ],
+                          'Lift Rolling Door': [
+                            'Standard Hardware',
+                            'Stainless Steel Hardware',
+                          ],
+                        };
+                        const options = optionsMap[editingSummary.productType] || [];
+                        const selected = editingSummary.productTypeOptions || [];
+
+                        const toggle = (opt: string) => {
+                          const next = selected.includes(opt)
+                            ? selected.filter(o => o !== opt)
+                            : [...selected, opt];
+                          setEditingSummary({ ...editingSummary, productTypeOptions: next });
+                        };
+
+                        return (
+                          <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              {editingSummary.productType} Options
+                            </label>
+                            <div className="space-y-2">
+                              {options.map(opt => (
+                                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.includes(opt)}
+                                    onChange={() => toggle(opt)}
+                                    className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                  />
+                                  <span className="text-sm text-gray-700">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 3: Wood Type + Finish */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
