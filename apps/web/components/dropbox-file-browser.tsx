@@ -115,15 +115,10 @@ export function DropboxFileBrowser({
         return;
       }
 
-      // Auto-create the record folder on first load
+      // Auto-create the record folder in background (non-blocking)
       if (!folderEnsured.current) {
         folderEnsured.current = true;
-        try {
-          await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
-        } catch (e) {
-          // Non-fatal — folder may already exist or Dropbox may be temporarily unavailable
-          console.warn('[DropboxFileBrowser] ensure folder failed:', e);
-        }
+        apiClient.ensureDropboxFolder(objectApiName, recordId, folderName).catch(() => {});
       }
 
       try {

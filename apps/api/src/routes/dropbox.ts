@@ -592,8 +592,8 @@ export async function dropboxRoutes(app: FastifyInstance) {
       }
     }
 
-    // Create subfolder structure for Property records
-    if (objectApiName === 'Property') {
+    // Create subfolder structure for Property records — only when folder is newly created
+    if (created && objectApiName === 'Property') {
       const createFolder = async (p: string) => {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
