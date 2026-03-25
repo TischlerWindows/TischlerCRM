@@ -485,9 +485,14 @@ export default function ReportBuilderPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                   >
                     <option value="">Select an object...</option>
-                    {OBJECT_TYPES.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
+                    {(schema?.objects && schema.objects.length > 0
+                      ? schema.objects.map(obj => (
+                          <option key={obj.apiName} value={obj.apiName}>{obj.pluralLabel || obj.label}</option>
+                        ))
+                      : OBJECT_TYPES.map(type => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))
+                    )}
                   </select>
                 </div>
                 
