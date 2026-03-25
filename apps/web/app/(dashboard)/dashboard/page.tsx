@@ -36,6 +36,8 @@ import {
 import { 
   BarChart, 
   Bar, 
+  LineChart,
+  Line,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -239,6 +241,31 @@ export default function DashboardPage() {
       }
     }
     
+    // For line charts with real data
+    if (selectedWidgetType === 'line' && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
+      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+      
+      if (selectedReport) {
+        try {
+          const aggregatedData = aggregateChartData({
+            objectType: selectedReport.objectType,
+            xAxisField: widgetConfig.xAxis,
+            yAxisField: widgetConfig.yAxis,
+            aggregationType: widgetConfig.aggregationType || 'sum'
+          });
+          
+          if (aggregatedData && aggregatedData.length > 0) {
+            return { data: aggregatedData };
+          } else {
+            return { data: [] };
+          }
+        } catch (error) {
+          console.error('❌ Error aggregating line data:', error);
+          return { data: [] };
+        }
+      }
+    }
+
     // For bar charts with real data
     if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
       const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
@@ -1046,6 +1073,92 @@ export default function DashboardPage() {
           </div>
         );
 
+      case 'stacked-vertical-bar': {
+        const svStackKeys = widget.config.stackKeys || [];
+        const svColors = ['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        
+        return (
+          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+            {refreshingWidgetId === widget.id && (
+              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+            )}
+            <div className="absolute top-2 right-2 flex gap-1 z-10">
+              <button
+                onClick={() => handleRefreshWidget(widget)}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                title="Refresh widget"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              {dashEditMode && (
+                <>
+                  <button
+                    onClick={() => handleEditWidget(widget)}
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    title="Edit widget"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWidget(widget.id)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    title="Delete widget"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to resize"
+              />
+            )}
+            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            
+            {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
+              <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={widget.config.data}
+                    margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="label"
+                      angle={-45}
+                      textAnchor="end"
+                      height={Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8))}
+                      tick={{ fontSize: 11 }}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                    />
+                    <Legend />
+                    {svStackKeys.map((key: string, idx: number) => (
+                      <Bar
+                        key={key}
+                        dataKey={key}
+                        stackId="stack"
+                        fill={svColors[idx % svColors.length]}
+                        radius={idx === svStackKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-gray-400 text-sm flex-1">
+                {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       case 'stacked-horizontal-bar':
         const stackKeys = widget.config.stackKeys || [];
         const colors = ['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
@@ -1166,7 +1279,7 @@ export default function DashboardPage() {
 
       case 'line':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative">
+          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1197,23 +1310,52 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to resize"
+              />
+            )}
             <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
-            <div className="flex items-end gap-2 h-[calc(100%-2rem)]">
-              {widget.config.data?.map((item: any, idx: number) => (
-                <div key={idx} className="flex flex-col items-center flex-1 h-full justify-end">
-                  <div className="relative h-full w-full flex items-end justify-center">
-                    <div
-                      className="bg-[#e8eaf6] w-full rounded-t"
-                      style={{ height: `${(item.value / Math.max(...widget.config.data.map((d: any) => d.value))) * 100}%` }}
+            
+            {widget.config.data && widget.config.data.length > 0 ? (
+              <div className="flex-1 min-h-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={widget.config.data}
+                    margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis
+                      dataKey="label"
+                      angle={-45}
+                      textAnchor="end"
+                      height={Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8))}
+                      tick={{ fontSize: 11 }}
                     />
-                    {idx > 0 && (
-                      <div className="absolute bottom-0 left-0 w-full h-1 bg-brand-navy" />
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-600 mt-2">{item.label}</div>
-                </div>
-              ))}
-            </div>
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                      formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke="#151f6d"
+                      strokeWidth={2}
+                      dot={{ r: 4, fill: '#151f6d' }}
+                      activeDot={{ r: 6, fill: '#da291c' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center text-gray-400 text-sm flex-1">
+                {widget.config.xAxis && widget.config.yAxis ? 'No data available' : 'Configure axes to see data'}
+              </div>
+            )}
           </div>
         );
 
