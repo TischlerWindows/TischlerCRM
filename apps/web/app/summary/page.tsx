@@ -562,6 +562,13 @@ interface Summary {
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
+  product: string;
+  woodType: string;
+  finish: string;
+  glassType: string;
+  muntinType: string;
+  spacerBars: string;
+  spacerBarColors: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -771,6 +778,13 @@ export default function SummaryPage() {
         doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
+      product: '',
+      woodType: '',
+      finish: '',
+      glassType: '',
+      muntinType: '',
+      spacerBars: '',
+      spacerBarColors: '',
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -2101,6 +2115,118 @@ export default function SummaryPage() {
                             {editingSummary.estimator || '—'}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Specifications */}
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Product Specifications</h3>
+                      <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
+                    </div>
+                    <div className="p-6 space-y-5">
+                      {/* Row 1: Product (auto-filled) */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                          {editingSummary.jobType || '—'}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Type on Page 1</p>
+                      </div>
+
+                      {/* Row 2: Wood Type + Finish */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
+                          <select
+                            value={editingSummary.woodType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select wood type...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
+                          <select
+                            value={editingSummary.finish || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, finish: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select finish...</option>
+                            <option value="200">Same finish inside and outside (paint/paint or stain/stain) 200</option>
+                            <option value="510">Partial Split Finish (stain or painted exterior/clear or white dip interior) 510</option>
+                            <option value="610">Stain Exterior/Clear dip interior (Clear dip is considered &quot;no finish&quot;) 610</option>
+                            <option value="500">Split paint finish &amp; paint exterior Stain Interior 500</option>
+                            <option value="600">Split stain finish (Different stain colors inside and outside) 600</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Glass Type + Muntin Type */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                          <select
+                            value={editingSummary.glassType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select glass type...</option>
+                            {['1','2','2.1','3','4','5','6','7','7.1','7.2','8','9','10','11','12','13','14','15','17','18','22','22.1','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40'].map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Muntin Type</label>
+                          <select
+                            value={editingSummary.muntinType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, muntinType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select muntin type...</option>
+                            <option value="SDL">SDL</option>
+                            <option value="TDL">TDL</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 4: Spacer Bars + Spacer Bar Colors */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
+                          <select
+                            value={editingSummary.spacerBars || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bars...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
+                          <select
+                            value={editingSummary.spacerBarColors || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar colors...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
                         </div>
                       </div>
                     </div>
