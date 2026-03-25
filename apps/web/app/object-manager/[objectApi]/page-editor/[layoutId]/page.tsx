@@ -2,221 +2,567 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSchemaStore } from '@/lib/schema-store';
-import { getSetting } from '@/lib/preferences';
-import type {
-  FieldDef,
-  FieldType,
-  FormattingRule,
-  PageLayout,
-  PicklistDependencyRule,
-} from '@/lib/schema';
-import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
-import { PicklistDependencyEditor } from '@/components/picklist-dependency-editor';
-import { LayoutPreviewDialog } from '../layout-preview-dialog';
-import { FormattingRulesDialog } from '../formatting-rules-dialog';
-import { buildPageLayoutFromCanvas } from '../build-page-layout';
-import { useEditorStore } from '../editor-store';
-import { EditorToolbar } from '../editor-toolbar';
-import { FieldPalette } from '../field-palette';
-import { PropertiesPanel } from '../properties-panel';
-import { UnsavedChangesDialog } from '../unsaved-changes-dialog';
-import { DndContextWrapper } from '../dnd-context-wrapper';
+import { ChevronRight, PanelLeftClose, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose, Plus, Trash2, X } from 'lucide-react';
+import { useSchemaStore } from '@/lib/schema-store';
+import {
+  generateId,
+  type FieldDef,
+  type PageField,
+  type PageLayout,
+  type PageSection,
+  type PageTab,
+  type PageWidget,
+} from '@/lib/schema';
 import { getObjectListHref } from '@/lib/object-list-routes';
+import { buildPageLayout } from '../build-page-layout';
+import { CanvasRegion } from '../canvas-region';
+import { DndContextWrapper } from '../dnd-context-wrapper';
+import { EditorToolbar } from '../editor-toolbar';
+import { FloatingProperties } from '../floating-properties';
+import { FormattingRulesDialog } from '../formatting-rules-dialog';
+import { PaletteComponents } from '../palette-components';
+import { PaletteFields } from '../palette-fields';
+import { TemplateGallery } from '../template-gallery';
+import { useEditorStore } from '../editor-store';
+import type {
+  EditorPageLayout,
+  LayoutPanel,
+  LayoutRegion,
+  LayoutTab,
+  LayoutWidget,
+  PanelField,
+  TemplateTabDef,
+} from '../types';
 import { useEditorSidePanels } from '../use-editor-side-panels';
-import { RecordHeaderChrome } from '../record-header-chrome';
-import { NewLayoutTemplateModal } from '../new-layout-template-modal';
-import { TabCanvasGridEditor } from '../tab-canvas-grid-editor';
-import type { LayoutPresetId } from '../layout-presets';
+
+function toParamValue(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? '';
+  return value ?? '';
+}
+
+function createBlankLayout(objectApi: string): EditorPageLayout {
+  return {
+    id: '',
+    name: 'New Layout',
+    objectApi,
+    active: false,
+    isDefault: false,
+    roles: [],
+    tabs: [
+      {
+        id: `tab-${Date.now()}`,
+        label: 'Details',
+        order: 0,
+        regions: [],
+      },
+    ],
+    formattingRules: [],
+  };
+}
+
+function parseBehavior(value: unknown): PanelField['behavior'] {
+  if (value === 'required' || value === 'readOnly' || value === 'hidden') return value;
+  return 'none';
+}
+
+function parseWidgetConfig(
+  widgetType: LayoutWidget['widgetType'],
+  value: unknown,
+): LayoutWidget['config'] {
+  if (value && typeof value === 'object' && 'type' in value) {
+    return value as LayoutWidget['config'];
+  }
+
+  switch (widgetType) {
+    case 'RelatedList':
+      return {
+        type: 'RelatedList',
+        relatedObjectApiName: '',
+        relationshipFieldApiName: '',
+        displayColumns: [],
+      };
+    case 'ActivityFeed':
+      return { type: 'ActivityFeed', maxItems: 10 };
+    case 'FileFolder':
+      return { type: 'FileFolder', provider: 'local' };
+    case 'CustomComponent':
+      return { type: 'CustomComponent', componentId: '' };
+    case 'Spacer':
+      return { type: 'Spacer', minHeightPx: 32 };
+    case 'HeaderHighlights':
+      return { type: 'HeaderHighlights', fieldApiNames: [] };
+  }
+}
+
+function normalizeField(rawField: unknown, fieldIndex: number): PanelField {
+  const candidate = (rawField ?? {}) as Record<string, unknown>;
+  return {
+    fieldApiName:
+      typeof candidate.fieldApiName === 'string'
+        ? candidate.fieldApiName
+        : `field-${fieldIndex + 1}`,
+    colSpan: typeof candidate.colSpan === 'number' ? Math.max(1, candidate.colSpan) : 1,
+    order: typeof candidate.order === 'number' ? candidate.order : fieldIndex,
+    behavior: parseBehavior(candidate.behavior),
+    labelOverride:
+      typeof candidate.labelOverride === 'string' ? candidate.labelOverride : undefined,
+    labelStyle:
+      candidate.labelStyle && typeof candidate.labelStyle === 'object'
+        ? (candidate.labelStyle as PanelField['labelStyle'])
+        : {},
+    valueStyle:
+      candidate.valueStyle && typeof candidate.valueStyle === 'object'
+        ? (candidate.valueStyle as PanelField['valueStyle'])
+        : {},
+  };
+}
+
+function normalizePanel(rawPanel: unknown, panelIndex: number): LayoutPanel {
+  const candidate = (rawPanel ?? {}) as Record<string, unknown>;
+  const fieldsRaw = Array.isArray(candidate.fields) ? candidate.fields : [];
+  const columns =
+    typeof candidate.columns === 'number' && candidate.columns >= 1 && candidate.columns <= 4
+      ? candidate.columns
+      : 2;
+
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : `panel-${Date.now()}-${panelIndex}`,
+    label: typeof candidate.label === 'string' ? candidate.label : `Panel ${panelIndex + 1}`,
+    order: typeof candidate.order === 'number' ? candidate.order : panelIndex,
+    columns: columns as LayoutPanel['columns'],
+    style:
+      candidate.style && typeof candidate.style === 'object'
+        ? (candidate.style as LayoutPanel['style'])
+        : {},
+    fields: fieldsRaw.map((field, fieldIndex) => normalizeField(field, fieldIndex)),
+  };
+}
+
+function normalizeWidget(rawWidget: unknown, widgetIndex: number): LayoutWidget {
+  const candidate = (rawWidget ?? {}) as Record<string, unknown>;
+  const widgetType =
+    candidate.widgetType === 'RelatedList' ||
+    candidate.widgetType === 'ActivityFeed' ||
+    candidate.widgetType === 'FileFolder' ||
+    candidate.widgetType === 'CustomComponent' ||
+    candidate.widgetType === 'Spacer' ||
+    candidate.widgetType === 'HeaderHighlights'
+      ? candidate.widgetType
+      : 'Spacer';
+
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : `widget-${Date.now()}-${widgetIndex}`,
+    widgetType,
+    order: typeof candidate.order === 'number' ? candidate.order : widgetIndex,
+    config: parseWidgetConfig(widgetType, candidate.config),
+  };
+}
+
+function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutRegion {
+  const candidate = (rawRegion ?? {}) as Record<string, unknown>;
+  const panelsRaw = Array.isArray(candidate.panels) ? candidate.panels : [];
+  const widgetsRaw = Array.isArray(candidate.widgets) ? candidate.widgets : [];
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : `region-${Date.now()}-${regionIndex}`,
+    label: typeof candidate.label === 'string' ? candidate.label : `Region ${regionIndex + 1}`,
+    gridColumn: typeof candidate.gridColumn === 'number' ? candidate.gridColumn : 1,
+    gridColumnSpan:
+      typeof candidate.gridColumnSpan === 'number' ? Math.max(1, candidate.gridColumnSpan) : 12,
+    gridRow: typeof candidate.gridRow === 'number' ? candidate.gridRow : regionIndex + 1,
+    gridRowSpan: typeof candidate.gridRowSpan === 'number' ? candidate.gridRowSpan : 1,
+    style:
+      candidate.style && typeof candidate.style === 'object'
+        ? (candidate.style as LayoutRegion['style'])
+        : {},
+    panels: panelsRaw.map((panel, panelIndex) => normalizePanel(panel, panelIndex)),
+    widgets: widgetsRaw.map((widget, widgetIndex) => normalizeWidget(widget, widgetIndex)),
+  };
+}
+
+function normalizeTab(rawTab: unknown, tabIndex: number): LayoutTab {
+  const candidate = (rawTab ?? {}) as Record<string, unknown>;
+  const regionsRaw = Array.isArray(candidate.regions) ? candidate.regions : [];
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : `tab-${Date.now()}-${tabIndex}`,
+    label: typeof candidate.label === 'string' ? candidate.label : `Tab ${tabIndex + 1}`,
+    order: typeof candidate.order === 'number' ? candidate.order : tabIndex,
+    regions: regionsRaw.map((region, regionIndex) => normalizeRegion(region, regionIndex)),
+  };
+}
+
+function normalizePanelColumns(value: number | undefined): LayoutPanel['columns'] {
+  if (value === 1 || value === 2 || value === 3 || value === 4) return value;
+  return 2;
+}
+
+function toPageField(panelField: PanelField, fieldIndex: number, columns: number): PageField {
+  return {
+    apiName: panelField.fieldApiName,
+    column: fieldIndex % Math.max(1, columns),
+    order: typeof panelField.order === 'number' ? panelField.order : fieldIndex,
+    ...(panelField.colSpan > 1 ? { colSpan: panelField.colSpan } : {}),
+  };
+}
+
+function toPageWidget(widget: LayoutWidget, region: LayoutRegion, widgetIndex: number): PageWidget {
+  return {
+    id: widget.id,
+    widgetType: widget.widgetType,
+    column: 0,
+    order: typeof widget.order === 'number' ? widget.order : widgetIndex,
+    config: widget.config,
+    gridColumn: region.gridColumn,
+    gridColumnSpan: region.gridColumnSpan,
+    gridRow: region.gridRow,
+    gridRowSpan: region.gridRowSpan,
+  };
+}
+
+function toPersistedLayout(editorLayout: EditorPageLayout): PageLayout {
+  const highlightSet = new Set<string>();
+  const tabs: PageTab[] = [...editorLayout.tabs]
+    .sort((a, b) => a.order - b.order)
+    .map((tab, tabIndex) => {
+      const sections: PageSection[] = [];
+      let nextSectionOrder = 0;
+      const regions = [...tab.regions].sort((a, b) => {
+        if (a.gridRow !== b.gridRow) return a.gridRow - b.gridRow;
+        if (a.gridColumn !== b.gridColumn) return a.gridColumn - b.gridColumn;
+        return 0;
+      });
+
+      regions.forEach((region, regionIndex) => {
+        const regionWidgets = [...region.widgets]
+          .sort((a, b) => a.order - b.order)
+          .map((widget, widgetIndex) => {
+            if (
+              widget.widgetType === 'HeaderHighlights' &&
+              widget.config.type === 'HeaderHighlights'
+            ) {
+              widget.config.fieldApiNames.forEach((fieldApiName) => highlightSet.add(fieldApiName));
+            }
+            return toPageWidget(widget, region, widgetIndex);
+          });
+        const panels = [...region.panels].sort((a, b) => a.order - b.order);
+
+        if (panels.length === 0) {
+          sections.push({
+            id: `section-${region.id}`,
+            label: region.label || `Region ${regionIndex + 1}`,
+            columns: 1,
+            order: nextSectionOrder++,
+            fields: [],
+            ...(regionWidgets.length > 0 ? { widgets: regionWidgets } : {}),
+            gridColumn: region.gridColumn,
+            gridColumnSpan: region.gridColumnSpan,
+            gridRow: region.gridRow,
+            gridRowSpan: region.gridRowSpan,
+          });
+          return;
+        }
+
+        panels.forEach((panel, panelIndex) => {
+          const fields = [...panel.fields]
+            .sort((a, b) => a.order - b.order)
+            .map((field, fieldIndex) => toPageField(field, fieldIndex, panel.columns));
+          sections.push({
+            id: `section-${region.id}-${panel.id}`,
+            label: panel.label || region.label || `Section ${panelIndex + 1}`,
+            columns: normalizePanelColumns(panel.columns),
+            order: nextSectionOrder++,
+            fields,
+            ...(panelIndex === 0 && regionWidgets.length > 0 ? { widgets: regionWidgets } : {}),
+            gridColumn: region.gridColumn,
+            gridColumnSpan: region.gridColumnSpan,
+            gridRow: region.gridRow + panelIndex,
+            gridRowSpan: panelIndex === 0 ? region.gridRowSpan : 1,
+          });
+        });
+      });
+
+      return {
+        id: tab.id,
+        label: tab.label || `Tab ${tabIndex + 1}`,
+        order: typeof tab.order === 'number' ? tab.order : tabIndex,
+        sections,
+      };
+    });
+
+  const formattingRules = [...editorLayout.formattingRules];
+  const highlightFields = [...highlightSet];
+  return {
+    id: editorLayout.id,
+    name: editorLayout.name,
+    objectApi: editorLayout.objectApi,
+    active: editorLayout.active,
+    isDefault: editorLayout.isDefault,
+    roles: [...editorLayout.roles],
+    tabs,
+    ...(highlightFields.length > 0 ? { highlightFields } : {}),
+    formattingRules,
+    extensions: {
+      editorTabs: editorLayout.tabs,
+      formattingRules,
+      version: 1,
+    },
+  };
+}
+
+function toLayoutWidget(pageWidget: PageWidget, widgetIndex: number): LayoutWidget {
+  return {
+    id: pageWidget.id || `widget-${Date.now()}-${widgetIndex}`,
+    widgetType: pageWidget.widgetType,
+    order: typeof pageWidget.order === 'number' ? pageWidget.order : widgetIndex,
+    config: parseWidgetConfig(pageWidget.widgetType, pageWidget.config),
+  };
+}
+
+function toPanelField(pageField: PageField, fieldIndex: number): PanelField {
+  const required = typeof pageField.required === 'boolean' ? pageField.required : false;
+  const readOnly = typeof pageField.readOnly === 'boolean' ? pageField.readOnly : false;
+  const behavior: PanelField['behavior'] = readOnly
+    ? 'readOnly'
+    : required
+      ? 'required'
+      : 'none';
+
+  return {
+    fieldApiName: pageField.apiName,
+    colSpan: typeof pageField.colSpan === 'number' ? Math.max(1, pageField.colSpan) : 1,
+    order: typeof pageField.order === 'number' ? pageField.order : fieldIndex,
+    behavior,
+    labelStyle: {},
+    valueStyle: {},
+  };
+}
+
+function toLayoutRegionFromSection(section: PageSection, sectionIndex: number): LayoutRegion {
+  const sectionWidgets = Array.isArray(section.widgets) ? section.widgets : [];
+  const sectionFields = Array.isArray(section.fields) ? section.fields : [];
+  const fields = [...sectionFields]
+    .sort((a, b) => a.order - b.order)
+    .map((field, fieldIndex) => toPanelField(field, fieldIndex));
+
+  return {
+    id: `region-${section.id || sectionIndex + 1}`,
+    label: section.label || `Region ${sectionIndex + 1}`,
+    gridColumn: typeof section.gridColumn === 'number' ? section.gridColumn : 1,
+    gridColumnSpan:
+      typeof section.gridColumnSpan === 'number' ? Math.max(1, section.gridColumnSpan) : 12,
+    gridRow: typeof section.gridRow === 'number' ? section.gridRow : sectionIndex + 1,
+    gridRowSpan: typeof section.gridRowSpan === 'number' ? Math.max(1, section.gridRowSpan) : 1,
+    style: {},
+    panels: [
+      {
+        id: `panel-${section.id || sectionIndex + 1}`,
+        label: section.label || `Panel ${sectionIndex + 1}`,
+        order: 0,
+        columns: normalizePanelColumns(section.columns),
+        style: {},
+        fields,
+      },
+    ],
+    widgets: sectionWidgets.map((widget, widgetIndex) => toLayoutWidget(widget, widgetIndex)),
+  };
+}
+
+function toLayoutRegionsFromLegacyTab(tab: PageTab): LayoutRegion[] {
+  const sections = Array.isArray(tab.sections) ? tab.sections : [];
+  const regions = [...sections]
+    .sort((a, b) => a.order - b.order)
+    .map((section, sectionIndex) => toLayoutRegionFromSection(section, sectionIndex));
+  const tabWidgets = Array.isArray(tab.widgets) ? tab.widgets : [];
+
+  tabWidgets.forEach((widget, widgetIndex) => {
+    regions.push({
+      id: `region-widget-${widget.id || widgetIndex + 1}`,
+      label: `Widget ${widgetIndex + 1}`,
+      gridColumn: typeof widget.gridColumn === 'number' ? widget.gridColumn : 1,
+      gridColumnSpan: typeof widget.gridColumnSpan === 'number' ? Math.max(1, widget.gridColumnSpan) : 12,
+      gridRow: typeof widget.gridRow === 'number' ? widget.gridRow : regions.length + 1,
+      gridRowSpan: typeof widget.gridRowSpan === 'number' ? Math.max(1, widget.gridRowSpan) : 1,
+      style: {},
+      panels: [],
+      widgets: [toLayoutWidget(widget, widgetIndex)],
+    });
+  });
+
+  return regions;
+}
+
+function toEditorLayout(pageLayout: PageLayout, objectApi: string): EditorPageLayout {
+  const extensions =
+    pageLayout.extensions && typeof pageLayout.extensions === 'object'
+      ? (pageLayout.extensions as Record<string, unknown>)
+      : null;
+  const extensionTabs = extensions && Array.isArray(extensions.editorTabs) ? extensions.editorTabs : [];
+  const tabsSource =
+    extensionTabs.length > 0
+      ? extensionTabs
+      : pageLayout.tabs.map((tab, tabIndex) => ({
+          id: tab.id,
+          label: tab.label,
+          order: typeof tab.order === 'number' ? tab.order : tabIndex,
+          regions: toLayoutRegionsFromLegacyTab(tab),
+        }));
+  const tabs = tabsSource.map((tab, index) => normalizeTab(tab, index));
+  const topLevelFormattingRules = Array.isArray(pageLayout.formattingRules)
+    ? pageLayout.formattingRules
+    : [];
+  const extensionFormattingRules =
+    extensions && Array.isArray(extensions.formattingRules)
+      ? (extensions.formattingRules as EditorPageLayout['formattingRules'])
+      : [];
+  const formattingRules =
+    topLevelFormattingRules.length > 0 ? topLevelFormattingRules : extensionFormattingRules;
+
+  return {
+    id: pageLayout.id || '',
+    name: pageLayout.name || 'Layout',
+    objectApi:
+      typeof pageLayout.objectApi === 'string' && pageLayout.objectApi.length > 0
+        ? pageLayout.objectApi
+        : objectApi,
+    active: Boolean(pageLayout.active),
+    isDefault: Boolean(pageLayout.isDefault),
+    roles: Array.isArray(pageLayout.roles)
+      ? pageLayout.roles.filter((role): role is string => typeof role === 'string')
+      : [],
+    tabs: tabs.length > 0 ? tabs : createBlankLayout(objectApi).tabs,
+    formattingRules,
+  };
+}
+
+function createDefaultRegion(regionCount: number): LayoutRegion {
+  return {
+    id: `region-${Date.now()}`,
+    label: `Region ${regionCount + 1}`,
+    gridColumn: 1,
+    gridColumnSpan: 12,
+    gridRow: regionCount + 1,
+    gridRowSpan: 1,
+    style: {},
+    panels: [],
+    widgets: [],
+  };
+}
+
+function convertTemplateTabsToLayoutTabs(templateTabs: TemplateTabDef[]): LayoutTab[] {
+  const sourceTabs = templateTabs.length > 0 ? templateTabs : [{ id: 'tab-1', label: 'Details', order: 0, regions: [] }];
+  return sourceTabs.map((tab, tabIndex) => ({
+    id: `tab-${Date.now()}-${tabIndex}-${Math.random().toString(36).slice(2, 6)}`,
+    label: tab.label || `Tab ${tabIndex + 1}`,
+    order: tabIndex,
+    regions: (tab.regions ?? []).map((region, regionIndex) => ({
+      id: `region-${Date.now()}-${tabIndex}-${regionIndex}-${Math.random().toString(36).slice(2, 6)}`,
+      label: region.label || `Region ${regionIndex + 1}`,
+      gridColumn: typeof region.gridColumn === 'number' ? region.gridColumn : 1,
+      gridColumnSpan: typeof region.gridColumnSpan === 'number' ? region.gridColumnSpan : 12,
+      gridRow: typeof region.gridRow === 'number' ? region.gridRow : regionIndex + 1,
+      gridRowSpan: typeof region.gridRowSpan === 'number' ? region.gridRowSpan : 1,
+      style: region.style ?? {},
+      panels: (region.panels ?? []).map((panel, panelIndex) => ({
+        id: `panel-${Date.now()}-${tabIndex}-${regionIndex}-${panelIndex}-${Math.random().toString(36).slice(2, 6)}`,
+        label: panel.label || `Panel ${panelIndex + 1}`,
+        order: panelIndex,
+        columns: panel.columns ?? 2,
+        style: panel.style ?? {},
+        fields: [],
+      })),
+      widgets: [],
+    })),
+  }));
+}
 
 export default function PageEditorFullPage() {
   const params = useParams();
   const router = useRouter();
-  const objectApiName = params.objectApi as string;
-  const layoutId = params.layoutId as string;
+  const objectApiName = toParamValue(params.objectApi);
+  const layoutId = toParamValue(params.layoutId);
+  const routeKey = `${objectApiName}::${layoutId}`;
 
   const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
 
-  // Editor store
-  const tabs = useEditorStore((s) => s.tabs);
-  const sections = useEditorStore((s) => s.sections);
-  const fields = useEditorStore((s) => s.fields);
-  const widgets = useEditorStore((s) => s.widgets);
+  const layout = useEditorStore((s) => s.layout);
   const activeTabId = useEditorStore((s) => s.activeTabId);
   const selectedElement = useEditorStore((s) => s.selectedElement);
-  const editingLayoutId = useEditorStore((s) => s.editingLayoutId);
-  const layoutName = useEditorStore((s) => s.layoutName);
-  const formattingRules = useEditorStore((s) => s.formattingRules);
-  const highlightFields = useEditorStore((s) => s.highlightFields);
-  const hasUnsavedChanges = useEditorStore((s) => s.hasUnsavedChanges);
-
+  const isDirty = useEditorStore((s) => s.isDirty);
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
-  const addTab = useEditorStore((s) => s.addTab);
-  const deleteTab = useEditorStore((s) => s.deleteTab);
-  const addSection = useEditorStore((s) => s.addSection);
+  const addRegion = useEditorStore((s) => s.addRegion);
   const loadLayout = useEditorStore((s) => s.loadLayout);
-  const reset = useEditorStore((s) => s.reset);
-  const applyLayoutPreset = useEditorStore((s) => s.applyLayoutPreset);
-  const markSaved = useEditorStore((s) => s.markSaved);
   const setFormattingRules = useEditorStore((s) => s.setFormattingRules);
-  const markDirty = useEditorStore((s) => s.markDirty);
 
-  // Modal state
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [showFormattingRulesDialog, setShowFormattingRulesDialog] = useState(false);
-  const [showVisibilityEditor, setShowVisibilityEditor] = useState(false);
-  const [showSectionVisibilityEditor, setShowSectionVisibilityEditor] = useState(false);
-  const [showPicklistDependencyEditor, setShowPicklistDependencyEditor] = useState(false);
-  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
-  const [unsavedDialogSaving, setUnsavedDialogSaving] = useState(false);
-  const [newLayoutTemplateGate, setNewLayoutTemplateGate] = useState(layoutId === 'new');
+  const [showTemplateGallery, setShowTemplateGallery] = useState(layoutId === 'new');
+  const [paletteTab, setPaletteTab] = useState<'fields' | 'components'>('fields');
+  const [isSaving, setIsSaving] = useState(false);
+  const leftPanelContainerId = `page-editor-left-panel-${encodeURIComponent(routeKey || 'new')}`;
 
   const sidePanels = useEditorSidePanels();
-
-  // Home special fields
-  const [homeReports, setHomeReports] = useState<Array<{ id: string; name: string }>>([]);
-  const [homeDashboards, setHomeDashboards] = useState<Array<{ id: string; name: string }>>([]);
-
-  const didLoad = useRef(false);
+  const didLoadLayoutRef = useRef<string | null>(null);
 
   useEffect(() => {
-    didLoad.current = false;
-  }, [layoutId]);
+    didLoadLayoutRef.current = null;
+    setShowTemplateGallery(layoutId === 'new');
+  }, [layoutId, routeKey]);
 
-  useEffect(() => {
-    if (layoutId === 'new') setNewLayoutTemplateGate(true);
-    else setNewLayoutTemplateGate(false);
-  }, [layoutId]);
-
-  useEffect(() => {
-    return () => {
-      didLoad.current = false;
-    };
-  }, []);
-
-  // Load layout once per layoutId visit; do not reset when `object` reference updates (e.g. after save).
   useEffect(() => {
     if (!object) return;
-    if (didLoad.current) return;
-    didLoad.current = true;
+    if (didLoadLayoutRef.current === routeKey) return;
+    didLoadLayoutRef.current = routeKey;
 
     if (layoutId === 'new') {
-      reset();
-    } else {
-      const layout = object.pageLayouts?.find((l) => l.id === layoutId);
-      if (layout) {
-        loadLayout(layout);
-      } else {
-        reset();
-      }
+      loadLayout(createBlankLayout(objectApiName));
+      return;
     }
-  }, [layoutId, object, loadLayout, reset]);
+
+    const existingLayout = object.pageLayouts?.find((item) => item.id === layoutId);
+    if (existingLayout) {
+      loadLayout(toEditorLayout(existingLayout, objectApiName));
+      return;
+    }
+
+    loadLayout(createBlankLayout(objectApiName));
+  }, [layoutId, loadLayout, object, objectApiName, routeKey]);
 
   useEffect(() => {
-    if (!hasUnsavedChanges) return;
+    if (!isDirty) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [isDirty]);
 
-  // Load Home reports/dashboards
-  useEffect(() => {
-    if (objectApiName !== 'Home') return;
-    (async () => {
-      const customReports = (await getSetting<any[]>('customReports')) || [];
-      setHomeReports(customReports.map((r: any) => ({ id: r.id, name: r.name })));
-      const dashboards = (await getSetting<any[]>('dashboards')) || [];
-      setHomeDashboards(dashboards.map((d: any) => ({ id: d.id, name: d.name })));
-    })();
-  }, [objectApiName]);
-
-  // All fields (including Home special fields + Contact name)
-  const allFields = useMemo(() => {
-    if (!object) return [];
-    let baseFields: FieldDef[] =
-      objectApiName === 'Home'
-        ? [
-            ...homeReports.map((report) => ({
-              id: `report-${report.id}`,
-              apiName: `Home__Report__${report.id}`,
-              label: `Report: ${report.name}`,
-              type: 'Text' as FieldType,
-              required: false,
-            })),
-            ...homeDashboards.map((dashboard) => ({
-              id: `dashboard-${dashboard.id}`,
-              apiName: `Home__Dashboard__${dashboard.id}`,
-              label: `Dashboard: ${dashboard.name}`,
-              type: 'Text' as FieldType,
-              required: false,
-            })),
-          ]
-        : object.fields;
-
-    if (
-      objectApiName === 'Contact' &&
-      !baseFields.find((f) => f.apiName === 'Contact__name')
-    ) {
-      const nameField: FieldDef = {
-        id: 'hardcoded-name-field',
-        apiName: 'Contact__name',
-        label: 'Name',
-        type: 'Text',
-        readOnly: true,
-        custom: false,
-        required: false,
-        maxLength: 255,
-        helpText: 'Auto-summarized full name (Salutation, First Name, Last Name)',
-      };
-      baseFields = [nameField, ...baseFields];
-    }
-    return baseFields;
-  }, [objectApiName, object, homeReports, homeDashboards]);
-
-  const getFieldDef = (apiName: string) => allFields.find((f) => f.apiName === apiName);
-
-  // Active sections for the current tab
-  const activeSections = sections
-    .filter((s) => s.tabId === activeTabId)
-    .sort((a, b) => a.order - b.order);
-
-  const tabWidgetsForActive = useMemo(
+  const allFields = useMemo<FieldDef[]>(() => object?.fields ?? [], [object]);
+  const sortedTabs = useMemo(
+    () => [...layout.tabs].sort((a, b) => a.order - b.order),
+    [layout.tabs],
+  );
+  const activeTab = useMemo(
+    () => sortedTabs.find((tab) => tab.id === activeTabId) ?? sortedTabs[0] ?? null,
+    [sortedTabs, activeTabId],
+  );
+  const activeRegions = useMemo(
     () =>
-      widgets
-        .filter((w) => w.tabId === activeTabId && !w.sectionId)
-        .sort((a, b) => a.order - b.order),
-    [widgets, activeTabId],
+      [...(activeTab?.regions ?? [])].sort((a, b) => {
+        if (a.gridRow !== b.gridRow) return a.gridRow - b.gridRow;
+        if (a.gridColumn !== b.gridColumn) return a.gridColumn - b.gridColumn;
+        return 0;
+      }),
+    [activeTab],
   );
 
-  const tabCanvasPlacements = useMemo(() => {
-    type P = { kind: 'section' | 'widget'; id: string };
-    const list: P[] = [
-      ...activeSections.map((s) => ({ kind: 'section' as const, id: s.id })),
-      ...tabWidgetsForActive.map((w) => ({ kind: 'widget' as const, id: w.id })),
-    ];
-    const gridOf = (p: P) => {
-      if (p.kind === 'section') {
-        const s = sections.find((x) => x.id === p.id);
-        return { r: s?.gridRow ?? 1, c: s?.gridColumn ?? 1 };
-      }
-      const w = widgets.find((x) => x.id === p.id);
-      return { r: w?.gridRow ?? 1, c: w?.gridColumn ?? 1 };
-    };
-    return list.sort((a, b) => {
-      const ga = gridOf(a);
-      const gb = gridOf(b);
-      if (ga.r !== gb.r) return ga.r - gb.r;
-      return ga.c - gb.c;
-    });
-  }, [activeSections, tabWidgetsForActive, sections, widgets]);
+  useEffect(() => {
+    if (!activeTab) return;
+    if (activeTabId !== activeTab.id) {
+      setActiveTab(activeTab.id);
+    }
+  }, [activeTab, activeTabId, setActiveTab]);
 
   const layoutAssignmentNote = useMemo(() => {
     if (!object?.recordTypes?.length) return null;
@@ -233,180 +579,104 @@ export default function PageEditorFullPage() {
     return `Used for: ${names}.${hasDefault ? ' Includes your default record type.' : ''}`;
   }, [object, layoutId]);
 
-  // Preview layout
-  const previewPageLayout = useMemo(
-    () =>
-      object
-        ? buildPageLayoutFromCanvas({
-            editingLayoutId,
-            layoutName,
-            tabs,
-            sections,
-            fields,
-            widgets,
-            objectFields: object.fields,
-            formattingRules,
-            highlightFields,
-          })
-        : null,
-    [
-      editingLayoutId,
-      layoutName,
-      tabs,
-      sections,
-      fields,
-      widgets,
-      object,
-      formattingRules,
-      highlightFields,
-    ],
-  );
-
-  const performSave = async (silent: boolean): Promise<boolean> => {
+  const performSave = useCallback(async (): Promise<boolean> => {
     if (!object) return false;
-    if (!layoutName.trim()) {
-      if (!silent) alert('Please enter a layout name.');
+    if (!layout.name.trim()) {
+      alert('Please enter a layout name.');
       return false;
     }
 
-    const pageLayout: PageLayout = buildPageLayoutFromCanvas({
-      editingLayoutId,
-      layoutName,
-      tabs,
-      sections,
-      fields,
-      widgets,
-      objectFields: object.fields,
-      formattingRules,
-      highlightFields,
-    });
+    setIsSaving(true);
 
-    const existingLayouts = object.pageLayouts || [];
-    let updatedLayouts: PageLayout[];
-    if (editingLayoutId) {
-      updatedLayouts = existingLayouts.map((l) => (l.id === editingLayoutId ? pageLayout : l));
-    } else {
-      const nonEmptyLayouts = existingLayouts.filter((l) =>
-        l.tabs?.some((t) => t.sections?.some((s) => (s.fields?.length || 0) > 0)),
-      );
-      updatedLayouts = [...nonEmptyLayouts, pageLayout];
-    }
-
-    const existingRecordTypes = object.recordTypes || [];
-    const updatedRecordTypes =
-      existingRecordTypes.length > 0
-        ? existingRecordTypes.map((rt, idx) => {
-            if (
-              (object.defaultRecordTypeId && rt.id === object.defaultRecordTypeId) ||
-              (!object.defaultRecordTypeId && idx === 0)
-            ) {
-              return { ...rt, pageLayoutId: pageLayout.id };
-            }
-            return rt;
-          })
-        : existingRecordTypes;
+    const builtLayout = buildPageLayout(layout);
+    const savedEditorLayout: EditorPageLayout = {
+      ...builtLayout,
+      id: builtLayout.id || (layoutId === 'new' ? generateId() : layoutId),
+      objectApi: objectApiName,
+    };
+    const savedLayout = toPersistedLayout(savedEditorLayout);
 
     try {
+      const existingLayouts = object.pageLayouts ?? [];
+      const updatedLayouts = existingLayouts.some((item) => item.id === savedLayout.id)
+        ? existingLayouts.map((item) => (item.id === savedLayout.id ? savedLayout : item))
+        : [...existingLayouts, savedLayout];
+
       await updateObject(objectApiName, {
         pageLayouts: updatedLayouts,
-        recordTypes: updatedRecordTypes,
       });
-      if (!silent) alert(`Layout "${layoutName}" saved successfully!`);
-      markSaved();
+
+      loadLayout(toEditorLayout(savedLayout, objectApiName));
+
+      if (layoutId === 'new') {
+        router.replace(
+          `/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(savedLayout.id)}`,
+        );
+      }
       return true;
     } catch (err) {
       console.error('Failed to save layout:', err);
-      if (!silent) alert('Failed to save layout. Please try again.');
+      alert('Failed to save layout. Please try again.');
       return false;
+    } finally {
+      setIsSaving(false);
     }
-  };
+  }, [layout, layoutId, loadLayout, object, objectApiName, router, updateObject]);
 
-  const performSaveRef = useRef(performSave);
-  performSaveRef.current = performSave;
-
-  const saveLayout = () => {
-    void performSave(false);
-  };
+  const handleSave = useCallback(() => {
+    void performSave();
+  }, [performSave]);
 
   const requestNavigate = useCallback(
     (href: string) => {
-      if (!useEditorStore.getState().hasUnsavedChanges) {
-        router.push(href);
-        return;
+      if (useEditorStore.getState().isDirty) {
+        const confirmed = window.confirm(
+          'You have unsaved changes. Leave this page without saving?',
+        );
+        if (!confirmed) return;
       }
-      setPendingNavigationHref(href);
-      setShowUnsavedDialog(true);
+      router.push(href);
     },
     [router],
   );
 
-  // Phase 6E: keyboard shortcuts
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        void performSaveRef.current(false);
+  const handleAddRegion = useCallback(() => {
+    if (!activeTab) return;
+    const region = createDefaultRegion(activeTab.regions.length);
+    addRegion(region, activeTab.id);
+    setSelectedElement({ type: 'region', id: region.id });
+  }, [activeTab, addRegion, setSelectedElement]);
+
+  const handleLeftResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        sidePanels.adjustLeftWidth(-16);
         return;
       }
-      const el = e.target as HTMLElement;
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable) {
-        return;
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        sidePanels.adjustLeftWidth(16);
       }
-      if (e.key === 'Escape') {
-        useEditorStore.getState().setSelectedElement(null);
-        return;
-      }
-      if (e.key === 'Delete') {
-        const sel = useEditorStore.getState().selectedElement;
-        if (!sel || (sel.type !== 'field' && sel.type !== 'widget')) return;
-        const st = useEditorStore.getState();
-        if (sel.type === 'field') st.deleteField(sel.id);
-        else st.deleteWidget(sel.id);
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        useEditorStore.getState().undo();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    },
+    [sidePanels],
+  );
+
+  const handleTemplateSelect = useCallback((tabs: TemplateTabDef[]) => {
+    const convertedTabs = convertTemplateTabsToLayoutTabs(tabs);
+    useEditorStore.setState((state) => ({
+      layout: {
+        ...state.layout,
+        tabs: convertedTabs.length > 0 ? convertedTabs : createBlankLayout(state.layout.objectApi).tabs,
+      },
+      activeTabId: convertedTabs[0]?.id ?? state.activeTabId,
+      selectedElement: null,
+      isDirty: true,
+      undoStack: [],
+      redoStack: [],
+    }));
+    setShowTemplateGallery(false);
   }, []);
-
-  // Visibility rule handlers
-  const handleSaveVisibilityRules = async (conditions: any[]) => {
-    if (!selectedElement || selectedElement.type !== 'field' || !object) return;
-    const field = fields.find((f) => f.id === selectedElement.id);
-    if (!field) return;
-    const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
-    if (!fieldDef) return;
-    const updatedFields = object.fields.map((f) =>
-      f.apiName === fieldDef.apiName ? { ...f, visibleIf: conditions } : f,
-    );
-    try {
-      await updateObject(objectApiName, { fields: updatedFields });
-      setShowVisibilityEditor(false);
-    } catch (err) {
-      console.error('Failed to save visibility rules:', err);
-    }
-  };
-
-  const handleSavePicklistDependencies = async (depRules: PicklistDependencyRule[]) => {
-    if (!selectedElement || selectedElement.type !== 'field' || !object) return;
-    const field = fields.find((f) => f.id === selectedElement.id);
-    if (!field) return;
-    const fieldDef = object.fields.find((f) => f.apiName === field.fieldApiName);
-    if (!fieldDef) return;
-    const updatedFields = object.fields.map((f) =>
-      f.apiName === fieldDef.apiName ? { ...f, picklistDependencies: depRules } : f,
-    );
-    try {
-      await updateObject(objectApiName, { fields: updatedFields });
-      setShowPicklistDependencyEditor(false);
-    } catch (err) {
-      console.error('Failed to save picklist dependencies:', err);
-    }
-  };
 
   if (!object) {
     return <div className="p-6">Object not found</div>;
@@ -416,26 +686,23 @@ export default function PageEditorFullPage() {
   const objectListHref = getObjectListHref(objectApiName);
   const objectListLabel = object.pluralLabel || object.label;
 
-  const allObjects = schema?.objects || [];
-
   return (
-    <DndContextWrapper getFieldDef={getFieldDef}>
-      <div className="flex flex-col h-screen">
-        {/* Phase 6A: Light minimal toolbar */}
-        <EditorToolbar
-          onSave={saveLayout}
-          onPreview={() => setShowPreviewDialog(true)}
-          onOpenRules={() => setShowFormattingRulesDialog(true)}
-          onRequestNavigate={requestNavigate}
-          objectManagerHref={objectManagerHref}
-          objectListHref={objectListHref}
-          objectListLabel={objectListLabel}
-          layoutAssignmentNote={layoutAssignmentNote}
-        />
+    <div className="flex h-screen flex-col">
+      <EditorToolbar
+        onSave={handleSave}
+        onPreview={() => void 0}
+        onOpenRules={() => setShowFormattingRulesDialog(true)}
+        onRequestNavigate={requestNavigate}
+        objectManagerHref={objectManagerHref}
+        objectListHref={objectListHref}
+        objectListLabel={objectListLabel}
+        layoutAssignmentNote={layoutAssignmentNote}
+      />
 
-        <div className="flex flex-1 overflow-hidden min-h-0">
-          {/* Left palette — width / collapse */}
+      <DndContextWrapper>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
+            id={leftPanelContainerId}
             className="relative flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-150"
             style={{
               width: sidePanels.leftCollapsed ? 40 : sidePanels.leftWidth,
@@ -446,6 +713,9 @@ export default function PageEditorFullPage() {
               type="button"
               title={sidePanels.leftCollapsed ? 'Show fields panel' : 'Hide fields panel'}
               onClick={() => sidePanels.toggleLeftCollapsed()}
+              aria-label={sidePanels.leftCollapsed ? 'Expand fields panel' : 'Collapse fields panel'}
+              aria-expanded={!sidePanels.leftCollapsed}
+              aria-controls={leftPanelContainerId}
               className="absolute right-0 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-l-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50"
             >
               {sidePanels.leftCollapsed ? (
@@ -455,315 +725,113 @@ export default function PageEditorFullPage() {
               )}
             </button>
             {!sidePanels.leftCollapsed && (
-              <FieldPalette
-                availableFields={allFields}
-                totalFieldCount={object.fields.length}
-              />
+              <div className="flex h-full min-h-0 flex-col">
+                <div className="grid grid-cols-2 border-b border-gray-200 bg-white p-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaletteTab('fields')}
+                    className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                      paletteTab === 'fields'
+                        ? 'bg-brand-navy text-white'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    Fields
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaletteTab('components')}
+                    className={`rounded-md px-2 py-1.5 text-xs font-medium transition ${
+                      paletteTab === 'components'
+                        ? 'bg-brand-navy text-white'
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    }`}
+                  >
+                    Components
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  {paletteTab === 'fields' ? (
+                    <PaletteFields availableFields={allFields} />
+                  ) : (
+                    <PaletteComponents />
+                  )}
+                </div>
+              </div>
             )}
           </div>
           {!sidePanels.leftCollapsed && (
-            <button
-              type="button"
+            <div
+              role="separator"
+              aria-orientation="vertical"
               aria-label="Resize fields panel"
+              aria-valuemin={200}
+              aria-valuemax={520}
+              aria-valuenow={Math.round(sidePanels.leftWidth)}
+              tabIndex={0}
               onMouseDown={sidePanels.startResizeLeft}
+              onKeyDown={handleLeftResizeKeyDown}
               className="w-1.5 shrink-0 cursor-col-resize border-r border-transparent bg-gray-200/80 hover:bg-brand-navy/20"
             />
           )}
 
-          <div className="min-w-0 flex-1 overflow-y-auto bg-gray-100" data-editor-canvas>
-            <div className={`p-6 ${newLayoutTemplateGate && layoutId === 'new' ? 'pointer-events-none opacity-40' : ''}`}>
-              {objectApiName !== 'Home' && <RecordHeaderChrome objectLabel={object.label} />}
-              {/* Phase 6C: Navy pill tabs */}
-              <div className="flex gap-2 mb-5 items-center">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all relative group ${
-                      activeTabId === tab.id
-                        ? 'bg-brand-navy text-white shadow-sm'
-                        : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200'
-                    }`}
-                    onClick={() => {
-                      setActiveTab(tab.id);
-                      setSelectedElement({ type: 'tab', id: tab.id });
-                    }}
+          <main className="min-w-0 flex-1 overflow-y-auto bg-gray-100 p-6" data-editor-canvas>
+            <div className={showTemplateGallery && layoutId === 'new' ? 'pointer-events-none opacity-40' : ''}>
+              {activeTab ? (
+                <>
+                  <div className="grid grid-cols-12 gap-4">
+                    {activeRegions.map((region) => (
+                      <CanvasRegion key={region.id} region={region} tabId={activeTab.id} />
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4 w-full border-dashed border-gray-300 hover:border-brand-navy hover:text-brand-navy"
+                    onClick={handleAddRegion}
                   >
-                    {tab.label}
-                    {tabs.length > 1 && (
-                      <button
-                        className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-red-500 text-white rounded-full p-0.5 transition-opacity"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTab(tab.id);
-                        }}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </button>
-                ))}
-                <button
-                  onClick={addTab}
-                  className="px-3 py-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 border border-dashed border-gray-300 text-sm flex items-center gap-1 transition-colors"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                <TabCanvasGridEditor
-                  tabId={activeTabId}
-                  placements={tabCanvasPlacements}
-                  sections={sections}
-                  widgets={widgets}
-                  fields={fields}
-                  getFieldDef={getFieldDef}
-                  activeSectionsOrdered={activeSections}
-                />
-
-                <Button
-                  onClick={addSection}
-                  variant="outline"
-                  className="w-full border-dashed border-gray-300 hover:border-brand-navy hover:text-brand-navy"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Section
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {!sidePanels.rightCollapsed && (
-            <button
-              type="button"
-              aria-label="Resize properties panel"
-              onMouseDown={sidePanels.startResizeRight}
-              className="w-1.5 shrink-0 cursor-col-resize border-l border-transparent bg-gray-200/80 hover:bg-brand-navy/20"
-            />
-          )}
-          {/* Right properties panel */}
-          <div
-            className="relative flex shrink-0 flex-col border-l border-gray-200 bg-white transition-[width] duration-150"
-            style={{
-              width: sidePanels.rightCollapsed ? 40 : sidePanels.rightWidth,
-              minWidth: sidePanels.rightCollapsed ? 40 : undefined,
-            }}
-          >
-            <button
-              type="button"
-              title={sidePanels.rightCollapsed ? 'Show properties' : 'Hide properties'}
-              onClick={() => sidePanels.toggleRightCollapsed()}
-              className="absolute left-0 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-r-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50"
-            >
-              {sidePanels.rightCollapsed ? (
-                <ChevronLeft className="h-4 w-4" />
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Region
+                  </Button>
+                </>
               ) : (
-                <PanelRightClose className="h-4 w-4" />
+                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-600">
+                  No tabs are available for this layout.
+                </div>
               )}
-            </button>
-            {!sidePanels.rightCollapsed && (
-              <PropertiesPanel
-                objectFields={object.fields}
-                allFields={allFields}
-                allObjects={allObjects}
-                onOpenFieldVisibility={() => setShowVisibilityEditor(true)}
-                onOpenSectionVisibility={() => setShowSectionVisibilityEditor(true)}
-                onOpenPicklistDependency={() => setShowPicklistDependencyEditor(true)}
-                onSave={saveLayout}
-                onPreview={() => setShowPreviewDialog(true)}
-              />
-            )}
-          </div>
+            </div>
+          </main>
         </div>
-      </div>
+      </DndContextWrapper>
 
-      {/* ─── Dialogs ─── */}
-
-      <NewLayoutTemplateModal
-        open={layoutId === 'new' && newLayoutTemplateGate}
-        onChoose={(presetId: LayoutPresetId) => {
-          applyLayoutPreset(presetId);
-          setNewLayoutTemplateGate(false);
-        }}
-      />
-
-      <LayoutPreviewDialog
-        open={showPreviewDialog}
-        onOpenChange={setShowPreviewDialog}
-        pageLayout={previewPageLayout}
-        allFields={allFields}
-        objectLabel={object.label}
+      <FloatingProperties
+        open={selectedElement !== null}
+        onClose={() => setSelectedElement(null)}
       />
 
       <FormattingRulesDialog
         open={showFormattingRulesDialog}
         onOpenChange={setShowFormattingRulesDialog}
-        rules={formattingRules}
-        onApply={(next) => {
-          setFormattingRules(next);
-          markDirty();
-        }}
-        sections={sections.map((s) => ({ id: s.id, label: s.label }))}
+        rules={layout.formattingRules}
+        onApply={(next) => setFormattingRules(next)}
+        sections={(activeTab?.regions ?? []).map((region) => ({ id: region.id, label: region.label }))}
         objectFields={object.fields}
       />
 
-      <UnsavedChangesDialog
-        open={showUnsavedDialog}
-        isSaving={unsavedDialogSaving}
-        onKeepEditing={() => {
-          setShowUnsavedDialog(false);
-          setPendingNavigationHref(null);
-        }}
-        onLeaveWithoutSaving={() => {
-          const dest = pendingNavigationHref;
-          setShowUnsavedDialog(false);
-          setPendingNavigationHref(null);
-          if (layoutId === 'new') {
-            reset();
-          } else {
-            const layout = object.pageLayouts?.find((l) => l.id === layoutId);
-            if (layout) loadLayout(layout);
-            else reset();
-          }
-          markSaved();
-          if (dest) router.push(dest);
-        }}
-        onSaveAndLeave={() => {
-          void (async () => {
-            setUnsavedDialogSaving(true);
-            try {
-              const dest = pendingNavigationHref;
-              const ok = await performSave(true);
-              if (ok) {
-                setShowUnsavedDialog(false);
-                setPendingNavigationHref(null);
-                if (dest) router.push(dest);
-              }
-            } finally {
-              setUnsavedDialogSaving(false);
-            }
-          })();
-        }}
+      <TemplateGallery
+        open={showTemplateGallery && layoutId === 'new'}
+        onClose={() => setShowTemplateGallery(false)}
+        onSelect={(tabs) => handleTemplateSelect(tabs)}
+        savedTemplates={(schema?.customLayoutTemplates ?? []).filter(
+          (template) => template.objectApi === objectApiName,
+        )}
       />
 
-      {/* Section Visibility Rule Editor Modal */}
-      {showSectionVisibilityEditor &&
-        selectedElement &&
-        selectedElement.type === 'section' &&
-        (() => {
-          const section = sections.find((s) => s.id === selectedElement.id);
-          if (!section) return null;
-          const fakeField = {
-            label: section.label,
-            apiName: section.id,
-            visibleIf: section.visibleIf || [],
-          } as FieldDef;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[80vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">
-                    Section Visibility Rules: {section.label}
-                  </h3>
-                  <button
-                    onClick={() => setShowSectionVisibilityEditor(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="p-6">
-                  <FieldVisibilityRuleEditor
-                    field={fakeField}
-                    availableFields={object.fields}
-                    onSave={(conditions) => {
-                      useEditorStore.getState().updateSection(selectedElement.id, {
-                        visibleIf: conditions,
-                      });
-                      markDirty();
-                      setShowSectionVisibilityEditor(false);
-                    }}
-                    onCancel={() => setShowSectionVisibilityEditor(false)}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-      {/* Field Visibility Rule Editor Modal */}
-      {showVisibilityEditor &&
-        selectedElement &&
-        selectedElement.type === 'field' &&
-        (() => {
-          const field = fields.find((f) => f.id === selectedElement.id);
-          const fieldDef = field ? getFieldDef(field.fieldApiName) : null;
-          if (!fieldDef) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[80vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                  <h3 className="text-lg font-semibold">
-                    Field Visibility Rules: {fieldDef.label}
-                  </h3>
-                  <button
-                    onClick={() => setShowVisibilityEditor(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="p-6">
-                  <FieldVisibilityRuleEditor
-                    field={fieldDef}
-                    availableFields={object.fields.filter(
-                      (f) => f.apiName !== fieldDef.apiName,
-                    )}
-                    onSave={handleSaveVisibilityRules}
-                    onCancel={() => setShowVisibilityEditor(false)}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-      {/* Picklist Dependency Editor Modal */}
-      {showPicklistDependencyEditor &&
-        selectedElement &&
-        selectedElement.type === 'field' &&
-        (() => {
-          const field = fields.find((f) => f.id === selectedElement.id);
-          const fieldDef = field ? getFieldDef(field.fieldApiName) : null;
-          if (!fieldDef || !fieldDef.picklistValues) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-              <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-                  <h3 className="text-lg font-semibold">
-                    Value Dependencies: {fieldDef.label}
-                  </h3>
-                  <button
-                    onClick={() => setShowPicklistDependencyEditor(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <div className="p-6">
-                  <PicklistDependencyEditor
-                    field={fieldDef}
-                    availableFields={object.fields.filter(
-                      (f) => f.apiName !== fieldDef.apiName,
-                    )}
-                    onSave={handleSavePicklistDependencies}
-                    onCancel={() => setShowPicklistDependencyEditor(false)}
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-    </DndContextWrapper>
+      {isSaving ? (
+        <div className="pointer-events-none fixed bottom-4 right-4 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg">
+          Saving...
+        </div>
+      ) : null}
+    </div>
   );
 }

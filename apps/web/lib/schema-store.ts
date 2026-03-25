@@ -1,9 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition, CustomLayoutTemplate } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
 import { recordsService } from './records-service';
+
+export interface LayoutActivationConflict {
+  layoutId: string;
+  layoutName: string;
+  sharedRoleIds: string[];
+}
+
+export interface SetLayoutActiveResult {
+  updated: boolean;
+  conflicts: LayoutActivationConflict[];
+}
 
 export interface SchemaStore {
   // Current schema state
@@ -41,6 +52,14 @@ export interface SchemaStore {
   addPageLayout: (objectApi: string, layout: Omit<PageLayout, 'id'>) => string;
   updatePageLayout: (objectApi: string, layoutId: string, updates: Partial<PageLayout>) => void;
   deletePageLayout: (objectApi: string, layoutId: string) => void;
+  setLayoutActive: (
+    objectApi: string,
+    layoutId: string,
+    active: boolean,
+    options?: { force?: boolean }
+  ) => Promise<SetLayoutActiveResult>;
+  setLayoutDefault: (objectApi: string, layoutId: string) => Promise<void>;
+  saveCustomTemplate: (template: CustomLayoutTemplate) => Promise<void>;
   
   // Validation rule operations
   addValidationRule: (objectApi: string, rule: Omit<ValidationRule, 'id'>) => string;
@@ -244,13 +263,14 @@ export const useSchemaStore = create<SchemaStore>()(
         const { schema } = get();
         if (!schema) return;
 
+        const previousSchema = schema;
         const updatedObjects = schema.objects.map(obj =>
           obj.apiName === objectApi 
             ? { ...obj, ...updates, updatedAt: new Date().toISOString() }
             : obj
         );
 
-        const updatedSchema = {
+        const optimisticSchema = {
           ...schema,
           objects: updatedObjects,
           version: schema.version + 1,
@@ -258,13 +278,13 @@ export const useSchemaStore = create<SchemaStore>()(
         };
         
         // Optimistic update — rollback on failure
-        set({ schema: updatedSchema });
+        set({ schema: optimisticSchema });
         
         try {
-          await schemaService.saveSchema(updatedSchema);
+          await schemaService.saveSchema(optimisticSchema);
         } catch (error) {
-          // Rollback to previous state
-          set({ schema });
+          // Roll back only when no newer write has replaced this optimistic state.
+          set((state) => (state.schema === optimisticSchema ? { schema: previousSchema } : state));
           throw error;
         }
       },
@@ -665,6 +685,149 @@ export const useSchemaStore = create<SchemaStore>()(
 
         set({ schema: updatedSchema });
         schemaService.saveSchema(updatedSchema);
+      },
+
+      setLayoutActive: async (objectApi, layoutId, active, options) => {
+        const { updateObject } = get();
+        const schema = get().schema;
+        if (!schema) {
+          return { updated: false, conflicts: [] };
+        }
+
+        const objectDef = schema.objects.find(obj => obj.apiName === objectApi);
+        if (!objectDef) {
+          return { updated: false, conflicts: [] };
+        }
+
+        const target = objectDef.pageLayouts.find(layout => layout.id === layoutId);
+        if (!target) {
+          return { updated: false, conflicts: [] };
+        }
+
+        if (active === false) {
+          const latestSchema = get().schema;
+          if (!latestSchema) {
+            return { updated: false, conflicts: [] };
+          }
+
+          const latestObjectDef = latestSchema.objects.find(obj => obj.apiName === objectApi);
+          if (!latestObjectDef) {
+            return { updated: false, conflicts: [] };
+          }
+
+          const latestTarget = latestObjectDef.pageLayouts.find(layout => layout.id === layoutId);
+          if (!latestTarget) {
+            return { updated: false, conflicts: [] };
+          }
+
+          const pageLayouts = latestObjectDef.pageLayouts.map(layout =>
+            layout.id === layoutId ? { ...layout, active: false } : layout
+          );
+          await updateObject(objectApi, { pageLayouts });
+          return { updated: true, conflicts: [] };
+        }
+
+        const latestSchema = get().schema;
+        if (!latestSchema) {
+          return { updated: false, conflicts: [] };
+        }
+
+        const latestObjectDef = latestSchema.objects.find(obj => obj.apiName === objectApi);
+        if (!latestObjectDef) {
+          return { updated: false, conflicts: [] };
+        }
+
+        const latestTarget = latestObjectDef.pageLayouts.find(layout => layout.id === layoutId);
+        if (!latestTarget) {
+          return { updated: false, conflicts: [] };
+        }
+
+        const targetRoleIds = latestTarget.roles ?? [];
+        const conflicts: LayoutActivationConflict[] = latestObjectDef.pageLayouts
+          .filter(layout => layout.id !== layoutId && layout.active === true)
+          .map((layout) => {
+            const overlap = targetRoleIds.filter((roleId) => (layout.roles ?? []).includes(roleId));
+            return {
+              layoutId: layout.id,
+              layoutName: layout.name,
+              sharedRoleIds: Array.from(new Set(overlap))
+            };
+          })
+          .filter(conflict => conflict.sharedRoleIds.length > 0);
+
+        if (conflicts.length > 0 && options?.force !== true) {
+          return { updated: false, conflicts };
+        }
+
+        const conflictingIds = new Set(conflicts.map(conflict => conflict.layoutId));
+        const pageLayouts = latestObjectDef.pageLayouts.map(layout => {
+          if (layout.id === layoutId) {
+            return { ...layout, active: true };
+          }
+          if (conflictingIds.has(layout.id)) {
+            return { ...layout, active: false };
+          }
+          return layout;
+        });
+
+        await updateObject(objectApi, { pageLayouts });
+        return { updated: true, conflicts: [] };
+      },
+
+      setLayoutDefault: async (objectApi, layoutId) => {
+        const { updateObject } = get();
+        const schema = get().schema;
+        if (!schema) return;
+
+        const objectDef = schema.objects.find(obj => obj.apiName === objectApi);
+        if (!objectDef) return;
+
+        const latestSchema = get().schema;
+        if (!latestSchema) return;
+
+        const latestObjectDef = latestSchema.objects.find(obj => obj.apiName === objectApi);
+        if (!latestObjectDef) return;
+
+        const target = latestObjectDef.pageLayouts.find(layout => layout.id === layoutId);
+        if (!target) return;
+
+        const updatedLayouts = latestObjectDef.pageLayouts.map(layout => ({
+          ...layout,
+          isDefault: layout.id === layoutId
+        }));
+
+        await updateObject(objectApi, { pageLayouts: updatedLayouts });
+      },
+
+      saveCustomTemplate: async (template) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const previousSchema = schema;
+        const currentTemplates = schema.customLayoutTemplates ?? [];
+        const existingIndex = currentTemplates.findIndex(existing => existing.id === template.id);
+        const nextTemplates = [...currentTemplates];
+        if (existingIndex >= 0) {
+          nextTemplates[existingIndex] = template;
+        } else {
+          nextTemplates.push(template);
+        }
+
+        const optimisticSchema = {
+          ...schema,
+          customLayoutTemplates: nextTemplates,
+          version: schema.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: optimisticSchema });
+
+        try {
+          await schemaService.saveSchema(optimisticSchema);
+        } catch (error) {
+          set((state) => (state.schema === optimisticSchema ? { schema: previousSchema } : state));
+          throw error;
+        }
       },
 
       // Add validation rule

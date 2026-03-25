@@ -1,622 +1,440 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCenter,
-  pointerWithin,
   KeyboardSensor,
   PointerSensor,
+  closestCenter,
   useSensor,
   useSensors,
-  DragStartEvent,
-  DragEndEvent,
-  DragOverEvent,
-  type CollisionDetection,
+  type Active,
+  type DragEndEvent,
+  type DragStartEvent,
+  type Over,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import type { FieldDef, WidgetType } from '@/lib/schema';
-import type { CanvasField, CanvasWidget, DraggedItem } from './types';
+import type { WidgetType } from '@/lib/schema';
+import type { LayoutPanel, LayoutRegion, LayoutWidget, PanelField } from './types';
 import { useEditorStore } from './editor-store';
-import { EditorDragUiContext } from './editor-drag-ui-context';
-import { RECORD_HEADER_DROP_ID } from './record-header-chrome';
-import { TAB_GRID_COLUMNS } from '@/lib/tab-canvas-grid';
 
-interface ResizeState {
-  id: string;
-  dir: 'col' | 'row' | 'both';
-  startX: number;
-  startY: number;
-  startColSpan: number;
-  startRowSpan: number;
-  sectionCols: number;
-}
+type DragSource =
+  | { kind: 'palette-field'; fieldApiName: string; label: string }
+  | { kind: 'existing-field'; fieldApiName: string; fromPanelId: string; label: string }
+  | { kind: 'palette-widget'; widgetType: WidgetType; label: string }
+  | { kind: 'existing-widget'; widgetId: string; label: string }
+  | { kind: 'panel'; panelId: string; regionId?: string; label: string }
+  | { kind: 'region'; regionId: string; label: string }
+  | null;
 
-const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, any> = {
-  RelatedList: { type: 'RelatedList', relatedObjectApiName: '', relationshipFieldApiName: '', displayColumns: [] },
+type DropTarget =
+  | { kind: 'panel-drop'; panelId: string }
+  | { kind: 'region-drop'; regionId: string }
+  | { kind: 'field-item'; panelId: string; index: number }
+  | { kind: 'widget-item'; regionId: string; index: number }
+  | { kind: 'panel-item'; panelId: string; regionId: string; index: number }
+  | { kind: 'region-item'; regionId: string }
+  | null;
+
+const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
+  RelatedList: {
+    type: 'RelatedList',
+    relatedObjectApiName: '',
+    relationshipFieldApiName: '',
+    displayColumns: [],
+  },
   ActivityFeed: { type: 'ActivityFeed', maxItems: 10 },
-  FileFolder: { type: 'FileFolder', provider: 'dropbox' },
+  FileFolder: { type: 'FileFolder', provider: 'local' },
   CustomComponent: { type: 'CustomComponent', componentId: '' },
   Spacer: { type: 'Spacer', minHeightPx: 32 },
+  HeaderHighlights: { type: 'HeaderHighlights', fieldApiNames: [] },
 };
 
-/** Placed canvas widget id: `widget-<timestamp>-<type>` — not palette `widget-new-*` */
-function isCanvasWidgetId(id: string): boolean {
-  return id.startsWith('widget-') && !id.startsWith('widget-new-');
+function sortedFields(panel: LayoutPanel): PanelField[] {
+  return [...panel.fields].sort((a, b) => a.order - b.order);
 }
 
-/** New drops onto a column surface go above existing items (smaller order = higher in stack). */
-function orderForDropIntoColumn(
-  sectionId: string,
-  column: number,
-  fields: CanvasField[],
-  widgets: CanvasWidget[],
-): number {
-  const orders = [
-    ...fields.filter((f) => f.sectionId === sectionId && f.column === column).map((f) => f.order),
-    ...widgets
-      .filter((w) => w.sectionId && w.sectionId === sectionId && w.column === column)
-      .map((w) => w.order),
-  ];
-  if (orders.length === 0) return 0;
-  return Math.min(...orders) - 1;
+function sortedWidgets(region: LayoutRegion): LayoutWidget[] {
+  return [...region.widgets].sort((a, b) => a.order - b.order);
 }
 
-type ColumnRow = { id: string; order: number };
-
-/** Tab-level widgets: sectionId === '' */
-function orderForDropIntoTabRoot(
-  tabId: string,
-  widgets: CanvasWidget[],
-): number {
-  const orders = widgets
-    .filter((w) => w.tabId === tabId && !w.sectionId)
-    .map((w) => w.order);
-  if (orders.length === 0) return 0;
-  return Math.min(...orders) - 1;
+function findRegion(layout: ReturnType<typeof useEditorStore.getState>['layout'], regionId: string) {
+  for (const tab of layout.tabs) {
+    const region = tab.regions.find((candidate) => candidate.id === regionId);
+    if (region) return region;
+  }
+  return undefined;
 }
 
-function tabRootWidgetsSorted(tabId: string, widgets: CanvasWidget[], excludeId: string): ColumnRow[] {
-  const rows: ColumnRow[] = [];
-  for (const w of widgets) {
-    if (w.tabId === tabId && !w.sectionId && w.id !== excludeId) {
-      rows.push({ id: w.id, order: w.order });
+function findPanel(layout: ReturnType<typeof useEditorStore.getState>['layout'], panelId: string) {
+  for (const tab of layout.tabs) {
+    for (const region of tab.regions) {
+      const panel = region.panels.find((candidate) => candidate.id === panelId);
+      if (panel) return { panel, region };
     }
   }
-  return rows.sort((a, b) => a.order - b.order);
+  return undefined;
 }
 
-function columnRowsSorted(
-  sectionId: string,
-  column: number,
-  fields: CanvasField[],
-  widgets: CanvasWidget[],
-  excludeId: string,
-): ColumnRow[] {
-  const rows: ColumnRow[] = [];
-  for (const f of fields) {
-    if (f.sectionId === sectionId && f.column === column && f.id !== excludeId) {
-      rows.push({ id: f.id, order: f.order });
+function findWidget(
+  layout: ReturnType<typeof useEditorStore.getState>['layout'],
+  widgetId: string,
+) {
+  for (const tab of layout.tabs) {
+    for (const region of tab.regions) {
+      const widget = region.widgets.find((candidate) => candidate.id === widgetId);
+      if (widget) return { widget, region };
     }
   }
-  for (const w of widgets) {
-    if (w.sectionId && w.sectionId === sectionId && w.column === column && w.id !== excludeId) {
-      rows.push({ id: w.id, order: w.order });
+  return undefined;
+}
+
+function buildField(fieldApiName: string, atIndex: number): PanelField {
+  return {
+    fieldApiName,
+    colSpan: 1,
+    behavior: 'none',
+    labelStyle: {},
+    valueStyle: {},
+    order: atIndex,
+  };
+}
+
+function buildWidget(widgetType: WidgetType, atIndex: number): LayoutWidget {
+  return {
+    id: `widget-${Date.now()}-${widgetType}`,
+    widgetType,
+    order: atIndex,
+    config: DEFAULT_WIDGET_CONFIGS[widgetType],
+  };
+}
+
+function isWidgetType(value: string): value is LayoutWidget['widgetType'] {
+  return Object.prototype.hasOwnProperty.call(DEFAULT_WIDGET_CONFIGS, value);
+}
+
+function parseActiveDrag(
+  active: Active,
+  layout: ReturnType<typeof useEditorStore.getState>['layout'],
+): DragSource {
+  const activeId = String(active.id);
+  const data = (active.data.current ?? {}) as Record<string, unknown>;
+
+  if (data.type === 'field' && typeof data.panelId === 'string' && typeof data.fieldApiName === 'string') {
+    return {
+      kind: 'existing-field',
+      fieldApiName: data.fieldApiName,
+      fromPanelId: data.panelId,
+      label: data.fieldApiName,
+    };
+  }
+
+  if (activeId.startsWith('field-')) {
+    const fieldApiName = activeId.replace(/^field-/, '');
+    const label =
+      typeof data.field === 'object' &&
+      data.field !== null &&
+      typeof (data.field as { label?: unknown }).label === 'string'
+        ? ((data.field as { label: string }).label ?? fieldApiName)
+        : fieldApiName;
+    return { kind: 'palette-field', fieldApiName, label };
+  }
+
+  if (activeId.startsWith('widget-new-')) {
+    const widgetType = activeId.replace(/^widget-new-/, '');
+    if (!isWidgetType(widgetType)) return null;
+    return { kind: 'palette-widget', widgetType, label: widgetType };
+  }
+
+  if (data.type === 'widget' && typeof data.widgetId === 'string') {
+    const entry = findWidget(layout, data.widgetId);
+    return {
+      kind: 'existing-widget',
+      widgetId: data.widgetId,
+      label: entry?.widget.widgetType ?? data.widgetId,
+    };
+  }
+
+  const widgetEntry = findWidget(layout, activeId);
+  if (widgetEntry) {
+    return {
+      kind: 'existing-widget',
+      widgetId: widgetEntry.widget.id,
+      label: widgetEntry.widget.widgetType,
+    };
+  }
+
+  if (data.type === 'panel' && typeof data.panelId === 'string') {
+    const panelEntry = findPanel(layout, data.panelId);
+    return {
+      kind: 'panel',
+      panelId: data.panelId,
+      regionId: typeof data.regionId === 'string' ? data.regionId : panelEntry?.region.id,
+      label: panelEntry?.panel.label ?? data.panelId,
+    };
+  }
+
+  if (activeId.startsWith('panel-')) {
+    const panelEntry = findPanel(layout, activeId);
+    if (panelEntry) {
+      return {
+        kind: 'panel',
+        panelId: panelEntry.panel.id,
+        regionId: panelEntry.region.id,
+        label: panelEntry.panel.label,
+      };
     }
   }
-  return rows.sort((a, b) => a.order - b.order);
+
+  if (data.type === 'region' && typeof data.regionId === 'string') {
+    const regionEntry = findRegion(layout, data.regionId);
+    return {
+      kind: 'region',
+      regionId: data.regionId,
+      label: regionEntry?.label ?? data.regionId,
+    };
+  }
+
+  if (activeId.startsWith('region-')) {
+    const regionEntry = findRegion(layout, activeId);
+    if (regionEntry) return { kind: 'region', regionId: regionEntry.id, label: regionEntry.label };
+  }
+
+  return null;
 }
 
-function maxTabCanvasRowEnd(
-  tabSections: { gridRow?: number; gridRowSpan?: number }[],
-  tabRootWidgets: { gridRow?: number; gridRowSpan?: number }[],
-): number {
-  let max = 0;
-  for (const s of tabSections) {
-    const end = (s.gridRow ?? 1) + (s.gridRowSpan ?? 1) - 1;
-    if (end > max) max = end;
-  }
-  for (const w of tabRootWidgets) {
-    const end = (w.gridRow ?? 1) + (w.gridRowSpan ?? 1) - 1;
-    if (end > max) max = end;
-  }
-  return max;
-}
+function parseDropTarget(
+  over: Over,
+  layout: ReturnType<typeof useEditorStore.getState>['layout'],
+): DropTarget {
+  const overId = String(over.id);
+  const data = (over.data.current ?? {}) as Record<string, unknown>;
 
-/** Prefer record header when pointer is inside it so drops are not stolen by the canvas. */
-const pageEditorCollisionDetection: CollisionDetection = (args) => {
-  const within = pointerWithin(args);
-  const hi = within.find((c) => String(c.id) === RECORD_HEADER_DROP_ID);
-  if (hi) return [hi];
-  return closestCenter(args);
-};
+  if (overId.startsWith('panel-drop-')) {
+    return { kind: 'panel-drop', panelId: overId.replace(/^panel-drop-/, '') };
+  }
+  if (data.type === 'panel-drop' && typeof data.panelId === 'string') {
+    return { kind: 'panel-drop', panelId: data.panelId };
+  }
+
+  if (overId.startsWith('region-drop-')) {
+    return { kind: 'region-drop', regionId: overId.replace(/^region-drop-/, '') };
+  }
+  if (data.type === 'region-drop' && typeof data.regionId === 'string') {
+    return { kind: 'region-drop', regionId: data.regionId };
+  }
+
+  if (data.type === 'field' && typeof data.panelId === 'string' && typeof data.fieldApiName === 'string') {
+    const panelEntry = findPanel(layout, data.panelId);
+    if (!panelEntry) return null;
+    const ordered = sortedFields(panelEntry.panel);
+    const index = ordered.findIndex((field) => field.fieldApiName === data.fieldApiName);
+    if (index < 0) return null;
+    return { kind: 'field-item', panelId: data.panelId, index };
+  }
+
+  if (data.type === 'widget' && typeof data.widgetId === 'string') {
+    const widgetEntry = findWidget(layout, data.widgetId);
+    if (!widgetEntry) return null;
+    const ordered = sortedWidgets(widgetEntry.region);
+    const index = ordered.findIndex((widget) => widget.id === data.widgetId);
+    if (index < 0) return null;
+    return { kind: 'widget-item', regionId: widgetEntry.region.id, index };
+  }
+
+  if (data.type === 'panel' && typeof data.panelId === 'string') {
+    const panelEntry = findPanel(layout, data.panelId);
+    if (!panelEntry) return null;
+    const ordered = [...panelEntry.region.panels].sort((a, b) => a.order - b.order);
+    const index = ordered.findIndex((panel) => panel.id === data.panelId);
+    if (index < 0) return null;
+    return {
+      kind: 'panel-item',
+      panelId: data.panelId,
+      regionId: panelEntry.region.id,
+      index,
+    };
+  }
+
+  if (data.type === 'region' && typeof data.regionId === 'string') {
+    return { kind: 'region-item', regionId: data.regionId };
+  }
+
+  if (overId.startsWith('region-') && findRegion(layout, overId)) {
+    return { kind: 'region-item', regionId: overId };
+  }
+
+  return null;
+}
 
 export function DndContextWrapper({
   children,
   getFieldDef,
 }: {
   children: React.ReactNode;
-  getFieldDef: (apiName: string) => FieldDef | undefined;
+  getFieldDef?: (apiName: string) => unknown;
 }) {
-  const fields = useEditorStore((s) => s.fields);
-  const widgets = useEditorStore((s) => s.widgets);
-  const sections = useEditorStore((s) => s.sections);
-  const addField = useEditorStore((s) => s.addField);
-  const setFields = useEditorStore((s) => s.setFields);
-  const setWidgets = useEditorStore((s) => s.setWidgets);
-  const addWidget = useEditorStore((s) => s.addWidget);
-  const addHighlightField = useEditorStore((s) => s.addHighlightField);
-  const markDirty = useEditorStore((s) => s.markDirty);
-  const pushUndo = useEditorStore((s) => s.pushUndo);
+  void getFieldDef;
 
-  const [draggedItem, setDraggedItem] = useState<DraggedItem | null>(null);
-  const [overId, setOverId] = useState<string | null>(null);
-  const [dropSide, setDropSide] = useState<'top' | 'bottom' | null>(null);
-  const [resizingField, setResizingField] = useState<ResizeState | null>(null);
+  const layout = useEditorStore((s) => s.layout);
+  const addField = useEditorStore((s) => s.addField);
+  const moveField = useEditorStore((s) => s.moveField);
+  const addWidget = useEditorStore((s) => s.addWidget);
+  const moveWidget = useEditorStore((s) => s.moveWidget);
+  const movePanel = useEditorStore((s) => s.movePanel);
+  const updateRegion = useEditorStore((s) => s.updateRegion);
+
+  const [overlayLabel, setOverlayLabel] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    }),
+    useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  useEffect(() => {
-    if (!resizingField) return;
-    const canvasEl = document.querySelector('[data-editor-canvas]');
-    const canvasWidth = canvasEl?.clientWidth ?? 800;
-    const COL_WIDTH = (canvasWidth - 80) / (resizingField.sectionCols + resizingField.startColSpan);
-    const ROW_HEIGHT = 72;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const dx = e.clientX - resizingField.startX;
-      const dy = e.clientY - resizingField.startY;
-      let newColSpan = resizingField.startColSpan;
-      let newRowSpan = resizingField.startRowSpan;
-
-      if (resizingField.dir === 'col' || resizingField.dir === 'both') {
-        newColSpan = Math.max(
-          1,
-          Math.min(resizingField.sectionCols, resizingField.startColSpan + Math.round(dx / COL_WIDTH)),
-        );
-      }
-      if (resizingField.dir === 'row' || resizingField.dir === 'both') {
-        newRowSpan = Math.max(1, Math.min(6, resizingField.startRowSpan + Math.round(dy / ROW_HEIGHT)));
-      }
-
-      setFields(
-        fields.map((f) =>
-          f.id === resizingField.id ? { ...f, colSpan: newColSpan, rowSpan: newRowSpan } : f,
-        ),
-      );
-    };
-
-    const handleMouseUp = () => {
-      setResizingField(null);
-      markDirty();
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [resizingField, fields, setFields, markDirty]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      pushUndo();
-      setResizingField(detail);
-    };
-    window.addEventListener('field-resize-start', handler);
-    return () => window.removeEventListener('field-resize-start', handler);
-  }, [pushUndo]);
-
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
-      const activeId = event.active.id.toString();
-
-      if (activeId.startsWith('field-')) {
-        const fieldApiName = activeId.replace('field-', '');
-        const field = getFieldDef(fieldApiName);
-        if (field) {
-          setDraggedItem({
-            id: field.apiName,
-            label: field.label,
-            apiName: field.apiName,
-            type: field.type,
-            required: field.required || false,
-          });
-        }
-      } else if (activeId.startsWith('placed-')) {
-        const placedField = fields.find((f) => f.id === activeId);
-        if (placedField) {
-          const fieldDef = getFieldDef(placedField.fieldApiName);
-          if (fieldDef) {
-            setDraggedItem({
-              id: placedField.id,
-              label: fieldDef.label,
-              apiName: fieldDef.apiName,
-              type: fieldDef.type,
-              required: fieldDef.required || false,
-            });
-          }
-        }
-      } else if (activeId.startsWith('widget-new-')) {
-        const widgetType = activeId.replace('widget-new-', '') as WidgetType;
-        setDraggedItem({
-          id: activeId,
-          widgetType,
-          label: widgetType,
-        });
-      } else if (isCanvasWidgetId(activeId)) {
-        const w = widgets.find((x) => x.id === activeId);
-        if (w) {
-          setDraggedItem({
-            id: w.id,
-            widgetType: w.widgetType,
-            label: w.widgetType,
-          });
-        }
-      }
+      const parsed = parseActiveDrag(event.active, layout);
+      setOverlayLabel(parsed?.label ?? String(event.active.id));
     },
-    [fields, widgets, getFieldDef],
+    [layout],
   );
-
-  const handleDragOver = useCallback((event: DragOverEvent) => {
-    const id = event.over ? event.over.id.toString() : null;
-    setOverId(id);
-  }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      const { active, over } = event;
-      setDraggedItem(null);
-      setOverId(null);
-      setDropSide(null);
+      setOverlayLabel(null);
+      if (!event.over) return;
 
-      if (!over) return;
+      const active = parseActiveDrag(event.active, layout);
+      const target = parseDropTarget(event.over, layout);
+      if (!active || !target) return;
 
-      const activeId = active.id.toString();
-      const targetId = over.id.toString();
+      if (active.kind === 'palette-field' || active.kind === 'existing-field') {
+        let targetPanelId: string | null = null;
+        let targetIndex = 0;
 
-      if (targetId === RECORD_HEADER_DROP_ID) {
-        if (activeId.startsWith('field-')) {
-          pushUndo();
-          const fieldApiName = activeId.replace('field-', '');
-          addHighlightField(fieldApiName);
-        } else if (activeId.startsWith('placed-')) {
-          const pf = fields.find((f) => f.id === activeId);
-          if (pf) {
-            pushUndo();
-            addHighlightField(pf.fieldApiName);
-          }
-        }
-        return;
-      }
-
-      const tabCanvasMatch = targetId.match(/^tab-canvas-(.+)$/);
-      if (tabCanvasMatch) {
-        const targetTabId = tabCanvasMatch[1];
-        const tabSecs = sections.filter((s) => s.tabId === targetTabId);
-        const tabRoots = widgets.filter(
-          (w) => w.tabId === targetTabId && !w.sectionId && w.id !== activeId,
-        );
-        const maxR = maxTabCanvasRowEnd(tabSecs, tabRoots);
-        const topOrder = orderForDropIntoTabRoot(targetTabId, widgets);
-        if (activeId.startsWith('widget-new-')) {
-          pushUndo();
-          const widgetType = activeId.replace('widget-new-', '') as WidgetType;
-          addWidget({
-            id: `widget-${Date.now()}-${widgetType}`,
-            widgetType,
-            tabId: targetTabId,
-            sectionId: '',
-            column: 0,
-            order: topOrder,
-            colSpan: 1,
-            rowSpan: 1,
-            config: DEFAULT_WIDGET_CONFIGS[widgetType],
-            gridRow: maxR + 1,
-            gridColumn: 1,
-            gridColumnSpan: TAB_GRID_COLUMNS,
-            gridRowSpan: 1,
-          });
-        } else if (isCanvasWidgetId(activeId)) {
-          pushUndo();
-          setWidgets(
-            widgets.map((w) =>
-              w.id === activeId
-                ? {
-                    ...w,
-                    tabId: targetTabId,
-                    sectionId: '',
-                    column: 0,
-                    order: topOrder,
-                    gridRow: maxR + 1,
-                    gridColumn: 1,
-                    gridColumnSpan: TAB_GRID_COLUMNS,
-                    gridRowSpan: 1,
-                  }
-                : w,
-            ),
-          );
-          markDirty();
-        }
-        return;
-      }
-
-      if (targetId.includes('-col-')) {
-        const colMatch = targetId.match(/^(.+)-col-(\d+)$/);
-        if (!colMatch) return;
-        pushUndo();
-        const targetSectionId = colMatch[1];
-        const targetColumn = parseInt(colMatch[2], 10);
-        const targetTabId = sections.find((s) => s.id === targetSectionId)?.tabId ?? '';
-        const topOrder = orderForDropIntoColumn(targetSectionId, targetColumn, fields, widgets);
-
-        if (activeId.startsWith('field-')) {
-          const fieldApiName = activeId.replace('field-', '');
-          addField({
-            id: `placed-${Date.now()}-${fieldApiName}`,
-            fieldApiName,
-            sectionId: targetSectionId,
-            column: targetColumn,
-            order: topOrder,
-            colSpan: 1,
-            rowSpan: 1,
-          });
-        } else if (activeId.startsWith('placed-')) {
-          setFields(
-            fields.map((f) =>
-              f.id === activeId
-                ? { ...f, sectionId: targetSectionId, column: targetColumn, order: topOrder }
-                : f,
-            ),
-          );
-          markDirty();
-        } else if (activeId.startsWith('widget-new-')) {
-          const widgetType = activeId.replace('widget-new-', '') as WidgetType;
-          addWidget({
-            id: `widget-${Date.now()}-${widgetType}`,
-            widgetType,
-            tabId: targetTabId,
-            sectionId: targetSectionId,
-            column: targetColumn,
-            order: topOrder,
-            colSpan: 1,
-            rowSpan: 1,
-            config: DEFAULT_WIDGET_CONFIGS[widgetType],
-          });
-        } else if (isCanvasWidgetId(activeId)) {
-          setWidgets(
-            widgets.map((w) =>
-              w.id === activeId
-                ? {
-                    ...w,
-                    tabId: targetTabId,
-                    sectionId: targetSectionId,
-                    column: targetColumn,
-                    order: topOrder,
-                  }
-                : w,
-            ),
-          );
-          markDirty();
-        }
-        return;
-      }
-
-      const overField = fields.find((f) => f.id === targetId);
-      const overWidget = widgets.find((w) => w.id === targetId);
-      if (!overField && !overWidget) return;
-
-      if (overWidget && !overWidget.sectionId) {
-        const targetTabId = overWidget.tabId;
-        const columnItems = tabRootWidgetsSorted(targetTabId, widgets, activeId);
-        const overIdx = columnItems.findIndex((r) => r.id === targetId);
-        if (overIdx < 0) return;
-        pushUndo();
-        const overOrder = overWidget.order;
-        let newOrder = overOrder;
-        if (dropSide === 'bottom') {
-          newOrder =
-            overIdx < columnItems.length - 1
-              ? (overOrder + columnItems[overIdx + 1].order) / 2
-              : overOrder + 1;
+        if (target.kind === 'panel-drop') {
+          const entry = findPanel(layout, target.panelId);
+          if (!entry) return;
+          targetPanelId = target.panelId;
+          targetIndex = sortedFields(entry.panel).length;
+        } else if (target.kind === 'field-item') {
+          targetPanelId = target.panelId;
+          targetIndex = target.index;
         } else {
-          newOrder =
-            overIdx > 0 ? (columnItems[overIdx - 1].order + overOrder) / 2 : overOrder - 1;
+          return;
         }
-        if (isCanvasWidgetId(activeId)) {
-          setWidgets(
-            widgets.map((w) =>
-              w.id === activeId
-                ? {
-                    ...w,
-                    tabId: targetTabId,
-                    sectionId: '',
-                    column: 0,
-                    order: newOrder,
-                  }
-                : w,
-            ),
-          );
-          markDirty();
-        } else if (activeId.startsWith('widget-new-')) {
-          const widgetType = activeId.replace('widget-new-', '') as WidgetType;
-          addWidget({
-            id: `widget-${Date.now()}-${widgetType}`,
-            widgetType,
-            tabId: targetTabId,
-            sectionId: '',
-            column: 0,
-            order: newOrder,
-            colSpan: 1,
-            rowSpan: 1,
-            config: DEFAULT_WIDGET_CONFIGS[widgetType],
-          });
+
+        if (active.kind === 'palette-field') {
+          addField(buildField(active.fieldApiName, targetIndex), targetPanelId, targetIndex);
+          return;
         }
+
+        const sourcePanel = findPanel(layout, active.fromPanelId);
+        if (!sourcePanel) return;
+        const sourceOrdered = sortedFields(sourcePanel.panel);
+        const sourceIndex = sourceOrdered.findIndex(
+          (field) => field.fieldApiName === active.fieldApiName,
+        );
+        if (sourceIndex < 0) return;
+
+        let insertionIndex = targetIndex;
+        if (active.fromPanelId === targetPanelId && sourceIndex < targetIndex) {
+          insertionIndex -= 1;
+        }
+        if (active.fromPanelId === targetPanelId && sourceIndex === insertionIndex) {
+          return;
+        }
+
+        moveField(active.fieldApiName, active.fromPanelId, targetPanelId, insertionIndex);
         return;
       }
 
-      const targetSectionId = overField?.sectionId ?? overWidget!.sectionId;
-      const targetColumn = overField?.column ?? overWidget!.column;
-      const overOrder = overField?.order ?? overWidget!.order;
-      const targetTabId = sections.find((s) => s.id === targetSectionId)?.tabId ?? '';
+      if (active.kind === 'palette-widget' || active.kind === 'existing-widget') {
+        let targetRegionId: string | null = null;
+        let targetIndex = 0;
 
-      const columnItems = columnRowsSorted(targetSectionId, targetColumn, fields, widgets, activeId);
-      const overIdx = columnItems.findIndex((r) => r.id === targetId);
-      if (overIdx < 0) return;
+        if (target.kind === 'region-drop') {
+          const region = findRegion(layout, target.regionId);
+          if (!region) return;
+          targetRegionId = target.regionId;
+          targetIndex = sortedWidgets(region).length;
+        } else if (target.kind === 'widget-item') {
+          targetRegionId = target.regionId;
+          targetIndex = target.index;
+        } else {
+          return;
+        }
 
-      pushUndo();
+        if (active.kind === 'palette-widget') {
+          addWidget(buildWidget(active.widgetType, targetIndex), targetRegionId, targetIndex);
+          return;
+        }
 
-      let newOrder = overOrder;
-      if (dropSide === 'bottom') {
-        newOrder =
-          overIdx < columnItems.length - 1
-            ? (overOrder + columnItems[overIdx + 1].order) / 2
-            : overOrder + 1;
-      } else {
-        newOrder =
-          overIdx > 0 ? (columnItems[overIdx - 1].order + overOrder) / 2 : overOrder - 1;
+        const source = findWidget(layout, active.widgetId);
+        if (!source) return;
+        const sourceOrdered = sortedWidgets(source.region);
+        const sourceIndex = sourceOrdered.findIndex((widget) => widget.id === source.widget.id);
+        if (sourceIndex < 0) return;
+
+        let insertionIndex = targetIndex;
+        if (source.region.id === targetRegionId && sourceIndex < targetIndex) {
+          insertionIndex -= 1;
+        }
+        if (source.region.id === targetRegionId && sourceIndex === insertionIndex) {
+          return;
+        }
+
+        moveWidget(source.widget.id, targetRegionId, insertionIndex);
+        return;
       }
 
-      if (activeId.startsWith('field-')) {
-        const fieldApiName = activeId.replace('field-', '');
-        addField({
-          id: `placed-${Date.now()}-${fieldApiName}`,
-          fieldApiName,
-          sectionId: targetSectionId,
-          column: targetColumn,
-          order: newOrder,
-          colSpan: 1,
-          rowSpan: 1,
+      if (active.kind === 'panel' && target.kind === 'panel-item') {
+        const activeRegionId =
+          active.regionId ?? findPanel(layout, active.panelId)?.region.id;
+        if (!activeRegionId || activeRegionId !== target.regionId) return;
+        if (active.panelId === target.panelId) return;
+        movePanel(active.panelId, target.regionId, target.index);
+        return;
+      }
+
+      if (active.kind === 'region' && target.kind === 'region-item') {
+        if (active.regionId === target.regionId) return;
+        const overRegion = findRegion(layout, target.regionId);
+        if (!overRegion) return;
+        updateRegion(active.regionId, {
+          gridColumn: overRegion.gridColumn,
+          gridRow: overRegion.gridRow,
         });
-      } else if (activeId.startsWith('placed-')) {
-        setFields(
-          fields.map((f) =>
-            f.id === activeId
-              ? { ...f, sectionId: targetSectionId, column: targetColumn, order: newOrder }
-              : f,
-          ),
-        );
-        markDirty();
-      } else if (activeId.startsWith('widget-new-')) {
-        const widgetType = activeId.replace('widget-new-', '') as WidgetType;
-        addWidget({
-          id: `widget-${Date.now()}-${widgetType}`,
-          widgetType,
-          tabId: targetTabId,
-          sectionId: targetSectionId,
-          column: targetColumn,
-          order: newOrder,
-          colSpan: 1,
-          rowSpan: 1,
-          config: DEFAULT_WIDGET_CONFIGS[widgetType],
-        });
-      } else if (isCanvasWidgetId(activeId)) {
-        setWidgets(
-          widgets.map((w) =>
-            w.id === activeId
-              ? {
-                  ...w,
-                  tabId: targetTabId,
-                  sectionId: targetSectionId,
-                  column: targetColumn,
-                  order: newOrder,
-                }
-              : w,
-          ),
-        );
-        markDirty();
       }
     },
-    [
-      fields,
-      widgets,
-      sections,
-      dropSide,
-      addField,
-      setFields,
-      setWidgets,
-      addWidget,
-      addHighlightField,
-      markDirty,
-      pushUndo,
-    ],
+    [addField, addWidget, layout, moveField, movePanel, moveWidget, updateRegion],
   );
 
-  const dragUiValue = React.useMemo(() => ({ overId, dropSide }), [overId, dropSide]);
+  const handleDragCancel = useCallback(() => {
+    setOverlayLabel(null);
+  }, []);
+
+  const overlay = useMemo(
+    () =>
+      overlayLabel ? (
+        <div className="rounded-full border border-brand-navy/20 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-sm">
+          {overlayLabel}
+        </div>
+      ) : null,
+    [overlayLabel],
+  );
 
   return (
-    <EditorDragUiContext.Provider value={dragUiValue}>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={pageEditorCollisionDetection}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        autoScroll
-      >
-        <DndOverlayDropSideTracker overId={overId} onDropSideChange={setDropSide} />
-        <div data-over-id={overId || ''} data-drop-side={dropSide || ''}>
-          {children}
-        </div>
-
-        <DragOverlay>
-          {draggedItem ? (
-            <div className="p-2 bg-white/90 border-2 border-brand-navy rounded-lg shadow-lg backdrop-blur-sm">
-              <div className="font-medium text-sm">
-                {'apiName' in draggedItem ? draggedItem.label : draggedItem.widgetType}
-              </div>
-              {'type' in draggedItem && (
-                <div className="text-xs text-gray-500">{(draggedItem as { type?: string }).type}</div>
-              )}
-            </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
-    </EditorDragUiContext.Provider>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      {children}
+      <DragOverlay>{overlay}</DragOverlay>
+    </DndContext>
   );
-}
-
-function DndOverlayDropSideTracker({
-  overId,
-  onDropSideChange,
-}: {
-  overId: string | null;
-  onDropSideChange: (side: 'top' | 'bottom' | null) => void;
-}) {
-  useEffect(() => {
-    const isSortableTarget =
-      !!overId &&
-      (overId.startsWith('placed-') || isCanvasWidgetId(overId));
-    if (!isSortableTarget) {
-      onDropSideChange(null);
-      return;
-    }
-
-    const handler = (e: MouseEvent) => {
-      const safe =
-        typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
-          ? CSS.escape(overId)
-          : overId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const el = document.querySelector(
-        `[data-editor-sortable-id="${safe}"]`,
-      ) as HTMLElement | null;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      const y = e.clientY - rect.top;
-      onDropSideChange(y < rect.height / 2 ? 'top' : 'bottom');
-    };
-
-    window.addEventListener('mousemove', handler);
-    return () => window.removeEventListener('mousemove', handler);
-  }, [overId, onDropSideChange]);
-
-  return null;
 }

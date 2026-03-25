@@ -1,592 +1,694 @@
 import { create } from 'zustand';
 import type {
-  FormattingRule,
-  PageLayout,
-  WidgetType,
-  WidgetConfig,
-} from '@/lib/schema';
-import type {
-  CanvasField,
-  CanvasSection,
-  CanvasTab,
-  CanvasWidget,
-  ColumnCount,
+  EditorPageLayout,
   SelectedElement,
+  LayoutTab,
+  LayoutRegion,
+  LayoutPanel,
+  PanelField,
+  LayoutWidget,
+  FormattingRule,
 } from './types';
-import type { LayoutPresetId } from './layout-presets';
-import { getPresetSections } from './layout-presets';
-import { normalizeCanvasTabGrids } from '@/lib/tab-canvas-grid';
 
-interface Snapshot {
-  tabs: CanvasTab[];
-  sections: CanvasSection[];
-  fields: CanvasField[];
-  widgets: CanvasWidget[];
-  highlightFields: string[];
+// ── Helper finders ────────────────────────────────────────────────────────────
+
+function findRegionEntry(
+  layout: EditorPageLayout,
+  regionId: string,
+): { tab: LayoutTab; region: LayoutRegion } | undefined {
+  for (const tab of layout.tabs) {
+    const region = tab.regions.find((r) => r.id === regionId);
+    if (region) return { tab, region };
+  }
 }
+
+function findPanelEntry(
+  layout: EditorPageLayout,
+  panelId: string,
+): { tab: LayoutTab; region: LayoutRegion; panel: LayoutPanel } | undefined {
+  for (const tab of layout.tabs) {
+    for (const region of tab.regions) {
+      const panel = region.panels.find((p) => p.id === panelId);
+      if (panel) return { tab, region, panel };
+    }
+  }
+}
+
+function findWidgetEntry(
+  layout: EditorPageLayout,
+  widgetId: string,
+): { tab: LayoutTab; region: LayoutRegion; widget: LayoutWidget } | undefined {
+  for (const tab of layout.tabs) {
+    for (const region of tab.regions) {
+      const widget = region.widgets.find((w) => w.id === widgetId);
+      if (widget) return { tab, region, widget };
+    }
+  }
+}
+
+function reindexOrder<T extends { order: number }>(items: T[]): T[] {
+  return items.map((item, index) => ({ ...item, order: index }));
+}
+
+// ── Default layout ────────────────────────────────────────────────────────────
+
+const DEFAULT_LAYOUT: EditorPageLayout = {
+  id: '',
+  name: 'New Layout',
+  objectApi: '',
+  active: false,
+  isDefault: false,
+  roles: [],
+  tabs: [
+    {
+      id: 'tab-1',
+      label: 'Details',
+      order: 0,
+      regions: [],
+    },
+  ],
+  formattingRules: [],
+};
+
+// ── State interface ───────────────────────────────────────────────────────────
 
 export interface EditorState {
-  // Data
-  tabs: CanvasTab[];
-  sections: CanvasSection[];
-  fields: CanvasField[];
-  widgets: CanvasWidget[];
-
-  // UI
-  activeTabId: string;
+  layout: EditorPageLayout;
   selectedElement: SelectedElement;
-  layoutName: string;
-  editingLayoutId: string | null;
-  /** Field API names for record header highlights (max ~6 in UI) */
-  highlightFields: string[];
-  formattingRules: FormattingRule[];
-  hasUnsavedChanges: boolean;
+  isDirty: boolean;
+  undoStack: EditorPageLayout[];
+  redoStack: EditorPageLayout[];
+  activeTabId: string;
 
-  // Undo
-  undoStack: Snapshot[];
-
-  // Actions — tabs
-  setLayoutName: (name: string) => void;
-  setActiveTab: (tabId: string) => void;
+  // Non-mutating UI actions
   setSelectedElement: (el: SelectedElement) => void;
-  addTab: () => void;
-  updateTabLabel: (tabId: string, label: string) => void;
-  deleteTab: (tabId: string) => void;
+  setActiveTab: (tabId: string) => void;
 
-  // Actions — sections
-  addSection: () => void;
-  updateSection: (id: string, updates: Partial<CanvasSection>) => void;
-  deleteSection: (id: string) => void;
-  moveSection: (id: string, dir: 'up' | 'down') => void;
-  updateSectionColumns: (id: string, cols: ColumnCount) => void;
-  toggleSectionCollapsed: (id: string) => void;
-  /** Resize shared border between two sections on the same grid row (12-col canvas). */
-  adjustAdjacentGridSpans: (
-    leftSectionId: string,
-    rightSectionId: string,
-    deltaLeftSpan: number,
-  ) => void;
-  /** Append preset sections to the active tab (undoable). */
-  applyLayoutPreset: (presetId: LayoutPresetId) => void;
+  // Mutating layout metadata
+  setLayoutName: (name: string) => void;
 
-  // Actions — fields
-  addField: (field: CanvasField) => void;
-  updateField: (id: string, updates: Partial<CanvasField>) => void;
-  deleteField: (id: string) => void;
-  setFields: (fields: CanvasField[]) => void;
+  // Region actions
+  updateRegion: (regionId: string, patch: Partial<LayoutRegion>) => void;
+  addRegion: (region: LayoutRegion, tabId: string) => void;
+  removeRegion: (regionId: string) => void;
+  resizeRegion: (regionId: string, newColSpan: number) => void;
 
-  // Actions — widgets
-  addWidget: (widget: CanvasWidget) => void;
-  updateWidget: (id: string, updates: Partial<CanvasWidget>) => void;
-  deleteWidget: (id: string) => void;
-  setWidgets: (widgets: CanvasWidget[]) => void;
+  // Panel actions
+  updatePanel: (panelId: string, patch: Partial<LayoutPanel>) => void;
+  addPanel: (panel: LayoutPanel, regionId: string) => void;
+  removePanel: (panelId: string) => void;
+  movePanel: (panelId: string, regionId: string, toIndex: number) => void;
 
-  // Highlights (layout-level)
-  setHighlightFields: (apiNames: string[]) => void;
-  addHighlightField: (apiName: string) => void;
-  removeHighlightField: (apiName: string) => void;
-  moveHighlightField: (index: number, dir: 'up' | 'down') => void;
+  // Field actions
+  updateField: (fieldApiName: string, panelId: string, patch: Partial<PanelField>) => void;
+  addField: (field: PanelField, panelId: string, atIndex?: number) => void;
+  removeField: (fieldApiName: string, panelId: string) => void;
+  moveField: (fieldApiName: string, fromPanelId: string, toPanelId: string, atIndex: number) => void;
+  resizeField: (fieldApiName: string, panelId: string, newColSpan: number) => void;
 
-  // Actions — formatting
-  setFormattingRules: (rules: FormattingRule[]) => void;
+  // Widget actions
+  updateWidget: (widgetId: string, patch: Partial<LayoutWidget>) => void;
+  addWidget: (widget: LayoutWidget, regionId: string, atIndex?: number) => void;
+  removeWidget: (widgetId: string) => void;
+  moveWidget: (widgetId: string, toRegionId: string, atIndex: number) => void;
 
-  // Actions — lifecycle
-  loadLayout: (layout: PageLayout) => void;
-  reset: () => void;
-  markSaved: () => void;
-  markDirty: () => void;
-  pushUndo: () => void;
-  undo: () => void;
-}
-
-const DEFAULT_TABS: CanvasTab[] = [
-  { id: 'tab-1', label: 'General Information', order: 0 },
-];
-
-const DEFAULT_SECTIONS: CanvasSection[] = [
-  {
-    id: 'section-1',
-    label: 'Basic Details',
-    tabId: 'tab-1',
-    columns: 2,
-    order: 0,
-    collapsed: false,
-    showInRecord: true,
-    showInTemplate: true,
-    gridRow: 1,
-    gridColumn: 1,
-    gridColumnSpan: 12,
-    gridRowSpan: 1,
-  },
-];
-
-export const useEditorStore = create<EditorState>()((set, get) => ({
-  // Initial state
-  tabs: DEFAULT_TABS,
-  sections: DEFAULT_SECTIONS,
-  fields: [],
-  widgets: [],
-  activeTabId: 'tab-1',
-  selectedElement: null,
-  layoutName: 'Page Layout',
-  editingLayoutId: null,
-  highlightFields: [],
-  formattingRules: [],
-  hasUnsavedChanges: false,
-  undoStack: [],
-
-  // Layout name
-  setLayoutName: (name) => set({ layoutName: name, hasUnsavedChanges: true }),
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
-  setSelectedElement: (el) => set({ selectedElement: el }),
-
-  // Tabs
-  addTab: () => {
-    const { tabs } = get();
-    const newTab: CanvasTab = {
-      id: `tab-${Date.now()}`,
-      label: `New Tab ${tabs.length + 1}`,
-      order: tabs.length,
-    };
-    set({ tabs: [...tabs, newTab], activeTabId: newTab.id, hasUnsavedChanges: true });
-  },
-
-  updateTabLabel: (tabId, label) => {
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === tabId ? { ...t, label } : t)),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  deleteTab: (tabId) => {
-    const { tabs, sections, fields, widgets, activeTabId } = get();
-    if (tabs.length <= 1) return;
-    const remaining = tabs.filter((t) => t.id !== tabId);
-    const sectionIds = new Set(sections.filter((s) => s.tabId === tabId).map((s) => s.id));
-    set({
-      tabs: remaining,
-      sections: sections.filter((s) => s.tabId !== tabId),
-      fields: fields.filter((f) => !sectionIds.has(f.sectionId)),
-      widgets: widgets.filter((w) => w.tabId !== tabId),
-      activeTabId: activeTabId === tabId ? remaining[0]?.id || '' : activeTabId,
-      hasUnsavedChanges: true,
-    });
-  },
-
-  // Sections
-  addSection: () => {
-    const { sections, widgets, activeTabId } = get();
-    const tabSections = sections.filter((s) => s.tabId === activeTabId);
-    const tabWids = widgets.filter((w) => w.tabId === activeTabId && !w.sectionId);
-    let maxRowEnd = 0;
-    for (const s of tabSections) {
-      const end = (s.gridRow ?? 1) + (s.gridRowSpan ?? 1) - 1;
-      if (end > maxRowEnd) maxRowEnd = end;
-    }
-    for (const w of tabWids) {
-      const end = (w.gridRow ?? 1) + (w.gridRowSpan ?? 1) - 1;
-      if (end > maxRowEnd) maxRowEnd = end;
-    }
-    const newSection: CanvasSection = {
-      id: `section-${Date.now()}`,
-      label: `New Section ${tabSections.length + 1}`,
-      tabId: activeTabId,
-      columns: 2,
-      order: tabSections.length,
-      collapsed: false,
-      showInRecord: true,
-      showInTemplate: true,
-      gridRow: maxRowEnd + 1,
-      gridColumn: 1,
-      gridColumnSpan: 12,
-      gridRowSpan: 1,
-    };
-    set({ sections: [...sections, newSection], hasUnsavedChanges: true });
-  },
-
-  updateSection: (id, updates) => {
-    set((s) => ({
-      sections: s.sections.map((sec) => (sec.id === id ? { ...sec, ...updates } : sec)),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  adjustAdjacentGridSpans: (leftSectionId: string, rightSectionId: string, deltaLeftSpan: number) => {
-    set((s) => {
-      const left = s.sections.find((sec) => sec.id === leftSectionId);
-      const right = s.sections.find((sec) => sec.id === rightSectionId);
-      if (!left || !right) return s;
-      const rowL = left.gridRow ?? 1;
-      const rowR = right.gridRow ?? 1;
-      if (rowL !== rowR) return s;
-      const lCol = left.gridColumn ?? 1;
-      const lSpan = left.gridColumnSpan ?? 12;
-      const rCol = right.gridColumn ?? 1;
-      if (lCol + lSpan !== rCol) return s;
-      const rSpan = right.gridColumnSpan ?? 12;
-      const newL = Math.max(1, Math.min(lSpan + rSpan - 1, lSpan + deltaLeftSpan));
-      const newR = lSpan + rSpan - newL;
-      if (newR < 1) return s;
-      return {
-        sections: s.sections.map((sec) => {
-          if (sec.id === leftSectionId) return { ...sec, gridColumnSpan: newL };
-          if (sec.id === rightSectionId) {
-            return { ...sec, gridColumn: lCol + newL, gridColumnSpan: newR };
-          }
-          return sec;
-        }),
-        hasUnsavedChanges: true,
-      };
-    });
-  },
-
-  deleteSection: (id) => {
-    set((s) => ({
-      sections: s.sections.filter((sec) => sec.id !== id),
-      fields: s.fields.filter((f) => f.sectionId !== id),
-      widgets: s.widgets.filter((w) => w.sectionId !== id),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  moveSection: (id, dir) => {
-    const { sections, activeTabId } = get();
-    const tabSections = sections
-      .filter((s) => s.tabId === activeTabId)
-      .sort((a, b) => a.order - b.order);
-    const idx = tabSections.findIndex((s) => s.id === id);
-    if (idx < 0) return;
-    if (dir === 'up' && idx === 0) return;
-    if (dir === 'down' && idx === tabSections.length - 1) return;
-    const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
-    const currentOrder = tabSections[idx].order;
-    const swapOrder = tabSections[swapIdx].order;
-    set({
-      sections: sections.map((s) => {
-        if (s.id === tabSections[idx].id) return { ...s, order: swapOrder };
-        if (s.id === tabSections[swapIdx].id) return { ...s, order: currentOrder };
-        return s;
-      }),
-      hasUnsavedChanges: true,
-    });
-  },
-
-  updateSectionColumns: (id, cols) => {
-    set((s) => {
-      const maxCol = cols - 1;
-      const nextFields = s.fields.map((f) => {
-        if (f.sectionId !== id) return f;
-        const column = Math.min(f.column, maxCol);
-        const colSpan = Math.min(f.colSpan, cols - column);
-        return { ...f, column, colSpan: Math.max(1, colSpan) };
-      });
-      const nextWidgets = s.widgets.map((w) => {
-        if (w.sectionId !== id) return w;
-        const column = Math.min(w.column, maxCol);
-        const colSpan = Math.min(w.colSpan, cols - column);
-        return { ...w, column, colSpan: Math.max(1, colSpan) };
-      });
-      return {
-        sections: s.sections.map((sec) => (sec.id === id ? { ...sec, columns: cols } : sec)),
-        fields: nextFields,
-        widgets: nextWidgets,
-        hasUnsavedChanges: true,
-      };
-    });
-  },
-
-  toggleSectionCollapsed: (id) => {
-    set((s) => ({
-      sections: s.sections.map((sec) =>
-        sec.id === id ? { ...sec, collapsed: !sec.collapsed } : sec,
-      ),
-    }));
-  },
-
-  applyLayoutPreset: (presetId) => {
-    get().pushUndo();
-    const { sections, fields, widgets, activeTabId } = get();
-    const removedIds = new Set(
-      sections.filter((s) => s.tabId === activeTabId).map((s) => s.id),
-    );
-    const keptSections = sections.filter((s) => s.tabId !== activeTabId);
-    const specs = getPresetSections(presetId);
-    const ts = Date.now();
-    const newSections: CanvasSection[] = specs.map((spec, i) => ({
-      id: `section-${ts}-${i}`,
-      label: spec.label,
-      tabId: activeTabId,
-      columns: spec.columns,
-      order: i,
-      collapsed: false,
-      showInRecord: true,
-      showInTemplate: true,
-      layoutRowId: spec.layoutRowId,
-      rowWeight: spec.rowWeight,
-      gridColumn: spec.gridColumn,
-      gridColumnSpan: spec.gridColumnSpan,
-      gridRow: spec.gridRow,
-      gridRowSpan: spec.gridRowSpan,
-    }));
-    set({
-      sections: [...keptSections, ...newSections],
-      fields: fields.filter((f) => !removedIds.has(f.sectionId)),
-      widgets: widgets.filter((w) => {
-        if (w.tabId !== activeTabId) return true;
-        if (!w.sectionId) return true;
-        return !removedIds.has(w.sectionId);
-      }),
-      selectedElement: null,
-      hasUnsavedChanges: true,
-    });
-  },
-
-  // Fields
-  addField: (field) => {
-    set((s) => ({ fields: [...s.fields, field], hasUnsavedChanges: true }));
-  },
-
-  updateField: (id, updates) => {
-    set((s) => ({
-      fields: s.fields.map((f) => (f.id === id ? { ...f, ...updates } : f)),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  deleteField: (id) => {
-    set((s) => ({ fields: s.fields.filter((f) => f.id !== id), hasUnsavedChanges: true }));
-  },
-
-  setFields: (fields) => set({ fields }),
-
-  // Widgets
-  addWidget: (widget) => {
-    set((s) => ({ widgets: [...s.widgets, widget], hasUnsavedChanges: true }));
-  },
-
-  updateWidget: (id, updates) => {
-    set((s) => ({
-      widgets: s.widgets.map((w) => (w.id === id ? { ...w, ...updates } : w)),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  deleteWidget: (id) => {
-    set((s) => ({ widgets: s.widgets.filter((w) => w.id !== id), hasUnsavedChanges: true }));
-  },
-
-  setWidgets: (widgets) => set({ widgets, hasUnsavedChanges: true }),
-
-  setHighlightFields: (apiNames) =>
-    set({ highlightFields: apiNames.slice(0, 8), hasUnsavedChanges: true }),
-
-  addHighlightField: (apiName) => {
-    set((s) => {
-      if (s.highlightFields.includes(apiName) || s.highlightFields.length >= 6) return s;
-      return {
-        highlightFields: [...s.highlightFields, apiName],
-        hasUnsavedChanges: true,
-      };
-    });
-  },
-
-  removeHighlightField: (apiName) => {
-    set((s) => ({
-      highlightFields: s.highlightFields.filter((a) => a !== apiName),
-      hasUnsavedChanges: true,
-    }));
-  },
-
-  moveHighlightField: (index, dir) => {
-    set((s) => {
-      const arr = [...s.highlightFields];
-      const j = dir === 'up' ? index - 1 : index + 1;
-      if (j < 0 || j >= arr.length) return s;
-      const t = arr[index];
-      arr[index] = arr[j];
-      arr[j] = t;
-      return { highlightFields: arr, hasUnsavedChanges: true };
-    });
-  },
+  // Tab actions
+  addTab: (label?: string) => void;
+  updateTab: (tabId: string, patch: Partial<LayoutTab>) => void;
+  removeTab: (tabId: string) => void;
 
   // Formatting rules
-  setFormattingRules: (rules) => set({ formattingRules: rules, hasUnsavedChanges: true }),
+  setFormattingRules: (rules: FormattingRule[]) => void;
 
-  // Load an existing PageLayout into canvas state
-  loadLayout: (layout) => {
-    const newTabs: CanvasTab[] = [];
-    const newSections: CanvasSection[] = [];
-    const newFields: CanvasField[] = [];
-    const newWidgets: CanvasWidget[] = [];
-    let fieldCounter = 1;
-    let widgetCounter = 1;
-    let sectionLoadCounter = 1;
+  // Undo/redo
+  pushUndo: () => void;
+  undo: () => void;
+  redo: () => void;
 
-    layout.tabs.forEach((tab, tabIdx) => {
-      const tabId = tab.id || `tab-${tabIdx + 1}`;
-      newTabs.push({
-        id: tabId,
-        label: tab.label,
-        order: tab.order,
-      });
+  // Lifecycle
+  loadLayout: (layout: EditorPageLayout) => void;
+  reset: () => void;
+}
 
-      tab.sections.forEach((section) => {
-        const sectionId = section.id || `section-load-${sectionLoadCounter++}`;
-        newSections.push({
-          id: sectionId,
-          label: section.label,
-          tabId,
-          columns: section.columns || 2,
-          order: section.order,
-          collapsed: false,
-          description: section.description,
-          visibleIf: section.visibleIf,
-          showInRecord: section.showInRecord !== false,
-          showInTemplate: section.showInTemplate !== false,
-          layoutRowId: section.layoutRowId,
-          rowWeight: section.rowWeight,
-          gridColumn: section.gridColumn,
-          gridColumnSpan: section.gridColumnSpan,
-          gridRow: section.gridRow,
-          gridRowSpan: section.gridRowSpan,
-        });
+// ── Store ─────────────────────────────────────────────────────────────────────
 
-        section.fields.forEach((f) => {
-          newFields.push({
-            id: `placed-${fieldCounter++}-${f.apiName}`,
-            fieldApiName: f.apiName,
-            sectionId,
-            column: f.column,
-            order: f.order,
-            colSpan: (f as any).colSpan ?? 1,
-            rowSpan: (f as any).rowSpan ?? 1,
-            presentation: f.presentation,
-          });
-        });
+export const useEditorStore = create<EditorState>()((set, get) => ({
+  layout: structuredClone(DEFAULT_LAYOUT),
+  selectedElement: null,
+  isDirty: false,
+  undoStack: [],
+  redoStack: [],
+  activeTabId: 'tab-1',
 
-        if (section.widgets) {
-          section.widgets.forEach((w) => {
-            newWidgets.push({
-              id: w.id || `widget-${widgetCounter++}-${w.widgetType}`,
-              widgetType: w.widgetType,
-              tabId,
-              sectionId,
-              column: w.column,
-              order: w.order,
-              colSpan: w.colSpan ?? 1,
-              rowSpan: w.rowSpan ?? 1,
-              config: w.config,
-            });
-          });
-        }
-      });
+  // ── Non-mutating UI ────────────────────────────────────────────────────────
 
-      if (tab.widgets?.length) {
-        tab.widgets.forEach((w) => {
-          newWidgets.push({
-            id: w.id || `widget-${widgetCounter++}-${w.widgetType}`,
-            widgetType: w.widgetType,
-            tabId,
-            sectionId: '',
-            column: w.column ?? 0,
-            order: w.order,
-            colSpan: w.colSpan ?? 1,
-            rowSpan: w.rowSpan ?? 1,
-            config: w.config,
-            gridColumn: w.gridColumn,
-            gridColumnSpan: w.gridColumnSpan,
-            gridRow: w.gridRow,
-            gridRowSpan: w.gridRowSpan,
-          });
-        });
-      }
-    });
+  setSelectedElement: (el) => set({ selectedElement: el }),
+  setActiveTab: (tabId) => set({ activeTabId: tabId }),
 
-    newTabs.forEach((tab) => {
-      normalizeCanvasTabGrids(newSections, newWidgets, tab.id);
-    });
+  // ── Undo/redo ──────────────────────────────────────────────────────────────
 
-    const formattingRules =
-      layout.formattingRules?.length
-        ? layout.formattingRules
-        : ((layout.extensions?.formattingRules as FormattingRule[] | undefined) ?? []);
-
-    set({
-      editingLayoutId: layout.id,
-      layoutName: layout.name || 'Page Layout',
-      highlightFields: [...(layout.highlightFields || [])].slice(0, 6),
-      tabs: newTabs.length ? newTabs : DEFAULT_TABS,
-      sections: newSections,
-      fields: newFields,
-      widgets: newWidgets,
-      activeTabId: newTabs[0]?.id || 'tab-1',
-      selectedElement: null,
-      formattingRules,
-      hasUnsavedChanges: false,
-      undoStack: [],
-    });
-  },
-
-  // Reset to defaults (new layout)
-  reset: () =>
-    set({
-      tabs: [{ id: 'tab-1', label: 'General Information', order: 0 }],
-      sections: [
-        {
-          id: 'section-1',
-          label: 'Basic Details',
-          tabId: 'tab-1',
-          columns: 2,
-          order: 0,
-          collapsed: false,
-          showInRecord: true,
-          showInTemplate: true,
-          gridRow: 1,
-          gridColumn: 1,
-          gridColumnSpan: 12,
-          gridRowSpan: 1,
-        },
-      ],
-      fields: [],
-      widgets: [],
-      activeTabId: 'tab-1',
-      selectedElement: null,
-      layoutName: 'Page Layout',
-      editingLayoutId: null,
-      highlightFields: [],
-      formattingRules: [],
-      hasUnsavedChanges: false,
-      undoStack: [],
-    }),
-
-  markSaved: () => set({ hasUnsavedChanges: false }),
-  markDirty: () => set({ hasUnsavedChanges: true }),
-
-  // Undo
   pushUndo: () => {
-    const { tabs, sections, fields, widgets, highlightFields, undoStack } = get();
-    const snapshot: Snapshot = {
-      tabs: structuredClone(tabs),
-      sections: structuredClone(sections),
-      fields: structuredClone(fields),
-      widgets: structuredClone(widgets),
-      highlightFields: [...highlightFields],
-    };
-    set({ undoStack: [...undoStack.slice(-29), snapshot] });
+    const { layout, undoStack } = get();
+    const snapshot = structuredClone(layout);
+    set({
+      undoStack: [...undoStack, snapshot].slice(-30),
+      redoStack: [],
+      isDirty: true,
+    });
   },
 
   undo: () => {
-    const { undoStack } = get();
+    const { undoStack, redoStack, layout } = get();
     if (undoStack.length === 0) return;
     const prev = undoStack[undoStack.length - 1];
     set({
-      tabs: prev.tabs,
-      sections: prev.sections,
-      fields: prev.fields,
-      widgets: prev.widgets,
-      highlightFields: [...(prev.highlightFields ?? [])],
+      layout: prev,
       undoStack: undoStack.slice(0, -1),
-      hasUnsavedChanges: true,
+      redoStack: [...redoStack, structuredClone(layout)],
+      isDirty: true,
+    });
+  },
+
+  redo: () => {
+    const { undoStack, redoStack, layout } = get();
+    if (redoStack.length === 0) return;
+    const next = redoStack[redoStack.length - 1];
+    set({
+      layout: next,
+      redoStack: redoStack.slice(0, -1),
+      undoStack: [...undoStack, structuredClone(layout)].slice(-30),
+      isDirty: true,
+    });
+  },
+
+  // ── Layout metadata ────────────────────────────────────────────────────────
+
+  setLayoutName: (name) => {
+    get().pushUndo();
+    set((s) => ({ layout: { ...s.layout, name } }));
+  },
+
+  // ── Region actions ─────────────────────────────────────────────────────────
+
+  updateRegion: (regionId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((r) =>
+            r.id === regionId ? { ...r, ...patch } : r,
+          ),
+        })),
+      },
+    }));
+  },
+
+  addRegion: (region, tabId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) =>
+          tab.id === tabId ? { ...tab, regions: [...tab.regions, region] } : tab,
+        ),
+      },
+    }));
+  },
+
+  removeRegion: (regionId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.filter((r) => r.id !== regionId),
+        })),
+      },
+    }));
+  },
+
+  resizeRegion: (regionId, newColSpan) => {
+    get().pushUndo();
+    set((s) => {
+      const entry = findRegionEntry(s.layout, regionId);
+      if (!entry) return s;
+      const { tab, region } = entry;
+      const oldSpan = region.gridColumnSpan;
+      const clampedSpan = Math.max(2, Math.min(10, newColSpan));
+      const delta = clampedSpan - oldSpan;
+
+      const sameRow = tab.regions.filter(
+        (r) => r.id !== regionId && r.gridRow === region.gridRow,
+      );
+      const rightNeighbor = sameRow.find(
+        (r) => r.gridColumn === region.gridColumn + oldSpan,
+      );
+
+      const newTabs = s.layout.tabs.map((t) => {
+        if (t.id !== tab.id) return t;
+        return {
+          ...t,
+          regions: t.regions.map((r) => {
+            if (r.id === regionId) return { ...r, gridColumnSpan: clampedSpan };
+            if (rightNeighbor && r.id === rightNeighbor.id) {
+              return {
+                ...r,
+                gridColumn: region.gridColumn + clampedSpan,
+                gridColumnSpan: Math.max(2, rightNeighbor.gridColumnSpan - delta),
+              };
+            }
+            return r;
+          }),
+        };
+      });
+
+      return { layout: { ...s.layout, tabs: newTabs } };
+    });
+  },
+
+  // ── Panel actions ──────────────────────────────────────────────────────────
+
+  updatePanel: (panelId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((p) =>
+              p.id === panelId ? { ...p, ...patch } : p,
+            ),
+          })),
+        })),
+      },
+    }));
+  },
+
+  addPanel: (panel, regionId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) =>
+            region.id === regionId
+              ? { ...region, panels: reindexOrder([...region.panels, panel]) }
+              : region,
+          ),
+        })),
+      },
+    }));
+  },
+
+  removePanel: (panelId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: reindexOrder(region.panels.filter((p) => p.id !== panelId)),
+          })),
+        })),
+      },
+    }));
+  },
+
+  movePanel: (panelId, regionId, toIndex) => {
+    get().pushUndo();
+    set((s) => {
+      const entry = findPanelEntry(s.layout, panelId);
+      if (!entry) return s;
+      const panelToMove = entry.panel;
+      const sourceRegionId = entry.region.id;
+
+      const captured = panelToMove;
+      const srcId = sourceRegionId;
+
+      const newTabs = s.layout.tabs.map((tab) => ({
+        ...tab,
+        regions: tab.regions.map((region) => {
+          const isSrc = region.id === srcId;
+          const isDst = region.id === regionId;
+
+          if (isSrc && !isDst) {
+            return {
+              ...region,
+              panels: reindexOrder(region.panels.filter((p) => p.id !== panelId)),
+            };
+          }
+          if (!isSrc && isDst) {
+            const panels = [...region.panels];
+            const insertionIndex = Math.max(0, Math.min(toIndex, panels.length));
+            panels.splice(insertionIndex, 0, captured);
+            return { ...region, panels: reindexOrder(panels) };
+          }
+          if (isSrc && isDst) {
+            const panels = region.panels.filter((p) => p.id !== panelId);
+            const insertionIndex = Math.max(0, Math.min(toIndex, panels.length));
+            panels.splice(insertionIndex, 0, captured);
+            return { ...region, panels: reindexOrder(panels) };
+          }
+          return region;
+        }),
+      }));
+
+      return { layout: { ...s.layout, tabs: newTabs } };
+    });
+  },
+
+  // ── Field actions ──────────────────────────────────────────────────────────
+
+  updateField: (fieldApiName, panelId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) =>
+              panel.id === panelId
+                ? {
+                    ...panel,
+                    fields: panel.fields.map((f) =>
+                      f.fieldApiName === fieldApiName ? { ...f, ...patch } : f,
+                    ),
+                  }
+                : panel,
+            ),
+          })),
+        })),
+      },
+    }));
+  },
+
+  addField: (field, panelId, atIndex) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) => {
+              if (panel.id !== panelId) return panel;
+              const fields = [...panel.fields];
+              if (atIndex !== undefined) {
+                const insertionIndex = Math.max(0, Math.min(atIndex, fields.length));
+                fields.splice(insertionIndex, 0, field);
+              } else {
+                fields.push(field);
+              }
+              return { ...panel, fields: reindexOrder(fields) };
+            }),
+          })),
+        })),
+      },
+    }));
+  },
+
+  removeField: (fieldApiName, panelId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) =>
+              panel.id === panelId
+                ? {
+                    ...panel,
+                    fields: reindexOrder(
+                      panel.fields.filter((f) => f.fieldApiName !== fieldApiName),
+                    ),
+                  }
+                : panel,
+            ),
+          })),
+        })),
+      },
+    }));
+  },
+
+  moveField: (fieldApiName, fromPanelId, toPanelId, atIndex) => {
+    get().pushUndo();
+    set((s) => {
+      const entry = findPanelEntry(s.layout, fromPanelId);
+      if (!entry) return s;
+      const fieldToMove = entry.panel.fields.find((f) => f.fieldApiName === fieldApiName);
+      if (!fieldToMove) return s;
+
+      const captured = fieldToMove;
+
+      const newTabs = s.layout.tabs.map((tab) => ({
+        ...tab,
+        regions: tab.regions.map((region) => ({
+          ...region,
+          panels: region.panels.map((panel) => {
+            const isSrc = panel.id === fromPanelId;
+            const isDst = panel.id === toPanelId;
+
+            if (isSrc && !isDst) {
+              return {
+                ...panel,
+                fields: reindexOrder(
+                  panel.fields.filter((f) => f.fieldApiName !== fieldApiName),
+                ),
+              };
+            }
+            if (!isSrc && isDst) {
+              const fields = [...panel.fields];
+              const insertionIndex = Math.max(0, Math.min(atIndex, fields.length));
+              fields.splice(insertionIndex, 0, captured);
+              return { ...panel, fields: reindexOrder(fields) };
+            }
+            if (isSrc && isDst) {
+              const fields = panel.fields.filter((f) => f.fieldApiName !== fieldApiName);
+              const insertionIndex = Math.max(0, Math.min(atIndex, fields.length));
+              fields.splice(insertionIndex, 0, captured);
+              return { ...panel, fields: reindexOrder(fields) };
+            }
+            return panel;
+          }),
+        })),
+      }));
+
+      return { layout: { ...s.layout, tabs: newTabs } };
+    });
+  },
+
+  resizeField: (fieldApiName, panelId, newColSpan) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) =>
+              panel.id === panelId
+                ? {
+                    ...panel,
+                    fields: panel.fields.map((f) =>
+                      f.fieldApiName === fieldApiName ? { ...f, colSpan: newColSpan } : f,
+                    ),
+                  }
+                : panel,
+            ),
+          })),
+        })),
+      },
+    }));
+  },
+
+  // ── Widget actions ─────────────────────────────────────────────────────────
+
+  updateWidget: (widgetId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            widgets: region.widgets.map((w) =>
+              w.id === widgetId ? { ...w, ...patch } : w,
+            ),
+          })),
+        })),
+      },
+    }));
+  },
+
+  addWidget: (widget, regionId, atIndex) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => {
+            if (region.id !== regionId) return region;
+            const widgets = [...region.widgets];
+            if (atIndex !== undefined) {
+              const insertionIndex = Math.max(0, Math.min(atIndex, widgets.length));
+              widgets.splice(insertionIndex, 0, widget);
+            } else {
+              widgets.push(widget);
+            }
+            return { ...region, widgets: reindexOrder(widgets) };
+          }),
+        })),
+      },
+    }));
+  },
+
+  removeWidget: (widgetId) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            widgets: reindexOrder(region.widgets.filter((w) => w.id !== widgetId)),
+          })),
+        })),
+      },
+    }));
+  },
+
+  moveWidget: (widgetId, toRegionId, atIndex) => {
+    get().pushUndo();
+    set((s) => {
+      const sourceEntry = findWidgetEntry(s.layout, widgetId);
+      if (!sourceEntry) return s;
+      const destinationEntry = findRegionEntry(s.layout, toRegionId);
+      if (!destinationEntry) return s;
+
+      const widgetToMove = sourceEntry.widget;
+      const sourceRegionId = sourceEntry.region.id;
+
+      const newTabs = s.layout.tabs.map((tab) => ({
+        ...tab,
+        regions: tab.regions.map((region) => {
+          const isSrc = region.id === sourceRegionId;
+          const isDst = region.id === toRegionId;
+
+          if (isSrc && isDst) {
+            const widgets = region.widgets.filter((w) => w.id !== widgetId);
+            const insertionIndex = Math.max(0, Math.min(atIndex, widgets.length));
+            widgets.splice(insertionIndex, 0, widgetToMove);
+            return { ...region, widgets: reindexOrder(widgets) };
+          }
+
+          if (isSrc && !isDst) {
+            return {
+              ...region,
+              widgets: reindexOrder(region.widgets.filter((w) => w.id !== widgetId)),
+            };
+          }
+
+          if (!isSrc && isDst) {
+            const widgets = [...region.widgets];
+            const insertionIndex = Math.max(0, Math.min(atIndex, widgets.length));
+            widgets.splice(insertionIndex, 0, widgetToMove);
+            return { ...region, widgets: reindexOrder(widgets) };
+          }
+
+          return region;
+        }),
+      }));
+
+      return { layout: { ...s.layout, tabs: newTabs } };
+    });
+  },
+
+  // ── Tab actions ────────────────────────────────────────────────────────────
+
+  addTab: (label) => {
+    get().pushUndo();
+    set((s) => {
+      const newTab: LayoutTab = {
+        id: `tab-${Date.now()}`,
+        label: label ?? `Tab ${s.layout.tabs.length + 1}`,
+        order: s.layout.tabs.length,
+        regions: [],
+      };
+      return {
+        layout: { ...s.layout, tabs: [...s.layout.tabs, newTab] },
+        activeTabId: newTab.id,
+      };
+    });
+  },
+
+  updateTab: (tabId, patch) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((t) => (t.id === tabId ? { ...t, ...patch } : t)),
+      },
+    }));
+  },
+
+  removeTab: (tabId) => {
+    get().pushUndo();
+    set((s) => {
+      if (s.layout.tabs.length <= 1) return s;
+      const remaining = s.layout.tabs.filter((t) => t.id !== tabId);
+      return {
+        layout: { ...s.layout, tabs: remaining },
+        activeTabId:
+          s.activeTabId === tabId ? (remaining[0]?.id ?? '') : s.activeTabId,
+      };
+    });
+  },
+
+  // ── Formatting rules ───────────────────────────────────────────────────────
+
+  setFormattingRules: (rules) => {
+    get().pushUndo();
+    set((s) => ({ layout: { ...s.layout, formattingRules: rules } }));
+  },
+
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+  loadLayout: (layout) => {
+    set({
+      layout,
+      selectedElement: null,
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+      activeTabId: layout.tabs[0]?.id ?? 'tab-1',
+    });
+  },
+
+  reset: () => {
+    set({
+      layout: structuredClone(DEFAULT_LAYOUT),
+      selectedElement: null,
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+      activeTabId: 'tab-1',
     });
   },
 }));
