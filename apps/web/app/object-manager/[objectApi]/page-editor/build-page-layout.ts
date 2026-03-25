@@ -1,132 +1,41 @@
-import type { FieldDef, FormattingRule, PageLayout, PageWidget } from '@/lib/schema';
-import type { CanvasField, CanvasSection, CanvasTab, CanvasWidget } from './types';
+import type { EditorState } from './editor-store';
+import type { EditorPageLayout } from './types';
 
-export function buildPageLayoutFromCanvas(params: {
-  editingLayoutId: string | null;
-  layoutName: string;
-  tabs: CanvasTab[];
-  sections: CanvasSection[];
-  fields: CanvasField[];
-  widgets?: CanvasWidget[];
-  objectFields: FieldDef[];
-  formattingRules: FormattingRule[];
-  highlightFields?: string[];
-}): PageLayout {
-  const {
-    editingLayoutId,
-    layoutName,
-    tabs,
-    sections,
-    fields,
-    widgets = [],
-    objectFields,
-    formattingRules,
-    highlightFields = [],
-  } = params;
+function stripNullish(obj: Record<string, unknown>): void {
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined || obj[key] === null) {
+      delete obj[key];
+    }
+  }
+}
 
-  const fieldMap = new Map(objectFields.map((f) => [f.apiName, f]));
+/**
+ * Minimal cleanup before saving — strips undefined/null style fields from a layout.
+ * Returns a new EditorPageLayout safe to pass to updateObject().
+ */
+export function buildPageLayout(layout: EditorPageLayout): EditorPageLayout {
+  const clone = structuredClone(layout);
+  for (const tab of clone.tabs) {
+    for (const region of tab.regions) {
+      if (region.style) stripNullish(region.style as Record<string, unknown>);
+      for (const panel of region.panels) {
+        if (panel.style) stripNullish(panel.style as Record<string, unknown>);
+        for (const field of panel.fields) {
+          if (field.labelStyle) stripNullish(field.labelStyle as Record<string, unknown>);
+          if (field.valueStyle) stripNullish(field.valueStyle as Record<string, unknown>);
+        }
+      }
+    }
+  }
+  return clone;
+}
 
-  return {
-    id: editingLayoutId || `layout-${Date.now()}`,
-    name: layoutName,
-    layoutType: 'edit',
-    highlightFields: highlightFields.length > 0 ? highlightFields.slice(0, 6) : undefined,
-    tabs: tabs.map((tab) => {
-      const tabCanvasWidgets = widgets
-        .filter((w) => w.tabId === tab.id && !w.sectionId)
-        .sort((a, b) => a.order - b.order)
-        .map(
-          (w): PageWidget => ({
-            id: w.id,
-            widgetType: w.widgetType,
-            column: w.column,
-            order: w.order,
-            colSpan: w.colSpan > 1 ? w.colSpan : undefined,
-            rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
-            config: w.config,
-            ...(w.gridColumn != null ? { gridColumn: w.gridColumn } : {}),
-            ...(w.gridColumnSpan != null ? { gridColumnSpan: w.gridColumnSpan } : {}),
-            ...(w.gridRow != null ? { gridRow: w.gridRow } : {}),
-            ...(w.gridRowSpan != null ? { gridRowSpan: w.gridRowSpan } : {}),
-          }),
-        );
-
-      return {
-        id: tab.id,
-        label: tab.label,
-        order: tab.order,
-        ...(tabCanvasWidgets.length > 0 ? { widgets: tabCanvasWidgets } : {}),
-        sections: sections
-        .filter((s) => s.tabId === tab.id)
-        .sort((a, b) => a.order - b.order)
-        .map((section) => {
-          const sectionWidgets = widgets
-            .filter((w) => w.sectionId && w.sectionId === section.id)
-            .map(
-              (w): PageWidget => ({
-                id: w.id,
-                widgetType: w.widgetType,
-                column: w.column,
-                order: w.order,
-                colSpan: w.colSpan > 1 ? w.colSpan : undefined,
-                rowSpan: w.rowSpan > 1 ? w.rowSpan : undefined,
-                config: w.config,
-                ...(w.gridColumn != null ? { gridColumn: w.gridColumn } : {}),
-                ...(w.gridColumnSpan != null ? { gridColumnSpan: w.gridColumnSpan } : {}),
-                ...(w.gridRow != null ? { gridRow: w.gridRow } : {}),
-                ...(w.gridRowSpan != null ? { gridRowSpan: w.gridRowSpan } : {}),
-              }),
-            );
-
-          return {
-            id: section.id,
-            label: section.label,
-            columns: section.columns,
-            order: section.order,
-            description: section.description,
-            ...(section.layoutRowId != null && section.layoutRowId !== ''
-              ? { layoutRowId: section.layoutRowId }
-              : {}),
-            ...(section.rowWeight != null && section.rowWeight > 0
-              ? { rowWeight: section.rowWeight }
-              : {}),
-            ...(section.gridColumn != null ? { gridColumn: section.gridColumn } : {}),
-            ...(section.gridColumnSpan != null ? { gridColumnSpan: section.gridColumnSpan } : {}),
-            ...(section.gridRow != null ? { gridRow: section.gridRow } : {}),
-            ...(section.gridRowSpan != null ? { gridRowSpan: section.gridRowSpan } : {}),
-            fields: fields
-              .filter((f) => f.sectionId === section.id)
-              .map((f) => {
-                const fieldDef = fieldMap.get(f.fieldApiName);
-                const cleanPresentation =
-                  f.presentation &&
-                  Object.values(f.presentation).some((v) => v !== undefined)
-                    ? Object.fromEntries(
-                        Object.entries(f.presentation).filter(
-                          ([, v]) => v !== undefined,
-                        ),
-                      )
-                    : undefined;
-                const base = {
-                  apiName: f.fieldApiName,
-                  column: f.column,
-                  order: f.order,
-                  colSpan: f.colSpan > 1 ? f.colSpan : undefined,
-                  rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
-                  presentation: cleanPresentation,
-                };
-                if (!fieldDef) return base;
-                const { apiName, ...rest } = fieldDef;
-                return { ...rest, ...base };
-              }),
-            widgets: sectionWidgets.length > 0 ? sectionWidgets : undefined,
-            visibleIf: section.visibleIf,
-            showInRecord: section.showInRecord,
-            showInTemplate: section.showInTemplate,
-          };
-        }),
-      };
-    }),
-    formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
-  };
+/**
+ * Initializes editor state from a loaded EditorPageLayout.
+ * Returns only the fields needed to hydrate the store.
+ */
+export function initEditorFromLayout(
+  layout: EditorPageLayout,
+): Pick<EditorState, 'layout' | 'isDirty' | 'selectedElement' | 'undoStack' | 'redoStack'> {
+  return { layout, isDirty: false, selectedElement: null, undoStack: [], redoStack: [] };
 }

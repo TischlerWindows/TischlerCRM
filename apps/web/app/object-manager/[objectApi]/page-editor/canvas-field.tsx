@@ -1,36 +1,47 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { labelPresentationClassName } from '@/lib/layout-presentation';
-import type { FieldDef } from '@/lib/schema';
-import type { CanvasField } from './types';
+import type { PanelField } from './types';
 import { useEditorStore } from './editor-store';
-import { GripVertical, Trash2, Eye, List } from 'lucide-react';
 
-export function CanvasFieldCard({
-  field,
-  fieldDef,
-  sectionColumns,
-  gridRowStart,
-  stackMode,
-  isOver,
-  dropSide,
-}: {
-  field: CanvasField;
-  fieldDef: FieldDef;
-  sectionColumns: number;
-  /** 0-based row from packing algorithm (CSS grid mode only) */
-  gridRowStart: number;
-  /** Vertical column stack in section editor (no CSS grid placement) */
-  stackMode?: boolean;
-  isOver: boolean;
-  dropSide: 'top' | 'bottom' | null;
-}) {
+interface CanvasFieldCardProps {
+  field: PanelField;
+  panelId: string;
+  panelColumns: number;
+}
+
+const FIELD_RESIZE_STEP_PX = 24;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function toBehaviorLabel(behavior: PanelField['behavior']): string {
+  switch (behavior) {
+    case 'readOnly':
+      return 'Read only';
+    case 'required':
+      return 'Required';
+    case 'hidden':
+      return 'Hidden';
+    default:
+      return 'None';
+  }
+}
+
+export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
-  const deleteField = useEditorStore((s) => s.deleteField);
+  const resizeField = useEditorStore((s) => s.resizeField);
+
+  const [dragSpan, setDragSpan] = useState<number | null>(null);
+  const resizeSessionRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startSpan: number;
+  } | null>(null);
 
   const {
     attributes,
@@ -40,172 +51,188 @@ export function CanvasFieldCard({
     transition,
     isDragging,
   } = useSortable({
-    id: field.id,
-    data: { field, fieldDef },
+    id: `field-${field.fieldApiName}`,
+    data: { type: 'field', panelId, fieldApiName: field.fieldApiName },
   });
+
+  useEffect(() => {
+    return () => {
+      resizeSessionRef.current = null;
+    };
+  }, []);
+
+  const isSelected =
+    selectedElement?.type === 'field' &&
+    selectedElement.id === field.fieldApiName &&
+    selectedElement.panelId === panelId;
+
+  const currentSpan = clamp(dragSpan ?? field.colSpan, 1, panelColumns);
+
+  const labelStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...(field.labelStyle.color ? { color: field.labelStyle.color } : {}),
+      ...(field.labelStyle.bold ? { fontWeight: 700 } : {}),
+      ...(field.labelStyle.italic ? { fontStyle: 'italic' } : {}),
+      ...(field.labelStyle.uppercase ? { textTransform: 'uppercase' } : {}),
+    }),
+    [field.labelStyle],
+  );
+
+  const valueStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...(field.valueStyle.color ? { color: field.valueStyle.color } : {}),
+      ...(field.valueStyle.background ? { backgroundColor: field.valueStyle.background } : {}),
+      ...(field.valueStyle.bold ? { fontWeight: 700 } : {}),
+      ...(field.valueStyle.italic ? { fontStyle: 'italic' } : {}),
+    }),
+    [field.valueStyle],
+  );
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    touchAction: 'none',
-    ...(stackMode
-      ? {}
-      : {
-          gridColumn: `${field.column + 1} / span ${Math.min(field.colSpan, sectionColumns - field.column)}`,
-          gridRow: `${gridRowStart + 1} / span ${field.rowSpan}`,
-        }),
+    opacity: isDragging ? 0.55 : 1,
+    gridColumn: `span ${currentSpan}`,
   };
 
-  const isSelected =
-    selectedElement?.type === 'field' && selectedElement.id === field.id;
+  const getPointerStep = (dx: number) =>
+    dx >= 0 ? Math.floor(dx / FIELD_RESIZE_STEP_PX) : Math.ceil(dx / FIELD_RESIZE_STEP_PX);
+
+  const getSpanFromPointer = (startSpan: number, startX: number, clientX: number) =>
+    clamp(startSpan + getPointerStep(clientX - startX), 1, panelColumns);
+
+  const endResizeGesture = (target: HTMLButtonElement) => {
+    const session = resizeSessionRef.current;
+    if (!session) return;
+    if (target.releasePointerCapture) {
+      try {
+        if (target.hasPointerCapture(session.pointerId)) {
+          target.releasePointerCapture(session.pointerId);
+        }
+      } catch {
+        // Ignore pointer capture errors for stale pointers.
+      }
+    }
+    resizeSessionRef.current = null;
+    setDragSpan(null);
+  };
+
+  const onResizePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startSpan = clamp(field.colSpan, 1, panelColumns);
+    resizeSessionRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startSpan,
+    };
+    setDragSpan(startSpan);
+    if (event.currentTarget.setPointerCapture) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+  };
+
+  const onResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const nextSpan = getSpanFromPointer(session.startSpan, session.startX, event.clientX);
+    setDragSpan(nextSpan);
+  };
+
+  const onResizePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    const nextSpan = getSpanFromPointer(session.startSpan, session.startX, event.clientX);
+    if (nextSpan !== session.startSpan) {
+      resizeField(field.fieldApiName, panelId, nextSpan);
+    }
+    endResizeGesture(event.currentTarget);
+  };
+
+  const onResizePointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const session = resizeSessionRef.current;
+    if (!session || session.pointerId !== event.pointerId) return;
+    endResizeGesture(event.currentTarget);
+  };
+
+  const onResizeKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    const nextSpan = clamp(field.colSpan + delta, 1, panelColumns);
+    if (nextSpan !== field.colSpan) {
+      resizeField(field.fieldApiName, panelId, nextSpan);
+    }
+  };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      data-editor-sortable-id={field.id}
-      {...attributes}
-      {...listeners}
-      className={`p-3 border rounded-lg bg-white relative group cursor-grab active:cursor-grabbing transition-shadow ${
-        isDragging ? 'cursor-grabbing z-10' : ''
-      } ${
+      className={`group relative min-h-10 rounded-md border bg-white px-2 py-2 text-xs transition-colors ${
         isSelected
-          ? 'border-brand-navy border-2 shadow-md ring-1 ring-brand-navy/20'
-          : 'border-gray-200 hover:shadow-sm'
-      }`}
-      onClick={(e) => {
-        e.stopPropagation();
-        setSelectedElement({ type: 'field', id: field.id });
+          ? 'border-brand-navy bg-brand-navy/5 shadow-sm'
+          : 'border-gray-200 hover:border-gray-300'
+      } ${isDragging ? 'z-20' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        setSelectedElement({
+          type: 'field',
+          id: field.fieldApiName,
+          panelId,
+        });
       }}
     >
-      {/* Drop indicators */}
-      {isOver && dropSide === 'top' && (
-        <div className="absolute -top-1 left-0 right-0 h-1.5 bg-teal-400 rounded-full z-10 shadow-[0_0_6px_rgba(20,184,166,0.4)]" />
-      )}
-      {isOver && dropSide === 'bottom' && (
-        <div className="absolute -bottom-1 left-0 right-0 h-1.5 bg-teal-400 rounded-full z-10 shadow-[0_0_6px_rgba(20,184,166,0.4)]" />
-      )}
-
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="text-gray-400 shrink-0 pointer-events-none" aria-hidden>
-            <GripVertical className="w-4 h-4" />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label={`Drag ${field.fieldApiName}`}
+          className="shrink-0 cursor-grab rounded px-1 text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+          onPointerDown={(event) => event.stopPropagation()}
+          {...attributes}
+          {...listeners}
+        >
+          ⠿
+        </button>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm" style={labelStyle}>
+            {field.fieldApiName}
           </div>
-          <div className="flex-1 min-w-0">
-            <div
-              className={`text-sm flex items-center gap-1 ${labelPresentationClassName(field.presentation)}`}
+          <div className="mt-1 flex items-center gap-2">
+            {field.behavior !== 'none' && (
+              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
+                {toBehaviorLabel(field.behavior)}
+              </span>
+            )}
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] leading-none ring-1 ring-gray-200"
+              style={valueStyle}
             >
-              {fieldDef.label}
-              {fieldDef.required && <span className="text-red-500">*</span>}
-            </div>
-            <div className="text-xs text-gray-500">{fieldDef.type}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {(field.colSpan > 1 || field.rowSpan > 1) && (
-            <span className="text-xs text-blue-600 font-medium whitespace-nowrap">
-              {field.colSpan}&times;{field.rowSpan}
+              Value
             </span>
-          )}
-          {fieldDef.visibleIf && fieldDef.visibleIf.length > 0 && (
-            <div
-              className="p-1 bg-orange-500 rounded flex-shrink-0"
-              title={`Visibility filter: ${fieldDef.visibleIf.map((f: any) => `${f.fieldApiName} ${f.operator} ${f.value}`).join(', ')}`}
-            >
-              <Eye className="w-3 h-3" fill="white" stroke="black" strokeWidth="0.5px" />
-            </div>
-          )}
-          {fieldDef.picklistDependencies && fieldDef.picklistDependencies.length > 0 && (
-            <div
-              className="p-1 bg-amber-500 rounded flex-shrink-0"
-              title={`Value dependencies: ${fieldDef.picklistDependencies.length} rule${fieldDef.picklistDependencies.length !== 1 ? 's' : ''}`}
-            >
-              <List className="w-3 h-3" stroke="white" strokeWidth="2.5px" />
-            </div>
-          )}
-          <button
-            type="button"
-            className="opacity-0 group-hover:opacity-100"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteField(field.id);
-            }}
-          >
-            <Trash2 className="h-3 w-3 text-red-500" />
-          </button>
+          </div>
         </div>
       </div>
 
-      {/* Right-edge resize handle (colSpan) */}
-      {sectionColumns > 1 && (
-        <div
-          className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize opacity-0 group-hover:opacity-100 bg-gray-200/80 hover:bg-brand-navy/15 border-r border-dashed border-gray-300/90 rounded-r transition-opacity"
-          title="Drag to stretch columns"
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const event = new CustomEvent('field-resize-start', {
-              detail: {
-                id: field.id,
-                dir: 'col',
-                startX: e.clientX,
-                startY: e.clientY,
-                startColSpan: field.colSpan,
-                startRowSpan: field.rowSpan,
-                sectionCols: sectionColumns - field.column,
-              },
-            });
-            window.dispatchEvent(event);
-          }}
-        />
-      )}
-      {/* Bottom-edge resize handle (rowSpan) */}
-      <div
-        className="absolute bottom-0 left-0 h-1.5 w-full cursor-row-resize opacity-0 group-hover:opacity-100 bg-gray-200/80 hover:bg-brand-navy/15 border-t border-dashed border-gray-300/90 rounded-b transition-opacity"
-        title="Drag to stretch rows"
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          const event = new CustomEvent('field-resize-start', {
-            detail: {
-              id: field.id,
-              dir: 'row',
-              startX: e.clientX,
-              startY: e.clientY,
-              startColSpan: field.colSpan,
-              startRowSpan: field.rowSpan,
-              sectionCols: sectionColumns - field.column,
-            },
-          });
-          window.dispatchEvent(event);
-        }}
-      />
-      {/* Corner resize handle */}
-      {sectionColumns > 1 && (
-        <div
-          className="absolute bottom-0 right-0 w-2.5 h-2.5 cursor-nwse-resize opacity-0 group-hover:opacity-100 bg-gray-200/90 hover:bg-brand-navy/20 border border-dashed border-gray-400/70 rounded-br transition-opacity z-10"
-          title="Drag to stretch both"
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const event = new CustomEvent('field-resize-start', {
-              detail: {
-                id: field.id,
-                dir: 'both',
-                startX: e.clientX,
-                startY: e.clientY,
-                startColSpan: field.colSpan,
-                startRowSpan: field.rowSpan,
-                sectionCols: sectionColumns - field.column,
-              },
-            });
-            window.dispatchEvent(event);
-          }}
+      {panelColumns > 1 && (
+        <button
+          type="button"
+          className="absolute inset-y-0 right-0 w-6 cursor-col-resize rounded-r-md border-0 bg-gray-200/70 p-0 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 touch-none"
+          onPointerDown={onResizePointerDown}
+          onPointerMove={onResizePointerMove}
+          onPointerUp={onResizePointerUp}
+          onPointerCancel={onResizePointerCancel}
+          onKeyDown={onResizeKeyDown}
+          onClick={(event) => event.stopPropagation()}
+          role="slider"
+          aria-orientation="horizontal"
+          aria-valuemin={1}
+          aria-valuemax={panelColumns}
+          aria-valuenow={currentSpan}
+          aria-valuetext={`Span ${currentSpan} of ${panelColumns}`}
+          aria-label={`Resize ${field.fieldApiName} field span`}
+          title={`Resize ${field.fieldApiName} field span`}
         />
       )}
     </div>

@@ -186,21 +186,23 @@ export interface RecordType {
   name: string;
   description?: string;
   default?: boolean;
+  /** @deprecated Use layout assignment rules instead; retained for backward compatibility */
   pageLayoutId?: string;
 }
 
-/** Allowlisted label colors — mapped to Tailwind in `layout-presentation.ts` */
+/** @deprecated Use PanelField.labelStyle / ValueStyle in the new Region→Panel→Field hierarchy */
 export type LabelColorToken = 'default' | 'brand' | 'muted' | 'danger' | 'success';
 
-/** Layout-scoped field label styling (not stored on FieldDef) */
+/** @deprecated Use PanelField.labelStyle in the new Region→Panel→Field hierarchy */
 export interface PageFieldPresentation {
   labelBold?: boolean;
   labelColorToken?: LabelColorToken;
 }
 
 export type FormattingRuleTarget =
-  | { kind: 'field'; fieldApiName: string }
-  | { kind: 'section'; sectionId: string };
+  | { kind: 'field'; fieldApiName: string; panelId: string }
+  | { kind: 'panel'; panelId: string }
+  | { kind: 'region'; regionId: string };
 
 export type FieldHighlightToken = 'none' | 'subtle' | 'attention' | 'positive' | 'critical';
 
@@ -230,7 +232,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights';
 
 export interface RelatedListConfig {
   type: 'RelatedList';
@@ -267,12 +269,19 @@ export interface SpacerConfig {
   minHeightPx?: number;
 }
 
+export interface HeaderHighlightsConfig {
+  type: 'HeaderHighlights';
+  /** Up to 6 field API names to display as highlight badges */
+  fieldApiNames: string[];
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
   | ActivityFeedConfig
   | FileFolderConfig
-  | SpacerConfig;
+  | SpacerConfig
+  | HeaderHighlightsConfig;
 
 export interface PageWidget {
   id: string;
@@ -336,7 +345,6 @@ export type PageField = {
   order: number;
   colSpan?: number;
   rowSpan?: number;
-  presentation?: PageFieldPresentation;
 } & Partial<Omit<FieldDef, 'apiName'>>;
 
 export interface PageTab {
@@ -348,10 +356,95 @@ export interface PageTab {
   widgets?: PageWidget[];
 }
 
+// ── New page editor hierarchy (Region → Panel → Field) ─────────────
+
+export interface RegionStyle {
+  background?: string;
+  borderColor?: string;
+  borderStyle?: 'solid' | 'dashed' | 'none';
+  shadow?: 'sm' | 'md' | 'none';
+  borderRadius?: 'none' | 'sm' | 'lg';
+}
+
+export interface PanelStyle {
+  headerBackground?: string;
+  headerTextColor?: string;
+  headerBold?: boolean;
+  headerItalic?: boolean;
+  headerUppercase?: boolean;
+  bodyBackground?: string;
+}
+
+export interface LabelStyle {
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  uppercase?: boolean;
+}
+
+export interface ValueStyle {
+  color?: string;
+  background?: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface PanelField {
+  fieldApiName: string;
+  labelOverride?: string;
+  colSpan: number;
+  order: number;
+  labelStyle: LabelStyle;
+  valueStyle: ValueStyle;
+  behavior: 'none' | 'required' | 'readOnly' | 'hidden';
+}
+
+export interface LayoutPanel {
+  id: string;
+  label: string;
+  order: number;
+  columns: 1 | 2 | 3 | 4;
+  style: PanelStyle;
+  fields: PanelField[];
+}
+
+export interface LayoutWidget {
+  id: string;
+  widgetType: WidgetType;
+  order: number;
+  config: WidgetConfig;
+}
+
+export interface LayoutRegion {
+  id: string;
+  label: string;
+  gridColumn: number;
+  gridColumnSpan: number;
+  gridRow: number;
+  gridRowSpan: number;
+  style: RegionStyle;
+  panels: LayoutPanel[];
+  widgets: LayoutWidget[];
+}
+
+export interface LayoutTab {
+  id: string;
+  label: string;
+  order: number;
+  regions: LayoutRegion[];
+}
+
 export interface PageLayout {
   id: string;
   name: string;
-  layoutType: 'create' | 'edit'; // New Record vs Existing Record
+  objectApi?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  active?: boolean;
+  isDefault?: boolean;
+  roles?: string[];
+  /** @deprecated Retained for backward compatibility; new layouts do not require this */
+  layoutType?: 'create' | 'edit';
   tabs: PageTab[];
   /** Up to ~6 field API names shown in record header highlights strip */
   highlightFields?: string[];
@@ -403,10 +496,26 @@ export interface SchemaVersion {
   description?: string;
 }
 
+export type TemplatePanelDef = Omit<LayoutPanel, 'fields'>;
+export type TemplateRegionDef = Omit<LayoutRegion, 'panels' | 'widgets'> & {
+  panels: TemplatePanelDef[];
+};
+export type TemplateTabDef = Omit<LayoutTab, 'regions'> & { regions: TemplateRegionDef[] };
+
+/** Structural skeleton of a saved layout template (no field data) */
+export interface CustomLayoutTemplate {
+  id: string;
+  name: string;
+  objectApi: string;
+  tabs: TemplateTabDef[];
+  createdAt: string;
+}
+
 export interface OrgSchema {
   version: number; // increment on save
   objects: ObjectDef[];
   flows?: FlowDefinition[];
+  customLayoutTemplates?: CustomLayoutTemplate[];
   updatedAt: string;
   createdBy?: string;
 }

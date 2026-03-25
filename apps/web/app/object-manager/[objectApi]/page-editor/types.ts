@@ -1,88 +1,57 @@
-import type { FieldType, ConditionExpr, PageFieldPresentation, WidgetType, WidgetConfig } from '@/lib/schema';
+import type {
+  ConditionExpr,
+  FormattingRule,
+  FormattingRuleTarget,
+  FieldHighlightToken,
+  LayoutTab,
+  LayoutRegion,
+  LayoutPanel,
+  PanelField,
+  LayoutWidget,
+  RegionStyle,
+  PanelStyle,
+  LabelStyle,
+  ValueStyle,
+  TemplatePanelDef,
+  TemplateRegionDef,
+  TemplateTabDef,
+  CustomLayoutTemplate,
+} from '@/lib/schema';
 
-export type ColumnCount = 1 | 2 | 3 | 4;
+export type {
+  ConditionExpr,
+  FormattingRule,
+  FormattingRuleTarget,
+  FieldHighlightToken,
+  LayoutTab,
+  LayoutRegion,
+  LayoutPanel,
+  PanelField,
+  LayoutWidget,
+  RegionStyle,
+  PanelStyle,
+  LabelStyle,
+  ValueStyle,
+  TemplatePanelDef,
+  TemplateRegionDef,
+  TemplateTabDef,
+  CustomLayoutTemplate,
+};
 
-export interface CanvasField {
+export interface EditorPageLayout {
   id: string;
-  fieldApiName: string;
-  sectionId: string;
-  column: number;
-  order: number;
-  colSpan: number;
-  rowSpan: number;
-  presentation?: PageFieldPresentation;
+  name: string;
+  objectApi: string;
+  active: boolean;
+  isDefault: boolean;
+  roles: string[];
+  tabs: LayoutTab[];
+  formattingRules: FormattingRule[];
 }
-
-export interface CanvasWidget {
-  id: string;
-  widgetType: WidgetType;
-  /** Tab this widget belongs to */
-  tabId: string;
-  /**
-   * Section containing the widget; empty string = tab-level (not inside a section).
-   */
-  sectionId: string;
-  column: number;
-  order: number;
-  colSpan: number;
-  rowSpan: number;
-  config: WidgetConfig;
-  /** Tab canvas grid (when sectionId is empty) */
-  gridColumn?: number;
-  gridColumnSpan?: number;
-  gridRow?: number;
-  gridRowSpan?: number;
-}
-
-export interface CanvasSection {
-  id: string;
-  label: string;
-  tabId: string;
-  columns: ColumnCount;
-  order: number;
-  collapsed: boolean;
-  description?: string;
-  visibleIf?: ConditionExpr[];
-  showInRecord: boolean;
-  showInTemplate: boolean;
-  /** Group sections with the same id into one horizontal row */
-  layoutRowId?: string;
-  /** Flex weight within row (default 1) */
-  rowWeight?: number;
-  /** Tab canvas 12-column grid */
-  gridColumn?: number;
-  gridColumnSpan?: number;
-  gridRow?: number;
-  gridRowSpan?: number;
-}
-
-export interface CanvasTab {
-  id: string;
-  label: string;
-  order: number;
-}
-
-export interface DraggedField {
-  id: string;
-  label: string;
-  apiName: string;
-  type: FieldType;
-  required: boolean;
-}
-
-export interface DraggedWidget {
-  id: string;
-  widgetType: WidgetType;
-  label: string;
-}
-
-export type DraggedItem = DraggedField | DraggedWidget;
 
 export type SelectedElement =
-  | { type: 'tab'; id: string }
-  | { type: 'section'; id: string }
-  | { type: 'field'; id: string }
+  | { type: 'region'; id: string }
+  | { type: 'panel'; id: string }
+  | { type: 'field'; id: string; panelId: string }
   | { type: 'widget'; id: string }
-  /** Record header highlight fields (configure in Properties) */
-  | { type: 'highlights' }
   | null;
