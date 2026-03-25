@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -61,17 +61,19 @@ interface SavedReport {
   sharedWith?: string[];
 }
 
-const OBJECT_TYPES = [
-  { value: 'properties', label: 'Properties', icon: '🏠' },
-  { value: 'contacts', label: 'Contacts', icon: '👤' },
-  { value: 'accounts', label: 'Accounts', icon: '🏢' },
-  { value: 'products', label: 'Products', icon: '📦' },
-  { value: 'leads', label: 'Leads', icon: '🎯' },
-  { value: 'deals', label: 'Deals', icon: '💼' },
-  { value: 'projects', label: 'Projects', icon: '📋' },
-  { value: 'services', label: 'Service', icon: '🔧' },
-  { value: 'quotes', label: 'Quotes', icon: '💰' },
-  { value: 'installations', label: 'Installations', icon: '⚙️' },
+// Fallback object types — used only when schema hasn't loaded yet.
+// Values must match the apiName stored in reports (PascalCase).
+const FALLBACK_OBJECT_TYPES = [
+  { value: 'Property', label: 'Properties' },
+  { value: 'Contact', label: 'Contacts' },
+  { value: 'Account', label: 'Accounts' },
+  { value: 'Product', label: 'Products' },
+  { value: 'Lead', label: 'Leads' },
+  { value: 'Deal', label: 'Opportunities' },
+  { value: 'Project', label: 'Projects' },
+  { value: 'Service', label: 'Service' },
+  { value: 'Quote', label: 'Quotes' },
+  { value: 'Installation', label: 'Installations' },
 ];
 
 const defaultTabs = DEFAULT_TAB_ORDER;
@@ -97,6 +99,27 @@ export default function ReportsPage() {
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
   const { schema } = useSchemaStore();
+
+  // Build object type list from live schema so renamed objects show correctly
+  const objectTypes = React.useMemo(() => {
+    if (schema?.objects && schema.objects.length > 0) {
+      return schema.objects.map(obj => ({
+        value: obj.apiName,
+        label: obj.pluralLabel || obj.label,
+      }));
+    }
+    return FALLBACK_OBJECT_TYPES;
+  }, [schema]);
+
+  // Helper to resolve an objectType apiName to its display label
+  const getObjectLabel = React.useCallback((apiName: string) => {
+    if (schema?.objects) {
+      const obj = schema.objects.find(o => o.apiName === apiName);
+      if (obj) return obj.pluralLabel || obj.label;
+    }
+    const fallback = FALLBACK_OBJECT_TYPES.find(t => t.value === apiName);
+    return fallback?.label || apiName;
+  }, [schema]);
 
   useEffect(() => {
     (async () => {
@@ -407,9 +430,9 @@ export default function ReportsPage() {
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                 >
                   <option value="all">All Objects</option>
-                  {OBJECT_TYPES.map(type => (
+                  {objectTypes.map(type => (
                     <option key={type.value} value={type.value}>
-                      {type.icon} {type.label}
+                      {type.label}
                     </option>
                   ))}
                 </select>
@@ -488,8 +511,8 @@ export default function ReportsPage() {
                         <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
                           {report.description}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 capitalize">
-                          {report.objectType}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {getObjectLabel(report.objectType)}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-900 capitalize">
                           {report.format}

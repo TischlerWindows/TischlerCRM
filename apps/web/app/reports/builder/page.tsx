@@ -65,13 +65,15 @@ interface ReportFilter {
   value: any;
 }
 
+// Fallback object type definitions — only used when the schema hasn't loaded.
+// The dropdown reads from the live schema when available.
 const OBJECT_TYPES = [
   { value: 'Property', label: 'Properties', fields: ['propertyNumber', 'address', 'propertyType', 'status', 'owner', 'squareFeet', 'bedrooms', 'bathrooms'] },
   { value: 'Contact', label: 'Contacts', fields: ['contactNumber', 'firstName', 'lastName', 'email', 'phone', 'role', 'accountName'] },
   { value: 'Account', label: 'Accounts', fields: ['accountNumber', 'accountName', 'industry', 'type', 'phone', 'website', 'billingAddress'] },
   { value: 'Product', label: 'Products', fields: ['productCode', 'productName', 'category', 'unitPrice', 'stockQuantity', 'inStock', 'supplier'] },
   { value: 'Lead', label: 'Leads', fields: ['leadNumber', 'contactName', 'propertyAddress', 'source', 'stage', 'assignedTo', 'estimatedValue'] },
-  { value: 'Deal', label: 'Deals', fields: ['dealNumber', 'dealName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
+  { value: 'Deal', label: 'Opportunities', fields: ['dealNumber', 'dealName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
   { value: 'Project', label: 'Projects', fields: ['projectNumber', 'projectName', 'status', 'startDate', 'expectedCompletion', 'assignedTeam', 'budget'] },
   { value: 'Service', label: 'Service', fields: ['serviceNumber', 'serviceName', 'accountName', 'serviceType', 'status', 'scheduledDate', 'priority'] },
   { value: 'Quote', label: 'Quotes', fields: ['quoteNumber', 'quoteName', 'accountName', 'dealNumber', 'status', 'totalAmount', 'validUntil'] },
@@ -236,9 +238,12 @@ export default function ReportBuilderPage() {
           // Map records to use clean field names
           records = allRecords.slice(0, 10).map((record: any) => {
             const cleanRecord: any = {};
+            const data = record.data && typeof record.data === 'object' ? record.data : record;
             columns.forEach(col => {
               const cleanField = stripPrefix(col.field, objectType);
-              cleanRecord[col.field] = record[cleanField] || record[col.field];
+              // Try prefixed key in data, then clean key, then top-level fields
+              const prefixedKey = `${objectType}__${cleanField}`;
+              cleanRecord[col.field] = data[prefixedKey] ?? data[cleanField] ?? data[col.field] ?? record[cleanField] ?? record[col.field];
             });
             return cleanRecord;
           });
