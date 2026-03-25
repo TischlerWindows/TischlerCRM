@@ -372,9 +372,9 @@ export function DropboxFileBrowser({
 
   // ── Connected — full file browser ──
   return (
-    <div className="border border-gray-200 rounded-lg mt-4 overflow-hidden">
+    <div className="border border-gray-200 rounded-lg mt-4 overflow-visible relative">
       {/* Header bar */}
-      <div className="bg-gray-50 border-b border-gray-200">
+      <div className="bg-gray-50 border-b border-gray-200 rounded-t-lg">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
             <DropboxLogo className="w-5 h-5" />
@@ -606,7 +606,7 @@ export function DropboxFileBrowser({
       </div>
 
       {/* Footer with file count */}
-      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 text-xs text-gray-500">
+      <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 rounded-b-lg text-xs text-gray-500">
         {entries.filter(e => !e.isFolder).length} file{entries.filter(e => !e.isFolder).length !== 1 ? 's' : ''}
         {entries.filter(e => e.isFolder).length > 0 && `, ${entries.filter(e => e.isFolder).length} folder${entries.filter(e => e.isFolder).length !== 1 ? 's' : ''}`}
         {currentPath.length > 0 && ` in /${currentPath.join('/')}`}
