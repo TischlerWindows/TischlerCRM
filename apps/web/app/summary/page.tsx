@@ -571,6 +571,7 @@ interface Summary {
   muntinType: string;
   spacerBars: string;
   spacerBarColors: string;
+  projectContains: string[];
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -789,6 +790,7 @@ export default function SummaryPage() {
       muntinType: '',
       spacerBars: '',
       spacerBarColors: '',
+      projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -2307,6 +2309,32 @@ export default function SummaryPage() {
                             <option value="3">3</option>
                             <option value="4">4</option>
                           </select>
+                        </div>
+                      </div>
+
+                      {/* Row: Project Contains */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Project Contains</label>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {['Sliding Doors', 'Big Units', 'Requires Site Measurements'].map(opt => {
+                            const selected = editingSummary.projectContains || [];
+                            return (
+                              <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.includes(opt)}
+                                  onChange={() => {
+                                    const next = selected.includes(opt)
+                                      ? selected.filter((o: string) => o !== opt)
+                                      : [...selected, opt];
+                                    setEditingSummary({ ...editingSummary, projectContains: next });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">{opt}</span>
+                              </label>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
