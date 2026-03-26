@@ -35,7 +35,8 @@ import {
   CreditCard,
   ChevronRight,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Layers
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -60,6 +61,12 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
 
+interface DashboardSection {
+  id: string;
+  title: string;
+  subtitle?: string;
+}
+
 interface DashboardWidget {
   id: string;
   type: 'horizontal-bar' | 'vertical-bar' | 'stacked-horizontal-bar' | 'stacked-vertical-bar' | 'line' | 'donut' | 'metric' | 'gauge' | 'funnel' | 'scatter' | 'table' | 'card';
@@ -68,6 +75,7 @@ interface DashboardWidget {
   dataSource: string;
   config: any;
   position: { x: number; y: number; w: number; h: number };
+  sectionId?: string;
 }
 
 interface Dashboard {
@@ -75,6 +83,7 @@ interface Dashboard {
   name: string;
   description: string;
   widgets: DashboardWidget[];
+  sections?: DashboardSection[];
   createdBy: string;
   createdAt: string;
   lastModifiedAt: string;
@@ -180,6 +189,9 @@ export default function DashboardPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [previewKey, setPreviewKey] = useState(0);
   const [resizingWidget, setResizingWidget] = useState<{ id: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editingSectionTitle, setEditingSectionTitle] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -651,7 +663,8 @@ export default function DashboardPage() {
       reportId: widgetConfig.reportId,
       dataSource: widgetConfig.dataSource,
       config: configData,
-      position: { x: 0, y: 0, w: 4, h: 2 }
+      position: { x: 0, y: 0, w: 4, h: 2 },
+      sectionId: widgetConfig.sectionId || undefined
     };
 
     const updatedDashboard = {
@@ -677,6 +690,89 @@ export default function DashboardPage() {
       lastModifiedAt: new Date().toISOString().split('T')[0] || ''
     };
 
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+  };
+
+  // ── Section CRUD ─────────────────────────────────────────────────────
+  const handleAddSection = (title: string) => {
+    if (!selectedDashboard) return;
+    const newSection: DashboardSection = { id: `s${Date.now()}`, title };
+    const updatedDashboard = {
+      ...selectedDashboard,
+      sections: [...(selectedDashboard.sections || []), newSection],
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+    setShowAddSection(false);
+  };
+
+  const handleDeleteSection = (sectionId: string) => {
+    if (!selectedDashboard) return;
+    // Unassign widgets in this section
+    const updatedDashboard = {
+      ...selectedDashboard,
+      sections: (selectedDashboard.sections || []).filter(s => s.id !== sectionId),
+      widgets: selectedDashboard.widgets.map(w =>
+        w.sectionId === sectionId ? { ...w, sectionId: undefined } : w
+      ),
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+  };
+
+  const handleRenameSection = (sectionId: string, newTitle: string) => {
+    if (!selectedDashboard) return;
+    const updatedDashboard = {
+      ...selectedDashboard,
+      sections: (selectedDashboard.sections || []).map(s =>
+        s.id === sectionId ? { ...s, title: newTitle } : s
+      ),
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+    setEditingSectionId(null);
+  };
+
+  const handleMoveSection = (sectionId: string, direction: 'up' | 'down') => {
+    if (!selectedDashboard) return;
+    const sections = [...(selectedDashboard.sections || [])];
+    const idx = sections.findIndex(s => s.id === sectionId);
+    if (idx < 0) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sections.length) return;
+    [sections[idx], sections[newIdx]] = [sections[newIdx], sections[idx]];
+    const updatedDashboard = {
+      ...selectedDashboard,
+      sections,
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+  };
+
+  const handleMoveWidgetToSection = (widgetId: string, sectionId: string | undefined) => {
+    if (!selectedDashboard) return;
+    const updatedDashboard = {
+      ...selectedDashboard,
+      widgets: selectedDashboard.widgets.map(w =>
+        w.id === widgetId ? { ...w, sectionId } : w
+      ),
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
@@ -832,7 +928,8 @@ export default function DashboardPage() {
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
       footer: widget.config?.footer || '',
-      legendPosition: widget.config?.legendPosition || 'right'
+      legendPosition: widget.config?.legendPosition || 'right',
+      sectionId: widget.sectionId || ''
     });
     setShowWidgetConfig(true);
   };
@@ -867,7 +964,8 @@ export default function DashboardPage() {
       reportId: widgetConfig.reportId,
       dataSource: widgetConfig.dataSource,
       config: configData,
-      position: existingWidget?.position || { x: 0, y: 0, w: 4, h: 2 }
+      position: existingWidget?.position || { x: 0, y: 0, w: 4, h: 2 },
+      sectionId: widgetConfig.sectionId || undefined
     };
 
     const updatedDashboard = {
@@ -2148,6 +2246,14 @@ export default function DashboardPage() {
                       {dashEditMode ? 'Done Editing' : 'Edit Dashboard'}
                     </button>
                     {dashEditMode && (
+                      <>
+                      <button
+                        onClick={() => setShowAddSection(true)}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                      >
+                        <Layers className="w-5 h-5 mr-2" />
+                        Add Section
+                      </button>
                       <button
                         onClick={() => setShowWidgetSelector(true)}
                         className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
@@ -2155,13 +2261,102 @@ export default function DashboardPage() {
                         <Plus className="w-5 h-5 mr-2" />
                         Add Widget
                       </button>
+                      </>
                     )}
                   </div>
                 </div>
 
-                {selectedDashboard.widgets.length > 0 ? (
-                  <div className="grid grid-cols-9 gap-4 auto-rows-[200px] pb-[600px]">
-                    {selectedDashboard.widgets.map(widget => renderWidget(widget))}
+                {selectedDashboard.widgets.length > 0 || (selectedDashboard.sections || []).length > 0 ? (
+                  <div className="pb-[600px] space-y-6">
+                    {/* Unsectioned widgets first */}
+                    {(() => {
+                      const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
+                      const unsectioned = selectedDashboard.widgets.filter(w => !w.sectionId || !sectionIds.has(w.sectionId));
+                      if (unsectioned.length === 0) return null;
+                      return (
+                        <div className="grid grid-cols-9 gap-4 auto-rows-[200px]">
+                          {unsectioned.map(widget => renderWidget(widget))}
+                        </div>
+                      );
+                    })()}
+                    {/* Section-grouped widgets */}
+                    {(selectedDashboard.sections || []).map((section, sIdx) => {
+                      const sectionWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
+                      return (
+                        <div key={section.id}>
+                          <div className="flex items-center justify-between mb-3">
+                            {editingSectionId === section.id ? (
+                              <form
+                                className="flex items-center gap-2"
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleRenameSection(section.id, editingSectionTitle);
+                                }}
+                              >
+                                <input
+                                  autoFocus
+                                  value={editingSectionTitle}
+                                  onChange={(e) => setEditingSectionTitle(e.target.value)}
+                                  className="px-2 py-1 border border-gray-300 rounded text-sm font-semibold text-gray-900"
+                                />
+                                <button type="submit" className="text-sm text-brand-navy hover:underline">Save</button>
+                                <button type="button" onClick={() => setEditingSectionId(null)} className="text-sm text-gray-500 hover:underline">Cancel</button>
+                              </form>
+                            ) : (
+                              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{section.title}</h3>
+                            )}
+                            {dashEditMode && editingSectionId !== section.id && (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleMoveSection(section.id, 'up')}
+                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                  title="Move up"
+                                  disabled={sIdx === 0}
+                                >
+                                  <ChevronUp className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleMoveSection(section.id, 'down')}
+                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                  title="Move down"
+                                  disabled={sIdx === (selectedDashboard.sections || []).length - 1}
+                                >
+                                  <ChevronDown className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => { setEditingSectionId(section.id); setEditingSectionTitle(section.title); }}
+                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                  title="Rename section"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSection(section.id)}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                  title="Delete section"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {section.subtitle && (
+                            <p className="text-xs text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
+                          )}
+                          {sectionWidgets.length > 0 ? (
+                            <div className="grid grid-cols-9 gap-4 auto-rows-[200px]">
+                              {sectionWidgets.map(widget => renderWidget(widget))}
+                            </div>
+                          ) : (
+                            dashEditMode && (
+                              <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+                                No widgets in this section. Add a widget and assign it here.
+                              </div>
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
@@ -2192,6 +2387,38 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Section Dialog */}
+      {showAddSection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">Add Section</h2>
+            </div>
+            <div className="p-6">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const formData = new FormData(e.currentTarget);
+                const title = (formData.get('title') as string)?.trim();
+                if (title) handleAddSection(title);
+              }}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Section Title</label>
+                <input
+                  name="title"
+                  autoFocus
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy text-sm"
+                  placeholder="e.g. Estimating Overview"
+                />
+                <div className="flex justify-end gap-3 mt-4">
+                  <button type="button" onClick={() => setShowAddSection(false)} className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="px-4 py-2 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Add Section</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Dashboard Dialog */}
       {showNewDashboard && (
@@ -2832,6 +3059,22 @@ export default function DashboardPage() {
                       placeholder="Widget title"
                     />
                   </div>
+
+                  {(selectedDashboard?.sections || []).length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+                    <select
+                      value={widgetConfig.sectionId || ''}
+                      onChange={(e) => setWidgetConfig({ ...widgetConfig, sectionId: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 text-sm"
+                    >
+                      <option value="">No section (top level)</option>
+                      {(selectedDashboard?.sections || []).map(s => (
+                        <option key={s.id} value={s.id}>{s.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Subtitle</label>
