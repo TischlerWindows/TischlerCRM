@@ -1938,7 +1938,8 @@ export default function DashboardPage() {
         const isExpanded = drillDownWidgetId === widget.id;
         const btnData = widget.config?.data || widget.config?.manualData || [];
         const btnColor = widget.config?.cardColor || '#1e3a5f';
-        const btnValue = widget.config?.value ?? widget.config?.manualMetric?.value ?? btnData.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0);
+        const rawVal = widget.config?.value ?? widget.config?.manualMetric?.value ?? undefined;
+        const btnValue = rawVal !== undefined ? rawVal : undefined;
         const btnPrefix = widget.config?.prefix ?? widget.config?.manualMetric?.prefix ?? '';
         const btnSuffix = widget.config?.suffix ?? widget.config?.manualMetric?.suffix ?? '';
 
@@ -1949,13 +1950,13 @@ export default function DashboardPage() {
               ...widgetStyle,
               ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
             }}
-            className="rounded-lg relative group flex flex-col transition-all duration-300 overflow-hidden cursor-pointer select-none"
+            className="relative group flex flex-col transition-all duration-300 overflow-hidden cursor-pointer select-none"
           >
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
             {/* Hover toolbar */}
-            <div className="absolute top-0.5 right-0.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded p-0.5">
+            <div className="absolute top-0 right-0 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-bl p-0.5">
               <button
                 onClick={(e) => { e.stopPropagation(); handleRefreshWidget(widget); }}
                 className="p-0.5 text-white/80 hover:text-white rounded transition-colors"
@@ -1990,18 +1991,20 @@ export default function DashboardPage() {
               />
             )}
 
-            {/* Button face */}
-            <div
-              className={`flex-1 flex items-center justify-center gap-2 px-2 py-1 rounded-lg text-white font-semibold`}
-              style={{ backgroundColor: btnColor }}
-              onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
-            >
-              <span className="text-xs truncate max-w-full leading-tight">{widget.title}</span>
-              {btnValue != null && (
-                <span className="text-sm font-bold tabular-nums flex-shrink-0">
-                  {btnPrefix}{typeof btnValue === 'number' ? btnValue.toLocaleString() : btnValue}{btnSuffix}
-                </span>
-              )}
+            {/* Button face — tight pill centered in cell */}
+            <div className="flex-1 flex items-center justify-center p-1">
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-white font-medium shadow-sm hover:shadow-md transition-shadow"
+                style={{ backgroundColor: btnColor }}
+                onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+              >
+                <span className="text-[11px] truncate leading-none">{widget.title}</span>
+                {btnValue !== undefined && btnValue !== '' && (
+                  <span className="text-[11px] font-bold tabular-nums flex-shrink-0 opacity-90">
+                    {btnPrefix}{typeof btnValue === 'number' ? btnValue.toLocaleString() : btnValue}{btnSuffix}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Drill-down table */}
