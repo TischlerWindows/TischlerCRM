@@ -1661,15 +1661,15 @@ export default function DashboardPage() {
 
             {/* Card summary */}
             <div
-              className="p-5 flex items-center gap-4 cursor-pointer select-none"
+              className="p-5 flex items-center justify-center gap-4 cursor-pointer select-none"
               onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
             >
               <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cardColor + '18' }}>
                 <CreditCard className="w-6 h-6" style={{ color: cardColor }} />
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-gray-600 truncate">{widget.title}</div>
-                <div className="flex items-baseline gap-2">
+              <div className="text-center">
+                <div className="text-sm text-gray-600">{widget.title}</div>
+                <div className="flex items-baseline justify-center gap-2">
                   <div className="text-2xl font-bold text-gray-900">
                     {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                   </div>
