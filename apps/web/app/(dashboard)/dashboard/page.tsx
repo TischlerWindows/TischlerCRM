@@ -36,7 +36,8 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
-  Layers
+  Layers,
+  MousePointerClick
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -69,7 +70,7 @@ interface DashboardSection {
 
 interface DashboardWidget {
   id: string;
-  type: 'horizontal-bar' | 'vertical-bar' | 'stacked-horizontal-bar' | 'stacked-vertical-bar' | 'line' | 'donut' | 'metric' | 'gauge' | 'funnel' | 'scatter' | 'table' | 'card';
+  type: 'horizontal-bar' | 'vertical-bar' | 'stacked-horizontal-bar' | 'stacked-vertical-bar' | 'line' | 'donut' | 'metric' | 'gauge' | 'funnel' | 'scatter' | 'table' | 'card' | 'button';
   title: string;
   reportId?: string;
   dataSource: string;
@@ -102,7 +103,8 @@ const WIDGET_TYPES = [
   { id: 'funnel', label: 'Funnel Chart', icon: Filter },
   { id: 'scatter', label: 'Scatter Chart', icon: Grid3x3 },
   { id: 'table', label: 'Lightning Table', icon: TableIcon },
-  { id: 'card', label: 'Card', icon: CreditCard }
+  { id: 'card', label: 'Card', icon: CreditCard },
+  { id: 'button', label: 'Button', icon: MousePointerClick }
 ];
 
 const OBJECT_TYPES = [
@@ -242,7 +244,7 @@ export default function DashboardPage() {
 
     // --- Manual data mode: use user-entered data directly ---
     if (widgetConfig.dataSourceMode === 'manual') {
-      if (selectedWidgetType === 'metric' || selectedWidgetType === 'card') {
+      if (selectedWidgetType === 'metric' || selectedWidgetType === 'card' || selectedWidgetType === 'button') {
         const m = widgetConfig.manualMetric || {};
         return {
           value: m.value ?? 0,
@@ -409,7 +411,7 @@ export default function DashboardPage() {
       const deltaY = (e.clientY - resizingWidget.startY) / 50; // pixels to grid units (50px per row)
 
       const resizingWidgetObj = selectedDashboard.widgets.find(w => w.id === resizingWidget.id);
-      const minW = (resizingWidgetObj?.type === 'card' || resizingWidgetObj?.type === 'metric') ? 1 : 2;
+      const minW = (resizingWidgetObj?.type === 'card' || resizingWidgetObj?.type === 'metric' || resizingWidgetObj?.type === 'button') ? 1 : 2;
       let newW = Math.max(minW, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
       let newH = Math.max(1, Math.round(resizingWidget.startH + deltaY));
 
@@ -661,9 +663,11 @@ export default function DashboardPage() {
       }
     }
 
-    const defaultSize = (selectedWidgetType === 'card' || selectedWidgetType === 'metric')
-      ? { x: 0, y: 0, w: 2, h: 1 }
-      : { x: 0, y: 0, w: 4, h: 2 };
+    const defaultSize = selectedWidgetType === 'button'
+      ? { x: 0, y: 0, w: 1, h: 1 }
+      : (selectedWidgetType === 'card' || selectedWidgetType === 'metric')
+        ? { x: 0, y: 0, w: 2, h: 1 }
+        : { x: 0, y: 0, w: 4, h: 2 };
 
     const newWidget: DashboardWidget = {
       id: `w${Date.now()}`,
@@ -1930,6 +1934,125 @@ export default function DashboardPage() {
         );
       }
 
+      case 'button': {
+        const isExpanded = drillDownWidgetId === widget.id;
+        const btnData = widget.config?.data || widget.config?.manualData || [];
+        const btnColor = widget.config?.cardColor || '#1e3a5f';
+        const btnValue = widget.config?.value ?? widget.config?.manualMetric?.value ?? btnData.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0);
+        const btnPrefix = widget.config?.prefix ?? widget.config?.manualMetric?.prefix ?? '';
+        const btnSuffix = widget.config?.suffix ?? widget.config?.manualMetric?.suffix ?? '';
+
+        return (
+          <div
+            key={widget.id}
+            style={{
+              ...widgetStyle,
+              ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
+            }}
+            className="rounded-lg relative group flex flex-col transition-all duration-300 overflow-hidden cursor-pointer select-none"
+          >
+            {refreshingWidgetId === widget.id && (
+              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+            )}
+            {/* Hover toolbar */}
+            <div className="absolute top-0.5 right-0.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded p-0.5">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleRefreshWidget(widget); }}
+                className="p-0.5 text-white/80 hover:text-white rounded transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw className="w-3 h-3" />
+              </button>
+              {dashEditMode && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleEditWidget(widget); }}
+                    className="p-0.5 text-white/80 hover:text-white rounded"
+                    title="Edit"
+                  >
+                    <Edit className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteWidget(widget.id); }}
+                    className="p-0.5 text-red-300 hover:text-red-100 rounded"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </>
+              )}
+            </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-3 h-3 bg-white/30 rounded-tl cursor-se-resize hover:bg-white/50 z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to resize"
+              />
+            )}
+
+            {/* Button face */}
+            <div
+              className={`flex-1 flex items-center justify-center gap-2 px-2 py-1 rounded-lg text-white font-semibold`}
+              style={{ backgroundColor: btnColor }}
+              onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+            >
+              <span className="text-xs truncate max-w-full leading-tight">{widget.title}</span>
+              {btnValue != null && (
+                <span className="text-sm font-bold tabular-nums flex-shrink-0">
+                  {btnPrefix}{typeof btnValue === 'number' ? btnValue.toLocaleString() : btnValue}{btnSuffix}
+                </span>
+              )}
+            </div>
+
+            {/* Drill-down table */}
+            {isExpanded && (
+              <div className="border-t border-gray-200 flex-1 overflow-auto bg-white">
+                {btnData.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>
+                        {Object.keys(btnData[0] || {}).map((key) => (
+                          <th key={key} className={`py-2 px-3 text-xs font-semibold text-gray-600 uppercase tracking-wider ${key === 'value' ? 'text-right' : 'text-left'}`}>
+                            {key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {btnData.map((row: any, idx: number) => (
+                        <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400 text-xs">{idx + 1}</td>
+                          {Object.entries(row).map(([key, val]: [string, any]) => (
+                            <td key={key} className={`py-1.5 px-3 ${key === 'value' ? 'text-right font-medium' : ''}`}>
+                              {typeof val === 'number' ? val.toLocaleString() : String(val)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex items-center justify-center h-24 text-gray-400 text-sm">
+                    No data. Add manual data or link a report.
+                  </div>
+                )}
+                {widget.reportId && (
+                  <div className="border-t border-gray-200 p-2 bg-gray-50">
+                    <Link
+                      href={`/reports/view/${widget.reportId}`}
+                      className="text-xs font-medium text-brand-navy hover:underline flex items-center gap-1"
+                    >
+                      Open full report <ChevronRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       default:
         return (
           <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 flex items-center justify-center text-gray-400 relative">
@@ -1969,7 +2092,7 @@ export default function DashboardPage() {
     const isDragging = draggingWidgetId === widget.id;
     const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
     // Card drill-down expansion
-    const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
+    const isExpandedCard = (widget.type === 'card' || widget.type === 'button') && drillDownWidgetId === widget.id;
     const spanW = isExpandedCard ? 9 : widget.position.w;
     const spanH = isExpandedCard ? 3 : widget.position.h;
 
@@ -2913,7 +3036,7 @@ export default function DashboardPage() {
               {widgetConfig.dataSourceMode === 'manual' && (
                 <div className="space-y-4">
                   {/* Metric / Card widget manual entry */}
-                  {(selectedWidgetType === 'metric' || selectedWidgetType === 'card') && (
+                  {(selectedWidgetType === 'metric' || selectedWidgetType === 'card' || selectedWidgetType === 'button') && (
                     <div className="space-y-3">
                       <h4 className="text-sm font-semibold text-gray-900">Metric Value</h4>
                       <div className="grid grid-cols-2 gap-3">
@@ -2963,7 +3086,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Card color picker */}
-                  {selectedWidgetType === 'card' && (
+                  {(selectedWidgetType === 'card' || selectedWidgetType === 'button') && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Card Accent Color</label>
                       <div className="flex items-center gap-3">
@@ -2989,7 +3112,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Card drill-down data rows */}
-                  {selectedWidgetType === 'card' && (
+                  {(selectedWidgetType === 'card' || selectedWidgetType === 'button') && (
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-sm font-semibold text-gray-900">Drill-Down Data</h4>
