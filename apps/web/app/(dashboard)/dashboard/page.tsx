@@ -31,7 +31,11 @@ import {
   Cog,
   Edit3,
   GripVertical,
-  X
+  X,
+  CreditCard,
+  ChevronRight,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -58,7 +62,7 @@ import { AlertCircle } from 'lucide-react';
 
 interface DashboardWidget {
   id: string;
-  type: 'horizontal-bar' | 'vertical-bar' | 'stacked-horizontal-bar' | 'stacked-vertical-bar' | 'line' | 'donut' | 'metric' | 'gauge' | 'funnel' | 'scatter' | 'table';
+  type: 'horizontal-bar' | 'vertical-bar' | 'stacked-horizontal-bar' | 'stacked-vertical-bar' | 'line' | 'donut' | 'metric' | 'gauge' | 'funnel' | 'scatter' | 'table' | 'card';
   title: string;
   reportId?: string;
   dataSource: string;
@@ -88,7 +92,8 @@ const WIDGET_TYPES = [
   { id: 'gauge', label: 'Gauge', icon: Gauge },
   { id: 'funnel', label: 'Funnel Chart', icon: Filter },
   { id: 'scatter', label: 'Scatter Chart', icon: Grid3x3 },
-  { id: 'table', label: 'Lightning Table', icon: TableIcon }
+  { id: 'table', label: 'Lightning Table', icon: TableIcon },
+  { id: 'card', label: 'Card', icon: CreditCard }
 ];
 
 const OBJECT_TYPES = [
@@ -166,6 +171,7 @@ export default function DashboardPage() {
   const [dashEditMode, setDashEditMode] = useState(false);
   const [editingWidget, setEditingWidget] = useState<string | null>(null);
   const [refreshingWidgetId, setRefreshingWidgetId] = useState<string | null>(null);
+  const [drillDownWidgetId, setDrillDownWidgetId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [searchTerm, setSearchTerm] = useState('');
@@ -222,9 +228,15 @@ export default function DashboardPage() {
 
     // --- Manual data mode: use user-entered data directly ---
     if (widgetConfig.dataSourceMode === 'manual') {
-      if (selectedWidgetType === 'metric') {
+      if (selectedWidgetType === 'metric' || selectedWidgetType === 'card') {
         const m = widgetConfig.manualMetric || {};
-        return { value: m.value ?? 0, prefix: m.prefix || '', suffix: m.suffix || '', trend: m.trend || 0 };
+        return {
+          value: m.value ?? 0,
+          prefix: m.prefix || '',
+          suffix: m.suffix || '',
+          trend: m.trend || 0,
+          data: (widgetConfig.manualData || []).map((d: any) => ({ label: d.label || '', value: Number(d.value) || 0 }))
+        };
       }
       if (selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') {
         const keys: string[] = widgetConfig.manualStackKeys || [];
@@ -586,11 +598,11 @@ export default function DashboardPage() {
       stackBy: '',
       manualData: isStacked
         ? [{ label: 'Category 1', 'Series A': 30, 'Series B': 45 }, { label: 'Category 2', 'Series A': 40, 'Series B': 35 }, { label: 'Category 3', 'Series A': 25, 'Series B': 50 }]
-        : type === 'metric'
-          ? []
+        : (type === 'metric' || type === 'card')
+          ? [{ label: 'Active', value: 24 }, { label: 'Pending', value: 12 }, { label: 'Closed', value: 8 }]
           : [{ label: 'Item 1', value: 45 }, { label: 'Item 2', value: 62 }, { label: 'Item 3', value: 38 }],
       manualStackKeys: isStacked ? ['Series A', 'Series B'] : [],
-      manualMetric: { value: 0, prefix: '', suffix: '', trend: 0 },
+      manualMetric: (type === 'metric' || type === 'card') ? { value: 44, prefix: '', suffix: '', trend: 12 } : { value: 0, prefix: '', suffix: '', trend: 0 },
       aggregationType: 'sum',
       displayUnits: 'actual',
       showValues: true,
@@ -602,6 +614,7 @@ export default function DashboardPage() {
       customDecimals: 2,
       sortBy: '',
       customLink: '',
+      cardColor: '#1e3a5f',
       title: `New ${WIDGET_TYPES.find(t => t.id === type)?.label}`,
       subtitle: '',
       footer: '',
@@ -815,6 +828,7 @@ export default function DashboardPage() {
       customDecimals: widget.config?.customDecimals || 2,
       sortBy: widget.config?.sortBy || '',
       customLink: widget.config?.customLink || '',
+      cardColor: widget.config?.cardColor || '#1e3a5f',
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
       footer: widget.config?.footer || '',
@@ -1580,6 +1594,147 @@ export default function DashboardPage() {
           </div>
         );
 
+      case 'card': {
+        const isExpanded = drillDownWidgetId === widget.id;
+        const cardData = widget.config?.data || widget.config?.manualData || [];
+        const cardColor = widget.config?.cardColor || '#1e3a5f';
+        const cardIcon = widget.config?.cardIcon || 'default';
+        const cardValue = widget.config?.value ?? widget.config?.manualMetric?.value ?? cardData.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0);
+        const cardPrefix = widget.config?.prefix ?? widget.config?.manualMetric?.prefix ?? '';
+        const cardSuffix = widget.config?.suffix ?? widget.config?.manualMetric?.suffix ?? '';
+        const cardTrend = widget.config?.trend ?? widget.config?.manualMetric?.trend ?? null;
+
+        return (
+          <div
+            key={widget.id}
+            style={{
+              ...widgetStyle,
+              ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
+            }}
+            className="bg-white rounded-lg border border-gray-200 relative group flex flex-col transition-all duration-300"
+          >
+            {refreshingWidgetId === widget.id && (
+              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+            )}
+            {/* Toolbar */}
+            <div className="absolute top-2 right-2 flex gap-1 z-10">
+              <button
+                onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                title={isExpanded ? 'Collapse' : 'Drill down to data'}
+              >
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <button
+                onClick={() => handleRefreshWidget(widget)}
+                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                title="Refresh widget"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              {dashEditMode && (
+                <>
+                  <button
+                    onClick={() => handleEditWidget(widget)}
+                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    title="Edit widget"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteWidget(widget.id)}
+                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    title="Delete widget"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Drag to resize"
+              />
+            )}
+
+            {/* Card summary */}
+            <div
+              className="p-5 flex items-center gap-4 cursor-pointer select-none"
+              onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+            >
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cardColor + '18' }}>
+                <CreditCard className="w-6 h-6" style={{ color: cardColor }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-gray-600 truncate">{widget.title}</div>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-2xl font-bold text-gray-900">
+                    {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
+                  </div>
+                  {cardTrend != null && cardTrend !== 0 && (
+                    <div className={`text-sm font-medium ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {cardTrend > 0 ? '+' : ''}{cardTrend}%
+                    </div>
+                  )}
+                </div>
+                {widget.config?.subtitle && (
+                  <div className="text-xs text-gray-500 mt-0.5">{widget.config.subtitle}</div>
+                )}
+              </div>
+              <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
+            </div>
+
+            {/* Drill-down table */}
+            {isExpanded && (
+              <div className="border-t border-gray-200 flex-1 overflow-auto">
+                {cardData.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>
+                        {Object.keys(cardData[0] || {}).map((key) => (
+                          <th key={key} className={`py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider ${key === 'value' ? 'text-right' : 'text-left'}`}>
+                            {key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cardData.map((row: any, idx: number) => (
+                        <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                          <td className="py-2 px-4 text-gray-400 text-xs">{idx + 1}</td>
+                          {Object.entries(row).map(([key, val]: [string, any]) => (
+                            <td key={key} className={`py-2 px-4 ${key === 'value' ? 'text-right font-medium' : ''}`}>
+                              {typeof val === 'number' ? val.toLocaleString() : String(val)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+                    No data to display. Configure this card with manual data or link a report.
+                  </div>
+                )}
+                {widget.reportId && (
+                  <div className="border-t border-gray-200 p-3 bg-gray-50">
+                    <Link
+                      href={`/reports/view/${widget.reportId}`}
+                      className="text-xs font-medium text-brand-navy hover:underline flex items-center gap-1"
+                    >
+                      Open full report <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      }
+
       default:
         return (
           <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 flex items-center justify-center text-gray-400 relative">
@@ -2207,7 +2362,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Chart Configuration (only for chart types in report mode) */}
-                  {!['metric', 'table'].includes(selectedWidgetType) && availableReports.length > 0 && (
+                  {!['metric', 'table', 'card'].includes(selectedWidgetType) && availableReports.length > 0 && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis</label>
@@ -2320,8 +2475,8 @@ export default function DashboardPage() {
               {/* ===== MANUAL MODE ===== */}
               {widgetConfig.dataSourceMode === 'manual' && (
                 <div className="space-y-4">
-                  {/* Metric widget manual entry */}
-                  {selectedWidgetType === 'metric' && (
+                  {/* Metric / Card widget manual entry */}
+                  {(selectedWidgetType === 'metric' || selectedWidgetType === 'card') && (
                     <div className="space-y-3">
                       <h4 className="text-sm font-semibold text-gray-900">Metric Value</h4>
                       <div className="grid grid-cols-2 gap-3">
@@ -2370,7 +2525,93 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Stacked chart manual entry */}
+                  {/* Card color picker */}
+                  {selectedWidgetType === 'card' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Card Accent Color</label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={widgetConfig.cardColor || '#1e3a5f'}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, cardColor: e.target.value })}
+                          className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                        />
+                        <div className="flex gap-1.5">
+                          {['#1e3a5f', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setWidgetConfig({ ...widgetConfig, cardColor: c })}
+                              className={`w-7 h-7 rounded-full border-2 transition-all ${widgetConfig.cardColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'}`}
+                              style={{ backgroundColor: c }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Card drill-down data rows */}
+                  {selectedWidgetType === 'card' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-gray-900">Drill-Down Data</h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newData = [...(widgetConfig.manualData || []), { label: `Row ${(widgetConfig.manualData?.length || 0) + 1}`, value: 0 }];
+                            setWidgetConfig({ ...widgetConfig, manualData: newData });
+                          }}
+                          className="text-xs text-brand-navy font-medium hover:text-brand-navy-dark"
+                        >
+                          + Add Row
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mb-2">These rows appear when users click to drill down into the card</p>
+                      <div className="space-y-2 max-h-[250px] overflow-y-auto">
+                        {(widgetConfig.manualData || []).map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={item.label || ''}
+                              onChange={(e) => {
+                                const newData = [...widgetConfig.manualData];
+                                newData[idx] = { ...newData[idx], label: e.target.value };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              }}
+                              placeholder="Label"
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            />
+                            <input
+                              type="number"
+                              value={item.value ?? 0}
+                              onChange={(e) => {
+                                const newData = [...widgetConfig.manualData];
+                                newData[idx] = { ...newData[idx], value: parseFloat(e.target.value) || 0 };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              }}
+                              placeholder="Value"
+                              className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            />
+                            {(widgetConfig.manualData || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newData = widgetConfig.manualData.filter((_: any, i: number) => i !== idx);
+                                  setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                }}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Stacked chart manual entry */}}
                   {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
                     <div className="space-y-3">
                       {/* Series (stack keys) management */}
@@ -2502,7 +2743,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Standard chart manual entry (bar, line, donut) */}
-                  {!['metric', 'table', 'stacked-horizontal-bar', 'stacked-vertical-bar'].includes(selectedWidgetType || '') && (
+                  {!['metric', 'table', 'card', 'stacked-horizontal-bar', 'stacked-vertical-bar'].includes(selectedWidgetType || '') && (
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-sm font-semibold text-gray-900">Data Points</h4>
@@ -2676,7 +2917,7 @@ export default function DashboardPage() {
                     Select a report or switch to &quot;Manual Entry&quot; to see live data preview
                   </p>
                 )}
-                {widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table'].includes(selectedWidgetType) && (
+                {widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table', 'card'].includes(selectedWidgetType) && (
                   <p className="text-xs text-amber-600 mt-2 text-center">
                     Configure <strong>X-Axis</strong> and <strong>Y-Axis</strong> to see data visualization
                   </p>
