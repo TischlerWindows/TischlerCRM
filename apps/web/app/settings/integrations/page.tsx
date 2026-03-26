@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   Plug,
   Map,
@@ -15,7 +15,6 @@ import {
   AlertCircle,
   ExternalLink,
   Mail,
-  Unplug,
   Send,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
@@ -221,10 +220,13 @@ interface ConfigPanelProps {
 
 function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProps) {
   const authType = integration.config?.authType || 'api_key';
+  const isOutlook = integration.provider === 'outlook';
   const [enabled, setEnabled] = useState(integration.enabled);
   const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [tenantId, setTenantId] = useState((integration.config?.tenantId as string) || '');
+  const [senderEmail, setSenderEmail] = useState((integration.config?.senderEmail as string) || '');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -239,6 +241,15 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
       } else {
         if (clientId.trim()) payload.clientId = clientId.trim();
         if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
+      }
+
+      // Save Outlook-specific config (tenantId + senderEmail) via config merge
+      if (isOutlook) {
+        payload.config = {
+          ...(integration.config || {}),
+          tenantId: tenantId.trim(),
+          senderEmail: senderEmail.trim(),
+        };
       }
 
       await apiClient.updateIntegration(integration.provider, payload);
@@ -350,7 +361,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               </button>
             </div>
           </div>
-          {!(integration.hasClientId || clientId.trim()) && (
+          {!(integration.hasClientId || clientId.trim()) && !isOutlook && (
             <p className="text-[11px] text-amber-600 bg-amber-50 rounded-md px-3 py-2 mb-4">
               OAuth connect flow for {integration.displayName} will be available once client credentials are configured.
             </p>
@@ -358,9 +369,15 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
         </>
       )}
 
-      {/* Outlook-specific connect section */}
-      {integration.provider === 'outlook' && (integration.hasClientId || clientId.trim()) && (
-        <OutlookConnectSection integration={integration} />
+      {/* Outlook-specific: Tenant ID + Sender Email + Test */}
+      {isOutlook && (
+        <OutlookAppOnlySection
+          integration={integration}
+          tenantId={tenantId}
+          setTenantId={setTenantId}
+          senderEmail={senderEmail}
+          setSenderEmail={setSenderEmail}
+        />
       )}
 
       {/* Actions */}
@@ -394,73 +411,23 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
   );
 }
 
-// ── Outlook connect / status / disconnect ──────────────────────────
+// ── Outlook app-only config fields + test ──────────────────────────
 
-function OutlookConnectSection({ integration }: { integration: Integration }) {
-  const [status, setStatus] = useState<{
-    connected: boolean;
-    externalEmail?: string;
-    connectedAt?: string;
-    connectedBy?: string;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
+function OutlookAppOnlySection({
+  integration,
+  tenantId,
+  setTenantId,
+  senderEmail,
+  setSenderEmail,
+}: {
+  integration: Integration;
+  tenantId: string;
+  setTenantId: (v: string) => void;
+  senderEmail: string;
+  setSenderEmail: (v: string) => void;
+}) {
   const [sendingTest, setSendingTest] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
-  const popupRef = useRef<Window | null>(null);
-
-  const loadStatus = useCallback(async () => {
-    try {
-      const s = await apiClient.getOutlookStatus();
-      setStatus({ connected: s.connected, externalEmail: s.externalEmail, connectedAt: s.connectedAt, connectedBy: s.connectedBy });
-    } catch {
-      setStatus({ connected: false });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadStatus();
-  }, [loadStatus]);
-
-  // Listen for OAuth popup result
-  useEffect(() => {
-    function onMessage(e: MessageEvent) {
-      if (e.data?.type !== 'outlook-oauth-result') return;
-      setConnecting(false);
-      if (e.data.status === 'connected') {
-        loadStatus();
-      }
-    }
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
-  }, [loadStatus]);
-
-  const handleConnect = async () => {
-    setConnecting(true);
-    try {
-      const { url } = await apiClient.getOutlookConnectUrl();
-      const w = 600, h = 700;
-      const left = window.screenX + (window.outerWidth - w) / 2;
-      const top = window.screenY + (window.outerHeight - h) / 2;
-      popupRef.current = window.open(url, 'outlook_oauth', `width=${w},height=${h},left=${left},top=${top}`);
-    } catch {
-      setConnecting(false);
-    }
-  };
-
-  const handleDisconnect = async () => {
-    if (!confirm('Disconnect Outlook? Invite emails will no longer be sent.')) return;
-    setDisconnecting(true);
-    try {
-      await apiClient.disconnectOutlook();
-      setStatus({ connected: false });
-    } finally {
-      setDisconnecting(false);
-    }
-  };
 
   const handleTestEmail = async () => {
     setSendingTest(true);
@@ -475,38 +442,44 @@ function OutlookConnectSection({ integration }: { integration: Integration }) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mb-4 flex items-center gap-2 text-xs text-brand-gray">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking Outlook connection…
-      </div>
-    );
-  }
-
   return (
     <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
       <h4 className="text-xs font-semibold text-brand-dark mb-3 flex items-center gap-1.5">
         <Mail className="w-3.5 h-3.5" style={{ color: '#0078D4' }} />
-        Outlook Connection
+        App-Only Configuration
       </h4>
+      <p className="text-[11px] text-brand-gray mb-3">
+        Uses application permissions — no personal sign-in required. The Azure AD app needs the <strong>Mail.Send</strong> application permission with admin consent.
+      </p>
 
-      {status?.connected ? (
-        <>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-[11px] font-medium text-green-700">
-              <Check className="w-3 h-3" /> Connected
-            </span>
-            {status.externalEmail && (
-              <span className="text-[11px] text-brand-gray">{status.externalEmail}</span>
-            )}
-          </div>
-          {status.connectedBy && (
-            <p className="text-[11px] text-brand-gray mb-3">
-              Connected by {status.connectedBy}
-              {status.connectedAt && ` on ${new Date(status.connectedAt).toLocaleDateString()}`}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-brand-dark mb-1.5">Tenant ID</label>
+        <input
+          type="text"
+          value={tenantId}
+          onChange={(e) => setTenantId(e.target.value)}
+          placeholder="e.g. 12345678-abcd-efgh-ijkl-123456789abc"
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+        />
+        <p className="mt-1 text-[10px] text-brand-gray">Azure AD → App registrations → Overview → Directory (tenant) ID</p>
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-brand-dark mb-1.5">Sender Email</label>
+        <input
+          type="email"
+          value={senderEmail}
+          onChange={(e) => setSenderEmail(e.target.value)}
+          placeholder="e.g. crm@tischlerwindows.com"
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+        />
+        <p className="mt-1 text-[10px] text-brand-gray">Shared mailbox or user mailbox that the app will send emails from</p>
+      </div>
+
+      {/* Test button — only works after credentials are saved */}
+      {integration.hasClientId && integration.hasClientSecret && integration.config?.tenantId && integration.config?.senderEmail && (
+        <div className="pt-2 border-t border-gray-200">
+          <div className="flex items-center gap-2 mt-2">
             <button
               onClick={handleTestEmail}
               disabled={sendingTest}
@@ -515,33 +488,12 @@ function OutlookConnectSection({ integration }: { integration: Integration }) {
               {sendingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               Send Test Email
             </button>
-            <button
-              onClick={handleDisconnect}
-              disabled={disconnecting}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition disabled:opacity-50"
-            >
-              {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
-              Disconnect
-            </button>
+            <span className="text-[11px] text-brand-gray">Sends a test to your CRM email</span>
           </div>
           {testResult && (
             <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>
           )}
-        </>
-      ) : (
-        <>
-          <p className="text-[11px] text-brand-gray mb-3">
-            Connect an Outlook account to send invite and notification emails from the CRM.
-          </p>
-          <button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white bg-[#0078D4] hover:bg-[#006CBE] transition disabled:opacity-50"
-          >
-            {connecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-            Connect Outlook Account
-          </button>
-        </>
+        </div>
       )}
     </div>
   );

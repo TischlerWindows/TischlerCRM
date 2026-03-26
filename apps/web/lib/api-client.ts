@@ -668,23 +668,14 @@ class ApiClient {
 
   // ── Outlook / Microsoft ────────────────────────────────────────────────────
 
-  async getOutlookConnectUrl() {
-    return this.request<{ url: string }>('/outlook/connect');
-  }
-
   async getOutlookStatus() {
     return this.request<{
       enabled: boolean;
       configured: boolean;
       connected: boolean;
-      externalEmail: string | null;
-      connectedAt: string | null;
-      connectedBy: string | null;
+      senderEmail: string | null;
+      tenantId: string | null;
     }>('/outlook/status');
-  }
-
-  async disconnectOutlook() {
-    return this.request<void>('/outlook/disconnect', { method: 'DELETE' });
   }
 
   async sendOutlookTestEmail() {

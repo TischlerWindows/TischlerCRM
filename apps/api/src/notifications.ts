@@ -1,6 +1,4 @@
-import { prisma } from '@crm/db/client';
-import { decrypt } from './crypto.js';
-import { getValidOutlookToken } from './routes/outlook.js';
+import { getAppOnlyToken } from './routes/outlook.js';
 
 function escapeHtml(str: string): string {
   return str
@@ -17,25 +15,8 @@ interface NotifyUser {
   email: string;
 }
 
-async function getOutlookToken(): Promise<string | null> {
-  // Try the token-refresh path first (handles expired tokens)
-  const fresh = await getValidOutlookToken();
-  if (fresh) return fresh;
-
-  // Legacy fallback: read from Integration.apiKey directly
-  try {
-    const integration = await prisma.integration.findUnique({
-      where: { provider: 'outlook' },
-    });
-    if (!integration?.apiKey) return null;
-    return decrypt(integration.apiKey);
-  } catch {
-    return null;
-  }
-}
-
-async function sendViaMsGraph(token: string, to: string, subject: string, body: string): Promise<void> {
-  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+async function sendViaMsGraph(token: string, senderEmail: string, to: string, subject: string, body: string): Promise<void> {
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderEmail)}/sendMail`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -56,12 +37,13 @@ export async function sendInviteEmail(
   user: NotifyUser,
   inviteUrl: string
 ): Promise<{ sent: boolean; inviteUrl: string }> {
-  const token = await getOutlookToken();
-  if (!token) return { sent: false, inviteUrl };
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false, inviteUrl };
   const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
-      token,
+      result.token,
+      result.senderEmail,
       user.email,
       'You have been invited to TischlerCRM',
       `<p>Hello ${displayName},</p>
@@ -79,12 +61,13 @@ export async function sendPasswordResetEmail(
   user: NotifyUser,
   resetUrl: string
 ): Promise<{ sent: boolean; resetUrl: string }> {
-  const token = await getOutlookToken();
-  if (!token) return { sent: false, resetUrl };
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false, resetUrl };
   const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
-      token,
+      result.token,
+      result.senderEmail,
       user.email,
       'Reset your TischlerCRM password',
       `<p>Hello ${displayName},</p>
