@@ -138,10 +138,12 @@ export default function DashboardPage() {
   const [selectedWidgetType, setSelectedWidgetType] = useState<string | null>(null);
   const [availableReports, setAvailableReports] = useState<any[]>([]);
   const [widgetConfig, setWidgetConfig] = useState<any>({
+    dataSourceMode: 'report', // 'report' or 'direct'
     reportId: '',
     dataSource: '',
     xAxis: '',
     yAxis: '',
+    stackBy: '',
     aggregationType: 'sum',
     displayUnits: 'actual',
     showValues: true,
@@ -214,15 +216,24 @@ export default function DashboardPage() {
   // Generate preview data based on widget config
   const previewData = useMemo(() => {
     if (!selectedWidgetType) return null;
+
+    // Determine the effective object type: from report or direct selection
+    let effectiveObjectType = '';
+    if (widgetConfig.dataSourceMode === 'direct') {
+      effectiveObjectType = widgetConfig.dataSource || '';
+    } else {
+      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+      effectiveObjectType = selectedReport?.objectType || '';
+    }
+
+    const hasDataSource = widgetConfig.dataSourceMode === 'direct' ? !!widgetConfig.dataSource : !!widgetConfig.reportId;
     
     // For stacked bar charts with real data
-    if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis && widgetConfig.stackBy) {
-      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-      
-      if (selectedReport) {
+    if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis && widgetConfig.stackBy) {
+      if (effectiveObjectType) {
         try {
           const { data, stackKeys } = aggregateStackedChartData({
-            objectType: selectedReport.objectType,
+            objectType: effectiveObjectType,
             xAxisField: widgetConfig.xAxis,
             yAxisField: widgetConfig.yAxis,
             stackByField: widgetConfig.stackBy,
@@ -242,13 +253,11 @@ export default function DashboardPage() {
     }
     
     // For line charts with real data
-    if (selectedWidgetType === 'line' && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
-      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-      
-      if (selectedReport) {
+    if (selectedWidgetType === 'line' && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis) {
+      if (effectiveObjectType) {
         try {
           const aggregatedData = aggregateChartData({
-            objectType: selectedReport.objectType,
+            objectType: effectiveObjectType,
             xAxisField: widgetConfig.xAxis,
             yAxisField: widgetConfig.yAxis,
             aggregationType: widgetConfig.aggregationType || 'sum'
@@ -267,13 +276,11 @@ export default function DashboardPage() {
     }
 
     // For bar charts with real data
-    if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
-      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-      
-      if (selectedReport) {
+    if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis) {
+      if (effectiveObjectType) {
         try {
           const aggregatedData = aggregateChartData({
-            objectType: selectedReport.objectType,
+            objectType: effectiveObjectType,
             xAxisField: widgetConfig.xAxis,
             yAxisField: widgetConfig.yAxis,
             aggregationType: widgetConfig.aggregationType || 'sum'
@@ -289,8 +296,8 @@ export default function DashboardPage() {
           return { data: [] };
         }
       }
-    } else if (widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis)) {
-      // Report selected but no axes - show prompt
+    } else if (hasDataSource && (!widgetConfig.xAxis || !widgetConfig.yAxis)) {
+      // Data source selected but no axes - show prompt
       return {
         data: [
           { label: 'Configure X & Y Axis', value: 30 },
@@ -298,7 +305,7 @@ export default function DashboardPage() {
         ]
       };
     } else {
-      // Default sample data when no report selected
+      // Default sample data when no data source selected
       if (selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') {
         return {
           data: [
@@ -348,7 +355,7 @@ export default function DashboardPage() {
     }
     
     return null;
-  }, [selectedWidgetType, widgetConfig.reportId, widgetConfig.xAxis, widgetConfig.yAxis, widgetConfig.stackBy, availableReports]);
+  }, [selectedWidgetType, widgetConfig.dataSourceMode, widgetConfig.reportId, widgetConfig.dataSource, widgetConfig.xAxis, widgetConfig.yAxis, widgetConfig.stackBy, widgetConfig.aggregationType, availableReports]);
 
   const handleResizeStart = (e: React.MouseEvent, widget: DashboardWidget) => {
     if (!dashEditMode) return;
@@ -512,10 +519,18 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  // Load records from API into chart data cache for all report object types
+  // Load records from API into chart data cache for all report object types + direct widget object types
   useEffect(() => {
-    if (availableReports.length === 0) return;
-    const objectTypes = Array.from(new Set(availableReports.map((r: any) => r.objectType).filter(Boolean)));
+    const objectTypesFromReports = availableReports.map((r: any) => r.objectType).filter(Boolean);
+    const objectTypesFromWidgets = dashboards.flatMap(d => 
+      d.widgets
+        .filter(w => w.config?.dataSourceMode === 'direct' && w.dataSource)
+        .map(w => w.dataSource)
+    );
+    const objectTypes = Array.from(new Set([...objectTypesFromReports, ...objectTypesFromWidgets]));
+    
+    if (objectTypes.length === 0) return;
+    
     objectTypes.forEach(async (objectType) => {
       try {
         const records = await recordsService.getRecords(objectType);
@@ -525,7 +540,7 @@ export default function DashboardPage() {
         console.error(`Failed to load records for ${objectType}:`, e);
       }
     });
-  }, [availableReports]);
+  }, [availableReports, dashboards]);
 
   const handleCreateDashboard = (name: string, description: string) => {
     const newDashboard: Dashboard = {
@@ -567,10 +582,12 @@ export default function DashboardPage() {
 
     setSelectedWidgetType(type);
     setWidgetConfig({
+      dataSourceMode: 'report',
       reportId: reports.length > 0 ? reports[0].id : '',
       dataSource: reports.length > 0 ? reports[0].objectType : '',
       xAxis: '',
       yAxis: '',
+      stackBy: '',
       aggregationType: 'sum',
       displayUnits: 'actual',
       showValues: true,
@@ -650,21 +667,26 @@ export default function DashboardPage() {
     setSetting('dashboards', updated);
   };
 
-  const handleRefreshWidget = (widget: DashboardWidget) => {
+  const handleRefreshWidget = async (widget: DashboardWidget) => {
     if (!selectedDashboard) return;
 
     // Show loading overlay
     setRefreshingWidgetId(widget.id);
 
-    // Find the report to get object type
-    const report = availableReports.find(r => r.id === widget.reportId);
-    if (!report) {
-      console.warn('Report not found for widget refresh');
-      setRefreshingWidgetId(null);
-      return;
+    // Determine object type: from report or direct config
+    let objectType = '';
+    if (widget.config?.dataSourceMode === 'direct') {
+      objectType = widget.dataSource || '';
+    } else {
+      const report = availableReports.find(r => r.id === widget.reportId);
+      if (!report) {
+        console.warn('Report not found for widget refresh');
+        setRefreshingWidgetId(null);
+        return;
+      }
+      objectType = report.objectType;
     }
 
-    const objectType = report.objectType;
     const xField = widget.config?.xAxis;
     const yField = widget.config?.yAxis;
     const stackByField = widget.config?.stackBy;
@@ -676,6 +698,11 @@ export default function DashboardPage() {
     }
 
     try {
+      // Re-fetch records for this object type
+      const records = await recordsService.getRecords(objectType);
+      const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+      setCachedRecords(objectType, flatRecords);
+
       // Check if this is a stacked chart
       if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
         // Use stacked aggregation
@@ -756,12 +783,27 @@ export default function DashboardPage() {
     }
   };
 
-  const handleEditWidget = (widget: DashboardWidget) => {
+  const handleEditWidget = async (widget: DashboardWidget) => {
     if (!widget) return;
+    
+    const mode = widget.config?.dataSourceMode || (widget.reportId ? 'report' : 'direct');
+    
+    // If direct mode, ensure records are cached for this object type
+    if (mode === 'direct' && widget.dataSource) {
+      try {
+        const records = await recordsService.getRecords(widget.dataSource);
+        const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+        setCachedRecords(widget.dataSource, flatRecords);
+      } catch (e) {
+        console.error('Failed to load records for edit:', e);
+      }
+    }
+    
     setEditingWidget(widget.id);
     setSelectedWidgetType(widget.type);
     setWidgetConfig({
-      reportId: widget.reportId,
+      dataSourceMode: mode,
+      reportId: widget.reportId || '',
       dataSource: widget.dataSource,
       xAxis: widget.config?.xAxis || '',
       yAxis: widget.config?.yAxis || '',
@@ -2087,42 +2129,111 @@ export default function DashboardPage() {
             <div className="flex-1 flex overflow-hidden">
               {/* Left Panel - Configuration */}
               <div className="w-1/2 p-6 overflow-y-auto border-r border-gray-200 space-y-6">
-              {/* Data Source - Select Report */}
+              {/* Data Source Mode Toggle */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Data Source (Report)</label>
-                {availableReports.length > 0 ? (
+                <label className="block text-sm font-medium text-gray-700 mb-2">Data Source</label>
+                <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'report', dataSource: '', xAxis: '', yAxis: '', stackBy: '' })}
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      widgetConfig.dataSourceMode === 'report'
+                        ? 'bg-brand-navy text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    From Report
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'direct', reportId: '', dataSource: '', xAxis: '', yAxis: '', stackBy: '' })}
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      widgetConfig.dataSourceMode === 'direct'
+                        ? 'bg-brand-navy text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Object Type (Direct)
+                  </button>
+                </div>
+              </div>
+
+              {/* Report Selector (shown when mode = report) */}
+              {widgetConfig.dataSourceMode === 'report' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Report</label>
+                  {availableReports.length > 0 ? (
+                    <select
+                      value={widgetConfig.reportId}
+                      onChange={(e) => {
+                        const selectedReport = availableReports.find(r => r.id === e.target.value);
+                        setWidgetConfig({ 
+                          ...widgetConfig, 
+                          reportId: e.target.value,
+                          dataSource: selectedReport?.objectType || '',
+                          xAxis: '', 
+                          yAxis: '',
+                          stackBy: ''
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                    >
+                      {availableReports.map(report => (
+                        <option key={report.id} value={report.id}>
+                          {report.name} ({report.objectType})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm text-yellow-800">
+                        No reports available. Create a report in the{' '}
+                        <Link href="/reports" className="font-medium underline">Reports</Link> page, or switch to &quot;Object Type (Direct)&quot; mode.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Object Type Selector (shown when mode = direct) */}
+              {widgetConfig.dataSourceMode === 'direct' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Object Type</label>
                   <select
-                    value={widgetConfig.reportId}
-                    onChange={(e) => {
-                      const selectedReport = availableReports.find(r => r.id === e.target.value);
+                    value={widgetConfig.dataSource}
+                    onChange={async (e) => {
+                      const objectType = e.target.value;
                       setWidgetConfig({ 
                         ...widgetConfig, 
-                        reportId: e.target.value,
-                        dataSource: selectedReport?.objectType || '',
+                        dataSource: objectType,
                         xAxis: '', 
-                        yAxis: '' 
+                        yAxis: '',
+                        stackBy: ''
                       });
+                      // Fetch and cache records for the selected object type
+                      if (objectType) {
+                        try {
+                          const records = await recordsService.getRecords(objectType);
+                          const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+                          setCachedRecords(objectType, flatRecords);
+                        } catch (err) {
+                          console.error(`Failed to load records for ${objectType}:`, err);
+                        }
+                      }
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                   >
-                    {availableReports.map(report => (
-                      <option key={report.id} value={report.id}>
-                        {report.name} ({report.objectType})
-                      </option>
+                    <option value="">Select object type...</option>
+                    {OBJECT_TYPES.map(obj => (
+                      <option key={obj.value} value={obj.value}>{obj.label}</option>
                     ))}
                   </select>
-                ) : (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      No reports available. Please create a report first in the{' '}
-                      <Link href="/reports" className="font-medium underline">Reports</Link> page.
-                    </p>
-                  </div>
-                )}
-              </div>
+                  <p className="text-xs text-gray-500 mt-1">Query records directly without needing a saved report</p>
+                </div>
+              )}
 
               {/* Chart Configuration (only for chart types) */}
-              {!['metric', 'table'].includes(selectedWidgetType) && availableReports.length > 0 && (
+              {!['metric', 'table'].includes(selectedWidgetType) && (widgetConfig.dataSourceMode === 'direct' ? !!widgetConfig.dataSource : availableReports.length > 0) && (
                 <>
                   {/* X-Axis */}
                   <div>
@@ -2456,6 +2567,7 @@ export default function DashboardPage() {
                 {/* Debug Info */}
                 <div className="mb-4 p-3 bg-[#f0f1fa] border border-[#d4d8f0] rounded text-xs">
                   <div><strong>Widget Type:</strong> {selectedWidgetType || 'None'}</div>
+                  <div><strong>Data Source:</strong> {widgetConfig.dataSourceMode === 'direct' ? `Direct — ${widgetConfig.dataSource || 'not selected'}` : `Report — ${availableReports.find(r => r.id === widgetConfig.reportId)?.name || 'not selected'}`}</div>
                   <div><strong>X-Axis:</strong> {widgetConfig.xAxis || 'Not set'}</div>
                   <div><strong>Y-Axis:</strong> {widgetConfig.yAxis || 'Not set'}</div>
                   {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
@@ -2504,12 +2616,17 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-                {!widgetConfig.reportId && (
+                {!widgetConfig.reportId && widgetConfig.dataSourceMode !== 'direct' && (
                   <p className="text-xs text-gray-500 mt-2 text-center">
-                    Select a report to see live data preview
+                    Select a report or switch to &quot;Object Type (Direct)&quot; to see live data preview
                   </p>
                 )}
-                {widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table'].includes(selectedWidgetType) && (
+                {widgetConfig.dataSourceMode === 'direct' && !widgetConfig.dataSource && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Select an object type to see live data preview
+                  </p>
+                )}
+                {((widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId) || (widgetConfig.dataSourceMode === 'direct' && widgetConfig.dataSource)) && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table'].includes(selectedWidgetType) && (
                   <p className="text-xs text-amber-600 mt-2 text-center">
                     Configure <strong>X-Axis: {widgetConfig.xAxis || 'not set'}</strong> and <strong>Y-Axis: {widgetConfig.yAxis || 'not set'}</strong> to see data visualization
                   </p>
