@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Plug,
   Map,
@@ -14,6 +14,9 @@ import {
   EyeOff,
   AlertCircle,
   ExternalLink,
+  Mail,
+  Unplug,
+  Send,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -347,10 +350,17 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-amber-600 bg-amber-50 rounded-md px-3 py-2 mb-4">
-            OAuth connect flow for {integration.displayName} will be available once client credentials are configured.
-          </p>
+          {!(integration.hasClientId || clientId.trim()) && (
+            <p className="text-[11px] text-amber-600 bg-amber-50 rounded-md px-3 py-2 mb-4">
+              OAuth connect flow for {integration.displayName} will be available once client credentials are configured.
+            </p>
+          )}
         </>
+      )}
+
+      {/* Outlook-specific connect section */}
+      {integration.provider === 'outlook' && (integration.hasClientId || clientId.trim()) && (
+        <OutlookConnectSection integration={integration} />
       )}
 
       {/* Actions */}
@@ -380,6 +390,159 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Outlook connect / status / disconnect ──────────────────────────
+
+function OutlookConnectSection({ integration }: { integration: Integration }) {
+  const [status, setStatus] = useState<{
+    connected: boolean;
+    externalEmail?: string;
+    connectedAt?: string;
+    connectedBy?: string;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+  const popupRef = useRef<Window | null>(null);
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const s = await apiClient.getOutlookStatus();
+      setStatus({ connected: s.connected, externalEmail: s.externalEmail, connectedAt: s.connectedAt, connectedBy: s.connectedBy });
+    } catch {
+      setStatus({ connected: false });
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+
+  // Listen for OAuth popup result
+  useEffect(() => {
+    function onMessage(e: MessageEvent) {
+      if (e.data?.type !== 'outlook-oauth-result') return;
+      setConnecting(false);
+      if (e.data.status === 'connected') {
+        loadStatus();
+      }
+    }
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [loadStatus]);
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    try {
+      const { url } = await apiClient.getOutlookConnectUrl();
+      const w = 600, h = 700;
+      const left = window.screenX + (window.outerWidth - w) / 2;
+      const top = window.screenY + (window.outerHeight - h) / 2;
+      popupRef.current = window.open(url, 'outlook_oauth', `width=${w},height=${h},left=${left},top=${top}`);
+    } catch {
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Outlook? Invite emails will no longer be sent.')) return;
+    setDisconnecting(true);
+    try {
+      await apiClient.disconnectOutlook();
+      setStatus({ connected: false });
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await apiClient.sendOutlookTestEmail();
+      setTestResult(res.message || 'Test email sent!');
+    } catch (err: any) {
+      setTestResult(err.message || 'Failed to send test email');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-4 flex items-center gap-2 text-xs text-brand-gray">
+        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking Outlook connection…
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+      <h4 className="text-xs font-semibold text-brand-dark mb-3 flex items-center gap-1.5">
+        <Mail className="w-3.5 h-3.5" style={{ color: '#0078D4' }} />
+        Outlook Connection
+      </h4>
+
+      {status?.connected ? (
+        <>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2.5 py-0.5 text-[11px] font-medium text-green-700">
+              <Check className="w-3 h-3" /> Connected
+            </span>
+            {status.externalEmail && (
+              <span className="text-[11px] text-brand-gray">{status.externalEmail}</span>
+            )}
+          </div>
+          {status.connectedBy && (
+            <p className="text-[11px] text-brand-gray mb-3">
+              Connected by {status.connectedBy}
+              {status.connectedAt && ` on ${new Date(status.connectedAt).toLocaleDateString()}`}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTestEmail}
+              disabled={sendingTest}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-[#0078D4] hover:bg-[#006CBE] transition disabled:opacity-50"
+            >
+              {sendingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Send Test Email
+            </button>
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 hover:bg-red-50 transition disabled:opacity-50"
+            >
+              {disconnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
+              Disconnect
+            </button>
+          </div>
+          {testResult && (
+            <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] text-brand-gray mb-3">
+            Connect an Outlook account to send invite and notification emails from the CRM.
+          </p>
+          <button
+            onClick={handleConnect}
+            disabled={connecting}
+            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-medium text-white bg-[#0078D4] hover:bg-[#006CBE] transition disabled:opacity-50"
+          >
+            {connecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+            Connect Outlook Account
+          </button>
+        </>
+      )}
     </div>
   );
 }

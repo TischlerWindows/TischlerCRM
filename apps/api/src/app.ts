@@ -31,6 +31,7 @@ import { recycleBinRoutes } from './routes/recycle-bin.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
 import { dropboxRoutes } from './routes/dropbox.js';
+import { outlookRoutes } from './routes/outlook.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -364,6 +365,7 @@ export function buildApp() {
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
     if (routeUrl === '/dropbox/callback') return;
+    if (routeUrl === '/outlook/callback') return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -449,6 +451,7 @@ export function buildApp() {
   app.register(integrationRoutes);
   app.register(placesRoutes);
   app.register(dropboxRoutes);
+  app.register(outlookRoutes);
 
   return app;
 }

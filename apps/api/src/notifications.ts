@@ -1,5 +1,6 @@
 import { prisma } from '@crm/db/client';
 import { decrypt } from './crypto.js';
+import { getValidOutlookToken } from './routes/outlook.js';
 
 function escapeHtml(str: string): string {
   return str
@@ -17,6 +18,11 @@ interface NotifyUser {
 }
 
 async function getOutlookToken(): Promise<string | null> {
+  // Try the token-refresh path first (handles expired tokens)
+  const fresh = await getValidOutlookToken();
+  if (fresh) return fresh;
+
+  // Legacy fallback: read from Integration.apiKey directly
   try {
     const integration = await prisma.integration.findUnique({
       where: { provider: 'outlook' },

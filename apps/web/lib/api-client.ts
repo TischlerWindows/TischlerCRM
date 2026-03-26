@@ -666,6 +666,31 @@ class ApiClient {
     }>(`/places/details?${params}`);
   }
 
+  // ── Outlook / Microsoft ────────────────────────────────────────────────────
+
+  async getOutlookConnectUrl() {
+    return this.request<{ url: string }>('/outlook/connect');
+  }
+
+  async getOutlookStatus() {
+    return this.request<{
+      enabled: boolean;
+      configured: boolean;
+      connected: boolean;
+      externalEmail: string | null;
+      connectedAt: string | null;
+      connectedBy: string | null;
+    }>('/outlook/status');
+  }
+
+  async disconnectOutlook() {
+    return this.request<void>('/outlook/disconnect', { method: 'DELETE' });
+  }
+
+  async sendOutlookTestEmail() {
+    return this.request<{ sent: boolean; message: string }>('/outlook/test-email', { method: 'POST' });
+  }
+
   // ── Dropbox ────────────────────────────────────────────────────────────────
 
   async getDropboxConnectUrl() {
