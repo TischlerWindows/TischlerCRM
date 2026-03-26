@@ -1661,26 +1661,26 @@ export default function DashboardPage() {
 
             {/* Card summary */}
             <div
-              className="p-5 flex items-center justify-center gap-4 cursor-pointer select-none"
+              className={`flex-1 flex items-center justify-center gap-5 cursor-pointer select-none px-6 ${isExpanded ? 'py-5' : ''}`}
               onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
             >
-              <div className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cardColor + '18' }}>
-                <CreditCard className="w-6 h-6" style={{ color: cardColor }} />
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: cardColor + '18' }}>
+                <CreditCard className="w-7 h-7" style={{ color: cardColor }} />
               </div>
               <div className="text-center">
-                <div className="text-sm text-gray-600">{widget.title}</div>
+                <div className="text-base text-gray-600 font-medium">{widget.title}</div>
                 <div className="flex items-baseline justify-center gap-2">
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-4xl font-bold text-gray-900">
                     {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                   </div>
                   {cardTrend != null && cardTrend !== 0 && (
-                    <div className={`text-sm font-medium ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-base font-semibold ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
                       {cardTrend > 0 ? '+' : ''}{cardTrend}%
                     </div>
                   )}
                 </div>
                 {widget.config?.subtitle && (
-                  <div className="text-xs text-gray-500 mt-0.5">{widget.config.subtitle}</div>
+                  <div className="text-sm text-gray-500 mt-1">{widget.config.subtitle}</div>
                 )}
               </div>
               <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
