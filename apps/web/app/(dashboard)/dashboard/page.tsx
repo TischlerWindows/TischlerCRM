@@ -138,12 +138,15 @@ export default function DashboardPage() {
   const [selectedWidgetType, setSelectedWidgetType] = useState<string | null>(null);
   const [availableReports, setAvailableReports] = useState<any[]>([]);
   const [widgetConfig, setWidgetConfig] = useState<any>({
-    dataSourceMode: 'report', // 'report' or 'direct'
+    dataSourceMode: 'report', // 'report' or 'manual'
     reportId: '',
     dataSource: '',
     xAxis: '',
     yAxis: '',
     stackBy: '',
+    manualData: [{ label: 'Item 1', value: 45 }, { label: 'Item 2', value: 62 }, { label: 'Item 3', value: 38 }],
+    manualStackKeys: ['Series A', 'Series B'],
+    manualMetric: { value: 0, prefix: '', suffix: '', trend: 0 },
     aggregationType: 'sum',
     displayUnits: 'actual',
     showValues: true,
@@ -217,19 +220,35 @@ export default function DashboardPage() {
   const previewData = useMemo(() => {
     if (!selectedWidgetType) return null;
 
-    // Determine the effective object type: from report or direct selection
-    let effectiveObjectType = '';
-    if (widgetConfig.dataSourceMode === 'direct') {
-      effectiveObjectType = widgetConfig.dataSource || '';
-    } else {
-      const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-      effectiveObjectType = selectedReport?.objectType || '';
+    // --- Manual data mode: use user-entered data directly ---
+    if (widgetConfig.dataSourceMode === 'manual') {
+      if (selectedWidgetType === 'metric') {
+        const m = widgetConfig.manualMetric || {};
+        return { value: m.value ?? 0, prefix: m.prefix || '', suffix: m.suffix || '', trend: m.trend || 0 };
+      }
+      if (selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') {
+        const keys: string[] = widgetConfig.manualStackKeys || [];
+        const rows: any[] = (widgetConfig.manualData || []).map((row: any) => {
+          const point: any = { label: row.label || '' };
+          keys.forEach((k: string) => { point[k] = Number(row[k]) || 0; });
+          return point;
+        });
+        return { data: rows, stackKeys: keys };
+      }
+      // bar, line, donut, etc.
+      const data = (widgetConfig.manualData || []).map((d: any) => ({
+        label: d.label || '',
+        value: Number(d.value) || 0
+      }));
+      return { data };
     }
 
-    const hasDataSource = widgetConfig.dataSourceMode === 'direct' ? !!widgetConfig.dataSource : !!widgetConfig.reportId;
-    
+    // --- Report mode: aggregate from cached records ---
+    const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+    const effectiveObjectType = selectedReport?.objectType || '';
+
     // For stacked bar charts with real data
-    if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis && widgetConfig.stackBy) {
+    if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis && widgetConfig.stackBy) {
       if (effectiveObjectType) {
         try {
           const { data, stackKeys } = aggregateStackedChartData({
@@ -239,12 +258,7 @@ export default function DashboardPage() {
             stackByField: widgetConfig.stackBy,
             aggregationType: widgetConfig.aggregationType || 'sum'
           });
-          
-          if (data && data.length > 0) {
-            return { data, stackKeys };
-          } else {
-            return { data: [], stackKeys: [] };
-          }
+          return data && data.length > 0 ? { data, stackKeys } : { data: [], stackKeys: [] };
         } catch (error) {
           console.error('❌ Error aggregating stacked data:', error);
           return { data: [], stackKeys: [] };
@@ -253,7 +267,7 @@ export default function DashboardPage() {
     }
     
     // For line charts with real data
-    if (selectedWidgetType === 'line' && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis) {
+    if (selectedWidgetType === 'line' && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
       if (effectiveObjectType) {
         try {
           const aggregatedData = aggregateChartData({
@@ -262,12 +276,7 @@ export default function DashboardPage() {
             yAxisField: widgetConfig.yAxis,
             aggregationType: widgetConfig.aggregationType || 'sum'
           });
-          
-          if (aggregatedData && aggregatedData.length > 0) {
-            return { data: aggregatedData };
-          } else {
-            return { data: [] };
-          }
+          return aggregatedData && aggregatedData.length > 0 ? { data: aggregatedData } : { data: [] };
         } catch (error) {
           console.error('❌ Error aggregating line data:', error);
           return { data: [] };
@@ -276,7 +285,7 @@ export default function DashboardPage() {
     }
 
     // For bar charts with real data
-    if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && hasDataSource && widgetConfig.xAxis && widgetConfig.yAxis) {
+    if ((selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') && widgetConfig.reportId && widgetConfig.xAxis && widgetConfig.yAxis) {
       if (effectiveObjectType) {
         try {
           const aggregatedData = aggregateChartData({
@@ -285,19 +294,13 @@ export default function DashboardPage() {
             yAxisField: widgetConfig.yAxis,
             aggregationType: widgetConfig.aggregationType || 'sum'
           });
-          
-          if (aggregatedData && aggregatedData.length > 0) {
-            return { data: aggregatedData };
-          } else {
-            return { data: [] };
-          }
+          return aggregatedData && aggregatedData.length > 0 ? { data: aggregatedData } : { data: [] };
         } catch (error) {
           console.error('❌ Error aggregating data:', error);
           return { data: [] };
         }
       }
-    } else if (hasDataSource && (!widgetConfig.xAxis || !widgetConfig.yAxis)) {
-      // Data source selected but no axes - show prompt
+    } else if (widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis)) {
       return {
         data: [
           { label: 'Configure X & Y Axis', value: 30 },
@@ -305,7 +308,7 @@ export default function DashboardPage() {
         ]
       };
     } else {
-      // Default sample data when no data source selected
+      // Default sample data when no report selected
       if (selectedWidgetType === 'vertical-bar' || selectedWidgetType === 'horizontal-bar') {
         return {
           data: [
@@ -355,7 +358,7 @@ export default function DashboardPage() {
     }
     
     return null;
-  }, [selectedWidgetType, widgetConfig.dataSourceMode, widgetConfig.reportId, widgetConfig.dataSource, widgetConfig.xAxis, widgetConfig.yAxis, widgetConfig.stackBy, widgetConfig.aggregationType, availableReports]);
+  }, [selectedWidgetType, widgetConfig, availableReports]);
 
   const handleResizeStart = (e: React.MouseEvent, widget: DashboardWidget) => {
     if (!dashEditMode) return;
@@ -519,18 +522,10 @@ export default function DashboardPage() {
     })();
   }, []);
 
-  // Load records from API into chart data cache for all report object types + direct widget object types
+  // Load records from API into chart data cache for all report object types
   useEffect(() => {
-    const objectTypesFromReports = availableReports.map((r: any) => r.objectType).filter(Boolean);
-    const objectTypesFromWidgets = dashboards.flatMap(d => 
-      d.widgets
-        .filter(w => w.config?.dataSourceMode === 'direct' && w.dataSource)
-        .map(w => w.dataSource)
-    );
-    const objectTypes = Array.from(new Set([...objectTypesFromReports, ...objectTypesFromWidgets]));
-    
-    if (objectTypes.length === 0) return;
-    
+    if (availableReports.length === 0) return;
+    const objectTypes = Array.from(new Set(availableReports.map((r: any) => r.objectType).filter(Boolean)));
     objectTypes.forEach(async (objectType) => {
       try {
         const records = await recordsService.getRecords(objectType);
@@ -540,7 +535,7 @@ export default function DashboardPage() {
         console.error(`Failed to load records for ${objectType}:`, e);
       }
     });
-  }, [availableReports, dashboards]);
+  }, [availableReports]);
 
   const handleCreateDashboard = (name: string, description: string) => {
     const newDashboard: Dashboard = {
@@ -581,6 +576,7 @@ export default function DashboardPage() {
     }
 
     setSelectedWidgetType(type);
+    const isStacked = type === 'stacked-horizontal-bar' || type === 'stacked-vertical-bar';
     setWidgetConfig({
       dataSourceMode: 'report',
       reportId: reports.length > 0 ? reports[0].id : '',
@@ -588,6 +584,13 @@ export default function DashboardPage() {
       xAxis: '',
       yAxis: '',
       stackBy: '',
+      manualData: isStacked
+        ? [{ label: 'Category 1', 'Series A': 30, 'Series B': 45 }, { label: 'Category 2', 'Series A': 40, 'Series B': 35 }, { label: 'Category 3', 'Series A': 25, 'Series B': 50 }]
+        : type === 'metric'
+          ? []
+          : [{ label: 'Item 1', value: 45 }, { label: 'Item 2', value: 62 }, { label: 'Item 3', value: 38 }],
+      manualStackKeys: isStacked ? ['Series A', 'Series B'] : [],
+      manualMetric: { value: 0, prefix: '', suffix: '', trend: 0 },
       aggregationType: 'sum',
       displayUnits: 'actual',
       showValues: true,
@@ -670,22 +673,23 @@ export default function DashboardPage() {
   const handleRefreshWidget = async (widget: DashboardWidget) => {
     if (!selectedDashboard) return;
 
+    // Manual mode widgets use static data — nothing to refresh from server
+    if (widget.config?.dataSourceMode === 'manual') {
+      setRefreshingWidgetId(widget.id);
+      setTimeout(() => setRefreshingWidgetId(null), 300);
+      return;
+    }
+
     // Show loading overlay
     setRefreshingWidgetId(widget.id);
 
-    // Determine object type: from report or direct config
-    let objectType = '';
-    if (widget.config?.dataSourceMode === 'direct') {
-      objectType = widget.dataSource || '';
-    } else {
-      const report = availableReports.find(r => r.id === widget.reportId);
-      if (!report) {
-        console.warn('Report not found for widget refresh');
-        setRefreshingWidgetId(null);
-        return;
-      }
-      objectType = report.objectType;
+    const report = availableReports.find(r => r.id === widget.reportId);
+    if (!report) {
+      console.warn('Report not found for widget refresh');
+      setRefreshingWidgetId(null);
+      return;
     }
+    const objectType = report.objectType;
 
     const xField = widget.config?.xAxis;
     const yField = widget.config?.yAxis;
@@ -786,18 +790,7 @@ export default function DashboardPage() {
   const handleEditWidget = async (widget: DashboardWidget) => {
     if (!widget) return;
     
-    const mode = widget.config?.dataSourceMode || (widget.reportId ? 'report' : 'direct');
-    
-    // If direct mode, ensure records are cached for this object type
-    if (mode === 'direct' && widget.dataSource) {
-      try {
-        const records = await recordsService.getRecords(widget.dataSource);
-        const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
-        setCachedRecords(widget.dataSource, flatRecords);
-      } catch (e) {
-        console.error('Failed to load records for edit:', e);
-      }
-    }
+    const mode = widget.config?.dataSourceMode || (widget.reportId ? 'report' : 'manual');
     
     setEditingWidget(widget.id);
     setSelectedWidgetType(widget.type);
@@ -808,6 +801,9 @@ export default function DashboardPage() {
       xAxis: widget.config?.xAxis || '',
       yAxis: widget.config?.yAxis || '',
       stackBy: widget.config?.stackBy || '',
+      manualData: widget.config?.manualData || widget.config?.data || [],
+      manualStackKeys: widget.config?.manualStackKeys || widget.config?.stackKeys || [],
+      manualMetric: widget.config?.manualMetric || { value: widget.config?.value || 0, prefix: widget.config?.prefix || '', suffix: widget.config?.suffix || '', trend: widget.config?.trend || 0 },
       aggregationType: widget.config?.aggregationType || 'sum',
       displayUnits: widget.config?.displayUnits || 'actual',
       showValues: widget.config?.showValues !== false,
@@ -2135,7 +2131,7 @@ export default function DashboardPage() {
                 <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                   <button
                     type="button"
-                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'report', dataSource: '', xAxis: '', yAxis: '', stackBy: '' })}
+                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'report', xAxis: '', yAxis: '', stackBy: '' })}
                     className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                       widgetConfig.dataSourceMode === 'report'
                         ? 'bg-brand-navy text-white'
@@ -2146,366 +2142,425 @@ export default function DashboardPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'direct', reportId: '', dataSource: '', xAxis: '', yAxis: '', stackBy: '' })}
+                    onClick={() => {
+                      const isStacked = selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar';
+                      const isMetric = selectedWidgetType === 'metric';
+                      setWidgetConfig({
+                        ...widgetConfig,
+                        dataSourceMode: 'manual',
+                        reportId: '',
+                        manualData: isStacked
+                          ? (widgetConfig.manualData?.length > 0 && widgetConfig.manualStackKeys?.length > 0 ? widgetConfig.manualData : [{ label: 'Category 1', 'Series A': 30, 'Series B': 45 }, { label: 'Category 2', 'Series A': 40, 'Series B': 35 }])
+                          : isMetric
+                            ? []
+                            : (widgetConfig.manualData?.length > 0 ? widgetConfig.manualData : [{ label: 'Item 1', value: 45 }, { label: 'Item 2', value: 62 }, { label: 'Item 3', value: 38 }]),
+                        manualStackKeys: isStacked ? (widgetConfig.manualStackKeys?.length > 0 ? widgetConfig.manualStackKeys : ['Series A', 'Series B']) : [],
+                        manualMetric: widgetConfig.manualMetric || { value: 0, prefix: '', suffix: '', trend: 0 },
+                      });
+                    }}
                     className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                      widgetConfig.dataSourceMode === 'direct'
+                      widgetConfig.dataSourceMode === 'manual'
                         ? 'bg-brand-navy text-white'
                         : 'bg-white text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    Object Type (Direct)
+                    Manual Entry
                   </button>
                 </div>
               </div>
 
-              {/* Report Selector (shown when mode = report) */}
+              {/* ===== REPORT MODE ===== */}
               {widgetConfig.dataSourceMode === 'report' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Report</label>
-                  {availableReports.length > 0 ? (
-                    <select
-                      value={widgetConfig.reportId}
-                      onChange={(e) => {
-                        const selectedReport = availableReports.find(r => r.id === e.target.value);
-                        setWidgetConfig({ 
-                          ...widgetConfig, 
-                          reportId: e.target.value,
-                          dataSource: selectedReport?.objectType || '',
-                          xAxis: '', 
-                          yAxis: '',
-                          stackBy: ''
-                        });
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      {availableReports.map(report => (
-                        <option key={report.id} value={report.id}>
-                          {report.name} ({report.objectType})
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        No reports available. Create a report in the{' '}
-                        <Link href="/reports" className="font-medium underline">Reports</Link> page, or switch to &quot;Object Type (Direct)&quot; mode.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Object Type Selector (shown when mode = direct) */}
-              {widgetConfig.dataSourceMode === 'direct' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Object Type</label>
-                  <select
-                    value={widgetConfig.dataSource}
-                    onChange={async (e) => {
-                      const objectType = e.target.value;
-                      setWidgetConfig({ 
-                        ...widgetConfig, 
-                        dataSource: objectType,
-                        xAxis: '', 
-                        yAxis: '',
-                        stackBy: ''
-                      });
-                      // Fetch and cache records for the selected object type
-                      if (objectType) {
-                        try {
-                          const records = await recordsService.getRecords(objectType);
-                          const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
-                          setCachedRecords(objectType, flatRecords);
-                        } catch (err) {
-                          console.error(`Failed to load records for ${objectType}:`, err);
-                        }
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                  >
-                    <option value="">Select object type...</option>
-                    {OBJECT_TYPES.map(obj => (
-                      <option key={obj.value} value={obj.value}>{obj.label}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">Query records directly without needing a saved report</p>
-                </div>
-              )}
-
-              {/* Chart Configuration (only for chart types) */}
-              {!['metric', 'table'].includes(selectedWidgetType) && (widgetConfig.dataSourceMode === 'direct' ? !!widgetConfig.dataSource : availableReports.length > 0) && (
                 <>
-                  {/* X-Axis */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis</label>
-                    <select
-                      value={widgetConfig.xAxis}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="">Select field...</option>
-                      {(() => {
-                        const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                        if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                          return selectedReport.fields.map((field: string) => (
-                            <option key={field} value={field}>{field}</option>
-                          ));
-                        }
-                        // Fallback to utility fields
-                        const fields = getAvailableFields(widgetConfig.dataSource);
-                        return fields.map(field => (
-                          <option key={field} value={field}>{field}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-
-                  {/* Y-Axis */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis</label>
-                    <select
-                      value={widgetConfig.yAxis}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="">Select field...</option>
-                      {(() => {
-                        const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                        if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                          return selectedReport.fields.map((field: string) => (
-                            <option key={field} value={field}>{field}</option>
-                          ));
-                        }
-                        // Fallback to utility fields
-                        const fields = getAvailableFields(widgetConfig.dataSource);
-                        return fields.map(field => (
-                          <option key={field} value={field}>{field}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-
-                  {/* Stack By - Only show for stacked chart types */}
-                  {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Stack By
-                        <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
-                      </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Report</label>
+                    {availableReports.length > 0 ? (
                       <select
-                        value={widgetConfig.stackBy}
-                        onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
+                        value={widgetConfig.reportId}
+                        onChange={(e) => {
+                          const selectedReport = availableReports.find(r => r.id === e.target.value);
+                          setWidgetConfig({ 
+                            ...widgetConfig, 
+                            reportId: e.target.value,
+                            dataSource: selectedReport?.objectType || '',
+                            xAxis: '', 
+                            yAxis: '',
+                            stackBy: ''
+                          });
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       >
-                        <option value="">Select field...</option>
-                        {(() => {
-                          const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                          if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                            return selectedReport.fields.map((field: string) => (
+                        {availableReports.map(report => (
+                          <option key={report.id} value={report.id}>
+                            {report.name} ({report.objectType})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          No reports available. Create a report in{' '}
+                          <Link href="/reports" className="font-medium underline">Reports</Link>, or switch to &quot;Manual Entry&quot;.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chart Configuration (only for chart types in report mode) */}
+                  {!['metric', 'table'].includes(selectedWidgetType) && availableReports.length > 0 && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis</label>
+                        <select
+                          value={widgetConfig.xAxis}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="">Select field...</option>
+                          {(() => {
+                            const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                            if (selectedReport?.fields && selectedReport.fields.length > 0) {
+                              return selectedReport.fields.map((field: string) => (
+                                <option key={field} value={field}>{field}</option>
+                              ));
+                            }
+                            const fields = getAvailableFields(widgetConfig.dataSource);
+                            return fields.map(field => (
                               <option key={field} value={field}>{field}</option>
                             ));
-                          }
-                          // Fallback to utility fields
-                          const fields = getAvailableFields(widgetConfig.dataSource);
-                          return fields.map(field => (
-                            <option key={field} value={field}>{field}</option>
-                          ));
-                        })()}
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        This field will create separate stacks in the chart
-                      </p>
+                          })()}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis</label>
+                        <select
+                          value={widgetConfig.yAxis}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="">Select field...</option>
+                          {(() => {
+                            const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                            if (selectedReport?.fields && selectedReport.fields.length > 0) {
+                              return selectedReport.fields.map((field: string) => (
+                                <option key={field} value={field}>{field}</option>
+                              ));
+                            }
+                            const fields = getAvailableFields(widgetConfig.dataSource);
+                            return fields.map(field => (
+                              <option key={field} value={field}>{field}</option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+
+                      {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Stack By
+                            <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
+                          </label>
+                          <select
+                            value={widgetConfig.stackBy}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                          >
+                            <option value="">Select field...</option>
+                            {(() => {
+                              const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                              if (selectedReport?.fields && selectedReport.fields.length > 0) {
+                                return selectedReport.fields.map((field: string) => (
+                                  <option key={field} value={field}>{field}</option>
+                                ));
+                              }
+                              const fields = getAvailableFields(widgetConfig.dataSource);
+                              return fields.map(field => (
+                                <option key={field} value={field}>{field}</option>
+                              ));
+                            })()}
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Aggregation Type</label>
+                        <select
+                          value={widgetConfig.aggregationType || 'sum'}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, aggregationType: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="sum">Sum</option>
+                          <option value="count">Count</option>
+                          <option value="avg">Average</option>
+                          <option value="max">Maximum</option>
+                          <option value="min">Minimum</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Legend Position</label>
+                        <select
+                          value={widgetConfig.legendPosition}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, legendPosition: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="top">Top</option>
+                          <option value="right">Right</option>
+                          <option value="bottom">Bottom</option>
+                          <option value="left">Left</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {/* ===== MANUAL MODE ===== */}
+              {widgetConfig.dataSourceMode === 'manual' && (
+                <div className="space-y-4">
+                  {/* Metric widget manual entry */}
+                  {selectedWidgetType === 'metric' && (
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold text-gray-900">Metric Value</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Value</label>
+                          <input
+                            type="number"
+                            value={widgetConfig.manualMetric?.value ?? 0}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, manualMetric: { ...widgetConfig.manualMetric, value: parseFloat(e.target.value) || 0 } })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Trend %</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={widgetConfig.manualMetric?.trend ?? 0}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, manualMetric: { ...widgetConfig.manualMetric, trend: parseFloat(e.target.value) || 0 } })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Prefix (e.g. $)</label>
+                          <input
+                            type="text"
+                            value={widgetConfig.manualMetric?.prefix ?? ''}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, manualMetric: { ...widgetConfig.manualMetric, prefix: e.target.value } })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            placeholder="$"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 mb-1">Suffix (e.g. %)</label>
+                          <input
+                            type="text"
+                            value={widgetConfig.manualMetric?.suffix ?? ''}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, manualMetric: { ...widgetConfig.manualMetric, suffix: e.target.value } })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            placeholder="%"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  {/* Display Units */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Display Units</label>
-                    <select
-                      value={widgetConfig.displayUnits}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, displayUnits: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="actual">Actual</option>
-                      <option value="shortened">Shortened Number (K, M, B)</option>
-                      <option value="percentage">Percentage</option>
-                    </select>
-                  </div>
-
-                  {/* Show Values */}
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      id="showValues"
-                      checked={widgetConfig.showValues}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, showValues: e.target.checked })}
-                      className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                    />
-                    <label htmlFor="showValues" className="text-sm font-medium text-gray-700">Show Values on Chart</label>
-                  </div>
-
-                  {/* Aggregation Type */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Aggregation Type</label>
-                    <select
-                      value={widgetConfig.aggregationType || 'sum'}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, aggregationType: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="sum">Sum</option>
-                      <option value="count">Count</option>
-                      <option value="avg">Average</option>
-                      <option value="max">Maximum</option>
-                      <option value="min">Minimum</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">How to combine grouped values</p>
-                  </div>
-
-                  {/* Sort Legend Values */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort Legend Values</label>
-                    <select
-                      value={widgetConfig.sortLegend}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, sortLegend: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="asc">Ascending</option>
-                      <option value="desc">Descending</option>
-                      <option value="alphabetical">Alphabetical</option>
-                    </select>
-                  </div>
-
-                  {/* Y-Axis Range */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis Range</label>
+                  {/* Stacked chart manual entry */}
+                  {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
                     <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          id="rangeAutomatic"
-                          name="yAxisRange"
-                          value="automatic"
-                          checked={widgetConfig.yAxisRange === 'automatic'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisRange: e.target.value })}
-                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
-                        />
-                        <label htmlFor="rangeAutomatic" className="text-sm text-gray-700">Automatic</label>
+                      {/* Series (stack keys) management */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-semibold text-gray-900">Series</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newKey = `Series ${String.fromCharCode(65 + (widgetConfig.manualStackKeys?.length || 0))}`;
+                              const newKeys = [...(widgetConfig.manualStackKeys || []), newKey];
+                              const newData = (widgetConfig.manualData || []).map((row: any) => ({ ...row, [newKey]: 0 }));
+                              setWidgetConfig({ ...widgetConfig, manualStackKeys: newKeys, manualData: newData });
+                            }}
+                            className="text-xs text-brand-navy font-medium hover:text-brand-navy-dark"
+                          >
+                            + Add Series
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          {(widgetConfig.manualStackKeys || []).map((key: string, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={key}
+                                onChange={(e) => {
+                                  const oldKey = widgetConfig.manualStackKeys[idx];
+                                  const newKeys = [...widgetConfig.manualStackKeys];
+                                  newKeys[idx] = e.target.value;
+                                  const newData = (widgetConfig.manualData || []).map((row: any) => {
+                                    const newRow = { ...row };
+                                    newRow[e.target.value] = newRow[oldKey] || 0;
+                                    if (oldKey !== e.target.value) delete newRow[oldKey];
+                                    return newRow;
+                                  });
+                                  setWidgetConfig({ ...widgetConfig, manualStackKeys: newKeys, manualData: newData });
+                                }}
+                                className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
+                              />
+                              {(widgetConfig.manualStackKeys || []).length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const removedKey = widgetConfig.manualStackKeys[idx];
+                                    const newKeys = widgetConfig.manualStackKeys.filter((_: any, i: number) => i !== idx);
+                                    const newData = (widgetConfig.manualData || []).map((row: any) => {
+                                      const newRow = { ...row };
+                                      delete newRow[removedKey];
+                                      return newRow;
+                                    });
+                                    setWidgetConfig({ ...widgetConfig, manualStackKeys: newKeys, manualData: newData });
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          id="rangeCustom"
-                          name="yAxisRange"
-                          value="custom"
-                          checked={widgetConfig.yAxisRange === 'custom'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisRange: e.target.value })}
-                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
-                        />
-                        <label htmlFor="rangeCustom" className="text-sm text-gray-700">Custom</label>
+
+                      {/* Data rows for stacked */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-semibold text-gray-900">Data Points</h4>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newRow: any = { label: `Category ${(widgetConfig.manualData?.length || 0) + 1}` };
+                              (widgetConfig.manualStackKeys || []).forEach((k: string) => { newRow[k] = 0; });
+                              setWidgetConfig({ ...widgetConfig, manualData: [...(widgetConfig.manualData || []), newRow] });
+                            }}
+                            className="text-xs text-brand-navy font-medium hover:text-brand-navy-dark"
+                          >
+                            + Add Row
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                          {(widgetConfig.manualData || []).map((row: any, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 p-2 bg-gray-50 rounded border border-gray-200">
+                              <div className="flex-1 space-y-1.5">
+                                <input
+                                  type="text"
+                                  value={row.label || ''}
+                                  onChange={(e) => {
+                                    const newData = [...widgetConfig.manualData];
+                                    newData[idx] = { ...newData[idx], label: e.target.value };
+                                    setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                  }}
+                                  placeholder="Label"
+                                  className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-medium focus:ring-2 focus:ring-brand-navy/40"
+                                />
+                                <div className="grid grid-cols-2 gap-1.5">
+                                  {(widgetConfig.manualStackKeys || []).map((key: string) => (
+                                    <div key={key} className="flex items-center gap-1">
+                                      <span className="text-[10px] text-gray-500 w-14 truncate" title={key}>{key}</span>
+                                      <input
+                                        type="number"
+                                        value={row[key] ?? 0}
+                                        onChange={(e) => {
+                                          const newData = [...widgetConfig.manualData];
+                                          newData[idx] = { ...newData[idx], [key]: parseFloat(e.target.value) || 0 };
+                                          setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                        }}
+                                        className="flex-1 min-w-0 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              {(widgetConfig.manualData || []).length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newData = widgetConfig.manualData.filter((_: any, i: number) => i !== idx);
+                                    setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded mt-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      {widgetConfig.yAxisRange === 'custom' && (
-                        <div className="grid grid-cols-2 gap-3 ml-7">
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Min</label>
+                    </div>
+                  )}
+
+                  {/* Standard chart manual entry (bar, line, donut) */}
+                  {!['metric', 'table', 'stacked-horizontal-bar', 'stacked-vertical-bar'].includes(selectedWidgetType || '') && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-gray-900">Data Points</h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newData = [...(widgetConfig.manualData || []), { label: `Item ${(widgetConfig.manualData?.length || 0) + 1}`, value: 0 }];
+                            setWidgetConfig({ ...widgetConfig, manualData: newData });
+                          }}
+                          className="text-xs text-brand-navy font-medium hover:text-brand-navy-dark"
+                        >
+                          + Add Data Point
+                        </button>
+                      </div>
+                      <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                        {(widgetConfig.manualData || []).map((item: any, idx: number) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={item.label || ''}
+                              onChange={(e) => {
+                                const newData = [...widgetConfig.manualData];
+                                newData[idx] = { ...newData[idx], label: e.target.value };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              }}
+                              placeholder="Label"
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            />
                             <input
                               type="number"
-                              value={widgetConfig.yAxisMin}
-                              onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisMin: parseFloat(e.target.value) })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                              value={item.value ?? 0}
+                              onChange={(e) => {
+                                const newData = [...widgetConfig.manualData];
+                                newData[idx] = { ...newData[idx], value: parseFloat(e.target.value) || 0 };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              }}
+                              placeholder="Value"
+                              className="w-24 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-navy/40"
                             />
+                            {(widgetConfig.manualData || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newData = widgetConfig.manualData.filter((_: any, i: number) => i !== idx);
+                                  setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                }}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
-                          <div>
-                            <label className="block text-xs text-gray-600 mb-1">Max</label>
-                            <input
-                              type="number"
-                              value={widgetConfig.yAxisMax}
-                              onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxisMax: parseFloat(e.target.value) })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Decimal Places */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Decimal Places</label>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          id="decimalAutomatic"
-                          name="decimalPlaces"
-                          value="automatic"
-                          checked={widgetConfig.decimalPlaces === 'automatic'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, decimalPlaces: e.target.value })}
-                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
-                        />
-                        <label htmlFor="decimalAutomatic" className="text-sm text-gray-700">Automatic</label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          id="decimalCustom"
-                          name="decimalPlaces"
-                          value="custom"
-                          checked={widgetConfig.decimalPlaces === 'custom'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, decimalPlaces: e.target.value })}
-                          className="w-4 h-4 text-brand-navy border-gray-300 focus:ring-brand-navy/40"
-                        />
-                        <label htmlFor="decimalCustom" className="text-sm text-gray-700">Custom</label>
-                      </div>
-                      {widgetConfig.decimalPlaces === 'custom' && (
-                        <div className="ml-7">
-                          <input
-                            type="number"
-                            min="0"
-                            max="10"
-                            value={widgetConfig.customDecimals}
-                            onChange={(e) => setWidgetConfig({ ...widgetConfig, customDecimals: parseInt(e.target.value) })}
-                            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Sort By */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
-                    <select
-                      value={widgetConfig.sortBy}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, sortBy: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="">None</option>
-                      {availableReports
-                        .find(r => r.id === widgetConfig.reportId)
-                        ?.fields?.map((field: string) => (
-                          <option key={field} value={field}>{field}</option>
-                        )) || FIELD_OPTIONS[widgetConfig.dataSource]?.map(field => (
-                          <option key={field} value={field}>{field}</option>
                         ))}
-                    </select>
-                  </div>
-
-                  {/* Legend Position */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Legend Position</label>
-                    <select
-                      value={widgetConfig.legendPosition}
-                      onChange={(e) => setWidgetConfig({ ...widgetConfig, legendPosition: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                    >
-                      <option value="top">Top</option>
-                      <option value="right">Right</option>
-                      <option value="bottom">Bottom</option>
-                      <option value="left">Left</option>
-                      <option value="none">None</option>
-                    </select>
-                  </div>
-                </>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Enter labels and values — the chart preview updates live</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Title, Subtitle, Footer */}
@@ -2567,7 +2622,7 @@ export default function DashboardPage() {
                 {/* Debug Info */}
                 <div className="mb-4 p-3 bg-[#f0f1fa] border border-[#d4d8f0] rounded text-xs">
                   <div><strong>Widget Type:</strong> {selectedWidgetType || 'None'}</div>
-                  <div><strong>Data Source:</strong> {widgetConfig.dataSourceMode === 'direct' ? `Direct — ${widgetConfig.dataSource || 'not selected'}` : `Report — ${availableReports.find(r => r.id === widgetConfig.reportId)?.name || 'not selected'}`}</div>
+                  <div><strong>Data Source:</strong> {widgetConfig.dataSourceMode === 'manual' ? `Manual — ${widgetConfig.manualData?.length || 0} data points` : `Report — ${availableReports.find(r => r.id === widgetConfig.reportId)?.name || 'not selected'}`}</div>
                   <div><strong>X-Axis:</strong> {widgetConfig.xAxis || 'Not set'}</div>
                   <div><strong>Y-Axis:</strong> {widgetConfig.yAxis || 'Not set'}</div>
                   {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
@@ -2616,19 +2671,14 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
-                {!widgetConfig.reportId && widgetConfig.dataSourceMode !== 'direct' && (
+                {widgetConfig.dataSourceMode === 'report' && !widgetConfig.reportId && (
                   <p className="text-xs text-gray-500 mt-2 text-center">
-                    Select a report or switch to &quot;Object Type (Direct)&quot; to see live data preview
+                    Select a report or switch to &quot;Manual Entry&quot; to see live data preview
                   </p>
                 )}
-                {widgetConfig.dataSourceMode === 'direct' && !widgetConfig.dataSource && (
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Select an object type to see live data preview
-                  </p>
-                )}
-                {((widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId) || (widgetConfig.dataSourceMode === 'direct' && widgetConfig.dataSource)) && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table'].includes(selectedWidgetType) && (
+                {widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table'].includes(selectedWidgetType) && (
                   <p className="text-xs text-amber-600 mt-2 text-center">
-                    Configure <strong>X-Axis: {widgetConfig.xAxis || 'not set'}</strong> and <strong>Y-Axis: {widgetConfig.yAxis || 'not set'}</strong> to see data visualization
+                    Configure <strong>X-Axis</strong> and <strong>Y-Axis</strong> to see data visualization
                   </p>
                 )}
               </div>
