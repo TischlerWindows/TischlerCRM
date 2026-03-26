@@ -1663,42 +1663,38 @@ export default function DashboardPage() {
             {(() => {
               const w = widget.position.w;
               const h = widget.position.h;
-              // Each grid row = 200px. Value text should fill ~60-70% of card height.
-              const heightPx = h * 200;
-              const valueFontSize = Math.round(heightPx * 0.3); // ~30% of height for the number line = ~60% visual weight with title/trend
-              const titleFontSize = Math.round(valueFontSize * 0.28);
-              const trendFontSize = Math.round(valueFontSize * 0.35);
-              const subtitleFontSize = Math.round(valueFontSize * 0.25);
-              const iconSize = Math.round(valueFontSize * 0.65);
-              const iconBoxSize = Math.round(iconSize * 1.6);
+              const scale = Math.min(w, h * 2);
+              const valueSizeClass = scale >= 8 ? 'text-6xl' : scale >= 6 ? 'text-5xl' : scale >= 4 ? 'text-4xl' : scale >= 3 ? 'text-3xl' : 'text-2xl';
+              const titleSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
+              const trendSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
+              const subtitleSizeClass = scale >= 6 ? 'text-sm' : 'text-xs';
+              const iconBoxClass = scale >= 6 ? 'w-16 h-16 rounded-xl' : scale >= 4 ? 'w-14 h-14 rounded-xl' : 'w-12 h-12 rounded-lg';
+              const iconClass = scale >= 6 ? 'w-8 h-8' : scale >= 4 ? 'w-7 h-7' : 'w-6 h-6';
               return (
                 <div
-                  className={`flex-1 flex items-center justify-center gap-[5%] cursor-pointer select-none px-6 ${isExpanded ? 'py-5' : ''}`}
+                  className={`flex-1 flex items-center justify-center gap-5 cursor-pointer select-none px-6 ${isExpanded ? 'py-5' : ''}`}
                   onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
                 >
-                  <div
-                    className="rounded-2xl flex items-center justify-center flex-shrink-0"
-                    style={{ width: iconBoxSize, height: iconBoxSize, backgroundColor: cardColor + '18' }}
-                  >
-                    <CreditCard style={{ width: iconSize, height: iconSize, color: cardColor }} />
+                  <div className={`${iconBoxClass} flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: cardColor + '18' }}>
+                    <CreditCard className={iconClass} style={{ color: cardColor }} />
                   </div>
                   <div className="text-center">
-                    <div className="text-gray-600 font-medium" style={{ fontSize: titleFontSize }}>{widget.title}</div>
+                    <div className={`${titleSizeClass} text-gray-600 font-medium`}>{widget.title}</div>
                     <div className="flex items-baseline justify-center gap-2">
-                      <div className="font-bold text-gray-900 leading-none" style={{ fontSize: valueFontSize }}>
+                      <div className={`${valueSizeClass} font-bold text-gray-900`}>
                         {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                       </div>
                       {cardTrend != null && cardTrend !== 0 && (
-                        <div className={`font-semibold ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`} style={{ fontSize: trendFontSize }}>
+                        <div className={`${trendSizeClass} font-semibold ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
                           {cardTrend > 0 ? '+' : ''}{cardTrend}%
                         </div>
                       )}
                     </div>
                     {widget.config?.subtitle && (
-                      <div className="text-gray-500 mt-1" style={{ fontSize: subtitleFontSize }}>{widget.config.subtitle}</div>
+                      <div className={`${subtitleSizeClass} text-gray-500 mt-1`}>{widget.config.subtitle}</div>
                     )}
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0" style={{ transform: isExpanded ? 'rotate(90deg)' : undefined }} />
+                  <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
                 </div>
               );
             })()}
