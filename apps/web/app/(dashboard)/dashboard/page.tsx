@@ -408,7 +408,9 @@ export default function DashboardPage() {
       const deltaX = (e.clientX - resizingWidget.startX) / 100; // pixels to grid units
       const deltaY = (e.clientY - resizingWidget.startY) / 50; // pixels to grid units (50px per row)
 
-      let newW = Math.max(2, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
+      const resizingWidgetObj = selectedDashboard.widgets.find(w => w.id === resizingWidget.id);
+      const minW = (resizingWidgetObj?.type === 'card' || resizingWidgetObj?.type === 'metric') ? 1 : 2;
+      let newW = Math.max(minW, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
       let newH = Math.max(1, Math.round(resizingWidget.startH + deltaY));
 
       const updatedDashboard = {
@@ -659,6 +661,10 @@ export default function DashboardPage() {
       }
     }
 
+    const defaultSize = (selectedWidgetType === 'card' || selectedWidgetType === 'metric')
+      ? { x: 0, y: 0, w: 2, h: 1 }
+      : { x: 0, y: 0, w: 4, h: 2 };
+
     const newWidget: DashboardWidget = {
       id: `w${Date.now()}`,
       type: selectedWidgetType as any,
@@ -666,7 +672,7 @@ export default function DashboardPage() {
       reportId: widgetConfig.reportId,
       dataSource: widgetConfig.dataSource,
       config: configData,
-      position: { x: 0, y: 0, w: 4, h: 2 },
+      position: defaultSize,
       sectionId: widgetConfig.sectionId || undefined
     };
 
@@ -1834,24 +1840,30 @@ export default function DashboardPage() {
               const w = widget.position.w;
               const h = widget.position.h;
               const scale = Math.min(w, h * 2);
-              const valueSizeClass = scale >= 8 ? 'text-7xl' : scale >= 6 ? 'text-6xl' : scale >= 4 ? 'text-5xl' : scale >= 3 ? 'text-4xl' : 'text-3xl';
-              const titleSizeClass = scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
-              const trendSizeClass = scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
-              const subtitleSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
+              const isCompact = w <= 1 || h <= 1;
+              const isTiny = w <= 1 && h <= 1;
+              const valueSizeClass = isTiny ? 'text-lg' : isCompact ? 'text-2xl' : scale >= 8 ? 'text-7xl' : scale >= 6 ? 'text-6xl' : scale >= 4 ? 'text-5xl' : scale >= 3 ? 'text-4xl' : 'text-3xl';
+              const titleSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
+              const trendSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
+              const subtitleSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-base' : 'text-sm';
+              const showIcon = !isCompact;
+              const showChevron = !isCompact;
               const iconBoxClass = scale >= 6 ? 'w-18 h-18 rounded-xl' : scale >= 4 ? 'w-16 h-16 rounded-xl' : 'w-12 h-12 rounded-lg';
               const iconClass = scale >= 6 ? 'w-9 h-9' : scale >= 4 ? 'w-8 h-8' : 'w-6 h-6';
               return (
                 <div
-                  className={`flex-1 flex items-center justify-center gap-5 cursor-pointer select-none px-6 ${isExpanded ? 'py-5' : ''}`}
+                  className={`flex-1 flex items-center justify-center ${isCompact ? 'gap-1 px-2' : 'gap-5 px-6'} cursor-pointer select-none ${isExpanded ? 'py-5' : ''}`}
                   onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
                 >
+                  {showIcon && (
                   <div className={`${iconBoxClass} flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: cardColor + '18' }}>
                     <CreditCard className={iconClass} style={{ color: cardColor }} />
                   </div>
-                  <div className="text-center">
-                    <div className={`${titleSizeClass} text-gray-600 font-medium`}>{widget.title}</div>
-                    <div className="flex items-baseline justify-center gap-2">
-                      <div className={`${valueSizeClass} font-bold text-gray-900`}>
+                  )}
+                  <div className={`text-center ${isCompact ? 'min-w-0 overflow-hidden' : ''}`}>
+                    <div className={`${titleSizeClass} text-gray-600 font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
+                    <div className={`flex items-baseline justify-center ${isTiny ? 'gap-1' : 'gap-2'}`}>
+                      <div className={`${valueSizeClass} font-bold text-gray-900 ${isCompact ? 'truncate' : ''}`}>
                         {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                       </div>
                       {cardTrend != null && cardTrend !== 0 && (
@@ -1860,11 +1872,11 @@ export default function DashboardPage() {
                         </div>
                       )}
                     </div>
-                    {widget.config?.subtitle && (
-                      <div className={`${subtitleSizeClass} text-gray-500 mt-1`}>{widget.config.subtitle}</div>
+                    {widget.config?.subtitle && !isTiny && (
+                      <div className={`${subtitleSizeClass} text-gray-500 mt-1 ${isCompact ? 'truncate' : ''}`}>{widget.config.subtitle}</div>
                     )}
                   </div>
-                  <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />
+                  {showChevron && <ChevronRight className={`w-5 h-5 text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} />}
                 </div>
               );
             })()}
