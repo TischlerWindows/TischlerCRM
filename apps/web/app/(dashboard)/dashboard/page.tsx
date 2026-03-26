@@ -1664,12 +1664,12 @@ export default function DashboardPage() {
               const w = widget.position.w;
               const h = widget.position.h;
               const scale = Math.min(w, h * 2);
-              const valueSizeClass = scale >= 8 ? 'text-6xl' : scale >= 6 ? 'text-5xl' : scale >= 4 ? 'text-4xl' : scale >= 3 ? 'text-3xl' : 'text-2xl';
-              const titleSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
-              const trendSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
-              const subtitleSizeClass = scale >= 6 ? 'text-sm' : 'text-xs';
-              const iconBoxClass = scale >= 6 ? 'w-16 h-16 rounded-xl' : scale >= 4 ? 'w-14 h-14 rounded-xl' : 'w-12 h-12 rounded-lg';
-              const iconClass = scale >= 6 ? 'w-8 h-8' : scale >= 4 ? 'w-7 h-7' : 'w-6 h-6';
+              const valueSizeClass = scale >= 8 ? 'text-7xl' : scale >= 6 ? 'text-6xl' : scale >= 4 ? 'text-5xl' : scale >= 3 ? 'text-4xl' : 'text-3xl';
+              const titleSizeClass = scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
+              const trendSizeClass = scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
+              const subtitleSizeClass = scale >= 6 ? 'text-base' : 'text-sm';
+              const iconBoxClass = scale >= 6 ? 'w-18 h-18 rounded-xl' : scale >= 4 ? 'w-16 h-16 rounded-xl' : 'w-12 h-12 rounded-lg';
+              const iconClass = scale >= 6 ? 'w-9 h-9' : scale >= 4 ? 'w-8 h-8' : 'w-6 h-6';
               return (
                 <div
                   className={`flex-1 flex items-center justify-center gap-5 cursor-pointer select-none px-6 ${isExpanded ? 'py-5' : ''}`}
