@@ -192,6 +192,8 @@ export default function DashboardPage() {
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState('');
+  const [draggingWidgetId, setDraggingWidgetId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -387,6 +389,7 @@ export default function DashboardPage() {
   const handleResizeStart = (e: React.MouseEvent, widget: DashboardWidget) => {
     if (!dashEditMode) return;
     e.preventDefault();
+    e.stopPropagation();
     setResizingWidget({
       id: widget.id,
       startX: e.clientX,
@@ -1027,8 +1030,77 @@ export default function DashboardPage() {
     saveTabConfiguration(newTabs);
   };
 
-  const renderWidget = (widget: DashboardWidget) => {
-    const widgetStyle = {
+  // ── Widget drag-and-drop ─────────────────────────────────────────────
+  const handleWidgetDragStart = (e: React.DragEvent, widgetId: string) => {
+    setDraggingWidgetId(widgetId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', widgetId);
+    // Make the drag image slightly transparent
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleWidgetDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+    setDraggingWidgetId(null);
+    setDropTarget(null);
+  };
+
+  const handleWidgetDrop = (targetSectionId: string | undefined, beforeWidgetId: string | null) => {
+    if (!selectedDashboard || !draggingWidgetId) return;
+
+    const widgets = [...selectedDashboard.widgets];
+    const dragIdx = widgets.findIndex(w => w.id === draggingWidgetId);
+    if (dragIdx < 0) return;
+
+    // Remove from old position
+    const [draggedWidget] = widgets.splice(dragIdx, 1);
+    // Update section
+    draggedWidget.sectionId = targetSectionId;
+
+    if (beforeWidgetId) {
+      // Insert before the target widget
+      const targetIdx = widgets.findIndex(w => w.id === beforeWidgetId);
+      if (targetIdx >= 0) {
+        widgets.splice(targetIdx, 0, draggedWidget);
+      } else {
+        widgets.push(draggedWidget);
+      }
+    } else {
+      // Append to end of section — find last widget in this section and insert after it
+      const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
+      let insertIdx = widgets.length;
+      for (let i = widgets.length - 1; i >= 0; i--) {
+        const wSection = widgets[i].sectionId;
+        const wInTarget = targetSectionId
+          ? wSection === targetSectionId
+          : (!wSection || !sectionIds.has(wSection));
+        if (wInTarget) {
+          insertIdx = i + 1;
+          break;
+        }
+      }
+      widgets.splice(insertIdx, 0, draggedWidget);
+    }
+
+    const updatedDashboard = {
+      ...selectedDashboard,
+      widgets,
+      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+    };
+    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+    setDashboards(updated);
+    setSelectedDashboard(updatedDashboard);
+    setSetting('dashboards', updated);
+    setDraggingWidgetId(null);
+    setDropTarget(null);
+  };
+
+  const renderWidget = (widget: DashboardWidget, overrideStyle?: React.CSSProperties) => {
+    const widgetStyle: React.CSSProperties = overrideStyle || {
       gridColumn: `span ${widget.position.w}`,
       gridRow: `span ${widget.position.h}`
     };
@@ -1878,6 +1950,58 @@ export default function DashboardPage() {
     }
   };
 
+  /** Wrap a widget with drag-and-drop behavior + drop indicator */
+  const renderWidgetWithDrag = (widget: DashboardWidget, sectionId: string | undefined) => {
+    if (!dashEditMode) return renderWidget(widget);
+
+    const isDragging = draggingWidgetId === widget.id;
+    const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
+    // Card drill-down expansion
+    const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
+    const spanW = isExpandedCard ? 9 : widget.position.w;
+    const spanH = isExpandedCard ? 3 : widget.position.h;
+
+    return (
+      <div
+        key={`drag-${widget.id}`}
+        draggable
+        onDragStart={(e) => handleWidgetDragStart(e, widget.id)}
+        onDragEnd={handleWidgetDragEnd}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          setDropTarget({ sectionId, beforeWidgetId: widget.id });
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleWidgetDrop(sectionId, widget.id);
+        }}
+        style={{
+          gridColumn: `span ${spanW}`,
+          gridRow: `span ${spanH}`,
+          opacity: isDragging ? 0.4 : 1,
+          position: 'relative'
+        }}
+        className={`transition-opacity group ${isDragging ? 'ring-2 ring-blue-400 rounded-lg' : ''} ${isDropBefore ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg' : ''}`}
+      >
+        {/* Drop indicator line */}
+        {isDropBefore && (
+          <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full z-30" />
+        )}
+        {/* Drag handle */}
+        <div
+          className="absolute top-1 left-1 z-20 cursor-grab active:cursor-grabbing"
+          title="Drag to reorder"
+        >
+          <div className="bg-white/90 border border-gray-200 rounded p-0.5 shadow-sm hover:bg-gray-50">
+            <GripVertical className="w-4 h-4 text-gray-400" />
+          </div>
+        </div>
+        {renderWidget(widget, { width: '100%', height: '100%' })}
+      </div>
+    );
+  };
+
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -2272,19 +2396,58 @@ export default function DashboardPage() {
                     {(() => {
                       const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
                       const unsectioned = selectedDashboard.widgets.filter(w => !w.sectionId || !sectionIds.has(w.sectionId));
-                      if (unsectioned.length === 0) return null;
+                      if (unsectioned.length === 0 && !dashEditMode) return null;
                       return (
-                        <div className="grid grid-cols-9 gap-4 auto-rows-[200px]">
-                          {unsectioned.map(widget => renderWidget(widget))}
+                        <div
+                          className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
+                          onDragOver={(e) => {
+                            if (!dashEditMode) return;
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            // Only set drop target if not already over a specific widget
+                            const target = e.target as HTMLElement;
+                            if (target === e.currentTarget) {
+                              setDropTarget({ sectionId: undefined, beforeWidgetId: null });
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (!dashEditMode) return;
+                            e.preventDefault();
+                            handleWidgetDrop(undefined, null);
+                          }}
+                        >
+                          {unsectioned.map(widget => renderWidgetWithDrag(widget, undefined))}
+                          {/* End-of-section drop indicator */}
+                          {dashEditMode && draggingWidgetId && dropTarget?.sectionId === undefined && dropTarget?.beforeWidgetId === null && (
+                            <div style={{ gridColumn: 'span 9', height: '4px', gridRow: 'span 1' }} className="flex items-center self-start">
+                              <div className="w-full h-1 bg-blue-500 rounded-full" />
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
                     {/* Section-grouped widgets */}
                     {(selectedDashboard.sections || []).map((section, sIdx) => {
                       const sectionWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
+                      const isSectionDropTarget = dashEditMode && draggingWidgetId && dropTarget?.sectionId === section.id && dropTarget?.beforeWidgetId === null;
                       return (
                         <div key={section.id}>
-                          <div className="flex items-center justify-between mb-3">
+                          <div
+                            className={`flex items-center justify-between mb-3 rounded px-2 py-1 transition-colors ${
+                              dashEditMode && draggingWidgetId ? 'border-2 border-dashed border-transparent hover:border-blue-300' : ''
+                            }`}
+                            onDragOver={(e) => {
+                              if (!dashEditMode) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDropTarget({ sectionId: section.id, beforeWidgetId: null });
+                            }}
+                            onDrop={(e) => {
+                              if (!dashEditMode) return;
+                              e.preventDefault();
+                              handleWidgetDrop(section.id, null);
+                            }}
+                          >
                             {editingSectionId === section.id ? (
                               <form
                                 className="flex items-center gap-2"
@@ -2343,9 +2506,31 @@ export default function DashboardPage() {
                           {section.subtitle && (
                             <p className="text-xs text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
                           )}
-                          {sectionWidgets.length > 0 ? (
-                            <div className="grid grid-cols-9 gap-4 auto-rows-[200px]">
-                              {sectionWidgets.map(widget => renderWidget(widget))}
+                          {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
+                            <div
+                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              onDragOver={(e) => {
+                                if (!dashEditMode) return;
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                const target = e.target as HTMLElement;
+                                if (target === e.currentTarget) {
+                                  setDropTarget({ sectionId: section.id, beforeWidgetId: null });
+                                }
+                              }}
+                              onDrop={(e) => {
+                                if (!dashEditMode) return;
+                                e.preventDefault();
+                                handleWidgetDrop(section.id, null);
+                              }}
+                            >
+                              {sectionWidgets.map(widget => renderWidgetWithDrag(widget, section.id))}
+                              {/* End-of-section drop indicator */}
+                              {isSectionDropTarget && (
+                                <div style={{ gridColumn: 'span 9', height: '4px', gridRow: 'span 1' }} className="flex items-center self-start">
+                                  <div className="w-full h-1 bg-blue-500 rounded-full" />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             dashEditMode && (
