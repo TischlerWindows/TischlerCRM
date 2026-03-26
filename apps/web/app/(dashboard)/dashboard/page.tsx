@@ -1793,20 +1793,20 @@ export default function DashboardPage() {
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
             {/* Toolbar */}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
               <button
                 onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-0.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 title={isExpanded ? 'Collapse' : 'Drill down to data'}
               >
-                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
               </button>
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-0.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 title="Refresh widget"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-3.5 h-3.5" />
               </button>
               {dashEditMode && (
                 <>
@@ -1842,10 +1842,10 @@ export default function DashboardPage() {
               const scale = Math.min(w, h * 2);
               const isCompact = w <= 1 || h <= 1;
               const isTiny = w <= 1 && h <= 1;
-              const valueSizeClass = isTiny ? 'text-lg' : isCompact ? 'text-2xl' : scale >= 8 ? 'text-7xl' : scale >= 6 ? 'text-6xl' : scale >= 4 ? 'text-5xl' : scale >= 3 ? 'text-4xl' : 'text-3xl';
-              const titleSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
-              const trendSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-sm';
-              const subtitleSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-base' : 'text-sm';
+              const valueSizeClass = isTiny ? 'text-base' : isCompact ? 'text-xl' : scale >= 8 ? 'text-6xl' : scale >= 6 ? 'text-5xl' : scale >= 4 ? 'text-4xl' : scale >= 3 ? 'text-3xl' : 'text-2xl';
+              const titleSizeClass = isTiny ? 'text-[9px] leading-tight' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
+              const trendSizeClass = isTiny ? 'text-[9px]' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
+              const subtitleSizeClass = isTiny ? 'text-[9px]' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-sm' : 'text-xs';
               const showIcon = !isCompact;
               const showChevron = !isCompact;
               const iconBoxClass = scale >= 6 ? 'w-18 h-18 rounded-xl' : scale >= 4 ? 'w-16 h-16 rounded-xl' : 'w-12 h-12 rounded-lg';
@@ -2411,7 +2411,7 @@ export default function DashboardPage() {
                       if (unsectioned.length === 0 && !dashEditMode) return null;
                       return (
                         <div
-                          className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
+                          className={`grid grid-cols-9 gap-3 auto-rows-[150px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
                           onDragOver={(e) => {
                             if (!dashEditMode) return;
                             e.preventDefault();
@@ -2520,7 +2520,7 @@ export default function DashboardPage() {
                           )}
                           {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
                             <div
-                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-9 gap-3 auto-rows-[150px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
