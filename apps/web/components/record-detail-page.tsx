@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
@@ -617,6 +617,25 @@ export default function RecordDetailPage({
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {objectApiName === 'Deal' && record && (
+              <button
+                onClick={() => {
+                  const numberKey = Object.keys(record).find(
+                    (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
+                  );
+                  const dealNumber = numberKey ? record[numberKey] : '';
+                  const dealName = typeof record.name === 'string' ? record.name : '';
+                  const params = new URLSearchParams({ fromDeal: record.id });
+                  if (dealName) params.set('dealName', dealName);
+                  if (dealNumber) params.set('dealNumber', dealNumber);
+                  router.push(`/summary?${params.toString()}`);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                New Summary
+              </button>
+              )}
               {canEdit && (
               <button
                 onClick={handleEdit}

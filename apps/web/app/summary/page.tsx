@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   FileSpreadsheet,
@@ -537,6 +537,7 @@ interface Summary {
   name: string;
   salesman: string;
   opportunityNumber: string;
+  linkedDealId?: string;
   jobType: string;
   estimator: string;
   date: string;
@@ -604,6 +605,7 @@ export default function SummaryPage() {
   const [showType4, setShowType4] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     (async () => {
@@ -615,6 +617,18 @@ export default function SummaryPage() {
       setLoading(false);
     })();
   }, []);
+
+  // Auto-create summary from deal/opportunity query params
+  useEffect(() => {
+    if (loading) return;
+    const dealId = searchParams.get('fromDeal');
+    if (!dealId) return;
+    const dealName = searchParams.get('dealName') || '';
+    const dealNumber = searchParams.get('dealNumber') || '';
+    // Clear query params so refreshing doesn't re-create
+    router.replace('/summary');
+    createNewSummary({ dealId, dealName, dealNumber });
+  }, [loading, searchParams]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -678,12 +692,13 @@ export default function SummaryPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const createNewSummary = () => {
+  const createNewSummary = (opts?: { dealId?: string; dealName?: string; dealNumber?: string }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
-      name: '',
+      name: opts?.dealName || '',
       salesman: '',
-      opportunityNumber: '',
+      opportunityNumber: opts?.dealNumber || '',
+      linkedDealId: opts?.dealId || undefined,
       jobType: '',
       estimator: '',
       date: '',
