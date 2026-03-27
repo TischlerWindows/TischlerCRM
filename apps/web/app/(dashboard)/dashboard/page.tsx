@@ -178,6 +178,8 @@ export default function DashboardPage() {
     widgetBg: '',
     accentColor: '',
     fontColor: '',
+    hBarLabelPos: 'left',
+    hBarValuePos: 'right',
     hiddenUntilFilter: false,
     filterButtons: [] as Array<{ label: string; field: string; value: string }>,
     title: '',
@@ -1310,9 +1312,15 @@ export default function DashboardPage() {
           </div>
         );
 
-      case 'vertical-bar':
+      case 'vertical-bar': {
+        const vbDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const vbDrillRecords = vbDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const vbDrillColumns = vbDrillRecords.length > 0 ? Object.keys(vbDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(vbDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative flex flex-col group transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1354,7 +1362,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
-              <div className="flex-1 min-h-0">
+              <div className={`${vbDrillActive ? '' : 'flex-1'} min-h-0`} style={vbDrillActive ? { height: '200px' } : {}}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={widget.config.data}
@@ -1390,12 +1398,61 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis ? 'No data available' : 'Configure axes to see data'}
               </div>
             )}
+            {vbDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {vbDrillRecords.length} record{vbDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {vbDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {vbDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {vbDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {vbDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
+      }
 
-      case 'horizontal-bar':
+      case 'horizontal-bar': {
+        const hLabelPos = widget.config?.hBarLabelPos || 'left';
+        const hValuePos = widget.config?.hBarValuePos || 'right';
+        const hDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const hDrillRecords = hDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const hDrillColumns = hDrillRecords.length > 0 ? Object.keys(hDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(hDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1435,14 +1492,16 @@ export default function DashboardPage() {
             )}
             <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
-            <div className="flex flex-col gap-2 flex-1 min-h-0">
+            <div className={`flex flex-col gap-2 ${hDrillActive ? '' : 'flex-1'} min-h-0`}>
               {widget.config.data?.map((item: any, idx: number) => {
                 const maxValue = Math.max(...widget.config.data.map((d: any) => d.value));
                 const widthPercent = (item.value / maxValue) * 100;
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
+                const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                 return (
-                  <div key={idx} className="flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
-                    <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>
+                  <div key={idx} className={`flex items-center gap-3 ${hDrillActive ? '' : 'flex-1'} min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
+                    {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
+                    {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
@@ -1450,20 +1509,69 @@ export default function DashboardPage() {
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
-                    <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>
+                    {hLabelPos === 'right' && <div className={`text-xs ${labelColorClass} w-20 truncate`}>{item.label}</div>}
+                    {hValuePos === 'right' && <div className={`text-xs ${valueColorClass} font-medium w-12 text-right`}>{item.value}</div>}
                   </div>
                 );
               })}
             </div>
+            {/* Inline drill-down table */}
+            {hDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {hDrillRecords.length} record{hDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {hDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {hDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {hDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {hDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
+      }
 
       case 'stacked-vertical-bar': {
         const svStackKeys = widget.config.stackKeys || [];
         const svColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const svDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const svDrillRecords = svDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const svDrillColumns = svDrillRecords.length > 0 ? Object.keys(svDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(svDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1505,7 +1613,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
-              <div className="flex-1 min-h-0">
+              <div className={`${svDrillActive ? '' : 'flex-1'} min-h-0`} style={svDrillActive ? { height: '200px' } : {}}>
                 <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <BarChart
                     data={widget.config.data}
@@ -1543,16 +1651,62 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
               </div>
             )}
+            {svDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {svDrillRecords.length} record{svDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {svDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {svDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {svDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {svDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
       }
 
-      case 'stacked-horizontal-bar':
+      case 'stacked-horizontal-bar': {
         const stackKeys = widget.config.stackKeys || [];
         const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const shDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const shDrillRecords = shDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const shDrillColumns = shDrillRecords.length > 0 ? Object.keys(shDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(shDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1594,7 +1748,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
-              <div className="flex flex-col gap-3 flex-1 min-h-0">
+              <div className={`flex flex-col gap-3 ${shDrillActive ? '' : 'flex-1'} min-h-0`}>
                 {/* Legend */}
                 <div className="flex flex-wrap gap-3 justify-center pb-2 border-b">
                   {stackKeys.map((key: string, idx: number) => (
@@ -1611,15 +1765,15 @@ export default function DashboardPage() {
                 {/* Stacked Bars */}
                 <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto">
                   {widget.config.data.map((item: any, idx: number) => {
-                    // Calculate total for this row
                     const total = stackKeys.reduce((sum: number, key: string) => {
                       return sum + (Number(item[key]) || 0);
                     }, 0);
                     
                     const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
+                    const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                     
                     return (
-                      <div key={idx} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
+                      <div key={idx} className={`flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
                         <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
@@ -1663,12 +1817,59 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
               </div>
             )}
+            {shDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {shDrillRecords.length} record{shDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {shDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {shDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {shDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {shDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
+      }
 
-      case 'line':
+      case 'line': {
+        const lnDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const lnDrillRecords = lnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const lnDrillColumns = lnDrillRecords.length > 0 ? Object.keys(lnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(lnDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1710,7 +1911,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
-              <div className="flex-1 min-h-0">
+              <div className={`${lnDrillActive ? '' : 'flex-1'} min-h-0`} style={lnDrillActive ? { height: '200px' } : {}}>
                 <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <LineChart
                     data={widget.config.data}
@@ -1746,12 +1947,59 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis ? 'No data available' : 'Configure axes to see data'}
               </div>
             )}
+            {lnDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {lnDrillRecords.length} record{lnDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {lnDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {lnDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {lnDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {lnDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
+      }
 
-      case 'donut':
+      case 'donut': {
+        const dnDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
+        const dnDrillRecords = dnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
+        const dnDrillColumns = dnDrillRecords.length > 0 ? Object.keys(dnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative`}>
+          <div key={widget.id} style={{
+            ...bgStyle,
+            ...(dnDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
+          }} className={`${bgClass} p-6 relative flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1784,7 +2032,7 @@ export default function DashboardPage() {
             </div>
             <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
-            <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
+            <div className={`flex flex-col items-center justify-center ${dnDrillActive ? '' : 'h-[calc(100%-2rem)]'}`}>
               <div className="relative w-32 h-32">
                 <svg viewBox="0 0 100 100" className="transform -rotate-90">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
@@ -1819,17 +2067,61 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <div className="mt-4 space-y-2 w-full">
-                {widget.config.data?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
-                    <span className={valueColorClass}>{item.label}</span>
-                    <span className={`${labelColorClass} ml-auto`}>{item.value}%</span>
-                  </div>
-                ))}
+                {widget.config.data?.map((item: any, idx: number) => {
+                  const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
+                  return (
+                    <div key={idx} className={`flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                      <span className={valueColorClass}>{item.label}</span>
+                      <span className={`${labelColorClass} ml-auto`}>{item.value}%</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+            {dnDrillActive && (
+              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    {dnDrillRecords.length} record{dnDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                    <X className="w-3 h-3" /> Close
+                  </button>
+                </div>
+                {dnDrillRecords.length > 0 ? (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                        {dnDrillColumns.map(col => (
+                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {dnDrillRecords.map((row: any, rIdx: number) => (
+                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                          {dnDrillColumns.map(col => (
+                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                )}
+              </div>
+            )}
           </div>
         );
+      }
 
       case 'gauge':
         return (
@@ -2135,10 +2427,11 @@ export default function DashboardPage() {
 
     const isDragging = draggingWidgetId === widget.id;
     const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
-    // Card drill-down expansion
+    // Card or chart drill-down expansion
     const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
-    const spanW = isExpandedCard ? 9 : widget.position.w;
-    const spanH = isExpandedCard ? 3 : widget.position.h;
+    const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
+    const spanW = (isExpandedCard || isExpandedDrill) ? 9 : widget.position.w;
+    const spanH = isExpandedCard ? 3 : isExpandedDrill ? Math.max(widget.position.h + 2, 3) : widget.position.h;
 
     return (
       <div
@@ -3518,6 +3811,37 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Horizontal Bar Layout (only for horizontal-bar) */}
+              {selectedWidgetType === 'horizontal-bar' && (
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Bar Layout</h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs text-gray-600 w-28">Label Position</label>
+                      <select
+                        value={widgetConfig.hBarLabelPos || 'left'}
+                        onChange={(e) => setWidgetConfig({ ...widgetConfig, hBarLabelPos: e.target.value })}
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                      >
+                        <option value="left">Left of bar</option>
+                        <option value="right">Right of bar</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs text-gray-600 w-28">Value Position</label>
+                      <select
+                        value={widgetConfig.hBarValuePos || 'right'}
+                        onChange={(e) => setWidgetConfig({ ...widgetConfig, hBarValuePos: e.target.value })}
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                      >
+                        <option value="left">Left of bar</option>
+                        <option value="right">Right of bar</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Title, Subtitle, Footer */}
               <div className="border-t pt-6">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Labels & Text</h3>
@@ -3742,83 +4066,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Drill-down modal overlay */}
-      {drillDownLabel && drillDownWidgetId && (() => {
-        const ddWidget = selectedDashboard?.widgets.find(w => w.id === drillDownWidgetId);
-        if (!ddWidget || ddWidget.type === 'card') return null;
-        const records = getDrillDownRecords(ddWidget, drillDownLabel);
-        const columns = records.length > 0
-          ? Object.keys(records[0]).filter(k => k !== 'id' && !k.startsWith('_'))
-          : [];
-        return (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={closeDrillDown}>
-            <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{ddWidget.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    Showing {records.length} record{records.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                </div>
-                <button
-                  onClick={closeDrillDown}
-                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-              {/* Table */}
-              <div className="flex-1 overflow-auto">
-                {records.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0">
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">#</th>
-                        {columns.map(col => (
-                          <th key={col} className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {records.map((row: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-2.5 px-4 text-gray-400 text-xs">{idx + 1}</td>
-                          {columns.map(col => (
-                            <td key={col} className="py-2.5 px-4 text-gray-700">
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                    <TableIcon className="w-10 h-10 mb-3 opacity-40" />
-                    <p className="text-sm">No records found for &quot;{drillDownLabel}&quot;</p>
-                    <p className="text-xs mt-1">This may be because records haven&apos;t been loaded yet. Try refreshing the widget first.</p>
-                  </div>
-                )}
-              </div>
-              {/* Footer */}
-              {ddWidget.reportId && (
-                <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">{records.length} record{records.length !== 1 ? 's' : ''}</span>
-                  <Link
-                    href={`/reports/view/${ddWidget.reportId}`}
-                    className="text-xs font-medium text-brand-navy hover:underline flex items-center gap-1"
-                  >
-                    Open full report <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
     </>
   );
 }
