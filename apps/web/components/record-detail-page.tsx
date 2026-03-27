@@ -132,7 +132,19 @@ export default function RecordDetailPage({
     return objectDef.pageLayouts?.[0] ?? null;
   };
 
-  const pageLayout = resolveLayout();
+  const pageLayout = (() => {
+    const raw = resolveLayout();
+    if (!raw) return null;
+    // Layouts saved by the editor store the full Region→Panel→Field tree in
+    // extensions.editorTabs. The persisted tabs[] only carry sections for
+    // legacy compatibility. Swap in the editor tabs so the new renderer
+    // (which checks 'regions' in tab) activates correctly.
+    const editorTabs = (raw.extensions as any)?.editorTabs;
+    if (Array.isArray(editorTabs) && editorTabs.length > 0) {
+      return { ...raw, tabs: editorTabs as any } as PageLayout;
+    }
+    return raw;
+  })();
 
   useEffect(() => {
     if (!record || !objectDef) {
