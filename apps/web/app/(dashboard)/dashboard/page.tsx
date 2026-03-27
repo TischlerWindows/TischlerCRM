@@ -409,10 +409,10 @@ export default function DashboardPage() {
       if (!selectedDashboard) return;
 
       const deltaX = (e.clientX - resizingWidget.startX) / 100; // pixels to grid units
-      const deltaY = (e.clientY - resizingWidget.startY) / 25; // pixels to grid units (25px per row, matches auto-rows-[25px])
+      const deltaY = (e.clientY - resizingWidget.startY) / 200; // pixels to grid units (200px per row)
 
       const resizingWidgetObj = selectedDashboard.widgets.find(w => w.id === resizingWidget.id);
-      const minW = (resizingWidgetObj?.type === 'card' || resizingWidgetObj?.type === 'metric') ? 1 : 2;
+      const minW = 2;
       let newW = Math.max(minW, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
       let newH = Math.max(1, Math.round(resizingWidget.startH + deltaY));
 
@@ -475,7 +475,7 @@ export default function DashboardPage() {
             title: 'Total Revenue',
             dataSource: 'deals',
             config: { value: 2450000, prefix: '$', trend: 12.5 },
-            position: { x: 0, y: 0, w: 3, h: 6 }
+            position: { x: 0, y: 0, w: 3, h: 1 }
           },
           {
             id: 'w2',
@@ -483,7 +483,7 @@ export default function DashboardPage() {
             title: 'Active Deals',
             dataSource: 'deals',
             config: { value: 47, trend: -5.2 },
-            position: { x: 3, y: 0, w: 3, h: 6 }
+            position: { x: 3, y: 0, w: 3, h: 1 }
           },
           {
             id: 'w3',
@@ -491,7 +491,7 @@ export default function DashboardPage() {
             title: 'Win Rate',
             dataSource: 'deals',
             config: { value: 68, suffix: '%', trend: 3.1 },
-            position: { x: 6, y: 0, w: 3, h: 6 }
+            position: { x: 6, y: 0, w: 3, h: 1 }
           },
           {
             id: 'w4',
@@ -507,7 +507,7 @@ export default function DashboardPage() {
                 { label: 'Closed Won', value: 5 }
               ]
             },
-            position: { x: 0, y: 6, w: 6, h: 12 }
+            position: { x: 0, y: 1, w: 6, h: 2 }
           },
           {
             id: 'w5',
@@ -522,7 +522,7 @@ export default function DashboardPage() {
                 { label: 'Installation', value: 10 }
               ]
             },
-            position: { x: 6, y: 6, w: 3, h: 12 }
+            position: { x: 6, y: 1, w: 3, h: 2 }
           },
           {
             id: 'w6',
@@ -539,7 +539,7 @@ export default function DashboardPage() {
                 { label: 'Jun', value: 240000 }
               ]
             },
-            position: { x: 0, y: 18, w: 9, h: 12 }
+            position: { x: 0, y: 3, w: 9, h: 2 }
           }
         ],
         createdBy: 'Development User',
@@ -666,8 +666,8 @@ export default function DashboardPage() {
     }
 
     const defaultSize = (selectedWidgetType === 'card' || selectedWidgetType === 'metric')
-      ? { x: 0, y: 0, w: 2, h: 6 }
-      : { x: 0, y: 0, w: 4, h: 12 };
+      ? { x: 0, y: 0, w: 2, h: 1 }
+      : { x: 0, y: 0, w: 4, h: 2 };
 
     const newWidget: DashboardWidget = {
       id: `w${Date.now()}`,
@@ -978,7 +978,7 @@ export default function DashboardPage() {
       reportId: widgetConfig.reportId,
       dataSource: widgetConfig.dataSource,
       config: configData,
-      position: existingWidget?.position || { x: 0, y: 0, w: 4, h: 12 },
+      position: existingWidget?.position || { x: 0, y: 0, w: 4, h: 2 },
       sectionId: widgetConfig.sectionId || undefined
     };
 
@@ -1848,7 +1848,7 @@ export default function DashboardPage() {
             key={widget.id}
             style={{
               ...widgetStyle,
-              ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 18' } : {})
+              ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
             }}
             className="bg-white rounded-lg border border-gray-200 relative group flex flex-col transition-all duration-300"
           >
@@ -1856,7 +1856,7 @@ export default function DashboardPage() {
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
             {/* Toolbar */}
-            <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 6 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
+            <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
               <button
                 onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
                 className="p-0.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1904,8 +1904,8 @@ export default function DashboardPage() {
               const w = widget.position.w;
               const h = widget.position.h;
               const scale = Math.min(w, h * 2);
-              const isCompact = w <= 1 || h <= 4;
-              const isTiny = w <= 1 && h <= 2;
+              const isCompact = w <= 1 || h <= 1;
+              const isTiny = w <= 1 && h <= 1;
               const valueSizeClass = isTiny ? 'text-base' : isCompact ? 'text-xl' : scale >= 8 ? 'text-6xl' : scale >= 6 ? 'text-5xl' : scale >= 4 ? 'text-4xl' : scale >= 3 ? 'text-3xl' : 'text-2xl';
               const titleSizeClass = isTiny ? 'text-[9px] leading-tight' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
               const trendSizeClass = isTiny ? 'text-[9px]' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
@@ -2035,7 +2035,7 @@ export default function DashboardPage() {
     // Card drill-down expansion
     const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
     const spanW = isExpandedCard ? 9 : widget.position.w;
-    const spanH = isExpandedCard ? 18 : widget.position.h;
+    const spanH = isExpandedCard ? 3 : widget.position.h;
 
     return (
       <div
@@ -2475,7 +2475,7 @@ export default function DashboardPage() {
                       if (unsectioned.length === 0 && !dashEditMode) return null;
                       return (
                         <div
-                          className={`grid grid-cols-9 gap-3 auto-rows-[25px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
+                          className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
                           onDragOver={(e) => {
                             if (!dashEditMode) return;
                             e.preventDefault();
@@ -2584,7 +2584,7 @@ export default function DashboardPage() {
                           )}
                           {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
                             <div
-                              className={`grid grid-cols-9 gap-3 auto-rows-[25px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
