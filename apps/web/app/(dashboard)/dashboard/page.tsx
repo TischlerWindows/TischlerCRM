@@ -1439,7 +1439,7 @@ export default function DashboardPage() {
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
               <div className="flex-1 min-h-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <BarChart
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
@@ -1642,7 +1642,7 @@ export default function DashboardPage() {
             
             {widget.config.data && widget.config.data.length > 0 ? (
               <div className="flex-1 min-h-0">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <LineChart
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
@@ -3098,64 +3098,6 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Widget Colors */}
-                  <div className="border-t pt-4 mt-2">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Widget Colors</h4>
-                    <div className="space-y-3">
-                      {/* Widget Background */}
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs text-gray-600 w-28">Background</label>
-                        <input
-                          type="color"
-                          value={widgetConfig.widgetBg || '#ffffff'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, widgetBg: e.target.value })}
-                          className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-                        />
-                        {widgetConfig.widgetBg && (
-                          <button type="button" onClick={() => setWidgetConfig({ ...widgetConfig, widgetBg: '' })} className="text-xs text-gray-500 hover:text-gray-700">Reset</button>
-                        )}
-                      </div>
-                      {/* Accent / Bar Color */}
-                      <div className="flex items-center gap-3">
-                        <label className="text-xs text-gray-600 w-28">
-                          {selectedWidgetType === 'line' ? 'Line Color' : selectedWidgetType === 'card' ? 'Card Color' : 'Bar / Accent'}
-                        </label>
-                        <input
-                          type="color"
-                          value={selectedWidgetType === 'card' ? (widgetConfig.cardColor || '#1e3a5f') : (widgetConfig.accentColor || '#151f6d')}
-                          onChange={(e) => {
-                            if (selectedWidgetType === 'card') {
-                              setWidgetConfig({ ...widgetConfig, cardColor: e.target.value });
-                            } else {
-                              setWidgetConfig({ ...widgetConfig, accentColor: e.target.value });
-                            }
-                          }}
-                          className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-                        />
-                        <div className="flex gap-1">
-                          {['#151f6d', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => {
-                                if (selectedWidgetType === 'card') {
-                                  setWidgetConfig({ ...widgetConfig, cardColor: c });
-                                } else {
-                                  setWidgetConfig({ ...widgetConfig, accentColor: c });
-                                }
-                              }}
-                              className={`w-6 h-6 rounded-full border-2 transition-all ${
-                                (selectedWidgetType === 'card' ? widgetConfig.cardColor : widgetConfig.accentColor) === c
-                                  ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'
-                              }`}
-                              style={{ backgroundColor: c }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Card drill-down data rows */}
                   {selectedWidgetType === 'card' && (
                     <div>
@@ -3426,6 +3368,64 @@ export default function DashboardPage() {
                   )}
                 </div>
               )}
+
+              {/* Widget Colors */}
+              <div className="border-t pt-6">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">Widget Colors</h3>
+                <div className="space-y-3">
+                  {/* Widget Background */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-600 w-28">Background</label>
+                    <input
+                      type="color"
+                      value={widgetConfig.widgetBg || '#ffffff'}
+                      onChange={(e) => setWidgetConfig({ ...widgetConfig, widgetBg: e.target.value })}
+                      className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                    />
+                    {widgetConfig.widgetBg && (
+                      <button type="button" onClick={() => setWidgetConfig({ ...widgetConfig, widgetBg: '' })} className="text-xs text-gray-500 hover:text-gray-700">Reset</button>
+                    )}
+                  </div>
+                  {/* Accent / Bar Color */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-600 w-28">
+                      {selectedWidgetType === 'line' ? 'Line Color' : selectedWidgetType === 'card' ? 'Card Color' : 'Bar / Accent'}
+                    </label>
+                    <input
+                      type="color"
+                      value={selectedWidgetType === 'card' ? (widgetConfig.cardColor || '#1e3a5f') : (widgetConfig.accentColor || '#151f6d')}
+                      onChange={(e) => {
+                        if (selectedWidgetType === 'card') {
+                          setWidgetConfig({ ...widgetConfig, cardColor: e.target.value });
+                        } else {
+                          setWidgetConfig({ ...widgetConfig, accentColor: e.target.value });
+                        }
+                      }}
+                      className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                    />
+                    <div className="flex gap-1">
+                      {['#151f6d', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            if (selectedWidgetType === 'card') {
+                              setWidgetConfig({ ...widgetConfig, cardColor: c });
+                            } else {
+                              setWidgetConfig({ ...widgetConfig, accentColor: c });
+                            }
+                          }}
+                          className={`w-6 h-6 rounded-full border-2 transition-all ${
+                            (selectedWidgetType === 'card' ? widgetConfig.cardColor : widgetConfig.accentColor) === c
+                              ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Title, Subtitle, Footer */}
               <div className="border-t pt-6">
