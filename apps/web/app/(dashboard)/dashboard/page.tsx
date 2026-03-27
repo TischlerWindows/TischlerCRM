@@ -3156,23 +3156,6 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Visibility */}
-                  <div className="border-t pt-4 mt-2">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Visibility</h4>
-                    <label className="flex items-center gap-2 cursor-pointer p-2 bg-gray-50 rounded-lg border border-gray-200">
-                      <input
-                        type="checkbox"
-                        checked={widgetConfig.hiddenUntilFilter || false}
-                        onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
-                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
-                      />
-                      <div>
-                        <span className="text-xs font-medium text-gray-800">Only visible when a filter button is selected</span>
-                        <p className="text-[10px] text-gray-500">Widget will be hidden until the user clicks one of its filter buttons</p>
-                      </div>
-                    </label>
-                  </div>
-
                   {/* Card drill-down data rows */}
                   {selectedWidgetType === 'card' && (
                     <div>
@@ -3529,6 +3512,15 @@ export default function DashboardPage() {
                   )}
                 </div>
 
+                <label className="flex items-center gap-2 cursor-pointer p-2 mb-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <input
+                    type="checkbox"
+                    checked={widgetConfig.hiddenUntilFilter || false}
+                    onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
+                    className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                  />
+                  <span className="text-xs font-medium text-gray-800">Only visible when a filter button is selected</span>
+                </label>
                 <p className="text-xs text-gray-500 mb-3">Add up to 10 buttons that filter this widget&apos;s data. Each button filters by matching a data field to a value.</p>
                 {(widgetConfig.filterButtons || []).length > 0 ? (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -3596,7 +3588,7 @@ export default function DashboardPage() {
                 
 
 
-                <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px] flex flex-col">
+                <div className="bg-white rounded-lg border border-gray-200 p-4 h-[450px]">
                   {selectedWidgetType ? (
                     (() => {
                       const currentPreviewData = previewData || {
@@ -3617,7 +3609,7 @@ export default function DashboardPage() {
                         position: { x: 0, y: 0, w: 4, h: 2 }
                       };
 
-                      return renderWidget(previewWidget, { width: '100%', height: '100%', minHeight: '350px' });
+                      return renderWidget(previewWidget, { width: '100%', height: '100%' });
                     })()
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-400">
