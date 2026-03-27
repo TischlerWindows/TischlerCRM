@@ -41,6 +41,7 @@ import {
 import { 
   BarChart, 
   Bar, 
+  Cell,
   LineChart,
   Line,
   XAxis, 
@@ -176,6 +177,7 @@ export default function DashboardPage() {
     cardColor: '#1e3a5f',
     widgetBg: '',
     accentColor: '',
+    hiddenUntilFilter: false,
     filterButtons: [] as Array<{ label: string; field: string; value: string }>,
     title: '',
     subtitle: '',
@@ -257,7 +259,7 @@ export default function DashboardPage() {
           prefix: m.prefix || '',
           suffix: m.suffix || '',
           trend: m.trend || 0,
-          data: (widgetConfig.manualData || []).map((d: any) => ({ label: d.label || '', value: Number(d.value) || 0 }))
+          data: (widgetConfig.manualData || []).map((d: any) => ({ label: d.label || '', value: Number(d.value) || 0, ...(d.color ? { color: d.color } : {}) }))
         };
       }
       if (selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') {
@@ -272,7 +274,8 @@ export default function DashboardPage() {
       // bar, line, donut, etc.
       const data = (widgetConfig.manualData || []).map((d: any) => ({
         label: d.label || '',
-        value: Number(d.value) || 0
+        value: Number(d.value) || 0,
+        ...(d.color ? { color: d.color } : {})
       }));
       return { data };
     }
@@ -956,6 +959,7 @@ export default function DashboardPage() {
       cardColor: widget.config?.cardColor || '#1e3a5f',
       widgetBg: widget.config?.widgetBg || '',
       accentColor: widget.config?.accentColor || '',
+      hiddenUntilFilter: widget.config?.hiddenUntilFilter || false,
       filterButtons: widget.config?.filterButtons || [],
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
@@ -1306,7 +1310,11 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" fill={widget.config.barColor || widgetAccent} radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                      {widget.config.data.map((entry: any, idx: number) => (
+                        <Cell key={idx} fill={entry.color || widget.config.barColor || widgetAccent} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1371,7 +1379,7 @@ export default function DashboardPage() {
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
-                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: widgetAccent }}
+                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widgetAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
@@ -1714,13 +1722,13 @@ export default function DashboardPage() {
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241'];
+                    const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241'];
                     const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
                     
                     acc.push({
                       percentage,
                       offset,
-                      color: colors[idx % colors.length]
+                      color: item.color || defaultColors[idx % defaultColors.length]
                     });
                     return acc;
                   }, []).map((segment: any, idx: number) => (
@@ -1741,7 +1749,7 @@ export default function DashboardPage() {
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                     <span className="text-gray-700">{item.label}</span>
                     <span className="text-gray-500 ml-auto">{item.value}%</span>
                   </div>
@@ -2053,6 +2061,12 @@ export default function DashboardPage() {
 
   /** Wrap a widget with drag-and-drop behavior + drop indicator */
   const renderWidgetWithDrag = (widget: DashboardWidget, sectionId: string | undefined) => {
+    // Hidden until a filter button is active
+    if (widget.config?.hiddenUntilFilter && !dashEditMode) {
+      const activeBtn = activeFilterButtons[widget.id] || null;
+      if (!activeBtn) return null;
+    }
+
     if (!dashEditMode) return renderWidget(widget);
 
     const isDragging = draggingWidgetId === widget.id;
@@ -3353,6 +3367,17 @@ export default function DashboardPage() {
                         {(widgetConfig.manualData || []).map((item: any, idx: number) => (
                           <div key={idx} className="flex items-center gap-2">
                             <input
+                              type="color"
+                              value={item.color || ['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2', '#9f9fa2', '#293241'][idx % 8]}
+                              onChange={(e) => {
+                                const newData = [...widgetConfig.manualData];
+                                newData[idx] = { ...newData[idx], color: e.target.value };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              }}
+                              className="w-7 h-7 rounded border border-gray-300 cursor-pointer flex-shrink-0"
+                              title="Bar color"
+                            />
+                            <input
                               type="text"
                               value={item.label || ''}
                               onChange={(e) => {
@@ -3479,6 +3504,15 @@ export default function DashboardPage() {
                     </button>
                   )}
                 </div>
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={widgetConfig.hiddenUntilFilter || false}
+                    onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
+                    className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                  />
+                  <span className="text-xs text-gray-700">Only visible when a filter button is selected</span>
+                </label>
                 <p className="text-xs text-gray-500 mb-3">Add up to 10 buttons that filter this widget&apos;s data. Each button filters by matching a data field to a value.</p>
                 {(widgetConfig.filterButtons || []).length > 0 ? (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -3567,7 +3601,7 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-lg border border-gray-200 p-6 min-h-[400px]">
+                <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px] flex flex-col">
                   {selectedWidgetType ? (
                     (() => {
                       const currentPreviewData = previewData || {
@@ -3579,7 +3613,7 @@ export default function DashboardPage() {
                       };
 
                       const previewWidget: DashboardWidget = {
-                        id: `preview-${Date.now()}`,
+                        id: `preview-${previewKey}`,
                         type: selectedWidgetType as any,
                         title: widgetConfig.title || `New ${WIDGET_TYPES.find(t => t.id === selectedWidgetType)?.label}`,
                         reportId: widgetConfig.reportId,
@@ -3588,7 +3622,7 @@ export default function DashboardPage() {
                         position: { x: 0, y: 0, w: 4, h: 2 }
                       };
 
-                      return renderWidget(previewWidget);
+                      return renderWidget(previewWidget, { width: '100%', height: '100%', minHeight: '350px' });
                     })()
                   ) : (
                     <div className="flex items-center justify-center h-full text-gray-400">
