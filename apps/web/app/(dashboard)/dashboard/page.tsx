@@ -1201,8 +1201,14 @@ export default function DashboardPage() {
     const widgetAccent = widget.config?.accentColor || '#151f6d';
     const widgetBg = widget.config?.widgetBg || '';
     const widgetFontColor = widget.config?.fontColor || '';
+    const fc = widgetFontColor; // shorthand for inline usage
     const bgClass = widgetBg ? 'rounded-lg border border-gray-200' : 'bg-white rounded-lg border border-gray-200';
-    const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(widgetFontColor ? { color: widgetFontColor } : {}) };
+    const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(fc ? { color: fc } : {}) };
+    const tickStyle = fc ? { fontSize: 12, fill: fc } : { fontSize: 12 };
+    const tickStyle11 = fc ? { fontSize: 11, fill: fc } : { fontSize: 11 };
+    const titleColorClass = fc ? '' : 'text-gray-900';
+    const labelColorClass = fc ? '' : 'text-gray-600';
+    const valueColorClass = fc ? '' : 'text-gray-700';
 
     // --- Filter buttons: filter data based on active button ---
     const filterBtns: Array<{ label: string; field: string; value: string }> = widget.config?.filterButtons || [];
@@ -1289,10 +1295,10 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className="text-sm text-gray-600 mb-2">{widget.title}</div>
+            <div className={`text-sm ${labelColorClass} mb-2`}>{widget.title}</div>
             {filterBar}
             <div className="flex items-baseline gap-2">
-              <div className="text-3xl font-bold text-gray-900">
+              <div className={`text-3xl font-bold ${titleColorClass}`}>
                 {widget.config.prefix}{widget.config.value?.toLocaleString()}{widget.config.suffix}
               </div>
               {widget.config.trend && (
@@ -1344,7 +1350,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1360,11 +1366,11 @@ export default function DashboardPage() {
                       angle={-45}
                       textAnchor="end"
                       height={Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8))}
-                      tick={{ fontSize: 12 }}
+                      tick={tickStyle}
                     />
                     <YAxis 
-                      label={{ value: widget.config.yAxis || 'Value', angle: -90, position: 'insideLeft' }}
-                      tick={{ fontSize: 12 }}
+                      label={{ value: widget.config.yAxis || 'Value', angle: -90, position: 'insideLeft', ...(fc ? { fill: fc } : {}) }}
+                      tick={tickStyle}
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
@@ -1427,7 +1433,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col gap-2 flex-1 min-h-0">
               {widget.config.data?.map((item: any, idx: number) => {
@@ -1436,7 +1442,7 @@ export default function DashboardPage() {
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 return (
                   <div key={idx} className="flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
-                    <div className="text-xs text-gray-600 w-20 text-right truncate">{item.label}</div>
+                    <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
@@ -1444,7 +1450,7 @@ export default function DashboardPage() {
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
-                    <div className="text-xs text-gray-700 font-medium w-12">{item.value}</div>
+                    <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>
                   </div>
                 );
               })}
@@ -1495,7 +1501,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
@@ -1511,9 +1517,9 @@ export default function DashboardPage() {
                       angle={-45}
                       textAnchor="end"
                       height={Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8))}
-                      tick={{ fontSize: 11 }}
+                      tick={tickStyle11}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <YAxis tick={tickStyle11} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
                     />
@@ -1584,7 +1590,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
@@ -1597,7 +1603,7 @@ export default function DashboardPage() {
                         className="w-3 h-3 rounded" 
                         style={{ backgroundColor: colors[idx % colors.length] }}
                       />
-                      <span className="text-xs text-gray-600">{key}</span>
+                      <span className={`text-xs ${labelColorClass}`}>{key}</span>
                     </div>
                   ))}
                 </div>
@@ -1614,7 +1620,7 @@ export default function DashboardPage() {
                     
                     return (
                       <div key={idx} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
-                        <div className="text-xs text-gray-600 w-24 text-right truncate flex-shrink-0" title={item.label}>
+                        <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
                         <div className="flex-1 bg-gray-100 rounded-full flex items-center overflow-hidden" style={{ height: `${barHeight}px` }}>
@@ -1644,7 +1650,7 @@ export default function DashboardPage() {
                             );
                           })}
                         </div>
-                        <div className="text-xs text-gray-700 font-medium w-12 text-right flex-shrink-0">
+                        <div className={`text-xs ${valueColorClass} font-medium w-12 text-right flex-shrink-0`}>
                           {total.toFixed(0)}
                         </div>
                       </div>
@@ -1700,7 +1706,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1716,9 +1722,9 @@ export default function DashboardPage() {
                       angle={-45}
                       textAnchor="end"
                       height={Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8))}
-                      tick={{ fontSize: 11 }}
+                      tick={tickStyle11}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <YAxis tick={tickStyle11} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
@@ -1776,7 +1782,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <div className="relative w-32 h-32">
@@ -1816,8 +1822,8 @@ export default function DashboardPage() {
                 {widget.config.data?.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
-                    <span className="text-gray-700">{item.label}</span>
-                    <span className="text-gray-500 ml-auto">{item.value}%</span>
+                    <span className={valueColorClass}>{item.label}</span>
+                    <span className={`${labelColorClass} ml-auto`}>{item.value}%</span>
                   </div>
                 ))}
               </div>
@@ -1858,7 +1864,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <Gauge className="w-24 h-24 text-brand-navy" />
@@ -1901,7 +1907,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className="text-sm font-semibold text-gray-900 mb-4">{widget.title}</div>
+            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
             <table className="w-full text-sm">
               <thead>
@@ -2016,9 +2022,9 @@ export default function DashboardPage() {
                   onClick={() => { setDrillDownWidgetId(isExpanded ? null : widget.id); setDrillDownLabel(null); }}
                 >
                   <div className={`text-center ${isCompact ? 'min-w-0 overflow-hidden' : ''}`}>
-                    <div className={`${titleSizeClass} text-gray-600 font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
+                    <div className={`${titleSizeClass} ${labelColorClass} font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
                     <div className={`flex items-baseline justify-center ${isTiny ? 'gap-1' : 'gap-2'}`}>
-                      <div className={`${valueSizeClass} font-bold text-gray-900 ${isCompact ? 'truncate' : ''}`}>
+                      <div className={`${valueSizeClass} font-bold ${titleColorClass} ${isCompact ? 'truncate' : ''}`}>
                         {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                       </div>
                       {cardTrend != null && cardTrend !== 0 && (
