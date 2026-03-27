@@ -1336,7 +1336,7 @@ export default function DashboardPage() {
         const vbDrillRecords = vbDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const vbDrillColumns = vbDrillRecords.length > 0 ? Object.keys(vbDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1379,7 +1379,7 @@ export default function DashboardPage() {
             
             {widget.config.data && widget.config.data.length > 0 ? (
               <div className={`${vbDrillActive ? '' : 'flex-1'} min-h-0`} style={vbDrillActive ? { height: '200px' } : {}}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <BarChart
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
@@ -1465,7 +1465,7 @@ export default function DashboardPage() {
         const hDrillRecords = hDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const hDrillColumns = hDrillRecords.length > 0 ? Object.keys(hDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1581,7 +1581,7 @@ export default function DashboardPage() {
         const svDrillColumns = svDrillRecords.length > 0 ? Object.keys(svDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1713,7 +1713,7 @@ export default function DashboardPage() {
         const shDrillColumns = shDrillRecords.length > 0 ? Object.keys(shDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1873,7 +1873,7 @@ export default function DashboardPage() {
         const lnDrillRecords = lnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const lnDrillColumns = lnDrillRecords.length > 0 ? Object.keys(lnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -2000,7 +2000,7 @@ export default function DashboardPage() {
         const dnDrillRecords = dnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const dnDrillColumns = dnDrillRecords.length > 0 ? Object.keys(dnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -2248,7 +2248,7 @@ export default function DashboardPage() {
               ...bgStyle,
               ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
             }}
-            className={`${bgClass} relative group flex flex-col transition-all duration-300`}
+            className={`${bgClass} relative group flex flex-col`}
           >
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
