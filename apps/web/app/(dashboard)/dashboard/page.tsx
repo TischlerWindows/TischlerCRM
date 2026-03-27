@@ -3021,7 +3021,27 @@ export default function DashboardPage() {
                             <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
                           )}
                           {/* Inline add filter button form */}
-                          {dashEditMode && addingFilterBtnSectionId === section.id && (
+                          {dashEditMode && addingFilterBtnSectionId === section.id && (() => {
+                            const secWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
+                            const allFields: string[] = [];
+                            secWidgets.forEach(w => {
+                              (w.config?.data || []).forEach((row: any) => {
+                                Object.keys(row).forEach(k => {
+                                  if (k !== 'id' && !k.startsWith('_') && k !== 'color' && k !== 'value' && !allFields.includes(k)) allFields.push(k);
+                                });
+                              });
+                            });
+                            const fieldValues: string[] = [];
+                            if (newFilterBtn.field) {
+                              secWidgets.forEach(w => {
+                                (w.config?.data || []).forEach((row: any) => {
+                                  const v = String(row[newFilterBtn.field] ?? '');
+                                  if (v && !fieldValues.includes(v)) fieldValues.push(v);
+                                });
+                              });
+                              fieldValues.sort();
+                            }
+                            return (
                             <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                               <p className="text-xs font-semibold text-gray-700 mb-2">Add Filter Button</p>
                               <div className="flex items-center gap-2">
@@ -3032,20 +3052,26 @@ export default function DashboardPage() {
                                   placeholder="Label (e.g. Open)"
                                   className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
                                 />
-                                <input
-                                  type="text"
+                                <select
                                   value={newFilterBtn.field}
-                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, field: e.target.value })}
-                                  placeholder="Field name (e.g. status)"
-                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
-                                />
-                                <input
-                                  type="text"
+                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, field: e.target.value, value: '' })}
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white"
+                                >
+                                  <option value="">Select field...</option>
+                                  {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                                </select>
+                                <select
                                   value={newFilterBtn.value}
-                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, value: e.target.value })}
-                                  placeholder="Value (e.g. Open)"
-                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
-                                />
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setNewFilterBtn({ ...newFilterBtn, value: val, label: newFilterBtn.label || val });
+                                  }}
+                                  disabled={!newFilterBtn.field}
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
+                                >
+                                  <option value="">Select value...</option>
+                                  {fieldValues.map(v => <option key={v} value={v}>{v}</option>)}
+                                </select>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3076,7 +3102,8 @@ export default function DashboardPage() {
                                 </button>
                               </div>
                             </div>
-                          )}
+                            );
+                          })()}
                           {/* Section-level filter buttons */}
                           {(() => {
                             const sectionFilterBtns = section.filterButtons || [];
