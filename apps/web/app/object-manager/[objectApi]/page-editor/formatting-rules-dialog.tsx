@@ -303,15 +303,17 @@ export function FormattingRulesDialog({
   onOpenChange,
   rules,
   onApply,
-  sections: _sections,
   objectFields,
+  targetFilter,
+  initialRuleId,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   rules: FormattingRule[];
   onApply: (next: FormattingRule[]) => void;
-  sections: { id: string; label: string }[];
   objectFields: FieldDef[];
+  targetFilter?: { type: 'field' | 'panel' | 'region'; id: string; panelId?: string };
+  initialRuleId?: string;
 }) {
   const layout = useEditorStore((s) => s.layout);
   const [working, setWorking] = useState<FormattingRule[]>([]);
@@ -369,8 +371,12 @@ export function FormattingRulesDialog({
     if (!open) return;
     const nextWorking = normalizeRulesFromInput(rules);
     setWorking(nextWorking);
-    setSelectedRuleId(nextWorking[0]?.id ?? null);
-  }, [open, rules]);
+    if (initialRuleId) {
+      setSelectedRuleId(initialRuleId);
+    } else {
+      setSelectedRuleId(nextWorking[0]?.id ?? null);
+    }
+  }, [open, rules, initialRuleId]);
 
   useEffect(() => {
     if (!open) return;
@@ -385,6 +391,23 @@ export function FormattingRulesDialog({
     () => working.find((rule) => rule.id === selectedRuleId) ?? null,
     [working, selectedRuleId],
   );
+
+  const displayedRules = useMemo(() => {
+    if (!targetFilter) return working;
+    return working.filter((rule) => {
+      if (targetFilter.type === 'field') {
+        return (
+          rule.target.kind === 'field' &&
+          rule.target.fieldApiName === targetFilter.id &&
+          (!targetFilter.panelId || rule.target.panelId === targetFilter.panelId)
+        );
+      }
+      if (targetFilter.type === 'panel') {
+        return rule.target.kind === 'panel' && rule.target.panelId === targetFilter.id;
+      }
+      return rule.target.kind === 'region' && rule.target.regionId === targetFilter.id;
+    });
+  }, [working, targetFilter]);
 
   const hasFieldTargetOptions = fieldTargets.length > 0;
   const hasPanelTargetOptions = panelTargets.length > 0;
@@ -404,7 +427,23 @@ export function FormattingRulesDialog({
 
   const addRule = () => {
     if (!hasAnyValidTargetOptions) return;
-    const defaultTarget = resolveDefaultTarget(fieldTargets, panelTargets, regionTargets);
+    let defaultTarget = resolveDefaultTarget(fieldTargets, panelTargets, regionTargets);
+    if (targetFilter) {
+      if (targetFilter.type === 'panel') {
+        const match = panelTargets.find((p) => p.panelId === targetFilter.id);
+        if (match) defaultTarget = { kind: 'panel', panelId: match.panelId };
+      } else if (targetFilter.type === 'region') {
+        const match = regionTargets.find((r) => r.regionId === targetFilter.id);
+        if (match) defaultTarget = { kind: 'region', regionId: match.regionId };
+      } else if (targetFilter.type === 'field' && targetFilter.panelId) {
+        const match = fieldTargets.find(
+          (f) => f.fieldApiName === targetFilter.id && f.panelId === targetFilter.panelId,
+        );
+        if (match) {
+          defaultTarget = { kind: 'field', fieldApiName: match.fieldApiName, panelId: match.panelId };
+        }
+      }
+    }
     const nextRule: FormattingRule = {
       id: generateId(),
       name: `Rule ${working.length + 1}`,
@@ -493,18 +532,18 @@ export function FormattingRulesDialog({
               </Button>
             </div>
             <div className="min-h-0 flex-1 overflow-auto p-3">
-              {working.length === 0 ? (
+              {displayedRules.length === 0 ? (
                 <div className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
                   No formatting rules yet.
                 </div>
               ) : (
                 <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
                   <SortableContext
-                    items={working.map((rule) => rule.id)}
+                    items={displayedRules.map((rule) => rule.id)}
                     strategy={verticalListSortingStrategy}
                   >
                     <div className="space-y-2">
-                      {working.map((rule) => (
+                      {displayedRules.map((rule) => (
                         <SortableRuleRow
                           key={rule.id}
                           rule={rule}

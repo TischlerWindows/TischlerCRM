@@ -65,11 +65,16 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
 
   return (
     <div
-      className={`rounded-lg border bg-white shadow-sm transition-colors ${
+      className={`relative rounded-lg border bg-white shadow-sm transition-colors ${
         isPanelSelected ? 'border-brand-navy ring-1 ring-brand-navy/20' : 'border-gray-200'
       }`}
       data-region-id={regionId}
     >
+      {panel.hidden ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
+          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+        </div>
+      ) : null}
       <div
         className="flex items-center justify-between gap-2 rounded-t-lg border-b border-gray-200 bg-gray-50 px-3 py-2"
         onClick={selectPanel}

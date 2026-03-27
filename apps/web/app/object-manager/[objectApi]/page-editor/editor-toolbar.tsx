@@ -92,6 +92,11 @@ export function EditorToolbar({
     [layout.tabs],
   );
 
+  const activeRulesCount = useMemo(
+    () => (layout.formattingRules ?? []).filter((r) => r.active !== false).length,
+    [layout.formattingRules],
+  );
+
   const roleOptions = useMemo(() => {
     const roleSet = new Set<string>(layout.roles);
     const objectDef = schema?.objects.find((obj) => obj.apiName === objectApi);
@@ -372,6 +377,11 @@ export function EditorToolbar({
           <Button variant="outline" size="sm" type="button" onClick={onOpenRules}>
             <Wand2 className="mr-1.5 h-4 w-4" />
             Formatting Rules
+            {activeRulesCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-semibold text-white leading-none">
+                {activeRulesCount}
+              </span>
+            )}
           </Button>
         </div>
       </div>

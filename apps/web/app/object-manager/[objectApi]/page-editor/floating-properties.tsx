@@ -5,13 +5,15 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { FieldDef } from '@/lib/schema';
 import { useEditorStore } from './editor-store';
-import type { LayoutPanel, LayoutRegion, LayoutTab, LayoutWidget, PanelField } from './types';
+import type { EditorPageLayout, LayoutPanel, LayoutRegion, LayoutTab, LayoutWidget, PanelField } from './types';
 
 interface FloatingPropertiesProps {
   open: boolean;
   anchor?: { x: number; y: number };
   onClose: () => void;
+  availableFields?: FieldDef[];
 }
 
 const SWATCH_COLORS = [
@@ -122,7 +124,323 @@ function ColorControl({ label, value, onChange }: ColorControlProps) {
   );
 }
 
-export function FloatingProperties({ open, anchor, onClose }: FloatingPropertiesProps) {
+function HeaderHighlightsPicker({
+  widgetId,
+  selectedApiNames,
+  availableFields,
+}: {
+  widgetId: string;
+  selectedApiNames: string[];
+  availableFields: FieldDef[];
+}) {
+  const updateWidget = useEditorStore((s) => s.updateWidget);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const handleRemove = (apiName: string) => {
+    updateWidget(widgetId, {
+      config: {
+        type: 'HeaderHighlights' as const,
+        fieldApiNames: selectedApiNames.filter((n) => n !== apiName),
+      },
+    });
+  };
+
+  const handleAdd = (apiName: string) => {
+    if (selectedApiNames.includes(apiName) || selectedApiNames.length >= 6) return;
+    updateWidget(widgetId, {
+      config: {
+        type: 'HeaderHighlights' as const,
+        fieldApiNames: [...selectedApiNames, apiName],
+      },
+    });
+    setDropdownOpen(false);
+    setFilterQuery('');
+  };
+
+  const filteredOptions = availableFields.filter(
+    (f) =>
+      !selectedApiNames.includes(f.apiName) &&
+      (f.label.toLowerCase().includes(filterQuery.toLowerCase()) ||
+        f.apiName.toLowerCase().includes(filterQuery.toLowerCase()))
+  );
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs text-gray-600">Highlight Fields (up to 6)</Label>
+      <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+        {selectedApiNames.map((apiName) => {
+          const fd = availableFields.find((f) => f.apiName === apiName);
+          return (
+            <span
+              key={apiName}
+              className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 px-2 py-0.5 text-xs font-medium text-brand-navy"
+            >
+              {fd?.label ?? apiName}
+              <button
+                type="button"
+                onClick={() => handleRemove(apiName)}
+                className="text-brand-navy/60 hover:text-brand-navy ml-0.5"
+                aria-label={`Remove ${fd?.label ?? apiName}`}
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      {selectedApiNames.length < 6 && (
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="flex w-full items-center gap-1 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
+          >
+            <span className="text-gray-400">+</span> Add field
+          </button>
+          {dropdownOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => { setDropdownOpen(false); setFilterQuery(''); }}
+              />
+              <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+                <div className="sticky top-0 border-b border-gray-100 bg-white p-1.5">
+                  <Input
+                    autoFocus
+                    value={filterQuery}
+                    onChange={(e) => setFilterQuery(e.target.value)}
+                    placeholder="Search..."
+                    className="h-7 text-xs"
+                  />
+                </div>
+                {filteredOptions.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-gray-400">No fields available</div>
+                ) : (
+                  filteredOptions.map((f) => (
+                    <button
+                      key={f.apiName}
+                      type="button"
+                      onClick={() => handleAdd(f.apiName)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-left"
+                    >
+                      {f.label}
+                      <span className="ml-auto text-[10px] text-gray-400">{f.apiName}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabBar({
+  active,
+  onChange,
+  rulesCount,
+}: {
+  active: 'style' | 'visibility' | 'rules';
+  onChange: (tab: 'style' | 'visibility' | 'rules') => void;
+  rulesCount: number;
+}) {
+  const tabs = [
+    { id: 'style' as const, label: 'Style' },
+    { id: 'visibility' as const, label: 'Visibility' },
+    { id: 'rules' as const, label: rulesCount > 0 ? `Rules (${rulesCount})` : 'Rules' },
+  ];
+  return (
+    <div className="flex border-b border-gray-200">
+      {tabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => onChange(tab.id)}
+          className={`px-3 py-2 text-xs font-medium transition-colors ${
+            active === tab.id
+              ? 'border-b-2 border-brand-navy text-brand-navy font-semibold'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
+  const updatePanel = useEditorStore((s) => s.updatePanel);
+  const updateRegion = useEditorStore((s) => s.updateRegion);
+  const updateField = useEditorStore((s) => s.updateField);
+
+  if (!selection) return null;
+  if (selection.kind === 'widget') return null;
+
+  const isHidden =
+    selection.kind === 'field'
+      ? selection.field.behavior === 'hidden'
+      : selection.kind === 'panel'
+      ? selection.panel.hidden === true
+      : selection.region.hidden === true;
+
+  const handleToggle = (hide: boolean) => {
+    if (selection.kind === 'field') {
+      updateField(selection.field.fieldApiName, selection.panel.id, {
+        behavior: hide ? 'hidden' : 'none',
+      });
+    } else if (selection.kind === 'panel') {
+      updatePanel(selection.panel.id, { hidden: hide });
+    } else if (selection.kind === 'region') {
+      updateRegion(selection.region.id, { hidden: hide });
+    }
+  };
+
+  return (
+    <div className="overflow-y-auto p-3 space-y-4" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+      <div>
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+          Visibility
+        </div>
+        <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+          <button
+            type="button"
+            onClick={() => handleToggle(false)}
+            className={`flex-1 py-1.5 font-medium transition-colors ${
+              !isHidden ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Always show
+          </button>
+          <button
+            type="button"
+            onClick={() => handleToggle(true)}
+            className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-200 ${
+              isHidden ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Always hide
+          </button>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3">
+        <div className="text-xs text-gray-500 mb-2">
+          For conditional show/hide based on record values, use Formatting Rules.
+        </div>
+        <button
+          type="button"
+          className="w-full rounded-md border border-dashed border-gray-300 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('open-formatting-rules', {
+                detail: {
+                  targetFilter: {
+                    type: selection.kind === 'field' ? 'field' : selection.kind,
+                    id:
+                      selection.kind === 'field'
+                        ? selection.field.fieldApiName
+                        : selection.kind === 'panel'
+                        ? selection.panel.id
+                        : selection.kind === 'region'
+                        ? selection.region.id
+                        : '',
+                    panelId: selection.kind === 'field' ? selection.panel.id : undefined,
+                  },
+                },
+              })
+            );
+          }}
+        >
+          + Add condition rule
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RulesTab({
+  selection,
+  layout,
+}: {
+  selection: ResolvedSelection;
+  layout: EditorPageLayout;
+}) {
+  if (!selection) return null;
+  if (selection.kind === 'widget') return null;
+
+  const matchingRules = (layout.formattingRules ?? []).filter((rule) => {
+    if (selection.kind === 'field') {
+      return (
+        rule.target.kind === 'field' &&
+        rule.target.fieldApiName === selection.field.fieldApiName &&
+        rule.target.panelId === selection.panel.id
+      );
+    }
+    if (selection.kind === 'panel') {
+      return rule.target.kind === 'panel' && rule.target.panelId === selection.panel.id;
+    }
+    if (selection.kind === 'region') {
+      return rule.target.kind === 'region' && rule.target.regionId === selection.region.id;
+    }
+    return false;
+  });
+
+  if (matchingRules.length === 0) {
+    return (
+      <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+        <div className="text-xs text-gray-500">
+          No rules for this element.{' '}
+          <span className="text-gray-700">Add one from the Visibility tab.</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+      {matchingRules.map((rule) => (
+        <div key={rule.id} className="rounded-md border border-gray-200 p-2 text-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-medium text-gray-800">{rule.name || 'Unnamed rule'}</span>
+            <button
+              type="button"
+              className="text-brand-navy hover:underline"
+              onClick={() => {
+                window.dispatchEvent(
+                  new CustomEvent('open-formatting-rules', {
+                    detail: { ruleId: rule.id },
+                  })
+                );
+              }}
+            >
+              Edit
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {rule.effects.hidden && (
+              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">Hidden</span>
+            )}
+            {rule.effects.readOnly && (
+              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">Read Only</span>
+            )}
+            {rule.effects.badge && (
+              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">Badge</span>
+            )}
+            {rule.effects.highlightToken && rule.effects.highlightToken !== 'none' && (
+              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-600">Highlight</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function FloatingProperties({ open, anchor, onClose, availableFields = [] }: FloatingPropertiesProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: 0, top: 0 });
 
@@ -142,6 +460,12 @@ export function FloatingProperties({ open, anchor, onClose }: FloatingProperties
   const resizeRegion = useEditorStore((s) => s.resizeRegion);
   const addRegion = useEditorStore((s) => s.addRegion);
   const addPanel = useEditorStore((s) => s.addPanel);
+
+  const [activeTab, setActiveTab] = useState<'style' | 'visibility' | 'rules'>('style');
+
+  useEffect(() => {
+    setActiveTab('style');
+  }, [selectedElement?.id, selectedElement?.type]);
 
   const selection = useMemo<ResolvedSelection>(() => {
     if (!selectedElement) return null;
@@ -180,6 +504,27 @@ export function FloatingProperties({ open, anchor, onClose }: FloatingProperties
 
     return null;
   }, [layout.tabs, selectedElement]);
+
+  const rulesCount = useMemo(() => {
+    if (!selection || !layout.formattingRules) return 0;
+    return layout.formattingRules.filter((rule) => {
+      if (rule.active === false) return false;
+      if (selection.kind === 'field') {
+        return (
+          rule.target.kind === 'field' &&
+          rule.target.fieldApiName === selection.field.fieldApiName &&
+          rule.target.panelId === selection.panel.id
+        );
+      }
+      if (selection.kind === 'panel') {
+        return rule.target.kind === 'panel' && rule.target.panelId === selection.panel.id;
+      }
+      if (selection.kind === 'region') {
+        return rule.target.kind === 'region' && rule.target.regionId === selection.region.id;
+      }
+      return false;
+    }).length;
+  }, [layout.formattingRules, selection]);
 
   const recalcPosition = useCallback(() => {
     if (!open || !selection) return;
@@ -310,7 +655,12 @@ export function FloatingProperties({ open, anchor, onClose }: FloatingProperties
         </Button>
       </div>
 
-      <div className="space-y-4 overflow-y-auto p-3 text-sm" style={{ maxHeight: 'calc(100vh - 72px)' }}>
+      {selection.kind !== 'widget' && (
+        <TabBar active={activeTab} onChange={setActiveTab} rulesCount={rulesCount} />
+      )}
+
+      {activeTab === 'style' && (
+      <div className="space-y-4 overflow-y-auto p-3 text-sm" style={{ maxHeight: 'calc(100vh - 112px)' }}>
         {selection.kind === 'region' && (
           <>
             <div className="space-y-1.5">
@@ -873,26 +1223,11 @@ export function FloatingProperties({ open, anchor, onClose }: FloatingProperties
             )}
 
             {selection.widget.config.type === 'HeaderHighlights' && (
-              <div className="space-y-1.5">
-                <Label className="text-xs text-gray-600">fieldApiNames (comma-separated, max 6)</Label>
-                <Input
-                  value={selection.widget.config.fieldApiNames.join(', ')}
-                  aria-label="Header highlights field API names"
-                  onChange={(e) => {
-                    const parsed = e.target.value
-                      .split(',')
-                      .map((part) => part.trim())
-                      .filter(Boolean);
-                    const deduped = Array.from(new Set(parsed)).slice(0, 6);
-                    updateWidget(selection.widget.id, {
-                      config: {
-                        ...selection.widget.config,
-                        fieldApiNames: deduped,
-                      },
-                    });
-                  }}
-                />
-              </div>
+              <HeaderHighlightsPicker
+                widgetId={selection.widget.id}
+                selectedApiNames={selection.widget.config.fieldApiNames ?? []}
+                availableFields={availableFields}
+              />
             )}
 
             <div className="border-t border-gray-200 pt-3">
@@ -908,6 +1243,10 @@ export function FloatingProperties({ open, anchor, onClose }: FloatingProperties
           </>
         )}
       </div>
+      )}
+
+      {activeTab === 'visibility' && selection.kind !== 'widget' && <VisibilityTab selection={selection} />}
+      {activeTab === 'rules' && selection.kind !== 'widget' && <RulesTab selection={selection} layout={layout} />}
     </div>
   );
 }

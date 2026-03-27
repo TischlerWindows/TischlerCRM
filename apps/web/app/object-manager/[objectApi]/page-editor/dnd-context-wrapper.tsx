@@ -21,6 +21,7 @@ import { useEditorStore } from './editor-store';
 
 type DragSource =
   | { kind: 'palette-field'; fieldApiName: string; label: string }
+  | { kind: 'palette-panel'; columns: 1 | 2 | 3 | 4; label: string }
   | { kind: 'existing-field'; fieldApiName: string; fromPanelId: string; label: string }
   | { kind: 'palette-widget'; widgetType: WidgetType; label: string }
   | { kind: 'existing-widget'; widgetId: string; label: string }
@@ -139,6 +140,14 @@ function parseActiveDrag(
         ? ((data.field as { label: string }).label ?? fieldApiName)
         : fieldApiName;
     return { kind: 'palette-field', fieldApiName, label };
+  }
+
+  if (data.type === 'palette-panel') {
+    return {
+      kind: 'palette-panel',
+      columns: data.columns as 1 | 2 | 3 | 4,
+      label: typeof data.label === 'string' ? data.label : 'New Section',
+    };
   }
 
   if (activeId.startsWith('widget-new-')) {
@@ -386,6 +395,23 @@ export function DndContextWrapper({
         }
 
         moveWidget(source.widget.id, targetRegionId, insertionIndex);
+        return;
+      }
+
+      // palette-panel dropped onto a region → add a new panel
+      if (active.kind === 'palette-panel' && target?.kind === 'region-drop') {
+        const { addPanel: addPanelFn } = useEditorStore.getState();
+        addPanelFn(
+          {
+            id: `panel-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            label: active.label,
+            order: 0,
+            columns: active.columns,
+            style: {},
+            fields: [],
+          },
+          target.regionId,
+        );
         return;
       }
 
