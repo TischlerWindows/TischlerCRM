@@ -21,6 +21,7 @@ import { DndContextWrapper } from '../dnd-context-wrapper';
 import { EditorToolbar } from '../editor-toolbar';
 import { FloatingProperties } from '../floating-properties';
 import { FormattingRulesDialog } from '../formatting-rules-dialog';
+import { LayoutPreviewDialog } from '../layout-preview-dialog';
 import { PaletteComponents } from '../palette-components';
 import { PaletteFields } from '../palette-fields';
 import { TemplateGallery } from '../template-gallery';
@@ -136,6 +137,7 @@ function normalizePanel(rawPanel: unknown, panelIndex: number): LayoutPanel {
         ? (candidate.style as LayoutPanel['style'])
         : {},
     fields: fieldsRaw.map((field, fieldIndex) => normalizeField(field, fieldIndex)),
+    ...(typeof candidate.hidden === 'boolean' ? { hidden: candidate.hidden } : {}),
   };
 }
 
@@ -177,6 +179,7 @@ function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutRegion 
         : {},
     panels: panelsRaw.map((panel, panelIndex) => normalizePanel(panel, panelIndex)),
     widgets: widgetsRaw.map((widget, widgetIndex) => normalizeWidget(widget, widgetIndex)),
+    ...(typeof candidate.hidden === 'boolean' ? { hidden: candidate.hidden } : {}),
   };
 }
 
@@ -496,6 +499,11 @@ export default function PageEditorFullPage() {
   const setFormattingRules = useEditorStore((s) => s.setFormattingRules);
 
   const [showFormattingRulesDialog, setShowFormattingRulesDialog] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [rulesTargetFilter, setRulesTargetFilter] = useState<
+    { type: 'field' | 'panel' | 'region'; id: string; panelId?: string } | undefined
+  >(undefined);
+  const [rulesInitialRuleId, setRulesInitialRuleId] = useState<string | undefined>(undefined);
   const [showTemplateGallery, setShowTemplateGallery] = useState(layoutId === 'new');
   const [paletteTab, setPaletteTab] = useState<'fields' | 'components'>('fields');
   const [isSaving, setIsSaving] = useState(false);
@@ -537,6 +545,17 @@ export default function PageEditorFullPage() {
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [isDirty]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail ?? {};
+      setRulesTargetFilter(detail.targetFilter ?? undefined);
+      setRulesInitialRuleId(detail.ruleId ?? undefined);
+      setShowFormattingRulesDialog(true);
+    };
+    window.addEventListener('open-formatting-rules', handler);
+    return () => window.removeEventListener('open-formatting-rules', handler);
+  }, []);
 
   const allFields = useMemo<FieldDef[]>(() => object?.fields ?? [], [object]);
   const sortedTabs = useMemo(
@@ -690,7 +709,7 @@ export default function PageEditorFullPage() {
     <div className="flex h-screen flex-col">
       <EditorToolbar
         onSave={handleSave}
-        onPreview={() => void 0}
+        onPreview={() => setShowPreview(true)}
         onOpenRules={() => setShowFormattingRulesDialog(true)}
         onRequestNavigate={requestNavigate}
         objectManagerHref={objectManagerHref}
@@ -807,15 +826,31 @@ export default function PageEditorFullPage() {
       <FloatingProperties
         open={selectedElement !== null}
         onClose={() => setSelectedElement(null)}
+        availableFields={allFields}
+      />
+
+      <LayoutPreviewDialog
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        pageLayout={layout as unknown as import('@/lib/schema').PageLayout}
+        allFields={allFields}
+        objectLabel={object.label}
       />
 
       <FormattingRulesDialog
         open={showFormattingRulesDialog}
-        onOpenChange={setShowFormattingRulesDialog}
+        onOpenChange={(isOpen) => {
+          setShowFormattingRulesDialog(isOpen);
+          if (!isOpen) {
+            setRulesTargetFilter(undefined);
+            setRulesInitialRuleId(undefined);
+          }
+        }}
         rules={layout.formattingRules}
         onApply={(next) => setFormattingRules(next)}
-        sections={(activeTab?.regions ?? []).map((region) => ({ id: region.id, label: region.label }))}
         objectFields={object.fields}
+        targetFilter={rulesTargetFilter}
+        initialRuleId={rulesInitialRuleId}
       />
 
       <TemplateGallery

@@ -63,3 +63,41 @@ export function getFormattingEffectsForSection(
   }
   return null;
 }
+
+export function getFormattingEffectsForPanel(
+  layout: PageLayout | null | undefined,
+  panelId: string,
+  data: RecordData,
+  context?: VisibilityContext
+): FormattingRule['effects'] | null {
+  const rules = getLayoutFormattingRules(layout)
+    .filter((r) => r.active !== false)
+    .filter((r) => r.target.kind === 'panel' && r.target.panelId === panelId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const rule of rules) {
+    if (evaluateVisibility(rule.when, data, context)) {
+      return rule.effects;
+    }
+  }
+  return null;
+}
+
+export function getFormattingEffectsForRegion(
+  layout: PageLayout | null | undefined,
+  regionId: string,
+  data: RecordData,
+  context?: VisibilityContext
+): FormattingRule['effects'] | null {
+  const rules = getLayoutFormattingRules(layout)
+    .filter((r) => r.active !== false)
+    .filter((r) => r.target.kind === 'region' && r.target.regionId === regionId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const rule of rules) {
+    if (evaluateVisibility(rule.when, data, context)) {
+      return rule.effects;
+    }
+  }
+  return null;
+}

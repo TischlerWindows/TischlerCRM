@@ -8,10 +8,12 @@ import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from '@/lib/utils';
-import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType } from '@/lib/schema';
+import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType, type LayoutRegion, type LayoutPanel, type PanelField } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import {
   getFormattingEffectsForField,
+  getFormattingEffectsForPanel,
+  getFormattingEffectsForRegion,
   getFormattingEffectsForSection,
 } from '@/lib/layout-formatting';
 import {
@@ -655,38 +657,192 @@ export default function RecordDetailPage({
             </div>
           </div>
 
-          {pageLayout?.highlightFields && pageLayout.highlightFields.length > 0 ? (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                {objectDef?.label ?? 'Record'}
-              </div>
-              <div className="flex flex-wrap gap-x-8 gap-y-3">
-                {pageLayout.highlightFields.map((apiName) => {
-                  const fd = getFieldDef(apiName);
-                  if (!fd) return null;
-                  if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
-                  const fFx = getFormattingEffectsForField(pageLayout, apiName, layoutVisibilityData);
-                  if (fFx?.hidden) return null;
-                  const raw = getRecordValue(apiName, fd);
-                  return (
-                    <div key={apiName} className="min-w-[100px] max-w-[220px]">
-                      <div className="text-xs text-gray-500">{fd.label}</div>
-                      <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                        {renderValue(apiName, raw, fd)}
+          {(() => {
+            // New model: find HeaderHighlights widget across all regions
+            let highlightApiNames: string[] = [];
+            if (pageLayout?.tabs) {
+              for (const tab of pageLayout.tabs) {
+                for (const region of (tab as any).regions ?? []) {
+                  const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights');
+                  if (hw && hw.config.type === 'HeaderHighlights') {
+                    highlightApiNames = hw.config.fieldApiNames ?? [];
+                    break;
+                  }
+                }
+                if (highlightApiNames.length > 0) break;
+              }
+            }
+            // Legacy fallback
+            if (highlightApiNames.length === 0 && pageLayout?.highlightFields?.length) {
+              highlightApiNames = pageLayout.highlightFields;
+            }
+            if (highlightApiNames.length === 0) return null;
+
+            return (
+              <div className="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  {objectDef?.label ?? 'Record'}
+                </div>
+                <div className="flex flex-wrap gap-x-8 gap-y-3">
+                  {highlightApiNames.map((apiName) => {
+                    const fd = getFieldDef(apiName);
+                    if (!fd) return null;
+                    if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
+                    const fFx = getFormattingEffectsForField(pageLayout!, apiName, layoutVisibilityData);
+                    if (fFx?.hidden) return null;
+                    const raw = getRecordValue(apiName, fd);
+                    return (
+                      <div key={apiName} className="min-w-[100px] max-w-[220px]">
+                        <div className="text-xs text-gray-500">{fd.label}</div>
+                        <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
+                          {renderValue(apiName, raw, fd)}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : null}
+            );
+          })()}
         </div>
 
         {/* Layout-driven field rendering */}
         {pageLayout ? (
           <div className="space-y-6">
             {pageLayout.tabs.map((tab, ti) => {
-              const sorted = [...tab.sections].sort((a, b) => a.order - b.order);
+              // NEW model: tab.regions exists
+              if ('regions' in tab && Array.isArray((tab as any).regions)) {
+                const regions = (tab as any).regions as LayoutRegion[];
+                const sortedRegions = [...regions].sort(
+                  (a, b) => (a.gridRow ?? 0) - (b.gridRow ?? 0) || (a.gridColumn ?? 0) - (b.gridColumn ?? 0)
+                );
+
+                return (
+                  <div
+                    key={ti}
+                    className="grid gap-4"
+                    style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
+                  >
+                    {sortedRegions.map((region) => {
+                      // Skip statically hidden regions
+                      if (region.hidden) return null;
+
+                      const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
+                      if (regionFx?.hidden) return null;
+
+                      const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
+                      const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
+
+                      const regionStyle: React.CSSProperties = {
+                        gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
+                        ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
+                        ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
+                        ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
+                        borderRadius: region.style?.borderRadius === 'lg' ? 12 : region.style?.borderRadius === 'sm' ? 6 : undefined,
+                        boxShadow: region.style?.shadow === 'md'
+                          ? '0 10px 24px rgba(15,23,42,.14)'
+                          : region.style?.shadow === 'sm'
+                          ? '0 1px 3px rgba(15,23,42,.12)'
+                          : undefined,
+                      };
+
+                      return (
+                        <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
+                          {/* Panels */}
+                          {sortedPanels.map((panel: any) => {
+                            if (panel.hidden) return null;
+                            const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
+                            if (panelFx?.hidden) return null;
+
+                            const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
+                            const visibleFields = sortedFields.filter((f: any) => {
+                              if (f.behavior === 'hidden') return false;
+                              const fd = getFieldDef(f.fieldApiName);
+                              if (!fd) return false;
+                              if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
+                              const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+                              if (fFx?.hidden) return false;
+                              return true;
+                            });
+
+                            if (visibleFields.length === 0) return null;
+
+                            const headerStyle: React.CSSProperties = {
+                              ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
+                              ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
+                              fontWeight: panel.style?.headerBold ? 700 : undefined,
+                              fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
+                              textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+                            };
+                            const bodyStyle: React.CSSProperties = {
+                              ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
+                            };
+
+                            return (
+                              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                                <div
+                                  className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 text-sm font-semibold text-gray-700"
+                                  style={headerStyle}
+                                >
+                                  {panel.label}
+                                </div>
+                                <div
+                                  className="grid gap-x-6 gap-y-4 p-4"
+                                  style={{
+                                    ...bodyStyle,
+                                    gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
+                                  }}
+                                >
+                                  {visibleFields.map((f: any) => {
+                                    const fd = getFieldDef(f.fieldApiName);
+                                    if (!fd) return null;
+                                    const raw = getRecordValue(f.fieldApiName, fd);
+                                    const labelStyle: React.CSSProperties = {
+                                      ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
+                                      fontWeight: f.labelStyle?.bold ? 700 : undefined,
+                                      fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
+                                      textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                                    };
+                                    const valueStyle: React.CSSProperties = {
+                                      ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
+                                      ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
+                                      fontWeight: f.valueStyle?.bold ? 700 : undefined,
+                                      fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
+                                    };
+                                    const displayLabel = f.labelOverride || fd.label;
+                                    return (
+                                      <div
+                                        key={f.fieldApiName}
+                                        style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                                      >
+                                        <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
+                                          {displayLabel}
+                                        </div>
+                                        <div className="text-sm text-gray-900" style={valueStyle}>
+                                          {renderValue(f.fieldApiName, raw, fd)}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Widgets */}
+                          {sortedWidgets.length > 0 && (
+                            <LayoutWidgetsInline widgets={sortedWidgets} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              // LEGACY FALLBACK: old tab.sections model
+              const legacyTab = tab as any;
+              const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
               const eligible = sorted.filter((section) => {
                 if (section.showInRecord === false) return false;
                 if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return false;
@@ -724,10 +880,10 @@ export default function RecordDetailPage({
                 );
                 return !allFieldsEmpty;
               });
-              const isSectionShown = (section: (typeof tab.sections)[0]) =>
-                eligible.some((s) => s.id === section.id);
+              const isSectionShown = (section: any) =>
+                eligible.some((s: any) => s.id === section.id);
 
-              const items = resolveTabCanvasItems(tab);
+              const items = resolveTabCanvasItems(legacyTab);
               const visibleItems = items.filter((item) => {
                 if (item.kind === 'widget') return true;
                 return isSectionShown(item.section);

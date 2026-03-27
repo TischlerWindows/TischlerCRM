@@ -187,6 +187,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       style={wrapperStyle}
       data-tab-id={tabId}
     >
+      {region.hidden ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
+          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+        </div>
+      ) : null}
       <div
         className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50/80 px-3 py-2"
         onClick={selectRegion}
@@ -237,7 +242,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
               addDefaultPanel();
             }}
           >
-            + Panel
+            + Field Section
           </button>
           <button
             type="button"
@@ -286,7 +291,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
               ))
             ) : (
               <div className="rounded border border-dashed border-gray-300 py-3 text-center text-xs text-gray-500">
-                Drop widgets here
+                Drop a field section or widget here
               </div>
             )}
           </SortableContext>
@@ -298,7 +303,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           onClick={addDefaultPanel}
         >
           <Plus className="h-3.5 w-3.5" />
-          + Panel
+          + Field Section
         </button>
       </div>
 

@@ -406,6 +406,7 @@ export interface LayoutPanel {
   columns: 1 | 2 | 3 | 4;
   style: PanelStyle;
   fields: PanelField[];
+  hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
 }
 
 export interface LayoutWidget {
@@ -425,6 +426,7 @@ export interface LayoutRegion {
   style: RegionStyle;
   panels: LayoutPanel[];
   widgets: LayoutWidget[];
+  hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
 }
 
 export interface LayoutTab {
