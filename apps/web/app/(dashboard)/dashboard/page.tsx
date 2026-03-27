@@ -3156,6 +3156,23 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
+                  {/* Visibility */}
+                  <div className="border-t pt-4 mt-2">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-2">Visibility</h4>
+                    <label className="flex items-center gap-2 cursor-pointer p-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <input
+                        type="checkbox"
+                        checked={widgetConfig.hiddenUntilFilter || false}
+                        onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                      />
+                      <div>
+                        <span className="text-xs font-medium text-gray-800">Only visible when a filter button is selected</span>
+                        <p className="text-[10px] text-gray-500">Widget will be hidden until the user clicks one of its filter buttons</p>
+                      </div>
+                    </label>
+                  </div>
+
                   {/* Card drill-down data rows */}
                   {selectedWidgetType === 'card' && (
                     <div>
@@ -3363,20 +3380,27 @@ export default function DashboardPage() {
                           + Add Data Point
                         </button>
                       </div>
+                      <p className="text-[10px] text-gray-500 mb-2 flex items-center gap-1">
+                        <span className="inline-block w-3 h-3 rounded border border-gray-300" style={{ backgroundColor: '#151f6d' }}></span>
+                        Click the colored square next to each row to change that bar&apos;s color
+                      </p>
                       <div className="space-y-2 max-h-[350px] overflow-y-auto">
                         {(widgetConfig.manualData || []).map((item: any, idx: number) => (
-                          <div key={idx} className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={item.color || ['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2', '#9f9fa2', '#293241'][idx % 8]}
-                              onChange={(e) => {
-                                const newData = [...widgetConfig.manualData];
-                                newData[idx] = { ...newData[idx], color: e.target.value };
-                                setWidgetConfig({ ...widgetConfig, manualData: newData });
-                              }}
-                              className="w-7 h-7 rounded border border-gray-300 cursor-pointer flex-shrink-0"
-                              title="Bar color"
-                            />
+                          <div key={idx} className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+                              <input
+                                type="color"
+                                value={item.color || ['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2', '#9f9fa2', '#293241'][idx % 8]}
+                                onChange={(e) => {
+                                  const newData = [...widgetConfig.manualData];
+                                  newData[idx] = { ...newData[idx], color: e.target.value };
+                                  setWidgetConfig({ ...widgetConfig, manualData: newData });
+                                }}
+                                className="w-8 h-8 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-brand-navy transition-colors"
+                                title="Click to change this bar's color"
+                              />
+                              <span className="text-[9px] text-gray-400">color</span>
+                            </div>
                             <input
                               type="text"
                               value={item.label || ''}
@@ -3504,15 +3528,7 @@ export default function DashboardPage() {
                     </button>
                   )}
                 </div>
-                <label className="flex items-center gap-2 mb-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={widgetConfig.hiddenUntilFilter || false}
-                    onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
-                    className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
-                  />
-                  <span className="text-xs text-gray-700">Only visible when a filter button is selected</span>
-                </label>
+
                 <p className="text-xs text-gray-500 mb-3">Add up to 10 buttons that filter this widget&apos;s data. Each button filters by matching a data field to a value.</p>
                 {(widgetConfig.filterButtons || []).length > 0 ? (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
@@ -3578,28 +3594,7 @@ export default function DashboardPage() {
               <div className="w-1/2 p-6 bg-gray-50 overflow-y-auto">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Live Preview</h3>
                 
-                {/* Debug Info */}
-                <div className="mb-4 p-3 bg-[#f0f1fa] border border-[#d4d8f0] rounded text-xs">
-                  <div><strong>Widget Type:</strong> {selectedWidgetType || 'None'}</div>
-                  <div><strong>Data Source:</strong> {widgetConfig.dataSourceMode === 'manual' ? `Manual — ${widgetConfig.manualData?.length || 0} data points` : `Report — ${availableReports.find(r => r.id === widgetConfig.reportId)?.name || 'not selected'}`}</div>
-                  <div><strong>X-Axis:</strong> {widgetConfig.xAxis || 'Not set'}</div>
-                  <div><strong>Y-Axis:</strong> {widgetConfig.yAxis || 'Not set'}</div>
-                  {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
-                    <div><strong>Stack By:</strong> {widgetConfig.stackBy || 'Not set'}</div>
-                  )}
-                  <div><strong>Data Points:</strong> {previewData?.data?.length || 0}</div>
-                  {previewData?.stackKeys && previewData.stackKeys.length > 0 && (
-                    <div><strong>Stack Keys:</strong> {previewData.stackKeys.join(', ')}</div>
-                  )}
-                  {previewData?.data && previewData.data.length > 0 && (
-                    <div className="mt-2">
-                      <strong>Sample Data:</strong>
-                      <pre className="mt-1 text-[10px] overflow-auto max-h-20">
-                        {JSON.stringify(previewData.data, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </div>
+
 
                 <div className="bg-white rounded-lg border border-gray-200 p-4 min-h-[400px] flex flex-col">
                   {selectedWidgetType ? (
