@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Settings, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { FieldDef } from '@/lib/schema';
 import { useEditorStore } from './editor-store';
-import type { EditorPageLayout, LayoutPanel, LayoutRegion, LayoutTab, LayoutWidget, PanelField } from './types';
+import type { EditorPageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
 
 interface FloatingPropertiesProps {
-  open: boolean;
-  anchor?: { x: number; y: number };
   onClose: () => void;
   availableFields?: FieldDef[];
 }
@@ -37,16 +35,16 @@ const REGION_WIDTH_OPTIONS = [3, 4, 6, 8, 9, 12] as const;
 const PANEL_COLUMN_OPTIONS = [1, 2, 3, 4] as const;
 
 type ResolvedSelection =
-  | { kind: 'region'; tab: LayoutTab; region: LayoutRegion }
-  | { kind: 'panel'; tab: LayoutTab; region: LayoutRegion; panel: LayoutPanel }
+  | { kind: 'region'; tab: LayoutTab; region: LayoutSection }
+  | { kind: 'panel'; tab: LayoutTab; region: LayoutSection; panel: LayoutPanel }
   | {
       kind: 'field';
       tab: LayoutTab;
-      region: LayoutRegion;
+      region: LayoutSection;
       panel: LayoutPanel;
       field: PanelField;
     }
-  | { kind: 'widget'; tab: LayoutTab; region: LayoutRegion; widget: LayoutWidget }
+  | { kind: 'widget'; tab: LayoutTab; region: LayoutSection; widget: LayoutWidget }
   | null;
 
 function clamp(value: number, min: number, max: number): number {
@@ -274,7 +272,7 @@ function TabBar({
 
 function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
   const updatePanel = useEditorStore((s) => s.updatePanel);
-  const updateRegion = useEditorStore((s) => s.updateRegion);
+  const updateSection = useEditorStore((s) => s.updateSection);
   const updateField = useEditorStore((s) => s.updateField);
 
   if (!selection) return null;
@@ -295,12 +293,12 @@ function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
     } else if (selection.kind === 'panel') {
       updatePanel(selection.panel.id, { hidden: hide });
     } else if (selection.kind === 'region') {
-      updateRegion(selection.region.id, { hidden: hide });
+      updateSection(selection.region.id, { hidden: hide });
     }
   };
 
   return (
-    <div className="overflow-y-auto p-3 space-y-4" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+    <div className="overflow-y-auto flex-1 p-3 space-y-4">
       <div>
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
           Visibility
@@ -391,7 +389,7 @@ function RulesTab({
 
   if (matchingRules.length === 0) {
     return (
-      <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+      <div className="overflow-y-auto flex-1 p-3">
         <div className="text-xs text-gray-500">
           No rules for this element.{' '}
           <span className="text-gray-700">Add one from the Visibility tab.</span>
@@ -401,7 +399,7 @@ function RulesTab({
   }
 
   return (
-    <div className="overflow-y-auto p-3 space-y-2" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+    <div className="overflow-y-auto flex-1 p-3 space-y-2">
       {matchingRules.map((rule) => (
         <div key={rule.id} className="rounded-md border border-gray-200 p-2 text-xs">
           <div className="flex items-center justify-between mb-1">
@@ -440,25 +438,24 @@ function RulesTab({
   );
 }
 
-export function FloatingProperties({ open, anchor, onClose, availableFields = [] }: FloatingPropertiesProps) {
+export function FloatingProperties({ onClose, availableFields = [] }: FloatingPropertiesProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ left: 0, top: 0 });
 
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const layout = useEditorStore((s) => s.layout);
 
-  const updateRegion = useEditorStore((s) => s.updateRegion);
+  const updateSection = useEditorStore((s) => s.updateSection);
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const updateField = useEditorStore((s) => s.updateField);
   const updateWidget = useEditorStore((s) => s.updateWidget);
 
-  const removeRegion = useEditorStore((s) => s.removeRegion);
+  const removeSection = useEditorStore((s) => s.removeSection);
   const removePanel = useEditorStore((s) => s.removePanel);
   const removeField = useEditorStore((s) => s.removeField);
   const removeWidget = useEditorStore((s) => s.removeWidget);
 
-  const resizeRegion = useEditorStore((s) => s.resizeRegion);
-  const addRegion = useEditorStore((s) => s.addRegion);
+  const resizeSection = useEditorStore((s) => s.resizeSection);
+  const addSection = useEditorStore((s) => s.addSection);
   const addPanel = useEditorStore((s) => s.addPanel);
 
   const [activeTab, setActiveTab] = useState<'style' | 'visibility' | 'rules'>('style');
@@ -526,55 +523,17 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
     }).length;
   }, [layout.formattingRules, selection]);
 
-  const recalcPosition = useCallback(() => {
-    if (!open || !selection) return;
-    const node = panelRef.current;
-    const panelWidth = node?.offsetWidth ?? 360;
-    const panelHeight = node?.offsetHeight ?? 520;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const desiredLeft = anchor ? anchor.x + 14 : vw - panelWidth - 16;
-    const desiredTop = anchor ? anchor.y + 14 : 80;
-    setPosition({
-      left: clamp(desiredLeft, 8, Math.max(8, vw - panelWidth - 8)),
-      top: clamp(desiredTop, 8, Math.max(8, vh - panelHeight - 8)),
-    });
-  }, [anchor, open, selection]);
-
   useEffect(() => {
-    if (!open || !selection) return;
-    const frame = window.requestAnimationFrame(recalcPosition);
-    const onResize = () => recalcPosition();
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener('resize', onResize);
-    };
-  }, [open, recalcPosition, selection]);
-
-  useEffect(() => {
-    if (!open || !selection) return;
-
-    const onMouseDown = (event: MouseEvent) => {
-      if (!panelRef.current) return;
-      if (!panelRef.current.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
-
-    document.addEventListener('mousedown', onMouseDown);
     document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener('mousedown', onMouseDown);
       document.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose, open, selection]);
+  }, [onClose]);
 
-  const duplicateRegion = () => {
+  const duplicateSection = () => {
     if (!selection || selection.kind !== 'region') return;
 
     const source = selection.region;
@@ -593,7 +552,7 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
       order: index,
     }));
 
-    const clonedRegion: LayoutRegion = {
+    const clonedSection: LayoutSection = {
       ...structuredClone(source),
       id: createId('region'),
       label: withCopyLabel(source.label),
@@ -604,7 +563,7 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
       widgets: clonedWidgets,
     };
 
-    addRegion(clonedRegion, selection.tab.id);
+    addSection(clonedSection, selection.tab.id);
   };
 
   const duplicatePanel = () => {
@@ -622,23 +581,32 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
     addPanel(clonedPanel, selection.region.id);
   };
 
-  if (!open || !selection) return null;
+  if (!selection) {
+    return (
+      <div className="flex h-full flex-col border-l border-gray-200 bg-white">
+        <div className="border-b border-gray-200 px-4 py-3">
+          <div className="text-sm font-semibold text-gray-900">Properties</div>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <div className="rounded-full bg-gray-100 p-3">
+            <Settings className="h-5 w-5 text-gray-400" />
+          </div>
+          <p className="text-sm text-gray-500">Click a section, panel, or field to configure it</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={panelRef}
-      className="fixed z-50 w-[360px] max-w-[calc(100vw-16px)] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
-      style={{
-        left: position.left,
-        top: position.top,
-        maxHeight: 'calc(100vh - 16px)',
-      }}
-      role="dialog"
-      aria-label="Floating properties panel"
+      className="flex h-full flex-col overflow-hidden border-l border-gray-200 bg-white"
+      role="region"
+      aria-label="Properties panel"
     >
       <div className="flex items-center justify-between border-b border-gray-200 px-3 py-2">
         <div className="text-sm font-semibold text-gray-900">
-          {selection.kind === 'region' && 'Region Properties'}
+          {selection.kind === 'region' && 'Section Properties'}
           {selection.kind === 'panel' && 'Panel Properties'}
           {selection.kind === 'field' && 'Field Properties'}
           {selection.kind === 'widget' && 'Widget Properties'}
@@ -660,15 +628,15 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
       )}
 
       {activeTab === 'style' && (
-      <div className="space-y-4 overflow-y-auto p-3 text-sm" style={{ maxHeight: 'calc(100vh - 112px)' }}>
+      <div className="overflow-y-auto flex-1 space-y-4 p-3 text-sm">
         {selection.kind === 'region' && (
           <>
             <div className="space-y-1.5">
               <Label className="text-xs text-gray-600">Label</Label>
               <Input
                 value={selection.region.label}
-                onChange={(e) => updateRegion(selection.region.id, { label: e.target.value })}
-                aria-label="Region label"
+                onChange={(e) => updateSection(selection.region.id, { label: e.target.value })}
+                aria-label="Section label"
               />
             </div>
 
@@ -681,7 +649,7 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
                     type="button"
                     size="sm"
                     variant={selection.region.gridColumnSpan === value ? 'default' : 'outline'}
-                    onClick={() => resizeRegion(selection.region.id, value)}
+                    onClick={() => resizeSection(selection.region.id, value)}
                   >
                     {value}
                   </Button>
@@ -693,7 +661,7 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
               label="Background color"
               value={selection.region.style.background}
               onChange={(value) =>
-                updateRegion(selection.region.id, {
+                updateSection(selection.region.id, {
                   style: { ...selection.region.style, background: value },
                 })
               }
@@ -703,7 +671,7 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
               label="Border color"
               value={selection.region.style.borderColor}
               onChange={(value) =>
-                updateRegion(selection.region.id, {
+                updateSection(selection.region.id, {
                   style: { ...selection.region.style, borderColor: value },
                 })
               }
@@ -714,9 +682,9 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
               <select
                 className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
                 value={selection.region.style.borderStyle ?? 'solid'}
-                aria-label="Region border style"
+                aria-label="Section border style"
                 onChange={(e) =>
-                  updateRegion(selection.region.id, {
+                  updateSection(selection.region.id, {
                     style: {
                       ...selection.region.style,
                       borderStyle: e.target.value as 'solid' | 'dashed' | 'none',
@@ -735,9 +703,9 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
               <select
                 className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
                 value={selection.region.style.shadow ?? 'none'}
-                aria-label="Region shadow"
+                aria-label="Section shadow"
                 onChange={(e) =>
-                  updateRegion(selection.region.id, {
+                  updateSection(selection.region.id, {
                     style: { ...selection.region.style, shadow: e.target.value as 'none' | 'sm' | 'md' },
                   })
                 }
@@ -753,9 +721,9 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
               <select
                 className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
                 value={selection.region.style.borderRadius ?? 'none'}
-                aria-label="Region corner radius"
+                aria-label="Section corner radius"
                 onChange={(e) =>
-                  updateRegion(selection.region.id, {
+                  updateSection(selection.region.id, {
                     style: {
                       ...selection.region.style,
                       borderRadius: e.target.value as 'none' | 'sm' | 'lg',
@@ -770,16 +738,16 @@ export function FloatingProperties({ open, anchor, onClose, availableFields = []
             </div>
 
             <div className="flex gap-2 border-t border-gray-200 pt-3">
-              <Button type="button" variant="outline" className="flex-1" onClick={duplicateRegion}>
-                Duplicate Region
+              <Button type="button" variant="outline" className="flex-1" onClick={duplicateSection}>
+                Duplicate Section
               </Button>
               <Button
                 type="button"
                 variant="destructive"
                 className="flex-1"
-                onClick={() => removeRegion(selection.region.id)}
+                onClick={() => removeSection(selection.region.id)}
               >
-                Delete Region
+                Delete Section
               </Button>
             </div>
           </>

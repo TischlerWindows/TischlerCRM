@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { GripVertical, Settings, Trash2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import type { LayoutPanel } from './types';
 import { useEditorStore } from './editor-store';
@@ -102,7 +102,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
           ) : (
             <button
               type="button"
-              className="truncate text-left text-sm font-medium"
+              className="group/label flex items-center gap-1 truncate text-left text-sm font-medium"
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setIsEditingLabel(true);
@@ -111,26 +111,17 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
                 e.stopPropagation();
                 selectPanel();
               }}
+              title="Double-click to rename"
             >
               {panel.label}
+              <Pencil className="h-3 w-3 text-gray-400 opacity-0 transition-opacity group-hover/label:opacity-100" />
             </button>
           )}
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+          <span className="rounded-full bg-brand-navy/10 px-2 py-0.5 text-xs font-semibold text-brand-navy">
             {panel.columns} cols
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              selectPanel();
-            }}
-            aria-label="Panel settings"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
           <button
             type="button"
             className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600"

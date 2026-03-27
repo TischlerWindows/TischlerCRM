@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useToast } from '@/components/toast';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { formatFieldValue, resolveLookupDisplayName, preloadLookupRecords } from '@/lib/utils';
-import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType, type LayoutRegion, type LayoutPanel, type PanelField } from '@/lib/schema';
+import { PageLayout, PageField, FieldDef, ObjectDef, normalizeFieldType, type LayoutSection, type LayoutPanel, type PanelField } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import {
   getFormattingEffectsForField,
@@ -69,13 +71,25 @@ export default function RecordDetailPage({
   const { hasAppPermission } = usePermissions();
   const canCustomize = hasAppPermission('customizeApplication');
   const { setRecordSetupContext } = useRecordSetupContext();
+  const { showToast } = useToast();
 
   const [rawRecord, setRawRecord] = useState<RecordData | null>(null);
   const [record, setRecord] = useState<Record<string, any> | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEditForm, setShowEditForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // Tracks which sections the user has manually toggled open/closed
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
+  const [activeTabIdx, setActiveTabIdx] = useState(0);
+  const [collapsedPanelIds, setCollapsedPanelIds] = useState<Set<string>>(new Set());
+  const togglePanelCollapse = useCallback((panelId: string) => {
+    setCollapsedPanelIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(panelId)) next.delete(panelId);
+      else next.add(panelId);
+      return next;
+    });
+  }, []);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   // Counter bumped after lookup records finish loading to trigger re-render
   const [lookupTick, setLookupTick] = useState(0);
@@ -110,41 +124,30 @@ export default function RecordDetailPage({
   }, [params?.id, objectApiName]);
 
   // ── Resolve layout ───────────────────────────────────────────────────
-  const resolveLayout = (): PageLayout | null => {
+  const pageLayout = useMemo(() => {
     if (!record || !objectDef) return null;
-
-    // 1. Layout stored on the record itself (the layout used to create it)
-    if (record.pageLayoutId) {
-      const layout = objectDef.pageLayouts?.find((l) => l.id === record.pageLayoutId);
-      if (layout) return layout;
+    // 1. Layout stored on the record itself
+    const findLayout = (id: string) => objectDef.pageLayouts?.find((l) => l.id === id) ?? null;
+    let raw: PageLayout | null = null;
+    if (record.pageLayoutId) raw = findLayout(record.pageLayoutId);
+    if (!raw) {
+      const rt = record.recordTypeId
+        ? objectDef.recordTypes?.find((r) => r.id === record.recordTypeId)
+        : objectDef.recordTypes?.[0];
+      if (rt?.pageLayoutId) raw = findLayout(rt.pageLayoutId);
     }
-
-    // 2. Fallback: layout from the record type
-    const rt = record.recordTypeId
-      ? objectDef.recordTypes?.find((r) => r.id === record.recordTypeId)
-      : objectDef.recordTypes?.[0];
-    if (rt?.pageLayoutId) {
-      const layout = objectDef.pageLayouts?.find((l) => l.id === rt.pageLayoutId);
-      if (layout) return layout;
-    }
-
-    // 3. Last resort: first available layout
-    return objectDef.pageLayouts?.[0] ?? null;
-  };
-
-  const pageLayout = (() => {
-    const raw = resolveLayout();
+    if (!raw) raw = objectDef.pageLayouts?.[0] ?? null;
     if (!raw) return null;
-    // Layouts saved by the editor store the full Region→Panel→Field tree in
-    // extensions.editorTabs. The persisted tabs[] only carry sections for
-    // legacy compatibility. Swap in the editor tabs so the new renderer
-    // (which checks 'regions' in tab) activates correctly.
     const editorTabs = (raw.extensions as any)?.editorTabs;
     if (Array.isArray(editorTabs) && editorTabs.length > 0) {
       return { ...raw, tabs: editorTabs as any } as PageLayout;
     }
     return raw;
-  })();
+  }, [record, objectDef]);
+
+  useEffect(() => {
+    setActiveTabIdx(0);
+  }, [pageLayout?.id]);
 
   useEffect(() => {
     if (!record || !objectDef) {
@@ -314,7 +317,7 @@ export default function RecordDetailPage({
       void lookupTick;
       if (route) {
         return (
-          <Link href={`/${route}/${value}`} className="text-brand-navy hover:text-brand-navy">
+          <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
             {displayLabel}
           </Link>
         );
@@ -349,7 +352,7 @@ export default function RecordDetailPage({
     // Email
     if (fieldType === 'Email') {
       return (
-        <a href={`mailto:${value}`} className="text-brand-navy hover:text-brand-navy">
+        <a href={`mailto:${value}`} className="text-brand-navy hover:underline underline-offset-2">
           {value}
         </a>
       );
@@ -358,7 +361,7 @@ export default function RecordDetailPage({
     // Phone
     if (fieldType === 'Phone') {
       return (
-        <a href={`tel:${value}`} className="text-brand-navy hover:text-brand-navy">
+        <a href={`tel:${value}`} className="text-brand-navy hover:underline underline-offset-2">
           {value}
         </a>
       );
@@ -368,7 +371,7 @@ export default function RecordDetailPage({
     if (fieldType === 'URL') {
       const href = fieldDef?.staticUrl || value;
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:text-brand-navy">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:underline underline-offset-2">
           {fieldDef?.staticUrl || value}
         </a>
       );
@@ -401,7 +404,7 @@ export default function RecordDetailPage({
         const displayLabel = resolveLookupDisplayName(value.lookup, lookupTarget);
         void lookupTick;
         lookupPart = route ? (
-          <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:text-brand-navy">
+          <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:underline underline-offset-2">
             {displayLabel}
           </Link>
         ) : displayLabel;
@@ -431,27 +434,19 @@ export default function RecordDetailPage({
       return addressText;
     }
 
-    // Date → MM-DD-YYYY
+    // Date — locale-aware formatting
     if (fieldType === 'Date' && typeof value === 'string') {
       const d = new Date(value + (value.includes('T') ? '' : 'T00:00:00'));
       if (!isNaN(d.getTime())) {
-        const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-        const dd = String(d.getUTCDate()).padStart(2, '0');
-        const yyyy = d.getUTCFullYear();
-        return `${mm}-${dd}-${yyyy}`;
+        return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', year: 'numeric' }).format(d);
       }
     }
 
-    // DateTime → MM-DD-YYYY HH:MM
+    // DateTime — locale-aware formatting
     if (fieldType === 'DateTime' && typeof value === 'string') {
       const d = new Date(value);
       if (!isNaN(d.getTime())) {
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        const hh = String(d.getHours()).padStart(2, '0');
-        const min = String(d.getMinutes()).padStart(2, '0');
-        return `${mm}-${dd}-${yyyy} ${hh}:${min}`;
+        return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
       }
     }
 
@@ -468,7 +463,7 @@ export default function RecordDetailPage({
     if (numberKey) return record[numberKey];
     // Fall back to name
     if (record.name && typeof record.name === 'string') return record.name;
-    return record.id;
+    return `Untitled ${objectDef?.label ?? 'Record'}`;
   };
 
   const getRecordSubtitle = (): string => {
@@ -503,7 +498,7 @@ export default function RecordDetailPage({
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleEdit = () => {
     if (!pageLayout) {
-      alert('No page layout found for this record.');
+      showToast('No page layout found for this record.', 'error');
       return;
     }
     setShowEditForm(true);
@@ -534,13 +529,19 @@ export default function RecordDetailPage({
     setShowEditForm(false);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
     if (!record) return;
-    if (!confirm(`Are you sure you want to delete this ${objectDef?.label ?? 'record'}?`)) return;
+    setShowDeleteConfirm(false);
     try {
       await recordsService.deleteRecord(objectApiName, record.id);
     } catch (err) {
       console.error('Failed to delete record:', err);
+      showToast('Failed to delete record. Please try again.', 'error');
+      return;
     }
     router.push(backRoute);
   };
@@ -548,8 +549,44 @@ export default function RecordDetailPage({
   // ── Loading / not found ──────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading {objectDef?.label ?? 'record'}...</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse">
+          {/* Header skeleton */}
+          <div className="mb-8">
+            <div className="h-4 w-24 bg-gray-200 rounded mb-4" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gray-200 rounded-lg" />
+                <div className="space-y-2">
+                  <div className="h-7 w-48 bg-gray-200 rounded" />
+                  <div className="h-4 w-32 bg-gray-200 rounded" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="h-9 w-20 bg-gray-200 rounded-lg" />
+                <div className="h-9 w-20 bg-gray-200 rounded-lg" />
+              </div>
+            </div>
+          </div>
+          {/* Panel skeletons */}
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <div className="h-10 bg-gray-100 border-b border-gray-200 px-4 flex items-center">
+                  <div className="h-4 w-32 bg-gray-200 rounded" />
+                </div>
+                <div className="p-4 grid grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((j) => (
+                    <div key={j} className="space-y-1.5">
+                      <div className="h-3 w-20 bg-gray-200 rounded" />
+                      <div className="h-4 w-36 bg-gray-200 rounded" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -582,6 +619,406 @@ export default function RecordDetailPage({
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
 
+  const renderTab = (tab: any, ti: number): React.ReactNode => {
+    if (!pageLayout) return null;
+
+    // NEW model: tab.regions exists
+    if ('regions' in tab && Array.isArray((tab as any).regions)) {
+      const regions = (tab as any).regions as LayoutSection[];
+      const sortedRegions = [...regions].sort(
+        (a, b) => (a.gridRow ?? 0) - (b.gridRow ?? 0) || (a.gridColumn ?? 0) - (b.gridColumn ?? 0)
+      );
+
+      return (
+        <div
+          key={tab.id ?? ti}
+          className="grid gap-4"
+          style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
+        >
+          {sortedRegions.map((region) => {
+            if (region.hidden) return null;
+
+            const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
+            if (regionFx?.hidden) return null;
+
+            const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
+            const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
+
+            const regionStyle: React.CSSProperties = {
+              gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
+              ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
+              ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
+              ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
+              borderRadius: region.style?.borderRadius === 'lg' ? 12 : region.style?.borderRadius === 'sm' ? 6 : undefined,
+              boxShadow: region.style?.shadow === 'md'
+                ? '0 10px 24px rgba(15,23,42,.14)'
+                : region.style?.shadow === 'sm'
+                ? '0 1px 3px rgba(15,23,42,.12)'
+                : undefined,
+            };
+
+            return (
+              <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
+                {/* Panels */}
+                {sortedPanels.map((panel: any) => {
+                  if (panel.hidden) return null;
+                  const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
+                  if (panelFx?.hidden) return null;
+
+                  const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
+                  const visibleFields = sortedFields.filter((f: any) => {
+                    if (f.behavior === 'hidden') return false;
+                    const fd = getFieldDef(f.fieldApiName);
+                    if (!fd) return false;
+                    if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
+                    const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+                    if (fFx?.hidden) return false;
+                    return true;
+                  });
+
+                  if (visibleFields.length === 0) return null;
+
+                  const headerStyle: React.CSSProperties = {
+                    ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
+                    ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
+                    fontWeight: panel.style?.headerBold ? 700 : undefined,
+                    fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
+                    textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+                  };
+                  const bodyStyle: React.CSSProperties = {
+                    ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
+                  };
+
+                  const isPanelCollapsed = collapsedPanelIds.has(panel.id);
+                  return (
+                    <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => togglePanelCollapse(panel.id)}
+                        className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                        style={headerStyle}
+                      >
+                        <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
+                        {isPanelCollapsed
+                          ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" />
+                          : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" />
+                        }
+                      </button>
+                      {!isPanelCollapsed && (
+                        <div
+                          className="grid gap-x-6 gap-y-4 p-4"
+                          style={{
+                            ...bodyStyle,
+                            gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
+                          }}
+                        >
+                          {visibleFields.map((f: any) => {
+                            const fd = getFieldDef(f.fieldApiName);
+                            if (!fd) return null;
+                            const raw = getRecordValue(f.fieldApiName, fd);
+                            const labelStyle: React.CSSProperties = {
+                              ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
+                              fontWeight: f.labelStyle?.bold ? 700 : undefined,
+                              fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
+                              textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                            };
+                            const valueStyle: React.CSSProperties = {
+                              ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
+                              ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
+                              fontWeight: f.valueStyle?.bold ? 700 : undefined,
+                              fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
+                            };
+                            const displayLabel = f.labelOverride || fd.label;
+                            return (
+                              <div
+                                key={f.fieldApiName}
+                                style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                              >
+                                <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
+                                  {displayLabel}
+                                </div>
+                                <div className="text-sm text-gray-900" style={valueStyle}>
+                                  {renderValue(f.fieldApiName, raw, fd)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Widgets */}
+                {sortedWidgets.length > 0 && (
+                  <LayoutWidgetsInline widgets={sortedWidgets} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // LEGACY FALLBACK: old tab.sections model
+    const legacyTab = tab as any;
+    const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
+    const eligible = sorted.filter((section: any) => {
+      if (section.showInRecord === false) return false;
+      if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return false;
+      const sectionFx = getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData);
+      if (sectionFx?.hidden) return false;
+      const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
+      for (let c = 0; c < section.columns; c++) {
+        columnArrays[c] = section.fields
+          .filter((f: any) => f.column === c)
+          .sort((a: any, b: any) => a.order - b.order)
+          .map((f: any) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+          .filter((entry: any) => entry.fieldDef != null)
+          .filter(({ layoutField, fieldDef }: any) => {
+            if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+            const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+            if (fFx?.hidden) return false;
+            return true;
+          });
+      }
+      const allFieldsEmpty = columnArrays.every((col) =>
+        col.every(({ layoutField, fieldDef }: any) => {
+          const v = getRecordValue(layoutField.apiName, fieldDef);
+          return v === undefined || v === null || v === '' || v === 'N/A';
+        })
+      );
+      return !allFieldsEmpty;
+    });
+    const isSectionShown = (section: any) =>
+      eligible.some((s: any) => s.id === section.id);
+
+    const items = resolveTabCanvasItems(legacyTab);
+    const visibleItems = items.filter((item) => {
+      if (item.kind === 'widget') return true;
+      return isSectionShown(item.section);
+    });
+
+    return (
+      <div
+        key={tab.id ?? ti}
+        className="grid gap-4 mb-6"
+        style={{ gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))` }}
+      >
+        {visibleItems.map((item) => {
+          if (item.kind === 'widget') {
+            const g = item.widget;
+            return (
+              <div
+                key={g.id}
+                className="min-w-0"
+                style={gridItemStyle({
+                  gridColumn: g.gridColumn ?? 1,
+                  gridColumnSpan: g.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                  gridRow: g.gridRow ?? 1,
+                  gridRowSpan: g.gridRowSpan ?? 1,
+                })}
+              >
+                <LayoutWidgetsInline widgets={[g]} />
+              </div>
+            );
+          }
+          const section = item.section;
+          const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
+          for (let c = 0; c < section.columns; c++) {
+            columnArrays[c] = section.fields
+              .filter((f) => f.column === c)
+              .sort((a, b) => a.order - b.order)
+              .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+              .filter((entry) => entry.fieldDef != null)
+              .filter(({ layoutField, fieldDef }) => {
+                if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+                const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                if (fFx?.hidden) return false;
+                return true;
+              });
+          }
+
+          const hasSpanning = section.fields.some(
+            (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
+          );
+
+          const sectionKey = `${ti}-${section.id}`;
+          const isCollapsed = sectionToggles[sectionKey] === false;
+
+          const toggleSection = () => {
+            if (!isCollapsed) {
+              setSectionToggles((prev) => ({ ...prev, [sectionKey]: false }));
+            } else {
+              setSectionToggles((prev) => {
+                const next = { ...prev };
+                delete next[sectionKey];
+                return next;
+              });
+            }
+          };
+
+          return (
+            <div
+              key={section.id}
+              className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
+              style={gridItemStyle({
+                gridColumn: section.gridColumn ?? 1,
+                gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
+                gridRow: section.gridRow ?? 1,
+                gridRowSpan: section.gridRowSpan ?? 1,
+              })}
+            >
+              <button
+                type="button"
+                onClick={toggleSection}
+                className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+              >
+                <div className="text-left">
+                  <h3 className="font-medium text-gray-900">{section.label}</h3>
+                  {section.description ? (
+                    <p className="text-xs text-gray-500 mt-0.5 font-normal">
+                      {section.description}
+                    </p>
+                  ) : null}
+                </div>
+                {isCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+
+              {!isCollapsed && (
+                <div className="p-6">
+                  {hasSpanning ? (() => {
+                    const allFields = section.fields
+                      .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
+                      .filter((e) => e.fieldDef != null)
+                      .filter(({ layoutField, fieldDef }) => {
+                        if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+                        const fx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                        return !fx?.hidden;
+                      });
+                    const occupied = new Set<string>();
+                    const colGroups: typeof allFields[] = [];
+                    for (let c = 0; c < section.columns; c++) {
+                      colGroups[c] = allFields
+                        .filter(e => e.layoutField.column === c)
+                        .sort((a, b) => a.layoutField.order - b.layoutField.order);
+                    }
+                    const placed: (typeof allFields[0] & { gridRow: number; colSpan: number; rowSpan: number })[] = [];
+                    for (let c = 0; c < section.columns; c++) {
+                      for (const entry of colGroups[c]) {
+                        const f = entry.layoutField;
+                        const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
+                        const rs = (f as any).rowSpan ?? 1;
+                        let row = 1;
+                        search: while (true) {
+                          for (let dr = 0; dr < rs; dr++) {
+                            for (let dc = 0; dc < cs; dc++) {
+                              if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
+                            }
+                          }
+                          break;
+                        }
+                        placed.push({ ...entry, gridRow: row, colSpan: cs, rowSpan: rs });
+                        for (let dr = 0; dr < rs; dr++) {
+                          for (let dc = 0; dc < cs; dc++) {
+                            occupied.add(`${row + dr},${f.column + dc}`);
+                          }
+                        }
+                      }
+                    }
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
+                        {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
+                          const value = getRecordValue(layoutField.apiName, fieldDef);
+                          const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                          const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                          const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                          const labelCn = labelPresentationClassName(layoutField.presentation);
+                          return (
+                            <div
+                              key={layoutField.apiName}
+                              style={{
+                                gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
+                                gridRow: `${gridRow} / span ${rowSpan}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                              }}
+                              className={hl || undefined}
+                            >
+                              <dt className={`text-sm ${labelCn}`}>
+                                {fieldDef.label}
+                                {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                                {fFx?.readOnly ? (
+                                  <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
+                                ) : null}
+                              </dt>
+                              <dd
+                                className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
+                                style={rowSpan > 1 ? { flex: 1 } : undefined}
+                              >
+                                {renderValue(layoutField.apiName, value, fieldDef)}
+                                {badgeC ? <span className={badgeC}>Status</span> : null}
+                              </dd>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })() : (
+                  <div
+                    className={`grid gap-6 ${
+                      section.columns === 1
+                        ? 'grid-cols-1'
+                        : section.columns === 2
+                          ? 'grid-cols-1 md:grid-cols-2'
+                          : section.columns === 4
+                            ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+                            : 'grid-cols-1 md:grid-cols-3'
+                    }`}
+                  >
+                    {columnArrays.map((colFields, colIdx) => (
+                      <div key={`col-${colIdx}`} className="flex flex-col gap-4">
+                        {colFields.map(({ layoutField, fieldDef }) => {
+                          const value = getRecordValue(layoutField.apiName, fieldDef);
+                          const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                          const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                          const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                          const labelCn = labelPresentationClassName(layoutField.presentation);
+                          return (
+                            <div key={layoutField.apiName} className={hl || undefined}>
+                              <dt className={`text-sm ${labelCn}`}>
+                                {fieldDef.label}
+                                {fieldDef.required && (
+                                  <span className="text-red-500 ml-1">*</span>
+                                )}
+                                {fFx?.readOnly ? (
+                                  <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
+                                ) : null}
+                              </dt>
+                              <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
+                                {renderValue(layoutField.apiName, value, fieldDef)}
+                                {badgeC ? <span className={badgeC}>Status</span> : null}
+                              </dd>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
@@ -598,8 +1035,8 @@ export default function RecordDetailPage({
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <IconComponent className="w-6 h-6 text-blue-600" />
+              <div className="w-12 h-12 bg-brand-navy/10 rounded-lg flex items-center justify-center">
+                <IconComponent className="w-6 h-6 text-brand-navy" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
@@ -720,452 +1157,43 @@ export default function RecordDetailPage({
 
         {/* Layout-driven field rendering */}
         {pageLayout ? (
-          <div className="space-y-6">
-            {pageLayout.tabs.map((tab, ti) => {
-              // NEW model: tab.regions exists
-              if ('regions' in tab && Array.isArray((tab as any).regions)) {
-                const regions = (tab as any).regions as LayoutRegion[];
-                const sortedRegions = [...regions].sort(
-                  (a, b) => (a.gridRow ?? 0) - (b.gridRow ?? 0) || (a.gridColumn ?? 0) - (b.gridColumn ?? 0)
-                );
-
-                return (
-                  <div
-                    key={ti}
-                    className="grid gap-4"
-                    style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
-                  >
-                    {sortedRegions.map((region) => {
-                      // Skip statically hidden regions
-                      if (region.hidden) return null;
-
-                      const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
-                      if (regionFx?.hidden) return null;
-
-                      const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
-                      const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
-
-                      const regionStyle: React.CSSProperties = {
-                        gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
-                        ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
-                        ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
-                        ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
-                        borderRadius: region.style?.borderRadius === 'lg' ? 12 : region.style?.borderRadius === 'sm' ? 6 : undefined,
-                        boxShadow: region.style?.shadow === 'md'
-                          ? '0 10px 24px rgba(15,23,42,.14)'
-                          : region.style?.shadow === 'sm'
-                          ? '0 1px 3px rgba(15,23,42,.12)'
-                          : undefined,
-                      };
-
-                      return (
-                        <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
-                          {/* Panels */}
-                          {sortedPanels.map((panel: any) => {
-                            if (panel.hidden) return null;
-                            const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
-                            if (panelFx?.hidden) return null;
-
-                            const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
-                            const visibleFields = sortedFields.filter((f: any) => {
-                              if (f.behavior === 'hidden') return false;
-                              const fd = getFieldDef(f.fieldApiName);
-                              if (!fd) return false;
-                              if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
-                              const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
-                              if (fFx?.hidden) return false;
-                              return true;
-                            });
-
-                            if (visibleFields.length === 0) return null;
-
-                            const headerStyle: React.CSSProperties = {
-                              ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
-                              ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
-                              fontWeight: panel.style?.headerBold ? 700 : undefined,
-                              fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
-                              textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
-                            };
-                            const bodyStyle: React.CSSProperties = {
-                              ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
-                            };
-
-                            return (
-                              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-                                <div
-                                  className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 text-sm font-semibold text-gray-700"
-                                  style={headerStyle}
-                                >
-                                  {panel.label}
-                                </div>
-                                <div
-                                  className="grid gap-x-6 gap-y-4 p-4"
-                                  style={{
-                                    ...bodyStyle,
-                                    gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
-                                  }}
-                                >
-                                  {visibleFields.map((f: any) => {
-                                    const fd = getFieldDef(f.fieldApiName);
-                                    if (!fd) return null;
-                                    const raw = getRecordValue(f.fieldApiName, fd);
-                                    const labelStyle: React.CSSProperties = {
-                                      ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
-                                      fontWeight: f.labelStyle?.bold ? 700 : undefined,
-                                      fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
-                                      textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
-                                    };
-                                    const valueStyle: React.CSSProperties = {
-                                      ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
-                                      ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
-                                      fontWeight: f.valueStyle?.bold ? 700 : undefined,
-                                      fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
-                                    };
-                                    const displayLabel = f.labelOverride || fd.label;
-                                    return (
-                                      <div
-                                        key={f.fieldApiName}
-                                        style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
-                                      >
-                                        <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
-                                          {displayLabel}
-                                        </div>
-                                        <div className="text-sm text-gray-900" style={valueStyle}>
-                                          {renderValue(f.fieldApiName, raw, fd)}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {/* Widgets */}
-                          {sortedWidgets.length > 0 && (
-                            <LayoutWidgetsInline widgets={sortedWidgets} />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              }
-
-              // LEGACY FALLBACK: old tab.sections model
-              const legacyTab = tab as any;
-              const sorted = [...(legacyTab.sections ?? [])].sort((a: any, b: any) => a.order - b.order);
-              const eligible = sorted.filter((section) => {
-                if (section.showInRecord === false) return false;
-                if (!evaluateVisibility(section.visibleIf, layoutVisibilityData)) return false;
-                const sectionFx = pageLayout
-                  ? getFormattingEffectsForSection(pageLayout, section.id, layoutVisibilityData)
-                  : null;
-                if (sectionFx?.hidden) return false;
-                const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
-                for (let c = 0; c < section.columns; c++) {
-                  columnArrays[c] = section.fields
-                    .filter((f) => f.column === c)
-                    .sort((a, b) => a.order - b.order)
-                    .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
-                    .filter((entry) => entry.fieldDef != null)
-                    .filter(({ layoutField, fieldDef }) => {
-                      if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
-                        return false;
-                      }
-                      const fFx = pageLayout
-                        ? getFormattingEffectsForField(
-                            pageLayout,
-                            layoutField.apiName,
-                            layoutVisibilityData
-                          )
-                        : null;
-                      if (fFx?.hidden) return false;
-                      return true;
-                    });
-                }
-                const allFieldsEmpty = columnArrays.every((col) =>
-                  col.every(({ layoutField, fieldDef }) => {
-                    const v = getRecordValue(layoutField.apiName, fieldDef);
-                    return v === undefined || v === null || v === '' || v === 'N/A';
-                  })
-                );
-                return !allFieldsEmpty;
-              });
-              const isSectionShown = (section: any) =>
-                eligible.some((s: any) => s.id === section.id);
-
-              const items = resolveTabCanvasItems(legacyTab);
-              const visibleItems = items.filter((item) => {
-                if (item.kind === 'widget') return true;
-                return isSectionShown(item.section);
-              });
-
-              return (
-              <div
-                key={ti}
-                className="grid gap-4 mb-6"
-                style={{ gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))` }}
-              >
-                {visibleItems.map((item) => {
-                  if (item.kind === 'widget') {
-                    const g = item.widget;
-                    return (
-                      <div
-                        key={g.id}
-                        className="min-w-0"
-                        style={gridItemStyle({
-                          gridColumn: g.gridColumn ?? 1,
-                          gridColumnSpan: g.gridColumnSpan ?? TAB_GRID_COLUMNS,
-                          gridRow: g.gridRow ?? 1,
-                          gridRowSpan: g.gridRowSpan ?? 1,
-                        })}
-                      >
-                        <LayoutWidgetsInline widgets={[g]} />
-                      </div>
-                    );
-                  }
-                  const section = item.section;
-                  // Column-based layout: group fields by column, sorted by
-                  // order within each column (same approach as DynamicForm).
-                  const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
-                  for (let c = 0; c < section.columns; c++) {
-                    columnArrays[c] = section.fields
-                      .filter((f) => f.column === c)
-                      .sort((a, b) => a.order - b.order)
-                      .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
-                      .filter((entry) => entry.fieldDef != null)
-                      .filter(({ layoutField, fieldDef }) => {
-                        if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
-                          return false;
-                        }
-                        const fFx = pageLayout
-                          ? getFormattingEffectsForField(
-                              pageLayout,
-                              layoutField.apiName,
-                              layoutVisibilityData
-                            )
-                          : null;
-                        if (fFx?.hidden) return false;
-                        return true;
-                      });
-                  }
-
-                  // Check if any field uses spanning
-                  const hasSpanning = section.fields.some(
-                    (f) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1
-                  );
-
-                  const sectionKey = `${ti}-${section.id}`;
-                  const isCollapsed = sectionToggles[sectionKey] === false;
-
-                  const toggleSection = () => {
-                    setSectionToggles((prev) => ({
-                      ...prev,
-                      [sectionKey]: !isCollapsed ? false : undefined!,
-                    }));
-                    // Clean up undefined entries
-                    if (!isCollapsed) {
-                      setSectionToggles((prev) => ({ ...prev, [sectionKey]: false }));
-                    } else {
-                      setSectionToggles((prev) => {
-                        const next = { ...prev };
-                        delete next[sectionKey];
-                        return next;
-                      });
-                    }
-                  };
-
-                  return (
-                    <div
-                      key={section.id}
-                      className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
-                      style={gridItemStyle({
-                        gridColumn: section.gridColumn ?? 1,
-                        gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
-                        gridRow: section.gridRow ?? 1,
-                        gridRowSpan: section.gridRowSpan ?? 1,
-                      })}
-                    >
-                      <button
-                        type="button"
-                        onClick={toggleSection}
-                        className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
-                      >
-                        <div className="text-left">
-                          <h3 className="font-medium text-gray-900">{section.label}</h3>
-                          {section.description ? (
-                            <p className="text-xs text-gray-500 mt-0.5 font-normal">
-                              {section.description}
-                            </p>
-                          ) : null}
-                        </div>
-                        {isCollapsed ? (
-                          <ChevronRight className="h-4 w-4 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-gray-500" />
-                        )}
-                      </button>
-
-                      {!isCollapsed && (
-                        <div className="p-6">
-                          {hasSpanning ? (() => {
-                            // Spanning mode: CSS grid with explicit row/col placement
-                            const allFields = section.fields
-                              .map((f) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, f)! }))
-                              .filter((e) => e.fieldDef != null)
-                              .filter(({ layoutField, fieldDef }) => {
-                                if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) {
-                                  return false;
-                                }
-                                const fx = pageLayout
-                                  ? getFormattingEffectsForField(
-                                      pageLayout,
-                                      layoutField.apiName,
-                                      layoutVisibilityData
-                                    )
-                                  : null;
-                                return !fx?.hidden;
-                              });
-                            // Grid-cell occupation: spanning fields only push down overlapping fields
-                            const occupied = new Set<string>();
-                            const colGroups: typeof allFields[] = [];
-                            for (let c = 0; c < section.columns; c++) {
-                              colGroups[c] = allFields
-                                .filter(e => e.layoutField.column === c)
-                                .sort((a, b) => a.layoutField.order - b.layoutField.order);
-                            }
-                            const placed: (typeof allFields[0] & { gridRow: number; colSpan: number; rowSpan: number })[] = [];
-                            for (let c = 0; c < section.columns; c++) {
-                              for (const entry of colGroups[c]) {
-                                const f = entry.layoutField;
-                                const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
-                                const rs = (f as any).rowSpan ?? 1;
-                                let row = 1;
-                                search: while (true) {
-                                  for (let dr = 0; dr < rs; dr++) {
-                                    for (let dc = 0; dc < cs; dc++) {
-                                      if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
-                                    }
-                                  }
-                                  break;
-                                }
-                                placed.push({ ...entry, gridRow: row, colSpan: cs, rowSpan: rs });
-                                for (let dr = 0; dr < rs; dr++) {
-                                  for (let dc = 0; dc < cs; dc++) {
-                                    occupied.add(`${row + dr},${f.column + dc}`);
-                                  }
-                                }
-                              }
-                            }
-                            return (
-                              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
-                                {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
-                                  const value = getRecordValue(layoutField.apiName, fieldDef);
-                                  const fFx = pageLayout
-                                    ? getFormattingEffectsForField(
-                                        pageLayout,
-                                        layoutField.apiName,
-                                        layoutVisibilityData
-                                      )
-                                    : null;
-                                  const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
-                                  const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
-                                  const labelCn = labelPresentationClassName(
-                                    layoutField.presentation
-                                  );
-                                  return (
-                                    <div
-                                      key={layoutField.apiName}
-                                      style={{
-                                        gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
-                                        gridRow: `${gridRow} / span ${rowSpan}`,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                      }}
-                                      className={hl || undefined}
-                                    >
-                                      <dt className={`text-sm ${labelCn}`}>
-                                        {fieldDef.label}
-                                        {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
-                                        {fFx?.readOnly ? (
-                                          <span className="ml-2 text-xs font-normal text-gray-400">
-                                            (read-only)
-                                          </span>
-                                        ) : null}
-                                      </dt>
-                                      <dd
-                                        className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
-                                        style={rowSpan > 1 ? { flex: 1 } : undefined}
-                                      >
-                                        {renderValue(layoutField.apiName, value, fieldDef)}
-                                        {badgeC ? <span className={badgeC}>Status</span> : null}
-                                      </dd>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })() : (
-                          <div
-                            className={`grid gap-6 ${
-                              section.columns === 1
-                                ? 'grid-cols-1'
-                                : section.columns === 2
-                                  ? 'grid-cols-1 md:grid-cols-2'
-                                  : section.columns === 4
-                                    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-                                    : 'grid-cols-1 md:grid-cols-3'
-                            }`}
-                          >
-                            {columnArrays.map((colFields, colIdx) => (
-                              <div key={`col-${colIdx}`} className="flex flex-col gap-4">
-                                {colFields.map(({ layoutField, fieldDef }) => {
-                                  const value = getRecordValue(layoutField.apiName, fieldDef);
-                                  const fFx = pageLayout
-                                    ? getFormattingEffectsForField(
-                                        pageLayout,
-                                        layoutField.apiName,
-                                        layoutVisibilityData
-                                      )
-                                    : null;
-                                  const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
-                                  const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
-                                  const labelCn = labelPresentationClassName(
-                                    layoutField.presentation
-                                  );
-                                  return (
-                                    <div key={layoutField.apiName} className={hl || undefined}>
-                                      <dt className={`text-sm ${labelCn}`}>
-                                        {fieldDef.label}
-                                        {fieldDef.required && (
-                                          <span className="text-red-500 ml-1">*</span>
-                                        )}
-                                        {fFx?.readOnly ? (
-                                          <span className="ml-2 text-xs font-normal text-gray-400">
-                                            (read-only)
-                                          </span>
-                                        ) : null}
-                                      </dt>
-                                      <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                                        {renderValue(layoutField.apiName, value, fieldDef)}
-                                        {badgeC ? <span className={badgeC}>Status</span> : null}
-                                      </dd>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ))}
-                          </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+          <div className="space-y-4">
+            {/* Tab navigation — only shown when layout has multiple tabs */}
+            {pageLayout.tabs.length > 1 && (() => {
+              const sortedTabsForNav = [...pageLayout.tabs].sort((a: any, b: any) =>
+                (a.order ?? 0) - (b.order ?? 0)
               );
-            })}
+              return (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {sortedTabsForNav.map((tab: any, idx: number) => (
+                    <button
+                      key={tab.id ?? idx}
+                      type="button"
+                      onClick={() => setActiveTabIdx(idx)}
+                      className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+                        activeTabIdx === idx
+                          ? 'border-brand-navy bg-brand-navy text-white'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {tab.label || `Tab ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
+            {/* Render only the active tab when multiple tabs, all tabs when single */}
+            {pageLayout.tabs.length > 1
+              ? (() => {
+                  const sortedTabsForRender = [...pageLayout.tabs].sort((a: any, b: any) =>
+                    (a.order ?? 0) - (b.order ?? 0)
+                  );
+                  const tab = sortedTabsForRender[activeTabIdx] ?? sortedTabsForRender[0];
+                  const ti = activeTabIdx;
+                  return renderTab(tab, ti);
+                })()
+              : pageLayout.tabs.map((tab, ti) => renderTab(tab, ti))
+            }
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 p-6 text-center text-gray-500">
@@ -1188,6 +1216,17 @@ export default function RecordDetailPage({
           title={`Edit ${title}`}
         />
       )}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title={`Delete ${objectDef?.label ?? 'record'}`}
+        description={`Are you sure you want to delete "${title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        variant="destructive"
+        onConfirm={() => { void confirmDelete(); }}
+      />
     </div>
   );
 }

@@ -15,8 +15,10 @@ import {
   type PageWidget,
 } from '@/lib/schema';
 import { getObjectListHref } from '@/lib/object-list-routes';
+import { useToast } from '@/components/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { buildPageLayout } from '../build-page-layout';
-import { CanvasRegion } from '../canvas-region';
+import { CanvasRegion } from '../canvas-section';
 import { DndContextWrapper } from '../dnd-context-wrapper';
 import { EditorToolbar } from '../editor-toolbar';
 import { FloatingProperties } from '../floating-properties';
@@ -29,7 +31,7 @@ import { useEditorStore } from '../editor-store';
 import type {
   EditorPageLayout,
   LayoutPanel,
-  LayoutRegion,
+  LayoutSection,
   LayoutTab,
   LayoutWidget,
   PanelField,
@@ -161,13 +163,13 @@ function normalizeWidget(rawWidget: unknown, widgetIndex: number): LayoutWidget 
   };
 }
 
-function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutRegion {
+function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutSection {
   const candidate = (rawRegion ?? {}) as Record<string, unknown>;
   const panelsRaw = Array.isArray(candidate.panels) ? candidate.panels : [];
   const widgetsRaw = Array.isArray(candidate.widgets) ? candidate.widgets : [];
   return {
     id: typeof candidate.id === 'string' ? candidate.id : `region-${Date.now()}-${regionIndex}`,
-    label: typeof candidate.label === 'string' ? candidate.label : `Region ${regionIndex + 1}`,
+    label: typeof candidate.label === 'string' ? candidate.label : `Section ${regionIndex + 1}`,
     gridColumn: typeof candidate.gridColumn === 'number' ? candidate.gridColumn : 1,
     gridColumnSpan:
       typeof candidate.gridColumnSpan === 'number' ? Math.max(1, candidate.gridColumnSpan) : 12,
@@ -175,7 +177,7 @@ function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutRegion 
     gridRowSpan: typeof candidate.gridRowSpan === 'number' ? candidate.gridRowSpan : 1,
     style:
       candidate.style && typeof candidate.style === 'object'
-        ? (candidate.style as LayoutRegion['style'])
+        ? (candidate.style as LayoutSection['style'])
         : {},
     panels: panelsRaw.map((panel, panelIndex) => normalizePanel(panel, panelIndex)),
     widgets: widgetsRaw.map((widget, widgetIndex) => normalizeWidget(widget, widgetIndex)),
@@ -208,7 +210,7 @@ function toPageField(panelField: PanelField, fieldIndex: number, columns: number
   };
 }
 
-function toPageWidget(widget: LayoutWidget, region: LayoutRegion, widgetIndex: number): PageWidget {
+function toPageWidget(widget: LayoutWidget, region: LayoutSection, widgetIndex: number): PageWidget {
   return {
     id: widget.id,
     widgetType: widget.widgetType,
@@ -252,7 +254,7 @@ function toPersistedLayout(editorLayout: EditorPageLayout): PageLayout {
         if (panels.length === 0) {
           sections.push({
             id: `section-${region.id}`,
-            label: region.label || `Region ${regionIndex + 1}`,
+            label: region.label || `Section ${regionIndex + 1}`,
             columns: 1,
             order: nextSectionOrder++,
             fields: [],
@@ -340,7 +342,7 @@ function toPanelField(pageField: PageField, fieldIndex: number): PanelField {
   };
 }
 
-function toLayoutRegionFromSection(section: PageSection, sectionIndex: number): LayoutRegion {
+function toLayoutSectionFromSection(section: PageSection, sectionIndex: number): LayoutSection {
   const sectionWidgets = Array.isArray(section.widgets) ? section.widgets : [];
   const sectionFields = Array.isArray(section.fields) ? section.fields : [];
   const fields = [...sectionFields]
@@ -349,7 +351,7 @@ function toLayoutRegionFromSection(section: PageSection, sectionIndex: number): 
 
   return {
     id: `region-${section.id || sectionIndex + 1}`,
-    label: section.label || `Region ${sectionIndex + 1}`,
+    label: section.label || `Section ${sectionIndex + 1}`,
     gridColumn: typeof section.gridColumn === 'number' ? section.gridColumn : 1,
     gridColumnSpan:
       typeof section.gridColumnSpan === 'number' ? Math.max(1, section.gridColumnSpan) : 12,
@@ -370,11 +372,11 @@ function toLayoutRegionFromSection(section: PageSection, sectionIndex: number): 
   };
 }
 
-function toLayoutRegionsFromLegacyTab(tab: PageTab): LayoutRegion[] {
+function toLayoutSectionsFromLegacyTab(tab: PageTab): LayoutSection[] {
   const sections = Array.isArray(tab.sections) ? tab.sections : [];
   const regions = [...sections]
     .sort((a, b) => a.order - b.order)
-    .map((section, sectionIndex) => toLayoutRegionFromSection(section, sectionIndex));
+    .map((section, sectionIndex) => toLayoutSectionFromSection(section, sectionIndex));
   const tabWidgets = Array.isArray(tab.widgets) ? tab.widgets : [];
 
   tabWidgets.forEach((widget, widgetIndex) => {
@@ -407,7 +409,7 @@ function toEditorLayout(pageLayout: PageLayout, objectApi: string): EditorPageLa
           id: tab.id,
           label: tab.label,
           order: typeof tab.order === 'number' ? tab.order : tabIndex,
-          regions: toLayoutRegionsFromLegacyTab(tab),
+          regions: toLayoutSectionsFromLegacyTab(tab),
         }));
   const tabs = tabsSource.map((tab, index) => normalizeTab(tab, index));
   const topLevelFormattingRules = Array.isArray(pageLayout.formattingRules)
@@ -437,10 +439,10 @@ function toEditorLayout(pageLayout: PageLayout, objectApi: string): EditorPageLa
   };
 }
 
-function createDefaultRegion(regionCount: number): LayoutRegion {
+function createDefaultRegion(regionCount: number): LayoutSection {
   return {
     id: `region-${Date.now()}`,
-    label: `Region ${regionCount + 1}`,
+    label: `Section ${regionCount + 1}`,
     gridColumn: 1,
     gridColumnSpan: 12,
     gridRow: regionCount + 1,
@@ -459,7 +461,7 @@ function convertTemplateTabsToLayoutTabs(templateTabs: TemplateTabDef[]): Layout
     order: tabIndex,
     regions: (tab.regions ?? []).map((region, regionIndex) => ({
       id: `region-${Date.now()}-${tabIndex}-${regionIndex}-${Math.random().toString(36).slice(2, 6)}`,
-      label: region.label || `Region ${regionIndex + 1}`,
+      label: region.label || `Section ${regionIndex + 1}`,
       gridColumn: typeof region.gridColumn === 'number' ? region.gridColumn : 1,
       gridColumnSpan: typeof region.gridColumnSpan === 'number' ? region.gridColumnSpan : 12,
       gridRow: typeof region.gridRow === 'number' ? region.gridRow : regionIndex + 1,
@@ -484,6 +486,7 @@ export default function PageEditorFullPage() {
   const objectApiName = toParamValue(params.objectApi);
   const layoutId = toParamValue(params.layoutId);
   const routeKey = `${objectApiName}::${layoutId}`;
+  const { showToast } = useToast();
 
   const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
@@ -494,10 +497,11 @@ export default function PageEditorFullPage() {
   const isDirty = useEditorStore((s) => s.isDirty);
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
-  const addRegion = useEditorStore((s) => s.addRegion);
+  const addSection = useEditorStore((s) => s.addSection);
   const loadLayout = useEditorStore((s) => s.loadLayout);
   const setFormattingRules = useEditorStore((s) => s.setFormattingRules);
 
+  const [pendingNavHref, setPendingNavHref] = useState<string | null>(null);
   const [showFormattingRulesDialog, setShowFormattingRulesDialog] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [rulesTargetFilter, setRulesTargetFilter] = useState<
@@ -507,6 +511,7 @@ export default function PageEditorFullPage() {
   const [showTemplateGallery, setShowTemplateGallery] = useState(layoutId === 'new');
   const [paletteTab, setPaletteTab] = useState<'fields' | 'components'>('fields');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const leftPanelContainerId = `page-editor-left-panel-${encodeURIComponent(routeKey || 'new')}`;
 
   const sidePanels = useEditorSidePanels();
@@ -601,7 +606,7 @@ export default function PageEditorFullPage() {
   const performSave = useCallback(async (): Promise<boolean> => {
     if (!object) return false;
     if (!layout.name.trim()) {
-      alert('Please enter a layout name.');
+      showToast('Please enter a layout name.', 'error');
       return false;
     }
 
@@ -632,10 +637,12 @@ export default function PageEditorFullPage() {
           `/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(savedLayout.id)}`,
         );
       }
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
       return true;
     } catch (err) {
       console.error('Failed to save layout:', err);
-      alert('Failed to save layout. Please try again.');
+      showToast('Failed to save layout. Please try again.', 'error');
       return false;
     } finally {
       setIsSaving(false);
@@ -649,22 +656,20 @@ export default function PageEditorFullPage() {
   const requestNavigate = useCallback(
     (href: string) => {
       if (useEditorStore.getState().isDirty) {
-        const confirmed = window.confirm(
-          'You have unsaved changes. Leave this page without saving?',
-        );
-        if (!confirmed) return;
+        setPendingNavHref(href);
+        return;
       }
       router.push(href);
     },
     [router],
   );
 
-  const handleAddRegion = useCallback(() => {
+  const handleAddSection = useCallback(() => {
     if (!activeTab) return;
     const region = createDefaultRegion(activeTab.regions.length);
-    addRegion(region, activeTab.id);
+    addSection(region, activeTab.id);
     setSelectedElement({ type: 'region', id: region.id });
-  }, [activeTab, addRegion, setSelectedElement]);
+  }, [activeTab, addSection, setSelectedElement]);
 
   const handleLeftResizeKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -807,10 +812,10 @@ export default function PageEditorFullPage() {
                     type="button"
                     variant="outline"
                     className="mt-4 w-full border-dashed border-gray-300 hover:border-brand-navy hover:text-brand-navy"
-                    onClick={handleAddRegion}
+                    onClick={handleAddSection}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Region
+                    Add Section
                   </Button>
                 </>
               ) : (
@@ -820,14 +825,15 @@ export default function PageEditorFullPage() {
               )}
             </div>
           </main>
+          {/* Right properties sidebar — always visible, 320px wide */}
+          <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-gray-200 bg-white">
+            <FloatingProperties
+              onClose={() => setSelectedElement(null)}
+              availableFields={allFields}
+            />
+          </div>
         </div>
       </DndContextWrapper>
-
-      <FloatingProperties
-        open={selectedElement !== null}
-        onClose={() => setSelectedElement(null)}
-        availableFields={allFields}
-      />
 
       <LayoutPreviewDialog
         open={showPreview}
@@ -862,11 +868,28 @@ export default function PageEditorFullPage() {
         )}
       />
 
-      {isSaving ? (
-        <div className="pointer-events-none fixed bottom-4 right-4 rounded-md bg-gray-900 px-3 py-2 text-xs text-white shadow-lg">
-          Saving...
+      <ConfirmDialog
+        open={pendingNavHref !== null}
+        onOpenChange={(open) => { if (!open) setPendingNavHref(null); }}
+        title="You have unsaved changes"
+        description="Leave this page without saving? Your changes will be lost."
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        variant="destructive"
+        onConfirm={() => {
+          const href = pendingNavHref;
+          setPendingNavHref(null);
+          if (href) router.push(href);
+        }}
+      />
+
+      {(isSaving || saveSuccess) && (
+        <div className={`pointer-events-none fixed bottom-4 right-4 rounded-md px-3 py-2 text-xs text-white shadow-lg transition-colors ${
+          saveSuccess ? 'bg-emerald-600' : 'bg-gray-900'
+        }`}>
+          {saveSuccess ? 'Saved ✓' : 'Saving...'}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

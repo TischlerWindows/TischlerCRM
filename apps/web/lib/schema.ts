@@ -416,7 +416,7 @@ export interface LayoutWidget {
   config: WidgetConfig;
 }
 
-export interface LayoutRegion {
+export interface LayoutSection {
   id: string;
   label: string;
   gridColumn: number;
@@ -433,7 +433,7 @@ export interface LayoutTab {
   id: string;
   label: string;
   order: number;
-  regions: LayoutRegion[];
+  regions: LayoutSection[];
 }
 
 export interface PageLayout {
@@ -499,10 +499,10 @@ export interface SchemaVersion {
 }
 
 export type TemplatePanelDef = Omit<LayoutPanel, 'fields'>;
-export type TemplateRegionDef = Omit<LayoutRegion, 'panels' | 'widgets'> & {
+export type TemplateSectionDef = Omit<LayoutSection, 'panels' | 'widgets'> & {
   panels: TemplatePanelDef[];
 };
-export type TemplateTabDef = Omit<LayoutTab, 'regions'> & { regions: TemplateRegionDef[] };
+export type TemplateTabDef = Omit<LayoutTab, 'regions'> & { regions: TemplateSectionDef[] };
 
 /** Structural skeleton of a saved layout template (no field data) */
 export interface CustomLayoutTemplate {

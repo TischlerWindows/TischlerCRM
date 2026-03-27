@@ -3,7 +3,7 @@ import type {
   EditorPageLayout,
   SelectedElement,
   LayoutTab,
-  LayoutRegion,
+  LayoutSection,
   LayoutPanel,
   PanelField,
   LayoutWidget,
@@ -15,7 +15,7 @@ import type {
 function findRegionEntry(
   layout: EditorPageLayout,
   regionId: string,
-): { tab: LayoutTab; region: LayoutRegion } | undefined {
+): { tab: LayoutTab; region: LayoutSection } | undefined {
   for (const tab of layout.tabs) {
     const region = tab.regions.find((r) => r.id === regionId);
     if (region) return { tab, region };
@@ -25,7 +25,7 @@ function findRegionEntry(
 function findPanelEntry(
   layout: EditorPageLayout,
   panelId: string,
-): { tab: LayoutTab; region: LayoutRegion; panel: LayoutPanel } | undefined {
+): { tab: LayoutTab; region: LayoutSection; panel: LayoutPanel } | undefined {
   for (const tab of layout.tabs) {
     for (const region of tab.regions) {
       const panel = region.panels.find((p) => p.id === panelId);
@@ -37,7 +37,7 @@ function findPanelEntry(
 function findWidgetEntry(
   layout: EditorPageLayout,
   widgetId: string,
-): { tab: LayoutTab; region: LayoutRegion; widget: LayoutWidget } | undefined {
+): { tab: LayoutTab; region: LayoutSection; widget: LayoutWidget } | undefined {
   for (const tab of layout.tabs) {
     for (const region of tab.regions) {
       const widget = region.widgets.find((w) => w.id === widgetId);
@@ -87,11 +87,11 @@ export interface EditorState {
   // Mutating layout metadata
   setLayoutName: (name: string) => void;
 
-  // Region actions
-  updateRegion: (regionId: string, patch: Partial<LayoutRegion>) => void;
-  addRegion: (region: LayoutRegion, tabId: string) => void;
-  removeRegion: (regionId: string) => void;
-  resizeRegion: (regionId: string, newColSpan: number) => void;
+  // Section actions
+  updateSection: (regionId: string, patch: Partial<LayoutSection>) => void;
+  addSection: (region: LayoutSection, tabId: string) => void;
+  removeSection: (regionId: string) => void;
+  resizeSection: (regionId: string, newColSpan: number) => void;
 
   // Panel actions
   updatePanel: (panelId: string, patch: Partial<LayoutPanel>) => void;
@@ -188,9 +188,9 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     set((s) => ({ layout: { ...s.layout, name } }));
   },
 
-  // ── Region actions ─────────────────────────────────────────────────────────
+  // ── Section actions ─────────────────────────────────────────────────────────
 
-  updateRegion: (regionId, patch) => {
+  updateSection: (regionId, patch) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -205,7 +205,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }));
   },
 
-  addRegion: (region, tabId) => {
+  addSection: (region, tabId) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -217,7 +217,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }));
   },
 
-  removeRegion: (regionId) => {
+  removeSection: (regionId) => {
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -230,7 +230,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     }));
   },
 
-  resizeRegion: (regionId, newColSpan) => {
+  resizeSection: (regionId, newColSpan) => {
     get().pushUndo();
     set((s) => {
       const entry = findRegionEntry(s.layout, regionId);
