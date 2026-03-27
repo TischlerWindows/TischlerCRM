@@ -1001,6 +1001,9 @@ export default function DashboardPage() {
       cardColor: widget.config?.cardColor || '#1e3a5f',
       widgetBg: widget.config?.widgetBg || '',
       accentColor: widget.config?.accentColor || '',
+      fontColor: widget.config?.fontColor || '',
+      hBarLabelPos: widget.config?.hBarLabelPos || 'left',
+      hBarValuePos: widget.config?.hBarValuePos || 'right',
       hiddenUntilFilter: widget.config?.hiddenUntilFilter || false,
       filterButtons: (() => {
         // Load filter buttons from the section (not the widget)
@@ -2408,10 +2411,13 @@ export default function DashboardPage() {
       // Compute drill-down expansion even in view mode
       const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
       const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
-      if (isExpandedCard || isExpandedDrill) {
-        const spanW = 9;
-        const spanH = isExpandedCard ? 3 : Math.max(widget.position.h + 2, 3);
-        return renderWidget(widget, { gridColumn: `span ${spanW}`, gridRow: `span ${spanH}` }, sectionFilter);
+      if (isExpandedCard) {
+        return renderWidget(widget, { gridColumn: 'span 9', gridRow: 'span 3' }, sectionFilter);
+      }
+      if (isExpandedDrill) {
+        // Keep original width, just add rows for the drill-down table
+        const spanH = Math.max(widget.position.h + 3, 4);
+        return renderWidget(widget, { gridColumn: `span ${widget.position.w}`, gridRow: `span ${spanH}` }, sectionFilter);
       }
       return renderWidget(widget, undefined, sectionFilter);
     }
@@ -2421,8 +2427,8 @@ export default function DashboardPage() {
     // Card or chart drill-down expansion
     const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
     const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
-    const spanW = (isExpandedCard || isExpandedDrill) ? 9 : widget.position.w;
-    const spanH = isExpandedCard ? 3 : isExpandedDrill ? Math.max(widget.position.h + 2, 3) : widget.position.h;
+    const spanW = isExpandedCard ? 9 : widget.position.w;
+    const spanH = isExpandedCard ? 3 : isExpandedDrill ? Math.max(widget.position.h + 3, 4) : widget.position.h;
 
     return (
       <div
