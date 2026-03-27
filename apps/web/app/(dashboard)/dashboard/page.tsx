@@ -51,7 +51,7 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords } from '@/lib/chart-data-utils';
+import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords, getCachedRecords, stripFieldPrefix } from '@/lib/chart-data-utils';
 import { recordsService } from '@/lib/records-service';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
@@ -188,6 +188,7 @@ export default function DashboardPage() {
   const [editingWidget, setEditingWidget] = useState<string | null>(null);
   const [refreshingWidgetId, setRefreshingWidgetId] = useState<string | null>(null);
   const [drillDownWidgetId, setDrillDownWidgetId] = useState<string | null>(null);
+  const [drillDownLabel, setDrillDownLabel] = useState<string | null>(null);
   const [activeFilterButtons, setActiveFilterButtons] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -1155,6 +1156,41 @@ export default function DashboardPage() {
     setDropTarget(null);
   };
 
+  // --- Drill-down helpers ---
+  const handleChartDrillDown = (widget: DashboardWidget, label: string) => {
+    if (drillDownWidgetId === widget.id && drillDownLabel === label) {
+      setDrillDownWidgetId(null);
+      setDrillDownLabel(null);
+    } else {
+      setDrillDownWidgetId(widget.id);
+      setDrillDownLabel(label);
+    }
+  };
+
+  const closeDrillDown = () => {
+    setDrillDownWidgetId(null);
+    setDrillDownLabel(null);
+  };
+
+  const getDrillDownRecords = (widget: DashboardWidget, label: string): any[] => {
+    if (widget.config?.dataSourceMode === 'report' && widget.reportId) {
+      const report = availableReports.find((r: any) => r.id === widget.reportId);
+      if (!report) return [];
+      const records = getCachedRecords(report.objectType);
+      const xAxisField = widget.config.xAxis || '';
+      const xField = stripFieldPrefix(xAxisField);
+      return records.filter((r: any) => {
+        let val = r[xAxisField] || r[xField];
+        if (val === null || val === undefined || val === '') val = 'Unspecified';
+        else val = String(val).substring(0, 50);
+        return val === label;
+      });
+    }
+    // Manual data — return matching entries
+    const data = widget.config?.data || widget.config?.manualData || [];
+    return data.filter((d: any) => d.label === label);
+  };
+
   const renderWidget = (widget: DashboardWidget, overrideStyle?: React.CSSProperties) => {
     const widgetStyle: React.CSSProperties = overrideStyle || {
       gridColumn: `span ${widget.position.w}`,
@@ -1333,7 +1369,7 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data: any) => handleChartDrillDown(widget, data.label)}>
                       {widget.config.data.map((entry: any, idx: number) => (
                         <Cell key={idx} fill={entry.color || widget.config.barColor || widgetAccent} />
                       ))}
@@ -1397,7 +1433,7 @@ export default function DashboardPage() {
                 const widthPercent = (item.value / maxValue) * 100;
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 return (
-                  <div key={idx} className="flex items-center gap-3 flex-1 min-h-0">
+                  <div key={idx} className="flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
                     <div className="text-xs text-gray-600 w-20 text-right truncate">{item.label}</div>
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
@@ -1487,6 +1523,8 @@ export default function DashboardPage() {
                         stackId="stack"
                         fill={svColors[idx % svColors.length]}
                         radius={idx === svStackKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        cursor="pointer"
+                        onClick={(data: any) => handleChartDrillDown(widget, data.label)}
                       />
                     ))}
                   </BarChart>
@@ -1573,7 +1611,7 @@ export default function DashboardPage() {
                     const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                     
                     return (
-                      <div key={idx} className="flex items-center gap-3">
+                      <div key={idx} className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
                         <div className="text-xs text-gray-600 w-24 text-right truncate flex-shrink-0" title={item.label}>
                           {item.label}
                         </div>
@@ -1689,8 +1727,8 @@ export default function DashboardPage() {
                       dataKey="value"
                       stroke={widgetAccent}
                       strokeWidth={2}
-                      dot={{ r: 4, fill: widgetAccent }}
-                      activeDot={{ r: 6, fill: '#da291c' }}
+                      dot={{ r: 4, fill: widgetAccent, cursor: 'pointer' }}
+                      activeDot={{ r: 6, fill: '#da291c', cursor: 'pointer', onClick: (_e: any, payload: any) => handleChartDrillDown(widget, payload?.payload?.label) }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1751,7 +1789,8 @@ export default function DashboardPage() {
                     acc.push({
                       percentage,
                       offset,
-                      color: item.color || defaultColors[idx % defaultColors.length]
+                      color: item.color || defaultColors[idx % defaultColors.length],
+                      label: item.label
                     });
                     return acc;
                   }, []).map((segment: any, idx: number) => (
@@ -1765,13 +1804,15 @@ export default function DashboardPage() {
                       strokeWidth="20"
                       strokeDasharray={`${segment.percentage * 2.513} 251.3`}
                       strokeDashoffset={-segment.offset * 2.513}
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => handleChartDrillDown(widget, segment.label)}
                     />
                   ))}
                 </svg>
               </div>
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-2 text-xs">
+                  <div key={idx} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors" onClick={() => handleChartDrillDown(widget, item.label)}>
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                     <span className="text-gray-700">{item.label}</span>
                     <span className="text-gray-500 ml-auto">{item.value}%</span>
@@ -1914,7 +1955,7 @@ export default function DashboardPage() {
             {/* Toolbar */}
             <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
               <button
-                onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+                onClick={() => { setDrillDownWidgetId(isExpanded ? null : widget.id); setDrillDownLabel(null); }}
                 className="p-0.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
                 title={isExpanded ? 'Collapse' : 'Drill down to data'}
               >
@@ -1970,7 +2011,7 @@ export default function DashboardPage() {
               return (
                 <div
                   className={`flex-1 flex items-center justify-center ${isCompact ? 'gap-1 px-2' : 'gap-5 px-6'} cursor-pointer select-none ${isExpanded ? 'py-5' : ''}`}
-                  onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
+                  onClick={() => { setDrillDownWidgetId(isExpanded ? null : widget.id); setDrillDownLabel(null); }}
                 >
                   <div className={`text-center ${isCompact ? 'min-w-0 overflow-hidden' : ''}`}>
                     <div className={`${titleSizeClass} text-gray-600 font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
@@ -3665,6 +3706,84 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Drill-down modal overlay */}
+      {drillDownLabel && drillDownWidgetId && (() => {
+        const ddWidget = selectedDashboard?.widgets.find(w => w.id === drillDownWidgetId);
+        if (!ddWidget || ddWidget.type === 'card') return null;
+        const records = getDrillDownRecords(ddWidget, drillDownLabel);
+        const columns = records.length > 0
+          ? Object.keys(records[0]).filter(k => k !== 'id' && !k.startsWith('_'))
+          : [];
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6" onClick={closeDrillDown}>
+            <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{ddWidget.title}</h3>
+                  <p className="text-sm text-gray-500">
+                    Showing {records.length} record{records.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  </p>
+                </div>
+                <button
+                  onClick={closeDrillDown}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              {/* Table */}
+              <div className="flex-1 overflow-auto">
+                {records.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0">
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-12">#</th>
+                        {columns.map(col => (
+                          <th key={col} className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            {stripFieldPrefix(col)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {records.map((row: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                          <td className="py-2.5 px-4 text-gray-400 text-xs">{idx + 1}</td>
+                          {columns.map(col => (
+                            <td key={col} className="py-2.5 px-4 text-gray-700">
+                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                    <TableIcon className="w-10 h-10 mb-3 opacity-40" />
+                    <p className="text-sm">No records found for &quot;{drillDownLabel}&quot;</p>
+                    <p className="text-xs mt-1">This may be because records haven&apos;t been loaded yet. Try refreshing the widget first.</p>
+                  </div>
+                )}
+              </div>
+              {/* Footer */}
+              {ddWidget.reportId && (
+                <div className="border-t border-gray-200 px-6 py-3 bg-gray-50 flex items-center justify-between">
+                  <span className="text-xs text-gray-500">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+                  <Link
+                    href={`/reports/view/${ddWidget.reportId}`}
+                    className="text-xs font-medium text-brand-navy hover:underline flex items-center gap-1"
+                  >
+                    Open full report <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
