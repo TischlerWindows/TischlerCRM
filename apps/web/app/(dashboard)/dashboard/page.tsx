@@ -66,6 +66,7 @@ interface DashboardSection {
   id: string;
   title: string;
   subtitle?: string;
+  filterButtons?: Array<{ label: string; field: string; value: string }>;
 }
 
 interface DashboardWidget {
@@ -693,8 +694,22 @@ export default function DashboardPage() {
     }
     const targetSectionId = widgetConfig.sectionId || sections[0].id;
 
+    // Move filter buttons to the section
+    const filterButtons = widgetConfig.filterButtons || [];
+    if (filterButtons.length > 0) {
+      sections = sections.map(s => {
+        if (s.id !== targetSectionId) return s;
+        const existing = s.filterButtons || [];
+        const merged = [...existing];
+        for (const btn of filterButtons) {
+          if (!merged.some(b => b.label === btn.label)) merged.push(btn);
+        }
+        return { ...s, filterButtons: merged };
+      });
+    }
+
     // Use the real previewData that was computed with actual aggregation
-    let configData: any = { ...widgetConfig };
+    let configData: any = { ...widgetConfig, filterButtons: [] };
     if (previewData) {
       if (previewData.data) {
         configData.data = previewData.data;
@@ -987,7 +1002,12 @@ export default function DashboardPage() {
       widgetBg: widget.config?.widgetBg || '',
       accentColor: widget.config?.accentColor || '',
       hiddenUntilFilter: widget.config?.hiddenUntilFilter || false,
-      filterButtons: widget.config?.filterButtons || [],
+      filterButtons: (() => {
+        // Load filter buttons from the section (not the widget)
+        const sId = widget.sectionId;
+        const sec = sId ? (selectedDashboard?.sections || []).find(s => s.id === sId) : null;
+        return sec?.filterButtons || widget.config?.filterButtons || [];
+      })(),
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
       footer: widget.config?.footer || '',
@@ -1002,9 +1022,25 @@ export default function DashboardPage() {
 
     // Get the existing widget to preserve its position
     const existingWidget = selectedDashboard.widgets.find(w => w.id === editingWidget);
+    const targetSectionId = widgetConfig.sectionId || existingWidget?.sectionId || (selectedDashboard.sections || [])[0]?.id;
+
+    // Move filter buttons to the section
+    let sections = [...(selectedDashboard.sections || [])];
+    const filterButtons = widgetConfig.filterButtons || [];
+    if (filterButtons.length > 0 && targetSectionId) {
+      sections = sections.map(s => {
+        if (s.id !== targetSectionId) return s;
+        const existing = s.filterButtons || [];
+        const merged = [...existing];
+        for (const btn of filterButtons) {
+          if (!merged.some(b => b.label === btn.label)) merged.push(btn);
+        }
+        return { ...s, filterButtons: merged };
+      });
+    }
 
     // Use the real previewData that was computed with actual aggregation
-    let configData: any = { ...widgetConfig };
+    let configData: any = { ...widgetConfig, filterButtons: [] };
     if (previewData) {
       if (previewData.data) {
         configData.data = previewData.data;
@@ -1033,6 +1069,7 @@ export default function DashboardPage() {
 
     const updatedDashboard = {
       ...selectedDashboard,
+      sections,
       widgets: selectedDashboard.widgets.map(w => w.id === editingWidget ? updatedWidget : w),
       lastModifiedAt: new Date().toISOString().split('T')[0] || ''
     };
@@ -1194,7 +1231,17 @@ export default function DashboardPage() {
     return data.filter((d: any) => d.label === label);
   };
 
-  const renderWidget = (widget: DashboardWidget, overrideStyle?: React.CSSProperties) => {
+  const renderWidget = (widget: DashboardWidget, overrideStyle?: React.CSSProperties, sectionFilter?: { field: string; value: string } | null) => {
+    // Apply section-level filter to widget data
+    if (sectionFilter && sectionFilter.field && sectionFilter.value) {
+      const originalData = widget.config?.data || [];
+      const filtered = originalData.filter((row: any) => {
+        const fieldVal = String(row[sectionFilter.field] ?? '').toLowerCase();
+        return fieldVal === sectionFilter.value.toLowerCase();
+      });
+      widget = { ...widget, config: { ...widget.config, data: filtered } };
+    }
+
     const widgetStyle: React.CSSProperties = overrideStyle || {
       gridColumn: `span ${widget.position.w}`,
       gridRow: `span ${widget.position.h}`
@@ -1212,56 +1259,8 @@ export default function DashboardPage() {
     const labelColorClass = fc ? '' : 'text-gray-600';
     const valueColorClass = fc ? '' : 'text-gray-700';
 
-    // --- Filter buttons: filter data based on active button ---
-    const filterBtns: Array<{ label: string; field: string; value: string }> = widget.config?.filterButtons || [];
-    const activeBtn = activeFilterButtons[widget.id] || null;
-    let filteredWidget = widget;
-    if (filterBtns.length > 0 && activeBtn) {
-      const btn = filterBtns.find(b => b.label === activeBtn);
-      if (btn && btn.field && btn.value) {
-        const originalData = widget.config?.data || [];
-        const filtered = originalData.filter((row: any) => {
-          const fieldVal = String(row[btn.field] ?? '').toLowerCase();
-          return fieldVal === btn.value.toLowerCase();
-        });
-        filteredWidget = {
-          ...widget,
-          config: { ...widget.config, data: filtered }
-        };
-      }
-    }
-
-    const filterBar = filterBtns.length > 0 ? (
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 overflow-x-auto flex-shrink-0">
-        <button
-          onClick={() => setActiveFilterButtons(prev => ({ ...prev, [widget.id]: null }))}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-            !activeBtn ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-          style={!activeBtn ? { backgroundColor: widgetAccent } : undefined}
-        >
-          All
-        </button>
-        {filterBtns.map((btn) => (
-          <button
-            key={btn.label}
-            onClick={() => setActiveFilterButtons(prev => ({
-              ...prev,
-              [widget.id]: prev[widget.id] === btn.label ? null : btn.label
-            }))}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-              activeBtn === btn.label ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            style={activeBtn === btn.label ? { backgroundColor: widgetAccent } : undefined}
-          >
-            {btn.label}
-          </button>
-        ))}
-      </div>
-    ) : null;
-
-    // Apply filtered data to widget for rendering
-    widget = filteredWidget;
+    // --- Section-level filter: applied before rendering ---
+    const filterBar = null; // Filter bar is now rendered at section level
 
     switch (widget.type) {
       case 'metric':
@@ -1317,10 +1316,7 @@ export default function DashboardPage() {
         const vbDrillRecords = vbDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const vbDrillColumns = vbDrillRecords.length > 0 ? Object.keys(vbDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(vbDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative flex flex-col group transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1449,10 +1445,7 @@ export default function DashboardPage() {
         const hDrillRecords = hDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const hDrillColumns = hDrillRecords.length > 0 ? Object.keys(hDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(hDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1568,10 +1561,7 @@ export default function DashboardPage() {
         const svDrillColumns = svDrillRecords.length > 0 ? Object.keys(svDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(svDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1703,10 +1693,7 @@ export default function DashboardPage() {
         const shDrillColumns = shDrillRecords.length > 0 ? Object.keys(shDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(shDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1866,10 +1853,7 @@ export default function DashboardPage() {
         const lnDrillRecords = lnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const lnDrillColumns = lnDrillRecords.length > 0 ? Object.keys(lnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(lnDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1996,10 +1980,7 @@ export default function DashboardPage() {
         const dnDrillRecords = dnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
         const dnDrillColumns = dnDrillRecords.length > 0 ? Object.keys(dnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={{
-            ...bgStyle,
-            ...(dnDrillActive ? { gridColumn: 'span 9', gridRow: `span ${Math.max(widget.position.h + 2, 3)}` } : {})
-          }} className={`${bgClass} p-6 relative flex flex-col transition-all duration-300`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col transition-all duration-300`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -2416,14 +2397,24 @@ export default function DashboardPage() {
   };
 
   /** Wrap a widget with drag-and-drop behavior + drop indicator */
-  const renderWidgetWithDrag = (widget: DashboardWidget, sectionId: string | undefined) => {
+  const renderWidgetWithDrag = (widget: DashboardWidget, sectionId: string | undefined, sectionFilter?: { field: string; value: string } | null) => {
     // Hidden until a filter button is active
     if (widget.config?.hiddenUntilFilter && !dashEditMode) {
-      const activeBtn = activeFilterButtons[widget.id] || null;
-      if (!activeBtn) return null;
+      const sectionActive = sectionId ? activeFilterButtons[sectionId] : null;
+      if (!sectionActive) return null;
     }
 
-    if (!dashEditMode) return renderWidget(widget);
+    if (!dashEditMode) {
+      // Compute drill-down expansion even in view mode
+      const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
+      const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
+      if (isExpandedCard || isExpandedDrill) {
+        const spanW = 9;
+        const spanH = isExpandedCard ? 3 : Math.max(widget.position.h + 2, 3);
+        return renderWidget(widget, { gridColumn: `span ${spanW}`, gridRow: `span ${spanH}` }, sectionFilter);
+      }
+      return renderWidget(widget, undefined, sectionFilter);
+    }
 
     const isDragging = draggingWidgetId === widget.id;
     const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
@@ -2469,7 +2460,7 @@ export default function DashboardPage() {
             <GripVertical className="w-4 h-4 text-gray-400" />
           </div>
         </div>
-        {renderWidget(widget, { width: '100%', height: '100%' })}
+        {renderWidget(widget, { width: '100%', height: '100%' }, sectionFilter)}
       </div>
     );
   };
@@ -2997,7 +2988,53 @@ export default function DashboardPage() {
                           {section.subtitle && (
                             <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
                           )}
-                          {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
+                          {/* Section-level filter buttons */}
+                          {(() => {
+                            const sectionFilterBtns = section.filterButtons || [];
+                            // Also collect from widgets for backwards compat
+                            const widgetFilterBtns = sectionWidgets.flatMap(w => w.config?.filterButtons || []);
+                            const allBtns = [...sectionFilterBtns, ...widgetFilterBtns];
+                            // Deduplicate by label
+                            const uniqueBtns = allBtns.filter((btn, idx, arr) => arr.findIndex(b => b.label === btn.label) === idx);
+                            const activeBtn = activeFilterButtons[section.id] || null;
+                            if (uniqueBtns.length === 0) return null;
+                            return (
+                              <div className="flex items-center gap-1.5 mb-3 overflow-x-auto">
+                                <button
+                                  onClick={() => setActiveFilterButtons(prev => ({ ...prev, [section.id]: null }))}
+                                  className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                                    !activeBtn ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  All
+                                </button>
+                                {uniqueBtns.map((btn) => (
+                                  <button
+                                    key={btn.label}
+                                    onClick={() => setActiveFilterButtons(prev => ({
+                                      ...prev,
+                                      [section.id]: prev[section.id] === btn.label ? null : btn.label
+                                    }))}
+                                    className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                                      activeBtn === btn.label ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {btn.label}
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                          {(() => {
+                            // Compute the active section filter to pass to each widget
+                            const sectionFilterBtns = section.filterButtons || [];
+                            const widgetFilterBtns = sectionWidgets.flatMap(w => w.config?.filterButtons || []);
+                            const allBtns = [...sectionFilterBtns, ...widgetFilterBtns];
+                            const uniqueBtns = allBtns.filter((btn, idx, arr) => arr.findIndex(b => b.label === btn.label) === idx);
+                            const activeBtn = activeFilterButtons[section.id] || null;
+                            const activeBtnObj = activeBtn ? uniqueBtns.find(b => b.label === activeBtn) : null;
+                            const sectionFilter = activeBtnObj ? { field: activeBtnObj.field, value: activeBtnObj.value } : null;
+                            return (sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId)) ? (
                             <>
                             <div
                               className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
@@ -3016,7 +3053,7 @@ export default function DashboardPage() {
                                 handleWidgetDrop(section.id, null);
                               }}
                             >
-                              {sectionWidgets.map(widget => renderWidgetWithDrag(widget, section.id))}
+                              {sectionWidgets.map(widget => renderWidgetWithDrag(widget, section.id, sectionFilter))}
                               {/* End-of-section drop indicator */}
                               {isSectionDropTarget && (
                                 <div style={{ gridColumn: 'span 9', height: '4px', gridRow: 'span 1' }} className="flex items-center self-start">
@@ -3043,7 +3080,8 @@ export default function DashboardPage() {
                             >
                               <Plus className="w-4 h-4" /> Add Widget
                             </button>
-                          )}
+                          );
+                          })()}
                         </div>
                       );
                     })}
@@ -3908,10 +3946,10 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Filter Buttons */}
+              {/* Section Filter Buttons */}
               <div className="border-t pt-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-gray-900">Filter Buttons</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">Section Filter Buttons</h3>
                   {(widgetConfig.filterButtons?.length || 0) < 10 && (
                     <button
                       type="button"
@@ -3933,9 +3971,9 @@ export default function DashboardPage() {
                     onChange={(e) => setWidgetConfig({ ...widgetConfig, hiddenUntilFilter: e.target.checked })}
                     className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
                   />
-                  <span className="text-xs font-medium text-gray-800">Only visible when a filter button is selected</span>
+                  <span className="text-xs font-medium text-gray-800">Only visible when a section filter is active</span>
                 </label>
-                <p className="text-xs text-gray-500 mb-3">Add up to 10 buttons that filter this widget&apos;s data. Each button filters by matching a data field to a value.</p>
+                <p className="text-xs text-gray-500 mb-3">Add buttons that filter all widgets in this section. Each button filters by matching a data field to a value.</p>
                 {(widgetConfig.filterButtons || []).length > 0 ? (
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
                     {(widgetConfig.filterButtons || []).map((btn: any, idx: number) => (
