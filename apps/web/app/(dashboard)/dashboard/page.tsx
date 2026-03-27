@@ -89,7 +89,6 @@ interface Dashboard {
   lastModifiedAt: string;
   isFavorite?: boolean;
   backgroundColor?: string;
-  accentColor?: string;
 }
 
 const WIDGET_TYPES = [
@@ -175,6 +174,8 @@ export default function DashboardPage() {
     sortBy: '',
     customLink: '',
     cardColor: '#1e3a5f',
+    widgetBg: '',
+    accentColor: '',
     filterButtons: [] as Array<{ label: string; field: string; value: string }>,
     title: '',
     subtitle: '',
@@ -953,6 +954,8 @@ export default function DashboardPage() {
       sortBy: widget.config?.sortBy || '',
       customLink: widget.config?.customLink || '',
       cardColor: widget.config?.cardColor || '#1e3a5f',
+      widgetBg: widget.config?.widgetBg || '',
+      accentColor: widget.config?.accentColor || '',
       filterButtons: widget.config?.filterButtons || [],
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
@@ -1131,7 +1134,10 @@ export default function DashboardPage() {
       gridRow: `span ${widget.position.h}`
     };
 
-    const dashAccent = selectedDashboard?.accentColor || '#151f6d';
+    const widgetAccent = widget.config?.accentColor || '#151f6d';
+    const widgetBg = widget.config?.widgetBg || '';
+    const bgClass = widgetBg ? 'rounded-lg border border-gray-200' : 'bg-white rounded-lg border border-gray-200';
+    const bgStyle = widgetBg ? { ...widgetStyle, backgroundColor: widgetBg } : widgetStyle;
 
     // --- Filter buttons: filter data based on active button ---
     const filterBtns: Array<{ label: string; field: string; value: string }> = widget.config?.filterButtons || [];
@@ -1159,7 +1165,7 @@ export default function DashboardPage() {
           className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
             !activeBtn ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
-          style={!activeBtn ? { backgroundColor: dashAccent } : undefined}
+          style={!activeBtn ? { backgroundColor: widgetAccent } : undefined}
         >
           All
         </button>
@@ -1173,7 +1179,7 @@ export default function DashboardPage() {
             className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
               activeBtn === btn.label ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
-            style={activeBtn === btn.label ? { backgroundColor: dashAccent } : undefined}
+            style={activeBtn === btn.label ? { backgroundColor: widgetAccent } : undefined}
           >
             {btn.label}
           </button>
@@ -1187,7 +1193,7 @@ export default function DashboardPage() {
     switch (widget.type) {
       case 'metric':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse" />
             )}
@@ -1235,7 +1241,7 @@ export default function DashboardPage() {
 
       case 'vertical-bar':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative flex flex-col group">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1300,7 +1306,7 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" fill={widget.config.barColor || dashAccent} radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="value" fill={widget.config.barColor || widgetAccent} radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1314,7 +1320,7 @@ export default function DashboardPage() {
 
       case 'horizontal-bar':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1365,7 +1371,7 @@ export default function DashboardPage() {
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
-                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: dashAccent }}
+                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: widgetAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
@@ -1379,10 +1385,10 @@ export default function DashboardPage() {
 
       case 'stacked-vertical-bar': {
         const svStackKeys = widget.config.stackKeys || [];
-        const svColors = [dashAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const svColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
         
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1466,10 +1472,10 @@ export default function DashboardPage() {
 
       case 'stacked-horizontal-bar':
         const stackKeys = widget.config.stackKeys || [];
-        const colors = [dashAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
         
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1585,7 +1591,7 @@ export default function DashboardPage() {
 
       case 'line':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1650,9 +1656,9 @@ export default function DashboardPage() {
                     <Line
                       type="monotone"
                       dataKey="value"
-                      stroke={dashAccent}
+                      stroke={widgetAccent}
                       strokeWidth={2}
-                      dot={{ r: 4, fill: dashAccent }}
+                      dot={{ r: 4, fill: widgetAccent }}
                       activeDot={{ r: 6, fill: '#da291c' }}
                     />
                   </LineChart>
@@ -1668,7 +1674,7 @@ export default function DashboardPage() {
 
       case 'donut':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1708,7 +1714,7 @@ export default function DashboardPage() {
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const colors = [dashAccent, '#da291c', '#9f9fa2', '#293241'];
+                    const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241'];
                     const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
                     
                     acc.push({
@@ -1735,7 +1741,7 @@ export default function DashboardPage() {
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: [dashAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                     <span className="text-gray-700">{item.label}</span>
                     <span className="text-gray-500 ml-auto">{item.value}%</span>
                   </div>
@@ -1747,7 +1753,7 @@ export default function DashboardPage() {
 
       case 'gauge':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1790,7 +1796,7 @@ export default function DashboardPage() {
 
       case 'table':
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative overflow-auto">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative overflow-auto`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1855,7 +1861,7 @@ export default function DashboardPage() {
       case 'card': {
         const isExpanded = drillDownWidgetId === widget.id;
         const cardData = widget.config?.data || widget.config?.manualData || [];
-        const cardColor = widget.config?.cardColor || dashAccent;
+        const cardColor = widget.config?.cardColor || widgetAccent;
         const cardIcon = widget.config?.cardIcon || 'default';
         const cardValue = widget.config?.value ?? widget.config?.manualMetric?.value ?? cardData.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0);
         const cardPrefix = widget.config?.prefix ?? widget.config?.manualMetric?.prefix ?? '';
@@ -1866,10 +1872,10 @@ export default function DashboardPage() {
           <div
             key={widget.id}
             style={{
-              ...widgetStyle,
+              ...bgStyle,
               ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
             }}
-            className="bg-white rounded-lg border border-gray-200 relative group flex flex-col transition-all duration-300"
+            className={`${bgClass} relative group flex flex-col transition-all duration-300`}
           >
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
@@ -2015,7 +2021,7 @@ export default function DashboardPage() {
 
       default:
         return (
-          <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 flex items-center justify-center text-gray-400 relative">
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 flex items-center justify-center text-gray-400 relative`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -2489,7 +2495,7 @@ export default function DashboardPage() {
                 {dashEditMode && (
                   <div className="mb-4 flex items-center gap-6 bg-white border border-gray-200 rounded-lg px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">Background</label>
+                      <label className="text-sm font-medium text-gray-700">Dashboard Background</label>
                       <input
                         type="color"
                         value={selectedDashboard.backgroundColor || '#f3f4f6'}
@@ -2506,33 +2512,6 @@ export default function DashboardPage() {
                         <button
                           onClick={() => {
                             const updated = { ...selectedDashboard, backgroundColor: undefined };
-                            setSelectedDashboard(updated);
-                            const all = dashboards.map(d => d.id === updated.id ? updated : d);
-                            setDashboards(all);
-                            setSetting('dashboards', all);
-                          }}
-                          className="text-xs text-gray-500 hover:text-gray-700"
-                        >Reset</button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">Accent / Bar Color</label>
-                      <input
-                        type="color"
-                        value={selectedDashboard.accentColor || '#151f6d'}
-                        onChange={(e) => {
-                          const updated = { ...selectedDashboard, accentColor: e.target.value };
-                          setSelectedDashboard(updated);
-                          const all = dashboards.map(d => d.id === updated.id ? updated : d);
-                          setDashboards(all);
-                          setSetting('dashboards', all);
-                        }}
-                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-                      />
-                      {selectedDashboard.accentColor && (
-                        <button
-                          onClick={() => {
-                            const updated = { ...selectedDashboard, accentColor: undefined };
                             setSelectedDashboard(updated);
                             const all = dashboards.map(d => d.id === updated.id ? updated : d);
                             setDashboards(all);
@@ -3105,31 +3084,63 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Card color picker */}
-                  {selectedWidgetType === 'card' && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Card Accent Color</label>
+                  {/* Widget Colors */}
+                  <div className="border-t pt-4 mt-2">
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Widget Colors</h4>
+                    <div className="space-y-3">
+                      {/* Widget Background */}
                       <div className="flex items-center gap-3">
+                        <label className="text-xs text-gray-600 w-28">Background</label>
                         <input
                           type="color"
-                          value={widgetConfig.cardColor || '#1e3a5f'}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, cardColor: e.target.value })}
-                          className="w-10 h-10 rounded border border-gray-300 cursor-pointer"
+                          value={widgetConfig.widgetBg || '#ffffff'}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, widgetBg: e.target.value })}
+                          className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                         />
-                        <div className="flex gap-1.5">
-                          {['#1e3a5f', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
+                        {widgetConfig.widgetBg && (
+                          <button type="button" onClick={() => setWidgetConfig({ ...widgetConfig, widgetBg: '' })} className="text-xs text-gray-500 hover:text-gray-700">Reset</button>
+                        )}
+                      </div>
+                      {/* Accent / Bar Color */}
+                      <div className="flex items-center gap-3">
+                        <label className="text-xs text-gray-600 w-28">
+                          {selectedWidgetType === 'line' ? 'Line Color' : selectedWidgetType === 'card' ? 'Card Color' : 'Bar / Accent'}
+                        </label>
+                        <input
+                          type="color"
+                          value={selectedWidgetType === 'card' ? (widgetConfig.cardColor || '#1e3a5f') : (widgetConfig.accentColor || '#151f6d')}
+                          onChange={(e) => {
+                            if (selectedWidgetType === 'card') {
+                              setWidgetConfig({ ...widgetConfig, cardColor: e.target.value });
+                            } else {
+                              setWidgetConfig({ ...widgetConfig, accentColor: e.target.value });
+                            }
+                          }}
+                          className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                        />
+                        <div className="flex gap-1">
+                          {['#151f6d', '#059669', '#dc2626', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
                             <button
                               key={c}
                               type="button"
-                              onClick={() => setWidgetConfig({ ...widgetConfig, cardColor: c })}
-                              className={`w-7 h-7 rounded-full border-2 transition-all ${widgetConfig.cardColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'}`}
+                              onClick={() => {
+                                if (selectedWidgetType === 'card') {
+                                  setWidgetConfig({ ...widgetConfig, cardColor: c });
+                                } else {
+                                  setWidgetConfig({ ...widgetConfig, accentColor: c });
+                                }
+                              }}
+                              className={`w-6 h-6 rounded-full border-2 transition-all ${
+                                (selectedWidgetType === 'card' ? widgetConfig.cardColor : widgetConfig.accentColor) === c
+                                  ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'
+                              }`}
                               style={{ backgroundColor: c }}
                             />
                           ))}
                         </div>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Card drill-down data rows */}
                   {selectedWidgetType === 'card' && (
