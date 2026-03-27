@@ -1515,7 +1515,7 @@ export default function DashboardPage() {
                   <div key={idx} className={`flex items-center gap-3 ${hDrillActive ? '' : 'flex-1'} min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
                     {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
                     {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
-                    <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
+                    <div className="flex-1 rounded-full flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
                         style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widgetAccent }}
@@ -1784,7 +1784,7 @@ export default function DashboardPage() {
                         <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
-                        <div className="flex-1 bg-gray-100 rounded-full flex items-center overflow-hidden" style={{ height: `${barHeight}px` }}>
+                        <div className="flex-1 rounded-full flex items-center overflow-hidden" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
                           {stackKeys.map((key: string, stackIdx: number) => {
                             const value = Number(item[key]) || 0;
                             const widthPercent = total > 0 ? (value / total) * 100 : 0;
@@ -3805,20 +3805,15 @@ export default function DashboardPage() {
                     )}
                   </div>
                   {/* Accent / Bar Color */}
+                  {selectedWidgetType !== 'card' && (
                   <div className="flex items-center gap-3">
                     <label className="text-xs text-gray-600 w-28">
-                      {selectedWidgetType === 'line' ? 'Line Color' : selectedWidgetType === 'card' ? 'Card Color' : 'Bar / Accent'}
+                      {selectedWidgetType === 'line' ? 'Line Color' : 'Bar / Accent'}
                     </label>
                     <input
                       type="color"
-                      value={selectedWidgetType === 'card' ? (widgetConfig.cardColor || '#1e3a5f') : (widgetConfig.accentColor || '#151f6d')}
-                      onChange={(e) => {
-                        if (selectedWidgetType === 'card') {
-                          setWidgetConfig({ ...widgetConfig, cardColor: e.target.value });
-                        } else {
-                          setWidgetConfig({ ...widgetConfig, accentColor: e.target.value });
-                        }
-                      }}
+                      value={widgetConfig.accentColor || '#151f6d'}
+                      onChange={(e) => setWidgetConfig({ ...widgetConfig, accentColor: e.target.value })}
                       className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                     />
                     <div className="flex gap-1">
@@ -3826,15 +3821,9 @@ export default function DashboardPage() {
                         <button
                           key={c}
                           type="button"
-                          onClick={() => {
-                            if (selectedWidgetType === 'card') {
-                              setWidgetConfig({ ...widgetConfig, cardColor: c });
-                            } else {
-                              setWidgetConfig({ ...widgetConfig, accentColor: c });
-                            }
-                          }}
+                          onClick={() => setWidgetConfig({ ...widgetConfig, accentColor: c })}
                           className={`w-6 h-6 rounded-full border-2 transition-all ${
-                            (selectedWidgetType === 'card' ? widgetConfig.cardColor : widgetConfig.accentColor) === c
+                            widgetConfig.accentColor === c
                               ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'
                           }`}
                           style={{ backgroundColor: c }}
@@ -3842,6 +3831,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
+                  )}
                   {/* Font Color */}
                   <div className="flex items-center gap-3">
                     <label className="text-xs text-gray-600 w-28">Font Color</label>
