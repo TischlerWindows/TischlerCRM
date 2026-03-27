@@ -1257,31 +1257,14 @@ export default function DashboardPage() {
     const widgetFontColor = widget.config?.fontColor || '';
     const fc = widgetFontColor; // shorthand for inline usage
     const bgClass = widgetBg ? 'rounded-lg border border-gray-200' : 'bg-white rounded-lg border border-gray-200';
+    const isDrillTarget = drillDownWidgetId === widget.id && (drillDownLabel || widget.type === 'card');
+    const drillRing = isDrillTarget ? ' ring-2 ring-red-500' : '';
     const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(fc ? { color: fc } : {}) };
     const tickStyle = fc ? { fontSize: 12, fill: fc } : { fontSize: 12 };
     const tickStyle11 = fc ? { fontSize: 11, fill: fc } : { fontSize: 11 };
     const titleColorClass = fc ? '' : 'text-gray-900';
     const labelColorClass = fc ? '' : 'text-gray-600';
     const valueColorClass = fc ? '' : 'text-gray-700';
-
-    // Detect dark background for drill-down table contrast
-    const isDarkBg = (() => {
-      const bg = widgetBg || '#ffffff';
-      const hex = bg.replace('#', '');
-      if (hex.length < 6) return false;
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return (r * 0.299 + g * 0.587 + b * 0.114) < 140;
-    })();
-    const ddBorder = isDarkBg ? 'border-white/20' : 'border-gray-200';
-    const ddSubtext = isDarkBg ? 'text-white/60' : 'text-gray-500';
-    const ddHighlight = isDarkBg ? 'text-white' : 'text-gray-700';
-    const ddMuted = isDarkBg ? 'text-white/40' : 'text-gray-400';
-    const ddHeadBg = isDarkBg ? 'bg-white/10' : 'bg-gray-50';
-    const ddRowHover = isDarkBg ? 'hover:bg-white/5' : 'hover:bg-gray-50';
-    const ddDivide = isDarkBg ? 'divide-white/10' : 'divide-gray-100';
-    const ddCell = isDarkBg ? 'text-white/90' : 'text-gray-700';
     const filterBar = null; // Filter bar is now rendered at section level
 
     switch (widget.type) {
@@ -1334,11 +1317,8 @@ export default function DashboardPage() {
         );
 
       case 'vertical-bar': {
-        const vbDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const vbDrillRecords = vbDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const vbDrillColumns = vbDrillRecords.length > 0 ? Object.keys(vbDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col group`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative flex flex-col group`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1380,7 +1360,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
-              <div className={`${vbDrillActive ? '' : 'flex-1'} min-h-0`} style={vbDrillActive ? { height: '200px' } : {}}>
+              <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <BarChart
                     data={widget.config.data}
@@ -1416,46 +1396,6 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis ? 'No data available' : 'Configure axes to see data'}
               </div>
             )}
-            {vbDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {vbDrillRecords.length} record{vbDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {vbDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {vbDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {vbDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {vbDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
@@ -1463,11 +1403,8 @@ export default function DashboardPage() {
       case 'horizontal-bar': {
         const hLabelPos = widget.config?.hBarLabelPos || 'left';
         const hValuePos = widget.config?.hBarValuePos || 'right';
-        const hDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const hDrillRecords = hDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const hDrillColumns = hDrillRecords.length > 0 ? Object.keys(hDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1507,14 +1444,14 @@ export default function DashboardPage() {
             )}
             <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
-            <div className={`flex flex-col gap-2 ${hDrillActive ? '' : 'flex-1'} min-h-0`}>
+            <div className={`flex flex-col gap-2 flex-1 min-h-0`}>
               {widget.config.data?.map((item: any, idx: number) => {
                 const maxValue = Math.max(...widget.config.data.map((d: any) => d.value));
                 const widthPercent = (item.value / maxValue) * 100;
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                 return (
-                  <div key={idx} className={`flex items-center gap-3 ${hDrillActive ? '' : 'flex-1'} min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
+                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
                     {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
                     {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
                     <div className="flex-1 rounded-full flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
@@ -1530,47 +1467,6 @@ export default function DashboardPage() {
                 );
               })}
             </div>
-            {/* Inline drill-down table */}
-            {hDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {hDrillRecords.length} record{hDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {hDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {hDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {hDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {hDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
@@ -1578,12 +1474,9 @@ export default function DashboardPage() {
       case 'stacked-vertical-bar': {
         const svStackKeys = widget.config.stackKeys || [];
         const svColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
-        const svDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const svDrillRecords = svDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const svDrillColumns = svDrillRecords.length > 0 ? Object.keys(svDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1625,8 +1518,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
-              <div className={`${svDrillActive ? '' : 'flex-1'} min-h-0`} style={svDrillActive ? { height: '200px' } : {}}>
-                <ResponsiveContainer width="100%" height="100%" debounce={0}>
+              <div className="flex-1 min-h-0">                <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <BarChart
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
@@ -1663,46 +1555,6 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
               </div>
             )}
-            {svDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {svDrillRecords.length} record{svDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {svDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {svDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {svDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {svDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
@@ -1710,12 +1562,9 @@ export default function DashboardPage() {
       case 'stacked-horizontal-bar': {
         const stackKeys = widget.config.stackKeys || [];
         const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
-        const shDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const shDrillRecords = shDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const shDrillColumns = shDrillRecords.length > 0 ? Object.keys(shDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1757,7 +1606,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
-              <div className={`flex flex-col gap-3 ${shDrillActive ? '' : 'flex-1'} min-h-0`}>
+              <div className="flex flex-col gap-3 flex-1 min-h-0">
                 {/* Legend */}
                 <div className="flex flex-wrap gap-3 justify-center pb-2 border-b">
                   {stackKeys.map((key: string, idx: number) => (
@@ -1826,56 +1675,13 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis && widget.config.stackBy ? 'No data available' : 'Configure X-Axis, Y-Axis, and Stack By field'}
               </div>
             )}
-            {shDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {shDrillRecords.length} record{shDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {shDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {shDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {shDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {shDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
 
       case 'line': {
-        const lnDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const lnDrillRecords = lnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const lnDrillColumns = lnDrillRecords.length > 0 ? Object.keys(lnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -1917,7 +1723,7 @@ export default function DashboardPage() {
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
-              <div className={`${lnDrillActive ? '' : 'flex-1'} min-h-0`} style={lnDrillActive ? { height: '200px' } : {}}>
+              <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%" debounce={0}>
                   <LineChart
                     data={widget.config.data}
@@ -1953,56 +1759,13 @@ export default function DashboardPage() {
                 {widget.config.xAxis && widget.config.yAxis ? 'No data available' : 'Configure axes to see data'}
               </div>
             )}
-            {lnDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {lnDrillRecords.length} record{lnDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {lnDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {lnDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {lnDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {lnDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
 
       case 'donut': {
-        const dnDrillActive = drillDownWidgetId === widget.id && drillDownLabel;
-        const dnDrillRecords = dnDrillActive ? getDrillDownRecords(widget, drillDownLabel!) : [];
-        const dnDrillColumns = dnDrillRecords.length > 0 ? Object.keys(dnDrillRecords[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
@@ -2035,7 +1798,7 @@ export default function DashboardPage() {
             </div>
             <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
             {filterBar}
-            <div className={`flex flex-col items-center justify-center ${dnDrillActive ? '' : 'h-[calc(100%-2rem)]'}`}>
+            <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <div className="relative w-32 h-32">
                 <svg viewBox="0 0 100 100" className="transform -rotate-90">
                   <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
@@ -2082,46 +1845,6 @@ export default function DashboardPage() {
                 })}
               </div>
             </div>
-            {dnDrillActive && (
-              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className={`text-xs ${ddSubtext}`}>
-                    {dnDrillRecords.length} record{dnDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
-                  </p>
-                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
-                    <X className="w-3 h-3" /> Close
-                  </button>
-                </div>
-                {dnDrillRecords.length > 0 ? (
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
-                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
-                        {dnDrillColumns.map(col => (
-                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
-                            {stripFieldPrefix(col)}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className={`divide-y ${ddDivide}`}>
-                      {dnDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
-                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
-                          {dnDrillColumns.map(col => (
-                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
-                              {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
@@ -2246,11 +1969,8 @@ export default function DashboardPage() {
         return (
           <div
             key={widget.id}
-            style={{
-              ...bgStyle,
-              ...(isExpanded ? { gridColumn: 'span 9', gridRow: 'span 3' } : {})
-            }}
-            className={`${bgClass} relative group flex flex-col`}
+            style={bgStyle}
+            className={`${bgClass}${drillRing} relative group flex flex-col`}
           >
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
@@ -2337,51 +2057,6 @@ export default function DashboardPage() {
               );
             })()}
 
-            {/* Drill-down table */}
-            {isExpanded && (
-              <div className="border-t border-gray-200 flex-1 overflow-auto">
-                {cardData.length > 0 ? (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">#</th>
-                        {Object.keys(cardData[0] || {}).map((key) => (
-                          <th key={key} className={`py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider ${key === 'value' ? 'text-right' : 'text-left'}`}>
-                            {key}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cardData.map((row: any, idx: number) => (
-                        <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-2 px-4 text-gray-400 text-xs">{idx + 1}</td>
-                          {Object.entries(row).map(([key, val]: [string, any]) => (
-                            <td key={key} className={`py-2 px-4 ${key === 'value' ? 'text-right font-medium' : ''}`}>
-                              {typeof val === 'number' ? val.toLocaleString() : String(val)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-                    No data to display. Configure this card with manual data or link a report.
-                  </div>
-                )}
-                {widget.reportId && (
-                  <div className="border-t border-gray-200 p-3 bg-gray-50">
-                    <Link
-                      href={`/reports/view/${widget.reportId}`}
-                      className="text-xs font-medium text-brand-navy hover:underline flex items-center gap-1"
-                    >
-                      Open full report <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         );
       }
@@ -2427,27 +2102,11 @@ export default function DashboardPage() {
     }
 
     if (!dashEditMode) {
-      // Compute drill-down expansion even in view mode
-      const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
-      const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
-      if (isExpandedCard) {
-        return renderWidget(widget, { gridColumn: 'span 9', gridRow: 'span 3' }, sectionFilter);
-      }
-      if (isExpandedDrill) {
-        // Keep original width, just add rows for the drill-down table
-        const spanH = Math.max(widget.position.h + 3, 4);
-        return renderWidget(widget, { gridColumn: `span ${widget.position.w}`, gridRow: `span ${spanH}` }, sectionFilter);
-      }
       return renderWidget(widget, undefined, sectionFilter);
     }
 
     const isDragging = draggingWidgetId === widget.id;
     const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
-    // Card or chart drill-down expansion
-    const isExpandedCard = widget.type === 'card' && drillDownWidgetId === widget.id;
-    const isExpandedDrill = widget.type !== 'card' && drillDownWidgetId === widget.id && drillDownLabel;
-    const spanW = isExpandedCard ? 9 : widget.position.w;
-    const spanH = isExpandedCard ? 3 : isExpandedDrill ? Math.max(widget.position.h + 3, 4) : widget.position.h;
 
     return (
       <div
@@ -2465,8 +2124,8 @@ export default function DashboardPage() {
           handleWidgetDrop(sectionId, widget.id);
         }}
         style={{
-          gridColumn: `span ${spanW}`,
-          gridRow: `span ${spanH}`,
+          gridColumn: `span ${widget.position.w}`,
+          gridRow: `span ${widget.position.h}`,
           opacity: isDragging ? 0.4 : 1,
           position: 'relative'
         }}
@@ -3204,6 +2863,60 @@ export default function DashboardPage() {
                                 </div>
                               )}
                             </div>
+                            {/* Standalone drill-down table below grid */}
+                            {(() => {
+                              const drillWidget = sectionWidgets.find(w => w.id === drillDownWidgetId);
+                              if (!drillWidget) return null;
+                              const isCard = drillWidget.type === 'card';
+                              const isChart = !isCard && !!drillDownLabel;
+                              if (!isCard && !isChart) return null;
+                              const records = isChart ? getDrillDownRecords(drillWidget, drillDownLabel!) : (drillWidget.config?.data || drillWidget.config?.manualData || []);
+                              const columns = records.length > 0 ? Object.keys(records[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
+                              return (
+                                <div className="mt-4 ring-2 ring-red-500 rounded-lg bg-white overflow-hidden">
+                                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+                                    <p className="text-sm text-gray-700">
+                                      <span className="font-semibold">{drillWidget.title}</span>
+                                      {isChart && <> &mdash; {records.length} record{records.length !== 1 ? 's' : ''} for <span className="font-medium text-red-600">&quot;{drillDownLabel}&quot;</span></>}
+                                      {isCard && <> &mdash; {records.length} record{records.length !== 1 ? 's' : ''}</>}
+                                    </p>
+                                    <button onClick={closeDrillDown} className="text-xs text-gray-500 hover:text-gray-900 flex items-center gap-1">
+                                      <X className="w-3.5 h-3.5" /> Close
+                                    </button>
+                                  </div>
+                                  {records.length > 0 ? (
+                                    <div className="overflow-auto max-h-[400px]">
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr className="bg-gray-50 border-b border-gray-200">
+                                            <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider w-10">#</th>
+                                            {columns.map(col => (
+                                              <th key={col} className="text-left py-2.5 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                                                {stripFieldPrefix(col)}
+                                              </th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {records.map((row: any, rIdx: number) => (
+                                            <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
+                                              <td className="py-2 px-4 text-gray-400 text-xs">{rIdx + 1}</td>
+                                              {columns.map(col => (
+                                                <td key={col} className="py-2 px-4 text-gray-700">
+                                                  {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
+                                                </td>
+                                              ))}
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-8 text-gray-400 text-sm">No records found</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {dashEditMode && (
                               <button
                                 onClick={() => { setPendingAddSectionId(section.id); setShowWidgetSelector(true); }}
