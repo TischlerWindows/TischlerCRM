@@ -177,6 +177,7 @@ export default function DashboardPage() {
     cardColor: '#1e3a5f',
     widgetBg: '',
     accentColor: '',
+    fontColor: '',
     hiddenUntilFilter: false,
     filterButtons: [] as Array<{ label: string; field: string; value: string }>,
     title: '',
@@ -1199,8 +1200,9 @@ export default function DashboardPage() {
 
     const widgetAccent = widget.config?.accentColor || '#151f6d';
     const widgetBg = widget.config?.widgetBg || '';
+    const widgetFontColor = widget.config?.fontColor || '';
     const bgClass = widgetBg ? 'rounded-lg border border-gray-200' : 'bg-white rounded-lg border border-gray-200';
-    const bgStyle = widgetBg ? { ...widgetStyle, backgroundColor: widgetBg } : widgetStyle;
+    const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(widgetFontColor ? { color: widgetFontColor } : {}) };
 
     // --- Filter buttons: filter data based on active button ---
     const filterBtns: Array<{ label: string; field: string; value: string }> = widget.config?.filterButtons || [];
@@ -3479,6 +3481,33 @@ export default function DashboardPage() {
                         />
                       ))}
                     </div>
+                  </div>
+                  {/* Font Color */}
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-600 w-28">Font Color</label>
+                    <input
+                      type="color"
+                      value={widgetConfig.fontColor || '#111827'}
+                      onChange={(e) => setWidgetConfig({ ...widgetConfig, fontColor: e.target.value })}
+                      className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                    />
+                    <div className="flex gap-1">
+                      {['#111827', '#ffffff', '#6b7280', '#1e3a5f', '#dc2626', '#059669'].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setWidgetConfig({ ...widgetConfig, fontColor: c })}
+                          className={`w-6 h-6 rounded-full border-2 transition-all ${
+                            widgetConfig.fontColor === c
+                              ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                    {widgetConfig.fontColor && (
+                      <button type="button" onClick={() => setWidgetConfig({ ...widgetConfig, fontColor: '' })} className="text-xs text-gray-500 hover:text-gray-700">Reset</button>
+                    )}
                   </div>
                 </div>
               </div>
