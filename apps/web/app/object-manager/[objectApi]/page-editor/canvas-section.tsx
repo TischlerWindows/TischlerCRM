@@ -3,14 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { GripVertical, Plus, Settings, Trash2 } from 'lucide-react';
-import type { LayoutPanel, LayoutRegion } from './types';
+import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasPanel } from './canvas-panel';
 import { CanvasWidgetCard } from './canvas-widget';
 
 interface CanvasRegionProps {
-  region: LayoutRegion;
+  region: LayoutSection;
   tabId: string;
 }
 
@@ -31,10 +31,10 @@ const REGION_SHADOW: Record<'none' | 'sm' | 'md', string> = {
 export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
-  const updateRegion = useEditorStore((s) => s.updateRegion);
+  const updateSection = useEditorStore((s) => s.updateSection);
   const addPanel = useEditorStore((s) => s.addPanel);
-  const removeRegion = useEditorStore((s) => s.removeRegion);
-  const resizeRegion = useEditorStore((s) => s.resizeRegion);
+  const removeSection = useEditorStore((s) => s.removeSection);
+  const resizeSection = useEditorStore((s) => s.resizeSection);
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [draftLabel, setDraftLabel] = useState(region.label);
@@ -94,7 +94,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     setIsEditingLabel(false);
     const next = draftLabel.trim();
     if (!next || next === region.label) return;
-    updateRegion(region.id, { label: next });
+    updateSection(region.id, { label: next });
   };
 
   const addDefaultPanel = () => {
@@ -157,7 +157,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     if (!session || session.pointerId !== event.pointerId) return;
     const nextSpan = Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX));
     if (nextSpan !== session.startSpan) {
-      resizeRegion(region.id, nextSpan);
+      resizeSection(region.id, nextSpan);
     }
     endResizeGesture(event.currentTarget);
   };
@@ -176,13 +176,15 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       event.key === 'ArrowRight'
         ? region.gridColumnSpan + 1
         : Math.max(2, region.gridColumnSpan - 1);
-    resizeRegion(region.id, nextSpan);
+    resizeSection(region.id, nextSpan);
   };
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border bg-white transition-colors ${
-        isRegionSelected ? 'border-brand-navy ring-1 ring-brand-navy/20' : 'border-gray-200'
+      className={`relative overflow-hidden rounded-xl border bg-white transition-colors border-l-4 ${
+        isRegionSelected
+          ? 'border-brand-navy ring-1 ring-brand-navy/20 border-l-brand-navy'
+          : 'border-gray-200 border-l-gray-300'
       }`}
       style={wrapperStyle}
       data-tab-id={tabId}
@@ -193,7 +195,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         </div>
       ) : null}
       <div
-        className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-50/80 px-3 py-2"
+        className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-100/80 px-3 py-2"
         onClick={selectRegion}
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -218,7 +220,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           ) : (
             <button
               type="button"
-              className="truncate text-left text-sm font-medium text-gray-900"
+              className="group/label flex items-center gap-1 truncate text-left text-sm font-medium text-gray-900"
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setIsEditingLabel(true);
@@ -227,8 +229,10 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
                 e.stopPropagation();
                 selectRegion();
               }}
+              title="Double-click to rename"
             >
               {region.label}
+              <Pencil className="h-3 w-3 text-gray-400 opacity-0 group-hover/label:opacity-100 transition-opacity" />
             </button>
           )}
         </div>
@@ -236,33 +240,12 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="rounded px-2 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              addDefaultPanel();
-            }}
-          >
-            + Field Section
-          </button>
-          <button
-            type="button"
-            className="rounded p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            onClick={(e) => {
-              e.stopPropagation();
-              selectRegion();
-            }}
-            aria-label="Region settings"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
             className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600"
             onClick={(e) => {
               e.stopPropagation();
-              removeRegion(region.id);
+              removeSection(region.id);
             }}
-            aria-label="Delete region"
+            aria-label="Delete section"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -274,28 +257,30 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           <CanvasPanel key={panel.id} panel={panel} regionId={region.id} />
         ))}
 
-        <div
-          ref={setWidgetDropRef}
-          className={`space-y-2 rounded-lg border bg-gray-50/60 p-2 transition-colors ${
-            isWidgetDropOver ? 'border-brand-navy/35 bg-brand-navy/5' : 'border-gray-200'
-          }`}
-          aria-label="Region widget drop zone"
-        >
-          <SortableContext
-            items={sortedWidgets.map((w) => w.id)}
-            strategy={verticalListSortingStrategy}
+        {(sortedWidgets.length > 0 || isRegionSelected) && (
+          <div
+            ref={setWidgetDropRef}
+            className={`space-y-2 rounded-lg border bg-gray-50/60 p-2 transition-colors ${
+              isWidgetDropOver ? 'border-brand-navy/35 bg-brand-navy/5' : 'border-gray-200'
+            }`}
+            aria-label="Section widget drop zone"
           >
-            {sortedWidgets.length > 0 ? (
-              sortedWidgets.map((widget) => (
-                <CanvasWidgetCard key={widget.id} widget={widget} />
-              ))
-            ) : (
-              <div className="rounded border border-dashed border-gray-300 py-3 text-center text-xs text-gray-500">
-                Drop a field section or widget here
-              </div>
-            )}
-          </SortableContext>
-        </div>
+            <SortableContext
+              items={sortedWidgets.map((w) => w.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {sortedWidgets.length > 0 ? (
+                sortedWidgets.map((widget) => (
+                  <CanvasWidgetCard key={widget.id} widget={widget} />
+                ))
+              ) : isRegionSelected ? (
+                <div className="rounded border border-dashed border-gray-300 py-3 text-center text-xs text-gray-500">
+                  Drop a widget here
+                </div>
+              ) : null}
+            </SortableContext>
+          </div>
+        )}
 
         <button
           type="button"
@@ -316,8 +301,8 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         onPointerCancel={onResizePointerCancel}
         onKeyDown={onResizeKeyDown}
         onClick={(e) => e.stopPropagation()}
-        aria-label="Resize region width"
-        title="Resize region width"
+        aria-label="Resize section width"
+        title="Resize section width"
       />
     </div>
   );

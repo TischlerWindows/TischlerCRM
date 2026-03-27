@@ -1,4 +1,4 @@
-import type { TemplateRegionDef, TemplateTabDef } from '@/lib/schema';
+import type { TemplateSectionDef, TemplateTabDef } from '@/lib/schema';
 
 export type TemplateCategory =
   | 'all'
@@ -22,7 +22,7 @@ function makeRegion(
   gridColumn: number,
   gridColumnSpan: number,
   gridRow: number,
-): TemplateRegionDef {
+): TemplateSectionDef {
   return {
     id: `region-${label.toLowerCase().replace(/\s+/g, '-')}-${gridRow}-${gridColumn}`,
     label,
@@ -35,7 +35,7 @@ function makeRegion(
   };
 }
 
-function makeTab(regions: TemplateRegionDef[]): TemplateTabDef {
+function makeTab(regions: TemplateSectionDef[]): TemplateTabDef {
   return { id: 'tab-1', label: 'Details', order: 0, regions };
 }
 

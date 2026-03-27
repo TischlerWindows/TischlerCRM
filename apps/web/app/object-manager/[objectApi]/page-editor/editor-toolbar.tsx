@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { Eye, Plus, Save, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Save, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
 import type { EditorPageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -16,7 +17,7 @@ export function EditorToolbar({
   objectManagerHref,
   objectListHref: _objectListHref,
   objectListLabel: _objectListLabel,
-  layoutAssignmentNote: _layoutAssignmentNote,
+  layoutAssignmentNote,
 }: {
   onSave: () => void;
   onPreview: () => void;
@@ -42,9 +43,14 @@ export function EditorToolbar({
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState(layout.name);
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [draftTabLabel, setDraftTabLabel] = useState('');
   const [isRolesOpen, setIsRolesOpen] = useState(false);
   const [isActiveUpdating, setIsActiveUpdating] = useState(false);
   const [activeError, setActiveError] = useState('');
+  const [pendingForceActivate, setPendingForceActivate] = useState<{
+    conflictNames: string;
+  } | null>(null);
   const rolesPopoverRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -136,6 +142,23 @@ export function EditorToolbar({
     setIsEditingName(false);
   }, [layout.name]);
 
+  const commitTabRename = useCallback((tabId: string) => {
+    const next = draftTabLabel.trim();
+    if (next && next !== sortedTabs.find(t => t.id === tabId)?.label) {
+      pushUndo();
+      useEditorStore.setState((state) => ({
+        layout: {
+          ...state.layout,
+          tabs: state.layout.tabs.map((t) =>
+            t.id === tabId ? { ...t, label: next } : t
+          ),
+        },
+        isDirty: true,
+      }));
+    }
+    setEditingTabId(null);
+  }, [draftTabLabel, pushUndo, sortedTabs]);
+
   const handleToggleRole = useCallback(
     (roleId: string) => {
       const hasRole = layout.roles.includes(roleId);
@@ -161,20 +184,9 @@ export function EditorToolbar({
         }
         if (result.conflicts.length > 0) {
           const conflictNames = result.conflicts.map((c) => c.layoutName).join(', ');
-          const confirmForce = window.confirm(
-            `This will deactivate conflicting layouts: ${conflictNames}. Continue?`,
-          );
-          if (!confirmForce) {
-            setActiveError('Activation cancelled due to conflicting active layouts.');
-            return;
-          }
-          const forced = await setLayoutActive(objectApi, layout.id, true, { force: true });
-          if (forced.updated) {
-            patchLayoutWithUndo({ active: true });
-            setActiveError('');
-          } else {
-            setActiveError('Unable to activate this layout after resolving conflicts.');
-          }
+          setPendingForceActivate({ conflictNames });
+          setIsActiveUpdating(false);
+          return;
         } else {
           setActiveError('Unable to activate this layout. Please try again.');
         }
@@ -196,6 +208,25 @@ export function EditorToolbar({
     }
   }, [isActiveUpdating, layout.active, layout.id, objectApi, patchLayoutWithUndo, setLayoutActive]);
 
+  const handleForceActivate = useCallback(async () => {
+    if (!objectApi || !layout.id) return;
+    setPendingForceActivate(null);
+    setIsActiveUpdating(true);
+    try {
+      const forced = await setLayoutActive(objectApi, layout.id, true, { force: true });
+      if (forced.updated) {
+        patchLayoutWithUndo({ active: true });
+        setActiveError('');
+      } else {
+        setActiveError('Unable to activate this layout after resolving conflicts.');
+      }
+    } catch {
+      setActiveError('Failed to update active state. Please try again.');
+    } finally {
+      setIsActiveUpdating(false);
+    }
+  }, [layout.id, objectApi, patchLayoutWithUndo, setLayoutActive]);
+
   return (
     <div className="border-b border-gray-200 bg-white px-4 py-3">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -203,9 +234,10 @@ export function EditorToolbar({
           <button
             type="button"
             onClick={() => onRequestNavigate(objectManagerHref)}
-            className="text-sm font-medium text-gray-600 transition-colors hover:text-brand-navy"
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-brand-navy"
           >
-            ← Layouts
+            <ArrowLeft className="h-4 w-4" />
+            Layouts
           </button>
           <div className="h-5 w-px bg-gray-200" />
           {isEditingName ? (
@@ -248,13 +280,46 @@ export function EditorToolbar({
                   <button
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
+                    onDoubleClick={!isActiveTab ? (e) => {
+                      e.stopPropagation();
+                      setDraftTabLabel(tab.label);
+                      setEditingTabId(tab.id);
+                    } : undefined}
                     className={`rounded-full border px-3 py-1.5 text-sm transition ${
                       isActiveTab
                         ? 'border-brand-navy bg-brand-navy text-white'
                         : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                     }`}
                   >
-                    <span>{tab.label}</span>
+                    {isActiveTab ? (
+                      editingTabId === tab.id ? (
+                        <input
+                          autoFocus
+                          value={draftTabLabel}
+                          onChange={(e) => setDraftTabLabel(e.target.value)}
+                          onBlur={() => commitTabRename(tab.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+                            if (e.key === 'Escape') { e.preventDefault(); setEditingTabId(null); }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-24 bg-transparent text-sm font-medium text-white outline-none"
+                        />
+                      ) : (
+                        <span
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setDraftTabLabel(tab.label);
+                            setEditingTabId(tab.id);
+                          }}
+                          title="Double-click to rename"
+                        >
+                          {tab.label}
+                        </span>
+                      )
+                    ) : (
+                      <span>{tab.label}</span>
+                    )}
                   </button>
                   {!isActiveTab && sortedTabs.length > 1 ? (
                     <button
@@ -385,6 +450,28 @@ export function EditorToolbar({
           </Button>
         </div>
       </div>
+      {layoutAssignmentNote && (
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5">
+          <span className="text-amber-500">ⓘ</span>
+          {layoutAssignmentNote}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={pendingForceActivate !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingForceActivate(null);
+            setActiveError('Activation cancelled.');
+          }
+        }}
+        title="Conflicting active layouts"
+        description={`This will deactivate: ${pendingForceActivate?.conflictNames ?? ''}. Continue?`}
+        confirmLabel="Activate Anyway"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => { void handleForceActivate(); }}
+      />
     </div>
   );
 }

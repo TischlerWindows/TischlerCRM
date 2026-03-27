@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { Search } from 'lucide-react';
+import { GripVertical, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import type { FieldDef } from '@/lib/schema';
 import { useEditorStore } from './editor-store';
@@ -51,7 +51,7 @@ function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4;
       {...attributes}
       className="flex w-full items-center gap-2 rounded-md border border-dashed border-gray-300 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:border-gray-400 hover:bg-gray-50 active:cursor-grabbing"
     >
-      <span className="select-none text-gray-400" aria-hidden>⠿</span>
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-gray-700">{label}</span>
       <ColumnIcon count={columns} />
     </button>
@@ -90,7 +90,7 @@ function DraggableFieldChip({
       {...attributes}
       className="flex w-full items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:bg-gray-50 active:cursor-grabbing"
     >
-      <span className="select-none text-gray-400" aria-hidden>⠿</span>
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-gray-700">{field.label}</span>
       {isPlaced ? (
         <span className="text-[10px] text-gray-400" aria-label="Field already placed">✓</span>

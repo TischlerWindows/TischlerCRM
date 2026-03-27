@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { LayoutTemplate, X } from 'lucide-react';
-import type { CustomLayoutTemplate, TemplateRegionDef, TemplateTabDef } from '@/lib/schema';
+import type { CustomLayoutTemplate, TemplateSectionDef, TemplateTabDef } from '@/lib/schema';
 import {
   BUILT_IN_TEMPLATES,
   TEMPLATE_CATEGORIES,
@@ -19,7 +19,7 @@ interface TemplateGalleryProps {
 
 // ── SVG block-diagram preview ─────────────────────────────────────────────────
 
-function TemplatePreviewSvg({ regions }: { regions: TemplateRegionDef[] }) {
+function TemplatePreviewSvg({ regions }: { regions: TemplateSectionDef[] }) {
   const ROW_H = 14;
   const ROW_GAP = 3;
   const PAD = 4;

@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import type { WidgetType } from '@/lib/schema';
-import type { LayoutPanel, LayoutRegion, LayoutWidget, PanelField } from './types';
+import type { LayoutPanel, LayoutSection, LayoutWidget, PanelField } from './types';
 import { useEditorStore } from './editor-store';
 
 type DragSource =
@@ -56,7 +56,7 @@ function sortedFields(panel: LayoutPanel): PanelField[] {
   return [...panel.fields].sort((a, b) => a.order - b.order);
 }
 
-function sortedWidgets(region: LayoutRegion): LayoutWidget[] {
+function sortedWidgets(region: LayoutSection): LayoutWidget[] {
   return [...region.widgets].sort((a, b) => a.order - b.order);
 }
 
@@ -292,7 +292,7 @@ export function DndContextWrapper({
   const addWidget = useEditorStore((s) => s.addWidget);
   const moveWidget = useEditorStore((s) => s.moveWidget);
   const movePanel = useEditorStore((s) => s.movePanel);
-  const updateRegion = useEditorStore((s) => s.updateRegion);
+  const updateSection = useEditorStore((s) => s.updateSection);
 
   const [overlayLabel, setOverlayLabel] = useState<string | null>(null);
 
@@ -428,13 +428,13 @@ export function DndContextWrapper({
         if (active.regionId === target.regionId) return;
         const overRegion = findRegion(layout, target.regionId);
         if (!overRegion) return;
-        updateRegion(active.regionId, {
+        updateSection(active.regionId, {
           gridColumn: overRegion.gridColumn,
           gridRow: overRegion.gridRow,
         });
       }
     },
-    [addField, addWidget, layout, moveField, movePanel, moveWidget, updateRegion],
+    [addField, addWidget, layout, moveField, movePanel, moveWidget, updateSection],
   );
 
   const handleDragCancel = useCallback(() => {
