@@ -1939,24 +1939,16 @@ export default function DashboardPage() {
               const scale = Math.min(w, h * 2);
               const isCompact = w <= 1 || h <= 1;
               const isTiny = w <= 1 && h <= 1;
-              const valueSizeClass = isTiny ? 'text-base' : isCompact ? 'text-xl' : scale >= 8 ? 'text-6xl' : scale >= 6 ? 'text-5xl' : scale >= 4 ? 'text-4xl' : scale >= 3 ? 'text-3xl' : 'text-2xl';
-              const titleSizeClass = isTiny ? 'text-[9px] leading-tight' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
-              const trendSizeClass = isTiny ? 'text-[9px]' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-base' : scale >= 4 ? 'text-sm' : 'text-sm';
-              const subtitleSizeClass = isTiny ? 'text-[9px]' : isCompact ? 'text-[11px]' : scale >= 6 ? 'text-sm' : 'text-xs';
-              const showIcon = !isCompact;
+              const valueSizeClass = isTiny ? 'text-lg' : isCompact ? 'text-2xl' : scale >= 8 ? 'text-7xl' : scale >= 6 ? 'text-6xl' : scale >= 4 ? 'text-5xl' : scale >= 3 ? 'text-4xl' : 'text-3xl';
+              const titleSizeClass = isTiny ? 'text-[10px] leading-tight' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-base';
+              const trendSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-lg' : scale >= 4 ? 'text-base' : 'text-base';
+              const subtitleSizeClass = isTiny ? 'text-[10px]' : isCompact ? 'text-xs' : scale >= 6 ? 'text-base' : 'text-sm';
               const showChevron = !isCompact;
-              const iconBoxClass = scale >= 6 ? 'w-18 h-18 rounded-xl' : scale >= 4 ? 'w-16 h-16 rounded-xl' : 'w-12 h-12 rounded-lg';
-              const iconClass = scale >= 6 ? 'w-9 h-9' : scale >= 4 ? 'w-8 h-8' : 'w-6 h-6';
               return (
                 <div
                   className={`flex-1 flex items-center justify-center ${isCompact ? 'gap-1 px-2' : 'gap-5 px-6'} cursor-pointer select-none ${isExpanded ? 'py-5' : ''}`}
                   onClick={() => setDrillDownWidgetId(isExpanded ? null : widget.id)}
                 >
-                  {showIcon && (
-                  <div className={`${iconBoxClass} flex items-center justify-center flex-shrink-0`} style={{ backgroundColor: cardColor + '18' }}>
-                    <CreditCard className={iconClass} style={{ color: cardColor }} />
-                  </div>
-                  )}
                   <div className={`text-center ${isCompact ? 'min-w-0 overflow-hidden' : ''}`}>
                     <div className={`${titleSizeClass} text-gray-600 font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
                     <div className={`flex items-baseline justify-center ${isTiny ? 'gap-1' : 'gap-2'}`}>
