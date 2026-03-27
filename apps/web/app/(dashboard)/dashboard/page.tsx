@@ -204,6 +204,7 @@ export default function DashboardPage() {
   const [editingSectionTitle, setEditingSectionTitle] = useState('');
   const [draggingWidgetId, setDraggingWidgetId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null } | null>(null);
+  const [pendingAddSectionId, setPendingAddSectionId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -487,6 +488,11 @@ export default function DashboardPage() {
         id: '1',
         name: 'Sales Overview',
         description: 'Key sales metrics and performance indicators',
+        sections: [
+          { id: 's1', title: 'Key Metrics' },
+          { id: 's2', title: 'Sales Pipeline' },
+          { id: 's3', title: 'Trends' }
+        ],
         widgets: [
           {
             id: 'w1',
@@ -494,7 +500,8 @@ export default function DashboardPage() {
             title: 'Total Revenue',
             dataSource: 'deals',
             config: { value: 2450000, prefix: '$', trend: 12.5 },
-            position: { x: 0, y: 0, w: 3, h: 1 }
+            position: { x: 0, y: 0, w: 3, h: 1 },
+            sectionId: 's1'
           },
           {
             id: 'w2',
@@ -502,7 +509,8 @@ export default function DashboardPage() {
             title: 'Active Deals',
             dataSource: 'deals',
             config: { value: 47, trend: -5.2 },
-            position: { x: 3, y: 0, w: 3, h: 1 }
+            position: { x: 3, y: 0, w: 3, h: 1 },
+            sectionId: 's1'
           },
           {
             id: 'w3',
@@ -510,7 +518,8 @@ export default function DashboardPage() {
             title: 'Win Rate',
             dataSource: 'deals',
             config: { value: 68, suffix: '%', trend: 3.1 },
-            position: { x: 6, y: 0, w: 3, h: 1 }
+            position: { x: 6, y: 0, w: 3, h: 1 },
+            sectionId: 's1'
           },
           {
             id: 'w4',
@@ -526,7 +535,8 @@ export default function DashboardPage() {
                 { label: 'Closed Won', value: 5 }
               ]
             },
-            position: { x: 0, y: 1, w: 6, h: 2 }
+            position: { x: 0, y: 1, w: 6, h: 2 },
+            sectionId: 's2'
           },
           {
             id: 'w5',
@@ -541,7 +551,8 @@ export default function DashboardPage() {
                 { label: 'Installation', value: 10 }
               ]
             },
-            position: { x: 6, y: 1, w: 3, h: 2 }
+            position: { x: 6, y: 1, w: 3, h: 2 },
+            sectionId: 's2'
           },
           {
             id: 'w6',
@@ -558,7 +569,8 @@ export default function DashboardPage() {
                 { label: 'Jun', value: 240000 }
               ]
             },
-            position: { x: 0, y: 3, w: 9, h: 2 }
+            position: { x: 0, y: 3, w: 9, h: 2 },
+            sectionId: 's3'
           }
         ],
         createdBy: 'Development User',
@@ -628,6 +640,7 @@ export default function DashboardPage() {
 
     setSelectedWidgetType(type);
     const isStacked = type === 'stacked-horizontal-bar' || type === 'stacked-vertical-bar';
+    const firstSectionId = pendingAddSectionId || (selectedDashboard?.sections || [])[0]?.id || '';
     setWidgetConfig({
       dataSourceMode: 'report',
       reportId: reports.length > 0 ? reports[0].id : '',
@@ -658,14 +671,23 @@ export default function DashboardPage() {
       title: `New ${WIDGET_TYPES.find(t => t.id === type)?.label}`,
       subtitle: '',
       footer: '',
-      legendPosition: 'right'
+      legendPosition: 'right',
+      sectionId: firstSectionId
     });
     setShowWidgetSelector(false);
     setShowWidgetConfig(true);
+    setPendingAddSectionId(null);
   };
 
   const handleSaveWidget = () => {
     if (!selectedDashboard || !selectedWidgetType) return;
+
+    // Ensure at least one section exists
+    let sections = selectedDashboard.sections || [];
+    if (sections.length === 0) {
+      sections = [{ id: `s${Date.now()}`, title: 'General' }];
+    }
+    const targetSectionId = widgetConfig.sectionId || sections[0].id;
 
     // Use the real previewData that was computed with actual aggregation
     let configData: any = { ...widgetConfig };
@@ -696,11 +718,12 @@ export default function DashboardPage() {
       dataSource: widgetConfig.dataSource,
       config: configData,
       position: defaultSize,
-      sectionId: widgetConfig.sectionId || undefined
+      sectionId: targetSectionId
     };
 
     const updatedDashboard = {
       ...selectedDashboard,
+      sections,
       widgets: [...selectedDashboard.widgets, newWidget],
       lastModifiedAt: new Date().toISOString().split('T')[0] || ''
     };
@@ -1001,7 +1024,7 @@ export default function DashboardPage() {
       dataSource: widgetConfig.dataSource,
       config: configData,
       position: existingWidget?.position || { x: 0, y: 0, w: 4, h: 2 },
-      sectionId: widgetConfig.sectionId || undefined
+      sectionId: widgetConfig.sectionId || (selectedDashboard.sections || [])[0]?.id || undefined
     };
 
     const updatedDashboard = {
@@ -2532,39 +2555,25 @@ export default function DashboardPage() {
 
                 {selectedDashboard.widgets.length > 0 || (selectedDashboard.sections || []).length > 0 ? (
                   <div className="pb-[600px] space-y-6 rounded-lg p-4" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
-                    {/* Unsectioned widgets first */}
+                    {/* Auto-migrate unsectioned widgets to first section */}
                     {(() => {
                       const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
                       const unsectioned = selectedDashboard.widgets.filter(w => !w.sectionId || !sectionIds.has(w.sectionId));
-                      if (unsectioned.length === 0 && !dashEditMode) return null;
-                      return (
-                        <div
-                          className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && unsectioned.length === 0 ? 'min-h-[100px]' : ''}`}
-                          onDragOver={(e) => {
-                            if (!dashEditMode) return;
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
-                            // Only set drop target if not already over a specific widget
-                            const target = e.target as HTMLElement;
-                            if (target === e.currentTarget) {
-                              setDropTarget({ sectionId: undefined, beforeWidgetId: null });
-                            }
-                          }}
-                          onDrop={(e) => {
-                            if (!dashEditMode) return;
-                            e.preventDefault();
-                            handleWidgetDrop(undefined, null);
-                          }}
-                        >
-                          {unsectioned.map(widget => renderWidgetWithDrag(widget, undefined))}
-                          {/* End-of-section drop indicator */}
-                          {dashEditMode && draggingWidgetId && dropTarget?.sectionId === undefined && dropTarget?.beforeWidgetId === null && (
-                            <div style={{ gridColumn: 'span 9', height: '4px', gridRow: 'span 1' }} className="flex items-center self-start">
-                              <div className="w-full h-1 bg-blue-500 rounded-full" />
-                            </div>
-                          )}
-                        </div>
-                      );
+                      if (unsectioned.length > 0 && (selectedDashboard.sections || []).length > 0) {
+                        const firstSectionId = selectedDashboard.sections![0].id;
+                        const migratedWidgets = selectedDashboard.widgets.map(w =>
+                          (!w.sectionId || !sectionIds.has(w.sectionId)) ? { ...w, sectionId: firstSectionId } : w
+                        );
+                        const updated = { ...selectedDashboard, widgets: migratedWidgets };
+                        const all = dashboards.map(d => d.id === updated.id ? updated : d);
+                        // Use setTimeout to avoid state update during render
+                        setTimeout(() => {
+                          setSelectedDashboard(updated);
+                          setDashboards(all);
+                          setSetting('dashboards', all);
+                        }, 0);
+                      }
+                      return null;
                     })()}
                     {/* Section-grouped widgets */}
                     {(selectedDashboard.sections || []).map((section, sIdx) => {
@@ -2647,6 +2656,7 @@ export default function DashboardPage() {
                             <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
                           )}
                           {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
+                            <>
                             <div
                               className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
@@ -2672,12 +2682,25 @@ export default function DashboardPage() {
                                 </div>
                               )}
                             </div>
+                            {dashEditMode && (
+                              <button
+                                onClick={() => { setPendingAddSectionId(section.id); setShowWidgetSelector(true); }}
+                                className="mt-3 w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-navy hover:text-brand-navy transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-4 h-4" /> Add Widget to {section.title}
+                              </button>
+                            )}
+                            </>
                           ) : (
-                            dashEditMode && (
-                              <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
-                                No widgets in this section. Add a widget and assign it here.
-                              </div>
-                            )
+                            <button
+                              onClick={() => {
+                                setPendingAddSectionId(section.id);
+                                setShowWidgetSelector(true);
+                              }}
+                              className="w-full py-8 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-navy hover:text-brand-navy transition-colors flex items-center justify-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" /> Add Widget
+                            </button>
                           )}
                         </div>
                       );
@@ -3443,7 +3466,6 @@ export default function DashboardPage() {
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, sectionId: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 text-sm"
                     >
-                      <option value="">No section (top level)</option>
                       {(selectedDashboard?.sections || []).map(s => (
                         <option key={s.id} value={s.id}>{s.title}</option>
                       ))}
