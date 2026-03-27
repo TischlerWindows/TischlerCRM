@@ -210,6 +210,8 @@ export default function DashboardPage() {
   const [draggingWidgetId, setDraggingWidgetId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null } | null>(null);
   const [pendingAddSectionId, setPendingAddSectionId] = useState<string | null>(null);
+  const [addingFilterBtnSectionId, setAddingFilterBtnSectionId] = useState<string | null>(null);
+  const [newFilterBtn, setNewFilterBtn] = useState({ label: '', field: '', value: '' });
 
   useEffect(() => {
     (async () => {
@@ -3005,11 +3007,75 @@ export default function DashboardPage() {
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
+                                <button
+                                  onClick={() => { setAddingFilterBtnSectionId(addingFilterBtnSectionId === section.id ? null : section.id); setNewFilterBtn({ label: '', field: '', value: '' }); }}
+                                  className="ml-1 px-2 py-1 text-xs text-brand-navy font-medium hover:bg-[#f0f1fa] rounded transition-colors"
+                                  title="Add filter button to section"
+                                >
+                                  + Add Button
+                                </button>
                               </div>
                             )}
                           </div>
                           {section.subtitle && (
                             <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
+                          )}
+                          {/* Inline add filter button form */}
+                          {dashEditMode && addingFilterBtnSectionId === section.id && (
+                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <p className="text-xs font-semibold text-gray-700 mb-2">Add Filter Button</p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={newFilterBtn.label}
+                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, label: e.target.value })}
+                                  placeholder="Label (e.g. Open)"
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
+                                />
+                                <input
+                                  type="text"
+                                  value={newFilterBtn.field}
+                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, field: e.target.value })}
+                                  placeholder="Field name (e.g. status)"
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
+                                />
+                                <input
+                                  type="text"
+                                  value={newFilterBtn.value}
+                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, value: e.target.value })}
+                                  placeholder="Value (e.g. Open)"
+                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!newFilterBtn.label.trim() || !newFilterBtn.field.trim() || !newFilterBtn.value.trim() || !selectedDashboard) return;
+                                    const updatedDashboard = {
+                                      ...selectedDashboard,
+                                      sections: (selectedDashboard.sections || []).map(s =>
+                                        s.id === section.id ? { ...s, filterButtons: [...(s.filterButtons || []), { label: newFilterBtn.label.trim(), field: newFilterBtn.field.trim(), value: newFilterBtn.value.trim() }] } : s
+                                      ),
+                                      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+                                    };
+                                    const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+                                    setDashboards(updated);
+                                    setSelectedDashboard(updatedDashboard);
+                                    setSetting('dashboards', updated);
+                                    setNewFilterBtn({ label: '', field: '', value: '' });
+                                  }}
+                                  className="px-3 py-1.5 bg-brand-navy text-white text-xs rounded font-medium hover:bg-brand-navy-dark transition-colors"
+                                >
+                                  Add
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAddingFilterBtnSectionId(null)}
+                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
                           )}
                           {/* Section-level filter buttons */}
                           {(() => {
@@ -3032,18 +3098,45 @@ export default function DashboardPage() {
                                   All
                                 </button>
                                 {uniqueBtns.map((btn) => (
-                                  <button
-                                    key={btn.label}
-                                    onClick={() => setActiveFilterButtons(prev => ({
-                                      ...prev,
-                                      [section.id]: prev[section.id] === btn.label ? null : btn.label
-                                    }))}
-                                    className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-                                      activeBtn === btn.label ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                  >
-                                    {btn.label}
-                                  </button>
+                                  <div key={btn.label} className="relative flex items-center">
+                                    <button
+                                      onClick={() => setActiveFilterButtons(prev => ({
+                                        ...prev,
+                                        [section.id]: prev[section.id] === btn.label ? null : btn.label
+                                      }))}
+                                      className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                                        activeBtn === btn.label ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                      } ${dashEditMode ? 'pr-6' : ''}`}
+                                    >
+                                      {btn.label}
+                                    </button>
+                                    {dashEditMode && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (!selectedDashboard) return;
+                                          const updatedDashboard = {
+                                            ...selectedDashboard,
+                                            sections: (selectedDashboard.sections || []).map(s =>
+                                              s.id === section.id ? { ...s, filterButtons: (s.filterButtons || []).filter(b => b.label !== btn.label) } : s
+                                            ),
+                                            lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+                                          };
+                                          const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+                                          setDashboards(updated);
+                                          setSelectedDashboard(updatedDashboard);
+                                          setSetting('dashboards', updated);
+                                          if (activeFilterButtons[section.id] === btn.label) {
+                                            setActiveFilterButtons(prev => ({ ...prev, [section.id]: null }));
+                                          }
+                                        }}
+                                        className="absolute right-0.5 top-1/2 -translate-y-1/2 p-0.5 text-red-400 hover:text-red-600 rounded-full"
+                                        title="Remove button"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             );
