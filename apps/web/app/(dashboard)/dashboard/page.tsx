@@ -1262,7 +1262,24 @@ export default function DashboardPage() {
     const labelColorClass = fc ? '' : 'text-gray-600';
     const valueColorClass = fc ? '' : 'text-gray-700';
 
-    // --- Section-level filter: applied before rendering ---
+    // Detect dark background for drill-down table contrast
+    const isDarkBg = (() => {
+      const bg = widgetBg || '#ffffff';
+      const hex = bg.replace('#', '');
+      if (hex.length < 6) return false;
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return (r * 0.299 + g * 0.587 + b * 0.114) < 140;
+    })();
+    const ddBorder = isDarkBg ? 'border-white/20' : 'border-gray-200';
+    const ddSubtext = isDarkBg ? 'text-white/60' : 'text-gray-500';
+    const ddHighlight = isDarkBg ? 'text-white' : 'text-gray-700';
+    const ddMuted = isDarkBg ? 'text-white/40' : 'text-gray-400';
+    const ddHeadBg = isDarkBg ? 'bg-white/10' : 'bg-gray-50';
+    const ddRowHover = isDarkBg ? 'hover:bg-white/5' : 'hover:bg-gray-50';
+    const ddDivide = isDarkBg ? 'divide-white/10' : 'divide-gray-100';
+    const ddCell = isDarkBg ? 'text-white/90' : 'text-gray-700';
     const filterBar = null; // Filter bar is now rendered at section level
 
     switch (widget.type) {
@@ -1398,33 +1415,33 @@ export default function DashboardPage() {
               </div>
             )}
             {vbDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {vbDrillRecords.length} record{vbDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {vbDrillRecords.length} record{vbDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {vbDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {vbDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {vbDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {vbDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -1433,7 +1450,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
@@ -1513,33 +1530,33 @@ export default function DashboardPage() {
             </div>
             {/* Inline drill-down table */}
             {hDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {hDrillRecords.length} record{hDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {hDrillRecords.length} record{hDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {hDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {hDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {hDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {hDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -1548,7 +1565,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
@@ -1645,33 +1662,33 @@ export default function DashboardPage() {
               </div>
             )}
             {svDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {svDrillRecords.length} record{svDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {svDrillRecords.length} record{svDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {svDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {svDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {svDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {svDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -1680,7 +1697,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
@@ -1808,33 +1825,33 @@ export default function DashboardPage() {
               </div>
             )}
             {shDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {shDrillRecords.length} record{shDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {shDrillRecords.length} record{shDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {shDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {shDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {shDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {shDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -1843,7 +1860,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
@@ -1935,33 +1952,33 @@ export default function DashboardPage() {
               </div>
             )}
             {lnDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {lnDrillRecords.length} record{lnDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {lnDrillRecords.length} record{lnDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {lnDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {lnDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {lnDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {lnDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -1970,7 +1987,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
@@ -2064,33 +2081,33 @@ export default function DashboardPage() {
               </div>
             </div>
             {dnDrillActive && (
-              <div className="border-t border-gray-200 mt-3 pt-3 flex-1 overflow-auto">
+              <div className={`border-t ${ddBorder} mt-3 pt-3 flex-1 overflow-auto`}>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs text-gray-500">
-                    {dnDrillRecords.length} record{dnDrillRecords.length !== 1 ? 's' : ''} for <span className="font-medium text-gray-700">&quot;{drillDownLabel}&quot;</span>
+                  <p className={`text-xs ${ddSubtext}`}>
+                    {dnDrillRecords.length} record{dnDrillRecords.length !== 1 ? 's' : ''} for <span className={`font-medium ${ddHighlight}`}>&quot;{drillDownLabel}&quot;</span>
                   </p>
-                  <button onClick={closeDrillDown} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                  <button onClick={closeDrillDown} className={`text-xs ${ddMuted} hover:${ddHighlight} flex items-center gap-1`}>
                     <X className="w-3 h-3" /> Close
                   </button>
                 </div>
                 {dnDrillRecords.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                      <tr className={`${ddHeadBg} border-b ${ddBorder}`}>
+                        <th className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider w-8`}>#</th>
                         {dnDrillColumns.map(col => (
-                          <th key={col} className="text-left py-2 px-3 font-semibold text-gray-500 uppercase tracking-wider">
+                          <th key={col} className={`text-left py-2 px-3 font-semibold ${ddSubtext} uppercase tracking-wider`}>
                             {stripFieldPrefix(col)}
                           </th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className={`divide-y ${ddDivide}`}>
                       {dnDrillRecords.map((row: any, rIdx: number) => (
-                        <tr key={rIdx} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-1.5 px-3 text-gray-400">{rIdx + 1}</td>
+                        <tr key={rIdx} className={`${ddRowHover} transition-colors`}>
+                          <td className={`py-1.5 px-3 ${ddMuted}`}>{rIdx + 1}</td>
                           {dnDrillColumns.map(col => (
-                            <td key={col} className="py-1.5 px-3 text-gray-700">
+                            <td key={col} className={`py-1.5 px-3 ${ddCell}`}>
                               {typeof row[col] === 'number' ? row[col].toLocaleString() : String(row[col] ?? '')}
                             </td>
                           ))}
@@ -2099,7 +2116,7 @@ export default function DashboardPage() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8 text-gray-400 text-xs">No records found</div>
+                  <div className={`text-center py-8 ${ddMuted} text-xs`}>No records found</div>
                 )}
               </div>
             )}
