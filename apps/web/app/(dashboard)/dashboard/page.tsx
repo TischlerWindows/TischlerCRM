@@ -685,7 +685,7 @@ export default function DashboardPage() {
     }
 
     const defaultSize = (selectedWidgetType === 'card' || selectedWidgetType === 'metric')
-      ? { x: 0, y: 0, w: 2, h: 1 }
+      ? { x: 0, y: 0, w: 3, h: 1 }
       : { x: 0, y: 0, w: 4, h: 2 };
 
     const newWidget: DashboardWidget = {
@@ -1163,10 +1163,10 @@ export default function DashboardPage() {
     }
 
     const filterBar = filterBtns.length > 0 ? (
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-100 overflow-x-auto flex-shrink-0">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-100 overflow-x-auto flex-shrink-0">
         <button
           onClick={() => setActiveFilterButtons(prev => ({ ...prev, [widget.id]: null }))}
-          className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+          className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
             !activeBtn ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
           style={!activeBtn ? { backgroundColor: widgetAccent } : undefined}
@@ -1180,7 +1180,7 @@ export default function DashboardPage() {
               ...prev,
               [widget.id]: prev[widget.id] === btn.label ? null : btn.label
             }))}
-            className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
               activeBtn === btn.label ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
             style={activeBtn === btn.label ? { backgroundColor: widgetAccent } : undefined}
@@ -2571,10 +2571,10 @@ export default function DashboardPage() {
                       const sectionWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
                       const isSectionDropTarget = dashEditMode && draggingWidgetId && dropTarget?.sectionId === section.id && dropTarget?.beforeWidgetId === null;
                       return (
-                        <div key={section.id}>
+                        <div key={section.id} className="bg-white/60 border border-gray-200 rounded-xl p-4 shadow-sm">
                           <div
-                            className={`flex items-center justify-between mb-3 rounded px-2 py-1 transition-colors ${
-                              dashEditMode && draggingWidgetId ? 'border-2 border-dashed border-transparent hover:border-blue-300' : ''
+                            className={`flex items-center justify-between mb-4 pb-2 border-b border-gray-200 transition-colors ${
+                              dashEditMode && draggingWidgetId ? 'border-2 border-dashed border-transparent hover:border-blue-300 rounded px-2 py-1' : ''
                             }`}
                             onDragOver={(e) => {
                               if (!dashEditMode) return;
@@ -2606,7 +2606,7 @@ export default function DashboardPage() {
                                 <button type="button" onClick={() => setEditingSectionId(null)} className="text-sm text-gray-500 hover:underline">Cancel</button>
                               </form>
                             ) : (
-                              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{section.title}</h3>
+                              <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">{section.title}</h3>
                             )}
                             {dashEditMode && editingSectionId !== section.id && (
                               <div className="flex items-center gap-1">
@@ -2644,7 +2644,7 @@ export default function DashboardPage() {
                             )}
                           </div>
                           {section.subtitle && (
-                            <p className="text-xs text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
+                            <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
                           )}
                           {sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId) ? (
                             <div
