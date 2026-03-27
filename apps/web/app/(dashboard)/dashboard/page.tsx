@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -88,6 +88,8 @@ interface Dashboard {
   createdAt: string;
   lastModifiedAt: string;
   isFavorite?: boolean;
+  backgroundColor?: string;
+  accentColor?: string;
 }
 
 const WIDGET_TYPES = [
@@ -192,6 +194,8 @@ export default function DashboardPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [previewKey, setPreviewKey] = useState(0);
   const [resizingWidget, setResizingWidget] = useState<{ id: string; startX: number; startY: number; startW: number; startH: number } | null>(null);
+  const lastResizePos = useRef<{ w: number; h: number } | null>(null);
+  const resizeRaf = useRef<number | null>(null);
   const [showAddSection, setShowAddSection] = useState(false);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState('');
@@ -404,33 +408,43 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!resizingWidget) return;
+    lastResizePos.current = { w: resizingWidget.startW, h: resizingWidget.startH };
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!selectedDashboard) return;
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current);
 
-      const deltaX = (e.clientX - resizingWidget.startX) / 100; // pixels to grid units
-      const deltaY = (e.clientY - resizingWidget.startY) / 200; // pixels to grid units (200px per row)
+      resizeRaf.current = requestAnimationFrame(() => {
+        const deltaX = (e.clientX - resizingWidget.startX) / 100;
+        const deltaY = (e.clientY - resizingWidget.startY) / 200;
 
-      const resizingWidgetObj = selectedDashboard.widgets.find(w => w.id === resizingWidget.id);
-      const minW = 2;
-      let newW = Math.max(minW, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
-      let newH = Math.max(1, Math.round(resizingWidget.startH + deltaY));
+        const minW = 2;
+        const newW = Math.max(minW, Math.min(9, Math.round(resizingWidget.startW + deltaX)));
+        const newH = Math.max(1, Math.round(resizingWidget.startH + deltaY));
 
-      const updatedDashboard = {
-        ...selectedDashboard,
-        widgets: selectedDashboard.widgets.map(w =>
-          w.id === resizingWidget.id
-            ? { ...w, position: { ...w.position, w: newW, h: newH } }
-            : w
-        )
-      };
+        // Only update state when grid position actually changes
+        if (lastResizePos.current && newW === lastResizePos.current.w && newH === lastResizePos.current.h) return;
+        lastResizePos.current = { w: newW, h: newH };
 
-      const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
-      setDashboards(updated);
-      setSelectedDashboard(updatedDashboard);
+        const updatedDashboard = {
+          ...selectedDashboard,
+          widgets: selectedDashboard.widgets.map(w =>
+            w.id === resizingWidget.id
+              ? { ...w, position: { ...w.position, w: newW, h: newH } }
+              : w
+          )
+        };
+
+        const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+        setDashboards(updated);
+        setSelectedDashboard(updatedDashboard);
+      });
     };
 
     const handleMouseUp = () => {
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current);
+      resizeRaf.current = null;
+      lastResizePos.current = null;
       setResizingWidget(null);
       if (selectedDashboard) {
         setSetting('dashboards', dashboards);
@@ -443,6 +457,7 @@ export default function DashboardPage() {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      if (resizeRaf.current) cancelAnimationFrame(resizeRaf.current);
     };
   }, [resizingWidget, selectedDashboard, dashboards]);
 
@@ -1116,6 +1131,8 @@ export default function DashboardPage() {
       gridRow: `span ${widget.position.h}`
     };
 
+    const dashAccent = selectedDashboard?.accentColor || '#151f6d';
+
     // --- Filter buttons: filter data based on active button ---
     const filterBtns: Array<{ label: string; field: string; value: string }> = widget.config?.filterButtons || [];
     const activeBtn = activeFilterButtons[widget.id] || null;
@@ -1140,8 +1157,9 @@ export default function DashboardPage() {
         <button
           onClick={() => setActiveFilterButtons(prev => ({ ...prev, [widget.id]: null }))}
           className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
-            !activeBtn ? 'bg-[#1e3a5f] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            !activeBtn ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}
+          style={!activeBtn ? { backgroundColor: dashAccent } : undefined}
         >
           All
         </button>
@@ -1153,8 +1171,9 @@ export default function DashboardPage() {
               [widget.id]: prev[widget.id] === btn.label ? null : btn.label
             }))}
             className={`px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${
-              activeBtn === btn.label ? 'bg-[#1e3a5f] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              activeBtn === btn.label ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
+            style={activeBtn === btn.label ? { backgroundColor: dashAccent } : undefined}
           >
             {btn.label}
           </button>
@@ -1281,7 +1300,7 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" fill={widget.config.barColor || '#151f6d'} radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="value" fill={widget.config.barColor || dashAccent} radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1345,8 +1364,8 @@ export default function DashboardPage() {
                     <div className="text-xs text-gray-600 w-20 text-right truncate">{item.label}</div>
                     <div className="flex-1 bg-gray-100 rounded-full flex items-center" style={{ height: `${barHeight}px` }}>
                       <div
-                        className="bg-brand-navy rounded-full h-full transition-all hover:bg-brand-navy-light"
-                        style={{ width: `${widthPercent}%`, minWidth: '2px' }}
+                        className="rounded-full h-full transition-all hover:opacity-80"
+                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: dashAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
@@ -1360,7 +1379,7 @@ export default function DashboardPage() {
 
       case 'stacked-vertical-bar': {
         const svStackKeys = widget.config.stackKeys || [];
-        const svColors = ['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const svColors = [dashAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
         
         return (
           <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
@@ -1447,7 +1466,7 @@ export default function DashboardPage() {
 
       case 'stacked-horizontal-bar':
         const stackKeys = widget.config.stackKeys || [];
-        const colors = ['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const colors = [dashAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
         
         return (
           <div key={widget.id} style={widgetStyle} className="bg-white rounded-lg border border-gray-200 p-6 relative group flex flex-col">
@@ -1631,9 +1650,9 @@ export default function DashboardPage() {
                     <Line
                       type="monotone"
                       dataKey="value"
-                      stroke="#151f6d"
+                      stroke={dashAccent}
                       strokeWidth={2}
-                      dot={{ r: 4, fill: '#151f6d' }}
+                      dot={{ r: 4, fill: dashAccent }}
                       activeDot={{ r: 6, fill: '#da291c' }}
                     />
                   </LineChart>
@@ -1689,7 +1708,7 @@ export default function DashboardPage() {
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const colors = ['#151f6d', '#da291c', '#9f9fa2', '#293241'];
+                    const colors = [dashAccent, '#da291c', '#9f9fa2', '#293241'];
                     const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
                     
                     acc.push({
@@ -1716,7 +1735,7 @@ export default function DashboardPage() {
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: ['#151f6d', '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: [dashAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                     <span className="text-gray-700">{item.label}</span>
                     <span className="text-gray-500 ml-auto">{item.value}%</span>
                   </div>
@@ -1836,7 +1855,7 @@ export default function DashboardPage() {
       case 'card': {
         const isExpanded = drillDownWidgetId === widget.id;
         const cardData = widget.config?.data || widget.config?.manualData || [];
-        const cardColor = widget.config?.cardColor || '#1e3a5f';
+        const cardColor = widget.config?.cardColor || dashAccent;
         const cardIcon = widget.config?.cardIcon || 'default';
         const cardValue = widget.config?.value ?? widget.config?.manualMetric?.value ?? cardData.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0);
         const cardPrefix = widget.config?.prefix ?? widget.config?.manualMetric?.prefix ?? '';
@@ -2466,8 +2485,68 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                {/* Dashboard Colors (edit mode) */}
+                {dashEditMode && (
+                  <div className="mb-4 flex items-center gap-6 bg-white border border-gray-200 rounded-lg px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">Background</label>
+                      <input
+                        type="color"
+                        value={selectedDashboard.backgroundColor || '#f3f4f6'}
+                        onChange={(e) => {
+                          const updated = { ...selectedDashboard, backgroundColor: e.target.value };
+                          setSelectedDashboard(updated);
+                          const all = dashboards.map(d => d.id === updated.id ? updated : d);
+                          setDashboards(all);
+                          setSetting('dashboards', all);
+                        }}
+                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                      />
+                      {selectedDashboard.backgroundColor && (
+                        <button
+                          onClick={() => {
+                            const updated = { ...selectedDashboard, backgroundColor: undefined };
+                            setSelectedDashboard(updated);
+                            const all = dashboards.map(d => d.id === updated.id ? updated : d);
+                            setDashboards(all);
+                            setSetting('dashboards', all);
+                          }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >Reset</button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">Accent / Bar Color</label>
+                      <input
+                        type="color"
+                        value={selectedDashboard.accentColor || '#151f6d'}
+                        onChange={(e) => {
+                          const updated = { ...selectedDashboard, accentColor: e.target.value };
+                          setSelectedDashboard(updated);
+                          const all = dashboards.map(d => d.id === updated.id ? updated : d);
+                          setDashboards(all);
+                          setSetting('dashboards', all);
+                        }}
+                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                      />
+                      {selectedDashboard.accentColor && (
+                        <button
+                          onClick={() => {
+                            const updated = { ...selectedDashboard, accentColor: undefined };
+                            setSelectedDashboard(updated);
+                            const all = dashboards.map(d => d.id === updated.id ? updated : d);
+                            setDashboards(all);
+                            setSetting('dashboards', all);
+                          }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >Reset</button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {selectedDashboard.widgets.length > 0 || (selectedDashboard.sections || []).length > 0 ? (
-                  <div className="pb-[600px] space-y-6">
+                  <div className="pb-[600px] space-y-6 rounded-lg p-4" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
                     {/* Unsectioned widgets first */}
                     {(() => {
                       const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
