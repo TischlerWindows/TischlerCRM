@@ -18,7 +18,7 @@ const defaultTabs = DEFAULT_TAB_ORDER;
 export default function AppWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isImpersonating, returnToAdmin } = useAuth();
   const { canAccess, hasAppPermission } = usePermissions();
   const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
@@ -209,6 +209,18 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="h-screen flex flex-col bg-brand-light overflow-hidden">
+      {/* Impersonation banner */}
+      {isImpersonating && (
+        <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
+          <span>You are logged in as <strong>{user?.name ?? user?.email}</strong></span>
+          <button
+            onClick={() => { returnToAdmin(); window.location.href = '/settings/users'; }}
+            className="bg-white/20 hover:bg-white/30 text-white px-3 py-0.5 rounded-full transition-colors"
+          >
+            Return to Admin
+          </button>
+        </div>
+      )}
       {/* Global Header — Salesforce-style navy bar */}
       <header className="bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
         {/* Left: Logo + App Name */}

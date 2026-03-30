@@ -290,6 +290,52 @@ export default function DashboardPage() {
       return { data };
     }
 
+    // --- From Object mode: aggregate directly from cached records ---
+    if (widgetConfig.dataSourceMode === 'object') {
+      const objType = widgetConfig.dataSource || '';
+      if (!objType) return { data: [{ label: 'Select an object type', value: 30 }, { label: 'to see preview', value: 20 }] };
+
+      // Metric/card: return record count or sum of a field
+      if (selectedWidgetType === 'metric' || selectedWidgetType === 'card') {
+        const records = getCachedRecords(objType);
+        if (widgetConfig.yAxis) {
+          const field = stripFieldPrefix(widgetConfig.yAxis);
+          const total = records.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
+          return { value: total, prefix: '', suffix: '', trend: 0, data: records.map((r: any) => ({ label: String(r[field] || r.name || r.id || ''), value: Number(r[field]) || 0 })) };
+        }
+        return { value: records.length, prefix: '', suffix: '', trend: 0, data: records.slice(0, 50).map((r: any) => ({ label: r.name || r.id || '', value: 1 })) };
+      }
+
+      if (!widgetConfig.xAxis || !widgetConfig.yAxis) {
+        return { data: [{ label: 'Configure X & Y Axis', value: 30 }, { label: 'to see preview', value: 20 }] };
+      }
+
+      // Stacked charts
+      if ((selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && widgetConfig.stackBy) {
+        try {
+          const { data, stackKeys } = aggregateStackedChartData({
+            objectType: objType,
+            xAxisField: widgetConfig.xAxis,
+            yAxisField: widgetConfig.yAxis,
+            stackByField: widgetConfig.stackBy,
+            aggregationType: widgetConfig.aggregationType || 'sum'
+          });
+          return data && data.length > 0 ? { data, stackKeys } : { data: [], stackKeys: [] };
+        } catch { return { data: [], stackKeys: [] }; }
+      }
+
+      // Bar, line, donut
+      try {
+        const aggregatedData = aggregateChartData({
+          objectType: objType,
+          xAxisField: widgetConfig.xAxis,
+          yAxisField: widgetConfig.yAxis,
+          aggregationType: widgetConfig.aggregationType || 'sum'
+        });
+        return aggregatedData && aggregatedData.length > 0 ? { data: aggregatedData } : { data: [] };
+      } catch { return { data: [] }; }
+    }
+
     // --- Report mode: aggregate from cached records ---
     const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
     const effectiveObjectType = selectedReport?.objectType || '';
@@ -609,6 +655,23 @@ export default function DashboardPage() {
     });
   }, [availableReports]);
 
+  // Load records into cache when user picks an object type in "From Object" mode
+  useEffect(() => {
+    if (widgetConfig.dataSourceMode !== 'object' || !widgetConfig.dataSource) return;
+    const objType = widgetConfig.dataSource;
+    // Skip if already cached
+    if (getCachedRecords(objType).length > 0) return;
+    (async () => {
+      try {
+        const records = await recordsService.getRecords(objType);
+        const flat = records.map((r: any) => ({ id: r.id, ...r.data }));
+        setCachedRecords(objType, flat);
+      } catch (e) {
+        console.error(`Failed to load records for ${objType}:`, e);
+      }
+    })();
+  }, [widgetConfig.dataSourceMode, widgetConfig.dataSource]);
+
   const handleCreateDashboard = (name: string, description: string) => {
     const newDashboard: Dashboard = {
       id: Date.now().toString(),
@@ -651,7 +714,7 @@ export default function DashboardPage() {
     const isStacked = type === 'stacked-horizontal-bar' || type === 'stacked-vertical-bar';
     const firstSectionId = pendingAddSectionId || (selectedDashboard?.sections || [])[0]?.id || '';
     setWidgetConfig({
-      dataSourceMode: 'report',
+      dataSourceMode: 'object',
       reportId: reports.length > 0 ? reports[0].id : '',
       dataSource: reports.length > 0 ? reports[0].objectType : '',
       xAxis: '',
@@ -3119,6 +3182,17 @@ export default function DashboardPage() {
                 <div className="flex rounded-lg border border-gray-300 overflow-hidden">
                   <button
                     type="button"
+                    onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'object', reportId: '', xAxis: '', yAxis: '', stackBy: '' })}
+                    className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                      widgetConfig.dataSourceMode === 'object'
+                        ? 'bg-brand-navy text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    From Object
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setWidgetConfig({ ...widgetConfig, dataSourceMode: 'report', xAxis: '', yAxis: '', stackBy: '' })}
                     className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
                       widgetConfig.dataSourceMode === 'report'
@@ -3156,6 +3230,120 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
+
+              {/* ===== FROM OBJECT MODE ===== */}
+              {widgetConfig.dataSourceMode === 'object' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Object Type</label>
+                    <select
+                      value={widgetConfig.dataSource || ''}
+                      onChange={(e) => setWidgetConfig({ ...widgetConfig, dataSource: e.target.value, xAxis: '', yAxis: '', stackBy: '' })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                    >
+                      <option value="">Select object…</option>
+                      {OBJECT_TYPES.map(ot => <option key={ot.value} value={ot.value}>{ot.label}</option>)}
+                    </select>
+                  </div>
+
+                  {widgetConfig.dataSource && !['metric', 'table', 'card'].includes(selectedWidgetType) && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis (Group By)</label>
+                        <select
+                          value={widgetConfig.xAxis}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="">Select field…</option>
+                          {getAvailableFields(widgetConfig.dataSource).map(f => (
+                            <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis (Measure)</label>
+                        <select
+                          value={widgetConfig.yAxis}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="">Select field…</option>
+                          {getAvailableFields(widgetConfig.dataSource).map(f => (
+                            <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Stack By
+                            <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
+                          </label>
+                          <select
+                            value={widgetConfig.stackBy}
+                            onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                          >
+                            <option value="">Select field…</option>
+                            {getAvailableFields(widgetConfig.dataSource).map(f => (
+                              <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Aggregation Type</label>
+                        <select
+                          value={widgetConfig.aggregationType || 'sum'}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, aggregationType: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="sum">Sum</option>
+                          <option value="count">Count</option>
+                          <option value="avg">Average</option>
+                          <option value="max">Maximum</option>
+                          <option value="min">Minimum</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Legend Position</label>
+                        <select
+                          value={widgetConfig.legendPosition}
+                          onChange={(e) => setWidgetConfig({ ...widgetConfig, legendPosition: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                        >
+                          <option value="top">Top</option>
+                          <option value="right">Right</option>
+                          <option value="bottom">Bottom</option>
+                          <option value="left">Left</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {widgetConfig.dataSource && ['metric', 'card'].includes(selectedWidgetType) && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Count Field</label>
+                      <select
+                        value={widgetConfig.yAxis}
+                        onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
+                      >
+                        <option value="">Total record count</option>
+                        {getAvailableFields(widgetConfig.dataSource).map(f => (
+                          <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* ===== REPORT MODE ===== */}
               {widgetConfig.dataSourceMode === 'report' && (

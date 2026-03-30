@@ -15,8 +15,11 @@ interface AuthContextType {
   token: string | null;
   loading: boolean;
   isAuthenticated: boolean;
+  isImpersonating: boolean;
   setAuth: (token: string, user: User) => void;
   logout: () => void;
+  impersonate: (token: string, user: User) => void;
+  returnToAdmin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isImpersonating, setIsImpersonating] = useState(false);
 
   useEffect(() => {
     // Check if token exists in cookies
@@ -58,6 +62,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
       }
+      // Check if currently impersonating
+      setIsImpersonating(!!localStorage.getItem('admin_token_backup'));
     } catch (err) {
       console.error('Error initializing auth:', err);
     } finally {
@@ -85,13 +91,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.setItem('user', JSON.stringify(newUser));
   };
 
+  const impersonate = (newToken: string, newUser: User) => {
+    // Back up current admin session before switching
+    if (token) localStorage.setItem('admin_token_backup', token);
+    if (user) localStorage.setItem('admin_user_backup', JSON.stringify(user));
+    setAuth(newToken, newUser);
+    setIsImpersonating(true);
+  };
+
+  const returnToAdmin = () => {
+    const adminToken = localStorage.getItem('admin_token_backup');
+    const adminUserStr = localStorage.getItem('admin_user_backup');
+    if (adminToken && adminUserStr) {
+      try {
+        const adminUser = JSON.parse(adminUserStr) as User;
+        setAuth(adminToken, adminUser);
+      } catch { /* ignore parse error */ }
+    }
+    localStorage.removeItem('admin_token_backup');
+    localStorage.removeItem('admin_user_backup');
+    setIsImpersonating(false);
+  };
+
   const value: AuthContextType = {
     user,
     token,
     loading,
     isAuthenticated: !!token,
+    isImpersonating,
     logout,
     setAuth,
+    impersonate,
+    returnToAdmin,
   };
 
   return (

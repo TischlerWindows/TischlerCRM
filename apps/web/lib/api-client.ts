@@ -288,6 +288,14 @@ class ApiClient {
     return this.post(`/admin/users/${id}/resend-invite`);
   }
 
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
+  }
+
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
+  }
+
   async getUserLoginHistory(id: string): Promise<LoginEventRow[]> {
     return this.get(`/security/login-events?userId=${id}`);
   }

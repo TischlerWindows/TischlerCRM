@@ -3,7 +3,8 @@ import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { hashPassword } from '../auth.js';
+import { hashPassword, signJwt } from '../auth.js';
+import { loadEnv } from '../config.js';
 import { logAudit, extractIp } from '../audit.js';
 import * as notifications from '../notifications.js';
 
@@ -445,5 +446,51 @@ export async function usersAdminRoutes(app: FastifyInstance) {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
     return reply.send(user.profile?.permissions ?? {});
+  });
+
+  // ── Impersonate user (admin-only) ───────────────────────────────────────
+  app.post('/admin/users/:id/impersonate', async (req, reply) => {
+    const actor = (req as any).user;
+    if (!actor || actor.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Only admins can impersonate users' });
+    }
+
+    const pp = idParam.safeParse(req.params);
+    if (!pp.success) return reply.code(400).send({ error: 'Invalid user ID' });
+    const { id } = pp.data;
+
+    if (id === actor.sub) {
+      return reply.code(400).send({ error: 'Cannot impersonate yourself' });
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id, deletedAt: null },
+      include: { profile: true },
+    });
+    if (!target) return reply.code(404).send({ error: 'User not found' });
+
+    const env = loadEnv();
+    const role = await resolveSystemRole(target.profileId);
+    const token = signJwt({ sub: target.id, role }, env.JWT_SECRET, 60 * 60 * 4); // 4-hour TTL
+
+    await logAudit({
+      actorId: actor.sub,
+      action: 'UPDATE',
+      objectType: 'User',
+      objectId: target.id,
+      objectName: target.name ?? target.email,
+      after: { event: 'admin_impersonate' },
+      ipAddress: extractIp(req),
+    });
+
+    return reply.send({
+      token,
+      user: {
+        id: target.id,
+        email: target.email,
+        name: target.name,
+        role,
+      },
+    });
   });
 }
