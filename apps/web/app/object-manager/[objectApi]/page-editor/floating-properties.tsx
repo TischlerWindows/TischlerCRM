@@ -5,9 +5,19 @@ import { Settings, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { FieldDef } from '@/lib/schema';
+import type { FieldDef, WidgetConfig } from '@/lib/schema';
+import { SchemaRenderer } from '@/lib/widgets/schema-renderer';
+import { getWidgetById } from '@/lib/widgets/registry-loader';
+import DemoConfigPanel from '@/widgets/external/demo-widget/ConfigPanel';
+import type { ConfigPanelProps } from '@/lib/widgets/types';
 import { useEditorStore } from './editor-store';
 import type { EditorPageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
+
+type ConfigPanelComponent = React.ComponentType<ConfigPanelProps & { objectOptions?: Array<{ value: string; label: string }> }>;
+
+const EXTERNAL_CONFIG_PANELS: Record<string, ConfigPanelComponent> = {
+  'demo-widget': DemoConfigPanel,
+};
 
 interface FloatingPropertiesProps {
   onClose: () => void;
@@ -1112,7 +1122,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                         config: {
                           ...selection.widget.config,
                           relatedObjectApiName: e.target.value,
-                        },
+                        } as WidgetConfig,
                       })
                     }
                   />
@@ -1128,7 +1138,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                         config: {
                           ...selection.widget.config,
                           maxRows: Math.max(1, parseNumber(e.target.value, 5)),
-                        },
+                        } as WidgetConfig,
                       })
                     }
                   />
@@ -1148,7 +1158,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                       config: {
                         ...selection.widget.config,
                         maxItems: Math.max(1, parseNumber(e.target.value, 10)),
-                      },
+                      } as WidgetConfig,
                     })
                   }
                 />
@@ -1168,7 +1178,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                         config: {
                           ...selection.widget.config,
                           provider: e.target.value as 'dropbox' | 'google-drive' | 'local',
-                        },
+                        } as WidgetConfig,
                       })
                     }
                   >
@@ -1187,7 +1197,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                         config: {
                           ...selection.widget.config,
                           folderId: e.target.value,
-                        },
+                        } as WidgetConfig,
                       })
                     }
                   />
@@ -1206,7 +1216,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                       config: {
                         ...selection.widget.config,
                         componentId: e.target.value,
-                      },
+                      } as WidgetConfig,
                     })
                   }
                 />
@@ -1225,7 +1235,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                       config: {
                         ...selection.widget.config,
                         minHeightPx: Math.max(8, parseNumber(e.target.value, 32)),
-                      },
+                      } as WidgetConfig,
                     })
                   }
                 />
@@ -1240,6 +1250,77 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
                 availableFields={availableFields}
               />
             )}
+
+            {selection.widget.config.type === 'ExternalWidget' && (() => {
+              const externalConfig = selection.widget.config;
+              const manifest = getWidgetById(externalConfig.externalWidgetId);
+              const ExternalConfigPanel = EXTERNAL_CONFIG_PANELS[externalConfig.externalWidgetId];
+              return (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-gray-600">Display Mode</Label>
+                    <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+                      {(['full', 'column'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() =>
+                            updateWidget(selection.widget.id, {
+                              config: { ...externalConfig, displayMode: mode },
+                            })
+                          }
+                          className={`flex-1 py-1.5 font-medium capitalize transition-colors ${
+                            externalConfig.displayMode === mode
+                              ? 'bg-brand-navy text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-50'
+                          } ${mode === 'column' ? 'border-l border-gray-200' : ''}`}
+                        >
+                          {mode === 'full' ? 'Full Width' : 'Column'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {ExternalConfigPanel ? (
+                    <ExternalConfigPanel
+                      config={externalConfig.config}
+                      onChange={(newCfg) =>
+                        updateWidget(selection.widget.id, {
+                          config: { ...externalConfig, config: newCfg },
+                        })
+                      }
+                      record={{}}
+                      integration={null}
+                      object={{ apiName: '', label: '', fields: [] }}
+                      objectOptions={[]}
+                    />
+                  ) : manifest ? (
+                    <SchemaRenderer
+                      schema={manifest.configSchema}
+                      config={externalConfig.config}
+                      onChange={(key, value) =>
+                        updateWidget(selection.widget.id, {
+                          config: {
+                            ...externalConfig,
+                            config: { ...externalConfig.config, [key]: value },
+                          },
+                        })
+                      }
+                    />
+                  ) : (
+                    <div className="text-xs text-gray-400">
+                      Widget &quot;{externalConfig.externalWidgetId}&quot; not found in registry.
+                    </div>
+                  )}
+
+                  {manifest?.integration && (
+                    <div className="rounded-md bg-blue-50 px-2.5 py-2 text-xs text-blue-700 border border-blue-100">
+                      Powered by {manifest.integration}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             <div className="border-t border-gray-200 pt-3">
               <Button
