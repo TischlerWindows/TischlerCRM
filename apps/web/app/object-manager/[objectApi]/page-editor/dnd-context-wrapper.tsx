@@ -7,9 +7,11 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
   type Active,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
   type Over,
@@ -18,13 +20,14 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { Grid2x2, LayoutPanelLeft, Puzzle } from 'lucide-react';
 import type { WidgetType } from '@/lib/schema';
 import type { LayoutPanel, LayoutSection, LayoutWidget, PanelField } from './types';
+import { getWidgetById } from '@/lib/widgets/registry-loader';
 import { useEditorStore } from './editor-store';
 
 type DragSource =
   | { kind: 'palette-field'; fieldApiName: string; label: string }
   | { kind: 'palette-panel'; columns: 1 | 2 | 3 | 4; label: string }
   | { kind: 'existing-field'; fieldApiName: string; fromPanelId: string; label: string }
-  | { kind: 'palette-widget'; widgetType: WidgetType; label: string }
+  | { kind: 'palette-widget'; widgetType: WidgetType; label: string; externalWidgetId?: string }
   | { kind: 'existing-widget'; widgetId: string; label: string }
   | { kind: 'panel'; panelId: string; regionId?: string; label: string }
   | { kind: 'region'; regionId: string; label: string }
@@ -52,6 +55,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   CustomComponent: { type: 'CustomComponent', componentId: '' },
   Spacer: { type: 'Spacer', minHeightPx: 32 },
   HeaderHighlights: { type: 'HeaderHighlights', fieldApiNames: [] },
+  ExternalWidget: { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} },
 };
 
 function sortedFields(panel: LayoutPanel): PanelField[] {
@@ -104,7 +108,26 @@ function buildField(fieldApiName: string, atIndex: number): PanelField {
   };
 }
 
-function buildWidget(widgetType: WidgetType, atIndex: number): LayoutWidget {
+function buildWidget(widgetType: WidgetType, atIndex: number, externalWidgetId?: string): LayoutWidget {
+  if (widgetType === 'ExternalWidget') {
+    const manifest = externalWidgetId ? getWidgetById(externalWidgetId) : undefined;
+    const defaultConfig: Record<string, unknown> = Object.fromEntries(
+      (manifest?.configSchema ?? [])
+        .filter((f): f is Extract<typeof f, { key: string }> => 'key' in f)
+        .map((f) => [f.key, f.default ?? '']),
+    );
+    return {
+      id: `widget-${Date.now()}-ext-${externalWidgetId ?? 'unknown'}`,
+      widgetType: 'ExternalWidget',
+      order: atIndex,
+      config: {
+        type: 'ExternalWidget' as const,
+        externalWidgetId: externalWidgetId ?? '',
+        displayMode: manifest?.defaultDisplayMode ?? 'full',
+        config: defaultConfig,
+      },
+    };
+  }
   return {
     id: `widget-${Date.now()}-${widgetType}`,
     widgetType,
@@ -151,6 +174,16 @@ function parseActiveDrag(
       kind: 'palette-panel',
       columns: cols,
       label: typeof data.label === 'string' ? data.label : 'New Section',
+    };
+  }
+
+  // External widget palette drag (data-driven, detected before ID-based fallback)
+  if (data.type === 'palette-widget' && data.widgetType === 'ExternalWidget') {
+    return {
+      kind: 'palette-widget',
+      widgetType: 'ExternalWidget',
+      externalWidgetId: typeof data.externalWidgetId === 'string' ? data.externalWidgetId : undefined,
+      label: typeof data.label === 'string' ? data.label : 'External Widget',
     };
   }
 
@@ -305,6 +338,29 @@ export function DndContextWrapper({
 
   const [activeDrag, setActiveDrag] = useState<DragSource>(null);
 
+  // Composite collision detection: prefer exact pointer hits on specific field/widget
+  // sortable items over container drop zones, then fall back to closest-center.
+  // This fixes the "rightmost column" glitch where closestCenter would prefer the
+  // panel-drop container instead of the field card the pointer was physically over.
+  const collisionDetectionStrategy = useCallback<CollisionDetection>((args) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length > 0) {
+      // Among pointer hits, prefer individual field/widget sortable items over
+      // broader container zones (panel-drop, region-drop, etc.)
+      const specificHit = pointerHits.find(({ id }) => {
+        const sid = String(id);
+        return (
+          sid.startsWith('field-') ||
+          (sid.startsWith('widget-') && !sid.startsWith('widget-new-'))
+        );
+      });
+      if (specificHit) return [specificHit];
+      return pointerHits;
+    }
+    // Pointer is outside all registered droppables — fall back to closest center
+    return closestCenter(args);
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -393,7 +449,7 @@ export function DndContextWrapper({
         }
 
         if (active.kind === 'palette-widget') {
-          addWidget(buildWidget(active.widgetType, targetIndex), targetRegionId, targetIndex);
+          addWidget(buildWidget(active.widgetType, targetIndex, active.externalWidgetId), targetRegionId, targetIndex);
           return;
         }
 
@@ -506,7 +562,7 @@ export function DndContextWrapper({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}

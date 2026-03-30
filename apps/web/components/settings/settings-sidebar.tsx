@@ -19,6 +19,7 @@ import {
   WifiOff,
   Zap,
   Plug,
+  Puzzle,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -62,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Integrations',
     items: [
       { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
+      { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell, disabled: true },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
     ],

@@ -95,6 +95,8 @@ function parseWidgetConfig(
       return { type: 'Spacer', minHeightPx: 32 };
     case 'HeaderHighlights':
       return { type: 'HeaderHighlights', fieldApiNames: [] };
+    case 'ExternalWidget':
+      return { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} };
     default: {
       // Exhaustiveness guard: if a new WidgetType is added without updating this switch,
       // TypeScript will error here because widgetType won't narrow to never.

@@ -24,6 +24,26 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_layout_field_presentation',
     sql: `ALTER TABLE "LayoutField" ADD COLUMN IF NOT EXISTS "presentation" JSONB`,
   },
+  {
+    name: 'add_widget_settings',
+    sql: `CREATE TABLE IF NOT EXISTS "WidgetSetting" (
+      "id" TEXT NOT NULL,
+      "orgId" TEXT NOT NULL,
+      "widgetId" TEXT NOT NULL,
+      "enabled" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "WidgetSetting_pkey" PRIMARY KEY ("id")
+    )`,
+  },
+  {
+    name: 'add_widget_settings_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "WidgetSetting_orgId_widgetId_key" ON "WidgetSetting"("orgId", "widgetId")`,
+  },
+  {
+    name: 'add_widget_settings_org_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "WidgetSetting_orgId_idx" ON "WidgetSetting"("orgId")`,
+  },
 ];
 
 export async function runPendingMigrations() {
