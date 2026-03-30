@@ -285,6 +285,26 @@ export async function ensureCoreObjects(): Promise<void> {
     console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);
   }
 
+  // Fix: ensure Lead 'property' lookup field is required.
+  // Every Lead must be linked to a Property so Dropbox folder auto-creation works.
+  try {
+    const leadObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+    });
+    if (leadObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: leadObj.id,
+          apiName: 'property',
+          required: false,
+        },
+        data: { required: true },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
+  }
+
   // Also sync any user-created objects from the schema settings to the DB.
   // The schema (stored in the Setting table under 'orgSchema') may contain
   // objects that were created in the UI but whose apiClient.createObject call

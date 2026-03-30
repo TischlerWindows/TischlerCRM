@@ -897,6 +897,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Lead__property',
       label: 'Property',
       type: 'Lookup',
+      required: true,
       lookupObject: 'Property',
       relationshipName: 'Properties'
     });
@@ -2768,6 +2769,7 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Lead__property',
           label: 'Property',
           type: 'Lookup',
+          required: true,
           lookupObject: 'Property',
           relationshipName: 'Properties'
         },
