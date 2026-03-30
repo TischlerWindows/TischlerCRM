@@ -234,6 +234,22 @@ export interface PageLayoutExtensions {
 
 export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget';
 
+export type RelatedListFilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'greater_than'
+  | 'less_than'
+  | 'is_empty'
+  | 'is_not_empty';
+
+export interface RelatedListFilter {
+  field: string;
+  operator: RelatedListFilterOperator;
+  value: string;
+}
+
 export interface RelatedListConfig {
   type: 'RelatedList';
   relatedObjectApiName: string;
@@ -242,12 +258,21 @@ export interface RelatedListConfig {
   sortField?: string;
   sortDirection?: 'asc' | 'desc';
   maxRows?: number;
+  /** Custom header label shown in the widget header. Falls back to object label when absent. */
   label?: string;
   objectApiName?: string;
   columns?: string[];
   linkField?: string;
   rowLimit?: number;
   showSearch?: boolean;
+  /** 'list' renders a table; 'tile' renders a card grid. Defaults to 'list'. */
+  viewMode?: 'list' | 'tile';
+  /** Show the action bar (New button) above the list. */
+  showActionBar?: boolean;
+  /** Show a "New" button in the action bar pre-filling the link field. */
+  showNewButton?: boolean;
+  /** Admin-defined filters applied after fetch (users cannot override). Up to 10. */
+  filters?: RelatedListFilter[];
 }
 
 export interface CustomComponentConfig {
@@ -278,8 +303,8 @@ export interface HeaderHighlightsConfig {
   type: 'HeaderHighlights';
   /** Up to 6 field API names to display as highlight badges */
   fieldApiNames: string[];
-  /** Which action buttons to show in the highlights bar. Defaults to both when absent. */
-  visibleActions?: Array<'edit' | 'delete'>;
+  /** Which action buttons to show in the highlights bar. Defaults to edit + delete when absent. */
+  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print'>;
 }
 
 export interface ExternalWidgetLayoutConfig {

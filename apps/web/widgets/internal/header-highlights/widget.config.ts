@@ -8,5 +8,5 @@ export const config: WidgetManifest = {
   category: 'internal',
   integration: null,
   defaultDisplayMode: 'full',
-  configSchema: [{ key: 'fields', type: 'json', label: 'Highlighted Fields' }],
+  configSchema: [], // all config handled by ConfigPanel.tsx
 }
