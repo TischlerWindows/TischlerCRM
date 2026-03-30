@@ -20,6 +20,7 @@ import {
   labelPresentationClassName,
 } from '@/lib/layout-presentation';
 import { recordsService, RecordData } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import LocationMapPreview from '@/components/location-map-preview';
 import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
@@ -99,6 +100,69 @@ export default function RecordDetailPage({
     if (params?.id) load();
     else setLoading(false);
   }, [params?.id, objectApiName]);
+
+  // ── Auto-create linked subfolder inside parent Property's Dropbox folder ──
+  // When a Lead or Deal (Opportunity) record has a propertyId, create a
+  // subfolder like /TischlerCRM/Property/{addr}/Leads/{leadFolder} automatically.
+  useEffect(() => {
+    if (!record || !params?.id) return;
+    // Only for object types that map to a Property subfolder
+    const LINKED_TYPES = ['Lead', 'Deal'];
+    if (!LINKED_TYPES.includes(objectApiName)) return;
+
+    // Find the property lookup value (could be propertyId, Property__propertyId, etc.)
+    const propKey = Object.keys(record).find(k => {
+      const lk = k.toLowerCase().replace(/^[a-z]+__/, '');
+      return lk === 'propertyid' || lk === 'property';
+    });
+    const propertyRecordId = propKey ? record[propKey] : null;
+    if (!propertyRecordId || typeof propertyRecordId !== 'string') return;
+
+    // Build a child folder name from the record (same logic as getDropboxFolderName)
+    const numberKey = Object.keys(record).find(
+      k => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
+    );
+    const nameKey = Object.keys(record).find(
+      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name')) && typeof record[k] === 'string' && record[k]
+    );
+    const childName = (numberKey ? record[numberKey] : '') || (nameKey ? record[nameKey] : '') || params.id as string;
+
+    // Fetch the parent Property record to get its folder name
+    (async () => {
+      try {
+        const parentRaw = await recordsService.getRecord('Property', propertyRecordId);
+        if (!parentRaw) return;
+        const parent = recordsService.flattenRecord(parentRaw);
+        // Build parent folder name the same way getDropboxFolderName does
+        const pNumKey = Object.keys(parent).find(k => k.toLowerCase().includes('number') && typeof parent[k] === 'string' && parent[k]);
+        let addrStr = '';
+        const streetKey = Object.keys(parent).find(k => {
+          const lk = k.toLowerCase();
+          return lk === 'street_address' || lk === 'property_address' || lk.endsWith('__street_address') || lk.endsWith('__property_address');
+        });
+        if (streetKey && typeof parent[streetKey] === 'string') addrStr = parent[streetKey];
+        if (!addrStr) {
+          const addrKey = Object.keys(parent).find(k => { const lk = k.toLowerCase(); return lk === 'address' || lk.endsWith('__address'); });
+          if (addrKey) {
+            let addr = parent[addrKey];
+            if (typeof addr === 'string' && addr.startsWith('{')) { try { addr = JSON.parse(addr); } catch { /* ignore */ } }
+            if (typeof addr === 'object' && addr !== null) addrStr = addr.street || addr.address || addr.addressLine1 || '';
+            else if (typeof addr === 'string') addrStr = addr;
+          }
+        }
+        const autoNum = pNumKey ? parent[pNumKey] : '';
+        const parentFolderName = addrStr && autoNum ? `${addrStr} (${autoNum})` : addrStr || autoNum || propertyRecordId;
+
+        await apiClient.ensureDropboxLinkedFolder({
+          parentObjectApiName: 'Property',
+          parentRecordId: propertyRecordId,
+          parentFolderName,
+          childObjectApiName: objectApiName,
+          childFolderName: childName,
+        });
+      } catch { /* non-fatal — Dropbox may not be connected */ }
+    })();
+  }, [record, params?.id, objectApiName]);
 
   // ── Resolve layout ───────────────────────────────────────────────────
   const resolveLayout = (): PageLayout | null => {

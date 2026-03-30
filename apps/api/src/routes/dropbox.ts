@@ -51,17 +51,21 @@ function buildFolderPath(objectApiName: string, recordId: string, folderName?: s
 
 /** Default subfolder structure for Property records. */
 const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
-  { name: '0. Initial Bid Documents', children: ['Final Proposals', 'Salesman Documents'] },
-  { name: '1. Estimating', children: ['ACAD', 'Backup'] },
-  { name: '2. Contract Documents' },
-  { name: '3. Project Management', children: ['Factory Orders & Order Confirmations', 'Custom Project Orders (Lutron, Centor, etc.)', 'Important Correspondence'] },
-  { name: '4. AutoCad', children: ['Files from Architect', 'Presentations', 'Files from Factory', 'Shops & Drawings'] },
-  { name: '5. Installation', children: ['Install Quotes', 'Project Cost Tracking'] },
-  { name: '6. Service', children: ['Customer Worksheets', 'Customer Correspondence', 'Punch Lists', 'Annual Maintenance'] },
-  { name: '7. Final Shop Drawings' },
-  { name: '8. Photos', children: ['Finished Photos', 'Site Photos'] },
-  { name: '9. Project Accounting', children: ['Escrow Information', 'Contract Financial Summary'] },
+  { name: 'Leads' },
+  { name: 'Service' },
+  { name: 'Photos', children: ['Site', 'Finished'] },
+  { name: 'Project Books' },
 ];
+
+/**
+ * Maps a child object type to the subfolder inside the parent Property folder
+ * where linked record folders should be auto-created.
+ */
+const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
+  Lead: 'Leads',
+  Deal: 'Project Books',
+  // Phase 2: WorkOrder: 'Service',
+};
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
 function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
@@ -638,5 +642,61 @@ export async function dropboxRoutes(app: FastifyInstance) {
       app.log.error(err, 'Dropbox delete failed');
       reply.code(500).send({ error: 'Failed to delete' });
     }
+  });
+
+  // ── Ensure linked-record subfolder inside a parent Property folder ──
+  // E.g. when a Lead is linked to a Property, create
+  //   /TischlerCRM/Property/{propertyFolder}/Leads/{leadFolder}
+  app.post('/dropbox/ensure-linked-folder', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const {
+      parentObjectApiName,
+      parentRecordId,
+      parentFolderName,
+      childObjectApiName,
+      childFolderName,
+    } = req.body as {
+      parentObjectApiName: string;
+      parentRecordId: string;
+      parentFolderName?: string;
+      childObjectApiName: string;
+      childFolderName: string;
+    };
+
+    if (!parentObjectApiName || !parentRecordId || !childObjectApiName || !childFolderName) {
+      return reply.code(400).send({ error: 'Missing required fields' });
+    }
+
+    const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
+    if (!subfolder) {
+      // No mapping — nothing to auto-create
+      return reply.send({ created: false, reason: 'no_mapping' });
+    }
+
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    const parentPath = buildFolderPath(parentObjectApiName, parentRecordId, parentFolderName);
+    const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const childPath = `${parentPath}/${subfolder}/${safeName}`;
+
+    let created = false;
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', {
+        path: childPath,
+        autorename: false,
+      });
+      created = true;
+    } catch (err: any) {
+      if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+        app.log.error(err, 'Dropbox ensure linked folder failed');
+        return reply.code(500).send({ error: 'Failed to create linked folder' });
+      }
+      // Already exists — fine
+    }
+
+    reply.send({ created, path: childPath });
   });
 }

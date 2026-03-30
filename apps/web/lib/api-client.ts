@@ -747,6 +747,19 @@ class ApiClient {
     );
   }
 
+  async ensureDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentRecordId: string;
+    parentFolderName?: string;
+    childObjectApiName: string;
+    childFolderName: string;
+  }) {
+    return this.request<{ created: boolean; path: string; reason?: string }>(
+      '/dropbox/ensure-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
   async deleteDropboxFile(fileId: string) {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }
