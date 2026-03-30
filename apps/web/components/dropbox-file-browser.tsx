@@ -68,12 +68,15 @@ export function DropboxFileBrowser({
   recordId,
   folderName,
   defaultSubPath,
+  rootLabel,
 }: {
   objectApiName: string;
   recordId: string;
   folderName?: string;
   /** Pre-navigate into a subfolder, e.g. "Leads/John Smith" */
   defaultSubPath?: string;
+  /** Label shown for the root breadcrumb (defaults to folderName or "Root") */
+  rootLabel?: string;
 }) {
   const [status, setStatus] = useState<DropboxStatus | null>(null);
   const [entries, setEntries] = useState<DropboxEntry[]>([]);
@@ -435,7 +438,7 @@ export function DropboxFileBrowser({
             onClick={() => setCurrentPath([])}
             className="text-blue-600 hover:underline font-medium"
           >
-            Root
+            {rootLabel || folderName || 'Root'}
           </button>
           {currentPath.map((segment, i) => (
             <span key={i} className="flex items-center gap-1">

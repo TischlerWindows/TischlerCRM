@@ -1056,6 +1056,7 @@ export default function RecordDetailPage({
             recordId={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.recordId : (params.id as string)}
             folderName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.folderName : getDropboxFolderName()}
             defaultSubPath={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.subPath : undefined}
+            rootLabel={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.folderName : undefined}
           />
         </div>
       )}
