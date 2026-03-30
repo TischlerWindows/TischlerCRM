@@ -15,6 +15,7 @@ import {
   type Over,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { Grid2x2, LayoutPanelLeft, Type, Puzzle } from 'lucide-react';
 import type { WidgetType } from '@/lib/schema';
 import type { LayoutPanel, LayoutSection, LayoutWidget, PanelField } from './types';
 import { useEditorStore } from './editor-store';
@@ -294,24 +295,26 @@ export function DndContextWrapper({
   const movePanel = useEditorStore((s) => s.movePanel);
   const updateSection = useEditorStore((s) => s.updateSection);
 
-  const [overlayLabel, setOverlayLabel] = useState<string | null>(null);
+  const [activeDrag, setActiveDrag] = useState<DragSource>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {
       const parsed = parseActiveDrag(event.active, layout);
-      setOverlayLabel(parsed?.label ?? String(event.active.id));
+      setActiveDrag(parsed);
     },
     [layout],
   );
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
-      setOverlayLabel(null);
+      setActiveDrag(null);
       if (!event.over) return;
 
       const active = parseActiveDrag(event.active, layout);
@@ -438,18 +441,51 @@ export function DndContextWrapper({
   );
 
   const handleDragCancel = useCallback(() => {
-    setOverlayLabel(null);
+    setActiveDrag(null);
   }, []);
 
-  const overlay = useMemo(
-    () =>
-      overlayLabel ? (
-        <div className="rounded-full border border-brand-navy/20 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-sm">
-          {overlayLabel}
+  const overlay = useMemo(() => {
+    if (!activeDrag) return null;
+    const { kind, label } = activeDrag;
+
+    if (kind === 'palette-field' || kind === 'existing-field') {
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-md">
+          <Type className="h-3.5 w-3.5 shrink-0 text-brand-navy/70" />
+          {label}
         </div>
-      ) : null,
-    [overlayLabel],
-  );
+      );
+    }
+    if (kind === 'palette-panel') {
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-md">
+          <Grid2x2 className="h-3.5 w-3.5 shrink-0 text-brand-navy/70" />
+          {label}
+        </div>
+      );
+    }
+    if (kind === 'panel') {
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-md">
+          <LayoutPanelLeft className="h-3.5 w-3.5 shrink-0 text-brand-navy/70" />
+          {label}
+        </div>
+      );
+    }
+    if (kind === 'palette-widget' || kind === 'existing-widget') {
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-md">
+          <Puzzle className="h-3.5 w-3.5 shrink-0 text-brand-navy/70" />
+          {label}
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-full border border-brand-navy/20 bg-white px-3 py-1.5 text-xs font-medium text-gray-800 shadow-sm">
+        {label}
+      </div>
+    );
+  }, [activeDrag]);
 
   return (
     <DndContext

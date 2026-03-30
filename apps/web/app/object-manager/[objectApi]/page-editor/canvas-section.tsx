@@ -8,6 +8,7 @@ import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasPanel } from './canvas-panel';
 import { CanvasWidgetCard } from './canvas-widget';
+import { cn } from '@/lib/utils';
 
 interface CanvasRegionProps {
   region: LayoutSection;
@@ -181,11 +182,12 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border bg-white transition-colors border-l-4 ${
+      className={cn(
+        'relative overflow-hidden rounded-xl border bg-slate-50 transition-colors border-l-4 border-l-brand-navy/50',
         isRegionSelected
-          ? 'border-brand-navy ring-1 ring-brand-navy/20 border-l-brand-navy'
-          : 'border-gray-200 border-l-gray-300'
-      }`}
+          ? 'border-brand-navy ring-2 ring-brand-navy/25 border-l-brand-navy'
+          : 'border-gray-200',
+      )}
       style={wrapperStyle}
       data-tab-id={tabId}
     >
@@ -194,12 +196,14 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
         </div>
       ) : null}
+
+      {/* Section header — tinted navy to distinguish from panel headers */}
       <div
-        className="flex items-center justify-between gap-2 border-b border-gray-200 bg-gray-100/80 px-3 py-2"
+        className="flex items-center justify-between gap-2 border-b border-brand-navy/15 bg-brand-navy/10 px-3 py-2 cursor-pointer"
         onClick={selectRegion}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <GripVertical className="h-4 w-4 shrink-0 text-gray-500" />
+          <GripVertical className="h-4 w-4 shrink-0 text-brand-navy/60" />
           {isEditingLabel ? (
             <input
               autoFocus
@@ -220,7 +224,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           ) : (
             <button
               type="button"
-              className="group/label flex items-center gap-1 truncate text-left text-sm font-medium text-gray-900"
+              className="group/label flex items-center gap-1 truncate text-left text-sm font-semibold text-brand-navy"
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 setIsEditingLabel(true);
@@ -232,15 +236,18 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
               title="Double-click to rename"
             >
               {region.label}
-              <Pencil className="h-3 w-3 text-gray-400 opacity-0 group-hover/label:opacity-100 transition-opacity" />
+              <Pencil className="h-3 w-3 text-brand-navy/40 opacity-0 group-hover/label:opacity-100 transition-opacity" />
             </button>
           )}
+          <span className="shrink-0 rounded-full bg-brand-navy/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-navy">
+            {region.gridColumnSpan} cols
+          </span>
         </div>
 
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="rounded p-1.5 text-red-500 hover:bg-red-50 hover:text-red-600"
+            className="rounded p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
             onClick={(e) => {
               e.stopPropagation();
               removeSection(region.id);
@@ -253,48 +260,55 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       </div>
 
       <div className="space-y-3 p-3">
-        {sortedPanels.map((panel) => (
-          <CanvasPanel key={panel.id} panel={panel} regionId={region.id} />
-        ))}
+        <SortableContext
+          items={sortedPanels.map((p) => p.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {sortedPanels.map((panel) => (
+            <CanvasPanel key={panel.id} panel={panel} regionId={region.id} />
+          ))}
+        </SortableContext>
 
-        {(sortedWidgets.length > 0 || isRegionSelected) && (
-          <div
-            ref={setWidgetDropRef}
-            className={`space-y-2 rounded-lg border bg-gray-50/60 p-2 transition-colors ${
-              isWidgetDropOver ? 'border-brand-navy/35 bg-brand-navy/5' : 'border-gray-200'
-            }`}
-            aria-label="Section widget drop zone"
+        {/* Widget drop zone — always visible so users know they can drop here */}
+        <div
+          ref={setWidgetDropRef}
+          className={cn(
+            'space-y-2 rounded-lg border p-2 transition-colors',
+            isWidgetDropOver
+              ? 'border-brand-navy/40 bg-brand-navy/5'
+              : 'border-dashed border-gray-200 bg-transparent',
+          )}
+          aria-label="Section widget drop zone"
+        >
+          <SortableContext
+            items={sortedWidgets.map((w) => w.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={sortedWidgets.map((w) => w.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {sortedWidgets.length > 0 ? (
-                sortedWidgets.map((widget) => (
-                  <CanvasWidgetCard key={widget.id} widget={widget} />
-                ))
-              ) : isRegionSelected ? (
-                <div className="rounded border border-dashed border-gray-300 py-3 text-center text-xs text-gray-500">
-                  Drop a widget here
-                </div>
-              ) : null}
-            </SortableContext>
-          </div>
-        )}
+            {sortedWidgets.map((widget) => (
+              <CanvasWidgetCard key={widget.id} widget={widget} />
+            ))}
+            {sortedWidgets.length === 0 && (
+              <div className="py-1.5 text-center text-[10px] text-gray-400">
+                Drop widgets here
+              </div>
+            )}
+          </SortableContext>
+        </div>
 
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-gray-300 py-2 text-xs font-medium text-gray-600 hover:border-brand-navy hover:text-brand-navy"
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-brand-navy/25 py-2 text-xs font-medium text-brand-navy/60 hover:border-brand-navy hover:text-brand-navy hover:bg-brand-navy/5 transition-colors"
           onClick={addDefaultPanel}
         >
           <Plus className="h-3.5 w-3.5" />
-          + Field Section
+          Add Panel
         </button>
       </div>
 
+      {/* Resize handle — visible stripe on the right edge */}
       <button
         type="button"
-        className="absolute inset-y-0 right-0 w-6 cursor-col-resize border-0 bg-brand-navy/5 p-0 hover:bg-brand-navy/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 touch-none"
+        className="absolute inset-y-0 right-0 flex w-4 cursor-col-resize flex-col items-center justify-center gap-1 border-0 bg-brand-navy/10 p-0 hover:bg-brand-navy/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 touch-none transition-colors"
         onPointerDown={startResize}
         onPointerMove={onResizePointerMove}
         onPointerUp={onResizePointerUp}
@@ -302,8 +316,12 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         onKeyDown={onResizeKeyDown}
         onClick={(e) => e.stopPropagation()}
         aria-label="Resize section width"
-        title="Resize section width"
-      />
+        title="Drag to resize section"
+      >
+        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+      </button>
     </div>
   );
 }
