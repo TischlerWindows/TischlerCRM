@@ -67,10 +67,13 @@ export function DropboxFileBrowser({
   objectApiName,
   recordId,
   folderName,
+  defaultSubPath,
 }: {
   objectApiName: string;
   recordId: string;
   folderName?: string;
+  /** Pre-navigate into a subfolder, e.g. "Leads/John Smith" */
+  defaultSubPath?: string;
 }) {
   const [status, setStatus] = useState<DropboxStatus | null>(null);
   const [entries, setEntries] = useState<DropboxEntry[]>([]);
@@ -81,7 +84,9 @@ export function DropboxFileBrowser({
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [currentPath, setCurrentPath] = useState<string[]>([]);
+  const [currentPath, setCurrentPath] = useState<string[]>(
+    defaultSubPath ? defaultSubPath.split('/').filter(Boolean) : []
+  );
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);

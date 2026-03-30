@@ -72,6 +72,16 @@ export default function RecordDetailPage({
   // Counter bumped after lookup records finish loading to trigger re-render
   const [lookupTick, setLookupTick] = useState(0);
 
+  // When a Lead/Deal is linked to a Property, redirect its file browser
+  // into the Property's subfolder (e.g. /Property/{addr}/Leads/{childName}).
+  // null = still resolving, false = no linked parent, object = linked info
+  const [linkedDropboxInfo, setLinkedDropboxInfo] = useState<{
+    objectApiName: string;
+    recordId: string;
+    folderName: string;
+    subPath: string;
+  } | false | null>(null);
+
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase()
   );
@@ -104,6 +114,8 @@ export default function RecordDetailPage({
   // ── Auto-create linked subfolder inside parent Property's Dropbox folder ──
   // When a Lead or Deal (Opportunity) record has a propertyId, create a
   // subfolder like /TischlerCRM/Property/{addr}/Leads/{leadFolder} automatically.
+  // Also redirect the DropboxFileBrowser to browse this subfolder.
+  const LINKED_SUBFOLDER: Record<string, string> = { Lead: 'Leads', Deal: 'Project Books' };
   useEffect(() => {
     if (!record || !params?.id) return;
     // Only for object types that map to a Property subfolder
@@ -116,7 +128,10 @@ export default function RecordDetailPage({
       return lk === 'propertyid' || lk === 'property';
     });
     const propertyRecordId = propKey ? record[propKey] : null;
-    if (!propertyRecordId || typeof propertyRecordId !== 'string') return;
+    if (!propertyRecordId || typeof propertyRecordId !== 'string') {
+      setLinkedDropboxInfo(false);
+      return;
+    }
 
     // Build a child folder name from the record (same logic as getDropboxFolderName)
     const numberKey = Object.keys(record).find(
@@ -131,7 +146,7 @@ export default function RecordDetailPage({
     (async () => {
       try {
         const parentRaw = await recordsService.getRecord('Property', propertyRecordId);
-        if (!parentRaw) return;
+        if (!parentRaw) { setLinkedDropboxInfo(false); return; }
         const parent = recordsService.flattenRecord(parentRaw);
         // Build parent folder name the same way getDropboxFolderName does
         const pNumKey = Object.keys(parent).find(k => k.toLowerCase().includes('number') && typeof parent[k] === 'string' && parent[k]);
@@ -153,6 +168,15 @@ export default function RecordDetailPage({
         const autoNum = pNumKey ? parent[pNumKey] : '';
         const parentFolderName = addrStr && autoNum ? `${addrStr} (${autoNum})` : addrStr || autoNum || propertyRecordId;
 
+        // Point the file browser at the Property subfolder
+        const subfolder = LINKED_SUBFOLDER[objectApiName] || objectApiName;
+        setLinkedDropboxInfo({
+          objectApiName: 'Property',
+          recordId: propertyRecordId,
+          folderName: parentFolderName,
+          subPath: `${subfolder}/${childName}`,
+        });
+
         await apiClient.ensureDropboxLinkedFolder({
           parentObjectApiName: 'Property',
           parentRecordId: propertyRecordId,
@@ -160,7 +184,7 @@ export default function RecordDetailPage({
           childObjectApiName: objectApiName,
           childFolderName: childName,
         });
-      } catch { /* non-fatal — Dropbox may not be connected */ }
+      } catch { setLinkedDropboxInfo(false); /* non-fatal — Dropbox may not be connected */ }
     })();
   }, [record, params?.id, objectApiName]);
 
@@ -1023,12 +1047,15 @@ export default function RecordDetailPage({
       </div>
 
       {/* Dropbox file browser — hardcoded at end of every record */}
-      {record && params?.id && (
+      {/* For linked types (Lead/Deal), wait for property resolution before rendering */}
+      {record && params?.id &&
+        (!['Lead', 'Deal'].includes(objectApiName) || linkedDropboxInfo !== null) && (
         <div className="max-w-6xl mx-auto px-6 pb-6">
           <DropboxFileBrowser
-            objectApiName={objectApiName}
-            recordId={params.id as string}
-            folderName={getDropboxFolderName()}
+            objectApiName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.objectApiName : objectApiName}
+            recordId={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.recordId : (params.id as string)}
+            folderName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.folderName : getDropboxFolderName()}
+            defaultSubPath={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.subPath : undefined}
           />
         </div>
       )}
