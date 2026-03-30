@@ -661,7 +661,7 @@ export default function DashboardPage() {
     objectTypes.forEach(async (objectType) => {
       try {
         const records = await recordsService.getRecords(objectType);
-        const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+        const flatRecords = recordsService.flattenRecords(records);
         setCachedRecords(objectType, flatRecords);
       } catch (e) {
         console.error(`Failed to load records for ${objectType}:`, e);
@@ -673,12 +673,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (widgetConfig.dataSourceMode !== 'object' || !widgetConfig.dataSource) return;
     const objType = widgetConfig.dataSource;
+    const apiName = PLURAL_TO_API_NAME[objType] || objType;
     // Skip if already cached
     if (getCachedRecords(objType).length > 0) return;
     (async () => {
       try {
-        const records = await recordsService.getRecords(objType);
-        const flat = records.map((r: any) => ({ id: r.id, ...r.data }));
+        const records = await recordsService.getRecords(apiName);
+        const flat = recordsService.flattenRecords(records);
         setCachedRecords(objType, flat);
       } catch (e) {
         console.error(`Failed to load records for ${objType}:`, e);
@@ -694,7 +695,7 @@ export default function DashboardPage() {
     (async () => {
       try {
         const records = await recordsService.getRecords(apiName);
-        const flat = records.map((r: any) => ({ id: r.id, ...r.data }));
+        const flat = recordsService.flattenRecords(records);
         setCachedRecords(newFilterBtn.objectType, flat);
       } catch (e) {
         console.error(`Failed to load records for ${apiName}:`, e);
@@ -963,13 +964,15 @@ export default function DashboardPage() {
     // Show loading overlay
     setRefreshingWidgetId(widget.id);
 
-    const report = availableReports.find(r => r.id === widget.reportId);
-    if (!report) {
-      console.warn('Report not found for widget refresh');
+    const report = widget.reportId ? availableReports.find(r => r.id === widget.reportId) : null;
+    const objectType = widget.config?.dataSourceMode === 'object'
+      ? widget.dataSource
+      : report?.objectType;
+    if (!objectType) {
+      console.warn('No object type found for widget refresh');
       setRefreshingWidgetId(null);
       return;
     }
-    const objectType = report.objectType;
 
     const xField = widget.config?.xAxis;
     const yField = widget.config?.yAxis;
@@ -983,8 +986,9 @@ export default function DashboardPage() {
 
     try {
       // Re-fetch records for this object type
-      const records = await recordsService.getRecords(objectType);
-      const flatRecords = records.map((r: any) => ({ id: r.id, ...r.data }));
+      const apiName = PLURAL_TO_API_NAME[objectType] || objectType;
+      const records = await recordsService.getRecords(apiName);
+      const flatRecords = recordsService.flattenRecords(records);
       setCachedRecords(objectType, flatRecords);
 
       // Check if this is a stacked chart
