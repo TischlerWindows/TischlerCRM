@@ -1264,7 +1264,7 @@ export default function DashboardPage() {
     const widgetBg = widget.config?.widgetBg || '';
     const widgetFontColor = widget.config?.fontColor || '';
     const fc = widgetFontColor; // shorthand for inline usage
-    const bgClass = widgetBg ? 'rounded-lg border border-gray-200' : 'bg-white rounded-lg border border-gray-200';
+    const bgClass = widgetBg ? 'rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-200' : 'bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-200';
     const isDrillTarget = drillDownWidgetId === widget.id && (drillDownLabel || widget.type === 'card');
     const drillRing = isDrillTarget ? ' ring-2 ring-red-500' : '';
     const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(fc ? { color: fc } : {}) };
@@ -1282,7 +1282,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1">
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1330,7 +1330,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1364,7 +1364,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1416,7 +1416,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1450,7 +1450,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className={`flex flex-col gap-2 flex-1 min-h-0`}>
               {widget.config.data?.map((item: any, idx: number) => {
@@ -1488,7 +1488,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1522,7 +1522,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
@@ -1576,7 +1576,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1610,7 +1610,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
@@ -1693,7 +1693,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1727,7 +1727,7 @@ export default function DashboardPage() {
                 title="Drag to resize"
               />
             )}
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1777,7 +1777,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1804,7 +1804,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <div className="relative w-32 h-32">
@@ -1863,7 +1863,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1890,7 +1890,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <Gauge className="w-24 h-24 text-brand-navy" />
@@ -1906,7 +1906,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -1933,7 +1933,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-sm font-semibold ${titleColorClass} mb-4`}>{widget.title}</div>
+            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <table className="w-full text-sm">
               <thead>
@@ -2075,7 +2075,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10">
+            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -2261,7 +2261,7 @@ export default function DashboardPage() {
     <>
     <div className="flex flex-1 bg-gray-50 h-screen">
         {/* Sidebar */}
-        <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+        <div className="w-64 bg-white border-r border-gray-100 p-6 overflow-y-auto flex-shrink-0">
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
@@ -2579,7 +2579,7 @@ export default function DashboardPage() {
                 )}
 
                 {selectedDashboard.widgets.length > 0 || (selectedDashboard.sections || []).length > 0 ? (
-                  <div className="pb-[600px] space-y-6 rounded-lg p-4" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
+                  <div className="pb-[600px] space-y-5 rounded-xl p-5" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
                     {/* Auto-migrate unsectioned widgets to first section */}
                     {(() => {
                       const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
@@ -2605,9 +2605,9 @@ export default function DashboardPage() {
                       const sectionWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
                       const isSectionDropTarget = dashEditMode && draggingWidgetId && dropTarget?.sectionId === section.id && dropTarget?.beforeWidgetId === null;
                       return (
-                        <div key={section.id} className="bg-white/60 border border-gray-200 rounded-xl p-4 shadow-sm">
+                        <div key={section.id} className="bg-gradient-to-b from-white to-gray-50/80 border border-gray-200/60 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
                           <div
-                            className={`flex items-center justify-between mb-4 pb-2 border-b border-gray-200 transition-colors ${
+                            className={`flex items-center justify-between mb-4 pb-3 border-b border-gray-100 transition-colors ${
                               dashEditMode && draggingWidgetId ? 'border-2 border-dashed border-transparent hover:border-blue-300 rounded px-2 py-1' : ''
                             }`}
                             onDragOver={(e) => {
@@ -2640,7 +2640,7 @@ export default function DashboardPage() {
                                 <button type="button" onClick={() => setEditingSectionId(null)} className="text-sm text-gray-500 hover:underline">Cancel</button>
                               </form>
                             ) : (
-                              <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">{section.title}</h3>
+                              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.08em] flex items-center gap-2"><span className="w-1 h-4 bg-brand-navy rounded-full inline-block"></span>{section.title}</h3>
                             )}
                             {dashEditMode && editingSectionId !== section.id && (
                               <div className="flex items-center gap-1">
@@ -2685,7 +2685,7 @@ export default function DashboardPage() {
                             )}
                           </div>
                           {section.subtitle && (
-                            <p className="text-sm text-gray-500 -mt-2 mb-3">{section.subtitle}</p>
+                            <p className="text-xs text-gray-400 -mt-2 mb-3 ml-3">{section.subtitle}</p>
                           )}
                           {/* Inline add filter button form */}
                           {dashEditMode && addingFilterBtnSectionId === section.id && (() => {
@@ -2783,11 +2783,11 @@ export default function DashboardPage() {
                             const activeBtn = activeFilterButtons[section.id] || null;
                             if (uniqueBtns.length === 0) return null;
                             return (
-                              <div className="flex items-center gap-1.5 mb-3 overflow-x-auto">
+                              <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-0.5">
                                 <button
                                   onClick={() => setActiveFilterButtons(prev => ({ ...prev, [section.id]: null }))}
-                                  className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-                                    !activeBtn ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                                    !activeBtn ? 'bg-brand-navy text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                                   }`}
                                 >
                                   All
@@ -2799,8 +2799,8 @@ export default function DashboardPage() {
                                         ...prev,
                                         [section.id]: prev[section.id] === btn.label ? null : btn.label
                                       }))}
-                                      className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
-                                        activeBtn === btn.label ? 'bg-brand-navy text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                      className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                                        activeBtn === btn.label ? 'bg-brand-navy text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
                                       } ${dashEditMode ? 'pr-6' : ''}`}
                                     >
                                       {btn.label}
@@ -2848,7 +2848,7 @@ export default function DashboardPage() {
                             return (sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId)) ? (
                             <>
                             <div
-                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-9 gap-5 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
@@ -2882,7 +2882,7 @@ export default function DashboardPage() {
                               const records = isChart ? getDrillDownRecords(drillWidget, drillDownLabel!) : (drillWidget.config?.data || drillWidget.config?.manualData || []);
                               const columns = records.length > 0 ? Object.keys(records[0]).filter(k => k !== 'id' && !k.startsWith('_')) : [];
                               return (
-                                <div className="mt-4 ring-2 ring-red-500 rounded-lg bg-white overflow-hidden">
+                                <div className="mt-4 ring-2 ring-red-500 rounded-xl bg-white overflow-hidden shadow-sm">
                                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
                                     <p className="text-sm text-gray-700">
                                       <span className="font-semibold">{drillWidget.title}</span>
@@ -2929,7 +2929,7 @@ export default function DashboardPage() {
                             {dashEditMode && (
                               <button
                                 onClick={() => { setPendingAddSectionId(section.id); setShowWidgetSelector(true); }}
-                                className="mt-3 w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-navy hover:text-brand-navy transition-colors flex items-center justify-center gap-2"
+                                className="mt-3 w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-xs font-medium text-gray-400 hover:border-brand-navy/40 hover:text-brand-navy hover:bg-brand-navy/[0.02] transition-all duration-200 flex items-center justify-center gap-2"
                               >
                                 <Plus className="w-4 h-4" /> Add Widget to {section.title}
                               </button>
@@ -2941,7 +2941,7 @@ export default function DashboardPage() {
                                 setPendingAddSectionId(section.id);
                                 setShowWidgetSelector(true);
                               }}
-                              className="w-full py-8 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-brand-navy hover:text-brand-navy transition-colors flex items-center justify-center gap-2"
+                              className="w-full py-8 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-brand-navy/40 hover:text-brand-navy hover:bg-brand-navy/[0.02] transition-all duration-200 flex items-center justify-center gap-2"
                             >
                               <Plus className="w-4 h-4" /> Add Widget
                             </button>
@@ -2952,7 +2952,7 @@ export default function DashboardPage() {
                     })}
                   </div>
                 ) : (
-                  <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
                     <LayoutDashboard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No Widgets Yet</h3>
                     <p className="text-gray-600 mb-4">Add widgets to start building your dashboard</p>
