@@ -3913,11 +3913,11 @@ export default function DashboardPage() {
                 </div>
                 {/* Color picker popup when a bar is clicked in preview */}
                 {colorPickerBarIdx !== null && (() => {
-                  const dataArr = widgetConfig.manualData || previewData?.data || [];
+                  const isManual = widgetConfig.dataSourceMode === 'manual';
+                  const dataArr = isManual ? (widgetConfig.manualData || []) : (previewData?.data || []);
                   const item = dataArr[colorPickerBarIdx];
                   if (!item) return null;
                   const currentColor = item.color || widgetConfig.barColors?.[item.label] || widgetConfig.accentColor || '#151f6d';
-                  const isManual = widgetConfig.dataSourceMode === 'manual';
                   return (
                     <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200 shadow-lg flex items-center gap-3">
                       <span className="text-xs text-gray-600 font-medium truncate max-w-[100px]">{item.label || `Bar ${colorPickerBarIdx + 1}`}</span>
