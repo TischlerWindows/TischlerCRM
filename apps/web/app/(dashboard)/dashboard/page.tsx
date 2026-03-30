@@ -114,7 +114,7 @@ const OBJECT_TYPES = [
   { value: 'accounts', label: 'Accounts' },
   { value: 'products', label: 'Products' },
   { value: 'leads', label: 'Leads' },
-  { value: 'deals', label: 'Deals' },
+  { value: 'deals', label: 'Opportunities' },
   { value: 'projects', label: 'Projects' },
   { value: 'services', label: 'Service' },
   { value: 'quotes', label: 'Quotes' },
