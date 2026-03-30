@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { LayoutWidget } from './types';
 import { useEditorStore } from './editor-store';
+import { getWidgetById } from '@/lib/widgets/registry-loader';
 import {
   Sparkles,
   Trash2,
@@ -13,23 +14,26 @@ import {
   FolderOpen,
   Component,
   Minus,
+  Puzzle,
   Rows3,
+  List,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
   widget: LayoutWidget;
 }
 
-const WIDGET_ICONS: Record<LayoutWidget['widgetType'], React.ElementType> = {
-  RelatedList: LayoutGrid,
+const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType>> = {
+  RelatedList: List,
   ActivityFeed: Activity,
   FileFolder: FolderOpen,
   CustomComponent: Component,
   Spacer: Minus,
   HeaderHighlights: Sparkles,
+  ExternalWidget: Puzzle,
 };
 
-const WIDGET_LABELS: Record<LayoutWidget['widgetType'], string> = {
+const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   RelatedList: 'Related List',
   ActivityFeed: 'Activity Feed',
   FileFolder: 'File Folder',
@@ -59,6 +63,10 @@ function summarizeWidget(widget: LayoutWidget): string {
       const extraCount = fields.length - preview.length;
       return extraCount > 0 ? `${preview.join(', ')} +${extraCount}` : preview.join(', ');
     }
+    case 'ExternalWidget': {
+      const manifest = getWidgetById(widget.config.externalWidgetId);
+      return manifest?.description ?? widget.config.externalWidgetId;
+    }
     default:
       return '';
   }
@@ -73,12 +81,20 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
     data: { type: 'widget', widgetId: widget.id },
   });
 
-  const Icon = WIDGET_ICONS[widget.widgetType] || Rows3;
+  const isExternal = widget.widgetType === 'ExternalWidget';
+  const externalManifest =
+    isExternal && widget.config.type === 'ExternalWidget'
+      ? getWidgetById(widget.config.externalWidgetId)
+      : undefined;
 
+  const Icon = WIDGET_ICONS[widget.widgetType] ?? Rows3;
   const isSelected =
     selectedElement?.type === 'widget' && selectedElement.id === widget.id;
   const configSummary = summarizeWidget(widget);
-  const widgetLabel = WIDGET_LABELS[widget.widgetType] || widget.widgetType;
+  const widgetLabel =
+    isExternal && externalManifest
+      ? externalManifest.name
+      : WIDGET_LABELS[widget.widgetType] ?? widget.widgetType;
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -124,8 +140,13 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
           </button>
           <Icon className="h-4 w-4 shrink-0 text-brand-navy" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium text-gray-900">
-              {widgetLabel}
+            <div className="flex items-center gap-1.5 truncate">
+              <span className="truncate text-sm font-medium text-gray-900">{widgetLabel}</span>
+              {isExternal && (
+                <span className="shrink-0 rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium leading-none text-blue-700">
+                  External
+                </span>
+              )}
             </div>
             <div className="truncate text-xs text-gray-600">{configSummary}</div>
           </div>
