@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { LayoutPanel, LayoutSection } from './types';
@@ -44,6 +44,20 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     id: `region-drop-${region.id}`,
     data: { type: 'region-drop', regionId: region.id },
   });
+  const { setNodeRef: setRegionDropRef } = useDroppable({
+    id: `region-swap-${region.id}`,
+    data: { type: 'region', regionId: region.id },
+  });
+  const {
+    attributes: dragAttributes,
+    listeners: dragListeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: region.id,
+    data: { type: 'region', regionId: region.id },
+    disabled: dragSpan !== null,
+  });
   const resizeSessionRef = useRef<{
     pointerId: number;
     startX: number;
@@ -79,8 +93,8 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     ...(region.style.background ? { backgroundColor: region.style.background } : {}),
     ...(region.style.borderColor ? { borderColor: region.style.borderColor } : {}),
     ...(region.style.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
-    ...(region.style.borderRadius ? { borderRadius: REGION_RADIUS_PX[region.style.borderRadius] } : {}),
-    ...(region.style.shadow ? { boxShadow: REGION_SHADOW[region.style.shadow] } : {}),
+    ...(region.style.borderRadius ? { borderRadius: REGION_RADIUS_PX[region.style.borderRadius] ?? 0 } : {}),
+    ...(region.style.shadow ? { boxShadow: REGION_SHADOW[region.style.shadow] ?? 'none' } : {}),
   };
 
   if (region.style.borderStyle === 'none') {
@@ -149,14 +163,14 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const onResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     const session = resizeSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    const nextSpan = Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX));
+    const nextSpan = Math.min(10, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
     setDragSpan(nextSpan);
   };
 
   const onResizePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     const session = resizeSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    const nextSpan = Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX));
+    const nextSpan = Math.min(10, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
     if (nextSpan !== session.startSpan) {
       resizeSection(region.id, nextSpan);
     }
@@ -199,11 +213,24 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
 
       {/* Section header — tinted navy to distinguish from panel headers */}
       <div
+        ref={setRegionDropRef}
         className="flex items-center justify-between gap-2 border-b border-brand-navy/15 bg-brand-navy/10 px-3 py-2 cursor-pointer"
         onClick={selectRegion}
       >
         <div className="flex min-w-0 items-center gap-2">
-          <GripVertical className="h-4 w-4 shrink-0 text-brand-navy/60" />
+          <span
+            ref={setDragRef}
+            {...dragListeners}
+            {...dragAttributes}
+            className={cn(
+              'flex cursor-grab items-center text-brand-navy/60',
+              isDragging && 'cursor-grabbing opacity-50',
+            )}
+            title="Drag to swap region position"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-4 w-4 shrink-0" />
+          </span>
           {isEditingLabel ? (
             <input
               autoFocus

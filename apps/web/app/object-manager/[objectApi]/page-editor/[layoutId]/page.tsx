@@ -95,6 +95,13 @@ function parseWidgetConfig(
       return { type: 'Spacer', minHeightPx: 32 };
     case 'HeaderHighlights':
       return { type: 'HeaderHighlights', fieldApiNames: [] };
+    default: {
+      // Exhaustiveness guard: if a new WidgetType is added without updating this switch,
+      // TypeScript will error here because widgetType won't narrow to never.
+      const _exhaustive: never = widgetType;
+      void _exhaustive;
+      return _exhaustive;
+    }
   }
 }
 
@@ -172,7 +179,7 @@ function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutSection
     label: typeof candidate.label === 'string' ? candidate.label : `Section ${regionIndex + 1}`,
     gridColumn: typeof candidate.gridColumn === 'number' ? candidate.gridColumn : 1,
     gridColumnSpan:
-      typeof candidate.gridColumnSpan === 'number' ? Math.max(1, candidate.gridColumnSpan) : 12,
+      typeof candidate.gridColumnSpan === 'number' ? Math.max(2, candidate.gridColumnSpan) : 12,
     gridRow: typeof candidate.gridRow === 'number' ? candidate.gridRow : regionIndex + 1,
     gridRowSpan: typeof candidate.gridRowSpan === 'number' ? candidate.gridRowSpan : 1,
     style:
