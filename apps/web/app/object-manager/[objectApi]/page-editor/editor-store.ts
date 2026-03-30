@@ -92,6 +92,7 @@ export interface EditorState {
   addSection: (region: LayoutSection, tabId: string) => void;
   removeSection: (regionId: string) => void;
   resizeSection: (regionId: string, newColSpan: number) => void;
+  swapSections: (regionIdA: string, regionIdB: string) => void;
 
   // Panel actions
   updatePanel: (panelId: string, patch: Partial<LayoutPanel>) => void;
@@ -269,6 +270,43 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     });
   },
 
+  swapSections: (regionIdA, regionIdB) => {
+    // Preflight both lookups before modifying undo stack
+    const currentLayout = get().layout;
+    const entryA = findRegionEntry(currentLayout, regionIdA);
+    const entryB = findRegionEntry(currentLayout, regionIdB);
+    if (!entryA || !entryB) return;
+
+    get().pushUndo();
+    set((s) => {
+      // Re-read from s.layout inside set for safety (in case of concurrent updates)
+      const a = findRegionEntry(s.layout, regionIdA);
+      const b = findRegionEntry(s.layout, regionIdB);
+      if (!a || !b) return s;
+
+      const { gridColumn: colA, gridRow: rowA, gridColumnSpan: spanA, gridRowSpan: rowSpanA } = a.region;
+      const { gridColumn: colB, gridRow: rowB, gridColumnSpan: spanB, gridRowSpan: rowSpanB } = b.region;
+
+      return {
+        layout: {
+          ...s.layout,
+          tabs: s.layout.tabs.map((tab) => ({
+            ...tab,
+            regions: tab.regions.map((r) => {
+              if (r.id === regionIdA) {
+                return { ...r, gridColumn: colB, gridRow: rowB, gridColumnSpan: spanB, gridRowSpan: rowSpanB };
+              }
+              if (r.id === regionIdB) {
+                return { ...r, gridColumn: colA, gridRow: rowA, gridColumnSpan: spanA, gridRowSpan: rowSpanA };
+              }
+              return r;
+            }),
+          })),
+        },
+      };
+    });
+  },
+
   // ── Panel actions ──────────────────────────────────────────────────────────
 
   updatePanel: (panelId, patch) => {
@@ -332,6 +370,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
 
       const captured = panelToMove;
       const srcId = sourceRegionId;
+      const fromIndex = entry.region.panels.findIndex((p) => p.id === panelId);
 
       const newTabs = s.layout.tabs.map((tab) => ({
         ...tab,
@@ -353,7 +392,8 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
           }
           if (isSrc && isDst) {
             const panels = region.panels.filter((p) => p.id !== panelId);
-            const insertionIndex = Math.max(0, Math.min(toIndex, panels.length));
+            const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+            const insertionIndex = Math.max(0, Math.min(adjustedTo, panels.length));
             panels.splice(insertionIndex, 0, captured);
             return { ...region, panels: reindexOrder(panels) };
           }
@@ -677,7 +717,7 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       isDirty: false,
       undoStack: [],
       redoStack: [],
-      activeTabId: layout.tabs[0]?.id ?? 'tab-1',
+      activeTabId: layout.tabs[0]?.id ?? '',
     });
   },
 

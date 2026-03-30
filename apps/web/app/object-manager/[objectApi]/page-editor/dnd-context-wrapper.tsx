@@ -145,9 +145,11 @@ function parseActiveDrag(
   }
 
   if (data.type === 'palette-panel') {
+    const cols = data.columns;
+    if (cols !== 1 && cols !== 2 && cols !== 3 && cols !== 4) return null;
     return {
       kind: 'palette-panel',
-      columns: data.columns as 1 | 2 | 3 | 4,
+      columns: cols,
       label: typeof data.label === 'string' ? data.label : 'New Section',
     };
   }
@@ -299,7 +301,7 @@ export function DndContextWrapper({
   const addWidget = useEditorStore((s) => s.addWidget);
   const moveWidget = useEditorStore((s) => s.moveWidget);
   const movePanel = useEditorStore((s) => s.movePanel);
-  const updateSection = useEditorStore((s) => s.updateSection);
+  const swapSections = useEditorStore((s) => s.swapSections);
 
   const [activeDrag, setActiveDrag] = useState<DragSource>(null);
 
@@ -441,15 +443,10 @@ export function DndContextWrapper({
 
       if (active.kind === 'region' && target.kind === 'region-item') {
         if (active.regionId === target.regionId) return;
-        const overRegion = findRegion(layout, target.regionId);
-        if (!overRegion) return;
-        updateSection(active.regionId, {
-          gridColumn: overRegion.gridColumn,
-          gridRow: overRegion.gridRow,
-        });
+        swapSections(active.regionId, target.regionId);
       }
     },
-    [addField, addWidget, layout, moveField, movePanel, moveWidget, removeField, updateSection],
+    [addField, addWidget, layout, moveField, movePanel, moveWidget, removeField, swapSections],
   );
 
   const handleDragCancel = useCallback(() => {

@@ -217,49 +217,32 @@ function buildFieldLabelMap(fields: FieldDef[]): Map<string, string> {
   return new Map(fields.map((field) => [field.apiName, field.label]));
 }
 
-function SortableRuleRow({
-  rule,
-  selected,
-  targetSummary,
-  onToggleActive,
-  onEdit,
-  onDelete,
-}: {
+interface RuleRowProps {
   rule: FormattingRule;
   selected: boolean;
   targetSummary: string;
   onToggleActive: (next: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: rule.id,
-  });
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : 1,
-  };
+}
 
+function RuleRowBody({
+  rule,
+  selected,
+  targetSummary,
+  onToggleActive,
+  onEdit,
+  onDelete,
+  dragHandle,
+}: RuleRowProps & { dragHandle?: React.ReactNode }) {
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       className={`rounded-md border px-3 py-2 ${
         selected ? 'border-brand-navy bg-brand-navy/5' : 'border-gray-200 bg-white'
       }`}
     >
       <div className="flex items-start gap-2">
-        <button
-          type="button"
-          className="mt-0.5 cursor-grab rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing"
-          aria-label={`Reorder ${rule.name}`}
-          onPointerDown={(event) => event.stopPropagation()}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        {dragHandle}
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
@@ -294,6 +277,40 @@ function SortableRuleRow({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function StaticRuleRow(props: RuleRowProps) {
+  return <RuleRowBody {...props} />;
+}
+
+function SortableRuleRow(props: RuleRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.rule.id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  };
+
+  const dragHandle = (
+    <button
+      type="button"
+      className="mt-0.5 cursor-grab rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing"
+      aria-label={`Reorder ${props.rule.name}`}
+      onPointerDown={(event) => event.stopPropagation()}
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="h-4 w-4" />
+    </button>
+  );
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <RuleRowBody {...props} dragHandle={dragHandle} />
     </div>
   );
 }
@@ -514,7 +531,9 @@ export function FormattingRulesDialog({
               Layout formatting rules
             </h2>
             <p className="text-xs text-gray-600">
-              First matching active rule wins. Drag to reorder priority.
+              {targetFilter
+                ? 'First matching active rule wins.'
+                : 'First matching active rule wins. Drag to reorder priority.'}
             </p>
           </div>
           <Button type="button" variant="ghost" size="icon" onClick={close} aria-label="Close">
@@ -535,6 +554,27 @@ export function FormattingRulesDialog({
               {displayedRules.length === 0 ? (
                 <div className="rounded-md border border-dashed border-gray-300 p-4 text-sm text-gray-600">
                   No formatting rules yet.
+                </div>
+              ) : targetFilter ? (
+                <div className="space-y-2">
+                  {displayedRules.map((rule) => (
+                    <StaticRuleRow
+                      key={rule.id}
+                      rule={rule}
+                      selected={rule.id === selectedRuleId}
+                      targetSummary={summarizeTarget(
+                        rule.target,
+                        fieldTargets,
+                        panelTargets,
+                        regionTargets,
+                      )}
+                      onToggleActive={(next) =>
+                        updateRule(rule.id, (current) => ({ ...current, active: next }))
+                      }
+                      onEdit={() => setSelectedRuleId(rule.id)}
+                      onDelete={() => removeRule(rule.id)}
+                    />
+                  ))}
                 </div>
               ) : (
                 <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
