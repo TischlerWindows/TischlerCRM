@@ -7,9 +7,11 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCenter,
+  pointerWithin,
   useSensor,
   useSensors,
   type Active,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
   type Over,
@@ -305,6 +307,29 @@ export function DndContextWrapper({
 
   const [activeDrag, setActiveDrag] = useState<DragSource>(null);
 
+  // Composite collision detection: prefer exact pointer hits on specific field/widget
+  // sortable items over container drop zones, then fall back to closest-center.
+  // This fixes the "rightmost column" glitch where closestCenter would prefer the
+  // panel-drop container instead of the field card the pointer was physically over.
+  const collisionDetectionStrategy = useCallback<CollisionDetection>((args) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length > 0) {
+      // Among pointer hits, prefer individual field/widget sortable items over
+      // broader container zones (panel-drop, region-drop, etc.)
+      const specificHit = pointerHits.find(({ id }) => {
+        const sid = String(id);
+        return (
+          sid.startsWith('field-') ||
+          (sid.startsWith('widget-') && !sid.startsWith('widget-new-'))
+        );
+      });
+      if (specificHit) return [specificHit];
+      return pointerHits;
+    }
+    // Pointer is outside all registered droppables — fall back to closest center
+    return closestCenter(args);
+  }, []);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -506,7 +531,7 @@ export function DndContextWrapper({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetectionStrategy}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}

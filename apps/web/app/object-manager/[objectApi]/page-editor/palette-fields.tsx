@@ -107,10 +107,12 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
   const [isDraggingExistingField, setIsDraggingExistingField] = useState(false);
   const layout = useEditorStore((s) => s.layout);
 
-  // Remove-field drop zone — only registered/shown when dragging an existing canvas field
+  // Remove-field drop zone — covers the entire sidebar, but disabled unless an existing
+  // canvas field is being dragged (prevents accidental removes from palette-field drags).
   const { setNodeRef: setPaletteDropRef, isOver: isPaletteOver } = useDroppable({
     id: 'palette-field-remove',
     data: { type: 'palette-remove' },
+    disabled: !isDraggingExistingField,
   });
 
   useDndMonitor({
@@ -148,11 +150,16 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
   }, [availableFields, search]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-2">
-      {/* Remove zone — floats at the top only while dragging an existing canvas field */}
+    <div
+      ref={setPaletteDropRef}
+      className={cn(
+        'flex h-full min-h-0 flex-col gap-3 p-2 transition-colors',
+        isDraggingExistingField && isPaletteOver && 'bg-red-50/60',
+      )}
+    >
+      {/* Remove hint — visible while dragging an existing canvas field; whole sidebar is the drop target */}
       {isDraggingExistingField && (
         <div
-          ref={setPaletteDropRef}
           className={cn(
             'flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-3 text-xs font-medium transition-colors',
             isPaletteOver
@@ -161,7 +168,7 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
           )}
         >
           <Trash2 className="h-3.5 w-3.5" />
-          Drop here to remove
+          Drop anywhere here to remove
         </div>
       )}
 
