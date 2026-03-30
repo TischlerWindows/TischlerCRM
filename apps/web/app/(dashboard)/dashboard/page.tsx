@@ -3272,7 +3272,16 @@ export default function DashboardPage() {
               </div>
 
               {/* ===== FROM OBJECT MODE ===== */}
-              {widgetConfig.dataSourceMode === 'object' && (
+              {widgetConfig.dataSourceMode === 'object' && (() => {
+                const objApiName = widgetConfig.dataSource ? PLURAL_TO_API_NAME[widgetConfig.dataSource] : '';
+                const objSchemaDef = objApiName && schema ? schema.objects.find((o: any) => o.apiName === objApiName) : null;
+                const EXCLUDED = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'];
+                const objectFields: { value: string; label: string }[] = objSchemaDef
+                  ? objSchemaDef.fields
+                      .filter((f: any) => !EXCLUDED.includes(f.apiName))
+                      .map((f: any) => ({ value: f.apiName, label: f.label || stripFieldPrefix(f.apiName) }))
+                  : getAvailableFields(widgetConfig.dataSource || '').map(f => ({ value: f, label: stripFieldPrefix(f) }));
+                return (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Object Type</label>
@@ -3296,8 +3305,8 @@ export default function DashboardPage() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                         >
                           <option value="">Select field…</option>
-                          {getAvailableFields(widgetConfig.dataSource).map(f => (
-                            <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                          {objectFields.map(f => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
                           ))}
                         </select>
                       </div>
@@ -3310,8 +3319,8 @@ export default function DashboardPage() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                         >
                           <option value="">Select field…</option>
-                          {getAvailableFields(widgetConfig.dataSource).map(f => (
-                            <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                          {objectFields.map(f => (
+                            <option key={f.value} value={f.value}>{f.label}</option>
                           ))}
                         </select>
                       </div>
@@ -3328,8 +3337,8 @@ export default function DashboardPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                           >
                             <option value="">Select field…</option>
-                            {getAvailableFields(widgetConfig.dataSource).map(f => (
-                              <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                            {objectFields.map(f => (
+                              <option key={f.value} value={f.value}>{f.label}</option>
                             ))}
                           </select>
                         </div>
@@ -3376,14 +3385,15 @@ export default function DashboardPage() {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
                       >
                         <option value="">Total record count</option>
-                        {getAvailableFields(widgetConfig.dataSource).map(f => (
-                          <option key={f} value={f}>{stripFieldPrefix(f)}</option>
+                        {objectFields.map(f => (
+                          <option key={f.value} value={f.value}>{f.label}</option>
                         ))}
                       </select>
                     </div>
                   )}
                 </>
-              )}
+                );
+              })()}
 
               {/* ===== REPORT MODE ===== */}
               {widgetConfig.dataSourceMode === 'report' && (
