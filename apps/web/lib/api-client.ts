@@ -638,6 +638,18 @@ class ApiClient {
     return this.request<any[]>('/integrations/me/connections');
   }
 
+  // Widgets
+  async getWidgetSettings(): Promise<Array<{ widgetId: string; enabled: boolean }>> {
+    return this.request('/widgets');
+  }
+
+  async updateWidgetSetting(widgetId: string, enabled: boolean): Promise<void> {
+    return this.request(`/widgets/${encodeURIComponent(widgetId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
   // Google Places (proxied through backend — API key never reaches the browser)
   async placesAutocomplete(input: string, sessionToken: string) {
     const params = new URLSearchParams({ input, sessionToken });
