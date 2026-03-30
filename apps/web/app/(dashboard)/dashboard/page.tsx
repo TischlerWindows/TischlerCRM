@@ -179,6 +179,7 @@ export default function DashboardPage() {
     widgetBg: '',
     accentColor: '',
     fontColor: '',
+    barColors: {} as Record<string, string>,
     hBarLabelPos: 'left',
     hBarValuePos: 'right',
     hiddenUntilFilter: false,
@@ -212,6 +213,7 @@ export default function DashboardPage() {
   const [pendingAddSectionId, setPendingAddSectionId] = useState<string | null>(null);
   const [addingFilterBtnSectionId, setAddingFilterBtnSectionId] = useState<string | null>(null);
   const [newFilterBtn, setNewFilterBtn] = useState({ label: '', field: '', value: '' });
+  const [colorPickerBarIdx, setColorPickerBarIdx] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -1202,7 +1204,12 @@ export default function DashboardPage() {
   };
 
   // --- Drill-down helpers ---
-  const handleChartDrillDown = (widget: DashboardWidget, label: string) => {
+  const handleChartDrillDown = (widget: DashboardWidget, label: string, barIndex?: number) => {
+    // In preview mode, open color picker instead of drill-down
+    if (widget.id.startsWith('preview-')) {
+      setColorPickerBarIdx(barIndex ?? null);
+      return;
+    }
     if (drillDownWidgetId === widget.id && drillDownLabel === label) {
       setDrillDownWidgetId(null);
       setDrillDownLabel(null);
@@ -1383,9 +1390,9 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data: any) => handleChartDrillDown(widget, data.label)}>
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data: any, idx: number) => handleChartDrillDown(widget, data.label, idx)}>
                       {widget.config.data.map((entry: any, idx: number) => (
-                        <Cell key={idx} fill={entry.color || widget.config.barColor || widgetAccent} />
+                        <Cell key={idx} fill={entry.color || widget.config.barColors?.[entry.label] || widget.config.barColor || widgetAccent} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -1451,13 +1458,13 @@ export default function DashboardPage() {
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                 return (
-                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
+                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
                     {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
                     {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
                     <div className="flex-1 rounded-full flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
                       <div
                         className="rounded-full h-full transition-all hover:opacity-80"
-                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widgetAccent }}
+                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widget.config.barColors?.[item.label] || widgetAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
@@ -1544,7 +1551,7 @@ export default function DashboardPage() {
                         fill={svColors[idx % svColors.length]}
                         radius={idx === svStackKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                         cursor="pointer"
-                        onClick={(data: any) => handleChartDrillDown(widget, data.label)}
+                        onClick={(data: any, barIdx: number) => handleChartDrillDown(widget, data.label, barIdx)}
                       />
                     ))}
                   </BarChart>
@@ -1631,7 +1638,7 @@ export default function DashboardPage() {
                     const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                     
                     return (
-                      <div key={idx} className={`flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
+                      <div key={idx} className={`flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
                         <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
@@ -1749,7 +1756,7 @@ export default function DashboardPage() {
                       stroke={widgetAccent}
                       strokeWidth={2}
                       dot={{ r: 4, fill: widgetAccent, cursor: 'pointer' }}
-                      activeDot={{ r: 6, fill: '#da291c', cursor: 'pointer', onClick: (_e: any, payload: any) => handleChartDrillDown(widget, payload?.payload?.label) }}
+                      activeDot={{ r: 6, fill: '#da291c', cursor: 'pointer', onClick: (_e: any, payload: any) => handleChartDrillDown(widget, payload?.payload?.label, payload?.index) }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1811,7 +1818,7 @@ export default function DashboardPage() {
                     acc.push({
                       percentage,
                       offset,
-                      color: item.color || defaultColors[idx % defaultColors.length],
+                      color: item.color || widget.config.barColors?.[item.label] || defaultColors[idx % defaultColors.length],
                       label: item.label
                     });
                     return acc;
@@ -1827,7 +1834,7 @@ export default function DashboardPage() {
                       strokeDasharray={`${segment.percentage * 2.513} 251.3`}
                       strokeDashoffset={-segment.offset * 2.513}
                       className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleChartDrillDown(widget, segment.label)}
+                      onClick={() => handleChartDrillDown(widget, segment.label, idx)}
                     />
                   ))}
                 </svg>
@@ -1836,8 +1843,8 @@ export default function DashboardPage() {
                 {widget.config.data?.map((item: any, idx: number) => {
                   const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                   return (
-                    <div key={idx} className={`flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label)}>
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                    <div key={idx} className={`flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || widget.config.barColors?.[item.label] || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
                       <span className={valueColorClass}>{item.label}</span>
                       <span className={`${labelColorClass} ml-auto`}>{item.value}%</span>
                     </div>
@@ -3556,27 +3563,16 @@ export default function DashboardPage() {
                           + Add Data Point
                         </button>
                       </div>
-                      <p className="text-[10px] text-gray-500 mb-2 flex items-center gap-1">
-                        <span className="inline-block w-3 h-3 rounded border border-gray-300" style={{ backgroundColor: '#151f6d' }}></span>
-                        Click the colored square next to each row to change that bar&apos;s color
+                      <p className="text-[10px] text-gray-500 mb-2">
+                        Click any bar in the preview to change its color
                       </p>
                       <div className="space-y-2 max-h-[350px] overflow-y-auto">
                         {(widgetConfig.manualData || []).map((item: any, idx: number) => (
                           <div key={idx} className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
-                              <input
-                                type="color"
-                                value={item.color || widgetConfig.accentColor || '#151f6d'}
-                                onChange={(e) => {
-                                  const newData = [...widgetConfig.manualData];
-                                  newData[idx] = { ...newData[idx], color: e.target.value };
-                                  setWidgetConfig({ ...widgetConfig, manualData: newData });
-                                }}
-                                className="w-8 h-8 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-brand-navy transition-colors"
-                                title="Click to change this bar's color"
-                              />
-                              <span className="text-[9px] text-gray-400">color</span>
-                            </div>
+                            <div
+                              className="w-4 h-4 rounded flex-shrink-0 border border-gray-300"
+                              style={{ backgroundColor: item.color || widgetConfig.accentColor || '#151f6d' }}
+                            />
                             <input
                               type="text"
                               value={item.label || ''}
@@ -3886,7 +3882,7 @@ export default function DashboardPage() {
                 
 
 
-                <div className="bg-white rounded-lg border border-gray-200 p-4 h-[450px]">
+                <div className="bg-white rounded-lg border border-gray-200 p-4 h-[450px] relative">
                   {selectedWidgetType ? (
                     (() => {
                       const currentPreviewData = previewData || {
@@ -3915,6 +3911,83 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+                {/* Color picker popup when a bar is clicked in preview */}
+                {colorPickerBarIdx !== null && (() => {
+                  const dataArr = widgetConfig.manualData || previewData?.data || [];
+                  const item = dataArr[colorPickerBarIdx];
+                  if (!item) return null;
+                  const currentColor = item.color || widgetConfig.barColors?.[item.label] || widgetConfig.accentColor || '#151f6d';
+                  const isManual = widgetConfig.dataSourceMode === 'manual';
+                  return (
+                    <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200 shadow-lg flex items-center gap-3">
+                      <span className="text-xs text-gray-600 font-medium truncate max-w-[100px]">{item.label || `Bar ${colorPickerBarIdx + 1}`}</span>
+                      <input
+                        type="color"
+                        value={currentColor}
+                        onChange={(e) => {
+                          const newColor = e.target.value;
+                          if (isManual) {
+                            const newData = [...(widgetConfig.manualData || [])];
+                            newData[colorPickerBarIdx] = { ...newData[colorPickerBarIdx], color: newColor };
+                            setWidgetConfig({ ...widgetConfig, manualData: newData });
+                          } else {
+                            const barColors = { ...(widgetConfig.barColors || {}) };
+                            barColors[item.label] = newColor;
+                            setWidgetConfig({ ...widgetConfig, barColors });
+                          }
+                        }}
+                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
+                      />
+                      <div className="flex gap-1">
+                        {['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => {
+                              if (isManual) {
+                                const newData = [...(widgetConfig.manualData || [])];
+                                newData[colorPickerBarIdx] = { ...newData[colorPickerBarIdx], color: c };
+                                setWidgetConfig({ ...widgetConfig, manualData: newData });
+                              } else {
+                                const barColors = { ...(widgetConfig.barColors || {}) };
+                                barColors[item.label] = c;
+                                setWidgetConfig({ ...widgetConfig, barColors });
+                              }
+                            }}
+                            className={`w-5 h-5 rounded-full border-2 transition-all ${currentColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:border-gray-400'}`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isManual) {
+                            const newData = [...(widgetConfig.manualData || [])];
+                            const { color: _, ...rest } = newData[colorPickerBarIdx];
+                            newData[colorPickerBarIdx] = rest;
+                            setWidgetConfig({ ...widgetConfig, manualData: newData });
+                          } else {
+                            const barColors = { ...(widgetConfig.barColors || {}) };
+                            delete barColors[item.label];
+                            setWidgetConfig({ ...widgetConfig, barColors });
+                          }
+                          setColorPickerBarIdx(null);
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700 ml-auto"
+                      >
+                        Reset
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setColorPickerBarIdx(null)}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })()}
                 {widgetConfig.dataSourceMode === 'report' && !widgetConfig.reportId && (
                   <p className="text-xs text-gray-500 mt-2 text-center">
                     Select a report or switch to &quot;Manual Entry&quot; to see live data preview
