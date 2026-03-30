@@ -3566,7 +3566,7 @@ export default function DashboardPage() {
                             <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
                               <input
                                 type="color"
-                                value={item.color || ['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2', '#9f9fa2', '#293241'][idx % 8]}
+                                value={item.color || widgetConfig.accentColor || '#151f6d'}
                                 onChange={(e) => {
                                   const newData = [...widgetConfig.manualData];
                                   newData[idx] = { ...newData[idx], color: e.target.value };
