@@ -550,7 +550,7 @@ export default function RecordDetailPage({
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-pulse">
+        <div className="px-4 sm:px-6 py-6 animate-pulse">
           {/* Header skeleton */}
           <div className="mb-8">
             <div className="h-4 w-24 bg-gray-200 rounded mb-4" />
@@ -1022,7 +1022,7 @@ export default function RecordDetailPage({
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-4 sm:px-6 py-6">
         {/* Header */}
         <div className="mb-8">
           <Link

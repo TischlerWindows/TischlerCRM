@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
+import { useDroppable, useDndMonitor } from '@dnd-kit/core';
 import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -41,6 +41,21 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
   const { setNodeRef: setDropRef, isOver: isFieldDropOver } = useDroppable({
     id: `panel-drop-${panel.id}`,
     data: { type: 'panel-drop', panelId: panel.id },
+  });
+
+  // Detect when any field is being dragged to show column dividers
+  const [isFieldBeingDragged, setIsFieldBeingDragged] = useState(false);
+  useDndMonitor({
+    onDragStart: (e) => {
+      const d = (e.active.data.current ?? {}) as Record<string, unknown>;
+      setIsFieldBeingDragged(
+        d.type === 'field' ||
+          d.type === 'palette-field' ||
+          String(e.active.id).startsWith('field-'),
+      );
+    },
+    onDragEnd: () => setIsFieldBeingDragged(false),
+    onDragCancel: () => setIsFieldBeingDragged(false),
   });
 
   useEffect(() => {
@@ -182,34 +197,49 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
       <div
         ref={setDropRef}
         className={cn(
-          'grid gap-2 rounded-b-lg border border-transparent p-3 transition-colors',
+          'relative overflow-hidden rounded-b-lg border border-transparent p-3 transition-colors',
           isFieldDropOver && 'border-brand-navy/30 bg-brand-navy/5',
         )}
         aria-label="Panel drop zone"
-        style={{
-          ...bodyStyle,
-          gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
-        }}
+        style={bodyStyle}
       >
-        <SortableContext
-          items={orderedFields.map((f) => `field-${f.fieldApiName}`)}
-          strategy={rectSortingStrategy}
-        >
-          {orderedFields.length === 0 ? (
-            <div className="col-span-full rounded border border-dashed border-gray-300 py-5 text-center text-xs text-gray-500">
-              Drop fields here
-            </div>
-          ) : (
-            orderedFields.map((field) => (
-              <CanvasFieldCard
-                key={field.fieldApiName}
-                field={field}
-                panelId={panel.id}
-                panelColumns={panel.columns}
+        {/* Column divider lines — visible only while a field is being dragged */}
+        {isFieldBeingDragged && panel.columns > 1 && (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            {Array.from({ length: panel.columns - 1 }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute inset-y-0 w-px bg-brand-navy/25"
+                style={{ left: `${((i + 1) / panel.columns) * 100}%` }}
               />
-            ))
-          )}
-        </SortableContext>
+            ))}
+          </div>
+        )}
+
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))` }}
+        >
+          <SortableContext
+            items={orderedFields.map((f) => `field-${f.fieldApiName}`)}
+            strategy={rectSortingStrategy}
+          >
+            {orderedFields.length === 0 ? (
+              <div className="col-span-full rounded border border-dashed border-gray-300 py-5 text-center text-xs text-gray-500">
+                Drop fields here
+              </div>
+            ) : (
+              orderedFields.map((field) => (
+                <CanvasFieldCard
+                  key={field.fieldApiName}
+                  field={field}
+                  panelId={panel.id}
+                  panelColumns={panel.columns}
+                />
+              ))
+            )}
+          </SortableContext>
+        </div>
       </div>
     </div>
   );
