@@ -672,6 +672,21 @@ export default function DashboardPage() {
     })();
   }, [widgetConfig.dataSourceMode, widgetConfig.dataSource]);
 
+  // Load records into cache when user picks an object type in the filter button form
+  useEffect(() => {
+    if (!newFilterBtn.objectType) return;
+    if (getCachedRecords(newFilterBtn.objectType).length > 0) return;
+    (async () => {
+      try {
+        const records = await recordsService.getRecords(newFilterBtn.objectType);
+        const flat = records.map((r: any) => ({ id: r.id, ...r.data }));
+        setCachedRecords(newFilterBtn.objectType, flat);
+      } catch (e) {
+        console.error(`Failed to load records for ${newFilterBtn.objectType}:`, e);
+      }
+    })();
+  }, [newFilterBtn.objectType]);
+
   const handleCreateDashboard = (name: string, description: string) => {
     const newDashboard: Dashboard = {
       id: Date.now().toString(),
