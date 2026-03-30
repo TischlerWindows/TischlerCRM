@@ -232,7 +232,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget';
 
 export interface RelatedListConfig {
   type: 'RelatedList';
@@ -243,6 +243,11 @@ export interface RelatedListConfig {
   sortDirection?: 'asc' | 'desc';
   maxRows?: number;
   label?: string;
+  objectApiName?: string;
+  columns?: string[];
+  linkField?: string;
+  rowLimit?: number;
+  showSearch?: boolean;
 }
 
 export interface CustomComponentConfig {
@@ -277,13 +282,21 @@ export interface HeaderHighlightsConfig {
   visibleActions?: Array<'edit' | 'delete'>;
 }
 
+export interface ExternalWidgetLayoutConfig {
+  type: 'ExternalWidget';
+  externalWidgetId: string;
+  displayMode: 'full' | 'column';
+  config: Record<string, unknown>;
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
   | ActivityFeedConfig
   | FileFolderConfig
   | SpacerConfig
-  | HeaderHighlightsConfig;
+  | HeaderHighlightsConfig
+  | ExternalWidgetLayoutConfig;
 
 export interface PageWidget {
   id: string;
