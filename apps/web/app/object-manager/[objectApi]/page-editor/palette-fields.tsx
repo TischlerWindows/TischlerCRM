@@ -2,9 +2,10 @@
 
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { useDraggable } from '@dnd-kit/core';
-import { GripVertical, Search } from 'lucide-react';
+import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
+import { GripVertical, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
 import { useEditorStore } from './editor-store';
 
@@ -103,7 +104,23 @@ function DraggableFieldChip({
 
 export function PaletteFields({ availableFields }: PaletteFieldsProps) {
   const [search, setSearch] = useState('');
+  const [isDraggingExistingField, setIsDraggingExistingField] = useState(false);
   const layout = useEditorStore((s) => s.layout);
+
+  // Remove-field drop zone — only registered/shown when dragging an existing canvas field
+  const { setNodeRef: setPaletteDropRef, isOver: isPaletteOver } = useDroppable({
+    id: 'palette-field-remove',
+    data: { type: 'palette-remove' },
+  });
+
+  useDndMonitor({
+    onDragStart: (e) => {
+      const d = (e.active.data.current ?? {}) as Record<string, unknown>;
+      setIsDraggingExistingField(d.type === 'field');
+    },
+    onDragEnd: () => setIsDraggingExistingField(false),
+    onDragCancel: () => setIsDraggingExistingField(false),
+  });
 
   const placedApiNames = useMemo(() => {
     const set = new Set<string>();
@@ -132,6 +149,22 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-2">
+      {/* Remove zone — floats at the top only while dragging an existing canvas field */}
+      {isDraggingExistingField && (
+        <div
+          ref={setPaletteDropRef}
+          className={cn(
+            'flex items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-3 text-xs font-medium transition-colors',
+            isPaletteOver
+              ? 'border-red-400 bg-red-50 text-red-600'
+              : 'border-gray-300 bg-gray-50/60 text-gray-400',
+          )}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Drop here to remove
+        </div>
+      )}
+
       {/* Search — filters fields only, not section tiles */}
       <div className="relative">
         <Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-gray-400" />

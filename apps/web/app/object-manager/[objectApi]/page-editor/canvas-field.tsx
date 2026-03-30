@@ -91,7 +91,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0 : 1,
     gridColumn: `span ${currentSpan}`,
   };
 
@@ -174,7 +174,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
         isSelected
           ? 'border-brand-navy bg-brand-navy/5 shadow-sm'
           : 'border-gray-200 hover:border-gray-300'
-      } ${isDragging ? 'z-20' : ''}`}
+      }`}
       onClick={(event) => {
         event.stopPropagation();
         setSelectedElement({

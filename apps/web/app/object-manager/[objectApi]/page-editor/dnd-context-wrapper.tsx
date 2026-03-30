@@ -15,7 +15,7 @@ import {
   type Over,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { Grid2x2, LayoutPanelLeft, Type, Puzzle } from 'lucide-react';
+import { Grid2x2, LayoutPanelLeft, Puzzle } from 'lucide-react';
 import type { WidgetType } from '@/lib/schema';
 import type { LayoutPanel, LayoutSection, LayoutWidget, PanelField } from './types';
 import { useEditorStore } from './editor-store';
@@ -37,6 +37,7 @@ type DropTarget =
   | { kind: 'widget-item'; regionId: string; index: number }
   | { kind: 'panel-item'; panelId: string; regionId: string; index: number }
   | { kind: 'region-item'; regionId: string }
+  | { kind: 'palette-remove' }
   | null;
 
 const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
@@ -221,6 +222,10 @@ function parseDropTarget(
   const overId = String(over.id);
   const data = (over.data.current ?? {}) as Record<string, unknown>;
 
+  if (overId === 'palette-field-remove' || data.type === 'palette-remove') {
+    return { kind: 'palette-remove' };
+  }
+
   if (overId.startsWith('panel-drop-')) {
     return { kind: 'panel-drop', panelId: overId.replace(/^panel-drop-/, '') };
   }
@@ -290,6 +295,7 @@ export function DndContextWrapper({
   const layout = useEditorStore((s) => s.layout);
   const addField = useEditorStore((s) => s.addField);
   const moveField = useEditorStore((s) => s.moveField);
+  const removeField = useEditorStore((s) => s.removeField);
   const addWidget = useEditorStore((s) => s.addWidget);
   const moveWidget = useEditorStore((s) => s.moveWidget);
   const movePanel = useEditorStore((s) => s.movePanel);
@@ -320,6 +326,12 @@ export function DndContextWrapper({
       const active = parseActiveDrag(event.active, layout);
       const target = parseDropTarget(event.over, layout);
       if (!active || !target) return;
+
+      // Dragging an existing field back to the palette remove zone → remove it
+      if (active.kind === 'existing-field' && target.kind === 'palette-remove') {
+        removeField(active.fieldApiName, active.fromPanelId);
+        return;
+      }
 
       if (active.kind === 'palette-field' || active.kind === 'existing-field') {
         let targetPanelId: string | null = null;
@@ -437,7 +449,7 @@ export function DndContextWrapper({
         });
       }
     },
-    [addField, addWidget, layout, moveField, movePanel, moveWidget, updateSection],
+    [addField, addWidget, layout, moveField, movePanel, moveWidget, removeField, updateSection],
   );
 
   const handleDragCancel = useCallback(() => {
@@ -450,9 +462,16 @@ export function DndContextWrapper({
 
     if (kind === 'palette-field' || kind === 'existing-field') {
       return (
-        <div className="flex items-center gap-2 rounded-lg border border-brand-navy/20 bg-white px-3 py-2 text-xs font-medium text-gray-800 shadow-md">
-          <Type className="h-3.5 w-3.5 shrink-0 text-brand-navy/70" />
-          {label}
+        <div className="flex min-w-[160px] cursor-grabbing items-center gap-2 rounded-md border border-brand-navy/25 bg-white px-2 py-2 text-xs shadow-lg ring-1 ring-brand-navy/10">
+          <span className="shrink-0 text-gray-400" aria-hidden>⠿</span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-gray-800">{label}</div>
+            <div className="mt-0.5 flex items-center gap-1">
+              <span className="rounded px-1.5 py-0.5 text-[10px] leading-none ring-1 ring-gray-200 text-gray-500">
+                Value
+              </span>
+            </div>
+          </div>
         </div>
       );
     }
