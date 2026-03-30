@@ -1006,6 +1006,7 @@ export default function DashboardPage() {
       widgetBg: widget.config?.widgetBg || '',
       accentColor: widget.config?.accentColor || '',
       fontColor: widget.config?.fontColor || '',
+      barColors: widget.config?.barColors || {},
       hBarLabelPos: widget.config?.hBarLabelPos || 'left',
       hBarValuePos: widget.config?.hBarValuePos || 'right',
       hiddenUntilFilter: widget.config?.hiddenUntilFilter || false,
