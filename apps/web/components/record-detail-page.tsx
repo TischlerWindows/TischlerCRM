@@ -1033,123 +1033,135 @@ export default function RecordDetailPage({
             Back to {backLabel}
           </Link>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-brand-navy/10 rounded-lg flex items-center justify-center">
-                <IconComponent className="w-6 h-6 text-brand-navy" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-                {subtitle && subtitle !== title && (
-                  <p className="text-gray-600">{subtitle}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {canEdit && (
-              <button
-                onClick={handleEdit}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </button>
-              )}
-              {canDelete && (
-              <button
-                onClick={handleDelete}
-                className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </button>
-              )}
-              {canCustomize && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowAdminMenu(prev => !prev)}
-                  className="inline-flex items-center px-2.5 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500"
-                  title="Page setup"
-                >
-                  <Settings className="w-4 h-4" />
-                  <ChevronDown className="w-3.5 h-3.5 ml-1" />
-                </button>
-                {showAdminMenu && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
-                    <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
-                      <Link
-                        href={`/object-manager/${encodeURIComponent(objectApiName)}`}
-                        className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                        onClick={() => setShowAdminMenu(false)}
-                      >
-                        <Database className="w-4 h-4 text-gray-400" />
-                        Edit Object
-                        <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
-                      </Link>
-                      {pageLayout && (
-                        <Link
-                          href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}`}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setShowAdminMenu(false)}
-                        >
-                          <Edit className="w-4 h-4 text-gray-400" />
-                          Edit Page Layout
-                          <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
-                        </Link>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-              )}
-            </div>
-          </div>
-
           {(() => {
-            // New model: find HeaderHighlights widget across all regions
+            // Resolve HeaderHighlights widget config
             let highlightApiNames: string[] = [];
+            let visibleActions: Array<'edit' | 'delete'> = ['edit', 'delete'];
             if (pageLayout?.tabs) {
-              for (const tab of pageLayout.tabs) {
+              outer: for (const tab of pageLayout.tabs) {
                 for (const region of (tab as any).regions ?? []) {
                   const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights');
                   if (hw && hw.config.type === 'HeaderHighlights') {
                     highlightApiNames = hw.config.fieldApiNames ?? [];
-                    break;
+                    if (Array.isArray(hw.config.visibleActions)) {
+                      visibleActions = hw.config.visibleActions;
+                    }
+                    break outer;
                   }
                 }
-                if (highlightApiNames.length > 0) break;
               }
             }
-            // Legacy fallback
+            // Legacy fallback for field names
             if (highlightApiNames.length === 0 && pageLayout?.highlightFields?.length) {
               highlightApiNames = pageLayout.highlightFields;
             }
-            if (highlightApiNames.length === 0) return null;
+
+            const showEdit = visibleActions.includes('edit');
+            const showDelete = visibleActions.includes('delete');
 
             return (
-              <div className="mt-4 rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                  {objectDef?.label ?? 'Record'}
-                </div>
-                <div className="flex flex-wrap gap-x-8 gap-y-3">
-                  {highlightApiNames.map((apiName) => {
-                    const fd = getFieldDef(apiName);
-                    if (!fd) return null;
-                    if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
-                    const fFx = getFormattingEffectsForField(pageLayout!, apiName, layoutVisibilityData);
-                    if (fFx?.hidden) return null;
-                    const raw = getRecordValue(apiName, fd);
-                    return (
-                      <div key={apiName} className="min-w-[100px] max-w-[220px]">
-                        <div className="text-xs text-gray-500">{fd.label}</div>
-                        <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                          {renderValue(apiName, raw, fd)}
-                        </div>
+              <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                {/* Identity + Actions row */}
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 shrink-0 bg-brand-navy/10 rounded-lg flex items-center justify-center">
+                      <IconComponent className="w-5 h-5 text-brand-navy" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5">
+                        {objectDef?.label ?? 'Record'}
                       </div>
-                    );
-                  })}
+                      <h1 className="text-xl font-bold text-gray-900 leading-tight truncate">{title}</h1>
+                      {subtitle && subtitle !== title && (
+                        <p className="text-sm text-gray-500 truncate">{subtitle}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-4">
+                    {showEdit && canEdit && (
+                      <button
+                        onClick={handleEdit}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <Edit className="w-4 h-4 mr-1.5" />
+                        Edit
+                      </button>
+                    )}
+                    {showDelete && canDelete && (
+                      <button
+                        onClick={handleDelete}
+                        className="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 mr-1.5" />
+                        Delete
+                      </button>
+                    )}
+                    {canCustomize && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowAdminMenu(prev => !prev)}
+                          className="inline-flex items-center px-2.5 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500 transition-colors"
+                          title="Page setup"
+                        >
+                          <Settings className="w-4 h-4" />
+                          <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                        </button>
+                        {showAdminMenu && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
+                            <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
+                              <Link
+                                href={`/object-manager/${encodeURIComponent(objectApiName)}`}
+                                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                                onClick={() => setShowAdminMenu(false)}
+                              >
+                                <Database className="w-4 h-4 text-gray-400" />
+                                Edit Object
+                                <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
+                              </Link>
+                              {pageLayout && (
+                                <Link
+                                  href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}`}
+                                  className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                                  onClick={() => setShowAdminMenu(false)}
+                                >
+                                  <Edit className="w-4 h-4 text-gray-400" />
+                                  Edit Page Layout
+                                  <ExternalLink className="w-3 h-3 text-gray-300 ml-auto" />
+                                </Link>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                {/* Highlight fields row */}
+                {highlightApiNames.length > 0 && (
+                  <>
+                    <div className="border-t border-gray-100" />
+                    <div className="flex flex-wrap gap-x-8 gap-y-3 px-5 py-3 bg-gray-50/60">
+                      {highlightApiNames.map((apiName) => {
+                        const fd = getFieldDef(apiName);
+                        if (!fd) return null;
+                        if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return null;
+                        const fFx = getFormattingEffectsForField(pageLayout!, apiName, layoutVisibilityData);
+                        if (fFx?.hidden) return null;
+                        const raw = getRecordValue(apiName, fd);
+                        return (
+                          <div key={apiName} className="min-w-[100px] max-w-[220px]">
+                            <div className="text-xs text-gray-500">{fd.label}</div>
+                            <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
+                              {renderValue(apiName, raw, fd)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })()}

@@ -273,6 +273,8 @@ export interface HeaderHighlightsConfig {
   type: 'HeaderHighlights';
   /** Up to 6 field API names to display as highlight badges */
   fieldApiNames: string[];
+  /** Which action buttons to show in the highlights bar. Defaults to both when absent. */
+  visibleActions?: Array<'edit' | 'delete'>;
 }
 
 export type WidgetConfig =
