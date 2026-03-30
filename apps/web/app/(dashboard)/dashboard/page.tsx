@@ -1345,9 +1345,22 @@ export default function DashboardPage() {
     // Apply section-level filter to widget data
     if (sectionFilter && sectionFilter.field && sectionFilter.value) {
       const originalData = widget.config?.data || [];
+      const filterVal = sectionFilter.value.toLowerCase();
+      const isChartType = ['vertical-bar', 'horizontal-bar', 'line', 'donut', 'stacked-horizontal-bar', 'stacked-vertical-bar'].includes(widget.type);
+      const xAxis = widget.config?.xAxis || '';
+      // For chart widgets whose X-axis matches the filter field, the aggregated
+      // data has { label, value } — match against "label" instead of the raw field key.
+      const filterMatchesXAxis = isChartType && xAxis && (
+        xAxis === sectionFilter.field ||
+        stripFieldPrefix(xAxis) === stripFieldPrefix(sectionFilter.field)
+      );
       const filtered = originalData.filter((row: any) => {
-        const fieldVal = String(row[sectionFilter.field] ?? '').toLowerCase();
-        return fieldVal === sectionFilter.value.toLowerCase();
+        if (filterMatchesXAxis) {
+          return String(row.label ?? '').toLowerCase() === filterVal;
+        }
+        // Fallback: try raw field key on the row (e.g. for table/card data)
+        const fieldVal = String(row[sectionFilter.field] ?? row[stripFieldPrefix(sectionFilter.field)] ?? '').toLowerCase();
+        return fieldVal === filterVal;
       });
       widget = { ...widget, config: { ...widget.config, data: filtered } };
     }
