@@ -115,10 +115,12 @@ export function DropboxFileBrowser({
         return;
       }
 
-      // Auto-create the record folder in background (non-blocking)
+      // Auto-create the record folder — await so listing happens after folder exists
       if (!folderEnsured.current) {
         folderEnsured.current = true;
-        apiClient.ensureDropboxFolder(objectApiName, recordId, folderName).catch(() => {});
+        try {
+          await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+        } catch { /* non-fatal — folder may already exist */ }
       }
 
       try {

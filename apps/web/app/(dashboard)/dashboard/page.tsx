@@ -212,7 +212,7 @@ export default function DashboardPage() {
   const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null } | null>(null);
   const [pendingAddSectionId, setPendingAddSectionId] = useState<string | null>(null);
   const [addingFilterBtnSectionId, setAddingFilterBtnSectionId] = useState<string | null>(null);
-  const [newFilterBtn, setNewFilterBtn] = useState({ label: '', field: '', value: '' });
+  const [newFilterBtn, setNewFilterBtn] = useState({ label: '', field: '', value: '', objectType: '' });
   const [colorPickerBarIdx, setColorPickerBarIdx] = useState<number | null>(null);
 
   useEffect(() => {
@@ -2675,7 +2675,7 @@ export default function DashboardPage() {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => { setAddingFilterBtnSectionId(addingFilterBtnSectionId === section.id ? null : section.id); setNewFilterBtn({ label: '', field: '', value: '' }); }}
+                                  onClick={() => { setAddingFilterBtnSectionId(addingFilterBtnSectionId === section.id ? null : section.id); setNewFilterBtn({ label: '', field: '', value: '', objectType: '' }); }}
                                   className="ml-1 px-2 py-1 text-xs text-brand-navy font-medium hover:bg-[#f0f1fa] rounded transition-colors"
                                   title="Add filter button to section"
                                 >
@@ -2689,43 +2689,44 @@ export default function DashboardPage() {
                           )}
                           {/* Inline add filter button form */}
                           {dashEditMode && addingFilterBtnSectionId === section.id && (() => {
-                            const secWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
-                            const allFields: string[] = [];
-                            secWidgets.forEach(w => {
-                              (w.config?.data || []).forEach((row: any) => {
-                                Object.keys(row).forEach(k => {
-                                  if (k !== 'id' && !k.startsWith('_') && k !== 'color' && k !== 'value' && !allFields.includes(k)) allFields.push(k);
-                                });
-                              });
-                            });
+                            const objFields = newFilterBtn.objectType ? getAvailableFields(newFilterBtn.objectType) : [];
                             const fieldValues: string[] = [];
-                            if (newFilterBtn.field) {
-                              secWidgets.forEach(w => {
-                                (w.config?.data || []).forEach((row: any) => {
-                                  const v = String(row[newFilterBtn.field] ?? '');
-                                  if (v && !fieldValues.includes(v)) fieldValues.push(v);
-                                });
+                            if (newFilterBtn.objectType && newFilterBtn.field) {
+                              const records = getCachedRecords(newFilterBtn.objectType);
+                              const rawField = stripFieldPrefix(newFilterBtn.field);
+                              records.forEach((rec: any) => {
+                                const v = String(rec[rawField] ?? rec[newFilterBtn.field] ?? '').trim();
+                                if (v && !fieldValues.includes(v)) fieldValues.push(v);
                               });
                               fieldValues.sort();
                             }
                             return (
                             <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                               <p className="text-xs font-semibold text-gray-700 mb-2">Add Filter Button</p>
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 <input
                                   type="text"
                                   value={newFilterBtn.label}
                                   onChange={(e) => setNewFilterBtn({ ...newFilterBtn, label: e.target.value })}
                                   placeholder="Label (e.g. Open)"
-                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
+                                  className="flex-1 min-w-[100px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40"
                                 />
+                                <select
+                                  value={newFilterBtn.objectType}
+                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, objectType: e.target.value, field: '', value: '' })}
+                                  className="flex-1 min-w-[110px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white"
+                                >
+                                  <option value="">Object type...</option>
+                                  {OBJECT_TYPES.map(ot => <option key={ot.value} value={ot.value}>{ot.label}</option>)}
+                                </select>
                                 <select
                                   value={newFilterBtn.field}
                                   onChange={(e) => setNewFilterBtn({ ...newFilterBtn, field: e.target.value, value: '' })}
-                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white"
+                                  disabled={!newFilterBtn.objectType}
+                                  className="flex-1 min-w-[110px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
                                 >
                                   <option value="">Select field...</option>
-                                  {allFields.map(f => <option key={f} value={f}>{f}</option>)}
+                                  {objFields.map(f => <option key={f} value={f}>{stripFieldPrefix(f)}</option>)}
                                 </select>
                                 <select
                                   value={newFilterBtn.value}
@@ -2734,7 +2735,7 @@ export default function DashboardPage() {
                                     setNewFilterBtn({ ...newFilterBtn, value: val, label: newFilterBtn.label || val });
                                   }}
                                   disabled={!newFilterBtn.field}
-                                  className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
+                                  className="flex-1 min-w-[110px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
                                 >
                                   <option value="">Select value...</option>
                                   {fieldValues.map(v => <option key={v} value={v}>{v}</option>)}
@@ -2746,7 +2747,7 @@ export default function DashboardPage() {
                                     const updatedDashboard = {
                                       ...selectedDashboard,
                                       sections: (selectedDashboard.sections || []).map(s =>
-                                        s.id === section.id ? { ...s, filterButtons: [...(s.filterButtons || []), { label: newFilterBtn.label.trim(), field: newFilterBtn.field.trim(), value: newFilterBtn.value.trim() }] } : s
+                                        s.id === section.id ? { ...s, filterButtons: [...(s.filterButtons || []), { label: newFilterBtn.label.trim(), field: stripFieldPrefix(newFilterBtn.field.trim()), value: newFilterBtn.value.trim() }] } : s
                                       ),
                                       lastModifiedAt: new Date().toISOString().split('T')[0] || ''
                                     };
@@ -2754,7 +2755,7 @@ export default function DashboardPage() {
                                     setDashboards(updated);
                                     setSelectedDashboard(updatedDashboard);
                                     setSetting('dashboards', updated);
-                                    setNewFilterBtn({ label: '', field: '', value: '' });
+                                    setNewFilterBtn({ label: '', field: '', value: '', objectType: '' });
                                   }}
                                   className="px-3 py-1.5 bg-brand-navy text-white text-xs rounded font-medium hover:bg-brand-navy-dark transition-colors"
                                 >
