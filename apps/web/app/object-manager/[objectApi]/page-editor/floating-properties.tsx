@@ -9,6 +9,8 @@ import type { FieldDef, WidgetConfig } from '@/lib/schema';
 import { SchemaRenderer } from '@/lib/widgets/schema-renderer';
 import { getWidgetById } from '@/lib/widgets/registry-loader';
 import DemoConfigPanel from '@/widgets/external/demo-widget/ConfigPanel';
+import HeaderHighlightsConfigPanel from '@/widgets/internal/header-highlights/ConfigPanel';
+import RelatedListConfigPanel from '@/widgets/internal/related-list/ConfigPanel';
 import type { ConfigPanelProps } from '@/lib/widgets/types';
 import { useEditorStore } from './editor-store';
 import type { EditorPageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
@@ -17,6 +19,12 @@ type ConfigPanelComponent = React.ComponentType<ConfigPanelProps & { objectOptio
 
 const EXTERNAL_CONFIG_PANELS: Record<string, ConfigPanelComponent> = {
   'demo-widget': DemoConfigPanel,
+};
+
+// Keyed by WidgetConfig.type (PascalCase)
+const INTERNAL_CONFIG_PANELS: Record<string, ConfigPanelComponent> = {
+  HeaderHighlights: HeaderHighlightsConfigPanel,
+  RelatedList: RelatedListConfigPanel,
 };
 
 interface FloatingPropertiesProps {
@@ -132,161 +140,6 @@ function ColorControl({ label, value, onChange }: ColorControlProps) {
   );
 }
 
-const ALL_ACTIONS: Array<'edit' | 'delete'> = ['edit', 'delete'];
-const ACTION_LABELS: Record<'edit' | 'delete', string> = { edit: 'Edit', delete: 'Delete' };
-
-function HeaderHighlightsPicker({
-  widgetId,
-  selectedApiNames,
-  visibleActions,
-  availableFields,
-}: {
-  widgetId: string;
-  selectedApiNames: string[];
-  visibleActions: Array<'edit' | 'delete'>;
-  availableFields: FieldDef[];
-}) {
-  const updateWidget = useEditorStore((s) => s.updateWidget);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [filterQuery, setFilterQuery] = useState('');
-
-  const handleRemove = (apiName: string) => {
-    updateWidget(widgetId, {
-      config: {
-        type: 'HeaderHighlights' as const,
-        fieldApiNames: selectedApiNames.filter((n) => n !== apiName),
-        visibleActions,
-      },
-    });
-  };
-
-  const handleAdd = (apiName: string) => {
-    if (selectedApiNames.includes(apiName) || selectedApiNames.length >= 6) return;
-    updateWidget(widgetId, {
-      config: {
-        type: 'HeaderHighlights' as const,
-        fieldApiNames: [...selectedApiNames, apiName],
-        visibleActions,
-      },
-    });
-    setDropdownOpen(false);
-    setFilterQuery('');
-  };
-
-  const handleToggleAction = (action: 'edit' | 'delete') => {
-    const next = visibleActions.includes(action)
-      ? visibleActions.filter((a) => a !== action)
-      : [...visibleActions, action];
-    updateWidget(widgetId, {
-      config: {
-        type: 'HeaderHighlights' as const,
-        fieldApiNames: selectedApiNames,
-        visibleActions: next,
-      },
-    });
-  };
-
-  const filteredOptions = availableFields.filter(
-    (f) =>
-      !selectedApiNames.includes(f.apiName) &&
-      (f.label.toLowerCase().includes(filterQuery.toLowerCase()) ||
-        f.apiName.toLowerCase().includes(filterQuery.toLowerCase()))
-  );
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Highlight Fields (up to 6)</Label>
-        <div className="flex flex-wrap gap-1.5 min-h-[28px]">
-          {selectedApiNames.map((apiName) => {
-            const fd = availableFields.find((f) => f.apiName === apiName);
-            return (
-              <span
-                key={apiName}
-                className="inline-flex items-center gap-1 rounded-full bg-brand-navy/10 px-2 py-0.5 text-xs font-medium text-brand-navy"
-              >
-                {fd?.label ?? apiName}
-                <button
-                  type="button"
-                  onClick={() => handleRemove(apiName)}
-                  className="text-brand-navy/60 hover:text-brand-navy ml-0.5"
-                  aria-label={`Remove ${fd?.label ?? apiName}`}
-                >
-                  ×
-                </button>
-              </span>
-            );
-          })}
-        </div>
-        {selectedApiNames.length < 6 && (
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setDropdownOpen((o) => !o)}
-              className="flex w-full items-center gap-1 rounded-md border border-dashed border-gray-300 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50"
-            >
-              <span className="text-gray-400">+</span> Add field
-            </button>
-            {dropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => { setDropdownOpen(false); setFilterQuery(''); }}
-                />
-                <div className="absolute left-0 right-0 z-50 mt-1 max-h-48 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
-                  <div className="sticky top-0 border-b border-gray-100 bg-white p-1.5">
-                    <Input
-                      autoFocus
-                      value={filterQuery}
-                      onChange={(e) => setFilterQuery(e.target.value)}
-                      placeholder="Search..."
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                  {filteredOptions.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-gray-400">No fields available</div>
-                  ) : (
-                    filteredOptions.map((f) => (
-                      <button
-                        key={f.apiName}
-                        type="button"
-                        onClick={() => handleAdd(f.apiName)}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-xs hover:bg-gray-50 text-left"
-                      >
-                        {f.label}
-                        <span className="ml-auto text-[10px] text-gray-400">{f.apiName}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Action Buttons</Label>
-        <div className="space-y-1.5">
-          {ALL_ACTIONS.map((action) => (
-            <label
-              key={action}
-              className="flex items-center gap-2 cursor-pointer select-none"
-            >
-              <input
-                type="checkbox"
-                checked={visibleActions.includes(action)}
-                onChange={() => handleToggleAction(action)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy accent-brand-navy"
-              />
-              <span className="text-xs text-gray-700">{ACTION_LABELS[action]}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function TabBar({
   active,
@@ -1110,41 +963,29 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
               Type: <span className="font-medium">{selection.widget.widgetType}</span>
             </div>
 
-            {selection.widget.config.type === 'RelatedList' && (
-              <>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-600">relatedObjectApiName</Label>
-                  <Input
-                    value={selection.widget.config.relatedObjectApiName}
-                    aria-label="Related object API name"
-                    onChange={(e) =>
-                      updateWidget(selection.widget.id, {
-                        config: {
-                          ...selection.widget.config,
-                          relatedObjectApiName: e.target.value,
-                        } as WidgetConfig,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-600">maxRows</Label>
-                  <Input
-                    type="number"
-                    value={selection.widget.config.maxRows ?? 5}
-                    aria-label="Related list max rows"
-                    onChange={(e) =>
-                      updateWidget(selection.widget.id, {
-                        config: {
-                          ...selection.widget.config,
-                          maxRows: Math.max(1, parseNumber(e.target.value, 5)),
-                        } as WidgetConfig,
-                      })
-                    }
-                  />
-                </div>
-              </>
-            )}
+            {(selection.widget.config.type === 'RelatedList' ||
+              selection.widget.config.type === 'HeaderHighlights') && (() => {
+              const InternalPanel = INTERNAL_CONFIG_PANELS[selection.widget.config.type];
+              if (!InternalPanel) return null;
+              const objectFields = (availableFields ?? []).map((f) => ({
+                apiName: f.apiName,
+                label: f.label,
+                type: String(f.type),
+              }));
+              return (
+                <InternalPanel
+                  config={selection.widget.config as unknown as Record<string, unknown>}
+                  onChange={(newCfg) =>
+                    updateWidget(selection.widget.id, {
+                      config: newCfg as unknown as WidgetConfig,
+                    })
+                  }
+                  record={{}}
+                  integration={null}
+                  object={{ apiName: '', label: '', fields: objectFields }}
+                />
+              );
+            })()}
 
             {selection.widget.config.type === 'ActivityFeed' && (
               <div className="space-y-1.5">
@@ -1242,14 +1083,6 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
               </div>
             )}
 
-            {selection.widget.config.type === 'HeaderHighlights' && (
-              <HeaderHighlightsPicker
-                widgetId={selection.widget.id}
-                selectedApiNames={selection.widget.config.fieldApiNames ?? []}
-                visibleActions={selection.widget.config.visibleActions ?? ['edit', 'delete']}
-                availableFields={availableFields}
-              />
-            )}
 
             {selection.widget.config.type === 'ExternalWidget' && (() => {
               const externalConfig = selection.widget.config;

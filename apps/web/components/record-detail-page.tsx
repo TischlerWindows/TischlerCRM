@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Database, ChevronDown, ChevronRight, Settings, ExternalLink, Copy, Printer } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
@@ -546,6 +546,32 @@ export default function RecordDetailPage({
     router.push(backRoute);
   };
 
+  const [isCloning, setIsCloning] = useState(false);
+  const handleClone = async () => {
+    if (!record || !rawRecord) return;
+    setIsCloning(true);
+    try {
+      const cloneData = { ...(rawRecord.data as Record<string, unknown>) };
+      const cloned = await recordsService.createRecord(objectApiName, {
+        data: cloneData,
+        pageLayoutId: rawRecord.pageLayoutId ?? undefined,
+      });
+      if (cloned) {
+        showToast('Record cloned successfully', 'success');
+        router.push(`/${backRoute.replace(/^\//, '').split('/')[0]}/${cloned.id}`);
+      }
+    } catch (err) {
+      console.error('Failed to clone record:', err);
+      showToast('Failed to clone record. Please try again.', 'error');
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   // ── Loading / not found ──────────────────────────────────────────────
   if (loading) {
     return (
@@ -751,7 +777,11 @@ export default function RecordDetailPage({
 
                 {/* Widgets */}
                 {sortedWidgets.length > 0 && (
-                  <LayoutWidgetsInline widgets={sortedWidgets} />
+                  <LayoutWidgetsInline
+                    widgets={sortedWidgets}
+                    record={record ?? undefined}
+                    objectDef={objectDef ? { apiName: objectDef.apiName, label: objectDef.label, fields: objectDef.fields.map(f => ({ apiName: f.apiName, label: f.label, type: String(f.type) })) } : undefined}
+                  />
                 )}
               </div>
             );
@@ -819,7 +849,11 @@ export default function RecordDetailPage({
                   gridRowSpan: g.gridRowSpan ?? 1,
                 })}
               >
-                <LayoutWidgetsInline widgets={[g]} />
+                <LayoutWidgetsInline
+                  widgets={[g]}
+                  record={record ?? undefined}
+                  objectDef={objectDef ? { apiName: objectDef.apiName, label: objectDef.label, fields: objectDef.fields.map(f => ({ apiName: f.apiName, label: f.label, type: String(f.type) })) } : undefined}
+                />
               </div>
             );
           }
@@ -1058,6 +1092,8 @@ export default function RecordDetailPage({
 
             const showEdit = visibleActions.includes('edit');
             const showDelete = visibleActions.includes('delete');
+            const showClone = visibleActions.includes('clone');
+            const showPrint = visibleActions.includes('print');
 
             return (
               <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -1085,6 +1121,25 @@ export default function RecordDetailPage({
                       >
                         <Edit className="w-4 h-4 mr-1.5" />
                         Edit
+                      </button>
+                    )}
+                    {showClone && canEdit && (
+                      <button
+                        onClick={handleClone}
+                        disabled={isCloning}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Copy className="w-4 h-4 mr-1.5" />
+                        {isCloning ? 'Cloning…' : 'Clone'}
+                      </button>
+                    )}
+                    {showPrint && (
+                      <button
+                        onClick={handlePrint}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                      >
+                        <Printer className="w-4 h-4 mr-1.5" />
+                        Print
                       </button>
                     )}
                     {showDelete && canDelete && (

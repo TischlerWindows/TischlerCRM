@@ -11,6 +11,7 @@ const ActivityFeedWidget = dynamic(() => import('@/widgets/internal/activity-fee
 const HeaderHighlightsWidget = dynamic(() => import('@/widgets/internal/header-highlights/index'));
 const FileFolderWidget = dynamic(() => import('@/widgets/internal/file-folder/index'));
 const SpacerWidget = dynamic(() => import('@/widgets/internal/spacer/index'));
+const RelatedListWidget = dynamic(() => import('@/widgets/internal/related-list/index'));
 
 const EXTERNAL_WIDGET_COMPONENTS: Record<string, React.ComponentType<WidgetProps>> = {
   'demo-widget': dynamic(() => import('@/widgets/external/demo-widget/index')),
@@ -46,16 +47,22 @@ const STUB_OBJECT = { apiName: '', label: '', fields: [] as Array<{ apiName: str
 interface LayoutWidgetsInlineProps {
   widgets?: PageWidget[];
   enabledIds?: string[];
+  /** The live CRM record being rendered — passed so data-fetching widgets (RelatedList) can use it */
+  record?: Record<string, unknown>;
+  /** The object definition for the current record */
+  objectDef?: { apiName: string; label: string; fields: Array<{ apiName: string; label: string; type: string }> };
 }
 
 /**
  * Renders tab-level or section-level layout widgets on record detail and forms.
  */
-export function LayoutWidgetsInline({ widgets, enabledIds }: LayoutWidgetsInlineProps) {
+export function LayoutWidgetsInline({ widgets, enabledIds, record, objectDef }: LayoutWidgetsInlineProps) {
   if (!widgets?.length) return null;
 
   const effectiveEnabledIds = enabledIds ?? externalWidgets.map((w) => w.id);
   const sorted = [...widgets].sort((a, b) => a.order - b.order);
+  const liveRecord = record ?? STUB_RECORD;
+  const liveObject = objectDef ?? STUB_OBJECT;
 
   return (
     <div className="mb-4 flex flex-col gap-3">
@@ -63,19 +70,34 @@ export function LayoutWidgetsInline({ widgets, enabledIds }: LayoutWidgetsInline
         const config = w.config;
 
         if (config.type === 'Spacer') {
-          return <SpacerWidget key={w.id} config={{ height: config.minHeightPx ?? 32 }} record={STUB_RECORD} object={STUB_OBJECT} integration={null} displayMode="full" orgId="" />;
+          return <SpacerWidget key={w.id} config={{ height: config.minHeightPx ?? 32 }} record={liveRecord} object={liveObject} integration={null} displayMode="full" orgId="" />;
         }
 
         if (config.type === 'ActivityFeed') {
-          return <ActivityFeedWidget key={w.id} config={config as unknown as Record<string, unknown>} record={STUB_RECORD} object={STUB_OBJECT} integration={null} displayMode="full" orgId="" />;
+          return <ActivityFeedWidget key={w.id} config={config as unknown as Record<string, unknown>} record={liveRecord} object={liveObject} integration={null} displayMode="full" orgId="" />;
         }
 
         if (config.type === 'HeaderHighlights') {
-          return <HeaderHighlightsWidget key={w.id} config={config as unknown as Record<string, unknown>} record={STUB_RECORD} object={STUB_OBJECT} integration={null} displayMode="full" orgId="" />;
+          return <HeaderHighlightsWidget key={w.id} config={config as unknown as Record<string, unknown>} record={liveRecord} object={liveObject} integration={null} displayMode="full" orgId="" />;
         }
 
         if (config.type === 'FileFolder') {
-          return <FileFolderWidget key={w.id} config={config as unknown as Record<string, unknown>} record={STUB_RECORD} object={STUB_OBJECT} integration={null} displayMode="full" orgId="" />;
+          return <FileFolderWidget key={w.id} config={config as unknown as Record<string, unknown>} record={liveRecord} object={liveObject} integration={null} displayMode="full" orgId="" />;
+        }
+
+        if (config.type === 'RelatedList') {
+          return (
+            <React.Suspense key={w.id} fallback={<WidgetLoadingPlaceholder />}>
+              <RelatedListWidget
+                config={config as unknown as Record<string, unknown>}
+                record={liveRecord}
+                object={liveObject}
+                integration={null}
+                displayMode="full"
+                orgId=""
+              />
+            </React.Suspense>
+          );
         }
 
         if (config.type === 'ExternalWidget') {
