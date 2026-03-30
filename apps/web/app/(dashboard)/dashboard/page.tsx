@@ -121,6 +121,20 @@ const OBJECT_TYPES = [
   { value: 'installations', label: 'Installations' },
 ];
 
+// Map plural lowercase OBJECT_TYPES values to PascalCase singular API names
+const PLURAL_TO_API_NAME: Record<string, string> = {
+  properties: 'Property',
+  contacts: 'Contact',
+  accounts: 'Account',
+  products: 'Product',
+  leads: 'Lead',
+  deals: 'Deal',
+  projects: 'Project',
+  services: 'Service',
+  quotes: 'Quote',
+  installations: 'Installation',
+};
+
 const FIELD_OPTIONS: Record<string, string[]> = {
   accounts: ['Name', 'Industry', 'Revenue', 'Employees', 'Status', 'Type', 'Rating'],
   contacts: ['Name', 'Email', 'Phone', 'Title', 'Department', 'Status'],
@@ -676,13 +690,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!newFilterBtn.objectType) return;
     if (getCachedRecords(newFilterBtn.objectType).length > 0) return;
+    const apiName = PLURAL_TO_API_NAME[newFilterBtn.objectType] || newFilterBtn.objectType;
     (async () => {
       try {
-        const records = await recordsService.getRecords(newFilterBtn.objectType);
+        const records = await recordsService.getRecords(apiName);
         const flat = records.map((r: any) => ({ id: r.id, ...r.data }));
         setCachedRecords(newFilterBtn.objectType, flat);
       } catch (e) {
-        console.error(`Failed to load records for ${newFilterBtn.objectType}:`, e);
+        console.error(`Failed to load records for ${apiName}:`, e);
       }
     })();
   }, [newFilterBtn.objectType]);
@@ -2767,14 +2782,21 @@ export default function DashboardPage() {
                           )}
                           {/* Inline add filter button form */}
                           {dashEditMode && addingFilterBtnSectionId === section.id && (() => {
-                            const objFields = newFilterBtn.objectType ? getAvailableFields(newFilterBtn.objectType) : [];
+                            // Get fields from schema first, fall back to hardcoded
+                            const apiName = newFilterBtn.objectType ? PLURAL_TO_API_NAME[newFilterBtn.objectType] : '';
+                            const schemaDef = apiName && schema ? schema.objects.find((o: any) => o.apiName === apiName) : null;
+                            const objFields = schemaDef
+                              ? schemaDef.fields.map((f: any) => f.apiName).filter((a: string) => !['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(a))
+                              : (newFilterBtn.objectType ? getAvailableFields(newFilterBtn.objectType) : []);
                             const fieldValues: string[] = [];
                             if (newFilterBtn.objectType && newFilterBtn.field) {
                               const records = getCachedRecords(newFilterBtn.objectType);
                               const rawField = stripFieldPrefix(newFilterBtn.field);
                               records.forEach((rec: any) => {
-                                const v = String(rec[rawField] ?? rec[newFilterBtn.field] ?? '').trim();
-                                if (v && !fieldValues.includes(v)) fieldValues.push(v);
+                                const raw = rec[rawField] ?? rec[newFilterBtn.field];
+                                if (raw == null) return;
+                                const v = typeof raw === 'object' ? JSON.stringify(raw) : String(raw).trim();
+                                if (v && v !== '{}' && v !== '[]' && !fieldValues.includes(v)) fieldValues.push(v);
                               });
                               fieldValues.sort();
                             }
@@ -2804,7 +2826,10 @@ export default function DashboardPage() {
                                   className="flex-1 min-w-[110px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
                                 >
                                   <option value="">Select field...</option>
-                                  {objFields.map(f => <option key={f} value={f}>{stripFieldPrefix(f)}</option>)}
+                                  {objFields.map((f: string) => {
+                                    const fieldDef = schemaDef?.fields.find((fd: any) => fd.apiName === f);
+                                    return <option key={f} value={f}>{fieldDef?.label || stripFieldPrefix(f)}</option>;
+                                  })}
                                 </select>
                                 <select
                                   value={newFilterBtn.value}
