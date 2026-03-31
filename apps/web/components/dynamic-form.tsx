@@ -541,9 +541,10 @@ export default function DynamicForm({
   /** Build a meaningful subtitle for lookup dropdown items (address, email, etc.) */
   const getRecordSubtitle = (record: Record<string, any>, primaryLabel: string): string => {
     const keys = Object.keys(record);
+    const strip = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
     // Property → show street address
     const addrKey = keys.find(k => {
-      const lk = k.toLowerCase().replace(/^[a-z]+__/, '');
+      const lk = strip(k);
       return lk === 'address' || lk === 'street_address' || lk === 'property_address';
     });
     if (addrKey) {
@@ -557,11 +558,16 @@ export default function DynamicForm({
       }
       if (typeof addr === 'string' && addr && addr !== primaryLabel) return addr;
     }
+    // Fallback: look for a separate city or street field
+    const cityKey = keys.find(k => strip(k) === 'city');
+    const streetKey = keys.find(k => strip(k) === 'street' || strip(k) === 'streetaddress');
+    if (streetKey && record[streetKey]) return String(record[streetKey]);
+    if (cityKey && record[cityKey]) return String(record[cityKey]);
     // Contact → show email
-    const emailKey = keys.find(k => k.toLowerCase().replace(/^[a-z]+__/, '') === 'email');
+    const emailKey = keys.find(k => strip(k) === 'email');
     if (emailKey && record[emailKey] && record[emailKey] !== primaryLabel) return String(record[emailKey]);
     // Account → show phone or industry
-    const phoneKey = keys.find(k => k.toLowerCase().replace(/^[a-z]+__/, '') === 'phone');
+    const phoneKey = keys.find(k => strip(k) === 'phone');
     if (phoneKey && record[phoneKey]) return String(record[phoneKey]);
     // Fallback: show nothing rather than the raw ID
     return '';
