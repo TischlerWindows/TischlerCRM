@@ -42,7 +42,7 @@ interface Quote {
   quoteNumber: string;
   quoteName: string;
   accountName: string;
-  dealNumber: string;
+  opportunityNumber: string;
   status: string;
   totalAmount: number;
   validUntil: string;
@@ -103,7 +103,7 @@ export default function QuotesPage() {
         { id: 'quoteNumber', label: 'Quote #', defaultVisible: true },
         { id: 'quoteName', label: 'Quote Name', defaultVisible: true },
         { id: 'accountName', label: 'Account', defaultVisible: true },
-        { id: 'dealNumber', label: 'Deal #', defaultVisible: true },
+        { id: 'opportunityNumber', label: 'Opportunity #', defaultVisible: true },
         { id: 'totalAmount', label: 'Amount', defaultVisible: true },
         { id: 'status', label: 'Status', defaultVisible: true },
         { id: 'validUntil', label: 'Valid Until', defaultVisible: true },
@@ -149,7 +149,7 @@ export default function QuotesPage() {
       
       // Get custom objects from schema store (already loaded)
       if (schema?.objects) {
-        const builtInApiNames = new Set(['Property', 'Contact', 'Account', 'Product', 'Lead', 'Deal', 'Project', 'Service', 'Quote', 'Installation', 'Home']);
+        const builtInApiNames = new Set(['Property', 'Contact', 'Account', 'Product', 'Lead', 'Opportunity', 'Project', 'Service', 'Quote', 'Installation', 'Home']);
         const customObjs = schema.objects
           .filter(obj => !builtInApiNames.has(obj.apiName))
           .map(obj => ({
@@ -525,7 +525,7 @@ export default function QuotesPage() {
                 <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center"><FileText className="w-6 h-6 text-brand-navy" /></div>
                 <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
               </div>
-              <p className="text-sm text-gray-600 ml-13">Generate and manage price quotes for deals</p>
+              <p className="text-sm text-gray-600 ml-13">Generate and manage price quotes for opportunities</p>
             </div>
 
             <div>

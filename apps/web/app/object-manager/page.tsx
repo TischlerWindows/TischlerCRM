@@ -67,7 +67,7 @@ const CORE_OBJECTS = new Set([
   'Account',
   'Product',
   'Lead',
-  'Deal',
+  'Opportunity',
   'Project',
   'Service',
   'Quote',

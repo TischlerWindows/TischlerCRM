@@ -252,7 +252,7 @@ export function DropboxFileBrowser({
 
   const getDropboxWebUrl = (entryPath?: string) => {
     if (entryPath) {
-      // Entry path is the full Dropbox path like /TischlerCRM/deals/abc123/file.pdf
+      // Entry path is the full Dropbox path like /TischlerCRM/opportunities/abc123/file.pdf
       const folderPath = entryPath.substring(0, entryPath.lastIndexOf('/'));
       return `https://www.dropbox.com/home${folderPath}`;
     }

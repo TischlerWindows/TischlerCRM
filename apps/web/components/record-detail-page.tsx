@@ -72,7 +72,7 @@ export default function RecordDetailPage({
   // Counter bumped after lookup records finish loading to trigger re-render
   const [lookupTick, setLookupTick] = useState(0);
 
-  // When a Lead/Deal is linked to a Property, redirect its file browser
+  // When a Lead/Opportunity is linked to a Property, redirect its file browser
   // into the Property's subfolder (e.g. /Property/{addr}/Leads/{childName}).
   // null = still resolving, false = no linked parent, object = linked info
   const [linkedDropboxInfo, setLinkedDropboxInfo] = useState<{
@@ -112,14 +112,14 @@ export default function RecordDetailPage({
   }, [params?.id, objectApiName]);
 
   // ── Auto-create linked subfolder inside parent Property's Dropbox folder ──
-  // When a Lead or Deal (Opportunity) record has a propertyId, create a
+  // When a Lead or Opportunity record has a propertyId, create a
   // subfolder like /TischlerCRM/Property/{addr}/Leads/{leadFolder} automatically.
   // Also redirect the DropboxFileBrowser to browse this subfolder.
-  const LINKED_SUBFOLDER: Record<string, string> = { Lead: 'Leads', Deal: 'Project Books', WorkOrder: 'Service' };
+  const LINKED_SUBFOLDER: Record<string, string> = { Lead: 'Leads', Opportunity: 'Project Books', WorkOrder: 'Service' };
   useEffect(() => {
     if (!record || !params?.id) return;
     // Only for object types that map to a Property subfolder
-    const LINKED_TYPES = ['Lead', 'Deal', 'WorkOrder'];
+    const LINKED_TYPES = ['Lead', 'Opportunity', 'WorkOrder'];
     if (!LINKED_TYPES.includes(objectApiName)) return;
 
     // Find the property lookup value (could be propertyId, Property__propertyId, etc.)
@@ -346,7 +346,7 @@ export default function RecordDetailPage({
         Account: 'accounts',
         Property: 'properties',
         Lead: 'leads',
-        Deal: 'deals',
+        Opportunity: 'opportunities',
         Product: 'products',
         Quote: 'quotes',
         Project: 'projects',
@@ -439,7 +439,7 @@ export default function RecordDetailPage({
       if (value.lookup && lookupTarget) {
         const routeMap: Record<string, string> = {
           Contact: 'contacts', Account: 'accounts', Property: 'properties',
-          Lead: 'leads', Deal: 'deals', Product: 'products',
+          Lead: 'leads', Opportunity: 'opportunities', Product: 'products',
           Quote: 'quotes', Project: 'projects', Service: 'service',
           Installation: 'installations',
         };
@@ -705,17 +705,17 @@ export default function RecordDetailPage({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {objectApiName === 'Deal' && record && (
+              {objectApiName === 'Opportunity' && record && (
               <button
                 onClick={() => {
                   const numberKey = Object.keys(record).find(
                     (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
                   );
-                  const dealNumber = numberKey ? record[numberKey] : '';
-                  const dealName = typeof record.name === 'string' ? record.name : '';
-                  const params = new URLSearchParams({ fromDeal: record.id });
-                  if (dealName) params.set('dealName', dealName);
-                  if (dealNumber) params.set('dealNumber', dealNumber);
+                  const oppNumber = numberKey ? record[numberKey] : '';
+                  const oppName = typeof record.name === 'string' ? record.name : '';
+                  const params = new URLSearchParams({ fromOpportunity: record.id });
+                  if (oppName) params.set('opportunityName', oppName);
+                  if (oppNumber) params.set('opportunityNumber', oppNumber);
                   router.push(`/summary?${params.toString()}`);
                 }}
                 className="inline-flex items-center px-4 py-2 border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50"
@@ -1047,9 +1047,9 @@ export default function RecordDetailPage({
       </div>
 
       {/* Dropbox file browser — hardcoded at end of every record */}
-      {/* For linked types (Lead/Deal), wait for property resolution before rendering */}
+      {/* For linked types (Lead/Opportunity), wait for property resolution before rendering */}
       {record && params?.id &&
-        (!['Lead', 'Deal', 'WorkOrder'].includes(objectApiName) || linkedDropboxInfo !== null) && (
+        (!['Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName) || linkedDropboxInfo !== null) && (
         <div className="max-w-6xl mx-auto px-6 pb-6">
           <DropboxFileBrowser
             objectApiName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.objectApiName : objectApiName}

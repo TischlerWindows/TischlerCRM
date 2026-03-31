@@ -69,7 +69,7 @@ const FALLBACK_OBJECT_TYPES = [
   { value: 'Account', label: 'Accounts' },
   { value: 'Product', label: 'Products' },
   { value: 'Lead', label: 'Leads' },
-  { value: 'Deal', label: 'Opportunities' },
+  { value: 'Opportunity', label: 'Opportunities' },
   { value: 'Project', label: 'Projects' },
   { value: 'Service', label: 'Service' },
   { value: 'Quote', label: 'Quotes' },

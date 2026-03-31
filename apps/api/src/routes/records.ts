@@ -357,7 +357,7 @@ export async function recordRoutes(app: FastifyInstance) {
       propertyNumber: 'P',
       contactNumber: 'C',
       leadNumber: 'LEAD',
-      dealNumber: 'DEAL',
+      opportunityNumber: 'OPP',
       productCode: 'PROD',
       projectNumber: 'PRJ',
       quoteNumber: 'QTE',
@@ -504,7 +504,7 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Strip auto-number fields — these are system-generated and must not be overwritten.
     const AUTO_NUMBER_FIELDS = new Set([
-      'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+      'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
       'serviceNumber', 'installationNumber',
     ]);

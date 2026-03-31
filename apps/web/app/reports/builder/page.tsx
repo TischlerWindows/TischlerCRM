@@ -73,10 +73,10 @@ const OBJECT_TYPES = [
   { value: 'Account', label: 'Accounts', fields: ['accountNumber', 'accountName', 'industry', 'type', 'phone', 'website', 'billingAddress'] },
   { value: 'Product', label: 'Products', fields: ['productCode', 'productName', 'category', 'unitPrice', 'stockQuantity', 'inStock', 'supplier'] },
   { value: 'Lead', label: 'Leads', fields: ['leadNumber', 'contactName', 'propertyAddress', 'source', 'stage', 'assignedTo', 'estimatedValue'] },
-  { value: 'Deal', label: 'Opportunities', fields: ['dealNumber', 'dealName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
+  { value: 'Opportunity', label: 'Opportunities', fields: ['opportunityNumber', 'opportunityName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
   { value: 'Project', label: 'Projects', fields: ['projectNumber', 'projectName', 'status', 'startDate', 'expectedCompletion', 'assignedTeam', 'budget'] },
   { value: 'Service', label: 'Service', fields: ['serviceNumber', 'serviceName', 'accountName', 'serviceType', 'status', 'scheduledDate', 'priority'] },
-  { value: 'Quote', label: 'Quotes', fields: ['quoteNumber', 'quoteName', 'accountName', 'dealNumber', 'status', 'totalAmount', 'validUntil'] },
+  { value: 'Quote', label: 'Quotes', fields: ['quoteNumber', 'quoteName', 'accountName', 'opportunityNumber', 'status', 'totalAmount', 'validUntil'] },
   { value: 'Installation', label: 'Installations', fields: ['installationNumber', 'installationName', 'accountName', 'projectNumber', 'status', 'startDate', 'leadInstaller'] },
 ];
 

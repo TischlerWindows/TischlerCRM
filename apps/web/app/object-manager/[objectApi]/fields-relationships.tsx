@@ -420,7 +420,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {(() => {
                         const AUTO_NUMBER_FIELDS = new Set([
-                          'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+                          'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
                           'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
                           'serviceNumber', 'installationNumber',
                         ]);

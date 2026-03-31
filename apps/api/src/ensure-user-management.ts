@@ -7,7 +7,7 @@ const STD   = { create:true,  read:true, edit:true,  delete:false, viewAll:false
 const READ  = { create:false, read:true, edit:false, delete:false, viewAll:true,  modifyAll:false };
 const NONE  = { create:false, read:false,edit:false, delete:false, viewAll:false, modifyAll:false };
 
-const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies'] as const;
+const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies'] as const;
 const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'] as const;
 
 function makePerms(
@@ -64,29 +64,29 @@ const SEED_PROFILES = [
     isSystem: false,
     grantsAdminAccess: false,
     permissions: makePerms(
-      { leads:STD, deals:STD, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:STD, installations:NONE, properties:{...READ,viewAll:false}, contacts:STD, companies:STD },
+      { leads:STD, opportunities:STD, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:STD, installations:NONE, properties:{...READ,viewAll:false}, contacts:STD, companies:STD },
       allApp(false)
     ),
   },
   {
     name: 'sales_user',
     label: 'Sales User',
-    description: 'Full access to sales objects: Leads, Deals, Contacts, Companies.',
+    description: 'Full access to sales objects: Leads, Opportunities, Contacts, Companies.',
     isSystem: false,
     grantsAdminAccess: false,
     permissions: makePerms(
-      { leads:FULL, deals:FULL, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...STD,delete:true,viewAll:true}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,delete:true,viewAll:true} },
+      { leads:FULL, opportunities:FULL, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...STD,delete:true,viewAll:true}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,delete:true,viewAll:true} },
       { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
     ),
   },
   {
     name: 'marketing_user',
     label: 'Marketing User',
-    description: 'Full access to Leads and Contacts; read-only Deals.',
+    description: 'Full access to Leads and Contacts; read-only Opportunities.',
     isSystem: false,
     grantsAdminAccess: false,
     permissions: makePerms(
-      { leads:FULL, deals:{...READ,viewAll:false}, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...READ,viewAll:false}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,viewAll:true} },
+      { leads:FULL, opportunities:{...READ,viewAll:false}, projects:{...READ,viewAll:false}, service:{...READ,viewAll:false}, quotes:{...READ,viewAll:false}, installations:NONE, properties:{...READ,viewAll:false}, contacts:{...STD,delete:true,viewAll:true}, companies:{...STD,viewAll:true} },
       { viewReports:true, exportData:true, manageUsers:false, manageProfiles:false, viewAuditLog:false, manageIntegrations:false, manageDepartments:false, manageCompanySettings:false }
     ),
   },

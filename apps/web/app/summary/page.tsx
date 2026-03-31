@@ -537,7 +537,7 @@ interface Summary {
   name: string;
   salesman: string;
   opportunityNumber: string;
-  linkedDealId?: string;
+  linkedOpportunityId?: string;
   jobType: string;
   estimator: string;
   date: string;
@@ -618,16 +618,16 @@ export default function SummaryPage() {
     })();
   }, []);
 
-  // Auto-create summary from deal/opportunity query params
+  // Auto-create summary from opportunity query params
   useEffect(() => {
     if (loading) return;
-    const dealId = searchParams.get('fromDeal');
-    if (!dealId) return;
-    const dealName = searchParams.get('dealName') || '';
-    const dealNumber = searchParams.get('dealNumber') || '';
+    const opportunityId = searchParams.get('fromOpportunity');
+    if (!opportunityId) return;
+    const opportunityName = searchParams.get('opportunityName') || '';
+    const opportunityNumber = searchParams.get('opportunityNumber') || '';
     // Clear query params so refreshing doesn't re-create
     router.replace('/summary');
-    createNewSummary({ dealId, dealName, dealNumber });
+    createNewSummary({ opportunityId, opportunityName, opportunityNumber });
   }, [loading, searchParams]);
 
   const handleSort = (columnId: string) => {
@@ -692,13 +692,13 @@ export default function SummaryPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const createNewSummary = (opts?: { dealId?: string; dealName?: string; dealNumber?: string }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
-      name: opts?.dealName || '',
+      name: opts?.opportunityName || '',
       salesman: '',
-      opportunityNumber: opts?.dealNumber || '',
-      linkedDealId: opts?.dealId || undefined,
+      opportunityNumber: opts?.opportunityNumber || '',
+      linkedOpportunityId: opts?.opportunityId || undefined,
       jobType: '',
       estimator: '',
       date: '',

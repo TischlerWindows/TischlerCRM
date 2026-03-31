@@ -15,7 +15,7 @@ const OBJECT_MAP: { key: string; label: string }[] = [
   { key: 'companies',     label: 'Account' },
   { key: 'products',      label: 'Product' },
   { key: 'leads',         label: 'Lead' },
-  { key: 'deals',         label: 'Deal' },
+  { key: 'opportunities', label: 'Opportunity' },
   { key: 'projects',      label: 'Project' },
   { key: 'service',       label: 'Service' },
   { key: 'quotes',        label: 'Quote' },

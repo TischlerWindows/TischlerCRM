@@ -84,13 +84,13 @@ const CORE_OBJECTS = [
     ],
   },
   {
-    apiName: 'Deal',
-    label: 'Deal',
-    pluralLabel: 'Deals',
-    description: 'Sales opportunities and deals',
+    apiName: 'Opportunity',
+    label: 'Opportunity',
+    pluralLabel: 'Opportunities',
+    description: 'Sales opportunities',
     fields: [
-      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', unique: true },
-      { apiName: 'dealName', label: 'Deal Name', type: 'Text', required: true },
+      { apiName: 'opportunityNumber', label: 'Opportunity Number', type: 'Text', unique: true },
+      { apiName: 'opportunityName', label: 'Opportunity Name', type: 'Text', required: true },
       { apiName: 'amount', label: 'Amount', type: 'Currency' },
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
@@ -272,7 +272,7 @@ export async function ensureCoreObjects(): Promise<void> {
   try {
     const autoNumberFieldNames = [
       'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
-      'dealNumber', 'productCode', 'projectNumber', 'quoteNumber',
+      'opportunityNumber', 'productCode', 'projectNumber', 'quoteNumber',
       'serviceNumber', 'installationNumber', 'workOrderNumber',
     ];
     await prisma.customField.updateMany({

@@ -165,7 +165,7 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureAccountTemplateLayout(migratedSchema);
         migratedSchema = this.ensureProductTemplateLayout(migratedSchema);
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
-        migratedSchema = this.ensureDealTemplateLayout(migratedSchema);
+        migratedSchema = this.ensureOpportunityTemplateLayout(migratedSchema);
 
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
@@ -1010,26 +1010,26 @@ class LocalStorageSchemaService implements SchemaService {
     return schema;
   }
 
-  private ensureDealTemplateLayout(schema: OrgSchema): OrgSchema {
-    const deal = schema.objects.find((obj) => obj.apiName === 'Deal');
-    if (!deal) return schema;
+  private ensureOpportunityTemplateLayout(schema: OrgSchema): OrgSchema {
+    const opp = schema.objects.find((obj) => obj.apiName === 'Opportunity');
+    if (!opp) return schema;
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
-      const exists = deal.fields.some((f) => f.apiName === field.apiName || f.label === field.label);
+      const exists = opp.fields.some((f) => f.apiName === field.apiName || f.label === field.label);
       if (!exists) requiredFields.push(field);
     };
 
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealName',
-      label: 'Deal Name',
+      apiName: 'Opportunity__opportunityName',
+      label: 'Opportunity Name',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__architectFirm',
+      apiName: 'Opportunity__architectFirm',
       label: 'Architect Firm',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1037,7 +1037,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__architect',
+      apiName: 'Opportunity__architect',
       label: 'Architect',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1045,7 +1045,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__contractorCompany',
+      apiName: 'Opportunity__contractorCompany',
       label: 'Contractor Company',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1053,7 +1053,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__contractor',
+      apiName: 'Opportunity__contractor',
       label: 'Contractor',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1061,7 +1061,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteAccount',
+      apiName: 'Opportunity__quoteAccount',
       label: 'Quote Account',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1069,7 +1069,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteContact',
+      apiName: 'Opportunity__quoteContact',
       label: 'Quote Contact',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1077,43 +1077,43 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteEmail',
+      apiName: 'Opportunity__quoteEmail',
       label: 'Quote Email',
       type: 'Email',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quotePhone',
+      apiName: 'Opportunity__quotePhone',
       label: 'Quote Phone',
       type: 'Phone',
       maxLength: 40
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__secondaryQuotePhone',
+      apiName: 'Opportunity__secondaryQuotePhone',
       label: 'Secondary Quote Phone',
       type: 'Phone',
       maxLength: 40
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealOwner',
-      label: 'Deal Owner',
+      apiName: 'Opportunity__opportunityOwner',
+      label: 'Opportunity Owner',
       type: 'Lookup',
       lookupObject: 'User',
-      relationshipName: 'Deal Owners'
+      relationshipName: 'Opportunity Owners'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealNumber',
-      label: 'Deal Number',
+      apiName: 'Opportunity__opportunityNumber',
+      label: 'Opportunity Number',
       type: 'AutoNumber',
       autoNumber: { displayFormat: 'YY{000}', startingNumber: 1 }
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__property',
+      apiName: 'Opportunity__property',
       label: 'Property',
       type: 'Lookup',
       lookupObject: 'Property',
@@ -1121,39 +1121,39 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__propertyAddress',
+      apiName: 'Opportunity__propertyAddress',
       label: 'Property Address',
       type: 'TextArea',
       maxLength: 2000
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatedContractDate',
+      apiName: 'Opportunity__estimatedContractDate',
       label: 'Estimated Contract Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__productRequiredOnsite',
+      apiName: 'Opportunity__productRequiredOnsite',
       label: 'Product Required Onsite',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteDue',
+      apiName: 'Opportunity__quoteDue',
       label: 'Quote Due',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__stage',
+      apiName: 'Opportunity__stage',
       label: 'Stage',
       type: 'Picklist',
       picklistValues: ['Incomplete', 'Queued', 'Estimating', 'Quoted/Active', 'Requote/Active', 'Closed Won', 'Closed Lost']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__competitors',
+      apiName: 'Opportunity__competitors',
       label: 'Competitors',
       type: 'MultiSelectPicklist',
       picklistValues: [
@@ -1186,14 +1186,14 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__probability',
+      apiName: 'Opportunity__probability',
       label: 'Probability',
       type: 'Picklist',
       picklistValues: ['25%', '50%', '75%', '90%']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__amount',
+      apiName: 'Opportunity__amount',
       label: 'Amount',
       type: 'Currency',
       precision: 16,
@@ -1201,111 +1201,111 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteBudget',
+      apiName: 'Opportunity__quoteBudget',
       label: 'Quote Budget',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__plansDated',
+      apiName: 'Opportunity__plansDated',
       label: 'Plans Dated',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sharedOpportunity',
+      apiName: 'Opportunity__sharedOpportunity',
       label: 'Shared Opportunity',
       type: 'Picklist',
       picklistValues: ['No', 'Yes']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sharedOpportunityUsers',
+      apiName: 'Opportunity__sharedOpportunityUsers',
       label: 'Shared Opportunity Users',
       type: 'MultiSelectPicklist',
       picklistValues: ['Andy', 'Chris', 'Jim', 'Tim', 'Brian']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealNotes',
-      label: 'Deal Notes',
+      apiName: 'Opportunity__opportunityNotes',
+      label: 'Opportunity Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__kornPriority',
+      apiName: 'Opportunity__kornPriority',
       label: 'Korn Priority',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimators',
+      apiName: 'Opportunity__estimators',
       label: 'Estimators',
       type: 'MultiSelectPicklist',
       picklistValues: ['Elaine', 'Nancy', 'Krystyna', 'Marianna', 'Estefania', 'Julian']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatingStatus',
+      apiName: 'Opportunity__estimatingStatus',
       label: 'Status',
       type: 'Picklist',
       picklistValues: ['Initial Review', 'Internal Info Request', 'External Info Request', 'In Progress', 'Final Review', 'Completed', 'Paused']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__priorityNextJob',
+      apiName: 'Opportunity__priorityNextJob',
       label: 'Priority/Next Job',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatingNotes',
+      apiName: 'Opportunity__estimatingNotes',
       label: 'Estimating Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__siteMeasurements',
+      apiName: 'Opportunity__siteMeasurements',
       label: 'Site Measurements',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__highAltitude',
+      apiName: 'Opportunity__highAltitude',
       label: 'High Altitude',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__newConstruction',
+      apiName: 'Opportunity__newConstruction',
       label: 'New Construction',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__renovation',
+      apiName: 'Opportunity__renovation',
       label: 'Renovation',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__waterfrontExposure',
+      apiName: 'Opportunity__waterfrontExposure',
       label: 'Waterfront Exposure',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__productSpecifications',
+      apiName: 'Opportunity__productSpecifications',
       label: 'Product Specifications',
       type: 'Picklist',
       picklistValues: ['Premium', 'Coastal', 'Dade (HVHZ)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__deliveryRequirements',
+      apiName: 'Opportunity__deliveryRequirements',
       label: 'Delivery Requirements',
       type: 'Picklist',
       picklistValues: [
@@ -1315,41 +1315,41 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__deliveryNotes',
+      apiName: 'Opportunity__deliveryNotes',
       label: 'Delivery Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__referenceUnitDimensions',
+      apiName: 'Opportunity__referenceUnitDimensions',
       label: 'Reference for Unit Dimensions',
       type: 'Picklist',
       picklistValues: ['Sash', 'Frame', 'Clear Opening', 'Rough Opening', 'Masonry Opening']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windLoadSpeed',
+      apiName: 'Opportunity__windLoadSpeed',
       label: 'Wind Load Speed MPH',
       type: 'Text',
       maxLength: 50
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windSpeedReference',
+      apiName: 'Opportunity__windSpeedReference',
       label: 'Wind Speed Reference',
       type: 'URL',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodType',
+      apiName: 'Opportunity__woodType',
       label: 'Wood Type',
       type: 'Picklist',
       picklistValues: ['Sipo', 'Split Sipo/Specify in Notes', 'Other/Specify in Notes']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finishSpecifications',
+      apiName: 'Opportunity__finishSpecifications',
       label: 'Finish Specifications',
       type: 'Picklist',
       picklistValues: [
@@ -1362,300 +1362,300 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodNotes',
+      apiName: 'Opportunity__woodNotes',
       label: 'Wood Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finalFinish',
+      apiName: 'Opportunity__finalFinish',
       label: 'Final Finish',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__glassType',
+      apiName: 'Opportunity__glassType',
       label: 'Glass Type',
       type: 'Picklist',
       picklistValues: ['Type 1', 'Type 2', 'Type 3', 'Type 4']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__alternativeGlass',
+      apiName: 'Opportunity__alternativeGlass',
       label: 'Alternative Glass',
       type: 'Picklist',
       picklistValues: ['Type 1', 'Type 2', 'Type 3', 'Type 4']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__glassNotes',
+      apiName: 'Opportunity__glassNotes',
       label: 'Glass Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__spacerBars',
+      apiName: 'Opportunity__spacerBars',
       label: 'Spacer Bars',
       type: 'Picklist',
       picklistValues: ['Standard White', 'Silver', 'Brown', 'Black', 'Premium C31', 'C32', 'C33', 'C34', 'Warm Edge']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowHardware',
+      apiName: 'Opportunity__windowHardware',
       label: 'Window Hardware',
       type: 'Picklist',
       picklistValues: ['White Zinc/Titan Silver', 'Corrosion Resistant Metal Alloy (E-Look)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__hardwareFinishNotes',
+      apiName: 'Opportunity__hardwareFinishNotes',
       label: 'Hardware Finish Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__hingeFinishSpecification',
+      apiName: 'Opportunity__hingeFinishSpecification',
       label: 'Hinge Finish Specification',
       type: 'Picklist',
       picklistValues: ['Base (Brushed Stainless Steel)', 'Premium Custom Finish (Specify in Notes)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finials',
+      apiName: 'Opportunity__finials',
       label: 'Finials',
       type: 'Picklist',
       picklistValues: ['Yes', 'No']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finialType',
+      apiName: 'Opportunity__finialType',
       label: 'Finial Type',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__security',
+      apiName: 'Opportunity__security',
       label: 'Security',
       type: 'MultiSelectPicklist',
       picklistValues: ['Magnetic Contact', 'Integrated Contact', 'Alarm Spider Contact', 'Secondary or Pool Contact']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowType',
+      apiName: 'Opportunity__windowType',
       label: 'Window Type',
       type: 'MultiSelectPicklist',
       picklistValues: ['Inswing', 'Inswing TT', 'Push Outswing', 'Crank Outswing', 'Offset Simulated Double Hung', 'Simulated Double Hung', 'Awning']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__fixedOptions',
+      apiName: 'Opportunity__fixedOptions',
       label: 'Fixed Options',
       type: 'MultiSelectPicklist',
       picklistValues: ['Direct Glaze', 'Fixed with Sash']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowTypeNotes',
+      apiName: 'Opportunity__windowTypeNotes',
       label: 'Window Type Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__singleDoubleTripleHung',
+      apiName: 'Opportunity__singleDoubleTripleHung',
       label: 'Single, Double & Triple Hung Windows',
       type: 'MultiSelectPicklist',
       picklistValues: ['Single Hung', 'Double Hung', 'Triple Hung', 'Concealed Balance', 'Weight and Chain', 'Cross Cable Balance System', 'Vent Locks']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__singleDoubleHungNotes',
+      apiName: 'Opportunity__singleDoubleHungNotes',
       label: 'Single/Double Hung Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sill',
+      apiName: 'Opportunity__sill',
       label: 'Sill',
       type: 'Picklist',
       picklistValues: ['No Sill', 'Standard Sill', 'Custom Sill (Specify Dimensions in Notes)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sillNotes',
+      apiName: 'Opportunity__sillNotes',
       label: 'Sill Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__doorOptions',
+      apiName: 'Opportunity__doorOptions',
       label: 'Door Options',
       type: 'MultiSelectPicklist',
       picklistValues: ['Inswing', 'Outswing', 'Outswing Folding', 'Inswing Folding', 'Sliding']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__inswingDoorThreshold',
+      apiName: 'Opportunity__inswingDoorThreshold',
       label: 'Inswing Door Threshold',
       type: 'MultiSelectPicklist',
       picklistValues: ['Classic Bronze Threshold #6C', 'Premium Bronze Threshold #6', 'ADA Threshold']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__outswingDoorThreshold',
+      apiName: 'Opportunity__outswingDoorThreshold',
       label: 'Outswing Door Threshold',
       type: 'MultiSelectPicklist',
       picklistValues: ['Bronze Threshold #7 Flush', 'Bronze Threshold #8 Stepdown', 'ADA Threshold']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__liftSlideStrikerBolts',
+      apiName: 'Opportunity__liftSlideStrikerBolts',
       label: 'Lift and Slide Doors Striker Bolts',
       type: 'MultiSelectPicklist',
       picklistValues: ['White Zinc Hooks and Striker Bolts', 'SS Locking Hooks and Striker Bolts']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__doorOptionNotes',
+      apiName: 'Opportunity__doorOptionNotes',
       label: 'Door Option Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__entryDoor',
+      apiName: 'Opportunity__entryDoor',
       label: 'Entry Door',
       type: 'Picklist',
       picklistValues: ['Include in base cost', 'Include as an option', 'Omit']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollScreens',
+      apiName: 'Opportunity__rollScreens',
       label: 'Roll Screens',
       type: 'MultiSelectPicklist',
       picklistValues: ['Low Wind (Brush) Manual', 'Low Wind (Brush) Motorized', 'Zip Motorized', 'Manual Horizontal', 'Centor']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollScreenLocation',
+      apiName: 'Opportunity__rollScreenLocation',
       label: 'Roll Screen Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__screens',
+      apiName: 'Opportunity__screens',
       label: 'Screens',
       type: 'MultiSelectPicklist',
       picklistValues: ['Aluminum Window Screens', 'Wood-covered Aluminum Window Screens', 'Wood Framed Window Screens', 'Wood Framed Door Screens']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__screenLocation',
+      apiName: 'Opportunity__screenLocation',
       label: 'Screen Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__meshType',
+      apiName: 'Opportunity__meshType',
       label: 'Mesh Type',
       type: 'Picklist',
       picklistValues: ['Fiberglass', 'Clearview', 'Bronze', 'Dog']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollShades',
+      apiName: 'Opportunity__rollShades',
       label: 'Roll Shades',
       type: 'MultiSelectPicklist',
       picklistValues: ['Sun Shade', 'Blackout Shade']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__shadesLocation',
+      apiName: 'Opportunity__shadesLocation',
       label: 'Shades Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__addOnProducts',
+      apiName: 'Opportunity__addOnProducts',
       label: 'Add-on Products',
       type: 'MultiSelectPicklist',
       picklistValues: ['Motorized Operation', '180-Degree Hinges', 'Genius Locks', 'Bent Units', 'Butt Glazing', 'Curtain Wall', 'Retractable', 'Door Closer']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__addOnLocations',
+      apiName: 'Opportunity__addOnLocations',
       label: 'Add-on Locations',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodExteriorTrimAndCasing',
+      apiName: 'Opportunity__woodExteriorTrimAndCasing',
       label: 'Wood Exterior Trim and Casing',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__installation',
+      apiName: 'Opportunity__installation',
       label: 'Installation',
       type: 'MultiSelectPicklist',
       picklistValues: ['MHB', 'Korn', 'Arcadia']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__requiredInstallationScope',
+      apiName: 'Opportunity__requiredInstallationScope',
       label: 'Required Installation Scope/Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revisionStartDate',
+      apiName: 'Opportunity__revisionStartDate',
       label: 'Start Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revisionFinishDate',
+      apiName: 'Opportunity__revisionFinishDate',
       label: 'Finish Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revision',
+      apiName: 'Opportunity__revision',
       label: 'Revision',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__generalNotes',
+      apiName: 'Opportunity__generalNotes',
       label: 'General Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__kornNotes',
+      apiName: 'Opportunity__kornNotes',
       label: 'Korn Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__lossReason',
+      apiName: 'Opportunity__lossReason',
       label: 'Loss Reason',
       type: 'MultiSelectPicklist',
       picklistValues: ['Lost Budget', 'Internal Lead Time', 'External Lead Time', 'Lost to Competitor', 'Unresponsive']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__lossNotes',
+      apiName: 'Opportunity__lossNotes',
       label: 'Loss Notes',
       type: 'Text',
       maxLength: 255
     });
 
     const mergedFields = requiredFields.length > 0
-      ? [...deal.fields, ...requiredFields]
-      : deal.fields;
+      ? [...opp.fields, ...requiredFields]
+      : opp.fields;
 
     // Only ensure required fields exist on the object.
     // Hard-coded template layouts are no longer auto-injected;
@@ -1664,7 +1664,7 @@ class LocalStorageSchemaService implements SchemaService {
       return {
         ...schema,
         objects: schema.objects.map((obj) =>
-          obj.apiName === 'Deal'
+          obj.apiName === 'Opportunity'
             ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
             : obj
         ),
@@ -1849,7 +1849,7 @@ class LocalStorageSchemaService implements SchemaService {
           label: 'Address',
           type: 'Address',
           required: true,
-          helpText: 'May start as a general location during the Leads pipeline before it is converted to the Deals pipeline. Includes Street, City, State, Country, and Zip Code.'
+          helpText: 'May start as a general location during the Leads pipeline before it is converted to the Opportunities pipeline. Includes Street, City, State, Country, and Zip Code.'
         },
         {
           id: generateId(),
@@ -2863,24 +2863,24 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
-    // 6. Deal
+    // 6. Opportunity
     objects.push(createBasicObject(
-      'Deal',
-      'Deal',
-      'Deals',
-      'Sales opportunities and deals',
+      'Opportunity',
+      'Opportunity',
+      'Opportunities',
+      'Sales opportunities',
       [
         {
           id: generateId(),
-          apiName: 'Deal__dealName',
-          label: 'Deal Name',
+          apiName: 'Opportunity__opportunityName',
+          label: 'Opportunity Name',
           type: 'Text',
           required: true,
           maxLength: 255
         },
         {
           id: generateId(),
-          apiName: 'Deal__amount',
+          apiName: 'Opportunity__amount',
           label: 'Amount',
           type: 'Currency',
           precision: 18,
@@ -2888,14 +2888,14 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__closeDate',
+          apiName: 'Opportunity__closeDate',
           label: 'Expected Close Date',
           type: 'Date',
           required: true
         },
         {
           id: generateId(),
-          apiName: 'Deal__stage',
+          apiName: 'Opportunity__stage',
           label: 'Stage',
           type: 'Picklist',
           required: true,
@@ -2904,7 +2904,7 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__probability',
+          apiName: 'Opportunity__probability',
           label: 'Probability (%)',
           type: 'Percent',
           precision: 3,
@@ -2912,7 +2912,7 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__description',
+          apiName: 'Opportunity__description',
           label: 'Description',
           type: 'TextArea',
           maxLength: 5000
@@ -3254,7 +3254,7 @@ class LocalStorageSchemaService implements SchemaService {
       updatedAt: now
     };
 
-    return this.ensureDealTemplateLayout(
+    return this.ensureOpportunityTemplateLayout(
       this.ensureLeadTemplateLayout(
         this.ensureProductTemplateLayout(
           this.ensureAccountTemplateLayout(

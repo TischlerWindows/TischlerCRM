@@ -114,7 +114,7 @@ const OBJECT_TYPES = [
   { value: 'accounts', label: 'Accounts' },
   { value: 'products', label: 'Products' },
   { value: 'leads', label: 'Leads' },
-  { value: 'deals', label: 'Opportunities' },
+  { value: 'opportunities', label: 'Opportunities' },
   { value: 'projects', label: 'Projects' },
   { value: 'services', label: 'Service' },
   { value: 'quotes', label: 'Quotes' },
@@ -128,7 +128,7 @@ const PLURAL_TO_API_NAME: Record<string, string> = {
   accounts: 'Account',
   products: 'Product',
   leads: 'Lead',
-  deals: 'Deal',
+  opportunities: 'Opportunity',
   projects: 'Project',
   services: 'Service',
   quotes: 'Quote',
@@ -139,7 +139,7 @@ const PLURAL_TO_API_NAME: Record<string, string> = {
 const FIELD_OPTIONS: Record<string, string[]> = {
   accounts: ['Name', 'Industry', 'Revenue', 'Employees', 'Status', 'Type', 'Rating'],
   contacts: ['Name', 'Email', 'Phone', 'Title', 'Department', 'Status'],
-  deals: ['Name', 'Amount', 'Stage', 'Probability', 'Close Date', 'Owner'],
+  opportunities: ['Name', 'Amount', 'Stage', 'Probability', 'Close Date', 'Owner'],
   leads: ['Name', 'Company', 'Status', 'Source', 'Estimated Value', 'Rating'],
   products: ['Name', 'Category', 'Unit Price', 'Stock Quantity', 'Status'],
   properties: ['Address', 'Type', 'Value', 'Size', 'Status', 'Owner'],
@@ -251,7 +251,7 @@ export default function DashboardPage() {
           'Account': '/accounts',
           'Product': '/products',
           'Lead': '/leads',
-          'Deal': '/deals',
+          'Opportunity': '/opportunities',
           'Project': '/projects',
           'Service': '/service',
           'Quote': '/quotes',
@@ -568,7 +568,7 @@ export default function DashboardPage() {
             id: 'w1',
             type: 'metric',
             title: 'Total Revenue',
-            dataSource: 'deals',
+            dataSource: 'opportunities',
             config: { value: 2450000, prefix: '$', trend: 12.5 },
             position: { x: 0, y: 0, w: 3, h: 1 },
             sectionId: 's1'
@@ -576,8 +576,8 @@ export default function DashboardPage() {
           {
             id: 'w2',
             type: 'metric',
-            title: 'Active Deals',
-            dataSource: 'deals',
+            title: 'Active Opportunities',
+            dataSource: 'opportunities',
             config: { value: 47, trend: -5.2 },
             position: { x: 3, y: 0, w: 3, h: 1 },
             sectionId: 's1'
@@ -586,7 +586,7 @@ export default function DashboardPage() {
             id: 'w3',
             type: 'metric',
             title: 'Win Rate',
-            dataSource: 'deals',
+            dataSource: 'opportunities',
             config: { value: 68, suffix: '%', trend: 3.1 },
             position: { x: 6, y: 0, w: 3, h: 1 },
             sectionId: 's1'
@@ -594,8 +594,8 @@ export default function DashboardPage() {
           {
             id: 'w4',
             type: 'vertical-bar',
-            title: 'Deals by Stage',
-            dataSource: 'deals',
+            title: 'Opportunities by Stage',
+            dataSource: 'opportunities',
             config: {
               data: [
                 { label: 'Prospecting', value: 15 },
@@ -628,7 +628,7 @@ export default function DashboardPage() {
             id: 'w6',
             type: 'line',
             title: 'Monthly Revenue Trend',
-            dataSource: 'deals',
+            dataSource: 'opportunities',
             config: {
               data: [
                 { label: 'Jan', value: 180000 },

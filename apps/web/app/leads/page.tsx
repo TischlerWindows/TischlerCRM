@@ -58,7 +58,7 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/opportunities' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
   { name: 'Work Orders', href: '/workorders' },
@@ -188,7 +188,7 @@ export default function LeadsPage() {
   useEffect(() => {
     if (schema?.objects) {
       const objectTabs = schema.objects
-        .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Deal', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
+        .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Opportunity', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
         .map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
@@ -741,7 +741,7 @@ export default function LeadsPage() {
                           </Link>
                         ) : column.id === 'stage' ? (
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            lead.stage === 'Ready for Deal' ? 'bg-green-100 text-green-800' :
+                            lead.stage === 'Ready for Opportunity' ? 'bg-green-100 text-green-800' :
                             lead.stage === 'Qualified' ? 'bg-blue-100 text-blue-800' :
                             lead.stage === 'Needs Assessment' ? 'bg-[#e8eaf6] text-brand-dark' :
                             lead.stage === 'Lost' ? 'bg-red-100 text-red-800' :

@@ -69,7 +69,7 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/opportunities' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
   { name: 'Work Orders', href: '/workorders' },
@@ -206,7 +206,7 @@ export default function ContactsPage() {
 
       if (schema?.objects) {
         const objectTabs = schema.objects
-          .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Deal', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
+          .filter((obj: any) => !['Account', 'Contact', 'Lead', 'Opportunity', 'Project', 'Product', 'Property', 'Service', 'Installation'].includes(obj.apiName))
           .map((obj: any) => ({
             name: obj.label,
             href: `/${obj.apiName.toLowerCase()}`

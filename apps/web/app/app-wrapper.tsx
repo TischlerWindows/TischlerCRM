@@ -37,7 +37,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     '/accounts': 'Account',
     '/products': 'Product',
     '/leads': 'Lead',
-    '/deals': 'Deal',
+    '/opportunities': 'Opportunity',
     '/projects': 'Project',
     '/service': 'Service',
     '/quotes': 'Quote',
@@ -84,7 +84,6 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     pathname?.startsWith('/opportunities') ||
     pathname?.startsWith('/properties') ||
     pathname?.startsWith('/accounts') ||
-    pathname?.startsWith('/deals') ||
     pathname?.startsWith('/projects') ||
     pathname?.startsWith('/installations') ||
     pathname?.startsWith('/products') ||
@@ -128,7 +127,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
           'Account': '/accounts',
           'Product': '/products',
           'Lead': '/leads',
-          'Deal': '/deals',
+          'Opportunity': '/opportunities',
           'Project': '/projects',
           'Service': '/service',
           'WorkOrder': '/workorders',

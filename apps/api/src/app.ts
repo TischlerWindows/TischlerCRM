@@ -400,7 +400,7 @@ export function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'];
+    const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products'];
     const APP_KEYS = [
       'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
       'exportData','importData',

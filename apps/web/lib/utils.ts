@@ -142,8 +142,8 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
     if (objectType === 'Lead') {
       return record.leadNumber || record.name || stringValue;
     }
-    if (objectType === 'Deal') {
-      return record.dealNumber || record.dealName || record.name || stringValue;
+    if (objectType === 'Opportunity') {
+      return record.opportunityNumber || record.opportunityName || record.name || stringValue;
     }
     if (objectType === 'Product') {
       return record.productName || record.name || stringValue;
@@ -230,11 +230,15 @@ export function inferLookupObjectType(fieldName: string): string | null {
     'relatedlead': 'Lead',
     'relatedleadid': 'Lead',
     
-    // Deal lookups
-    'dealid': 'Deal',
-    'deal': 'Deal',
-    'relateddeal': 'Deal',
-    'relateddealid': 'Deal',
+    // Opportunity lookups
+    'opportunityid': 'Opportunity',
+    'opportunity': 'Opportunity',
+    'relatedopportunity': 'Opportunity',
+    'relatedopportunityid': 'Opportunity',
+    'dealid': 'Opportunity',
+    'deal': 'Opportunity',
+    'relateddeal': 'Opportunity',
+    'relateddealid': 'Opportunity',
     
     // User lookups (only for actual ID fields)
     'userid': 'User',
