@@ -177,6 +177,13 @@ const CORE_OBJECTS = [
 export async function ensureCoreObjects(): Promise<void> {
   console.log('[ensure-core-objects] Checking core objects...');
 
+  // Clean up renamed objects (Deal→Opportunity rename)
+  const legacyDeal = await prisma.customObject.findFirst({ where: { apiName: 'Deal' } });
+  if (legacyDeal) {
+    await prisma.customObject.delete({ where: { id: legacyDeal.id } });
+    console.log('[ensure-core-objects] Removed legacy Deal object (renamed to Opportunity)');
+  }
+
   // Grab any existing user to use as the creator/modifier
   let systemUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
 
