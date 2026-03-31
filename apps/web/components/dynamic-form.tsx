@@ -538,6 +538,35 @@ export default function DynamicForm({
     return String(record.id || 'Record');
   };
 
+  /** Build a meaningful subtitle for lookup dropdown items (address, email, etc.) */
+  const getRecordSubtitle = (record: Record<string, any>, primaryLabel: string): string => {
+    const keys = Object.keys(record);
+    // Property → show street address
+    const addrKey = keys.find(k => {
+      const lk = k.toLowerCase().replace(/^[a-z]+__/, '');
+      return lk === 'address' || lk === 'street_address' || lk === 'property_address';
+    });
+    if (addrKey) {
+      let addr = record[addrKey];
+      if (typeof addr === 'string' && addr.startsWith('{')) { try { addr = JSON.parse(addr); } catch { /* ignore */ } }
+      if (typeof addr === 'object' && addr !== null) {
+        const street = addr.street || addr.address || addr.addressLine1 || '';
+        const city = addr.city || '';
+        const parts = [street, city].filter(Boolean);
+        if (parts.length > 0) return parts.join(', ');
+      }
+      if (typeof addr === 'string' && addr && addr !== primaryLabel) return addr;
+    }
+    // Contact → show email
+    const emailKey = keys.find(k => k.toLowerCase().replace(/^[a-z]+__/, '') === 'email');
+    if (emailKey && record[emailKey] && record[emailKey] !== primaryLabel) return String(record[emailKey]);
+    // Account → show phone or industry
+    const phoneKey = keys.find(k => k.toLowerCase().replace(/^[a-z]+__/, '') === 'phone');
+    if (phoneKey && record[phoneKey]) return String(record[phoneKey]);
+    // Fallback: show nothing rather than the raw ID
+    return '';
+  };
+
   const getFieldIcon = (type: FieldType) => {
     const iconMap: Record<string, any> = {
       Text: FileText,
@@ -1496,7 +1525,9 @@ export default function DynamicForm({
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
                         <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
-                        <div className="text-xs text-gray-500">{record.id}</div>
+                        {getRecordSubtitle(record, displayLabel) && (
+                          <div className="text-xs text-gray-500 truncate">{getRecordSubtitle(record, displayLabel)}</div>
+                        )}
                       </button>
                     );
                   })
@@ -1744,7 +1775,9 @@ export default function DynamicForm({
                         className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
                       >
                         <div className="font-medium text-gray-900 truncate">{displayLabel}</div>
-                        <div className="text-xs text-gray-500">{record.id}</div>
+                        {getRecordSubtitle(record, displayLabel) && (
+                          <div className="text-xs text-gray-500 truncate">{getRecordSubtitle(record, displayLabel)}</div>
+                        )}
                       </button>
                     );
                   })
