@@ -47,18 +47,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const userFromSession = sessionStorage.getItem('user');
+      const userFromStorage = localStorage.getItem('user');
       
-      if (tokenFromCookie && userFromSession) {
+      if (tokenFromCookie && userFromStorage) {
         setToken(tokenFromCookie);
         // Sync token to API client
         apiClient.setToken(tokenFromCookie);
-        if (userFromSession) {
+        if (userFromStorage) {
           try {
-            setUser(JSON.parse(userFromSession));
+            setUser(JSON.parse(userFromStorage));
           } catch (e) {
             console.error('Failed to parse user:', e);
-            sessionStorage.removeItem('user');
+            localStorage.removeItem('user');
           }
         }
       }
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = () => {
-    sessionStorage.removeItem('user');
+    localStorage.removeItem('user');
     // Clear auth cookie
     document.cookie = 'auth-token=; Max-Age=0; path=/;';
     // Clear API client token
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     apiClient.setToken(newToken);
     // Also set cookie as backup
     document.cookie = `auth-token=${encodeURIComponent(newToken)}; path=/`;
-    sessionStorage.setItem('user', JSON.stringify(newUser));
+    localStorage.setItem('user', JSON.stringify(newUser));
   };
 
   const impersonate = (newToken: string, newUser: User) => {

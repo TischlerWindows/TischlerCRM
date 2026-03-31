@@ -188,7 +188,7 @@ class ApiClient {
       // Guard against redirect loop: don't redirect if we're already on /login.
       if (response.status === 401 && typeof window !== 'undefined') {
         this.setToken(null);
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('user');
         document.cookie = 'auth-token=; Max-Age=0; path=/;';
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';

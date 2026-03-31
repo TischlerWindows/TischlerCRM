@@ -53,7 +53,7 @@ export default function SignupPage() {
 
       if (data.token) {
         document.cookie = `auth-token=${data.token}; path=/; max-age=28800`;
-        sessionStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('user', JSON.stringify(data.user));
         setTimeout(() => router.push('/'), 1500);
       } else {
         setTimeout(() => router.push('/login'), 1500);
