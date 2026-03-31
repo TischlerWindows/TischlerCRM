@@ -67,6 +67,18 @@ const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
   WorkOrder: 'Service',
 };
 
+/** Subfolders created inside each Opportunity folder. */
+const OPPORTUNITY_SUBFOLDERS = [
+  'Estimation',
+  'Proposals',
+  'Contract',
+  'Project Management',
+  'AutoCad',
+  'Installation',
+  'Final Shop Drawings',
+  'Project Accounting',
+];
+
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
 function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
   const data = JSON.stringify({ type: 'dropbox-oauth-result', status, reason });
@@ -695,6 +707,18 @@ export async function dropboxRoutes(app: FastifyInstance) {
         return reply.code(500).send({ error: 'Failed to create linked folder' });
       }
       // Already exists — fine
+    }
+
+    // Create subfolders for Opportunity records
+    if (created && childObjectApiName === 'Opportunity') {
+      for (const sf of OPPORTUNITY_SUBFOLDERS) {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: `${childPath}/${sf}`,
+            autorename: false,
+          });
+        } catch { /* folder already exists — ignore */ }
+      }
     }
 
     reply.send({ created, path: childPath });
