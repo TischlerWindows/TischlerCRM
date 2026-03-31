@@ -133,6 +133,7 @@ const PLURAL_TO_API_NAME: Record<string, string> = {
   services: 'Service',
   quotes: 'Quote',
   installations: 'Installation',
+  workorders: 'WorkOrder',
 };
 
 const FIELD_OPTIONS: Record<string, string[]> = {

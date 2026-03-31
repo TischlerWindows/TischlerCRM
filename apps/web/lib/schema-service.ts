@@ -3151,6 +3151,102 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
+    // 11. Work Order (mirrored from Salesforce – 78 fields)
+    objects.push(createBasicObject(
+      'WorkOrder',
+      'Work Order',
+      'Work Orders',
+      'Scheduled work orders for service and maintenance',
+      [
+        // ── Auto-number & Name ──
+        { id: generateId(), apiName: 'WorkOrder__workOrderNumber', label: 'Work Order Number', type: 'AutoNumber', autoNumber: { displayFormat: 'WO-{00000}', startingNumber: 1 } },
+        { id: generateId(), apiName: 'WorkOrder__name', label: 'Work Order', type: 'Text', maxLength: 80 },
+        { id: generateId(), apiName: 'WorkOrder__title', label: 'Title', type: 'TextArea', maxLength: 255 },
+        // ── Type / Status ──
+        { id: generateId(), apiName: 'WorkOrder__workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
+        { id: generateId(), apiName: 'WorkOrder__workStatus', label: 'Work Status', type: 'Picklist', required: true, picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
+        { id: generateId(), apiName: 'WorkOrder__leadTech', label: 'Lead Tech', type: 'Picklist', picklistValues: [] },
+        { id: generateId(), apiName: 'WorkOrder__punchListStatus', label: 'Punch List', type: 'Picklist', picklistValues: ['Not Started', 'In Progress', 'Completed'] },
+        // ── Scheduling ──
+        { id: generateId(), apiName: 'WorkOrder__scheduledStartDate', label: 'Scheduled Start Date', type: 'DateTime' },
+        { id: generateId(), apiName: 'WorkOrder__scheduledEndDate', label: 'Scheduled End Date', type: 'DateTime' },
+        { id: generateId(), apiName: 'WorkOrder__originalInstallationDate', label: 'Original Installation Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__confirmedAppointment', label: 'Confirmed Appointment', type: 'Checkbox' },
+        // ── Contacts & Lookups ──
+        { id: generateId(), apiName: 'WorkOrder__primaryContact', label: 'Primary Contact', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactA', label: 'Additional Contact A', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactB', label: 'Additional Contact B', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__project', label: 'Job/Project', type: 'Lookup', lookupObject: 'Project' },
+        // ── Location ──
+        { id: generateId(), apiName: 'WorkOrder__location', label: 'Location', type: 'Address' },
+        { id: generateId(), apiName: 'WorkOrder__location2', label: 'Location 2', type: 'Address' },
+        // ── Workforce / Technicians ──
+        { id: generateId(), apiName: 'WorkOrder__assignedTischlerServiceTechs', label: 'Assigned Tischler Service Techs', type: 'MultiSelectPicklist', picklistValues: [] },
+        { id: generateId(), apiName: 'WorkOrder__installationDoneBy', label: 'Installation Done By', type: 'MultiSelectPicklist', picklistValues: ['Tischler', 'Subcontractor', 'Factory', 'Other'] },
+        { id: generateId(), apiName: 'WorkOrder__assignedTechnicianNames', label: 'Assigned Technician Names', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__additionalOutsideServiceTechs', label: 'Additional Outside Service Techs', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__notifiedTechs', label: 'Notified Techs', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__notifyTheTechs', label: 'Notify The Techs', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__hours1', label: 'Hours', type: 'Number', precision: 18, scale: 0 },
+        { id: generateId(), apiName: 'WorkOrder__hours2', label: 'Hours 2', type: 'Number', precision: 18, scale: 0 },
+        { id: generateId(), apiName: 'WorkOrder__men', label: 'Men', type: 'Number', precision: 18, scale: 0 },
+        // ── Financial ──
+        { id: generateId(), apiName: 'WorkOrder__estimateCost', label: 'Estimate Cost', type: 'Currency', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__hotelCosts', label: 'Hotel Costs', type: 'Number', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__perDiem', label: 'Per Diem', type: 'Number', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__invoiceNumber', label: 'Invoice Number', type: 'Text', maxLength: 255 },
+        // ── Billing ──
+        { id: generateId(), apiName: 'WorkOrder__billed', label: 'Billed', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__billedDate', label: 'Billed Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__paid', label: 'Paid', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__paidDate', label: 'Paid Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__toBeBilledBasedOnEstimate', label: 'To be billed based on estimate', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__toBeBilledOnTimeOfMaterial', label: 'To be billed on time of material', type: 'Checkbox' },
+        // ── Materials ──
+        { id: generateId(), apiName: 'WorkOrder__materialInWarehouse', label: 'Material in WH', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__materialToOrder', label: 'Material TO ORDER', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__materialsAndToolsNeeded', label: 'Materials & Tools Needed', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__specialEquipmentNeeded', label: 'Special Equipment Needed/Comments', type: 'TextArea', maxLength: 255 },
+        // ── Work Description & Notes ──
+        { id: generateId(), apiName: 'WorkOrder__descriptionOfWork', label: 'Description of work', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workDescription', label: 'Work Description', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workPerformed', label: 'Work Performed', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workPerformedAdditionalNotes', label: 'Work Performed/Additional Service Notes', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workOrderNotes', label: 'Work Order Notes', type: 'LongTextArea', maxLength: 32768 },
+        // ── Punch List ──
+        { id: generateId(), apiName: 'WorkOrder__punchListDetail', label: 'Punch List Detail', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__punchListCreated', label: 'Punch List Created?', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__punchListPrinted', label: 'Punch List Printed', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__punchListProcessed', label: 'Punch List Processed', type: 'Checkbox' },
+        // ── Signature ──
+        { id: generateId(), apiName: 'WorkOrder__customerSignature', label: 'Customer Signature', type: 'Text', maxLength: 100 },
+        { id: generateId(), apiName: 'WorkOrder__signatureDate', label: 'Signature Date', type: 'Date' },
+        // ── Category Checkboxes ──
+        { id: generateId(), apiName: 'WorkOrder__customer', label: 'Customer', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__factoryBcfInstall', label: 'Factory BCF/Install', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__marketing', label: 'Marketing', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__product', label: 'Product', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__service', label: 'Service', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__tischlerWarranty', label: 'Tischler Und Sohn Warranty', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__reminderEmailSent', label: 'Reminder Email Sent', type: 'Checkbox' },
+        // ── Misc ──
+        { id: generateId(), apiName: 'WorkOrder__combinedField', label: 'Combined Field', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__unit', label: 'Unit', type: 'TextArea', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__emailLink', label: 'Email Link', type: 'Text', maxLength: 255 },
+        // ── Formula / Rollup (expressions TBD — placeholders) ──
+        { id: generateId(), apiName: 'WorkOrder__serviceNumber', label: 'Service Number', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__calendarDisplay', label: 'Calendar Display', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__projectLocation', label: 'Project Location', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__originalProjectNumber', label: 'Original Project #', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__primaryContactInfo', label: 'Primary Contact Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__primaryContactInfoServiceTech', label: 'Primary Contact Information (Tech)', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactAInfo', label: 'Additional Contact A Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactBInfo', label: 'Additional Contact B Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__totalHours', label: 'Total hrs', type: 'Formula', formulaReturnType: 'Number', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__totalHoursForAllPunchLists', label: 'Total Hours For all Punch Lists', type: 'Number', precision: 18, scale: 2 },
+      ]
+    ));
+
     const baseSchema: OrgSchema = {
       version: 1,
       objects,

@@ -7,6 +7,7 @@ export const DEFAULT_TAB_ORDER = [
   { name: 'Deals', href: '/deals' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
+  { name: 'Work Orders', href: '/workorders' },
   { name: 'Quotes', href: '/quotes' },
   { name: 'Installations', href: '/installations' },
   { name: 'Summary', href: '/summary' },

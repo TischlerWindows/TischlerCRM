@@ -150,6 +150,22 @@ const CORE_OBJECTS = [
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Scheduled' },
     ],
   },
+  {
+    apiName: 'WorkOrder',
+    label: 'Work Order',
+    pluralLabel: 'Work Orders',
+    description: 'Scheduled work orders for service and maintenance',
+    fields: [
+      { apiName: 'workOrderNumber', label: 'Work Order Number', type: 'Text', unique: true },
+      { apiName: 'name', label: 'Work Order', type: 'Text' },
+      { apiName: 'title', label: 'Title', type: 'TextArea' },
+      { apiName: 'workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
+      { apiName: 'workStatus', label: 'Work Status', type: 'Picklist', picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
+      { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
+      { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
+      { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
+    ],
+  },
 ];
 
 /**
@@ -257,7 +273,7 @@ export async function ensureCoreObjects(): Promise<void> {
     const autoNumberFieldNames = [
       'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
       'dealNumber', 'productCode', 'projectNumber', 'quoteNumber',
-      'serviceNumber', 'installationNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber',
     ];
     await prisma.customField.updateMany({
       where: {

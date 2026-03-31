@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { 
-  Wrench, 
+  ClipboardList, 
   Plus, 
   Search, 
   MoreVertical,
@@ -37,25 +37,24 @@ import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
-interface Service {
+interface WorkOrder {
   id: string;
-  serviceNumber: string;
-  serviceName: string;
-  accountName: string;
-  projectNumber: string;
-  serviceType: string;
-  status: string;
-  scheduledDate: string;
-  assignedTechnician: string;
-  priority: string;
+  workOrderNumber: string;
+  name: string;
+  title: string;
+  workOrderType: string;
+  workStatus: string;
+  leadTech: string;
+  scheduledStartDate: string;
+  scheduledEndDate: string;
+  estimateCost: string;
+  primaryContact: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
   lastModifiedAt: string;
   isFavorite?: boolean;
 }
-
-
 
 const informationModules = [
   { name: 'Properties', href: '/properties' },
@@ -84,8 +83,8 @@ const analyticsModules = [
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
-export default function ServicePage() {
-  const [services, setServices] = useState<Service[]>([]);
+export default function WorkOrdersPage() {
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -104,9 +103,9 @@ export default function ServicePage() {
   const { schema } = useSchemaStore();
   const { user } = useAuth();
   const { canAccess } = usePermissions();
-  const canCreateService = canAccess('Service', 'create');
-  const canEditService = canAccess('Service', 'edit');
-  const canDeleteService = canAccess('Service', 'delete');
+  const canCreate = canAccess('WorkOrder', 'create');
+  const canEdit = canAccess('WorkOrder', 'edit');
+  const canDelete = canAccess('WorkOrder', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -118,42 +117,41 @@ export default function ServicePage() {
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
-  const serviceObject = schema?.objects.find(obj => obj.apiName === 'Service');
-  const lookupTick = useLookupPreloader(serviceObject);
-  const pageLayouts = serviceObject?.pageLayouts || [];
+  const objectDef = schema?.objects.find(obj => obj.apiName === 'WorkOrder');
+  const lookupTick = useLookupPreloader(objectDef);
+  const pageLayouts = objectDef?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
   const AVAILABLE_COLUMNS = useMemo(() => {
-    if (!serviceObject?.fields) {
+    if (!objectDef?.fields) {
       return [
-        { id: 'serviceNumber', label: 'Service #', defaultVisible: true },
-        { id: 'serviceName', label: 'Service Name', defaultVisible: true },
-        { id: 'accountName', label: 'Account', defaultVisible: true },
-        { id: 'projectNumber', label: 'Project #', defaultVisible: false },
-        { id: 'serviceType', label: 'Type', defaultVisible: true },
-        { id: 'status', label: 'Status', defaultVisible: true },
-        { id: 'scheduledDate', label: 'Scheduled Date', defaultVisible: true },
-        { id: 'assignedTechnician', label: 'Technician', defaultVisible: true },
-        { id: 'priority', label: 'Priority', defaultVisible: true },
+        { id: 'workOrderNumber', label: 'WO #', defaultVisible: true },
+        { id: 'name', label: 'Work Order', defaultVisible: true },
+        { id: 'workOrderType', label: 'Type', defaultVisible: true },
+        { id: 'workStatus', label: 'Status', defaultVisible: true },
+        { id: 'leadTech', label: 'Lead Tech', defaultVisible: true },
+        { id: 'scheduledStartDate', label: 'Start Date', defaultVisible: true },
+        { id: 'scheduledEndDate', label: 'End Date', defaultVisible: false },
+        { id: 'estimateCost', label: 'Estimate Cost', defaultVisible: true },
+        { id: 'primaryContact', label: 'Primary Contact', defaultVisible: true },
         { id: 'createdBy', label: 'Created By', defaultVisible: false },
         { id: 'createdAt', label: 'Created Date', defaultVisible: false },
         { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
         { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false }
       ];
     }
-    return serviceObject.fields.map((field, index) => {
-      const cleanApiName = field.apiName.replace('Service__', '');
+    return objectDef.fields.map((field, index) => {
+      const cleanApiName = field.apiName.replace('WorkOrder__', '');
       const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
       const defaultVisible = !isSystemField && index < 10;
       return { id: cleanApiName, label: field.label, defaultVisible };
     });
-  }, [serviceObject]);
+  }, [objectDef]);
 
-  // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
       (async () => {
-        const savedLayoutId = await getPreference<string>('serviceSelectedLayoutId');
+        const savedLayoutId = await getPreference<string>('workOrderSelectedLayoutId');
         if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
           setSelectedLayoutId(savedLayoutId);
         } else if (pageLayouts.length > 0) {
@@ -163,7 +161,6 @@ export default function ServicePage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
-
   useEffect(() => {
     (async () => {
       const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
@@ -172,35 +169,32 @@ export default function ServicePage() {
       } else {
         setTabs(defaultTabs);
       }
-
       if (schema?.objects) {
-        const objects = schema.objects;
-        setAvailableObjects(objects.map((obj: any) => ({
+        setAvailableObjects(schema.objects.map((obj: any) => ({
           name: obj.label,
           href: `/${obj.apiName.toLowerCase()}`
         })));
       }
-
       setIsLoaded(true);
     })();
   }, [schema]);
 
-  const fetchServices = useCallback(async () => {
+  const fetchWorkOrders = useCallback(async () => {
     try {
       setLoading(true);
       setFetchError(null);
-      const records = await recordsService.getRecords('Service');
+      const records = await recordsService.getRecords('WorkOrder');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
-        serviceNumber: record.serviceNumber || '',
+        workOrderNumber: record.workOrderNumber || '',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
       }));
-      setServices(flattenedRecords as Service[]);
+      setWorkOrders(flattenedRecords as WorkOrder[]);
     } catch (error) {
-      console.error('Failed to fetch services from API:', error);
+      console.error('Failed to fetch work orders from API:', error);
       setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
@@ -209,7 +203,7 @@ export default function ServicePage() {
 
   useEffect(() => {
     (async () => {
-      const storedColumns = await getPreference<string[]>('servicesVisibleColumns');
+      const storedColumns = await getPreference<string[]>('workOrdersVisibleColumns');
       if (storedColumns) {
         setVisibleColumns(storedColumns);
       } else {
@@ -218,9 +212,9 @@ export default function ServicePage() {
           .map(col => col.id);
         setVisibleColumns(defaultColumns);
       }
-      fetchServices();
+      fetchWorkOrders();
     })();
-  }, [fetchServices]);
+  }, [fetchWorkOrders]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -231,9 +225,9 @@ export default function ServicePage() {
     }
   };
 
-  const filteredServices = services.filter(service => {
+  const filteredWorkOrders = workOrders.filter(wo => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || Object.values(service).some(value => {
+    const matchesSearch = !searchTerm || Object.values(wo).some(value => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
       if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
@@ -246,13 +240,13 @@ export default function ServicePage() {
     
     switch (sidebarFilter) {
       case 'recent':
-        matchesSidebar = new Date(service.lastModifiedAt) >= thirtyDaysAgo;
+        matchesSidebar = new Date(wo.lastModifiedAt) >= thirtyDaysAgo;
         break;
       case 'created-by-me':
-        matchesSidebar = service.createdBy === 'Development User';
+        matchesSidebar = wo.createdBy === 'Development User';
         break;
       case 'favorites':
-        matchesSidebar = (service as any).isFavorite === true;
+        matchesSidebar = (wo as any).isFavorite === true;
         break;
       case 'all':
       default:
@@ -262,65 +256,52 @@ export default function ServicePage() {
     return matchesSearch && matchesSidebar;
   }).sort((a, b) => {
     if (!sortColumn) return 0;
-    
     const aValue = (a as any)[sortColumn];
     const bValue = (b as any)[sortColumn];
-    
     if (Array.isArray(aValue) && Array.isArray(bValue)) {
       const aStr = aValue.join(', ').toLowerCase();
       const bStr = bValue.join(', ').toLowerCase();
-      return sortDirection === 'asc' 
-        ? aStr.localeCompare(bStr)
-        : bStr.localeCompare(aStr);
+      return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
     }
-    
     if (aValue == null && bValue == null) return 0;
     if (aValue == null) return sortDirection === 'asc' ? 1 : -1;
     if (bValue == null) return sortDirection === 'asc' ? -1 : 1;
-    
-    if (sortColumn.includes('At') || sortColumn === 'serviceDate' || sortColumn === 'completionDate') {
+    if (sortColumn.includes('Date') || sortColumn.includes('At')) {
       const aDate = new Date(aValue).getTime();
       const bDate = new Date(bValue).getTime();
       return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
     }
-    
     const aStr = String(aValue).toLowerCase();
     const bStr = String(bValue).toLowerCase();
-    
-    return sortDirection === 'asc' 
+    return sortDirection === 'asc'
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const handleColumnDragStart = (index: number) => {
-    setDraggedColumnIndex(index);
-  };
+  const handleColumnDragStart = (index: number) => { setDraggedColumnIndex(index); };
 
   const handleColumnDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedColumnIndex === null || draggedColumnIndex === index) return;
-
     const newColumns = [...visibleColumns];
     const draggedColumn = newColumns[draggedColumnIndex];
     if (!draggedColumn) return;
-    
     newColumns.splice(draggedColumnIndex, 1);
     newColumns.splice(index, 0, draggedColumn);
-
     setVisibleColumns(newColumns);
     setDraggedColumnIndex(index);
   };
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    setPreference('servicesVisibleColumns', visibleColumns);
+    setPreference('workOrdersVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      setPreference('servicesVisibleColumns', newVisibleColumns);
+      setPreference('workOrdersVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -328,7 +309,7 @@ export default function ServicePage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    setPreference('servicesVisibleColumns', newVisibleColumns);
+    setPreference('workOrdersVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -336,129 +317,98 @@ export default function ServicePage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    setPreference('servicesVisibleColumns', defaultColumns);
+    setPreference('workOrdersVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
-  const formatColumnValue = (service: Service, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
-    let value = (service as any)[columnId];
+  const formatColumnValue = (wo: WorkOrder, columnId: string) => {
+    void lookupTick;
+    let value = (wo as any)[columnId];
 
-    // Formula fields: evaluate expression instead of showing raw value
-    const schemaFieldForFormula = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
+    const schemaFieldForFormula = objectDef?.fields?.find(f => f.apiName === `WorkOrder__${columnId}` || f.apiName === columnId);
     if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
-      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, service as any, serviceObject);
+      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, wo as any, objectDef);
       if (computed !== null && computed !== undefined) return String(computed);
       return '-';
     }
-    
-    if (value === null || value === undefined) {
-      return '-';
-    }
-    // Auto-parse JSON strings
+
+    if (value === null || value === undefined) return '-';
     if (typeof value === 'string' && value.startsWith('{')) {
       try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
-    
-    // Check if this is a lookup field and resolve the display name
     const lookupObjectType = inferLookupObjectType(columnId);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }
-
-    if (Array.isArray(value)) {
-      return value.length > 0 ? value.join(', ') : '-';
-    }
-
+    if (Array.isArray(value)) return value.length > 0 ? value.join(', ') : '-';
     if (typeof value === 'object') {
-      const schemaField = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
-      const fieldType = schemaField?.type;
-      return formatFieldValue(value, fieldType, schemaField?.lookupObject);
+      const schemaField = objectDef?.fields?.find(f => f.apiName === `WorkOrder__${columnId}` || f.apiName === columnId);
+      return formatFieldValue(value, schemaField?.type, schemaField?.lookupObject);
     }
-    
-    // Route remaining values through formatFieldValue for field-type-aware display
-    const schemaFieldFinal = serviceObject?.fields?.find(f => f.apiName === `Service__${columnId}` || f.apiName === columnId);
+    const schemaFieldFinal = objectDef?.fields?.find(f => f.apiName === `WorkOrder__${columnId}` || f.apiName === columnId);
     if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {
-      // Map schema field names (e.g., Service__serviceName) to simple field names
-      const normalizeFieldName = (fieldName: string): string => {
-        return fieldName.replace('Service__', '');
-      };
-
-      // Create normalized data object with simple field names
+      const normalizeFieldName = (fieldName: string): string => fieldName.replace('WorkOrder__', '');
       const normalizedData: Record<string, any> = {};
       Object.entries(data).forEach(([key, value]) => {
-        const cleanKey = normalizeFieldName(key);
-        normalizedData[cleanKey] = value;
+        normalizedData[normalizeFieldName(key)] = value;
       });
 
-      // Generate unique service number
-      const existingNumbers = services
-        .map(s => s.serviceNumber)
-        .filter(num => num.startsWith('SRV'))
-        .map(num => parseInt(num.replace(/^SRV-?/, ''), 10))
+      // Generate unique work order number
+      const existingNumbers = workOrders
+        .map(w => w.workOrderNumber)
+        .filter(num => num.startsWith('WO'))
+        .map(num => parseInt(num.replace(/^WO-?/, ''), 10))
         .filter(num => !isNaN(num));
-      
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const serviceNumber = `SRV${String(nextNumber).padStart(3, '0')}`;
+      const workOrderNumber = `WO${String(nextNumber).padStart(5, '0')}`;
       
-      const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
+      const today = new Date().toISOString().split('T')[0];
       
-      const recordData = {
-        ...normalizedData,
-        serviceNumber,
-      };
-
-      const result = await recordsService.createRecord('Service', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
+      const recordData = { ...normalizedData, workOrderNumber };
+      const result = await recordsService.createRecord('WorkOrder', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
       
-      const newService: Service = {
+      const newWorkOrder: WorkOrder = {
         id: result.id,
-        serviceNumber,
+        workOrderNumber,
         ...normalizedData,
         createdBy: currentUserName,
         createdAt: today,
         lastModifiedBy: currentUserName,
         lastModifiedAt: today
-      };
+      } as WorkOrder;
 
-      const updatedServices = [newService, ...services];
-      setServices(updatedServices);
-      
+      setWorkOrders([newWorkOrder, ...workOrders]);
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/service/${result.id}`);
+      router.push(`/workorders/${result.id}`);
     } catch (error) {
-      console.error('Failed to create service:', error);
+      console.error('Failed to create work order:', error);
       throw error;
     }
   };
 
-  const handleDeleteService = async (id: string) => {
-    if (confirm('Are you sure you want to delete this service?')) {
+  const handleDelete = async (id: string) => {
+    if (confirm('Are you sure you want to delete this work order?')) {
       try {
-        await recordsService.deleteRecord('Service', id);
-        const updatedServices = services.filter(s => s.id !== id);
-        setServices(updatedServices);
+        await recordsService.deleteRecord('WorkOrder', id);
+        setWorkOrders(workOrders.filter(w => w.id !== id));
       } catch (error) {
-        console.error('Failed to delete service from API, trying locally:', error);
-        const updatedServices = services.filter(s => s.id !== id);
-        setServices(updatedServices);
+        console.error('Failed to delete work order:', error);
+        setWorkOrders(workOrders.filter(w => w.id !== id));
       }
     }
   };
 
   const handleToggleFavorite = (id: string) => {
-    const updatedServices = services.map(s => 
-      s.id === id ? { ...s, isFavorite: !s.isFavorite } : s
-    );
-    setServices(updatedServices);
+    setWorkOrders(workOrders.map(w => w.id === id ? { ...w, isFavorite: !w.isFavorite } : w));
     setOpenDropdown(null);
   };
 
@@ -466,14 +416,9 @@ export default function ServicePage() {
     setSetting('tabConfiguration', newTabs);
   };
 
-  const handleResetToDefault = () => {
-    setTabs(defaultTabs);
-    saveTabConfiguration(defaultTabs);
-  };
+  const handleResetToDefault = () => { setTabs(defaultTabs); saveTabConfiguration(defaultTabs); };
 
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
+  const handleDragStart = (index: number) => { setDraggedIndex(index); };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
@@ -487,10 +432,7 @@ export default function ServicePage() {
     setDraggedIndex(index);
   };
 
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-    saveTabConfiguration(tabs);
-  };
+  const handleDragEnd = () => { setDraggedIndex(null); saveTabConfiguration(tabs); };
 
   const handleAddTab = (tab: { name: string; href: string }) => {
     const newTabs = [...tabs, tab];
@@ -508,18 +450,18 @@ export default function ServicePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Loading services...</div>
+        <div className="text-gray-600">Loading work orders...</div>
       </div>
     );
   }
 
-  if (!canAccess('Service', 'read')) {
+  if (!canAccess('WorkOrder', 'read')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Service records.</p>
+          <p className="text-gray-600 mb-6">You don&apos;t have permission to view Work Order records.</p>
           <Link href="/" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark">Go to Home</Link>
         </div>
       </div>
@@ -531,26 +473,23 @@ export default function ServicePage() {
         {/* Sidebar */}
         <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="space-y-6">
-            {/* Page Header in Sidebar */}
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
-                  <Wrench className="w-6 h-6 text-brand-navy" />
+                  <ClipboardList className="w-6 h-6 text-brand-navy" />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900">Service</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Work Orders</h1>
               </div>
-              <p className="text-sm text-gray-600 ml-13">Manage post-installation service and maintenance</p>
+              <p className="text-sm text-gray-600 ml-13">Manage service and maintenance work orders</p>
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Service</h3>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Work Orders</h3>
               <nav className="space-y-1">
                 <button
                   onClick={() => setSidebarFilter('recent')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                    sidebarFilter === 'recent'
-                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    sidebarFilter === 'recent' ? 'bg-[#f0f1fa] text-brand-navy font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <Clock className="w-4 h-4" />
@@ -559,9 +498,7 @@ export default function ServicePage() {
                 <button
                   onClick={() => setSidebarFilter('created-by-me')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                    sidebarFilter === 'created-by-me'
-                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    sidebarFilter === 'created-by-me' ? 'bg-[#f0f1fa] text-brand-navy font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <User className="w-4 h-4" />
@@ -570,20 +507,16 @@ export default function ServicePage() {
                 <button
                   onClick={() => setSidebarFilter('all')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                    sidebarFilter === 'all'
-                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    sidebarFilter === 'all' ? 'bg-[#f0f1fa] text-brand-navy font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <List className="w-4 h-4" />
-                  All Service
+                  All Work Orders
                 </button>
                 <button
                   onClick={() => setSidebarFilter('favorites')}
                   className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors ${
-                    sidebarFilter === 'favorites'
-                      ? 'bg-[#f0f1fa] text-brand-navy font-medium'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    sidebarFilter === 'favorites' ? 'bg-[#f0f1fa] text-brand-navy font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <Star className="w-4 h-4" />
@@ -597,9 +530,8 @@ export default function ServicePage() {
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
       <div className="px-6 py-6">
-        {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-900">Service Records</h3>
+          <h3 className="text-lg font-medium text-gray-900">Work Order Records</h3>
           <div className="flex gap-3">
             <button
               onClick={() => setShowFilterSettings(true)}
@@ -607,7 +539,9 @@ export default function ServicePage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>            {canCreateService && (            <button
+            </button>
+            {canCreate && (
+              <button
                 onClick={() => {
                   if (!hasPageLayout) {
                     setShowNoLayoutsDialog(true);
@@ -621,19 +555,18 @@ export default function ServicePage() {
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                New Service
+                New Work Order
               </button>
-              )}
+            )}
           </div>
         </div>
 
-        {/* Search */}
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search services by number, name, account, type, or status..."
+              placeholder="Search work orders by number, title, type, or status..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
@@ -650,7 +583,7 @@ export default function ServicePage() {
             <button onClick={() => { setFetchError(null); window.location.reload(); }} className="text-sm text-red-600 hover:text-red-800 font-medium">Retry</button>
           </div>
         )}
-        {/* Services List */}
+
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
             <table className="w-full divide-y divide-gray-200">
@@ -677,73 +610,60 @@ export default function ServicePage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredServices.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/service/${service.id}`)}>
+                {filteredWorkOrders.map((wo) => (
+                  <tr key={wo.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/workorders/${wo.id}`)}>
                     {AVAILABLE_COLUMNS.filter(col => isColumnVisible(col.id)).map(column => (
                       <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
-                        {column.id === 'serviceNumber' ? (
-                            <Link href={`/service/${service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
-                            {service.serviceNumber}
+                        {column.id === 'workOrderNumber' ? (
+                          <Link href={`/workorders/${wo.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            {wo.workOrderNumber}
                           </Link>
-                        ) : column.id === 'serviceName' ? (
-                          <Link href={`/service/${service.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
-                            {service.serviceName}
+                        ) : column.id === 'name' ? (
+                          <Link href={`/workorders/${wo.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                            {wo.name}
                           </Link>
-                        ) : column.id === 'status' ? (
+                        ) : column.id === 'workStatus' ? (
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            service.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                            service.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
-                            service.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                            wo.workStatus === 'Completed' ? 'bg-green-100 text-green-800' :
+                            wo.workStatus === 'In Progress' ? 'bg-blue-100 text-blue-800' :
+                            wo.workStatus === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                            wo.workStatus === 'On Hold' ? 'bg-orange-100 text-orange-800' :
                             'bg-yellow-100 text-yellow-800'
                           }`}>
-                            {service.status}
-                          </span>
-                        ) : column.id === 'priority' ? (
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            service.priority === 'High' ? 'bg-red-100 text-red-800' :
-                            service.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {service.priority}
+                            {wo.workStatus}
                           </span>
                         ) : (
-                          formatColumnValue(service, column.id)
+                          formatColumnValue(wo, column.id)
                         )}
                       </td>
                     ))}
                     <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setOpenDropdown(openDropdown === service.id ? null : service.id)}
+                        onClick={() => setOpenDropdown(openDropdown === wo.id ? null : wo.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
                         <MoreVertical className="w-5 h-5 text-gray-600" />
                       </button>
-                      {openDropdown === service.id && (
+                      {openDropdown === wo.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
-                            {canEditService && (
-                            <button
-                              onClick={() => {
-                                router.push(`/service/${service.id}`);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
-                            >
-                              <Edit className="w-4 h-4" />
-                              Edit
-                            </button>
+                            {canEdit && (
+                              <button
+                                onClick={() => { router.push(`/workorders/${wo.id}`); setOpenDropdown(null); }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
+                              >
+                                <Edit className="w-4 h-4" />
+                                Edit
+                              </button>
                             )}
-                            {canDeleteService && (
-                            <button
-                              onClick={() => {
-                                handleDeleteService(service.id);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                              Delete
-                            </button>
+                            {canDelete && (
+                              <button
+                                onClick={() => { handleDelete(wo.id); setOpenDropdown(null); }}
+                                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Delete
+                              </button>
                             )}
                           </div>
                         </div>
@@ -751,10 +671,10 @@ export default function ServicePage() {
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleToggleFavorite(service.id)}
+                        onClick={() => handleToggleFavorite(wo.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
                       >
-                        <Star className={`w-5 h-5 ${service.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
+                        <Star className={`w-5 h-5 ${wo.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                       </button>
                     </td>
                   </tr>
@@ -764,12 +684,12 @@ export default function ServicePage() {
           </div>
         </div>
 
-        {filteredServices.length === 0 && (
+        {filteredWorkOrders.length === 0 && (
           <div className="text-center py-12">
-            <Wrench className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No services found</h3>
+            <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No work orders found</h3>
             <p className="text-gray-600">
-              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first service.'}
+              {searchTerm ? 'Try adjusting your search.' : 'Get started by creating your first work order.'}
             </p>
           </div>
         )}
@@ -786,12 +706,8 @@ export default function ServicePage() {
               <div className="flex items-start gap-3 mb-4">
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-gray-700">
-                  <p className="mb-3">
-                    To create new services, you need to configure a page layout in the Page Editor first.
-                  </p>
-                  <p className="font-medium text-gray-900">
-                    This allows you to:
-                  </p>
+                  <p className="mb-3">To create new work orders, you need to configure a page layout in the Page Editor first.</p>
+                  <p className="font-medium text-gray-900">This allows you to:</p>
                   <ul className="list-disc list-inside mt-2 space-y-1 text-gray-600">
                     <li>Customize which fields appear</li>
                     <li>Organize fields into sections</li>
@@ -802,17 +718,8 @@ export default function ServicePage() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setShowNoLayoutsDialog(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <Link
-                href="/object-manager/Service"
-                className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
-                onClick={() => setShowNoLayoutsDialog(false)}
-              >
+              <button onClick={() => setShowNoLayoutsDialog(false)} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+              <Link href="/object-manager/WorkOrder" className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark" onClick={() => setShowNoLayoutsDialog(false)}>
                 <Layout className="w-4 h-4 mr-2" />
                 Go to Page Editor
               </Link>
@@ -827,9 +734,7 @@ export default function ServicePage() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Choose which form layout to use for creating a new service
-              </p>
+              <p className="text-sm text-gray-600 mt-1">Choose which form layout to use for creating a new work order</p>
             </div>
             <div className="p-6 space-y-3">
               {pageLayouts.map((layout) => (
@@ -837,14 +742,14 @@ export default function ServicePage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    setPreference('serviceSelectedLayoutId', layout.id);
+                    setPreference('workOrderSelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}
                   className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left"
                 >
                   <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Wrench className="w-5 h-5 text-brand-navy" />
+                    <ClipboardList className="w-5 h-5 text-brand-navy" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-gray-900">{layout.name}</div>
@@ -857,12 +762,7 @@ export default function ServicePage() {
               ))}
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => setShowLayoutSelector(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowLayoutSelector(false)} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
             </div>
           </div>
         </div>
@@ -872,15 +772,12 @@ export default function ServicePage() {
       {hasPageLayout && selectedLayoutId && (
         <DynamicFormDialog
           open={showDynamicForm}
-          onOpenChange={(open) => {
-            setShowDynamicForm(open);
-            if (!open) setSelectedLayoutId(null);
-          }}
-          objectApiName="Service"
+          onOpenChange={(open) => { setShowDynamicForm(open); if (!open) setSelectedLayoutId(null); }}
+          objectApiName="WorkOrder"
           layoutType="create"
           layoutId={selectedLayoutId}
           onSubmit={handleDynamicFormSubmit}
-          title="New Service"
+          title="New Work Order"
         />
       )}
 
@@ -892,23 +789,15 @@ export default function ServicePage() {
               <h2 className="text-xl font-semibold text-gray-900">Configure Table Columns</h2>
               <p className="text-sm text-gray-600 mt-1">Customize which columns appear in your table. Drag to reorder, click to remove.</p>
             </div>
-            
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-medium text-gray-700 uppercase">Visible Columns ({visibleColumns.length})</h3>
-                <button 
-                  onClick={() => setShowAddColumn(true)} 
-                  className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Add More Columns
-                </button>
+                <button onClick={() => setShowAddColumn(true)} className="px-4 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Add More Columns</button>
               </div>
-              
               <div className="space-y-2">
                 {visibleColumns.map((columnId, index) => {
                   const column = AVAILABLE_COLUMNS.find(c => c.id === columnId);
                   if (!column) return null;
-                  
                   return (
                     <div
                       key={columnId}
@@ -920,99 +809,22 @@ export default function ServicePage() {
                     >
                       <GripVertical className="w-5 h-5 text-gray-400" />
                       <span className="flex-1 text-sm font-medium text-gray-900">{column.label}</span>
-                      <button
-                        onClick={() => handleRemoveColumn(columnId)}
-                        className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100"
-                        title="Remove"
-                      >
+                      <button onClick={() => handleRemoveColumn(columnId)} className="p-1 hover:bg-white rounded transition-colors opacity-0 group-hover:opacity-100" title="Remove">
                         <X className="w-4 h-4 text-gray-500" />
                       </button>
                     </div>
                   );
                 })}
               </div>
-              
-              <button 
-                onClick={handleResetColumns} 
-                className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1"
-              >
-                Reset Columns to Default
-              </button>
+              <button onClick={handleResetColumns} className="mt-6 text-sm text-brand-navy hover:text-brand-dark flex items-center gap-1">Reset Columns to Default</button>
             </div>
-            
             <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowFilterSettings(false)}
-                className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors"
-              >
-                Save
-              </button>
+              <button onClick={() => setShowFilterSettings(false)} className="px-6 py-2 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={() => setShowFilterSettings(false)} className="px-6 py-2 text-sm bg-brand-navy text-white rounded hover:bg-brand-navy-dark transition-colors">Save</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Add Column Modal */}
-      {showAddColumn && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center" onClick={() => setShowAddColumn(false)}>
-          <div className="bg-white rounded-lg w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-gray-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-900">Add Columns</h3>
-            </div>
-            <div className="px-6 py-4">
-              <input
-                type="text"
-                placeholder="Search fields..."
-                value={columnSearchTerm}
-                onChange={(e) => setColumnSearchTerm(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 mb-4"
-              />
-              <div className="max-h-80 overflow-y-auto">
-                <div className="space-y-2">
-                  {AVAILABLE_COLUMNS
-                    .filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase()))
-                    .map((column) => (
-                      <button
-                        key={column.id}
-                        onClick={() => {
-                          handleAddColumn(column.id);
-                          setColumnSearchTerm('');
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 rounded border border-gray-200 transition-colors text-left"
-                      >
-                        <span className="text-sm font-medium text-gray-900">{column.label}</span>
-                      </button>
-                    ))}
-                  {AVAILABLE_COLUMNS.filter(col => !visibleColumns.includes(col.id) && col.label.toLowerCase().includes(columnSearchTerm.toLowerCase())).length === 0 && (
-                    <p className="text-gray-500 text-sm py-8 text-center">
-                      {columnSearchTerm ? 'No fields match your search.' : 'All available columns are already visible.'}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="border-t border-gray-200 px-6 py-4">
-              <button
-                onClick={() => {
-                  setShowAddColumn(false);
-                  setColumnSearchTerm('');
-                }}
-                className="w-full px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigation Editor Modal */}
       </div>
     </div>
   );

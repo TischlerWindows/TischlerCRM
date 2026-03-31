@@ -64,7 +64,7 @@ const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
 const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
   Lead: 'Leads',
   Deal: 'Project Books',
-  // Phase 2: WorkOrder: 'Service',
+  WorkOrder: 'Service',
 };
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
