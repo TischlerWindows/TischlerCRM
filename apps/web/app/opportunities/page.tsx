@@ -429,7 +429,7 @@ export default function OpportunitiesPage() {
       // Generate unique opportunity number
       const existingNumbers = opportunities
         .map(d => d.opportunityNumber)
-        .filter(num => num.startsWith('Opportunity'))
+        .filter(num => num && num.startsWith('OPP'))
         .map(num => parseInt(num.replace(/^OPP-?/, ''), 10))
         .filter(num => !isNaN(num));
       
