@@ -94,11 +94,12 @@ function resolveCompositeTextValue(obj: any): string | null {
 export function resolveLookupDisplayName(value: any, objectType: string): string {
   if (!value) return '-';
   
-  // If the value doesn't look like an ID (numeric/timestamp), it might already be a name
-  // IDs are typically numeric strings (timestamps) or UUIDs
+  // If the value doesn't look like an ID, it might already be a name
+  // IDs are typically numeric strings, UUIDs, or alphanumeric hashes
   const stringValue = String(value);
   const looksLikeId = /^\d+$/.test(stringValue) || 
-                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stringValue);
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stringValue) ||
+                      /^[0-9a-zA-Z]{10,}$/.test(stringValue);
   
   if (!looksLikeId) {
     // Value is likely already a display name, return it as-is
