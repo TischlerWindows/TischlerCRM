@@ -553,8 +553,13 @@ export default function DynamicForm({
       if (typeof addr === 'object' && addr !== null) {
         const street = addr.street || addr.address || addr.addressLine1 || '';
         const city = addr.city || '';
-        const parts = [street, city].filter(Boolean);
-        if (parts.length > 0) return parts.join(', ');
+        const state = addr.state || '';
+        const zip = addr.postalCode || addr.zipCode || '';
+        const parts = [street, city, state, zip].filter(Boolean);
+        if (parts.length > 0) {
+          const result = parts.join(', ');
+          if (result !== primaryLabel) return result;
+        }
       }
       if (typeof addr === 'string' && addr && addr !== primaryLabel) return addr;
     }
