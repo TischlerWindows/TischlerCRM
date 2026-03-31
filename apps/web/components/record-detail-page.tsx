@@ -115,11 +115,11 @@ export default function RecordDetailPage({
   // When a Lead or Deal (Opportunity) record has a propertyId, create a
   // subfolder like /TischlerCRM/Property/{addr}/Leads/{leadFolder} automatically.
   // Also redirect the DropboxFileBrowser to browse this subfolder.
-  const LINKED_SUBFOLDER: Record<string, string> = { Lead: 'Leads', Deal: 'Project Books' };
+  const LINKED_SUBFOLDER: Record<string, string> = { Lead: 'Leads', Deal: 'Project Books', WorkOrder: 'Service' };
   useEffect(() => {
     if (!record || !params?.id) return;
     // Only for object types that map to a Property subfolder
-    const LINKED_TYPES = ['Lead', 'Deal'];
+    const LINKED_TYPES = ['Lead', 'Deal', 'WorkOrder'];
     if (!LINKED_TYPES.includes(objectApiName)) return;
 
     // Find the property lookup value (could be propertyId, Property__propertyId, etc.)
@@ -1049,7 +1049,7 @@ export default function RecordDetailPage({
       {/* Dropbox file browser — hardcoded at end of every record */}
       {/* For linked types (Lead/Deal), wait for property resolution before rendering */}
       {record && params?.id &&
-        (!['Lead', 'Deal'].includes(objectApiName) || linkedDropboxInfo !== null) && (
+        (!['Lead', 'Deal', 'WorkOrder'].includes(objectApiName) || linkedDropboxInfo !== null) && (
         <div className="max-w-6xl mx-auto px-6 pb-6">
           <DropboxFileBrowser
             objectApiName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.objectApiName : objectApiName}

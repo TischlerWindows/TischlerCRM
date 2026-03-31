@@ -3177,6 +3177,7 @@ class LocalStorageSchemaService implements SchemaService {
         { id: generateId(), apiName: 'WorkOrder__additionalContactA', label: 'Additional Contact A', type: 'Lookup', lookupObject: 'Contact' },
         { id: generateId(), apiName: 'WorkOrder__additionalContactB', label: 'Additional Contact B', type: 'Lookup', lookupObject: 'Contact' },
         { id: generateId(), apiName: 'WorkOrder__project', label: 'Job/Project', type: 'Lookup', lookupObject: 'Project' },
+        { id: generateId(), apiName: 'WorkOrder__property', label: 'Property', type: 'Lookup', lookupObject: 'Property' },
         // ── Location ──
         { id: generateId(), apiName: 'WorkOrder__location', label: 'Location', type: 'Address' },
         { id: generateId(), apiName: 'WorkOrder__location2', label: 'Location 2', type: 'Address' },
