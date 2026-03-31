@@ -92,6 +92,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     pathname?.startsWith('/reports') ||
     pathname?.startsWith('/settings') ||
     pathname?.startsWith('/service') ||
+    pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
     pathname?.includes('demo');
