@@ -542,32 +542,40 @@ export default function DynamicForm({
   const getRecordSubtitle = (record: Record<string, any>, primaryLabel: string): string => {
     const keys = Object.keys(record);
     const strip = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
-    // Property → show street address
+    // Property → combine separate address/city/state/zip text fields
     const addrKey = keys.find(k => {
       const lk = strip(k);
       return lk === 'address' || lk === 'street_address' || lk === 'property_address';
     });
-    if (addrKey) {
-      let addr = record[addrKey];
-      if (typeof addr === 'string' && addr.startsWith('{')) { try { addr = JSON.parse(addr); } catch { /* ignore */ } }
-      if (typeof addr === 'object' && addr !== null) {
-        const street = addr.street || addr.address || addr.addressLine1 || '';
-        const city = addr.city || '';
-        const state = addr.state || '';
-        const zip = addr.postalCode || addr.zipCode || '';
+    const cityKey = keys.find(k => strip(k) === 'city');
+    const stateKey = keys.find(k => strip(k) === 'state');
+    const zipKey = keys.find(k => strip(k) === 'zipcode' || strip(k) === 'postalcode');
+    if (addrKey || cityKey) {
+      let addrVal = addrKey ? record[addrKey] : '';
+      // Handle composite address objects (Address type fields)
+      if (typeof addrVal === 'string' && addrVal.startsWith('{')) { try { addrVal = JSON.parse(addrVal); } catch { /* ignore */ } }
+      if (typeof addrVal === 'object' && addrVal !== null) {
+        const street = addrVal.street || addrVal.address || addrVal.addressLine1 || '';
+        const city = addrVal.city || '';
+        const state = addrVal.state || '';
+        const zip = addrVal.postalCode || addrVal.zipCode || '';
         const parts = [street, city, state, zip].filter(Boolean);
         if (parts.length > 0) {
           const result = parts.join(', ');
           if (result !== primaryLabel) return result;
         }
       }
-      if (typeof addr === 'string' && addr && addr !== primaryLabel) return addr;
+      // Combine separate text fields: address, city, state, zip
+      const addrStr = (typeof addrVal === 'string') ? addrVal : '';
+      const cityStr = cityKey ? String(record[cityKey] || '') : '';
+      const stateStr = stateKey ? String(record[stateKey] || '') : '';
+      const zipStr = zipKey ? String(record[zipKey] || '') : '';
+      const parts = [addrStr, cityStr, stateStr, zipStr].filter(Boolean);
+      if (parts.length > 0) {
+        const result = parts.join(', ');
+        if (result !== primaryLabel) return result;
+      }
     }
-    // Fallback: look for a separate city or street field
-    const cityKey = keys.find(k => strip(k) === 'city');
-    const streetKey = keys.find(k => strip(k) === 'street' || strip(k) === 'streetaddress');
-    if (streetKey && record[streetKey]) return String(record[streetKey]);
-    if (cityKey && record[cityKey]) return String(record[cityKey]);
     // Contact → show email
     const emailKey = keys.find(k => strip(k) === 'email');
     if (emailKey && record[emailKey] && record[emailKey] !== primaryLabel) return String(record[emailKey]);
