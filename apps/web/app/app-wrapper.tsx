@@ -130,6 +130,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
           'Deal': '/deals',
           'Project': '/projects',
           'Service': '/service',
+          'WorkOrder': '/workorders',
           'Quote': '/quotes',
           'Installation': '/installations',
         };
