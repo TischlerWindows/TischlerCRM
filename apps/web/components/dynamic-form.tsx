@@ -542,35 +542,22 @@ export default function DynamicForm({
   const getRecordSubtitle = (record: Record<string, any>, primaryLabel: string): string => {
     const keys = Object.keys(record);
     const strip = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
-    // Property → combine separate address/city/state/zip text fields
-    const addrKey = keys.find(k => {
-      const lk = strip(k);
-      return lk === 'address' || lk === 'street_address' || lk === 'property_address';
-    });
+    // Property → prefer property_address (full formatted), then street_address + city/state/zip
+    const propAddrKey = keys.find(k => strip(k) === 'property_address');
+    if (propAddrKey && record[propAddrKey] && String(record[propAddrKey]) !== primaryLabel) {
+      return String(record[propAddrKey]);
+    }
+    const streetAddrKey = keys.find(k => strip(k) === 'street_address');
     const cityKey = keys.find(k => strip(k) === 'city');
     const stateKey = keys.find(k => strip(k) === 'state');
     const zipKey = keys.find(k => strip(k) === 'zipcode' || strip(k) === 'postalcode');
-    if (addrKey || cityKey) {
-      let addrVal = addrKey ? record[addrKey] : '';
-      // Handle composite address objects (Address type fields)
-      if (typeof addrVal === 'string' && addrVal.startsWith('{')) { try { addrVal = JSON.parse(addrVal); } catch { /* ignore */ } }
-      if (typeof addrVal === 'object' && addrVal !== null) {
-        const street = addrVal.street || addrVal.address || addrVal.addressLine1 || '';
-        const city = addrVal.city || '';
-        const state = addrVal.state || '';
-        const zip = addrVal.postalCode || addrVal.zipCode || '';
-        const parts = [street, city, state, zip].filter(Boolean);
-        if (parts.length > 0) {
-          const result = parts.join(', ');
-          if (result !== primaryLabel) return result;
-        }
-      }
-      // Combine separate text fields: address, city, state, zip
-      const addrStr = (typeof addrVal === 'string') ? addrVal : '';
-      const cityStr = cityKey ? String(record[cityKey] || '') : '';
-      const stateStr = stateKey ? String(record[stateKey] || '') : '';
-      const zipStr = zipKey ? String(record[zipKey] || '') : '';
-      const parts = [addrStr, cityStr, stateStr, zipStr].filter(Boolean);
+    if (streetAddrKey || cityKey) {
+      const parts = [
+        streetAddrKey ? String(record[streetAddrKey] || '') : '',
+        cityKey ? String(record[cityKey] || '') : '',
+        stateKey ? String(record[stateKey] || '') : '',
+        zipKey ? String(record[zipKey] || '') : '',
+      ].filter(Boolean);
       if (parts.length > 0) {
         const result = parts.join(', ');
         if (result !== primaryLabel) return result;
