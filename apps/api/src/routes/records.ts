@@ -379,14 +379,23 @@ export async function recordRoutes(app: FastifyInstance) {
         for (const rec of existing) {
           const recData = rec.data as Record<string, any> | null;
           if (!recData) continue;
-          const val = recData[field.apiName];
+          // Check both bare field name and prefixed variants (e.g. Opportunity__opportunityNumber)
+          let val: string | undefined;
+          for (const [k, v] of Object.entries(recData)) {
+            const stripped = k.replace(/^[A-Za-z]+__/, '');
+            if (stripped === field.apiName && typeof v === 'string') { val = v; break; }
+          }
           if (typeof val === 'string') {
             const m = val.match(prefixRegex);
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
         const padWidth = field.apiName === 'propertyNumber' ? 4 : 3;
-        normalizedData[field.apiName] = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        normalizedData[field.apiName] = generatedNum;
+        // Also set the prefixed key so the stored JSON is consistent
+        const prefixedKey = `${apiName}__${field.apiName}`;
+        normalizedData[prefixedKey] = generatedNum;
       }
     }
 
