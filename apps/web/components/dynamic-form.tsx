@@ -946,7 +946,15 @@ export default function DynamicForm({
       case 'LookupUser': {
         // Try to display the lookup label from the search input state
         const lookupLabel = lookupQueries[fieldDef.apiName];
-        return lookupLabel || String(val);
+        if (lookupLabel) return lookupLabel;
+        // Resolve from cached lookup records
+        const targetApiName = getLookupTargetApi(fieldDef);
+        if (targetApiName) {
+          const cachedRecords = getLookupRecords(targetApiName);
+          const matched = cachedRecords.find((r: any) => String(r.id) === String(val));
+          if (matched) return getRecordLabel(matched);
+        }
+        return String(val);
       }
       case 'CompositeText': {
         if (typeof val === 'object' && val !== null) {
