@@ -170,19 +170,22 @@ export default function RecordDetailPage({
 
         // Point the file browser at the Property subfolder
         const subfolder = LINKED_SUBFOLDER[objectApiName] || objectApiName;
-        setLinkedDropboxInfo({
-          objectApiName: 'Property',
-          recordId: propertyRecordId,
-          folderName: parentFolderName,
-          subPath: `${subfolder}/${childName}`,
-        });
 
+        // Ensure the linked folder (and subfolders) exist BEFORE setting the
+        // file-browser path so the browser sees the subfolders on first load.
         await apiClient.ensureDropboxLinkedFolder({
           parentObjectApiName: 'Property',
           parentRecordId: propertyRecordId,
           parentFolderName,
           childObjectApiName: objectApiName,
           childFolderName: childName,
+        });
+
+        setLinkedDropboxInfo({
+          objectApiName: 'Property',
+          recordId: propertyRecordId,
+          folderName: parentFolderName,
+          subPath: `${subfolder}/${childName}`,
         });
       } catch { setLinkedDropboxInfo(false); /* non-fatal — Dropbox may not be connected */ }
     })();
