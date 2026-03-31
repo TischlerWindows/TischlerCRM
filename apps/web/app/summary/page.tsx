@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
+import { recordsService } from '@/lib/records-service';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -604,6 +605,11 @@ export default function SummaryPage() {
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  // Opportunity picker state
+  const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
+  const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
+  const [opportunitySearch, setOpportunitySearch] = useState('');
+  const [loadingOpportunities, setLoadingOpportunities] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -691,6 +697,30 @@ export default function SummaryPage() {
       ? aStr.localeCompare(bStr, undefined, { numeric: true })
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
+
+  const openOpportunityPicker = async () => {
+    setShowOpportunityPicker(true);
+    setOpportunitySearch('');
+    setLoadingOpportunities(true);
+    try {
+      const records = await recordsService.getRecords('Opportunity');
+      setOpportunityRecords(records.map(r => ({ id: r.id, ...r.data })));
+    } catch (err) {
+      console.error('Failed to load opportunities:', err);
+      setOpportunityRecords([]);
+    } finally {
+      setLoadingOpportunities(false);
+    }
+  };
+
+  const handleOpportunitySelected = (record: any) => {
+    setShowOpportunityPicker(false);
+    createNewSummary({
+      opportunityId: record.id,
+      opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
+      opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+    });
+  };
 
   const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string }) => {
     const newSummary: Summary = {
@@ -1783,7 +1813,7 @@ export default function SummaryPage() {
             <h3 className="text-lg font-medium text-gray-900">Summary Records</h3>
             <div className="flex gap-3">
               <button
-                onClick={createNewSummary}
+                onClick={openOpportunityPicker}
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -1963,6 +1993,78 @@ export default function SummaryPage() {
         </div>
       </div>
     </div>
+
+    {/* Opportunity Picker Modal */}
+    {showOpportunityPicker && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Select Opportunity</h2>
+              <p className="text-sm text-gray-600 mt-1">Choose an Opportunity to link to this Summary</p>
+            </div>
+            <button
+              onClick={() => setShowOpportunityPicker(false)}
+              className="p-2 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4">
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search opportunities..."
+                value={opportunitySearch}
+                onChange={(e) => setOpportunitySearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+              {loadingOpportunities ? (
+                <div className="p-6 text-center text-gray-500">
+                  <div className="animate-spin w-6 h-6 border-2 border-brand-navy border-t-transparent rounded-full mx-auto mb-2" />
+                  Loading opportunities...
+                </div>
+              ) : opportunityRecords.filter(r => {
+                if (!opportunitySearch) return true;
+                const q = opportunitySearch.toLowerCase();
+                const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                return name.includes(q) || num.includes(q);
+              }).length === 0 ? (
+                <div className="p-6 text-center text-gray-500">
+                  <p className="text-sm">No opportunities found</p>
+                </div>
+              ) : (
+                opportunityRecords.filter(r => {
+                  if (!opportunitySearch) return true;
+                  const q = opportunitySearch.toLowerCase();
+                  const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                  const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                  return name.includes(q) || num.includes(q);
+                }).map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleOpportunitySelected(r)}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">
+                      {r.opportunityNumber || r.Opportunity__opportunityNumber || 'No Number'}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {r.opportunityName || r.Opportunity__opportunityName || 'Unnamed'}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
