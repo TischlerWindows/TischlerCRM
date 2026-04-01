@@ -146,11 +146,13 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                     onClick={() => togglePanelCollapse(panel.id)}
                     className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                     style={headerStyle}
+                    aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
+                    aria-expanded={!isPanelCollapsed}
                   >
                     <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
                     {isPanelCollapsed
-                      ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" />
-                      : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" />
+                      ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                      : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
                     }
                   </button>
                   {!isPanelCollapsed && (
@@ -348,6 +350,8 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
               type="button"
               onClick={toggleSection}
               className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+              aria-label={isCollapsed ? `Expand ${section.label} section` : `Collapse ${section.label} section`}
+              aria-expanded={!isCollapsed}
             >
               <div className="text-left">
                 <h3 className="font-medium text-gray-900">{section.label}</h3>
@@ -358,9 +362,9 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                 ) : null}
               </div>
               {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-gray-500" />
+                <ChevronRight className="h-4 w-4 text-gray-500" aria-hidden="true" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+                <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden="true" />
               )}
             </button>
 

@@ -217,7 +217,7 @@ export function FieldInput({
         <div key={fieldDef.apiName} className="flex flex-col">
           {inputElement}
           {error && (
-            <span className="text-xs text-red-500 mt-1">{error}</span>
+            <span className="text-xs text-red-500 mt-1" role="alert">{error}</span>
           )}
           {fieldDef.helpText && (
             <span className="text-xs text-gray-500 mt-1">
@@ -771,7 +771,7 @@ export function FieldInput({
       ) : (
         inputElement
       )}
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-xs text-red-500" role="alert">{error}</span>}
       {!error && fieldDef.helpText && (
         <span className="text-xs text-gray-500">{fieldDef.helpText}</span>
       )}
