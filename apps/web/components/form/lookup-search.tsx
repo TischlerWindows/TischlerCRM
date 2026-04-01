@@ -1,0 +1,427 @@
+'use client';
+
+import React from 'react';
+import { Input } from '@/components/ui/input';
+import { FieldDef, ObjectDef } from '@/lib/schema';
+import { cn } from '@/lib/utils';
+
+// ── getRecordLabel ───────────────────────────────────────────────────
+// Derives a human-readable label from a flattened lookup record.
+
+export function getRecordLabel(record: any): string {
+  if (!record) return '';
+
+  // Handle name object (Contact name with salutation, firstName, lastName)
+  if (record.name && typeof record.name === 'object') {
+    const nameObj = record.name;
+    const nameParts = [
+      nameObj.salutation || nameObj.Contact__name_salutation,
+      nameObj.firstName || nameObj.Contact__name_firstName,
+      nameObj.lastName || nameObj.Contact__name_lastName,
+    ].filter(Boolean);
+    if (nameParts.length > 0) return nameParts.join(' ');
+  }
+
+  // Handle simple name string
+  if (record.name && typeof record.name === 'string') return record.name;
+
+  if (record.title) return record.title;
+
+  // Account name - check multiple variations
+  if (record.accountName) return record.accountName;
+  if (record.Account__accountName) return record.Account__accountName;
+
+  // Property number
+  if (record.propertyNumber) return record.propertyNumber;
+  if (record.Property__propertyNumber) return record.Property__propertyNumber;
+
+  // Account number as fallback for accounts
+  if (record.accountNumber) return record.accountNumber;
+
+  // Contact names
+  if (record.firstName || record.lastName) {
+    return `${record.firstName || ''} ${record.lastName || ''}`.trim();
+  }
+  if (record.email) return record.email;
+
+  // Lead/Deal/Project numbers
+  if (record.leadNumber) return record.leadNumber;
+  if (record.dealNumber) return record.dealNumber;
+  if (record.projectNumber) return record.projectNumber;
+  if (record.quoteNumber) return record.quoteNumber;
+  if (record.serviceNumber) return record.serviceNumber;
+  if (record.installationNumber) return record.installationNumber;
+  if (record.productName) return record.productName;
+
+  // Handle address - could be string or object
+  if (record.address) {
+    if (typeof record.address === 'object') {
+      const addrParts = [
+        record.address.street,
+        record.address.city,
+        record.address.state,
+      ].filter(Boolean);
+      if (addrParts.length > 0) return addrParts.join(', ');
+    } else {
+      return record.address;
+    }
+  }
+
+  // Search for prefixed field names as last resort
+  const keys = Object.keys(record);
+  const firstNameKey = keys.find((key) =>
+    key.toLowerCase().endsWith('__firstname'),
+  );
+  const lastNameKey = keys.find((key) =>
+    key.toLowerCase().endsWith('__lastname'),
+  );
+  if (firstNameKey || lastNameKey) {
+    return `${record[firstNameKey || ''] || ''} ${record[lastNameKey || ''] || ''}`.trim();
+  }
+  const nameKey = keys.find((key) => key.toLowerCase().endsWith('__name'));
+  if (nameKey && record[nameKey]) {
+    const nameVal = record[nameKey];
+    if (typeof nameVal === 'object' && nameVal !== null) {
+      // CompositeText: extract display text from the object
+      const nameKeys = Object.keys(nameVal);
+      const findVal = (pattern: string) => {
+        const k = nameKeys.find((nk) => nk.toLowerCase().includes(pattern));
+        return k ? nameVal[k] : undefined;
+      };
+      const parts = [
+        nameVal.salutation || findVal('salutation'),
+        nameVal.firstName || findVal('firstname'),
+        nameVal.lastName || findVal('lastname'),
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(' ');
+      // Fallback: join all string values
+      const allStringVals = Object.values(nameVal).filter(
+        (v) => typeof v === 'string' && v,
+      );
+      if (allStringVals.length > 0) return allStringVals.join(' ');
+    }
+    return String(nameVal);
+  }
+  const accountKey = keys.find((key) =>
+    key.toLowerCase().endsWith('__accountname'),
+  );
+  if (accountKey && record[accountKey]) return record[accountKey];
+  const propertyKey = keys.find((key) =>
+    key.toLowerCase().endsWith('__propertynumber'),
+  );
+  if (propertyKey && record[propertyKey]) return record[propertyKey];
+  const emailKey = keys.find((key) =>
+    key.toLowerCase().endsWith('__email'),
+  );
+  if (emailKey && record[emailKey]) return record[emailKey];
+
+  // Final fallback - use any "name" or "number" field
+  const anyNameField = keys.find(
+    (key) => key.toLowerCase().includes('name') && record[key],
+  );
+  if (anyNameField && record[anyNameField]) {
+    const val = record[anyNameField];
+    if (typeof val === 'object' && val !== null) {
+      const objKeys = Object.keys(val);
+      const findVal = (pattern: string) => {
+        const k = objKeys.find((nk) => nk.toLowerCase().includes(pattern));
+        return k ? val[k] : undefined;
+      };
+      const parts = [
+        val.salutation || findVal('salutation'),
+        val.firstName || findVal('firstname'),
+        val.lastName || findVal('lastname'),
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(' ');
+      const allStringVals = Object.values(val).filter(
+        (v) => typeof v === 'string' && v,
+      );
+      if (allStringVals.length > 0) return (allStringVals as string[]).join(' ');
+    }
+    return String(val);
+  }
+  const anyNumberField = keys.find(
+    (key) => key.toLowerCase().includes('number') && record[key],
+  );
+  if (anyNumberField && record[anyNumberField])
+    return String(record[anyNumberField]);
+
+  return String(record.id || 'Record');
+}
+
+// ── getLookupTargetApi ──────────────────────────────────────────────
+
+export function getLookupTargetApi(
+  fieldDef: FieldDef,
+  objectFields: FieldDef[],
+  schemaObjects?: ObjectDef[],
+): string | undefined {
+  const relatedObject = (fieldDef as any).relatedObject as string | undefined;
+  if (fieldDef.lookupObject) return fieldDef.lookupObject;
+  if (fieldDef.relationship?.targetObject)
+    return fieldDef.relationship.targetObject;
+  if (relatedObject) return relatedObject;
+
+  // Fallback: try to find from object.fields by apiName
+  const objField = objectFields.find((f) => f.apiName === fieldDef.apiName);
+  if (objField?.lookupObject) return objField.lookupObject;
+
+  // Last resort: infer from apiName pattern (e.g., "ContactId" -> "Contact")
+  if (fieldDef.apiName.endsWith('Id')) {
+    const possibleTarget = fieldDef.apiName.slice(0, -2);
+    const matchedObj = schemaObjects?.find(
+      (o) => o.apiName === possibleTarget,
+    );
+    if (matchedObj) return matchedObj.apiName;
+  }
+
+  return undefined;
+}
+
+// ── LookupSearch component ──────────────────────────────────────────
+
+export interface LookupSearchProps {
+  fieldDef: FieldDef;
+  value: any;
+  onChange: (val: any) => void;
+  disabled?: boolean;
+  error?: string;
+  records: any[];
+  lookupQuery: string;
+  isActive: boolean;
+  onQueryChange: (query: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  onInlineCreate?: (targetApi: string) => void;
+  schemaObjects?: ObjectDef[];
+}
+
+export function LookupSearch({
+  fieldDef,
+  value,
+  onChange,
+  disabled,
+  error,
+  records,
+  lookupQuery,
+  isActive,
+  onQueryChange,
+  onFocus,
+  onBlur,
+  onInlineCreate,
+  schemaObjects,
+}: LookupSearchProps) {
+  const recordsArray = Array.isArray(records) ? records : [];
+  const selectedRecord = value
+    ? recordsArray.find((r) => String(r.id) === String(value))
+    : null;
+  const selectedLabel = selectedRecord ? getRecordLabel(selectedRecord) : '';
+
+  // Determine what to display:
+  // - If lookup is active (user is typing), show the query
+  // - If we have a selected label (found the record), show that
+  // - If a value is set but record isn't in cache yet, fall back to lookupQuery
+  // - Otherwise show empty
+  const displayValue = isActive
+    ? lookupQuery
+    : selectedLabel || (value ? lookupQuery : '');
+
+  const filteredRecords = recordsArray.filter((record) => {
+    const label = getRecordLabel(record);
+    const labelStr = typeof label === 'string' ? label : String(label || '');
+    if (!labelStr) return true;
+    const query = lookupQuery.toLowerCase();
+    if (labelStr.toLowerCase().includes(query)) return true;
+    return Object.values(record).some(
+      (val) => typeof val === 'string' && val.toLowerCase().includes(query),
+    );
+  });
+
+  const targetApi = getLookupTargetApi(
+    fieldDef,
+    [],
+    schemaObjects,
+  );
+
+  return (
+    <div className="relative">
+      <Input
+        id={fieldDef.apiName}
+        value={displayValue}
+        placeholder={`Search ${fieldDef.relationshipName || targetApi || 'records'}...`}
+        onChange={(e) => onQueryChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        disabled={disabled}
+        className={cn(error && 'border-red-500')}
+      />
+      {isActive && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('');
+              onQueryChange('');
+            }}
+            className={cn(
+              'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+              !value && 'bg-blue-50',
+            )}
+          >
+            -- None --
+          </button>
+          {filteredRecords.length > 0 ? (
+            filteredRecords.slice(0, 20).map((record) => {
+              const label = getRecordLabel(record);
+              const displayLabel =
+                typeof label === 'string' ? label : String(label || 'Record');
+              return (
+                <button
+                  key={record.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(record.id);
+                    onQueryChange(displayLabel);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                >
+                  <div className="font-medium text-gray-900 truncate">
+                    {displayLabel}
+                  </div>
+                  <div className="text-xs text-gray-500">{record.id}</div>
+                </button>
+              );
+            })
+          ) : lookupQuery ? (
+            <div className="px-3 py-2 text-xs text-gray-500">
+              No matches found.
+            </div>
+          ) : null}
+          {targetApi &&
+            onInlineCreate &&
+            (() => {
+              const targetObj = schemaObjects?.find(
+                (o) => o.apiName === targetApi,
+              );
+              const createLabel = targetObj?.label || targetApi;
+              return (
+                <button
+                  type="button"
+                  onClick={() => onInlineCreate(targetApi)}
+                  className="w-full px-3 py-2 text-left text-sm font-medium text-indigo-600 hover:bg-indigo-50 border-t border-gray-100 rounded-b-lg"
+                >
+                  + Create new {createLabel}
+                </button>
+              );
+            })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── LookupUserSearch component ──────────────────────────────────────
+
+export interface LookupUserSearchProps {
+  fieldDef: FieldDef;
+  value: any;
+  onChange: (val: any) => void;
+  disabled?: boolean;
+  error?: string;
+  userRecords: any[];
+  lookupQuery: string;
+  isActive: boolean;
+  onQueryChange: (query: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}
+
+export function LookupUserSearch({
+  fieldDef,
+  value,
+  onChange,
+  disabled,
+  error,
+  userRecords,
+  lookupQuery,
+  isActive,
+  onQueryChange,
+  onFocus,
+  onBlur,
+}: LookupUserSearchProps) {
+  const selectedUser = value
+    ? userRecords.find((u) => String(u.id) === String(value))
+    : null;
+  const selectedUserLabel = selectedUser
+    ? selectedUser.name || selectedUser.email || ''
+    : '';
+  const userDisplayValue = isActive ? lookupQuery : selectedUserLabel;
+
+  const filteredUsers = userRecords.filter((user) => {
+    const query = lookupQuery.toLowerCase();
+    if (!query) return true;
+    const name = (user.name || '').toLowerCase();
+    const email = (user.email || '').toLowerCase();
+    const title = (user.title || '').toLowerCase();
+    return (
+      name.includes(query) || email.includes(query) || title.includes(query)
+    );
+  });
+
+  return (
+    <div className="relative">
+      <Input
+        id={fieldDef.apiName}
+        value={userDisplayValue}
+        placeholder="Search users..."
+        onChange={(e) => onQueryChange(e.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        disabled={disabled}
+        className={cn(error && 'border-red-500')}
+      />
+      {isActive && (
+        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onChange('');
+              onQueryChange('');
+            }}
+            className={cn(
+              'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+              !value && 'bg-blue-50',
+            )}
+          >
+            -- None --
+          </button>
+          {filteredUsers.length > 0 ? (
+            filteredUsers.slice(0, 20).map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => {
+                  onChange(user.id);
+                  onQueryChange(user.name || user.email);
+                }}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+              >
+                <div className="font-medium text-gray-900 truncate">
+                  {user.name || user.email}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {user.email}
+                  {user.title ? ` \u00b7 ${user.title}` : ''}
+                </div>
+              </button>
+            ))
+          ) : lookupQuery ? (
+            <div className="px-3 py-2 text-xs text-gray-500">
+              No users found.
+            </div>
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
