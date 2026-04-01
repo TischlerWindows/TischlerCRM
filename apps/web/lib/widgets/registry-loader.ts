@@ -1,6 +1,6 @@
-import type { WidgetManifest } from './types'
-import { externalWidgets } from '@/widgets/external/registry'
-import { internalWidgets } from '@/widgets/internal/registry'
+import type { WidgetManifest, WidgetRegistration } from './types'
+import { externalWidgets, externalWidgetRegistrations } from '@/widgets/external/registry'
+import { internalWidgets, internalWidgetRegistrations } from '@/widgets/internal/registry'
 
 export function getAllWidgets(): WidgetManifest[] {
   return [...internalWidgets, ...externalWidgets]
@@ -29,4 +29,17 @@ export function getEnabledExternalWidgets(
     if (w.integration === null) return true
     return connectedProviders.includes(w.integration)
   })
+}
+
+/** Look up an external widget registration by its manifest ID (e.g. 'demo-widget') */
+export function getExternalRegistration(id: string): WidgetRegistration | undefined {
+  return externalWidgetRegistrations.find((r) => r.manifest.id === id)
+}
+
+/**
+ * Look up an internal widget registration by its WidgetConfig.type discriminant
+ * (the PascalCase value, e.g. 'Spacer', 'ActivityFeed')
+ */
+export function getInternalRegistrationByType(type: string): WidgetRegistration | undefined {
+  return internalWidgetRegistrations.find((r) => r.widgetConfigType === type)
 }

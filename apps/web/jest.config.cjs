@@ -7,4 +7,7 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
+  transform: {
+    '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: { jsx: 'react' } }],
+  },
 }
