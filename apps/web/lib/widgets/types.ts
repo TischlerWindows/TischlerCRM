@@ -1,5 +1,7 @@
 // apps/web/lib/widgets/types.ts
 
+import type React from 'react'
+
 export type WidgetCategory = 'external' | 'internal'
 export type DisplayMode = 'full' | 'column'
 
@@ -73,7 +75,7 @@ export interface ConfigPanelProps {
   record: Record<string, unknown>
   integration: WidgetProps['integration']
   object: WidgetProps['object']
-  objectOptions?: Array<{ apiName: string; label: string }>
+  objectOptions?: Array<{ value: string; label: string }>
 }
 
 export interface WidgetRegistration {
