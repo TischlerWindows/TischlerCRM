@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { LayoutWidget } from './types';
 import { useEditorStore } from './editor-store';
 import { getWidgetById } from '@/lib/widgets/registry-loader';
+import { CanvasErrorBoundary } from './canvas-error-boundary';
 import {
   Sparkles,
   Trash2,
@@ -102,6 +103,7 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
   };
 
   return (
+    <CanvasErrorBoundary label="Widget">
     <div
       ref={setNodeRef}
       style={style}
@@ -165,5 +167,6 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
         </button>
       </div>
     </div>
+    </CanvasErrorBoundary>
   );
 }

@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { LayoutPanel } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasFieldCard } from './canvas-field';
+import { CanvasErrorBoundary } from './canvas-error-boundary';
 import { cn } from '@/lib/utils';
 
 interface CanvasPanelProps {
@@ -102,6 +103,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
   };
 
   return (
+    <CanvasErrorBoundary label="Panel">
     <div
       ref={setSortableRef}
       style={sortableStyle}
@@ -242,5 +244,6 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
         </div>
       </div>
     </div>
+    </CanvasErrorBoundary>
   );
 }
