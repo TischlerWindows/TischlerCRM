@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Eye, Plus, Redo2, Save, Undo2, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
+import { selectUndoCount, selectRedoCount } from './store';
 import type { PageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
 
@@ -39,8 +40,8 @@ export function EditorToolbar({
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const undoCount = useEditorStore((s) => s.undoStack.length);
-  const redoCount = useEditorStore((s) => s.redoStack.length);
+  const undoCount = useEditorStore(selectUndoCount);
+  const redoCount = useEditorStore(selectRedoCount);
 
   const schema = useSchemaStore((s) => s.schema);
   const setLayoutActive = useSchemaStore((s) => s.setLayoutActive);
