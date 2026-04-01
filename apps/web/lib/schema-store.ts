@@ -396,11 +396,11 @@ export const useSchemaStore = create<SchemaStore>()(
             ...layout,
             tabs: layout.tabs.map(tab => ({
               ...tab,
-              regions: tab.regions.map(region => ({
+              regions: (tab.regions || []).map(region => ({
                 ...region,
-                panels: region.panels.map(panel => ({
+                panels: (region.panels || []).map(panel => ({
                   ...panel,
-                  fields: panel.fields.map(pf => {
+                  fields: (panel.fields || []).map(pf => {
                     // Match by old apiName (rename) or current apiName (property update)
                     const matchesOld = apiNameChanged && pf.fieldApiName === oldApiName;
                     const matchesCurrent = pf.fieldApiName === (newApiName || fieldId);

@@ -7,6 +7,7 @@ import { ArrowLeft, Database } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
+import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import { getFormattingEffectsForField } from '@/lib/layout-formatting';
@@ -115,6 +116,10 @@ export default function RecordDetailPage({
     }
     if (!raw) raw = objectDef.pageLayouts?.[0] ?? null;
     if (!raw) return null;
+    // Migrate legacy layouts (sections → regions/panels/fields)
+    if (isLegacyLayout(raw)) {
+      raw = migrateLegacyLayout(raw as any);
+    }
     const editorTabs = (raw.extensions as any)?.editorTabs;
     if (Array.isArray(editorTabs) && editorTabs.length > 0) {
       return { ...raw, tabs: editorTabs as any } as PageLayout;
