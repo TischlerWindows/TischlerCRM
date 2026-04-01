@@ -1408,6 +1408,7 @@ export default function DynamicForm({
       case 'LocationSearch': {
         // Build display value from saved target fields if the field's own value is empty
         let locationValue = value as string | undefined;
+        const targets = fieldDef.targetFields || {};
         if (!locationValue && fieldDef.targetFields) {
           const tf = fieldDef.targetFields;
           const parts = [
@@ -1419,23 +1420,93 @@ export default function DynamicForm({
           ].filter(Boolean);
           if (parts.length > 0) locationValue = parts.join(', ');
         }
+        const hasTargets = targets.street || targets.city || targets.state || targets.postalCode || targets.country;
         inputElement = (
-          <AddressAutocomplete
-            disabled={isReadOnly}
-            value={locationValue || ''}
-            onAddressSelected={(addr) => {
-              const targets = fieldDef.targetFields || {};
-              if (targets.street) handleFieldChange(targets.street, addr.street);
-              if (targets.city) handleFieldChange(targets.city, addr.city);
-              if (targets.state) handleFieldChange(targets.state, addr.state);
-              if (targets.postalCode) handleFieldChange(targets.postalCode, addr.postalCode);
-              if (targets.country) handleFieldChange(targets.country, addr.country);
-              if (targets.lat) handleFieldChange(targets.lat, String(addr.lat));
-              if (targets.lng) handleFieldChange(targets.lng, String(addr.lng));
-              // Persist the formatted address in the field's own value
-              handleFieldChange(fieldDef.apiName, addr.formattedAddress);
-            }}
-          />
+          <div className="space-y-2">
+            <AddressAutocomplete
+              disabled={isReadOnly}
+              value={locationValue || ''}
+              onAddressSelected={(addr) => {
+                if (targets.street) handleFieldChange(targets.street, addr.street);
+                if (targets.city) handleFieldChange(targets.city, addr.city);
+                if (targets.state) handleFieldChange(targets.state, addr.state);
+                if (targets.postalCode) handleFieldChange(targets.postalCode, addr.postalCode);
+                if (targets.country) handleFieldChange(targets.country, addr.country);
+                if (targets.lat) handleFieldChange(targets.lat, String(addr.lat));
+                if (targets.lng) handleFieldChange(targets.lng, String(addr.lng));
+                // Persist the formatted address in the field's own value
+                handleFieldChange(fieldDef.apiName, addr.formattedAddress);
+              }}
+            />
+            {hasTargets && (
+              <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 space-y-2">
+                {targets.street && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-0.5">Street Address</label>
+                    <Input
+                      value={formData[targets.street] || ''}
+                      onChange={(e) => handleFieldChange(targets.street!, e.target.value)}
+                      disabled={isReadOnly}
+                      placeholder="Street Address"
+                      className="bg-white"
+                    />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {targets.city && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-0.5">City</label>
+                      <Input
+                        value={formData[targets.city] || ''}
+                        onChange={(e) => handleFieldChange(targets.city!, e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="City"
+                        className="bg-white"
+                      />
+                    </div>
+                  )}
+                  {targets.state && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-0.5">State / Province</label>
+                      <Input
+                        value={formData[targets.state] || ''}
+                        onChange={(e) => handleFieldChange(targets.state!, e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="State / Province"
+                        className="bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {targets.postalCode && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-0.5">Zip Code</label>
+                      <Input
+                        value={formData[targets.postalCode] || ''}
+                        onChange={(e) => handleFieldChange(targets.postalCode!, e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="Zip Code"
+                        className="bg-white"
+                      />
+                    </div>
+                  )}
+                  {targets.country && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-0.5">Country</label>
+                      <Input
+                        value={formData[targets.country] || ''}
+                        onChange={(e) => handleFieldChange(targets.country!, e.target.value)}
+                        disabled={isReadOnly}
+                        placeholder="Country"
+                        className="bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         );
         break;
       }
