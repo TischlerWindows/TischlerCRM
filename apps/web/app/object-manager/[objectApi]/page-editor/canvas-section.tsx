@@ -168,14 +168,14 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const onResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
     const session = resizeSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    const nextSpan = Math.min(10, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
+    const nextSpan = Math.min(12, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
     setDragSpan(nextSpan);
   };
 
   const onResizePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
     const session = resizeSessionRef.current;
     if (!session || session.pointerId !== event.pointerId) return;
-    const nextSpan = Math.min(10, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
+    const nextSpan = Math.min(12, Math.max(2, session.startSpan + getPointerStep(event.clientX - session.startX)));
     if (nextSpan !== session.startSpan) {
       resizeSection(region.id, nextSpan);
     }
