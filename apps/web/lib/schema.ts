@@ -858,22 +858,13 @@ export function createDefaultPageLayout(objectApiName: string): PageLayout {
         regions: [
           {
             id: generateId(),
-            label: 'Information',
+            label: 'Main',
             gridColumn: 1,
             gridColumnSpan: 12,
             gridRow: 1,
             gridRowSpan: 1,
             style: {},
-            panels: [
-              {
-                id: generateId(),
-                label: 'Information',
-                order: 0,
-                columns: 2,
-                style: {},
-                fields: [],
-              },
-            ],
+            panels: [],
             widgets: [],
           },
         ],
