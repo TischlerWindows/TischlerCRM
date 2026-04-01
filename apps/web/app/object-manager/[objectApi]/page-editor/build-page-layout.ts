@@ -1,5 +1,5 @@
 import type { EditorState } from './editor-store';
-import type { EditorPageLayout } from './types';
+import type { PageLayout } from './types';
 
 function stripNullish(obj: Record<string, unknown>): void {
   for (const key of Object.keys(obj)) {
@@ -11,9 +11,9 @@ function stripNullish(obj: Record<string, unknown>): void {
 
 /**
  * Minimal cleanup before saving — strips undefined/null style fields from a layout.
- * Returns a new EditorPageLayout safe to pass to updateObject().
+ * Returns a new PageLayout safe to pass to updateObject().
  */
-export function buildPageLayout(layout: EditorPageLayout): EditorPageLayout {
+export function buildPageLayout(layout: PageLayout): PageLayout {
   const clone = structuredClone(layout);
   for (const tab of clone.tabs) {
     for (const region of tab.regions) {
@@ -31,11 +31,11 @@ export function buildPageLayout(layout: EditorPageLayout): EditorPageLayout {
 }
 
 /**
- * Initializes editor state from a loaded EditorPageLayout.
+ * Initializes editor state from a loaded PageLayout.
  * Returns only the fields needed to hydrate the store.
  */
 export function initEditorFromLayout(
-  layout: EditorPageLayout,
+  layout: PageLayout,
 ): Pick<EditorState, 'layout' | 'isDirty' | 'selectedElement' | 'undoStack' | 'redoStack'> {
   return { layout, isDirty: false, selectedElement: null, undoStack: [], redoStack: [] };
 }

@@ -6,7 +6,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Eye, Plus, Save, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
-import type { EditorPageLayout } from './types';
+import type { PageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
 
 export function EditorToolbar({
@@ -120,7 +120,7 @@ export function EditorToolbar({
   }, [layout.roles, objectApi, schema]);
 
   const patchLayoutWithUndo = useCallback(
-    (patch: Partial<EditorPageLayout>) => {
+    (patch: Partial<PageLayout>) => {
       pushUndo();
       useEditorStore.setState((state) => ({
         layout: { ...state.layout, ...patch },
@@ -161,10 +161,11 @@ export function EditorToolbar({
 
   const handleToggleRole = useCallback(
     (roleId: string) => {
-      const hasRole = layout.roles.includes(roleId);
+      const roles = layout.roles ?? [];
+      const hasRole = roles.includes(roleId);
       const nextRoles = hasRole
-        ? layout.roles.filter((id) => id !== roleId)
-        : [...layout.roles, roleId];
+        ? roles.filter((id) => id !== roleId)
+        : [...roles, roleId];
       patchLayoutWithUndo({ roles: nextRoles });
     },
     [layout.roles, patchLayoutWithUndo],
@@ -357,8 +358,8 @@ export function EditorToolbar({
               aria-controls="layout-roles-popover"
               className="flex max-w-xs flex-wrap items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
             >
-              {layout.roles.length > 0 ? (
-                layout.roles.map((role) => (
+              {(layout.roles ?? []).length > 0 ? (
+                (layout.roles ?? []).map((role) => (
                   <span
                     key={role}
                     className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
@@ -386,7 +387,7 @@ export function EditorToolbar({
                     >
                       <input
                         type="checkbox"
-                        checked={layout.roles.includes(roleId)}
+                        checked={(layout.roles ?? []).includes(roleId)}
                         onChange={() => handleToggleRole(roleId)}
                       />
                       <span>{roleId}</span>

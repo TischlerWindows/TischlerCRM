@@ -8,12 +8,9 @@ import { useSchemaStore } from '@/lib/schema-store';
 import {
   generateId,
   type FieldDef,
-  type PageField,
   type PageLayout,
-  type PageSection,
-  type PageTab,
-  type PageWidget,
 } from '@/lib/schema';
+import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { getObjectListHref } from '@/lib/object-list-routes';
 import { useToast } from '@/components/toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -29,12 +26,8 @@ import { PaletteFields } from '../palette-fields';
 import { TemplateGallery } from '../template-gallery';
 import { useEditorStore } from '../editor-store';
 import type {
-  EditorPageLayout,
-  LayoutPanel,
   LayoutSection,
   LayoutTab,
-  LayoutWidget,
-  PanelField,
   TemplateTabDef,
 } from '../types';
 import { useEditorSidePanels } from '../use-editor-side-panels';
@@ -44,7 +37,7 @@ function toParamValue(value: string | string[] | undefined): string {
   return value ?? '';
 }
 
-function createBlankLayout(objectApi: string): EditorPageLayout {
+function createBlankLayout(objectApi: string): PageLayout {
   return {
     id: '',
     name: 'New Layout',
@@ -61,390 +54,6 @@ function createBlankLayout(objectApi: string): EditorPageLayout {
       },
     ],
     formattingRules: [],
-  };
-}
-
-function parseBehavior(value: unknown): PanelField['behavior'] {
-  if (value === 'required' || value === 'readOnly' || value === 'hidden') return value;
-  return 'none';
-}
-
-function parseWidgetConfig(
-  widgetType: LayoutWidget['widgetType'],
-  value: unknown,
-): LayoutWidget['config'] {
-  if (value && typeof value === 'object' && 'type' in value) {
-    return value as LayoutWidget['config'];
-  }
-
-  switch (widgetType) {
-    case 'RelatedList':
-      return {
-        type: 'RelatedList',
-        relatedObjectApiName: '',
-        relationshipFieldApiName: '',
-        displayColumns: [],
-      };
-    case 'ActivityFeed':
-      return { type: 'ActivityFeed', maxItems: 10 };
-    case 'FileFolder':
-      return { type: 'FileFolder', provider: 'local' };
-    case 'CustomComponent':
-      return { type: 'CustomComponent', componentId: '' };
-    case 'Spacer':
-      return { type: 'Spacer', minHeightPx: 32 };
-    case 'HeaderHighlights':
-      return { type: 'HeaderHighlights', fieldApiNames: [] };
-    case 'ExternalWidget':
-      return { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} };
-    default: {
-      // Exhaustiveness guard: if a new WidgetType is added without updating this switch,
-      // TypeScript will error here because widgetType won't narrow to never.
-      const _exhaustive: never = widgetType;
-      void _exhaustive;
-      return _exhaustive;
-    }
-  }
-}
-
-function normalizeField(rawField: unknown, fieldIndex: number): PanelField {
-  const candidate = (rawField ?? {}) as Record<string, unknown>;
-  return {
-    fieldApiName:
-      typeof candidate.fieldApiName === 'string'
-        ? candidate.fieldApiName
-        : `field-${fieldIndex + 1}`,
-    colSpan: typeof candidate.colSpan === 'number' ? Math.max(1, candidate.colSpan) : 1,
-    order: typeof candidate.order === 'number' ? candidate.order : fieldIndex,
-    behavior: parseBehavior(candidate.behavior),
-    labelOverride:
-      typeof candidate.labelOverride === 'string' ? candidate.labelOverride : undefined,
-    labelStyle:
-      candidate.labelStyle && typeof candidate.labelStyle === 'object'
-        ? (candidate.labelStyle as PanelField['labelStyle'])
-        : {},
-    valueStyle:
-      candidate.valueStyle && typeof candidate.valueStyle === 'object'
-        ? (candidate.valueStyle as PanelField['valueStyle'])
-        : {},
-  };
-}
-
-function normalizePanel(rawPanel: unknown, panelIndex: number): LayoutPanel {
-  const candidate = (rawPanel ?? {}) as Record<string, unknown>;
-  const fieldsRaw = Array.isArray(candidate.fields) ? candidate.fields : [];
-  const columns =
-    typeof candidate.columns === 'number' && candidate.columns >= 1 && candidate.columns <= 4
-      ? candidate.columns
-      : 2;
-
-  return {
-    id: typeof candidate.id === 'string' ? candidate.id : `panel-${Date.now()}-${panelIndex}`,
-    label: typeof candidate.label === 'string' ? candidate.label : `Panel ${panelIndex + 1}`,
-    order: typeof candidate.order === 'number' ? candidate.order : panelIndex,
-    columns: columns as LayoutPanel['columns'],
-    style:
-      candidate.style && typeof candidate.style === 'object'
-        ? (candidate.style as LayoutPanel['style'])
-        : {},
-    fields: fieldsRaw.map((field, fieldIndex) => normalizeField(field, fieldIndex)),
-    ...(typeof candidate.hidden === 'boolean' ? { hidden: candidate.hidden } : {}),
-  };
-}
-
-function normalizeWidget(rawWidget: unknown, widgetIndex: number): LayoutWidget {
-  const candidate = (rawWidget ?? {}) as Record<string, unknown>;
-  const widgetType =
-    candidate.widgetType === 'RelatedList' ||
-    candidate.widgetType === 'ActivityFeed' ||
-    candidate.widgetType === 'FileFolder' ||
-    candidate.widgetType === 'CustomComponent' ||
-    candidate.widgetType === 'Spacer' ||
-    candidate.widgetType === 'HeaderHighlights'
-      ? candidate.widgetType
-      : 'Spacer';
-
-  return {
-    id: typeof candidate.id === 'string' ? candidate.id : `widget-${Date.now()}-${widgetIndex}`,
-    widgetType,
-    order: typeof candidate.order === 'number' ? candidate.order : widgetIndex,
-    config: parseWidgetConfig(widgetType, candidate.config),
-  };
-}
-
-function normalizeRegion(rawRegion: unknown, regionIndex: number): LayoutSection {
-  const candidate = (rawRegion ?? {}) as Record<string, unknown>;
-  const panelsRaw = Array.isArray(candidate.panels) ? candidate.panels : [];
-  const widgetsRaw = Array.isArray(candidate.widgets) ? candidate.widgets : [];
-  return {
-    id: typeof candidate.id === 'string' ? candidate.id : `region-${Date.now()}-${regionIndex}`,
-    label: typeof candidate.label === 'string' ? candidate.label : `Section ${regionIndex + 1}`,
-    gridColumn: typeof candidate.gridColumn === 'number' ? candidate.gridColumn : 1,
-    gridColumnSpan:
-      typeof candidate.gridColumnSpan === 'number' ? Math.max(2, candidate.gridColumnSpan) : 12,
-    gridRow: typeof candidate.gridRow === 'number' ? candidate.gridRow : regionIndex + 1,
-    gridRowSpan: typeof candidate.gridRowSpan === 'number' ? candidate.gridRowSpan : 1,
-    style:
-      candidate.style && typeof candidate.style === 'object'
-        ? (candidate.style as LayoutSection['style'])
-        : {},
-    panels: panelsRaw.map((panel, panelIndex) => normalizePanel(panel, panelIndex)),
-    widgets: widgetsRaw.map((widget, widgetIndex) => normalizeWidget(widget, widgetIndex)),
-    ...(typeof candidate.hidden === 'boolean' ? { hidden: candidate.hidden } : {}),
-  };
-}
-
-function normalizeTab(rawTab: unknown, tabIndex: number): LayoutTab {
-  const candidate = (rawTab ?? {}) as Record<string, unknown>;
-  const regionsRaw = Array.isArray(candidate.regions) ? candidate.regions : [];
-  return {
-    id: typeof candidate.id === 'string' ? candidate.id : `tab-${Date.now()}-${tabIndex}`,
-    label: typeof candidate.label === 'string' ? candidate.label : `Tab ${tabIndex + 1}`,
-    order: typeof candidate.order === 'number' ? candidate.order : tabIndex,
-    regions: regionsRaw.map((region, regionIndex) => normalizeRegion(region, regionIndex)),
-  };
-}
-
-function normalizePanelColumns(value: number | undefined): LayoutPanel['columns'] {
-  if (value === 1 || value === 2 || value === 3 || value === 4) return value;
-  return 2;
-}
-
-function toPageField(panelField: PanelField, fieldIndex: number, columns: number): PageField {
-  return {
-    apiName: panelField.fieldApiName,
-    column: fieldIndex % Math.max(1, columns),
-    order: typeof panelField.order === 'number' ? panelField.order : fieldIndex,
-    ...(panelField.colSpan > 1 ? { colSpan: panelField.colSpan } : {}),
-  };
-}
-
-function toPageWidget(widget: LayoutWidget, region: LayoutSection, widgetIndex: number): PageWidget {
-  return {
-    id: widget.id,
-    widgetType: widget.widgetType,
-    column: 0,
-    order: typeof widget.order === 'number' ? widget.order : widgetIndex,
-    config: widget.config,
-    gridColumn: region.gridColumn,
-    gridColumnSpan: region.gridColumnSpan,
-    gridRow: region.gridRow,
-    gridRowSpan: region.gridRowSpan,
-  };
-}
-
-function toPersistedLayout(editorLayout: EditorPageLayout): PageLayout {
-  const highlightSet = new Set<string>();
-  const tabs: PageTab[] = [...editorLayout.tabs]
-    .sort((a, b) => a.order - b.order)
-    .map((tab, tabIndex) => {
-      const sections: PageSection[] = [];
-      let nextSectionOrder = 0;
-      const regions = [...tab.regions].sort((a, b) => {
-        if (a.gridRow !== b.gridRow) return a.gridRow - b.gridRow;
-        if (a.gridColumn !== b.gridColumn) return a.gridColumn - b.gridColumn;
-        return 0;
-      });
-
-      regions.forEach((region, regionIndex) => {
-        const regionWidgets = [...region.widgets]
-          .sort((a, b) => a.order - b.order)
-          .map((widget, widgetIndex) => {
-            if (
-              widget.widgetType === 'HeaderHighlights' &&
-              widget.config.type === 'HeaderHighlights'
-            ) {
-              widget.config.fieldApiNames.forEach((fieldApiName) => highlightSet.add(fieldApiName));
-            }
-            return toPageWidget(widget, region, widgetIndex);
-          });
-        const panels = [...region.panels].sort((a, b) => a.order - b.order);
-
-        if (panels.length === 0) {
-          sections.push({
-            id: `section-${region.id}`,
-            label: region.label || `Section ${regionIndex + 1}`,
-            columns: 1,
-            order: nextSectionOrder++,
-            fields: [],
-            ...(regionWidgets.length > 0 ? { widgets: regionWidgets } : {}),
-            gridColumn: region.gridColumn,
-            gridColumnSpan: region.gridColumnSpan,
-            gridRow: region.gridRow,
-            gridRowSpan: region.gridRowSpan,
-          });
-          return;
-        }
-
-        panels.forEach((panel, panelIndex) => {
-          const fields = [...panel.fields]
-            .sort((a, b) => a.order - b.order)
-            .map((field, fieldIndex) => toPageField(field, fieldIndex, panel.columns));
-          sections.push({
-            id: `section-${region.id}-${panel.id}`,
-            label: panel.label || region.label || `Section ${panelIndex + 1}`,
-            columns: normalizePanelColumns(panel.columns),
-            order: nextSectionOrder++,
-            fields,
-            ...(panelIndex === 0 && regionWidgets.length > 0 ? { widgets: regionWidgets } : {}),
-            gridColumn: region.gridColumn,
-            gridColumnSpan: region.gridColumnSpan,
-            gridRow: region.gridRow + panelIndex,
-            gridRowSpan: panelIndex === 0 ? region.gridRowSpan : 1,
-          });
-        });
-      });
-
-      return {
-        id: tab.id,
-        label: tab.label || `Tab ${tabIndex + 1}`,
-        order: typeof tab.order === 'number' ? tab.order : tabIndex,
-        sections,
-      };
-    });
-
-  const formattingRules = [...editorLayout.formattingRules];
-  const highlightFields = [...highlightSet];
-  return {
-    id: editorLayout.id,
-    name: editorLayout.name,
-    objectApi: editorLayout.objectApi,
-    active: editorLayout.active,
-    isDefault: editorLayout.isDefault,
-    roles: [...editorLayout.roles],
-    tabs,
-    ...(highlightFields.length > 0 ? { highlightFields } : {}),
-    formattingRules,
-    extensions: {
-      editorTabs: editorLayout.tabs,
-      formattingRules,
-      version: 1,
-    },
-  };
-}
-
-function toLayoutWidget(pageWidget: PageWidget, widgetIndex: number): LayoutWidget {
-  return {
-    id: pageWidget.id || `widget-${Date.now()}-${widgetIndex}`,
-    widgetType: pageWidget.widgetType,
-    order: typeof pageWidget.order === 'number' ? pageWidget.order : widgetIndex,
-    config: parseWidgetConfig(pageWidget.widgetType, pageWidget.config),
-  };
-}
-
-function toPanelField(pageField: PageField, fieldIndex: number): PanelField {
-  const required = typeof pageField.required === 'boolean' ? pageField.required : false;
-  const readOnly = typeof pageField.readOnly === 'boolean' ? pageField.readOnly : false;
-  const behavior: PanelField['behavior'] = readOnly
-    ? 'readOnly'
-    : required
-      ? 'required'
-      : 'none';
-
-  return {
-    fieldApiName: pageField.apiName,
-    colSpan: typeof pageField.colSpan === 'number' ? Math.max(1, pageField.colSpan) : 1,
-    order: typeof pageField.order === 'number' ? pageField.order : fieldIndex,
-    behavior,
-    labelStyle: {},
-    valueStyle: {},
-  };
-}
-
-function toLayoutSectionFromSection(section: PageSection, sectionIndex: number): LayoutSection {
-  const sectionWidgets = Array.isArray(section.widgets) ? section.widgets : [];
-  const sectionFields = Array.isArray(section.fields) ? section.fields : [];
-  const fields = [...sectionFields]
-    .sort((a, b) => a.order - b.order)
-    .map((field, fieldIndex) => toPanelField(field, fieldIndex));
-
-  return {
-    id: `region-${section.id || sectionIndex + 1}`,
-    label: section.label || `Section ${sectionIndex + 1}`,
-    gridColumn: typeof section.gridColumn === 'number' ? section.gridColumn : 1,
-    gridColumnSpan:
-      typeof section.gridColumnSpan === 'number' ? Math.max(1, section.gridColumnSpan) : 12,
-    gridRow: typeof section.gridRow === 'number' ? section.gridRow : sectionIndex + 1,
-    gridRowSpan: typeof section.gridRowSpan === 'number' ? Math.max(1, section.gridRowSpan) : 1,
-    style: {},
-    panels: [
-      {
-        id: `panel-${section.id || sectionIndex + 1}`,
-        label: section.label || `Panel ${sectionIndex + 1}`,
-        order: 0,
-        columns: normalizePanelColumns(section.columns),
-        style: {},
-        fields,
-      },
-    ],
-    widgets: sectionWidgets.map((widget, widgetIndex) => toLayoutWidget(widget, widgetIndex)),
-  };
-}
-
-function toLayoutSectionsFromLegacyTab(tab: PageTab): LayoutSection[] {
-  const sections = Array.isArray(tab.sections) ? tab.sections : [];
-  const regions = [...sections]
-    .sort((a, b) => a.order - b.order)
-    .map((section, sectionIndex) => toLayoutSectionFromSection(section, sectionIndex));
-  const tabWidgets = Array.isArray(tab.widgets) ? tab.widgets : [];
-
-  tabWidgets.forEach((widget, widgetIndex) => {
-    regions.push({
-      id: `region-widget-${widget.id || widgetIndex + 1}`,
-      label: `Widget ${widgetIndex + 1}`,
-      gridColumn: typeof widget.gridColumn === 'number' ? widget.gridColumn : 1,
-      gridColumnSpan: typeof widget.gridColumnSpan === 'number' ? Math.max(1, widget.gridColumnSpan) : 12,
-      gridRow: typeof widget.gridRow === 'number' ? widget.gridRow : regions.length + 1,
-      gridRowSpan: typeof widget.gridRowSpan === 'number' ? Math.max(1, widget.gridRowSpan) : 1,
-      style: {},
-      panels: [],
-      widgets: [toLayoutWidget(widget, widgetIndex)],
-    });
-  });
-
-  return regions;
-}
-
-function toEditorLayout(pageLayout: PageLayout, objectApi: string): EditorPageLayout {
-  const extensions =
-    pageLayout.extensions && typeof pageLayout.extensions === 'object'
-      ? (pageLayout.extensions as Record<string, unknown>)
-      : null;
-  const extensionTabs = extensions && Array.isArray(extensions.editorTabs) ? extensions.editorTabs : [];
-  const tabsSource =
-    extensionTabs.length > 0
-      ? extensionTabs
-      : pageLayout.tabs.map((tab, tabIndex) => ({
-          id: tab.id,
-          label: tab.label,
-          order: typeof tab.order === 'number' ? tab.order : tabIndex,
-          regions: toLayoutSectionsFromLegacyTab(tab),
-        }));
-  const tabs = tabsSource.map((tab, index) => normalizeTab(tab, index));
-  const topLevelFormattingRules = Array.isArray(pageLayout.formattingRules)
-    ? pageLayout.formattingRules
-    : [];
-  const extensionFormattingRules =
-    extensions && Array.isArray(extensions.formattingRules)
-      ? (extensions.formattingRules as EditorPageLayout['formattingRules'])
-      : [];
-  const formattingRules =
-    topLevelFormattingRules.length > 0 ? topLevelFormattingRules : extensionFormattingRules;
-
-  return {
-    id: pageLayout.id || '',
-    name: pageLayout.name || 'Layout',
-    objectApi:
-      typeof pageLayout.objectApi === 'string' && pageLayout.objectApi.length > 0
-        ? pageLayout.objectApi
-        : objectApi,
-    active: Boolean(pageLayout.active),
-    isDefault: Boolean(pageLayout.isDefault),
-    roles: Array.isArray(pageLayout.roles)
-      ? pageLayout.roles.filter((role): role is string => typeof role === 'string')
-      : [],
-    tabs: tabs.length > 0 ? tabs : createBlankLayout(objectApi).tabs,
-    formattingRules,
   };
 }
 
@@ -543,7 +152,11 @@ export default function PageEditorFullPage() {
 
     const existingLayout = object.pageLayouts?.find((item) => item.id === layoutId);
     if (existingLayout) {
-      loadLayout(toEditorLayout(existingLayout, objectApiName));
+      if (isLegacyLayout(existingLayout)) {
+        loadLayout(migrateLegacyLayout(existingLayout as any));
+      } else {
+        loadLayout(existingLayout);
+      }
       return;
     }
 
@@ -622,12 +235,11 @@ export default function PageEditorFullPage() {
     setIsSaving(true);
 
     const builtLayout = buildPageLayout(layout);
-    const savedEditorLayout: EditorPageLayout = {
+    const savedLayout: PageLayout = {
       ...builtLayout,
       id: builtLayout.id || (layoutId === 'new' ? generateId() : layoutId),
       objectApi: objectApiName,
     };
-    const savedLayout = toPersistedLayout(savedEditorLayout);
 
     try {
       const existingLayouts = object.pageLayouts ?? [];
@@ -639,7 +251,7 @@ export default function PageEditorFullPage() {
         pageLayouts: updatedLayouts,
       });
 
-      loadLayout(toEditorLayout(savedLayout, objectApiName));
+      loadLayout(savedLayout);
 
       if (layoutId === 'new') {
         router.replace(
@@ -700,7 +312,7 @@ export default function PageEditorFullPage() {
     useEditorStore.setState((state) => ({
       layout: {
         ...state.layout,
-        tabs: convertedTabs.length > 0 ? convertedTabs : createBlankLayout(state.layout.objectApi).tabs,
+        tabs: convertedTabs.length > 0 ? convertedTabs : createBlankLayout(state.layout.objectApi ?? '').tabs,
       },
       activeTabId: convertedTabs[0]?.id ?? state.activeTabId,
       selectedElement: null,
@@ -861,7 +473,7 @@ export default function PageEditorFullPage() {
             setRulesInitialRuleId(undefined);
           }
         }}
-        rules={layout.formattingRules}
+        rules={layout.formattingRules ?? []}
         onApply={(next) => setFormattingRules(next)}
         objectFields={object.fields}
         targetFilter={rulesTargetFilter}

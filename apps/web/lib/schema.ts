@@ -340,12 +340,12 @@ export interface PageWidget {
 
 // ── Page layout sections ───────────────────────────────────────
 
-export interface PageSection {
+export interface LegacyPageSection {
   id: string;
   label: string;
   columns: 1 | 2 | 3 | 4;
   order: number;
-  fields: PageField[];
+  fields: LegacyPageField[];
   widgets?: PageWidget[];
   /** Shown under the section title in form/detail when supported */
   description?: string;
@@ -371,15 +371,18 @@ export interface PageSection {
   gridRowSpan?: number;
 }
 
+/** @deprecated Use LegacyPageSection — alias retained for backward compatibility */
+export type PageSection = LegacyPageSection;
+
 /**
- * A field reference inside a page layout section.
+ * A field reference inside a legacy page layout section.
  *
  * Self-contained: every rendering-relevant property from the parent
  * FieldDef is embedded directly so DynamicForm never needs to cross-
  * reference `object.fields` at render time.  The enrichment happens
  * once during schema load (see `enrichLayoutFieldDefs` in schema-service).
  */
-export type PageField = {
+export type LegacyPageField = {
   apiName: string;
   column: number;
   order: number;
@@ -387,14 +390,20 @@ export type PageField = {
   rowSpan?: number;
 } & Partial<Omit<FieldDef, 'apiName'>>;
 
-export interface PageTab {
+/** @deprecated Use LegacyPageField — alias retained for backward compatibility */
+export type PageField = LegacyPageField;
+
+export interface LegacyPageTab {
   id: string;
   label: string;
   order: number;
-  sections: PageSection[];
+  sections: LegacyPageSection[];
   /** Widgets on the tab canvas (not inside a section), e.g. related lists above the fold */
   widgets?: PageWidget[];
 }
+
+/** @deprecated Use LegacyPageTab — alias retained for backward compatibility */
+export type PageTab = LegacyPageTab;
 
 // ── New page editor hierarchy (Region → Panel → Field) ─────────────
 
@@ -485,13 +494,29 @@ export interface PageLayout {
   active?: boolean;
   isDefault?: boolean;
   roles?: string[];
-  /** @deprecated Retained for backward compatibility; new layouts do not require this */
   layoutType?: 'create' | 'edit';
-  tabs: PageTab[];
+  tabs: LayoutTab[];
   /** Up to ~6 field API names shown in record header highlights strip */
   highlightFields?: string[];
   formattingRules?: FormattingRule[];
   /** Optional DB mirror / forward-compatible bag */
+  extensions?: PageLayoutExtensions;
+}
+
+/** Legacy PageLayout shape — tabs use the old PageTab/PageSection/PageField hierarchy */
+export interface LegacyPageLayout {
+  id: string;
+  name: string;
+  objectApi?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  active?: boolean;
+  isDefault?: boolean;
+  roles?: string[];
+  layoutType?: 'create' | 'edit';
+  tabs: LegacyPageTab[];
+  highlightFields?: string[];
+  formattingRules?: FormattingRule[];
   extensions?: PageLayoutExtensions;
 }
 
@@ -830,17 +855,30 @@ export function createDefaultPageLayout(objectApiName: string): PageLayout {
         id: generateId(),
         label: 'Details',
         order: 0,
-        sections: [
+        regions: [
           {
             id: generateId(),
             label: 'Information',
-            columns: 2,
-            order: 0,
-            fields: []
-          }
-        ]
-      }
-    ]
+            gridColumn: 1,
+            gridColumnSpan: 12,
+            gridRow: 1,
+            gridRowSpan: 1,
+            style: {},
+            panels: [
+              {
+                id: generateId(),
+                label: 'Information',
+                order: 0,
+                columns: 2,
+                style: {},
+                fields: [],
+              },
+            ],
+            widgets: [],
+          },
+        ],
+      },
+    ],
   };
 }
 

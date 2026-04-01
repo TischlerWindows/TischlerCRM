@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type {
-  EditorPageLayout,
+  PageLayout,
   SelectedElement,
   LayoutTab,
   LayoutSection,
@@ -13,7 +13,7 @@ import type {
 // ── Helper finders ────────────────────────────────────────────────────────────
 
 function findRegionEntry(
-  layout: EditorPageLayout,
+  layout: PageLayout,
   regionId: string,
 ): { tab: LayoutTab; region: LayoutSection } | undefined {
   for (const tab of layout.tabs) {
@@ -23,7 +23,7 @@ function findRegionEntry(
 }
 
 function findPanelEntry(
-  layout: EditorPageLayout,
+  layout: PageLayout,
   panelId: string,
 ): { tab: LayoutTab; region: LayoutSection; panel: LayoutPanel } | undefined {
   for (const tab of layout.tabs) {
@@ -35,7 +35,7 @@ function findPanelEntry(
 }
 
 function findWidgetEntry(
-  layout: EditorPageLayout,
+  layout: PageLayout,
   widgetId: string,
 ): { tab: LayoutTab; region: LayoutSection; widget: LayoutWidget } | undefined {
   for (const tab of layout.tabs) {
@@ -52,7 +52,7 @@ function reindexOrder<T extends { order: number }>(items: T[]): T[] {
 
 // ── Default layout ────────────────────────────────────────────────────────────
 
-const DEFAULT_LAYOUT: EditorPageLayout = {
+const DEFAULT_LAYOUT: PageLayout = {
   id: '',
   name: 'New Layout',
   objectApi: '',
@@ -73,11 +73,11 @@ const DEFAULT_LAYOUT: EditorPageLayout = {
 // ── State interface ───────────────────────────────────────────────────────────
 
 export interface EditorState {
-  layout: EditorPageLayout;
+  layout: PageLayout;
   selectedElement: SelectedElement;
   isDirty: boolean;
-  undoStack: EditorPageLayout[];
-  redoStack: EditorPageLayout[];
+  undoStack: PageLayout[];
+  redoStack: PageLayout[];
   activeTabId: string;
 
   // Non-mutating UI actions
@@ -127,7 +127,7 @@ export interface EditorState {
   redo: () => void;
 
   // Lifecycle
-  loadLayout: (layout: EditorPageLayout) => void;
+  loadLayout: (layout: PageLayout) => void;
   reset: () => void;
 }
 

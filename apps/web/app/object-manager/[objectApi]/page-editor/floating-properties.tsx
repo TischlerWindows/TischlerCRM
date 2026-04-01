@@ -9,7 +9,7 @@ import type { FieldDef, WidgetConfig } from '@/lib/schema';
 import { SchemaRenderer } from '@/lib/widgets/schema-renderer';
 import { getWidgetById, getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader';
 import { useEditorStore } from './editor-store';
-import type { EditorPageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
+import type { PageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
 
 
 interface FloatingPropertiesProps {
@@ -255,7 +255,7 @@ function RulesTab({
   layout,
 }: {
   selection: ResolvedSelection;
-  layout: EditorPageLayout;
+  layout: PageLayout;
 }) {
   if (!selection) return null;
   if (selection.kind === 'widget') return null;
