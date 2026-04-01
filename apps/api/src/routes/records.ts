@@ -390,7 +390,7 @@ export async function recordRoutes(app: FastifyInstance) {
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = field.apiName === 'propertyNumber' ? 4 : 3;
+        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber') ? 4 : 3;
         const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
         normalizedData[field.apiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent

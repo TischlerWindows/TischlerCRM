@@ -138,9 +138,18 @@ export default function RecordDetailPage({
       k => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
     );
     const nameKey = Object.keys(record).find(
-      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name')) && typeof record[k] === 'string' && record[k]
+      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof record[k] === 'string' && record[k]
     );
-    const childName = (numberKey ? record[numberKey] : '') || (nameKey ? record[nameKey] : '') || params.id as string;
+
+    let childName: string;
+    if (objectApiName === 'Lead') {
+      // Lead folders: "Name (LeadNumber)" e.g. "Mr. Jeremy Griffin (LEAD0001)"
+      const leadName = nameKey ? String(record[nameKey]) : '';
+      const leadNum = numberKey ? String(record[numberKey]) : '';
+      childName = leadName && leadNum ? `${leadName} (${leadNum})` : leadName || leadNum || params.id as string;
+    } else {
+      childName = (numberKey ? record[numberKey] : '') || (nameKey ? record[nameKey] : '') || params.id as string;
+    }
 
     // Fetch the parent Property record to get its folder name
     (async () => {

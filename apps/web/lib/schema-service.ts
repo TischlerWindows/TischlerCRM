@@ -986,7 +986,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Lead__leadNumber',
       label: 'Lead Number',
       type: 'AutoNumber',
-      autoNumber: { displayFormat: 'L{00}', startingNumber: 1 }
+      autoNumber: { displayFormat: 'LEAD{0000}', startingNumber: 1 }
     });
 
     const mergedFields = requiredFields.length > 0
@@ -2858,7 +2858,7 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Lead__leadNumber',
           label: 'Lead Number',
           type: 'AutoNumber',
-          autoNumber: { displayFormat: 'L{00}', startingNumber: 1 }
+          autoNumber: { displayFormat: 'LEAD{0000}', startingNumber: 1 }
         }
       ]
     ));

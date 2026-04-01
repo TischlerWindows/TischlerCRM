@@ -444,7 +444,7 @@ export default function LeadsPage() {
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const leadNumber = `LEAD${String(nextNumber).padStart(3, '0')}`;
+      const leadNumber = `LEAD${String(nextNumber).padStart(4, '0')}`;
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
