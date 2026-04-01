@@ -22,7 +22,7 @@ import {
   TAB_GRID_COLUMNS,
 } from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
-import { getFieldDef, getRecordValue, renderValue } from './field-value-renderer';
+import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -188,7 +188,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                               {displayLabel}
                             </div>
                             <div className="text-sm text-gray-900" style={valueStyle}>
-                              {renderValue(f.fieldApiName, raw, fd, record, isLookupLoaded)}
+                              <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
                             </div>
                           </div>
                         );
@@ -437,7 +437,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                               className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
                               style={rowSpan > 1 ? { flex: 1 } : undefined}
                             >
-                              {renderValue(layoutField.apiName, value, fieldDef, record, isLookupLoaded)}
+                              <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
                               {badgeC ? <span className={badgeC}>Status</span> : null}
                             </dd>
                           </div>
@@ -477,7 +477,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                               ) : null}
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                              {renderValue(layoutField.apiName, value, fieldDef, record, isLookupLoaded)}
+                              <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
                               {badgeC ? <span className={badgeC}>Status</span> : null}
                             </dd>
                           </div>

@@ -13,7 +13,7 @@ import { getFormattingEffectsForField } from '@/lib/layout-formatting';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import { useRecordSetupContext } from '@/lib/record-setup-context';
-import { getFieldDef, getRecordValue, renderValue } from './field-value-renderer';
+import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { RecordTabRenderer } from './record-tab-renderer';
 import { RecordActions } from './record-actions';
 
@@ -379,7 +379,7 @@ export default function RecordDetailPage({
                         <div key={apiName} className="min-w-[100px] max-w-[220px]">
                           <div className="text-xs text-gray-500">{fd.label}</div>
                           <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                            {renderValue(apiName, raw, fd, record, isLookupLoaded)}
+                            <MemoizedFieldValue apiName={apiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
                           </div>
                         </div>
                       );
