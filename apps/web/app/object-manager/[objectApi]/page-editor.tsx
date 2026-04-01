@@ -7,6 +7,7 @@
 import { useRouter } from 'next/navigation';
 import type { SetLayoutActiveResult } from '@/lib/schema-store';
 import { useSchemaStore } from '@/lib/schema-store';
+import { recordsService } from '@/lib/records-service';
 import { LayoutListView } from './page-editor/layout-list-view';
 
 interface PageEditorProps {
@@ -129,6 +130,10 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
     ]),
   );
 
+  const onMigrateLayouts = async (fromPageLayoutId: string): Promise<{ updatedCount: number }> => {
+    return recordsService.migrateRecordLayouts(objectApiName, fromPageLayoutId);
+  };
+
   return (
     <LayoutListView
       objectLabel={object?.label}
@@ -141,6 +146,7 @@ export default function PageEditor({ objectApiName }: PageEditorProps) {
       onSetRoles={onSetRoles}
       availableRoles={availableRoles}
       onDuplicate={onDuplicate}
+      onMigrateLayouts={onMigrateLayouts}
     />
   );
 }

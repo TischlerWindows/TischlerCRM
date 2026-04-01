@@ -522,6 +522,98 @@ export async function recordRoutes(app: FastifyInstance) {
     }).catch(err => req.log.error({ err }, 'Workflow execution error (create)'));
   });
 
+  // ── Bulk migrate per-record layout overrides ────────────────────────────
+  // POST /objects/:apiName/records/page-layout/migrate
+  // Body: { fromPageLayoutId: string }
+  // Finds all records on this object whose stored layout FK or data._pageLayoutId
+  // matches `fromPageLayoutId`, then clears both so they fall back to the
+  // record-type / default layout going forward.
+  app.post('/objects/:apiName/records/page-layout/migrate', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const { fromPageLayoutId } = req.body as { fromPageLayoutId?: string };
+
+    if (!fromPageLayoutId) {
+      return reply.code(400).send({ error: 'fromPageLayoutId is required' });
+    }
+
+    const userRole = req.user!.role;
+    if (userRole !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Only admins can perform layout migrations' });
+    }
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+
+    if (!object) {
+      return reply.code(404).send({ error: 'Object not found' });
+    }
+
+    // Collect record IDs to migrate in two passes:
+    // 1. Records whose FK column matches
+    // 2. Records whose JSON data._pageLayoutId matches (those skipped FK storage)
+    const BATCH_SIZE = 500;
+    let updatedCount = 0;
+    let skip = 0;
+
+    // Pass 1 — FK column match
+    while (true) {
+      const batch = await prisma.record.findMany({
+        where: { objectId: object.id, pageLayoutId: fromPageLayoutId },
+        select: { id: true, data: true },
+        take: BATCH_SIZE,
+        skip,
+      });
+
+      if (batch.length === 0) break;
+
+      for (const rec of batch) {
+        const cleaned = { ...(rec.data as Record<string, any>) };
+        delete cleaned._pageLayoutId;
+        await prisma.record.update({
+          where: { id: rec.id },
+          data: { pageLayoutId: null, data: cleaned },
+        });
+      }
+
+      updatedCount += batch.length;
+      if (batch.length < BATCH_SIZE) break;
+      skip += BATCH_SIZE;
+    }
+
+    // Pass 2 — JSON blob match (records where FK was null / non-UUID but _pageLayoutId was stored)
+    skip = 0;
+    while (true) {
+      const batch = await prisma.record.findMany({
+        where: {
+          objectId: object.id,
+          pageLayoutId: null, // FK already cleared records are excluded; only touch un-cleared ones
+          data: { path: ['_pageLayoutId'], equals: fromPageLayoutId },
+        },
+        select: { id: true, data: true },
+        take: BATCH_SIZE,
+        skip,
+      });
+
+      if (batch.length === 0) break;
+
+      for (const rec of batch) {
+        const cleaned = { ...(rec.data as Record<string, any>) };
+        delete cleaned._pageLayoutId;
+        await prisma.record.update({
+          where: { id: rec.id },
+          data: { data: cleaned },
+        });
+      }
+
+      updatedCount += batch.length;
+      if (batch.length < BATCH_SIZE) break;
+      skip += BATCH_SIZE;
+    }
+
+    return reply.send({ updatedCount });
+  });
+
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {
     const { apiName, recordId: idParam } = req.params as { apiName: string; recordId: string };
     const body = req.body as Record<string, any>;

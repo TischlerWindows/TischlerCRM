@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import type { PageLayout } from '@/lib/schema';
 import type { SetLayoutActiveResult } from '@/lib/schema-store';
-import { Copy, Layout, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Copy, Layout, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 
 interface LayoutListViewProps {
   objectLabel?: string;
@@ -31,6 +31,7 @@ interface LayoutListViewProps {
   onSetRoles: (layoutId: string, roles: string[]) => Promise<void>;
   availableRoles: string[];
   onDuplicate?: (layoutId: string) => void | Promise<void>;
+  onMigrateLayouts?: (fromPageLayoutId: string) => Promise<{ updatedCount: number }>;
 }
 
 function formatLastModified(layout: PageLayout): string {
@@ -58,6 +59,7 @@ export function LayoutListView({
   onSetRoles,
   availableRoles,
   onDuplicate,
+  onMigrateLayouts,
 }: LayoutListViewProps) {
   const [rolesLayoutId, setRolesLayoutId] = useState<string | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -65,6 +67,43 @@ export function LayoutListView({
   const [pendingActiveLayoutId, setPendingActiveLayoutId] = useState<string | null>(null);
   const [pendingDefaultLayoutId, setPendingDefaultLayoutId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // ── Migrate records dialog state ──────────────────────────────────────
+  const [showMigrateDialog, setShowMigrateDialog] = useState(false);
+  const [migrateFromId, setMigrateFromId] = useState<string>('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<number | null>(null);
+  const [migrateError, setMigrateError] = useState<string | null>(null);
+
+  const openMigrateDialog = () => {
+    setMigrateFromId(layouts[0]?.id ?? '');
+    setMigrateResult(null);
+    setMigrateError(null);
+    setShowMigrateDialog(true);
+  };
+
+  const closeMigrateDialog = () => {
+    if (isMigrating) return;
+    setShowMigrateDialog(false);
+    setMigrateResult(null);
+    setMigrateError(null);
+  };
+
+  const runMigration = async () => {
+    if (!onMigrateLayouts || !migrateFromId) return;
+    setIsMigrating(true);
+    setMigrateError(null);
+    setMigrateResult(null);
+    try {
+      const { updatedCount } = await onMigrateLayouts(migrateFromId);
+      setMigrateResult(updatedCount);
+    } catch (err) {
+      console.error('Failed to migrate record layouts:', err);
+      setMigrateError('Migration failed. Please try again.');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   const roleOptions = useMemo(
     () => Array.from(new Set(availableRoles.filter(Boolean))),
@@ -185,11 +224,21 @@ export function LayoutListView({
         </div>
       ) : null}
 
-      <div className="mb-6">
+      <div className="mb-6 flex items-center gap-3">
         <Button onClick={onCreate} className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
           New Layout
         </Button>
+        {onMigrateLayouts && layouts.length > 0 && (
+          <Button
+            variant="outline"
+            onClick={openMigrateDialog}
+            className="flex items-center gap-2"
+          >
+            <ArrowRightLeft className="h-4 w-4" />
+            Migrate Records to New Layout
+          </Button>
+        )}
       </div>
 
       {layouts.length === 0 ? (
@@ -367,6 +416,75 @@ export function LayoutListView({
             <Button onClick={() => void saveRoles()} disabled={savingRoles}>
               Save
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Migrate records to new layout dialog ─────────────────────────── */}
+      <Dialog open={showMigrateDialog} onOpenChange={(open) => !open && closeMigrateDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Migrate existing records to new layout</DialogTitle>
+            <DialogDescription>
+              Select the <strong>old layout</strong> that records are currently pinned to. All
+              matching records will have their per-record layout override removed so they follow
+              the object&apos;s current record-type or default layout going forward.
+            </DialogDescription>
+          </DialogHeader>
+
+          {migrateResult === null ? (
+            <div className="space-y-4 py-2">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  From layout (records currently pinned to)
+                </label>
+                <select
+                  value={migrateFromId}
+                  onChange={(e) => setMigrateFromId(e.target.value)}
+                  disabled={isMigrating}
+                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+                >
+                  {layouts.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                This action is not reversible. Records will no longer be pinned to the selected
+                layout and will instead use the current record-type or default layout.
+              </div>
+              {migrateError && (
+                <p className="text-sm text-red-600">{migrateError}</p>
+              )}
+            </div>
+          ) : (
+            <div className="py-4 text-center">
+              <p className="text-lg font-semibold text-gray-900">
+                {migrateResult === 0
+                  ? 'No records were pinned to that layout.'
+                  : `${migrateResult} record${migrateResult !== 1 ? 's' : ''} updated successfully.`}
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                Those records will now follow the current record-type or default layout.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeMigrateDialog} disabled={isMigrating}>
+              {migrateResult !== null ? 'Close' : 'Cancel'}
+            </Button>
+            {migrateResult === null && (
+              <Button
+                onClick={() => void runMigration()}
+                disabled={isMigrating || !migrateFromId}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                {isMigrating ? 'Migrating…' : 'Migrate Records'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

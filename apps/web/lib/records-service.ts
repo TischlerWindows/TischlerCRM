@@ -97,6 +97,26 @@ class RecordsService {
   }
 
   /**
+   * Remove per-record page layout overrides so records revert to the object's
+   * current record-type / default layout.  Only records pinned to
+   * `fromPageLayoutId` are affected.
+   */
+  async migrateRecordLayouts(
+    objectApiName: string,
+    fromPageLayoutId: string,
+  ): Promise<{ updatedCount: number }> {
+    try {
+      return await apiClient.migrateRecordLayouts(objectApiName, fromPageLayoutId);
+    } catch (error) {
+      console.error(
+        `Failed to migrate record layouts for ${objectApiName} from ${fromPageLayoutId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Helper to flatten record data for display
    * The API returns data in a nested format: { id, data: {...}, createdBy, ... }
    * This flattens it for easier use in tables
