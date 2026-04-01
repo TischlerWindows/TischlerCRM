@@ -1071,11 +1071,16 @@ export default function RecordDetailPage({
             // Resolve HeaderHighlights widget config
             let highlightApiNames: string[] = [];
             let visibleActions: Array<'edit' | 'delete'> = ['edit', 'delete'];
+            let hasHighlightsWidget = false;
+            let isNewStyleLayout = false;
             if (pageLayout?.tabs) {
               outer: for (const tab of pageLayout.tabs) {
-                for (const region of (tab as any).regions ?? []) {
+                const regions = (tab as any).regions ?? [];
+                if (regions.length > 0) isNewStyleLayout = true;
+                for (const region of regions) {
                   const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights');
                   if (hw && hw.config.type === 'HeaderHighlights') {
+                    hasHighlightsWidget = true;
                     highlightApiNames = hw.config.fieldApiNames ?? [];
                     if (Array.isArray(hw.config.visibleActions)) {
                       visibleActions = hw.config.visibleActions;
@@ -1089,6 +1094,12 @@ export default function RecordDetailPage({
             if (highlightApiNames.length === 0 && pageLayout?.highlightFields?.length) {
               highlightApiNames = pageLayout.highlightFields;
             }
+
+            // For new-style layouts (editorTabs with regions), only show the header card
+            // when a HeaderHighlights widget has been explicitly placed in the layout.
+            // Legacy layouts (no regions) always show the card for backward compatibility.
+            const showHeaderCard = hasHighlightsWidget || !isNewStyleLayout;
+            if (!showHeaderCard) return null;
 
             const showEdit = visibleActions.includes('edit');
             const showDelete = visibleActions.includes('delete');
