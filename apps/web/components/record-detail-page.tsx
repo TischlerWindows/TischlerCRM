@@ -138,7 +138,7 @@ export default function RecordDetailPage({
       k => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k]
     );
     const nameKey = Object.keys(record).find(
-      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof record[k] === 'string' && record[k]
+      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname' || k.toLowerCase() === 'opportunityname' || k.toLowerCase().endsWith('__opportunityname')) && typeof record[k] === 'string' && record[k]
     );
 
     let childName: string;
@@ -573,7 +573,7 @@ export default function RecordDetailPage({
       k => k.toLowerCase().includes('number') && typeof data[k] === 'string' && data[k]
     );
     const nameKey = Object.keys(data).find(
-      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof data[k] === 'string' && data[k]
+      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname' || k.toLowerCase() === 'opportunityname' || k.toLowerCase().endsWith('__opportunityname')) && typeof data[k] === 'string' && data[k]
     );
     if (objApiName === 'Lead' || objApiName === 'Opportunity' || objApiName === 'WorkOrder') {
       const recName = nameKey ? String(data[nameKey]) : '';
