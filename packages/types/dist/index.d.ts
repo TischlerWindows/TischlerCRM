@@ -1,3 +1,4 @@
+export { getPropertyPrefix, extractAddressFromRecord, generatePropertyNumber } from './property-number';
 export type UUID = string;
 export type Role = 'admin' | 'user' | 'viewer';
 export interface BaseEntity {

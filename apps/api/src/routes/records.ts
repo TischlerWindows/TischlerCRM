@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
+import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -367,8 +368,10 @@ export async function recordRoutes(app: FastifyInstance) {
     };
     for (const field of object.fields) {
       if (field.apiName in autoNumberFormats && !normalizedData[field.apiName]) {
-        // Find the highest existing number for this field
-        const prefix = autoNumberFormats[field.apiName];
+        // For propertyNumber, derive a smart prefix from address data
+        const prefix = field.apiName === 'propertyNumber'
+          ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
+          : autoNumberFormats[field.apiName];
         const existing = await prisma.record.findMany({
           where: { objectId: object.id },
           select: { data: true },
