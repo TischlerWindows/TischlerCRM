@@ -41,6 +41,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [draftLabel, setDraftLabel] = useState(region.label);
   const [dragSpan, setDragSpan] = useState<number | null>(null);
+  const [isHovered, setIsHovered] = useState(false);
   const { setNodeRef: setWidgetDropRef, isOver: isWidgetDropOver } = useDroppable({
     id: `region-drop-${region.id}`,
     data: { type: 'region-drop', regionId: region.id },
@@ -87,6 +88,9 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
 
   const isRegionSelected =
     selectedElement?.type === 'region' && selectedElement.id === region.id;
+
+  const isEmpty = sortedPanels.length === 0 && sortedWidgets.length === 0;
+  const showChrome = !isEmpty || isRegionSelected || isHovered;
 
   const wrapperStyle: React.CSSProperties = {
     gridColumn: `${region.gridColumn} / span ${dragSpan ?? region.gridColumnSpan}`,
@@ -195,17 +199,159 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
     resizeSection(region.id, nextSpan);
   };
 
+  /* ── Resize handle (shared between empty and populated states) ── */
+  const resizeHandle = (
+    <button
+      type="button"
+      className="absolute inset-y-0 right-0 flex w-4 cursor-col-resize flex-col items-center justify-center gap-1 border-0 bg-brand-navy/10 p-0 hover:bg-brand-navy/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 touch-none transition-colors"
+      onPointerDown={startResize}
+      onPointerMove={onResizePointerMove}
+      onPointerUp={onResizePointerUp}
+      onPointerCancel={onResizePointerCancel}
+      onKeyDown={onResizeKeyDown}
+      onClick={(e) => e.stopPropagation()}
+      aria-label="Resize section width"
+      title="Drag to resize section"
+    >
+      <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+      <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+      <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
+    </button>
+  );
+
+  /* ── Empty region: Salesforce-style clean drop zone ── */
+  if (isEmpty) {
+    return (
+      <CanvasErrorBoundary label="Section">
+        <div
+          ref={setWidgetDropRef}
+          className={cn(
+            'group/empty-region relative flex min-h-[120px] flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all',
+            isWidgetDropOver
+              ? 'border-brand-navy bg-brand-navy/5'
+              : isRegionSelected
+                ? 'border-brand-navy/60 bg-brand-navy/[0.03] ring-2 ring-brand-navy/25'
+                : 'border-gray-300 bg-white hover:border-brand-navy/40 hover:bg-slate-50',
+          )}
+          style={wrapperStyle}
+          data-tab-id={tabId}
+          onClick={selectRegion}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+        >
+          {region.hidden ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
+              <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+            </div>
+          ) : null}
+
+          {/* Compact header — only visible on hover or selection; also serves as region-swap drop target */}
+          <div
+            ref={setRegionDropRef}
+            className={cn(
+              'absolute inset-x-0 top-0 flex items-center justify-between gap-2 rounded-t-xl px-3 py-1.5 transition-opacity',
+              showChrome ? 'opacity-100' : 'opacity-0',
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span
+                ref={setDragRef}
+                {...dragListeners}
+                {...dragAttributes}
+                className={cn(
+                  'flex cursor-grab items-center text-gray-400 hover:text-brand-navy/60',
+                  isDragging && 'cursor-grabbing opacity-50',
+                )}
+                title="Drag to swap region position"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <GripVertical className="h-3.5 w-3.5 shrink-0" />
+              </span>
+              {isEditingLabel ? (
+                <input
+                  autoFocus
+                  value={draftLabel}
+                  onChange={(e) => setDraftLabel(e.target.value)}
+                  onBlur={commitLabel}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      commitLabel();
+                    } else if (e.key === 'Escape') {
+                      setDraftLabel(region.label);
+                      setIsEditingLabel(false);
+                    }
+                  }}
+                  className="h-6 rounded border border-gray-300 bg-white px-1.5 text-xs text-gray-900"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="truncate text-left text-xs font-medium text-gray-500 hover:text-brand-navy"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditingLabel(true);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    selectRegion();
+                  }}
+                  title="Double-click to rename"
+                >
+                  {region.label}
+                </button>
+              )}
+              <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gray-500">
+                {region.gridColumnSpan} cols
+              </span>
+            </div>
+            <button
+              type="button"
+              className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500"
+              onClick={(e) => {
+                e.stopPropagation();
+                removeSection(region.id);
+              }}
+              aria-label="Delete section"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Central drop prompt */}
+          <div className="pointer-events-none flex flex-col items-center gap-1.5">
+            <Plus className={cn(
+              'h-6 w-6 transition-colors',
+              isWidgetDropOver ? 'text-brand-navy' : 'text-gray-300',
+            )} />
+            <span className={cn(
+              'text-sm font-medium transition-colors',
+              isWidgetDropOver ? 'text-brand-navy' : 'text-gray-400',
+            )}>
+              Add Component(s) Here
+            </span>
+          </div>
+
+          {resizeHandle}
+        </div>
+      </CanvasErrorBoundary>
+    );
+  }
+
+  /* ── Populated region: full chrome with panels & widgets ── */
   return (
     <CanvasErrorBoundary label="Section">
     <div
       className={cn(
-        'relative overflow-hidden rounded-xl border bg-slate-50 transition-colors border-l-4 border-l-brand-navy/50',
+        'group/region relative overflow-hidden rounded-xl border bg-slate-50 transition-colors border-l-4 border-l-brand-navy/50',
         isRegionSelected
           ? 'border-brand-navy ring-2 ring-brand-navy/25 border-l-brand-navy'
           : 'border-gray-200',
       )}
       style={wrapperStyle}
       data-tab-id={tabId}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {region.hidden ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
@@ -213,7 +359,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         </div>
       ) : null}
 
-      {/* Section header — tinted navy to distinguish from panel headers */}
+      {/* Section header */}
       <div
         ref={setRegionDropRef}
         className="flex items-center justify-between gap-2 border-b border-brand-navy/15 bg-brand-navy/10 px-3 py-2 cursor-pointer"
@@ -298,7 +444,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           ))}
         </SortableContext>
 
-        {/* Widget drop zone — always visible so users know they can drop here */}
+        {/* Widget drop zone */}
         <div
           ref={setWidgetDropRef}
           className={cn(
@@ -324,33 +470,23 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           </SortableContext>
         </div>
 
-        <button
-          type="button"
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-brand-navy/25 py-2 text-xs font-medium text-brand-navy/60 hover:border-brand-navy hover:text-brand-navy hover:bg-brand-navy/5 transition-colors"
-          onClick={addDefaultPanel}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add Panel
-        </button>
+        {/* Add Panel — contextual, shown on hover or selection */}
+        <div className={cn(
+          'transition-opacity',
+          (isHovered || isRegionSelected) ? 'opacity-100' : 'opacity-0',
+        )}>
+          <button
+            type="button"
+            className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-brand-navy/25 py-2 text-xs font-medium text-brand-navy/60 hover:border-brand-navy hover:text-brand-navy hover:bg-brand-navy/5 transition-colors"
+            onClick={addDefaultPanel}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Panel
+          </button>
+        </div>
       </div>
 
-      {/* Resize handle — visible stripe on the right edge */}
-      <button
-        type="button"
-        className="absolute inset-y-0 right-0 flex w-4 cursor-col-resize flex-col items-center justify-center gap-1 border-0 bg-brand-navy/10 p-0 hover:bg-brand-navy/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy/40 touch-none transition-colors"
-        onPointerDown={startResize}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerUp}
-        onPointerCancel={onResizePointerCancel}
-        onKeyDown={onResizeKeyDown}
-        onClick={(e) => e.stopPropagation()}
-        aria-label="Resize section width"
-        title="Drag to resize section"
-      >
-        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
-        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
-        <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
-      </button>
+      {resizeHandle}
     </div>
     </CanvasErrorBoundary>
   );
