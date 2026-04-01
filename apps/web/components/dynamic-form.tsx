@@ -129,6 +129,8 @@ interface DynamicFormProps {
   onCancel?: () => void;
 }
 
+import { DateInput } from '@/components/date-input';
+
 export default function DynamicForm({
   objectApiName,
   layoutType,
@@ -1222,9 +1224,18 @@ export default function DynamicForm({
         );
         break;
 
-      case 'Date':
-        inputElement = <Input {...commonProps} type="date" />;
+      case 'Date': {
+        inputElement = (
+          <DateInput
+            value={value || ''}
+            onChange={(iso) => handleFieldChange(fieldDef.apiName, iso)}
+            disabled={isReadOnly}
+            className={cn(error && 'border-red-500')}
+            id={fieldDef.apiName}
+          />
+        );
         break;
+      }
 
       case 'DateTime':
         inputElement = <Input {...commonProps} type="datetime-local" />;

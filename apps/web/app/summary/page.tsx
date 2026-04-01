@@ -26,6 +26,7 @@ import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
+import { DateInput } from '@/components/date-input';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -2678,10 +2679,9 @@ export default function SummaryPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Date <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={editingSummary.date}
-                    onChange={(e) => setEditingSummary({ ...editingSummary, date: e.target.value })}
+                    onChange={(iso) => setEditingSummary({ ...editingSummary, date: iso })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   />
                 </div>
