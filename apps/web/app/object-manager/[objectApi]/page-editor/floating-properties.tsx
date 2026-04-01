@@ -7,25 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { FieldDef, WidgetConfig } from '@/lib/schema';
 import { SchemaRenderer } from '@/lib/widgets/schema-renderer';
-import { getWidgetById } from '@/lib/widgets/registry-loader';
-import DemoConfigPanel from '@/widgets/external/demo-widget/ConfigPanel';
-import HeaderHighlightsConfigPanel from '@/widgets/internal/header-highlights/ConfigPanel';
-import RelatedListConfigPanel from '@/widgets/internal/related-list/ConfigPanel';
-import type { ConfigPanelProps } from '@/lib/widgets/types';
+import { getWidgetById, getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader';
 import { useEditorStore } from './editor-store';
 import type { EditorPageLayout, LayoutPanel, LayoutSection, LayoutTab, LayoutWidget, PanelField } from './types';
 
-type ConfigPanelComponent = React.ComponentType<ConfigPanelProps & { objectOptions?: Array<{ value: string; label: string }> }>;
-
-const EXTERNAL_CONFIG_PANELS: Record<string, ConfigPanelComponent> = {
-  'demo-widget': DemoConfigPanel,
-};
-
-// Keyed by WidgetConfig.type (PascalCase)
-const INTERNAL_CONFIG_PANELS: Record<string, ConfigPanelComponent> = {
-  HeaderHighlights: HeaderHighlightsConfigPanel,
-  RelatedList: RelatedListConfigPanel,
-};
 
 interface FloatingPropertiesProps {
   onClose: () => void;
@@ -965,7 +950,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
 
             {(selection.widget.config.type === 'RelatedList' ||
               selection.widget.config.type === 'HeaderHighlights') && (() => {
-              const InternalPanel = INTERNAL_CONFIG_PANELS[selection.widget.config.type];
+              const InternalPanel = getInternalRegistrationByType(selection.widget.config.type)?.ConfigPanel;
               if (!InternalPanel) return null;
               const objectFields = (availableFields ?? []).map((f) => ({
                 apiName: f.apiName,
@@ -1087,7 +1072,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
             {selection.widget.config.type === 'ExternalWidget' && (() => {
               const externalConfig = selection.widget.config;
               const manifest = getWidgetById(externalConfig.externalWidgetId);
-              const ExternalConfigPanel = EXTERNAL_CONFIG_PANELS[externalConfig.externalWidgetId];
+              const ExternalConfigPanel = getExternalRegistration(externalConfig.externalWidgetId)?.ConfigPanel;
               return (
                 <div className="space-y-4">
                   <div className="space-y-1.5">
