@@ -73,4 +73,24 @@ export interface ConfigPanelProps {
   record: Record<string, unknown>
   integration: WidgetProps['integration']
   object: WidgetProps['object']
+  objectOptions?: Array<{ apiName: string; label: string }>
+}
+
+export interface WidgetRegistration {
+  manifest: WidgetManifest
+  Component: React.ComponentType<WidgetProps>
+  ConfigPanel?: React.ComponentType<ConfigPanelProps>
+  /**
+   * Internal widgets only. The PascalCase discriminant stored in
+   * WidgetConfig.type (e.g. 'Spacer', 'ActivityFeed'). Used by
+   * getInternalRegistrationByType to dispatch the correct component.
+   * Not needed for external widgets (looked up by manifest.id).
+   */
+  widgetConfigType?: string
+  /**
+   * Internal widgets only. Maps the stored WidgetConfig shape to
+   * Record<string, unknown> before passing as the `config` prop.
+   * If omitted, the stored config is passed through as-is (cast).
+   */
+  transformConfig?: (stored: Record<string, unknown>) => Record<string, unknown>
 }
