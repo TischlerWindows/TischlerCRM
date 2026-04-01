@@ -117,7 +117,7 @@ export default function ProjectsPage() {
   
   // Check if Project object exists with page layouts
   const projectObject = schema?.objects.find(obj => obj.apiName === 'Project');
-  const lookupTick = useLookupPreloader(projectObject);
+  const isLookupLoaded = useLookupPreloader(projectObject);
   const pageLayouts = projectObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -282,7 +282,7 @@ export default function ProjectsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (project: Project, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value: any = project[columnId as keyof Project];
 
     // Formula fields: evaluate expression instead of showing raw value

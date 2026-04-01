@@ -93,7 +93,7 @@ export default function QuotesPage() {
   
   // Check if Quote object exists with page layouts
   const quoteObject = schema?.objects.find(obj => obj.apiName === 'Quote');
-  const lookupTick = useLookupPreloader(quoteObject);
+  const isLookupLoaded = useLookupPreloader(quoteObject);
   const pageLayouts = quoteObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -212,7 +212,7 @@ export default function QuotesPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (quote: Quote, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value: any = quote[columnId as keyof Quote];
 
     // Formula fields: evaluate expression instead of showing raw value

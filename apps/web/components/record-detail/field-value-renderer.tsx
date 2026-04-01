@@ -90,14 +90,14 @@ export function getRecordValue(
  * Render a field value with type-appropriate formatting (links for
  * email/phone/URL, locale formatting for numbers/dates, etc.).
  *
- * @param lookupTick - counter bumped after lookup cache loads; forces re-render
+ * @param isLookupLoaded - true once the lookup cache has been populated; triggers re-render
  */
 export function renderValue(
   apiName: string,
   rawValue: any,
   fieldDef: FieldDef | undefined,
   record: Record<string, any> | null,
-  lookupTick: number,
+  isLookupLoaded: boolean,
 ): React.ReactNode {
   // Auto-parse JSON strings
   let value = rawValue;
@@ -142,7 +142,6 @@ export function renderValue(
     const lookupTarget = fieldDef?.lookupObject || 'User';
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = resolveLookupDisplayName(value, lookupTarget);
-    void lookupTick;
     if (route) {
       return (
         <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
@@ -224,7 +223,6 @@ export function renderValue(
     if (value.lookup && lookupTarget) {
       const route = LOOKUP_ROUTE_MAP[lookupTarget];
       const displayLabel = resolveLookupDisplayName(value.lookup, lookupTarget);
-      void lookupTick;
       lookupPart = route ? (
         <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:underline underline-offset-2">
           {displayLabel}
@@ -274,3 +272,33 @@ export function renderValue(
 
   return formatFieldValue(value, fieldType, fieldDef?.lookupObject);
 }
+
+// ── MemoizedFieldValue ────────────────────────────────────────────────
+/**
+ * A memoized wrapper component around `renderValue`. Re-renders only when
+ * one of the inputs changes, avoiding expensive re-computation of JSON
+ * parsing, date formatting, and lookup resolution on every parent render.
+ */
+interface MemoizedFieldValueProps {
+  apiName: string;
+  rawValue: any;
+  fieldDef: FieldDef | undefined;
+  record: Record<string, any> | null;
+  isLookupLoaded: boolean;
+}
+
+function MemoizedFieldValueInner({
+  apiName,
+  rawValue,
+  fieldDef,
+  record,
+  isLookupLoaded,
+}: MemoizedFieldValueProps) {
+  const rendered = React.useMemo(
+    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded),
+    [apiName, rawValue, fieldDef, record, isLookupLoaded],
+  );
+  return <>{rendered}</>;
+}
+
+export const MemoizedFieldValue = React.memo(MemoizedFieldValueInner);

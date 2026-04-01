@@ -77,7 +77,7 @@ export default function CustomObjectRecordsPage() {
       obj.label.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase()
     );
   }, [schema, slug]);
-  const lookupTick = useLookupPreloader(objectDef);
+  const isLookupLoaded = useLookupPreloader(objectDef);
   
   const pageLayouts = objectDef?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
@@ -234,7 +234,7 @@ export default function CustomObjectRecordsPage() {
   };
 
   const getFieldValue = (record: CustomRecord, columnId: string): string => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     const value = record[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

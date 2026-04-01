@@ -33,7 +33,7 @@ export interface RecordTabRendererProps {
   record: Record<string, any> | null;
   objectDef: ObjectDef | undefined;
   formulaValues: Record<string, any>;
-  lookupTick: number;
+  isLookupLoaded: boolean;
   /** Section-level toggle state (for legacy model) */
   sectionToggles: Record<string, boolean>;
   setSectionToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
@@ -67,7 +67,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
     record,
     objectDef,
     formulaValues,
-    lookupTick,
+    isLookupLoaded,
     collapsedPanelIds,
     togglePanelCollapse,
   } = props;
@@ -188,7 +188,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                               {displayLabel}
                             </div>
                             <div className="text-sm text-gray-900" style={valueStyle}>
-                              {renderValue(f.fieldApiName, raw, fd, record, lookupTick)}
+                              {renderValue(f.fieldApiName, raw, fd, record, isLookupLoaded)}
                             </div>
                           </div>
                         );
@@ -224,7 +224,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
     record,
     objectDef,
     formulaValues,
-    lookupTick,
+    isLookupLoaded,
     sectionToggles,
     setSectionToggles,
   } = props;
@@ -437,7 +437,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                               className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
                               style={rowSpan > 1 ? { flex: 1 } : undefined}
                             >
-                              {renderValue(layoutField.apiName, value, fieldDef, record, lookupTick)}
+                              {renderValue(layoutField.apiName, value, fieldDef, record, isLookupLoaded)}
                               {badgeC ? <span className={badgeC}>Status</span> : null}
                             </dd>
                           </div>
@@ -477,7 +477,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                               ) : null}
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                              {renderValue(layoutField.apiName, value, fieldDef, record, lookupTick)}
+                              {renderValue(layoutField.apiName, value, fieldDef, record, isLookupLoaded)}
                               {badgeC ? <span className={badgeC}>Status</span> : null}
                             </dd>
                           </div>

@@ -25,8 +25,14 @@ function WidgetUnavailablePlaceholder({ widgetId }: { widgetId: string }) {
 
 function WidgetLoadingPlaceholder() {
   return (
-    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center text-xs text-gray-400 animate-pulse">
-      Loading widget…
+    <div className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
+      <div className="h-4 w-1/3 rounded bg-gray-200 mb-3" />
+      <div className="space-y-2">
+        <div className="h-3 w-full rounded bg-gray-200" />
+        <div className="h-3 w-5/6 rounded bg-gray-200" />
+        <div className="h-3 w-2/3 rounded bg-gray-200" />
+      </div>
+      <div className="mt-4 h-8 w-24 rounded bg-gray-200" />
     </div>
   )
 }

@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { DndContextWrapper } from '../dnd-context-wrapper';
 import { EditorToolbar } from '../editor-toolbar';
-import { FormattingRulesDialog } from '../formatting-rules-dialog';
+import { LazyFormattingRulesDialog } from '../formatting';
 import { LayoutPreviewDialog } from '../layout-preview-dialog';
 import { TemplateGallery } from '../template-gallery';
 import { useEditorStore } from '../editor-store';
@@ -63,21 +63,25 @@ export default function EditorPage() {
         objectLabel={lifecycle.object.label}
       />
 
-      <FormattingRulesDialog
-        open={lifecycle.showFormattingRulesDialog}
-        onOpenChange={(isOpen) => {
-          lifecycle.setShowFormattingRulesDialog(isOpen);
-          if (!isOpen) {
-            lifecycle.setRulesTargetFilter(undefined);
-            lifecycle.setRulesInitialRuleId(undefined);
-          }
-        }}
-        rules={layout.formattingRules ?? []}
-        onApply={(next) => setFormattingRules(next)}
-        objectFields={lifecycle.object.fields}
-        targetFilter={lifecycle.rulesTargetFilter}
-        initialRuleId={lifecycle.rulesInitialRuleId}
-      />
+      {lifecycle.showFormattingRulesDialog && (
+        <React.Suspense fallback={null}>
+          <LazyFormattingRulesDialog
+            open={lifecycle.showFormattingRulesDialog}
+            onOpenChange={(isOpen) => {
+              lifecycle.setShowFormattingRulesDialog(isOpen);
+              if (!isOpen) {
+                lifecycle.setRulesTargetFilter(undefined);
+                lifecycle.setRulesInitialRuleId(undefined);
+              }
+            }}
+            rules={layout.formattingRules ?? []}
+            onApply={(next) => setFormattingRules(next)}
+            objectFields={lifecycle.object.fields}
+            targetFilter={lifecycle.rulesTargetFilter}
+            initialRuleId={lifecycle.rulesInitialRuleId}
+          />
+        </React.Suspense>
+      )}
 
       <TemplateGallery
         open={lifecycle.showTemplateGallery && lifecycle.layoutId === 'new'}

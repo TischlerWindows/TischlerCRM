@@ -137,7 +137,7 @@ export default function ProductsPage() {
   
   // Check if Product object exists with page layouts
   const productObject = schema?.objects.find(obj => obj.apiName === 'Product');
-  const lookupTick = useLookupPreloader(productObject);
+  const isLookupLoaded = useLookupPreloader(productObject);
   const pageLayouts = productObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -389,7 +389,7 @@ export default function ProductsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (product: Product, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value = (product as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

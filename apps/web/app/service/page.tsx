@@ -118,7 +118,7 @@ export default function ServicePage() {
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
   const serviceObject = schema?.objects.find(obj => obj.apiName === 'Service');
-  const lookupTick = useLookupPreloader(serviceObject);
+  const isLookupLoaded = useLookupPreloader(serviceObject);
   const pageLayouts = serviceObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -341,7 +341,7 @@ export default function ServicePage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (service: Service, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value = (service as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

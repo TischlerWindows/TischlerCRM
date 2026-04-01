@@ -72,7 +72,7 @@ export default function RecordDetailPage({
       return next;
     });
   }, []);
-  const [lookupTick, setLookupTick] = useState(0);
+  const [isLookupLoaded, setIsLookupLoaded] = useState(false);
 
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase(),
@@ -166,9 +166,10 @@ export default function RecordDetailPage({
       }
     }
     if (lookupTargets.size > 0) {
+      setIsLookupLoaded(false);
       Promise.all(
         Array.from(lookupTargets).map((t) => preloadLookupRecords(t)),
-      ).then(() => setLookupTick((n) => n + 1));
+      ).then(() => setIsLookupLoaded(true));
     }
   }, [objectDef, schema]);
 
@@ -378,7 +379,7 @@ export default function RecordDetailPage({
                         <div key={apiName} className="min-w-[100px] max-w-[220px]">
                           <div className="text-xs text-gray-500">{fd.label}</div>
                           <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                            {renderValue(apiName, raw, fd, record, lookupTick)}
+                            {renderValue(apiName, raw, fd, record, isLookupLoaded)}
                           </div>
                         </div>
                       );
@@ -432,7 +433,7 @@ export default function RecordDetailPage({
                       record={record}
                       objectDef={objectDef}
                       formulaValues={formulaValues}
-                      lookupTick={lookupTick}
+                      isLookupLoaded={isLookupLoaded}
                       sectionToggles={sectionToggles}
                       setSectionToggles={setSectionToggles}
                       collapsedPanelIds={collapsedPanelIds}
@@ -449,7 +450,7 @@ export default function RecordDetailPage({
                     record={record}
                     objectDef={objectDef}
                     formulaValues={formulaValues}
-                    lookupTick={lookupTick}
+                    isLookupLoaded={isLookupLoaded}
                     sectionToggles={sectionToggles}
                     setSectionToggles={setSectionToggles}
                     collapsedPanelIds={collapsedPanelIds}
