@@ -194,9 +194,91 @@ export default function RecordDetailPage({
           objectApiName: 'Property',
           recordId: propertyRecordId,
           folderName: parentFolderName,
-          subPath: `${subfolder}/${childName}`,
+          // For Opportunities, default into the Estimation subfolder
+          subPath: objectApiName === 'Opportunity'
+            ? `${subfolder}/${childName}/1. Estimation`
+            : `${subfolder}/${childName}`,
         });
       } catch { setLinkedDropboxInfo(false); /* non-fatal — Dropbox may not be connected */ }
+    })();
+  }, [record, params?.id, objectApiName]);
+
+  // ── Project: show the linked Opportunity's Dropbox folder instead of its own ──
+  useEffect(() => {
+    if (!record || !params?.id) return;
+    if (objectApiName !== 'Project') return;
+
+    // Find the linked Opportunity ID
+    const oppKey = Object.keys(record).find(k => {
+      const lk = k.toLowerCase().replace(/^[a-z]+__/, '');
+      return lk === 'opportunityid' || lk === 'opportunity';
+    });
+    const opportunityId = oppKey ? record[oppKey] : null;
+    if (!opportunityId || typeof opportunityId !== 'string') {
+      setLinkedDropboxInfo(false);
+      return;
+    }
+
+    (async () => {
+      try {
+        // Fetch the Opportunity record
+        const oppRaw = await recordsService.getRecord('Opportunity', opportunityId);
+        if (!oppRaw) { setLinkedDropboxInfo(false); return; }
+        const opp = recordsService.flattenRecord(oppRaw);
+
+        // Find the Opportunity's Property link
+        const oppPropKey = Object.keys(opp).find(k => {
+          const lk = k.toLowerCase().replace(/^[a-z]+__/, '');
+          return lk === 'propertyid' || lk === 'property';
+        });
+        const propertyRecordId = oppPropKey ? opp[oppPropKey] : null;
+        if (!propertyRecordId || typeof propertyRecordId !== 'string') {
+          setLinkedDropboxInfo(false);
+          return;
+        }
+
+        // Build the Opportunity child folder name
+        const oppNumKey = Object.keys(opp).find(
+          k => k.toLowerCase().includes('number') && typeof opp[k] === 'string' && opp[k]
+        );
+        const oppNameKey = Object.keys(opp).find(
+          k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'opportunityname' || k.toLowerCase().endsWith('__opportunityname')) && typeof opp[k] === 'string' && opp[k]
+        );
+        const oppName = oppNameKey ? String(opp[oppNameKey]) : '';
+        const oppNum = oppNumKey ? String(opp[oppNumKey]) : '';
+        const oppChildName = oppName && oppNum ? `${oppName} (${oppNum})` : oppName || oppNum || opportunityId;
+
+        // Fetch the parent Property record
+        const parentRaw = await recordsService.getRecord('Property', propertyRecordId);
+        if (!parentRaw) { setLinkedDropboxInfo(false); return; }
+        const parent = recordsService.flattenRecord(parentRaw);
+        const pNumKey = Object.keys(parent).find(k => k.toLowerCase().includes('number') && typeof parent[k] === 'string' && parent[k]);
+        let addrStr = '';
+        const streetKey = Object.keys(parent).find(k => {
+          const lk = k.toLowerCase();
+          return lk === 'street_address' || lk === 'property_address' || lk.endsWith('__street_address') || lk.endsWith('__property_address');
+        });
+        if (streetKey && typeof parent[streetKey] === 'string') addrStr = parent[streetKey];
+        if (!addrStr) {
+          const addrKey = Object.keys(parent).find(k => { const lk = k.toLowerCase(); return lk === 'address' || lk.endsWith('__address'); });
+          if (addrKey) {
+            let addr = parent[addrKey];
+            if (typeof addr === 'string' && addr.startsWith('{')) { try { addr = JSON.parse(addr); } catch { /* ignore */ } }
+            if (typeof addr === 'object' && addr !== null) addrStr = addr.street || addr.address || addr.addressLine1 || '';
+            else if (typeof addr === 'string') addrStr = addr;
+          }
+        }
+        const autoNum = pNumKey ? parent[pNumKey] : '';
+        const parentFolderName = addrStr && autoNum ? `${addrStr} (${autoNum})` : addrStr || autoNum || propertyRecordId;
+
+        // Point at the same folder the Opportunity uses
+        setLinkedDropboxInfo({
+          objectApiName: 'Property',
+          recordId: propertyRecordId,
+          folderName: parentFolderName,
+          subPath: `Project Books/${oppChildName}`,
+        });
+      } catch { setLinkedDropboxInfo(false); }
     })();
   }, [record, params?.id, objectApiName]);
 
@@ -705,6 +787,7 @@ export default function RecordDetailPage({
         }
       } else if (['Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName) && linkedDropboxInfo && linkedDropboxInfo !== false) {
         // Linked records: rename the child folder inside the parent Property's subfolder
+        // Note: Project is excluded here — it doesn't own a folder, it borrows the Opportunity's
         const merged = { ...record, ...data, ...normalizedData };
         const oldChildName = buildChildFolderName(record, objectApiName);
         const newChildName = buildChildFolderName(merged, objectApiName);
@@ -1171,7 +1254,7 @@ export default function RecordDetailPage({
 
       {/* Dropbox file browser — hardcoded at end of every record */}
       {/* For linked types (Lead/Opportunity/WorkOrder), show loading while creating folders */}
-      {record && params?.id && ['Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName) && linkedDropboxInfo === null && (
+      {record && params?.id && ['Lead', 'Opportunity', 'WorkOrder', 'Project'].includes(objectApiName) && linkedDropboxInfo === null && (
         <div className="max-w-6xl mx-auto px-6 pb-6">
           <div className="border border-gray-200 rounded-lg p-6">
             <div className="flex items-center gap-2 text-gray-500">
@@ -1182,7 +1265,7 @@ export default function RecordDetailPage({
         </div>
       )}
       {record && params?.id &&
-        (!['Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName) || linkedDropboxInfo !== null) && (
+        (!['Lead', 'Opportunity', 'WorkOrder', 'Project'].includes(objectApiName) || linkedDropboxInfo !== null) && (
         <div className="max-w-6xl mx-auto px-6 pb-6">
           <DropboxFileBrowser
             objectApiName={linkedDropboxInfo && linkedDropboxInfo !== false ? linkedDropboxInfo.objectApiName : objectApiName}
