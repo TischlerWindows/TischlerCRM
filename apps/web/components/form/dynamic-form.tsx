@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSchemaStore } from '@/lib/schema-store';
 import {
   PageLayout,
@@ -12,6 +12,7 @@ import {
   LayoutSection,
   normalizeFieldType,
 } from '@/lib/schema';
+import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
@@ -150,25 +151,35 @@ export default function DynamicForm({
   const visibilityCtx: VisibilityContext = { currentUserId: authUser?.id };
 
   // ── Layout resolution ─────────────────────────────────────────
-  const layout = (() => {
+  const layout = useMemo(() => {
     if (!object?.pageLayouts?.length) return undefined;
-    if (layoutId) return object.pageLayouts.find((l) => l.id === layoutId);
 
-    const defaultRt = object.defaultRecordTypeId
-      ? object.recordTypes?.find((r) => r.id === object.defaultRecordTypeId)
-      : object.recordTypes?.[0];
-    if (defaultRt?.pageLayoutId) {
-      const rtLayout = object.pageLayouts.find((l) => l.id === defaultRt.pageLayoutId);
-      if (rtLayout) return rtLayout;
+    let resolved: PageLayout | undefined;
+    if (layoutId) {
+      resolved = object.pageLayouts.find((l) => l.id === layoutId);
+    } else {
+      const defaultRt = object.defaultRecordTypeId
+        ? object.recordTypes?.find((r) => r.id === object.defaultRecordTypeId)
+        : object.recordTypes?.[0];
+      if (defaultRt?.pageLayoutId) {
+        resolved = object.pageLayouts.find((l) => l.id === defaultRt.pageLayoutId);
+      }
+      if (!resolved) {
+        const hasFields = (l: any) =>
+          l.tabs?.some((t: any) =>
+            t.regions?.some((r: any) => r.panels?.some((p: any) => (p.fields?.length || 0) > 0)) ||
+            t.sections?.some((s: any) => (s.fields?.length || 0) > 0),
+          );
+        const byType = object.pageLayouts.filter((l) => l.layoutType === layoutType);
+        resolved = byType.find(hasFields) || object.pageLayouts.find(hasFields) || byType[0] || object.pageLayouts[0];
+      }
     }
 
-    const hasFields = (l: any) =>
-      l.tabs?.some((t: any) => t.sections?.some((s: any) => (s.fields?.length || 0) > 0));
-
-    const byType = object.pageLayouts.filter((l) => l.layoutType === layoutType);
-    const withFields = byType.find(hasFields) || object.pageLayouts.find(hasFields);
-    return withFields || byType[0] || object.pageLayouts[0];
-  })();
+    if (resolved && isLegacyLayout(resolved)) {
+      return migrateLegacyLayout(resolved as any);
+    }
+    return resolved;
+  }, [object, layoutId, layoutType]);
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab && layout.tabs[0]) {

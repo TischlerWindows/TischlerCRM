@@ -454,7 +454,7 @@ class LocalStorageSchemaService implements SchemaService {
       const updatedLayouts = source.pageLayouts.map((layout) => {
         if (!layout.tabs.length || !layout.tabs[0]) return layout;
         const tabs = layout.tabs.map((tab, tabIndex) => {
-          if (tabIndex !== 0 || !tab.regions.length || !tab.regions[0]?.panels?.length || !tab.regions[0].panels[0]) return tab;
+          if (tabIndex !== 0 || !tab.regions?.length || !tab.regions[0]?.panels?.length || !tab.regions[0].panels[0]) return tab;
           const region = tab.regions[0]!;
           const panel = region.panels[0]!;
           const existingFieldApi = new Set(panel.fields.map((f) => f.fieldApiName));
