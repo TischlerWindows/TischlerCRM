@@ -69,14 +69,14 @@ const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
 
 /** Subfolders created inside each Opportunity folder. */
 const OPPORTUNITY_SUBFOLDERS = [
-  'Estimation',
-  'Proposals',
-  'Contract',
-  'Project Management',
-  'AutoCad',
-  'Installation',
-  'Final Shop Drawings',
-  'Project Accounting',
+  '1. Estimation',
+  '2. Proposals',
+  '3. Contract',
+  '4. Project Management',
+  '5. AutoCad',
+  '6. Installation',
+  '7. Final Shop Drawings',
+  '8. Project Accounting',
 ];
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
