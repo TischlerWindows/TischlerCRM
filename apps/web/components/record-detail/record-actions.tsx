@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer } from 'lucide-react';
@@ -55,6 +55,14 @@ export function RecordActions({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
+
+  // Lock body scroll when the admin menu overlay is open
+  useEffect(() => {
+    if (showAdminMenu) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [showAdminMenu]);
 
   const showEdit = visibleActions.includes('edit');
   const showDelete = visibleActions.includes('delete');
@@ -186,8 +194,8 @@ export function RecordActions({
             </button>
             {showAdminMenu && (
               <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowAdminMenu(false)} />
-                <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-40">
+                <div className="fixed inset-0 z-overlay" onClick={() => setShowAdminMenu(false)} />
+                <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal">
                   <Link
                     href={`/object-manager/${encodeURIComponent(objectApiName)}`}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"

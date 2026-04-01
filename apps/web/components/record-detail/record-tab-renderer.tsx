@@ -81,8 +81,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
   return (
     <div
       key={tab.id ?? ti}
-      className="grid gap-4"
-      style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
+      className="grid grid-cols-12 gap-4"
     >
       {sortedRegions.map((region) => {
         if (region.hidden) return null;
@@ -274,8 +273,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
   return (
     <div
       key={tab.id ?? ti}
-      className="grid gap-4 mb-6"
-      style={{ gridTemplateColumns: `repeat(${TAB_GRID_COLUMNS}, minmax(0, 1fr))` }}
+      className="grid grid-cols-12 gap-4 mb-6"
     >
       {visibleItems.map((item) => {
         if (item.kind === 'widget') {
