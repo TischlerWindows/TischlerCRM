@@ -45,6 +45,9 @@ importers:
       '@crm/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@crm/widgets':
+        specifier: workspace:*
+        version: link:../../packages/widgets
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.2.0
@@ -224,6 +227,12 @@ importers:
         version: 5.4.5
 
   packages/types:
+    devDependencies:
+      typescript:
+        specifier: 5.4.5
+        version: 5.4.5
+
+  packages/widgets:
     devDependencies:
       typescript:
         specifier: 5.4.5
