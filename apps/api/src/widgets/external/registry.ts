@@ -1,9 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-
-// IDs must match WidgetManifest.id in apps/web/widgets/external/
-export const externalWidgetIds: string[] = [
-  'demo-widget',
-]
+export { EXTERNAL_WIDGET_IDS as externalWidgetIds } from '@crm/widgets'
 
 export const externalWidgetRouteModules: Array<{
   widgetId: string
