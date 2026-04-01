@@ -431,38 +431,45 @@ export function DropboxFileBrowser({
         </div>
       </div>
 
-      {/* Breadcrumb navigation */}
-      {currentPath.length > 0 && (
-        <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-100 text-sm">
+      {/* Breadcrumb / folder path */}
+      <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-100 text-sm">
+        {currentPath.length > 0 ? (
           <button
             onClick={() => setCurrentPath([])}
             className="text-blue-600 hover:underline font-medium"
           >
             {rootLabel || folderName || 'Root'}
           </button>
-          {currentPath.map((segment, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <ChevronRight className="w-3 h-3 text-gray-400" />
-              {i === currentPath.length - 1 ? (
-                <span className="text-gray-700 font-medium">{segment}</span>
-              ) : (
-                <button
-                  onClick={() => handleBreadcrumb(i)}
-                  className="text-blue-600 hover:underline"
-                >
-                  {segment}
-                </button>
-              )}
-            </span>
-          ))}
+        ) : (
+          <span className="text-gray-700 font-medium flex items-center gap-1">
+            <FolderOpen className="w-3.5 h-3.5 text-gray-400" />
+            {rootLabel || folderName || 'Root'}
+          </span>
+        )}
+        {currentPath.map((segment, i) => (
+          <span key={i} className="flex items-center gap-1">
+            <ChevronRight className="w-3 h-3 text-gray-400" />
+            {i === currentPath.length - 1 ? (
+              <span className="text-gray-700 font-medium">{segment}</span>
+            ) : (
+              <button
+                onClick={() => handleBreadcrumb(i)}
+                className="text-blue-600 hover:underline"
+              >
+                {segment}
+              </button>
+            )}
+          </span>
+        ))}
+        {currentPath.length > 0 && (
           <button
             onClick={handleNavigateUp}
             className="ml-auto text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
           >
             <ArrowLeft className="w-3 h-3" /> Back
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <input
         ref={fileInputRef}
