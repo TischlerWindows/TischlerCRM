@@ -41,11 +41,6 @@ body {
     animation: slide-in-from-right 0.3s ease-out;
   }
 
-  .bg-gray-50 {
-    background-color: var(--color-primary) !important;
-  }
-
-  .border-gray-200 {
-    border-color: #e2e3e5 !important;
-  }
+  /* Removed !important overrides on .bg-gray-50 and .border-gray-200.
+     Use bg-surface and border-border-default instead (defined in tailwind.config.js). */
 }
