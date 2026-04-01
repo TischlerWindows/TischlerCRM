@@ -171,10 +171,13 @@ export function useEditorLifecycle(): EditorLifecycle {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const didLoadLayoutRef = useRef<string | null>(null);
+  /** Captures `object.updatedAt` at load time for concurrent-edit detection. */
+  const loadedUpdatedAtRef = useRef<string | null>(null);
 
   /* ---- Load layout from schema store ---- */
   useEffect(() => {
     didLoadLayoutRef.current = null;
+    loadedUpdatedAtRef.current = null;
     setShowTemplateGallery(layoutId === 'new');
   }, [layoutId, routeKey]);
 
@@ -182,6 +185,9 @@ export function useEditorLifecycle(): EditorLifecycle {
     if (!object) return;
     if (didLoadLayoutRef.current === routeKey) return;
     didLoadLayoutRef.current = routeKey;
+
+    // Capture the object's updatedAt so we can detect concurrent edits on save.
+    loadedUpdatedAtRef.current = object.updatedAt ?? null;
 
     if (layoutId === 'new') {
       loadLayout(createBlankLayout(objectApiName));
@@ -275,6 +281,24 @@ export function useEditorLifecycle(): EditorLifecycle {
       return false;
     }
 
+    // Concurrent-edit detection: compare the object's current updatedAt with the
+    // value captured at load time. If another user (or tab) saved in the meantime,
+    // the timestamps will differ.
+    const freshObject = useSchemaStore.getState().schema?.objects.find(
+      (o) => o.apiName === objectApiName,
+    );
+    if (
+      loadedUpdatedAtRef.current &&
+      freshObject?.updatedAt &&
+      freshObject.updatedAt !== loadedUpdatedAtRef.current
+    ) {
+      showToast(
+        'This layout was modified by another user. Please reload to see their changes.',
+        'error',
+      );
+      return false;
+    }
+
     setIsSaving(true);
 
     const builtLayout = buildPageLayout(layout);
@@ -293,6 +317,15 @@ export function useEditorLifecycle(): EditorLifecycle {
       await updateObject(objectApiName, {
         pageLayouts: updatedLayouts,
       });
+
+      // After a successful save, refresh the baseline timestamp so the next
+      // save doesn't mistakenly detect our own write as a concurrent edit.
+      const savedObject = useSchemaStore.getState().schema?.objects.find(
+        (o) => o.apiName === objectApiName,
+      );
+      if (savedObject?.updatedAt) {
+        loadedUpdatedAtRef.current = savedObject.updatedAt;
+      }
 
       loadLayout(savedLayout);
 

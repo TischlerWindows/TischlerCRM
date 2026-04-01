@@ -14,6 +14,14 @@ export interface HistorySlice {
   redo: () => void;
 }
 
+// ── Selectors ───────────────────────────────────────────────────────────────
+
+/** Number of available undo snapshots (0–30). */
+export const selectUndoCount = (state: HistorySlice): number => state.undoStack.length;
+
+/** Number of available redo snapshots. */
+export const selectRedoCount = (state: HistorySlice): number => state.redoStack.length;
+
 // ── History slice creator ────────────────────────────────────────────────────
 
 export const createHistorySlice: StateCreator<

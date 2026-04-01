@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Eye, Plus, Save, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Redo2, Save, Undo2, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
 import type { PageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -37,6 +37,10 @@ export function EditorToolbar({
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
   const pushUndo = useEditorStore((s) => s.pushUndo);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const undoCount = useEditorStore((s) => s.undoStack.length);
+  const redoCount = useEditorStore((s) => s.redoStack.length);
 
   const schema = useSchemaStore((s) => s.schema);
   const setLayoutActive = useSchemaStore((s) => s.setLayoutActive);
@@ -427,6 +431,32 @@ export function EditorToolbar({
           </button>
           {activeError ? <p className="text-xs text-red-600">{activeError}</p> : null}
 
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={undo}
+            disabled={undoCount === 0}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+            {undoCount > 0 && (
+              <span className="ml-1 text-xs text-gray-500">({undoCount})</span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={redo}
+            disabled={redoCount === 0}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+            {redoCount > 0 && (
+              <span className="ml-1 text-xs text-gray-500">({redoCount})</span>
+            )}
+          </Button>
           <Button variant="outline" size="sm" type="button" onClick={onPreview}>
             <Eye className="mr-1.5 h-4 w-4" />
             Preview
