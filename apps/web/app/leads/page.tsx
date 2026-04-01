@@ -893,7 +893,7 @@ export default function LeadsPage() {
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs.reduce((acc, tab) => acc + tab.regions.length, 0)} sections
                     </div>
                   </div>
                 </button>

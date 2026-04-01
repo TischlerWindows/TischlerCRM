@@ -396,34 +396,28 @@ export const useSchemaStore = create<SchemaStore>()(
             ...layout,
             tabs: layout.tabs.map(tab => ({
               ...tab,
-              sections: tab.sections.map(section => ({
-                ...section,
-                fields: section.fields.map(pf => {
-                  // Match by old apiName (rename) or current apiName (property update)
-                  const matchesOld = apiNameChanged && pf.apiName === oldApiName;
-                  const matchesCurrent = pf.apiName === (newApiName || fieldId);
-                  if (!matchesOld && !matchesCurrent) return pf;
+              regions: tab.regions.map(region => ({
+                ...region,
+                panels: region.panels.map(panel => ({
+                  ...panel,
+                  fields: panel.fields.map(pf => {
+                    // Match by old apiName (rename) or current apiName (property update)
+                    const matchesOld = apiNameChanged && pf.fieldApiName === oldApiName;
+                    const matchesCurrent = pf.fieldApiName === (newApiName || fieldId);
+                    if (!matchesOld && !matchesCurrent) return pf;
 
-                  // Rebuild with the updated field def so embedded data stays fresh
-                  const freshField = updatedFields.find(f => f.apiName === (newApiName || fieldId));
-                  if (!freshField) {
-                    // At minimum, update the apiName reference
-                    return apiNameChanged ? { ...pf, apiName: newApiName! } : pf;
-                  }
-                  const { apiName: _a, ...rest } = freshField;
-                  return {
-                    ...rest,
-                    ...pf,
-                    apiName: freshField.apiName,
-                    label: freshField.label,
-                    type: freshField.type,
-                    required: freshField.required,
-                    lookupObject: freshField.lookupObject,
-                    relationshipName: freshField.relationshipName,
-                    picklistValues: freshField.picklistValues ? [...freshField.picklistValues] : freshField.picklistValues,
-                    defaultValue: freshField.defaultValue,
-                  };
-                }),
+                    // Rebuild with the updated field def so embedded data stays fresh
+                    const freshField = updatedFields.find(f => f.apiName === (newApiName || fieldId));
+                    if (!freshField) {
+                      // At minimum, update the fieldApiName reference
+                      return apiNameChanged ? { ...pf, fieldApiName: newApiName! } : pf;
+                    }
+                    return {
+                      ...pf,
+                      fieldApiName: freshField.apiName,
+                    } as any;
+                  }),
+                })),
               })),
             })),
           }));
