@@ -1,7 +1,7 @@
 # Widget Developer Guide
 
 **Framework version:** 1.0  
-**Last updated:** 2026-03-30  
+**Last updated:** 2026-04-01  
 **Spec:** `docs/superpowers/specs/2026-03-30-external-widget-framework-design.md`
 
 ---
@@ -12,14 +12,15 @@
 2. [Quickstart — Internal widget](#2-quickstart--internal-widget)
 3. [`widget.config.ts` reference](#3-widgetconfigts-reference)
 4. [Component props reference (`WidgetProps`)](#4-component-props-reference-widgetprops)
-5. [Schema field type catalogue](#5-schema-field-type-catalogue)
-6. [`ConfigPanel.tsx` guide](#6-configpaneltsx-guide)
-7. [`widget.routes.ts` guide](#7-widgetroutests-guide)
-8. [Merge-text resolution](#8-merge-text-resolution)
-9. [Integration gating](#9-integration-gating)
-10. [Demo widget walkthrough](#10-demo-widget-walkthrough)
-11. [RelatedList walkthrough](#11-relatedlist-walkthrough)
-12. [Shipping checklist](#12-shipping-checklist)
+5. [What's wired vs deferred](#whats-wired-vs-deferred)
+6. [Schema field type catalogue](#5-schema-field-type-catalogue)
+7. [`ConfigPanel.tsx` guide](#6-configpaneltsx-guide)
+8. [`widget.routes.ts` guide](#7-widgetroutests-guide)
+9. [Merge-text resolution](#8-merge-text-resolution)
+10. [Integration gating](#9-integration-gating)
+11. [Demo widget walkthrough](#10-demo-widget-walkthrough)
+12. [RelatedList walkthrough](#11-relatedlist-walkthrough)
+13. [Shipping checklist](#12-shipping-checklist)
 
 ---
 
@@ -29,48 +30,37 @@ An **external widget** is backed by a third-party integration (e.g. Dropbox, Sla
 
 ### Steps
 
-**1. Copy the demo widget folder**
+**1. Add the widget ID to the shared package**
 
-```
-cp -r apps/web/widgets/external/demo-widget apps/web/widgets/external/my-widget
-```
+Add the widget's ID string to the `EXTERNAL_WIDGET_IDS` array in `packages/widgets/src/index.ts`.
 
-**2. Rename the widget ID**
+**2. Create the widget folder**
 
-Open `apps/web/widgets/external/my-widget/widget.config.ts` and change `id` to a unique kebab-case string that will never change after deploy:
+Create `apps/web/widgets/external/<widget-name>/` with:
+
+- `widget.config.ts` — the `WidgetManifest`
+- `index.tsx` — the widget component (receives `WidgetProps`)
+- `ConfigPanel.tsx` (optional) — override config panel
+
+**3. Add a `WidgetRegistration` entry to the frontend registry**
+
+Add an entry to `apps/web/widgets/external/registry.ts`:
 
 ```ts
-export const config: WidgetManifest = {
-  id: 'my-widget',          // ← rename; must be unique and permanent
-  name: 'My Widget',
-  description: 'What this widget does',
-  icon: 'Star',             // any Lucide icon name
-  category: 'external',
-  integration: null,        // or a provider ID like 'dropbox'
-  defaultDisplayMode: 'full',
-  configSchema: [
-    // ... define your fields
-  ],
+{
+  manifest: yourWidgetManifest,
+  Component: dynamic(() => import('./<widget-name>/index')),
+  ConfigPanel: YourConfigPanel, // optional
 }
 ```
 
-**3. Register the widget**
+**4. Optionally add a backend route module**
 
-Add one import line to `apps/web/widgets/external/registry.ts`:
+Add `apps/api/src/widgets/external/<widget-name>/widget.routes.ts` and register it in `apps/api/src/widgets/external/registry.ts`.
 
-```ts
-export { config as myWidget } from './my-widget/widget.config'
-```
+That is the complete list. No other files need editing.
 
-**4. Implement the component**
-
-Edit `apps/web/widgets/external/my-widget/index.tsx`. The component receives a `WidgetProps` object (see [§4](#4-component-props-reference-widgetprops)).
-
-**5. Enable in Settings**
-
-Start the dev server, go to **Settings → Widgets**, and toggle the widget on. It will now appear in the page editor palette under the **External** section.
-
-> If `integration` is set to a provider ID (e.g. `'dropbox'`), the toggle will be locked until that integration is connected in **Settings → Connected Apps**.
+> If `integration` is set to a provider ID (e.g. `'dropbox'`), the palette toggle will be locked until that integration is connected in **Settings → Connected Apps**.
 
 ---
 
@@ -80,46 +70,31 @@ An **internal widget** is powered by CRM data. It always appears in the palette 
 
 ### Steps
 
-**1. Copy an existing internal widget**
+**1. Create the widget folder**
 
-The `activity-feed` widget is a good minimal template:
+Create `apps/web/widgets/internal/<widget-name>/` with:
 
-```
-cp -r apps/web/widgets/internal/activity-feed apps/web/widgets/internal/my-internal-widget
-```
+- `widget.config.ts` — the `WidgetManifest`
+- `index.tsx` — the widget component (receives `WidgetProps`)
+- `ConfigPanel.tsx` (optional) — override config panel
 
-**2. Edit `widget.config.ts`**
+**2. Add a `WidgetRegistration` entry to the internal registry**
+
+Add an entry to `apps/web/widgets/internal/registry.ts`:
 
 ```ts
-export const config: WidgetManifest = {
-  id: 'my-internal-widget',
-  name: 'My Internal Widget',
-  description: 'Displays CRM data in a useful way',
-  icon: 'LayoutList',
-  category: 'internal',     // must be 'internal'
-  integration: null,        // always null for internal widgets
-  defaultDisplayMode: 'full',
-  configSchema: [
-    { key: 'maxItems', type: 'number', label: 'Max Items', default: 20 },
-  ],
+{
+  manifest: yourWidgetManifest,
+  widgetConfigType: 'YourType', // must match WidgetConfig.type discriminant in schema
+  Component: dynamic(() => import('./<widget-name>/index')),
+  ConfigPanel: YourConfigPanel, // optional
+  transformConfig: (stored) => ({ ... }), // optional: map stored keys to component prop keys
 }
 ```
 
-**3. Register the widget**
+No other files need editing.
 
-Add one import to `apps/web/widgets/internal/registry.ts`:
-
-```ts
-export { config as myInternalWidget } from './my-internal-widget/widget.config'
-```
-
-**4. Implement the component**
-
-Edit `index.tsx`. Internal widgets call existing CRM API routes directly (there is no `widget.routes.ts` for internal widgets). Use the `record`, `object`, and `orgId` props to build your API calls.
-
-**5. Test in the editor**
-
-The widget appears immediately in the **Components** section of the palette. Drag it onto a layout and check that the properties panel renders your `configSchema` fields correctly.
+Internal widgets call existing CRM API routes directly from `index.tsx` (there is no `widget.routes.ts` for internal widgets). Use the `record`, `object`, and `orgId` props to build your API calls. The widget appears immediately in the **Components** section of the palette.
 
 ---
 
@@ -214,7 +189,7 @@ interface WidgetProps {
 | `config` | `Record<string, unknown>` | Config values from the properties panel. `merge-text` tokens have already been resolved — `{record.name}` becomes the actual record name. Access fields by the `key` you defined in `configSchema`. |
 | `record` | `Record<string, unknown>` | The CRM record currently being viewed. Contains all field values keyed by their API name (`record.name`, `record.accountId`, etc.). |
 | `object` | `ObjectDefinition` | The object definition: `{ apiName, label, fields: [{ apiName, label, type }] }`. Use to read the full field schema, build column lists, etc. |
-| `integration` | `IntegrationContext \| null` | `null` for internal widgets or `integration: null` external widgets. For connected external widgets: `{ provider, accessToken?, isConnected }`. Do not use `accessToken` directly in client code — prefer calling your `widget.routes.ts` backend handler instead. |
+| `integration` | `IntegrationContext \| null` | `null` for internal widgets or `integration: null` external widgets. For connected external widgets: `{ provider, accessToken?, isConnected }`. Do not use `accessToken` directly in client code — prefer calling your `widget.routes.ts` backend handler instead. **Note:** `accessToken` is not currently populated (deferred to follow-on work). Widgets should check `integration?.isConnected` before attempting integration API calls. Do not assume a token is present. |
 | `displayMode` | `'full' \| 'column'` | Current placement mode. Use to adapt the component layout — e.g. hide secondary columns in `'column'` mode. |
 | `orgId` | `string` | The current organisation ID. Pass to API calls that require multi-tenant isolation. |
 
@@ -239,6 +214,19 @@ export default function DropboxFolderWidget({ config, record, integration, orgId
   )
 }
 ```
+
+---
+
+## What's wired vs deferred
+
+**Currently wired:**
+- Merge-text token resolution (`{record.fieldApiName}` substitution in config values)
+- Live record and object definition passed to all widgets
+- `orgId` passed to all widgets
+- Integration connection status (`integration.isConnected`)
+
+**Deferred (follow-on work):**
+- OAuth `accessToken` injection — requires server-side decryption infrastructure. Widgets should check `isConnected` before making integration API calls.
 
 ---
 
@@ -726,7 +714,7 @@ Use this checklist before considering a widget done.
 - [ ] `category` matches the folder (`'external'` or `'internal'`)
 - [ ] `icon` is a valid Lucide icon name (verify at [lucide.dev](https://lucide.dev))
 - [ ] All `configSchema` fields have a `default` so the widget renders without manual configuration
-- [ ] Widget is registered in the appropriate `registry.ts`
+- [ ] A `WidgetRegistration` entry has been added to the appropriate registry file (`apps/web/widgets/external/registry.ts` or `apps/web/widgets/internal/registry.ts`) — this is the only registration step required; do not edit `layout-widgets-inline.tsx` or `floating-properties.tsx`
 - [ ] Dragging the widget onto a layout in the page editor works without errors
 - [ ] All `configSchema` fields render correctly in the properties panel
 - [ ] The component renders correctly on a record page with default config
