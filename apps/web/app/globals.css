@@ -44,3 +44,18 @@ body {
   /* Removed !important overrides on .bg-gray-50 and .border-gray-200.
      Use bg-surface and border-border-default instead (defined in tailwind.config.js). */
 }
+
+/* Responsive: force all region children and panel field cells to full width on mobile */
+@media (max-width: 767px) {
+  .region-grid > * {
+    grid-column: 1 / -1 !important;
+  }
+
+  .panel-field-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .panel-field-grid > * {
+    grid-column: 1 / -1 !important;
+  }
+}

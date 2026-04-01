@@ -81,7 +81,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
   return (
     <div
       key={tab.id ?? ti}
-      className="grid grid-cols-12 gap-4"
+      className="region-grid grid grid-cols-1 md:grid-cols-12 gap-4"
     >
       {sortedRegions.map((region) => {
         if (region.hidden) return null;
@@ -156,7 +156,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                   </button>
                   {!isPanelCollapsed && (
                     <div
-                      className="grid gap-x-6 gap-y-4 p-4"
+                      className="panel-field-grid grid gap-x-6 gap-y-4 p-4"
                       style={{
                         ...bodyStyle,
                         gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
@@ -273,7 +273,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
   return (
     <div
       key={tab.id ?? ti}
-      className="grid grid-cols-12 gap-4 mb-6"
+      className="region-grid grid grid-cols-1 md:grid-cols-12 gap-4 mb-6"
     >
       {visibleItems.map((item) => {
         if (item.kind === 'widget') {

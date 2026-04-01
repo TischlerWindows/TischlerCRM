@@ -46,7 +46,7 @@ export function AddressInput({
         onChange={(e) => onChange({ ...addressValue, street: e.target.value })}
         disabled={disabled}
       />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="City"
           value={addressValue.city || ''}
@@ -60,7 +60,7 @@ export function AddressInput({
           disabled={disabled}
         />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="Postal Code"
           value={addressValue.postalCode || ''}
@@ -151,7 +151,7 @@ export function GeolocationInput({
   const geoValue = value || {};
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
       <Input
         placeholder="Latitude"
         type="number"
