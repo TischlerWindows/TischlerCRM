@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Database } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
-import { preloadLookupRecords } from '@/lib/utils';
+import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import { getFormattingEffectsForField } from '@/lib/layout-formatting';
@@ -72,8 +72,6 @@ export default function RecordDetailPage({
       return next;
     });
   }, []);
-  const [isLookupLoaded, setIsLookupLoaded] = useState(false);
-
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase(),
   );
@@ -144,34 +142,7 @@ export default function RecordDetailPage({
   }, [setRecordSetupContext]);
 
   // ── Preload lookup target records so IDs resolve to labels ──────────
-  useEffect(() => {
-    if (!objectDef) return;
-    const knownObjects = new Set<string>(
-      (schema?.objects || []).map((o: any) => o.apiName),
-    );
-    knownObjects.add('User');
-
-    const lookupTargets = new Set<string>();
-    lookupTargets.add('User');
-    for (const field of objectDef.fields) {
-      if (
-        (field.type === 'Lookup' || field.type === 'ExternalLookup' || field.type === 'LookupUser' || field.type === 'PicklistLookup') &&
-        field.lookupObject &&
-        knownObjects.has(field.lookupObject)
-      ) {
-        lookupTargets.add(field.lookupObject);
-      }
-      if (field.type === 'LookupUser') {
-        lookupTargets.add('User');
-      }
-    }
-    if (lookupTargets.size > 0) {
-      setIsLookupLoaded(false);
-      Promise.all(
-        Array.from(lookupTargets).map((t) => preloadLookupRecords(t)),
-      ).then(() => setIsLookupLoaded(true));
-    }
-  }, [objectDef, schema]);
+  const isLookupLoaded = useLookupPreloader(objectDef);
 
   // ── Build a display title from the record ────────────────────────────
   const getRecordTitle = (): string => {
