@@ -777,4 +777,65 @@ export async function dropboxRoutes(app: FastifyInstance) {
       reply.code(500).send({ error: 'Failed to rename folder' });
     }
   });
+
+  // ── Rename a linked record folder inside a parent Property folder ──
+  app.post('/dropbox/rename-linked-folder', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const {
+      parentObjectApiName,
+      parentFolderName,
+      childObjectApiName,
+      oldChildFolderName,
+      newChildFolderName,
+    } = req.body as {
+      parentObjectApiName: string;
+      parentFolderName: string;
+      childObjectApiName: string;
+      oldChildFolderName: string;
+      newChildFolderName: string;
+    };
+
+    if (!parentObjectApiName || !parentFolderName || !childObjectApiName || !oldChildFolderName || !newChildFolderName) {
+      return reply.code(400).send({ error: 'Missing required fields' });
+    }
+
+    if (oldChildFolderName.trim() === newChildFolderName.trim()) {
+      return reply.send({ renamed: false, reason: 'same_name' });
+    }
+
+    const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
+    if (!subfolder) {
+      return reply.send({ renamed: false, reason: 'no_mapping' });
+    }
+
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    const parentPath = buildFolderPath(parentObjectApiName, '', parentFolderName);
+    const safeOld = oldChildFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const safeNew = newChildFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const oldPath = `${parentPath}/${subfolder}/${safeOld}`;
+    const newPath = `${parentPath}/${subfolder}/${safeNew}`;
+
+    try {
+      await dropboxApi(accessToken, '/files/move_v2', {
+        from_path: oldPath,
+        to_path: newPath,
+        autorename: false,
+        allow_ownership_transfer: false,
+      });
+      reply.send({ renamed: true, oldPath, newPath });
+    } catch (err: any) {
+      if (err.message?.includes('not_found')) {
+        return reply.send({ renamed: false, reason: 'old_folder_not_found' });
+      }
+      if (err.message?.includes('409') || err.message?.includes('conflict')) {
+        return reply.send({ renamed: false, reason: 'new_folder_exists' });
+      }
+      app.log.error(err, 'Dropbox rename linked folder failed');
+      reply.code(500).send({ error: 'Failed to rename linked folder' });
+    }
+  });
 }

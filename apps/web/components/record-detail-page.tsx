@@ -567,6 +567,22 @@ export default function RecordDetailPage({
     return '';
   };
 
+  /** Build a linked child folder name from record data (matches the useEffect childName logic). */
+  const buildChildFolderName = (data: Record<string, any>, objApiName: string): string => {
+    const numberKey = Object.keys(data).find(
+      k => k.toLowerCase().includes('number') && typeof data[k] === 'string' && data[k]
+    );
+    const nameKey = Object.keys(data).find(
+      k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof data[k] === 'string' && data[k]
+    );
+    if (objApiName === 'Lead') {
+      const leadName = nameKey ? String(data[nameKey]) : '';
+      const leadNum = numberKey ? String(data[numberKey]) : '';
+      return leadName && leadNum ? `${leadName} (${leadNum})` : leadName || leadNum || '';
+    }
+    return (numberKey ? String(data[numberKey]) : '') || (nameKey ? String(data[nameKey]) : '') || '';
+  };
+
   /** Build a Dropbox folder name: "6 Suburban Avenue (CT00001)" */
   const getDropboxFolderName = (): string => {
     if (!record) return '';
@@ -679,6 +695,41 @@ export default function RecordDetailPage({
           try {
             await apiClient.renameDropboxFolder({
               objectApiName: 'Property',
+              recordId: record.id,
+              oldFolderName,
+              newFolderName,
+            });
+          } catch (err) {
+            console.warn('[Dropbox] Folder rename failed (non-fatal):', err);
+          }
+        }
+      } else if (['Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName) && linkedDropboxInfo && linkedDropboxInfo !== false) {
+        // Linked records: rename the child folder inside the parent Property's subfolder
+        const merged = { ...record, ...data, ...normalizedData };
+        const oldChildName = buildChildFolderName(record, objectApiName);
+        const newChildName = buildChildFolderName(merged, objectApiName);
+        if (oldChildName && newChildName && oldChildName !== newChildName) {
+          try {
+            await apiClient.renameDropboxLinkedFolder({
+              parentObjectApiName: linkedDropboxInfo.objectApiName,
+              parentFolderName: linkedDropboxInfo.folderName,
+              childObjectApiName: objectApiName,
+              oldChildFolderName: oldChildName,
+              newChildFolderName: newChildName,
+            });
+          } catch (err) {
+            console.warn('[Dropbox] Linked folder rename failed (non-fatal):', err);
+          }
+        }
+      } else if (!['Property', 'Lead', 'Opportunity', 'WorkOrder'].includes(objectApiName)) {
+        // Other top-level objects: rename their own Dropbox folder
+        const oldFolderName = getDropboxFolderName();
+        const merged = { ...record, ...data, ...normalizedData };
+        const newFolderName = buildFolderNameFromData(merged);
+        if (oldFolderName && newFolderName && oldFolderName !== newFolderName) {
+          try {
+            await apiClient.renameDropboxFolder({
+              objectApiName,
               recordId: record.id,
               oldFolderName,
               newFolderName,

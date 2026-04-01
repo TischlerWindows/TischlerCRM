@@ -772,6 +772,19 @@ class ApiClient {
     );
   }
 
+  async renameDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentFolderName: string;
+    childObjectApiName: string;
+    oldChildFolderName: string;
+    newChildFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
   async deleteDropboxFile(fileId: string) {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }
