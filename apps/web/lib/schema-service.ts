@@ -3159,7 +3159,7 @@ class LocalStorageSchemaService implements SchemaService {
       'Scheduled work orders for service and maintenance',
       [
         // ── Auto-number & Name ──
-        { id: generateId(), apiName: 'WorkOrder__workOrderNumber', label: 'Work Order Number', type: 'AutoNumber', autoNumber: { displayFormat: 'WO-{00000}', startingNumber: 1 } },
+        { id: generateId(), apiName: 'WorkOrder__workOrderNumber', label: 'Work Order Number', type: 'AutoNumber', autoNumber: { displayFormat: 'WO{0000}', startingNumber: 1 } },
         { id: generateId(), apiName: 'WorkOrder__name', label: 'Work Order', type: 'Text', maxLength: 80 },
         { id: generateId(), apiName: 'WorkOrder__title', label: 'Title', type: 'TextArea', maxLength: 255 },
         // ── Type / Status ──

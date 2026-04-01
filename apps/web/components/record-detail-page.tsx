@@ -142,8 +142,8 @@ export default function RecordDetailPage({
     );
 
     let childName: string;
-    if (objectApiName === 'Lead' || objectApiName === 'Opportunity') {
-      // Lead/Opportunity folders: "Name (Number)" e.g. "Mr. Jeremy Griffin (LEAD0001)" or "Project X (OPP0001)"
+    if (objectApiName === 'Lead' || objectApiName === 'Opportunity' || objectApiName === 'WorkOrder') {
+      // Lead/Opportunity/WorkOrder folders: "Name (Number)" e.g. "Mr. Jeremy Griffin (LEAD0001)"
       const recName = nameKey ? String(record[nameKey]) : '';
       const recNum = numberKey ? String(record[numberKey]) : '';
       childName = recName && recNum ? `${recName} (${recNum})` : recName || recNum || params.id as string;
@@ -575,7 +575,7 @@ export default function RecordDetailPage({
     const nameKey = Object.keys(data).find(
       k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof data[k] === 'string' && data[k]
     );
-    if (objApiName === 'Lead' || objApiName === 'Opportunity') {
+    if (objApiName === 'Lead' || objApiName === 'Opportunity' || objApiName === 'WorkOrder') {
       const recName = nameKey ? String(data[nameKey]) : '';
       const recNum = numberKey ? String(data[numberKey]) : '';
       return recName && recNum ? `${recName} (${recNum})` : recName || recNum || '';
