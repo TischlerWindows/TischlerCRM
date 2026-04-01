@@ -863,6 +863,228 @@ export default function SummaryPage() {
     setOpenDropdown(null);
   };
 
+  // ── Print PDF — renders both pages into a new window and triggers print ──
+  const handlePrintPDF = () => {
+    if (!editingSummary) return;
+    const s = editingSummary;
+    const esc = (v: string | undefined | null) => (v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+    const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+    const p = (x: string | undefined) => parseFloat(x || '0') || 0;
+    const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
+
+    // Build row HTML for windows/doors tables
+    const buildDataRows = (rows: any[]) => rows.filter((r: any) =>
+      r.tusPosition || r.archPosition || r.qty || r.widthMM || r.heightMM || r.type || r.type2
+    ).map((r: any) => `<tr>
+      <td>${esc(r.tusPosition)}</td><td>${esc(r.archPosition)}</td><td class="r">${esc(r.qty)}</td>
+      <td class="r">${esc(r.widthMM)}</td><td class="r">${esc(r.heightMM)}</td>
+      <td class="r">${esc(r.widthFtIn)}</td><td class="r">${esc(r.heightFtIn)}</td>
+      <td class="r">${esc(r.sqFeetEach)}</td><td class="r">${esc(r.sqFeetTotal)}</td>
+      <td class="r">${esc(r.operableSashesEach)}</td><td class="r">${esc(r.operableSashesTotal)}</td>
+      <td class="r">${esc(r.qty2)}</td><td>${esc(r.type)}</td>
+      <td class="r">${esc(r.qty3)}</td><td>${esc(r.type2)}</td>
+      <td>${esc(r.specialRemarks)}</td>
+      <td class="r">${esc(r.fieldsEach)}</td><td class="r">${esc(r.fieldsTotal)}</td>
+      <td class="r">${esc(r.siteMullionsEach)}</td><td class="r">${esc(r.siteMullionsTotal)}</td>
+      <td class="r">${esc(r.netEuroEach)}</td><td class="r">${esc(r.netEuroTotal)}</td>
+      <td class="r mc">${esc(r.magneticContactUnit)}</td><td class="r mc">${esc(r.magneticContactPosition)}</td>
+      <td class="r snt">${esc(r.shadeBoxesNoSideTrimUnit)}</td><td class="r snt">${esc(r.shadeBoxesNoSideTrimPosition)}</td>
+      <td class="r swt">${esc(r.shadeBoxesWithSideTrimUnit)}</td><td class="r swt">${esc(r.shadeBoxesWithSideTrimPosition)}</td>
+      <td class="r ff">${esc(r.finalFinishUnit)}</td><td class="r ff">${esc(r.finalFinishPosition)}</td>
+    </tr>`).join('');
+
+    const dataTableHeaders = `<tr>
+      <th>TuS Pos.</th><th>Arch Pos.</th><th>Qty</th>
+      <th>W (MM)</th><th>H (MM)</th><th>W (Ft&In)</th><th>H (Ft&In)</th>
+      <th>Sq Ft (Ea)</th><th>Sq Ft (Tot)</th>
+      <th>Op. Sash (Ea)</th><th>Op. Sash (Tot)</th>
+      <th>Qty</th><th>Type</th><th>Qty</th><th>Type 2</th>
+      <th>Special Remarks</th>
+      <th>Fields (Ea)</th><th>Fields (Tot)</th>
+      <th># Site Mull. (Ea)</th><th># Site Mull. (Tot)</th>
+      <th>NET € (Ea)</th><th>NET € (Tot)</th>
+      <th class="mc">Mag. Ct. /Unit</th><th class="mc">Mag. Ct. /Pos</th>
+      <th class="snt">Shade No Trim /Unit</th><th class="snt">Shade No Trim /Pos</th>
+      <th class="swt">Shade W/ Trim /Unit</th><th class="swt">Shade W/ Trim /Pos</th>
+      <th class="ff">Final Fin. /Unit</th><th class="ff">Final Fin. /Pos</th>
+    </tr>`;
+
+    // Quote totals calculation
+    const ewQty = sumField(s.rows, 'qty'), ewFields = sumField(s.rows, 'fieldsTotal');
+    const ewSqFt = sumField(s.rows, 'sqFeetTotal'), ewNet = sumField(s.rows, 'netEuroTotal');
+    const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
+    const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
+    const tQty = ewQty + dQty, tFields = ewFields + dFields, tSqFt = ewSqFt + dSqFt, tNet = ewNet + dNet;
+    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    const calcRow = (net: number, cat: any) => {
+      const full = net ? p(cat?.full) / net : 0;
+      const disc = net ? p(cat?.pct) / net : 0;
+      const fn = net ? p(cat?.final) / net : 0;
+      const fa = net ? p(cat?.finalAdj) / net : 0;
+      return { full, disc, final: fn, finalAdj: fa };
+    };
+    const ewC = calcRow(ewNet, qt.euroWindows), dhC = calcRow(0, qt.doubleHung), edC = calcRow(dNet, qt.euroDoors);
+    const gtC = { full: ewC.full + dhC.full + edC.full, disc: ewC.disc + dhC.disc + edC.disc, final: ewC.final + dhC.final + edC.final, finalAdj: ewC.finalAdj + dhC.finalAdj + edC.finalAdj };
+    const qtSum = (f: string) => p((qt.euroWindows as any)?.[f]) + p((qt.doubleHung as any)?.[f]) + p((qt.euroDoors as any)?.[f]);
+
+    const quoteTotalRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any, calc: any) => `
+      <tr><td class="b">${label}</td><td class="r">${fmtInt(qty)}</td><td class="r">${fmtInt(fields)}</td>
+      <td class="r">${fmt(sqFt)}</td><td class="r">${net ? '€' + fmt(net) : '—'}</td>
+      <td class="r">${cat?.full || '—'}</td><td class="r">${cat?.pct || '—'}</td>
+      <td class="r">${cat?.final || '—'}</td><td class="r">${cat?.finalAdj || '—'}</td>
+      <td class="r cb">${calc.full ? '€' + fmt(calc.full) : '—'}</td><td class="r cb">${calc.disc ? '€' + fmt(calc.disc) : '—'}</td>
+      <td class="r cg">${calc.final ? fmt(calc.final) : '—'}</td><td class="r cp">${calc.finalAdj ? fmt(calc.finalAdj) : '—'}</td></tr>`;
+
+    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    const html = `<!DOCTYPE html><html><head><title>${esc(s.name)} — Summary</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; }
+  h1 { font-size: 14pt; margin-bottom: 2px; }
+  h2 { font-size: 11pt; margin: 10px 0 4px; border-bottom: 2px solid #1e3a5f; padding-bottom: 2px; color: #1e3a5f; }
+  h3 { font-size: 9pt; margin: 8px 0 3px; color: #333; }
+  .header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #ccc; }
+  .header .subtitle { font-size: 8pt; color: #666; }
+  .info-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+  .info-grid .item { }
+  .info-grid .item .label { font-size: 7pt; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.3px; }
+  .info-grid .item .value { font-size: 9pt; padding: 2px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 7pt; }
+  th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; }
+  th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; }
+  .r { text-align: right; }
+  .b { font-weight: 600; }
+  .mc { background: #e8f5e9; }
+  .snt { background: #fff3e0; }
+  .swt { background: #e3f2fd; }
+  .ff { background: #fce4ec; }
+  .cb { background: #e3f2fd; }
+  .cg { background: #e8f5e9; }
+  .cp { background: #f3e5f5; }
+  .gt { font-weight: 700; background: #f5f5f5; }
+  .section-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; }
+  .section-card .heading { background: #f8f8f8; padding: 4px 8px; font-size: 9pt; font-weight: 600; border-bottom: 1px solid #ddd; }
+  .section-card .body { padding: 6px 8px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .field .fl { font-size: 7pt; font-weight: 600; color: #555; }
+  .field .fv { font-size: 8.5pt; padding: 1px 0; min-height: 14px; }
+  @media print {
+    @page { margin: 0.4in; }
+    .page1 { page: landscape; }
+    .page2 { page-break-before: always; }
+  }
+  @page { size: landscape; margin: 0.4in; }
+</style></head><body>
+
+<!-- PAGE 1: Data Entry -->
+<div class="page1">
+  <div class="header">
+    <h1>Quote Summary — Data Entry</h1>
+    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
+  </div>
+
+  <div class="info-grid">
+    <div class="item"><div class="label">Job Name</div><div class="value">${esc(s.name)}</div></div>
+    <div class="item"><div class="label">Salesman</div><div class="value">${esc(s.salesman)}</div></div>
+    <div class="item"><div class="label">Opportunity #</div><div class="value">${esc(s.opportunityNumber)}</div></div>
+    <div class="item"><div class="label">Job Type</div><div class="value">${esc(s.jobType)}</div></div>
+    <div class="item"><div class="label">Estimator</div><div class="value">${esc(s.estimator)}</div></div>
+    <div class="item"><div class="label">Date</div><div class="value">${dateStr}</div></div>
+  </div>
+
+  <h2>Windows</h2>
+  <table>${dataTableHeaders}${buildDataRows(s.rows)}</table>
+
+  <h2 style="margin-top:12px">Doors</h2>
+  <table>${dataTableHeaders}${buildDataRows(s.doorRows)}</table>
+</div>
+
+<!-- PAGE 2: Project Summary -->
+<div class="page2">
+  <div class="header">
+    <h1>Quote Summary — Project Summary</h1>
+    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Project Overview</div>
+    <div class="body">
+      <div class="three-col">
+        <div class="field"><div class="fl">Date</div><div class="fv">${dateStr}</div></div>
+        <div class="field"><div class="fl">Opportunity #</div><div class="fv">${esc(s.opportunityNumber)}</div></div>
+        <div class="field"><div class="fl">Project Name</div><div class="fv">${esc(s.name)}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Address</div><div class="fv">${esc(s.address)}</div></div>
+        <div class="field"><div class="fl">Salesman</div><div class="fv">${esc(s.salesman)}</div></div>
+        <div class="field"><div class="fl">Estimator</div><div class="fv">${esc(s.estimator)}</div></div>
+      </div>
+      <div class="two-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Quote Type</div><div class="fv">${s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—'}</div></div>
+        ${s.quoteType === 'requote' ? `<div class="field"><div class="fl">Description of Changes</div><div class="fv">${esc(s.requoteDescription)}</div></div>` : ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Product Specifications</div>
+    <div class="body">
+      <div class="three-col">
+        <div class="field"><div class="fl">Product</div><div class="fv">${esc(s.product || s.jobType)}</div></div>
+        <div class="field"><div class="fl">Product Type</div><div class="fv">${esc(s.productType)}</div></div>
+        <div class="field"><div class="fl">Options</div><div class="fv">${(s.productTypeOptions || []).map(esc).join(', ') || '—'}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Wood Type</div><div class="fv">${esc(s.woodType)}</div></div>
+        <div class="field"><div class="fl">Finish</div><div class="fv">${esc(s.finish)}</div></div>
+        <div class="field"><div class="fl">Glass Type</div><div class="fv">${esc(s.glassType)}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Muntin Type</div><div class="fv">${esc(s.muntinType)}</div></div>
+        <div class="field"><div class="fl">Spacer Bars</div><div class="fv">${esc(s.spacerBars)}</div></div>
+        <div class="field"><div class="fl">Spacer Bar Colors</div><div class="fv">${esc(s.spacerBarColors)}</div></div>
+      </div>
+      <div class="field" style="margin-top:4px"><div class="fl">Project Contains</div><div class="fv">${(s.projectContains || []).map(esc).join(', ') || '—'}</div></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Quote Totals</div>
+    <div class="body" style="padding:0">
+      <table>
+        <thead><tr>
+          <th></th><th class="r">Qty</th><th class="r">Fields</th><th class="r">Sq Feet</th><th class="r">NET €</th>
+          <th class="r">Full</th><th class="r">%</th><th class="r">FINAL</th><th class="r">FINAL W/ ADJ</th>
+          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th class="r cp">Final W/ Adj</th>
+        </tr></thead>
+        <tbody>
+          ${quoteTotalRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows, ewC)}
+          ${quoteTotalRow('Double Hung', 0, 0, 0, 0, qt.doubleHung, dhC)}
+          ${quoteTotalRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors, edC)}
+          <tr class="gt"><td class="b">Grand Total</td><td class="r">${fmtInt(tQty)}</td><td class="r">${fmtInt(tFields)}</td>
+          <td class="r">${fmt(tSqFt)}</td><td class="r">${tNet ? '€' + fmt(tNet) : '—'}</td>
+          <td class="r">${qtSum('full') ? fmt(qtSum('full')) : '—'}</td><td class="r">${qtSum('pct') ? fmt(qtSum('pct')) : '—'}</td>
+          <td class="r">${qtSum('final') ? fmt(qtSum('final')) : '—'}</td><td class="r">${qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—'}</td>
+          <td class="r cb">${gtC.full ? '€' + fmt(gtC.full) : '—'}</td><td class="r cb">${gtC.disc ? '€' + fmt(gtC.disc) : '—'}</td>
+          <td class="r cg">${gtC.final ? fmt(gtC.final) : '—'}</td><td class="r cp">${gtC.finalAdj ? fmt(gtC.finalAdj) : '—'}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => { printWindow.print(); };
+  };
+
   const handleSaveSummary = () => {
     if (!editingSummary) return;
     
@@ -2078,7 +2300,7 @@ export default function SummaryPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintPDF}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Printer className="w-4 h-4 mr-2" />
