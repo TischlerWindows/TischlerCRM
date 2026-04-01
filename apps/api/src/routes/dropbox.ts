@@ -723,4 +723,58 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     reply.send({ created, path: childPath });
   });
+
+  // ── Rename a record folder (e.g. when Property address changes) ──
+  app.post('/dropbox/rename-folder', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const {
+      objectApiName,
+      recordId,
+      oldFolderName,
+      newFolderName,
+    } = req.body as {
+      objectApiName: string;
+      recordId: string;
+      oldFolderName: string;
+      newFolderName: string;
+    };
+
+    if (!objectApiName || !recordId || !oldFolderName || !newFolderName) {
+      return reply.code(400).send({ error: 'Missing required fields' });
+    }
+
+    // Nothing to do if names are the same
+    if (oldFolderName.trim() === newFolderName.trim()) {
+      return reply.send({ renamed: false, reason: 'same_name' });
+    }
+
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    const oldPath = buildFolderPath(objectApiName, recordId, oldFolderName);
+    const newPath = buildFolderPath(objectApiName, recordId, newFolderName);
+
+    try {
+      await dropboxApi(accessToken, '/files/move_v2', {
+        from_path: oldPath,
+        to_path: newPath,
+        autorename: false,
+        allow_ownership_transfer: false,
+      });
+      reply.send({ renamed: true, oldPath, newPath });
+    } catch (err: any) {
+      // If old folder doesn't exist, just let the ensure-folder create the new one
+      if (err.message?.includes('not_found')) {
+        return reply.send({ renamed: false, reason: 'old_folder_not_found' });
+      }
+      // If new path already exists, that's also acceptable
+      if (err.message?.includes('409') || err.message?.includes('conflict')) {
+        return reply.send({ renamed: false, reason: 'new_folder_exists' });
+      }
+      app.log.error(err, 'Dropbox rename folder failed');
+      reply.code(500).send({ error: 'Failed to rename folder' });
+    }
+  });
 }

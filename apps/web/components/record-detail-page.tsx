@@ -520,6 +520,44 @@ export default function RecordDetailPage({
     return record.id;
   };
 
+  /** Build a Dropbox folder name from arbitrary record data (used for rename comparison). */
+  const buildFolderNameFromData = (data: Record<string, any>): string => {
+    const numberKey = Object.keys(data).find(
+      (k) => k.toLowerCase().includes('number') && typeof data[k] === 'string' && data[k]
+    );
+    const autoNumber = numberKey ? data[numberKey] : '';
+    let addrStr = '';
+    const streetKey = Object.keys(data).find((k) => {
+      const lk = k.toLowerCase();
+      return lk === 'street_address' || lk === 'property_address' ||
+             lk.endsWith('__street_address') || lk.endsWith('__property_address');
+    });
+    if (streetKey && typeof data[streetKey] === 'string' && data[streetKey]) {
+      addrStr = data[streetKey];
+    }
+    if (!addrStr) {
+      const addrKey = Object.keys(data).find((k) => {
+        const lk = k.toLowerCase();
+        return lk === 'address' || lk.endsWith('__address');
+      });
+      if (addrKey) {
+        let addr = data[addrKey];
+        if (typeof addr === 'string' && addr.startsWith('{')) {
+          try { addr = JSON.parse(addr); } catch { /* not JSON */ }
+        }
+        if (typeof addr === 'object' && addr !== null) {
+          addrStr = addr.street || addr.address || addr.addressLine1 || '';
+        } else if (typeof addr === 'string' && addr) {
+          addrStr = addr;
+        }
+      }
+    }
+    if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`;
+    if (addrStr) return addrStr;
+    if (autoNumber) return autoNumber;
+    return '';
+  };
+
   /** Build a Dropbox folder name: "6 Suburban Avenue (CT00001)" */
   const getDropboxFolderName = (): string => {
     if (!record) return '';
@@ -620,6 +658,28 @@ export default function RecordDetailPage({
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
         normalizedData[cleanKey] = value;
       }
+
+      // For Property records, rename the Dropbox folder if the address changed
+      if (objectApiName === 'Property') {
+        const oldFolderName = getDropboxFolderName();
+        // Build what the new folder name would be after save using the same
+        // logic as getDropboxFolderName but with merged data
+        const merged = { ...record, ...data, ...normalizedData };
+        const newFolderName = buildFolderNameFromData(merged);
+        if (oldFolderName && newFolderName && oldFolderName !== newFolderName) {
+          try {
+            await apiClient.renameDropboxFolder({
+              objectApiName: 'Property',
+              recordId: record.id,
+              oldFolderName,
+              newFolderName,
+            });
+          } catch (err) {
+            console.warn('[Dropbox] Folder rename failed (non-fatal):', err);
+          }
+        }
+      }
+
       const updated = await recordsService.updateRecord(objectApiName, record.id, { data: normalizedData });
       if (updated) {
         setRawRecord(updated);

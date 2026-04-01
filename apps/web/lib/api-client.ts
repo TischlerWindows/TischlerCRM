@@ -760,6 +760,18 @@ class ApiClient {
     );
   }
 
+  async renameDropboxFolder(opts: {
+    objectApiName: string;
+    recordId: string;
+    oldFolderName: string;
+    newFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
   async deleteDropboxFile(fileId: string) {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }
