@@ -1,0 +1,276 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { formatFieldValue, resolveLookupDisplayName } from '@/lib/utils';
+import { FieldDef, normalizeFieldType, type PageField } from '@/lib/schema';
+import type { ObjectDef } from '@/lib/schema';
+import LocationMapPreview from '@/components/location-map-preview';
+
+// ── Lookup route map ───────────────────────────────────────────────────
+const LOOKUP_ROUTE_MAP: Record<string, string> = {
+  Contact: 'contacts',
+  Account: 'accounts',
+  Property: 'properties',
+  Lead: 'leads',
+  Deal: 'deals',
+  Product: 'products',
+  Quote: 'quotes',
+  Project: 'projects',
+  Service: 'service',
+  Installation: 'installations',
+};
+
+// ── getFieldDef ────────────────────────────────────────────────────────
+/**
+ * Resolves the FieldDef for a given API name, merging layout-enriched
+ * data with the authoritative object-level definition.
+ */
+export function getFieldDef(
+  apiName: string,
+  objectDef: ObjectDef | undefined,
+  layoutField?: PageField,
+): FieldDef | undefined {
+  const objField = objectDef?.fields.find((f) => f.apiName === apiName);
+
+  if (layoutField && layoutField.type && layoutField.label) {
+    const { column, order, presentation: _pres, colSpan: _cs, rowSpan: _rs, ...fieldProps } =
+      layoutField as any;
+    const def = {
+      id: fieldProps.id || apiName,
+      ...fieldProps,
+      apiName,
+      type: normalizeFieldType(fieldProps.type!),
+    } as FieldDef;
+    if (objField?.lookupObject) def.lookupObject = objField.lookupObject;
+    if (objField?.relationshipName) def.relationshipName = objField.relationshipName;
+    if (objField?.targetFields) def.targetFields = objField.targetFields;
+    return def;
+  }
+
+  return objField;
+}
+
+// ── getRecordValue ─────────────────────────────────────────────────────
+/**
+ * Read a value from the flattened record, trying prefixed then stripped key.
+ * Handles Formula computed values and CompositeText sub-field assembly.
+ */
+export function getRecordValue(
+  apiName: string,
+  record: Record<string, any> | null,
+  fieldDef?: FieldDef,
+  formulaValues?: Record<string, any>,
+): any {
+  if (!record) return undefined;
+
+  // For Formula fields, return the computed value from the formula hook
+  if (fieldDef?.type === 'Formula' && fieldDef.formulaExpr) {
+    const computed = formulaValues?.[fieldDef.apiName] ?? formulaValues?.[apiName];
+    if (computed !== undefined && computed !== null) return computed;
+  }
+
+  let value = record[apiName] ?? record[apiName.replace(/^[A-Za-z]+__/, '')];
+
+  // For CompositeText, construct from sub-fields when missing
+  if (!value && fieldDef?.type === 'CompositeText' && fieldDef.subFields) {
+    const composite: Record<string, any> = {};
+    for (const sf of fieldDef.subFields) {
+      const v = record[sf.apiName] ?? record[sf.apiName.replace(/^[A-Za-z]+__/, '')];
+      if (v) composite[sf.apiName] = v;
+    }
+    if (Object.keys(composite).length > 0) value = composite;
+  }
+
+  return value;
+}
+
+// ── renderValue ────────────────────────────────────────────────────────
+/**
+ * Render a field value with type-appropriate formatting (links for
+ * email/phone/URL, locale formatting for numbers/dates, etc.).
+ *
+ * @param lookupTick - counter bumped after lookup cache loads; forces re-render
+ */
+export function renderValue(
+  apiName: string,
+  rawValue: any,
+  fieldDef: FieldDef | undefined,
+  record: Record<string, any> | null,
+  lookupTick: number,
+): React.ReactNode {
+  // Auto-parse JSON strings
+  let value = rawValue;
+  if (typeof value === 'string' && value.startsWith('{')) {
+    try { value = JSON.parse(value); } catch { /* not JSON */ }
+  }
+  const fieldType = fieldDef?.type;
+
+  // LocationSearch — virtual widget, reads mapped target fields
+  if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
+    const tf = fieldDef.targetFields;
+    const resolve = (key: string | undefined) => {
+      if (!key) return undefined;
+      return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
+    };
+    const lat = Number(resolve(tf.lat));
+    const lng = Number(resolve(tf.lng));
+    const addressParts = [
+      resolve(tf.street),
+      resolve(tf.city),
+      resolve(tf.state),
+      resolve(tf.postalCode),
+      resolve(tf.country),
+    ].filter(Boolean).join(', ');
+
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return (
+        <LocationMapPreview
+          lat={lat}
+          lng={lng}
+          address={addressParts || undefined}
+        />
+      );
+    }
+    return addressParts || '-';
+  }
+
+  if (value === null || value === undefined || value === '') return '-';
+
+  // Lookup → clickable link showing resolved label (not raw UUID)
+  if ((fieldType === 'Lookup' || fieldType === 'LookupUser') && (fieldDef?.lookupObject || fieldType === 'LookupUser')) {
+    const lookupTarget = fieldDef?.lookupObject || 'User';
+    const route = LOOKUP_ROUTE_MAP[lookupTarget];
+    const displayLabel = resolveLookupDisplayName(value, lookupTarget);
+    void lookupTick;
+    if (route) {
+      return (
+        <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
+          {displayLabel}
+        </Link>
+      );
+    }
+    return displayLabel;
+  }
+
+  // TextArea — preserve line breaks
+  if (fieldType === 'TextArea' && typeof value === 'string') {
+    return <span className="whitespace-pre-wrap">{value}</span>;
+  }
+
+  // CompositeText (e.g. Name)
+  if (fieldType === 'CompositeText' && typeof value === 'object') {
+    const keys = Object.keys(value);
+    const salutation =
+      value.salutation ||
+      keys.find((k) => k.toLowerCase().includes('salutation')) &&
+        value[keys.find((k) => k.toLowerCase().includes('salutation'))!];
+    const firstName =
+      value.firstName ||
+      keys.find((k) => k.toLowerCase().includes('firstname')) &&
+        value[keys.find((k) => k.toLowerCase().includes('firstname'))!];
+    const lastName =
+      value.lastName ||
+      keys.find((k) => k.toLowerCase().includes('lastname')) &&
+        value[keys.find((k) => k.toLowerCase().includes('lastname'))!];
+    const parts = [salutation, firstName, lastName].filter(Boolean);
+    return parts.length > 0 ? parts.join(' ') : '-';
+  }
+
+  // Email
+  if (fieldType === 'Email') {
+    return (
+      <a href={`mailto:${value}`} className="text-brand-navy hover:underline underline-offset-2">
+        {value}
+      </a>
+    );
+  }
+
+  // Phone
+  if (fieldType === 'Phone') {
+    return (
+      <a href={`tel:${value}`} className="text-brand-navy hover:underline underline-offset-2">
+        {value}
+      </a>
+    );
+  }
+
+  // URL
+  if (fieldType === 'URL') {
+    const href = fieldDef?.staticUrl || value;
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="text-brand-navy hover:underline underline-offset-2">
+        {fieldDef?.staticUrl || value}
+      </a>
+    );
+  }
+
+  // Checkbox
+  if (fieldType === 'Checkbox') {
+    return value ? 'Yes' : 'No';
+  }
+
+  // PicklistText
+  if (fieldType === 'PicklistText' && typeof value === 'object' && value !== null) {
+    const parts = [value.picklist, value.text].filter(Boolean);
+    return parts.length > 0 ? parts.join(' — ') : '-';
+  }
+
+  // PicklistLookup — composite: picklist selection + lookup record
+  if (fieldType === 'PicklistLookup' && typeof value === 'object' && value !== null) {
+    const lookupTarget = fieldDef?.lookupObject;
+    const picklistPart = value.picklist || '';
+    let lookupPart: React.ReactNode = '';
+    if (value.lookup && lookupTarget) {
+      const route = LOOKUP_ROUTE_MAP[lookupTarget];
+      const displayLabel = resolveLookupDisplayName(value.lookup, lookupTarget);
+      void lookupTick;
+      lookupPart = route ? (
+        <Link href={`/${route}/${value.lookup}`} className="text-brand-navy hover:underline underline-offset-2">
+          {displayLabel}
+        </Link>
+      ) : displayLabel;
+    }
+    if (!picklistPart && !lookupPart) return '-';
+    return (
+      <span className="inline-flex items-center gap-1">
+        {picklistPart}{picklistPart && lookupPart ? ' — ' : ''}{lookupPart}
+      </span>
+    );
+  }
+
+  // Address (object) — show map preview when lat/lng are available
+  if (fieldType === 'Address' && typeof value === 'object') {
+    const parts = [value.street, value.city, value.state, value.postalCode, value.country].filter(Boolean);
+    const addressText = parts.length > 0 ? parts.join(', ') : '-';
+    const lat = Number(value.lat);
+    const lng = Number(value.lng);
+    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+      return (
+        <div className="space-y-2">
+          <span>{addressText}</span>
+          <LocationMapPreview lat={lat} lng={lng} address={addressText !== '-' ? addressText : undefined} />
+        </div>
+      );
+    }
+    return addressText;
+  }
+
+  // Date — locale-aware formatting
+  if (fieldType === 'Date' && typeof value === 'string') {
+    const d = new Date(value + (value.includes('T') ? '' : 'T00:00:00'));
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', year: 'numeric' }).format(d);
+    }
+  }
+
+  // DateTime — locale-aware formatting
+  if (fieldType === 'DateTime' && typeof value === 'string') {
+    const d = new Date(value);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat(undefined, { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+    }
+  }
+
+  return formatFieldValue(value, fieldType, fieldDef?.lookupObject);
+}
