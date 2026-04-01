@@ -191,7 +191,7 @@ export const createLayoutSlice: StateCreator<
       if (!entry) return s;
       const { tab, region } = entry;
       const oldSpan = region.gridColumnSpan;
-      const clampedSpan = Math.max(2, Math.min(10, newColSpan));
+      const clampedSpan = Math.max(2, Math.min(12, newColSpan));
       const delta = clampedSpan - oldSpan;
 
       const sameRow = tab.regions.filter(

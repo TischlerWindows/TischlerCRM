@@ -16,7 +16,6 @@ import {
   Puzzle,
   Sparkles,
   StretchHorizontal,
-  Table2,
 } from 'lucide-react';
 import type { ElementType } from 'react';
 
@@ -30,7 +29,6 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Puzzle,
   Sparkles,
   StretchHorizontal,
-  Table2,
 };
 
 function getLucideIcon(name: string): ElementType {
@@ -158,53 +156,6 @@ function ExternalDraggableCard({
   );
 }
 
-const FIELD_SECTION_VARIANTS: { id: string; label: string; columns: 1 | 2 | 3; description: string }[] = [
-  { id: 'field-section-1col', label: 'Field Section (1 Column)', columns: 1, description: 'Single-column field container' },
-  { id: 'field-section-2col', label: 'Field Section (2 Columns)', columns: 2, description: 'Two-column field container' },
-  { id: 'field-section-3col', label: 'Field Section (3 Columns)', columns: 3, description: 'Three-column field container' },
-];
-
-function FieldSectionDraggableCard({
-  variant,
-}: {
-  variant: (typeof FIELD_SECTION_VARIANTS)[number];
-}): JSX.Element {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `palette-panel-${variant.id}`,
-    data: {
-      type: 'palette-panel',
-      columns: variant.columns,
-      label: `New Section`,
-    },
-  });
-
-  const style: CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : 1,
-  };
-
-  return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="w-full rounded-lg border border-emerald-200 bg-white p-3 text-left shadow-sm transition hover:border-emerald-400 hover:bg-emerald-50/30 active:cursor-grabbing"
-    >
-      <div className="flex items-start gap-2.5">
-        <span className="mt-0.5 rounded-md border border-emerald-200 bg-emerald-50 p-1.5 text-emerald-600">
-          <Table2 className="h-4 w-4" />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-sm font-medium text-gray-900">{variant.label}</span>
-          <span className="mt-0.5 block text-xs leading-4 text-gray-500">{variant.description}</span>
-        </span>
-      </div>
-    </button>
-  );
-}
-
 interface PaletteComponentsProps {
   enabledExternalWidgetIds?: string[];
   connectedProviders?: string[];
@@ -217,15 +168,6 @@ export function PaletteComponents({
   return (
     <div className="flex h-full min-h-0 flex-col p-2">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-        <div className="space-y-2">
-          <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-            Field Sections
-          </div>
-          {FIELD_SECTION_VARIANTS.map((variant) => (
-            <FieldSectionDraggableCard key={variant.id} variant={variant} />
-          ))}
-        </div>
-
         <div className="space-y-2">
           <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
             Components
