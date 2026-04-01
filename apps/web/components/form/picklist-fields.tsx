@@ -188,7 +188,9 @@ export function MultiPicklistInput({
     formData,
     visibilityCtx,
   );
-  const selectedValues: string[] = value ? value.split(';') : [];
+  const selectedValues: string[] = value
+    ? value.split(';').map((v: string) => v.trim()).filter(Boolean)
+    : [];
 
   return (
     <div className="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto">
