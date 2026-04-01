@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { PanelField } from './types';
 import { useEditorStore } from './editor-store';
+import { CanvasErrorBoundary } from './canvas-error-boundary';
 
 interface CanvasFieldCardProps {
   field: PanelField;
@@ -167,6 +168,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
   };
 
   return (
+    <CanvasErrorBoundary label="Field">
     <div
       ref={setNodeRef}
       style={style}
@@ -236,5 +238,6 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
         />
       )}
     </div>
+    </CanvasErrorBoundary>
   );
 }

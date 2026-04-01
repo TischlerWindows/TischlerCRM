@@ -1,4 +1,4 @@
-import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, cloneSystemFields, normalizeFieldType } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, generateId, createDefaultPageLayout, createDefaultRecordType, SYSTEM_FIELDS, cloneSystemFields, normalizeFieldType, PageLayout, LayoutSection, PanelField } from './schema';
 import { apiClient } from './api-client';
 
 const STORAGE_KEY = 'tces-object-manager-schema';
@@ -318,15 +318,25 @@ class LocalStorageSchemaService implements SchemaService {
               id: tabId,
               label: 'Home',
               order: 0,
-              sections: [
+              regions: [
                 {
                   id: sectionId,
                   label: 'Main',
-                  columns: 2,
-                  order: 0,
-                  fields: [
-                    { apiName: 'Home__ReportsPanel', column: 0, order: 0 },
-                    { apiName: 'Home__DashboardsPanel', column: 1, order: 0 },
+                  gridColumn: 1, gridColumnSpan: 1, gridRow: 1, gridRowSpan: 1,
+                  style: {},
+                  widgets: [],
+                  panels: [
+                    {
+                      id: sectionId + '_panel',
+                      label: 'Main',
+                      order: 0,
+                      columns: 2 as 1 | 2 | 3 | 4,
+                      style: {},
+                      fields: [
+                        { fieldApiName: 'Home__ReportsPanel', colSpan: 1, order: 0, labelStyle: {}, valueStyle: {}, behavior: 'none' as const },
+                        { fieldApiName: 'Home__DashboardsPanel', colSpan: 1, order: 1, labelStyle: {}, valueStyle: {}, behavior: 'none' as const },
+                      ],
+                    },
                   ],
                 },
               ],
@@ -444,9 +454,10 @@ class LocalStorageSchemaService implements SchemaService {
       const updatedLayouts = source.pageLayouts.map((layout) => {
         if (!layout.tabs.length || !layout.tabs[0]) return layout;
         const tabs = layout.tabs.map((tab, tabIndex) => {
-          if (tabIndex !== 0 || !tab.sections.length || !tab.sections[0]) return tab;
-          const section = tab.sections[0];
-          const existingFieldApi = new Set(section.fields.map((f) => f.apiName));
+          if (tabIndex !== 0 || !tab.regions.length || !tab.regions[0]?.panels?.length || !tab.regions[0].panels[0]) return tab;
+          const region = tab.regions[0]!;
+          const panel = region.panels[0]!;
+          const existingFieldApi = new Set(panel.fields.map((f) => f.fieldApiName));
           const relationshipFields = fields.filter((field) =>
             (field.type === 'Lookup' || field.type === 'ExternalLookup') &&
             !existingFieldApi.has(field.apiName)
@@ -454,26 +465,35 @@ class LocalStorageSchemaService implements SchemaService {
 
           if (relationshipFields.length === 0) return tab;
 
-          const nextFields = section.fields.slice();
+          const nextFields = panel.fields.slice();
           const nextOrderStart = nextFields.length;
 
           relationshipFields.forEach((field, index) => {
             nextFields.push({
-              apiName: field.apiName,
-              column: index % section.columns,
-              order: nextOrderStart + index
+              fieldApiName: field.apiName,
+              colSpan: 1,
+              order: nextOrderStart + index,
+              labelStyle: {},
+              valueStyle: {},
+              behavior: 'none' as const,
             });
           });
 
           return {
             ...tab,
-            sections: [
+            regions: [
               {
-                ...section,
-                fields: nextFields
+                ...region,
+                panels: [
+                  {
+                    ...panel,
+                    fields: nextFields,
+                  },
+                  ...region.panels.slice(1),
+                ],
               },
-              ...tab.sections.slice(1)
-            ]
+              ...tab.regions.slice(1),
+            ],
           };
         });
 
@@ -483,7 +503,7 @@ class LocalStorageSchemaService implements SchemaService {
         };
       });
 
-      return { ...source, fields, pageLayouts: updatedLayouts, updatedAt: new Date().toISOString() };
+      return { ...source, fields, pageLayouts: updatedLayouts as PageLayout[], updatedAt: new Date().toISOString() };
     });
 
     if (!updated) {
@@ -492,7 +512,7 @@ class LocalStorageSchemaService implements SchemaService {
 
     return {
       ...schema,
-      objects,
+      objects: objects as ObjectDef[],
       updatedAt: new Date().toISOString()
     };
   }
@@ -517,8 +537,10 @@ class LocalStorageSchemaService implements SchemaService {
       // only relationship lookups — has made a deliberate choice that we must respect.
       const hasAnyPopulatedLayout = (obj.pageLayouts || []).some((layout) =>
         layout.tabs?.some((tab) =>
-          tab.sections?.some((section) =>
-            (section.fields?.length || 0) > 0
+          tab.regions?.some((region) =>
+            region.panels?.some((panel) =>
+              (panel.fields?.length || 0) > 0
+            )
           )
         )
       );
@@ -557,6 +579,8 @@ class LocalStorageSchemaService implements SchemaService {
       if (allLayoutFields.length === 0) return obj;
 
       const layoutId = generateId();
+      const regionId = generateId();
+      const panelId = generateId();
       const layout = {
         id: layoutId,
         name: `${obj.apiName} - Default Template`,
@@ -566,21 +590,37 @@ class LocalStorageSchemaService implements SchemaService {
             id: generateId(),
             label: 'Details',
             order: 0,
-            sections: [
+            regions: [
               {
-                id: generateId(),
+                id: regionId,
                 label: `${obj.label} Information`,
-                columns: 2 as 1 | 2 | 3,
-                order: 0,
-                fields: allLayoutFields.map((f, index) => ({
-                  apiName: f.apiName,
-                  column: index % 2,
-                  order: index
-                }))
-              }
-            ]
-          }
-        ]
+                gridColumn: 1,
+                gridColumnSpan: 1,
+                gridRow: 1,
+                gridRowSpan: 1,
+                style: {},
+                widgets: [],
+                panels: [
+                  {
+                    id: panelId,
+                    label: `${obj.label} Information`,
+                    order: 0,
+                    columns: 2 as 1 | 2 | 3 | 4,
+                    style: {},
+                    fields: allLayoutFields.map((f, index) => ({
+                      fieldApiName: f.apiName,
+                      colSpan: 1,
+                      order: index,
+                      labelStyle: {},
+                      valueStyle: {},
+                      behavior: 'none' as const,
+                    })),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       };
 
       // Only update record type assignment if it doesn't already point to an existing layout
@@ -597,8 +637,8 @@ class LocalStorageSchemaService implements SchemaService {
 
       // Keep any existing layouts that have any fields; replace only empty ones
       const existingWithFields = (obj.pageLayouts || []).filter((l) =>
-        l.tabs?.some((t) => t.sections?.some((s) =>
-          (s.fields?.length || 0) > 0
+        l.tabs?.some((t) => t.regions?.some((r) =>
+          r.panels?.some((p) => (p.fields?.length || 0) > 0)
         ))
       );
 
@@ -634,24 +674,23 @@ class LocalStorageSchemaService implements SchemaService {
       const fieldMap = new Map(obj.fields.map(f => [f.apiName, f]));
       for (const layout of obj.pageLayouts || []) {
         for (const tab of layout.tabs || []) {
-          for (const section of tab.sections || []) {
-            section.fields = (section.fields || []).map(pf => {
-              const fieldDef = fieldMap.get(pf.apiName);
-              if (!fieldDef) return pf; // field not found — leave as-is
-              // Spread the full FieldDef, then overlay the layout-specific
-              // positioning (column, order) on top. Key field-definition props
-              // (type, lookupObject, etc.) must come from the FIELD DEF source
-              // of truth, not from a stale embedded copy in the layout page field.
-              const { apiName, ...rest } = fieldDef;
-              return {
-                ...rest,
-                ...pf,
-                presentation: pf.presentation,
-                type: normalizeFieldType(fieldDef.type),
-                lookupObject: fieldDef.lookupObject,
-                relationshipName: fieldDef.relationshipName,
-              };
-            });
+          for (const region of tab.regions || []) {
+            for (const panel of region.panels || []) {
+              panel.fields = (panel.fields || []).map(pf => {
+                const fieldDef = fieldMap.get(pf.fieldApiName);
+                if (!fieldDef) return pf; // field not found — leave as-is
+                // Enrich the PanelField with full FieldDef props so DynamicForm
+                // can render without cross-referencing object.fields.
+                const { apiName, ...rest } = fieldDef;
+                return {
+                  ...rest,
+                  ...pf,
+                  type: normalizeFieldType(fieldDef.type),
+                  lookupObject: fieldDef.lookupObject,
+                  relationshipName: fieldDef.relationshipName,
+                } as any;
+              });
+            }
           }
         }
       }
@@ -1756,10 +1795,23 @@ class LocalStorageSchemaService implements SchemaService {
             tabs: layout.tabs?.map((tab: any) => ({
               ...tab,
               id: generateId(),
-              sections: tab.sections?.map((section: any) => ({
-                ...section,
-                id: generateId()
-              })) || []
+              // Support both legacy (sections) and new (regions) formats
+              ...(tab.sections ? {
+                sections: tab.sections.map((section: any) => ({
+                  ...section,
+                  id: generateId()
+                }))
+              } : {}),
+              ...(tab.regions ? {
+                regions: tab.regions.map((region: any) => ({
+                  ...region,
+                  id: generateId(),
+                  panels: region.panels?.map((panel: any) => ({
+                    ...panel,
+                    id: generateId()
+                  })) || []
+                }))
+              } : {}),
             })) || []
           })) || [],
           validationRules: obj.validationRules?.map((rule: any) => ({
@@ -1795,7 +1847,7 @@ class LocalStorageSchemaService implements SchemaService {
 
       // Build a layout that includes all fields (not just an empty one)
       const layoutId = generateId();
-      const layout = {
+      const layout: PageLayout = {
         id: layoutId,
         name: `${apiName} Layout`,
         layoutType: 'edit' as const,
@@ -1804,21 +1856,37 @@ class LocalStorageSchemaService implements SchemaService {
             id: generateId(),
             label: 'Details',
             order: 0,
-            sections: [
+            regions: [
               {
                 id: generateId(),
                 label: `${label} Information`,
-                columns: 2 as 1 | 2 | 3,
-                order: 0,
-                fields: customFields.map((f, index) => ({
-                  apiName: f.apiName,
-                  column: index % 2,
-                  order: index
-                }))
-              }
-            ]
-          }
-        ]
+                gridColumn: 1,
+                gridColumnSpan: 1,
+                gridRow: 1,
+                gridRowSpan: 1,
+                style: {},
+                widgets: [],
+                panels: [
+                  {
+                    id: generateId(),
+                    label: `${label} Information`,
+                    order: 0,
+                    columns: 2 as 1 | 2 | 3 | 4,
+                    style: {},
+                    fields: customFields.map((f, index) => ({
+                      fieldApiName: f.apiName,
+                      colSpan: 1,
+                      order: index,
+                      labelStyle: {},
+                      valueStyle: {},
+                      behavior: 'none' as const,
+                    })),
+                  },
+                ],
+              },
+            ],
+          },
+        ],
       };
 
       const recordType = createDefaultRecordType(apiName, layoutId);
@@ -1928,12 +1996,12 @@ class LocalStorageSchemaService implements SchemaService {
       layoutType: 'create' | 'edit',
       fields: FieldDef[],
       sectionDefs: Array<{ label: string; columns: 1 | 2 | 3; fields: string[] }>
-    ) => {
+    ): PageLayout => {
       const fieldMap = new Map(fields.map((field) => [field.label, field.apiName]));
       const missing = new Set<string>();
 
-      const sections = sectionDefs.map((section, sectionIndex) => {
-        const sectionFields = section.fields
+      const regions: LayoutSection[] = sectionDefs.map((section, sectionIndex) => {
+        const panelFields: PanelField[] = section.fields
           .map((label, index) => {
             const apiName = fieldMap.get(label) || fields.find((f) => f.apiName === label)?.apiName;
             if (!apiName) {
@@ -1941,19 +2009,36 @@ class LocalStorageSchemaService implements SchemaService {
               return null;
             }
             return {
-              apiName,
-              column: index % section.columns,
-              order: index
+              fieldApiName: apiName,
+              colSpan: 1,
+              order: index,
+              labelStyle: {},
+              valueStyle: {},
+              behavior: 'none' as const,
             };
           })
-          .filter(Boolean) as Array<{ apiName: string; column: number; order: number }>;
+          .filter(Boolean) as PanelField[];
 
+        const panelId = generateId();
         return {
           id: generateId(),
           label: section.label,
-          columns: section.columns,
-          order: sectionIndex,
-          fields: sectionFields
+          gridColumn: 1,
+          gridColumnSpan: 1,
+          gridRow: sectionIndex + 1,
+          gridRowSpan: 1,
+          style: {},
+          widgets: [],
+          panels: [
+            {
+              id: panelId,
+              label: section.label,
+              order: 0,
+              columns: section.columns as 1 | 2 | 3 | 4,
+              style: {},
+              fields: panelFields,
+            },
+          ],
         };
       });
 
@@ -1970,9 +2055,9 @@ class LocalStorageSchemaService implements SchemaService {
             id: generateId(),
             label: 'Details',
             order: 0,
-            sections
-          }
-        ]
+            regions,
+          },
+        ],
       };
     };
 
@@ -2041,15 +2126,25 @@ class LocalStorageSchemaService implements SchemaService {
               id: homeTabId,
               label: 'Home',
               order: 0,
-              sections: [
+              regions: [
                 {
                   id: homeSectionId,
                   label: 'Main',
-                  columns: 2,
-                  order: 0,
-                  fields: [
-                    { apiName: 'Home__ReportsPanel', column: 0, order: 0 },
-                    { apiName: 'Home__DashboardsPanel', column: 1, order: 0 },
+                  gridColumn: 1, gridColumnSpan: 1, gridRow: 1, gridRowSpan: 1,
+                  style: {},
+                  widgets: [],
+                  panels: [
+                    {
+                      id: homeSectionId + '_panel',
+                      label: 'Main',
+                      order: 0,
+                      columns: 2 as 1 | 2 | 3 | 4,
+                      style: {},
+                      fields: [
+                        { fieldApiName: 'Home__ReportsPanel', colSpan: 1, order: 0, labelStyle: {}, valueStyle: {}, behavior: 'none' as const },
+                        { fieldApiName: 'Home__DashboardsPanel', colSpan: 1, order: 1, labelStyle: {}, valueStyle: {}, behavior: 'none' as const },
+                      ],
+                    },
                   ],
                 },
               ],

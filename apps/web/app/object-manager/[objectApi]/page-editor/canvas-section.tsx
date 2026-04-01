@@ -8,6 +8,7 @@ import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasPanel } from './canvas-panel';
 import { CanvasWidgetCard } from './canvas-widget';
+import { CanvasErrorBoundary } from './canvas-error-boundary';
 import { cn } from '@/lib/utils';
 
 interface CanvasRegionProps {
@@ -195,6 +196,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   };
 
   return (
+    <CanvasErrorBoundary label="Section">
     <div
       className={cn(
         'relative overflow-hidden rounded-xl border bg-slate-50 transition-colors border-l-4 border-l-brand-navy/50',
@@ -350,5 +352,6 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
         <span className="h-1 w-1 rounded-full bg-brand-navy/50" />
       </button>
     </div>
+    </CanvasErrorBoundary>
   );
 }

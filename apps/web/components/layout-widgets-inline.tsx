@@ -25,10 +25,73 @@ function WidgetUnavailablePlaceholder({ widgetId }: { widgetId: string }) {
 
 function WidgetLoadingPlaceholder() {
   return (
-    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center text-xs text-gray-400 animate-pulse">
-      Loading widget…
+    <div className="rounded-lg border border-gray-200 bg-white p-4 animate-pulse">
+      <div className="h-4 w-1/3 rounded bg-gray-200 mb-3" />
+      <div className="space-y-2">
+        <div className="h-3 w-full rounded bg-gray-200" />
+        <div className="h-3 w-5/6 rounded bg-gray-200" />
+        <div className="h-3 w-2/3 rounded bg-gray-200" />
+      </div>
+      <div className="mt-4 h-8 w-24 rounded bg-gray-200" />
     </div>
   )
+}
+
+function WidgetInvalidConfigFallback({
+  widgetType,
+  externalWidgetId,
+}: {
+  widgetType: string
+  externalWidgetId?: string
+}) {
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+      <p className="font-medium">Widget unavailable</p>
+      <p className="mt-1 text-xs">
+        {widgetType === 'ExternalWidget'
+          ? `External widget "${externalWidgetId}" is not registered.`
+          : `Widget type "${widgetType}" could not be loaded.`}
+        {' '}Edit this layout to fix or remove it.
+      </p>
+    </div>
+  )
+}
+
+interface WidgetErrorBoundaryState {
+  hasError: boolean
+}
+
+class WidgetErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  WidgetErrorBoundaryState
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(): WidgetErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[WidgetErrorBoundary] Widget crashed at render time:', error, info)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+          <p className="font-medium">Widget unavailable</p>
+          <p className="mt-1 text-xs">
+            This widget encountered an error and could not be displayed. Edit this layout to fix or
+            remove it.
+          </p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 const STUB_RECORD: Record<string, unknown> = {}
@@ -88,7 +151,13 @@ export function LayoutWidgetsInline({
           const registration = getExternalRegistration(externalWidgetId)
 
           if (!registration) {
-            return <WidgetUnavailablePlaceholder key={w.id} widgetId={externalWidgetId} />
+            return (
+              <WidgetInvalidConfigFallback
+                key={w.id}
+                widgetType="ExternalWidget"
+                externalWidgetId={externalWidgetId}
+              />
+            )
           }
 
           if (!effectiveEnabledIds.includes(externalWidgetId)) {
@@ -100,16 +169,18 @@ export function LayoutWidgetsInline({
           const integration = getIntegrationContext(registration.manifest.integration, integrations)
 
           return (
-            <React.Suspense key={w.id} fallback={<WidgetLoadingPlaceholder />}>
-              <Component
-                config={resolvedConfig}
-                record={liveRecord}
-                object={liveObject}
-                integration={integration}
-                displayMode={displayMode}
-                orgId={orgId}
-              />
-            </React.Suspense>
+            <WidgetErrorBoundary key={w.id}>
+              <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
+                <Component
+                  config={resolvedConfig}
+                  record={liveRecord}
+                  object={liveObject}
+                  integration={integration}
+                  displayMode={displayMode}
+                  orgId={orgId}
+                />
+              </React.Suspense>
+            </WidgetErrorBoundary>
           )
         }
 
@@ -132,15 +203,7 @@ export function LayoutWidgetsInline({
 
         if (!registration) {
           return (
-            <div
-              key={w.id}
-              className="p-3 rounded-lg border border-dashed border-blue-200 bg-blue-50/50 text-sm text-blue-900"
-            >
-              <span className="font-medium">Widget:</span> {w.widgetType}
-              {config && 'label' in config && (config as { label?: string }).label
-                ? ` — ${(config as { label?: string }).label}`
-                : null}
-            </div>
+            <WidgetInvalidConfigFallback key={w.id} widgetType={config.type} />
           )
         }
 
@@ -151,16 +214,18 @@ export function LayoutWidgetsInline({
         const resolvedConfig = resolveConfig(rawConfig, liveRecord)
 
         return (
-          <React.Suspense key={w.id} fallback={<WidgetLoadingPlaceholder />}>
-            <Component
-              config={resolvedConfig}
-              record={liveRecord}
-              object={liveObject}
-              integration={null}
-              displayMode="full"
-              orgId={orgId}
-            />
-          </React.Suspense>
+          <WidgetErrorBoundary key={w.id}>
+            <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
+              <Component
+                config={resolvedConfig}
+                record={liveRecord}
+                object={liveObject}
+                integration={null}
+                displayMode="full"
+                orgId={orgId}
+              />
+            </React.Suspense>
+          </WidgetErrorBoundary>
         )
       })}
     </div>

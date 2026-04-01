@@ -77,7 +77,7 @@ export default function CustomObjectRecordsPage() {
       obj.label.toLowerCase().replace(/\s+/g, '-') === slug.toLowerCase()
     );
   }, [schema, slug]);
-  const lookupTick = useLookupPreloader(objectDef);
+  const isLookupLoaded = useLookupPreloader(objectDef);
   
   const pageLayouts = objectDef?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
@@ -142,7 +142,7 @@ export default function CustomObjectRecordsPage() {
           }
           // 2. Fallback: prefer a layout that has fields over an empty default
           const withFields = pageLayouts.find(l =>
-            l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
+            l.tabs?.some(t => t.regions?.some(r => r.panels?.some(p => (p.fields?.length || 0) > 0)))
           );
           const best = withFields || pageLayouts[0];
           if (best) {
@@ -207,7 +207,7 @@ export default function CustomObjectRecordsPage() {
 
     // Filter to layouts that actually have fields
     const layoutsWithFields = pageLayouts.filter(l =>
-      l.tabs?.some(t => t.sections?.some(s => (s.fields?.length || 0) > 0))
+      l.tabs?.some(t => t.regions?.some(r => r.panels?.some(p => (p.fields?.length || 0) > 0)))
     );
     const effectiveLayouts = layoutsWithFields.length > 0 ? layoutsWithFields : pageLayouts;
     
@@ -234,7 +234,7 @@ export default function CustomObjectRecordsPage() {
   };
 
   const getFieldValue = (record: CustomRecord, columnId: string): string => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     const value = record[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

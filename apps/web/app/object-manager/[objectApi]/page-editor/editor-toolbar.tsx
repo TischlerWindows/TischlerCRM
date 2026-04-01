@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Eye, Plus, Save, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Redo2, Save, Undo2, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
-import type { EditorPageLayout } from './types';
+import { selectUndoCount, selectRedoCount } from './store';
+import type { PageLayout } from './types';
 import { useSchemaStore } from '@/lib/schema-store';
 
 export function EditorToolbar({
@@ -37,6 +38,10 @@ export function EditorToolbar({
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
   const pushUndo = useEditorStore((s) => s.pushUndo);
+  const undo = useEditorStore((s) => s.undo);
+  const redo = useEditorStore((s) => s.redo);
+  const undoCount = useEditorStore(selectUndoCount);
+  const redoCount = useEditorStore(selectRedoCount);
 
   const schema = useSchemaStore((s) => s.schema);
   const setLayoutActive = useSchemaStore((s) => s.setLayoutActive);
@@ -120,7 +125,7 @@ export function EditorToolbar({
   }, [layout.roles, objectApi, schema]);
 
   const patchLayoutWithUndo = useCallback(
-    (patch: Partial<EditorPageLayout>) => {
+    (patch: Partial<PageLayout>) => {
       pushUndo();
       useEditorStore.setState((state) => ({
         layout: { ...state.layout, ...patch },
@@ -161,10 +166,11 @@ export function EditorToolbar({
 
   const handleToggleRole = useCallback(
     (roleId: string) => {
-      const hasRole = layout.roles.includes(roleId);
+      const roles = layout.roles ?? [];
+      const hasRole = roles.includes(roleId);
       const nextRoles = hasRole
-        ? layout.roles.filter((id) => id !== roleId)
-        : [...layout.roles, roleId];
+        ? roles.filter((id) => id !== roleId)
+        : [...roles, roleId];
       patchLayoutWithUndo({ roles: nextRoles });
     },
     [layout.roles, patchLayoutWithUndo],
@@ -357,8 +363,8 @@ export function EditorToolbar({
               aria-controls="layout-roles-popover"
               className="flex max-w-xs flex-wrap items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
             >
-              {layout.roles.length > 0 ? (
-                layout.roles.map((role) => (
+              {(layout.roles ?? []).length > 0 ? (
+                (layout.roles ?? []).map((role) => (
                   <span
                     key={role}
                     className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700"
@@ -386,7 +392,7 @@ export function EditorToolbar({
                     >
                       <input
                         type="checkbox"
-                        checked={layout.roles.includes(roleId)}
+                        checked={(layout.roles ?? []).includes(roleId)}
                         onChange={() => handleToggleRole(roleId)}
                       />
                       <span>{roleId}</span>
@@ -426,6 +432,32 @@ export function EditorToolbar({
           </button>
           {activeError ? <p className="text-xs text-red-600">{activeError}</p> : null}
 
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={undo}
+            disabled={undoCount === 0}
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+            {undoCount > 0 && (
+              <span className="ml-1 text-xs text-gray-500">({undoCount})</span>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={redo}
+            disabled={redoCount === 0}
+            title="Redo (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="h-4 w-4" />
+            {redoCount > 0 && (
+              <span className="ml-1 text-xs text-gray-500">({redoCount})</span>
+            )}
+          </Button>
           <Button variant="outline" size="sm" type="button" onClick={onPreview}>
             <Eye className="mr-1.5 h-4 w-4" />
             Preview

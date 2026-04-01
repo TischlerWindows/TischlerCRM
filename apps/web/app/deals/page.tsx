@@ -118,7 +118,7 @@ export default function DealsPage() {
   
   // Check if Deal object exists with page layouts
   const dealObject = schema?.objects.find(obj => obj.apiName === 'Deal');
-  const lookupTick = useLookupPreloader(dealObject);
+  const isLookupLoaded = useLookupPreloader(dealObject);
   const objectLabel = dealObject?.label || 'Deal';
   const objectPluralLabel = dealObject?.pluralLabel || objectLabel + 's';
   const pageLayouts = dealObject?.pageLayouts || [];
@@ -362,7 +362,7 @@ export default function DealsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (deal: Deal, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value = (deal as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value
@@ -874,7 +874,7 @@ export default function DealsPage() {
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs.reduce((acc, tab) => acc + tab.regions.length, 0)} sections
                     </div>
                   </div>
                 </button>

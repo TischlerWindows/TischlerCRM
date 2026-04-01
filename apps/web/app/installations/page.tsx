@@ -95,7 +95,7 @@ export default function InstallationsPage() {
   
   // Check if Installation object exists with page layouts
   const installationObject = schema?.objects.find(obj => obj.apiName === 'Installation');
-  const lookupTick = useLookupPreloader(installationObject);
+  const isLookupLoaded = useLookupPreloader(installationObject);
   const pageLayouts = installationObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -209,7 +209,7 @@ export default function InstallationsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (installation: Installation, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value: any = installation[columnId as keyof Installation];
 
     // Formula fields: evaluate expression instead of showing raw value
@@ -819,7 +819,7 @@ export default function InstallationsPage() {
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs.reduce((acc, tab) => acc + tab.regions.length, 0)} sections
                     </div>
                   </div>
                 </button>

@@ -16,6 +16,7 @@ import type {
   TemplateSectionDef,
   TemplateTabDef,
   CustomLayoutTemplate,
+  PageLayout,
 } from '@/lib/schema';
 
 export type {
@@ -36,18 +37,8 @@ export type {
   TemplateSectionDef,
   TemplateTabDef,
   CustomLayoutTemplate,
+  PageLayout,
 };
-
-export interface EditorPageLayout {
-  id: string;
-  name: string;
-  objectApi: string;
-  active: boolean;
-  isDefault: boolean;
-  roles: string[];
-  tabs: LayoutTab[];
-  formattingRules: FormattingRule[];
-}
 
 export type SelectedElement =
   | { type: 'region'; id: string }
