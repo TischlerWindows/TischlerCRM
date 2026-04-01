@@ -1109,7 +1109,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Opportunity__opportunityNumber',
       label: 'Opportunity Number',
       type: 'AutoNumber',
-      autoNumber: { displayFormat: 'YY{000}', startingNumber: 1 }
+      autoNumber: { displayFormat: 'OPP{0000}', startingNumber: 1 }
     });
     ensureField({
       id: generateId(),

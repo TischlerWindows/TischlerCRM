@@ -435,7 +435,8 @@ export default function OpportunitiesPage() {
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const opportunityNumber = `OPP${String(nextNumber).padStart(3, '0')}`;
+      const opportunityNumber = `OPP${String(nextNumber).padStart(4, '0')}`;
+
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';

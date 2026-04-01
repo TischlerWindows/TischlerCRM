@@ -142,11 +142,11 @@ export default function RecordDetailPage({
     );
 
     let childName: string;
-    if (objectApiName === 'Lead') {
-      // Lead folders: "Name (LeadNumber)" e.g. "Mr. Jeremy Griffin (LEAD0001)"
-      const leadName = nameKey ? String(record[nameKey]) : '';
-      const leadNum = numberKey ? String(record[numberKey]) : '';
-      childName = leadName && leadNum ? `${leadName} (${leadNum})` : leadName || leadNum || params.id as string;
+    if (objectApiName === 'Lead' || objectApiName === 'Opportunity') {
+      // Lead/Opportunity folders: "Name (Number)" e.g. "Mr. Jeremy Griffin (LEAD0001)" or "Project X (OPP0001)"
+      const recName = nameKey ? String(record[nameKey]) : '';
+      const recNum = numberKey ? String(record[numberKey]) : '';
+      childName = recName && recNum ? `${recName} (${recNum})` : recName || recNum || params.id as string;
     } else {
       childName = (numberKey ? record[numberKey] : '') || (nameKey ? record[nameKey] : '') || params.id as string;
     }
@@ -575,10 +575,10 @@ export default function RecordDetailPage({
     const nameKey = Object.keys(data).find(
       k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name') || k.toLowerCase() === 'contactname') && typeof data[k] === 'string' && data[k]
     );
-    if (objApiName === 'Lead') {
-      const leadName = nameKey ? String(data[nameKey]) : '';
-      const leadNum = numberKey ? String(data[numberKey]) : '';
-      return leadName && leadNum ? `${leadName} (${leadNum})` : leadName || leadNum || '';
+    if (objApiName === 'Lead' || objApiName === 'Opportunity') {
+      const recName = nameKey ? String(data[nameKey]) : '';
+      const recNum = numberKey ? String(data[numberKey]) : '';
+      return recName && recNum ? `${recName} (${recNum})` : recName || recNum || '';
     }
     return (numberKey ? String(data[numberKey]) : '') || (nameKey ? String(data[nameKey]) : '') || '';
   };
