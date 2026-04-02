@@ -778,6 +778,56 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
   });
 
+  // ── Copy a file or folder between record folders ──
+  app.post('/dropbox/copy', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { fromPath, toObjectApiName, toRecordId, toFolderName, toSubPath } = req.body as {
+      fromPath: string;
+      toObjectApiName: string;
+      toRecordId: string;
+      toFolderName?: string;
+      toSubPath?: string;
+    };
+
+    if (!fromPath || !toObjectApiName || !toRecordId) {
+      return reply.code(400).send({ error: 'Missing required fields: fromPath, toObjectApiName, toRecordId' });
+    }
+
+    // Validate source path is within CRM root
+    if (!fromPath.toLowerCase().startsWith(CRM_ROOT_FOLDER.toLowerCase() + '/')) {
+      return reply.code(400).send({ error: 'Invalid source path' });
+    }
+
+    const accessToken = await getAccessToken(user.sub);
+    if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
+
+    // Extract filename from source path
+    const fileName = fromPath.split('/').pop();
+    if (!fileName) return reply.code(400).send({ error: 'Invalid source path' });
+
+    // Build destination path
+    const destFolder = buildFolderPath(toObjectApiName, toRecordId, toFolderName);
+    const destBase = toSubPath ? `${destFolder}/${toSubPath}` : destFolder;
+    const toPath = `${destBase}/${fileName}`;
+
+    try {
+      const result = await dropboxApi(accessToken, '/files/copy_v2', {
+        from_path: fromPath,
+        to_path: toPath,
+        autorename: true,
+      });
+      reply.send({ success: true, path: result.metadata?.path_display || toPath });
+    } catch (err: any) {
+      if (err.message?.includes('not_found')) {
+        return reply.code(404).send({ error: 'Source file not found' });
+      }
+      app.log.error(err, 'Dropbox copy failed');
+      reply.code(500).send({ error: 'Failed to copy file' });
+    }
+  });
+
   // ── Rename a linked record folder inside a parent Property folder ──
   app.post('/dropbox/rename-linked-folder', async (req, reply) => {
     const user = req.user;

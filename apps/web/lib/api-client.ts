@@ -785,6 +785,19 @@ class ApiClient {
     );
   }
 
+  async copyDropboxFile(opts: {
+    fromPath: string;
+    toObjectApiName: string;
+    toRecordId: string;
+    toFolderName?: string;
+    toSubPath?: string;
+  }) {
+    return this.request<{ success: boolean; path: string }>(
+      '/dropbox/copy',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
   async deleteDropboxFile(fileId: string) {
     return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { apiClient } from '@/lib/api-client';
 import {
   FileText, Upload, Download, Loader2, CloudOff, FolderOpen, X, Trash2,
@@ -94,7 +94,11 @@ export function DropboxFileBrowser({
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copying, setCopying] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextRef = useRef<HTMLDivElement>(null);
 
@@ -274,10 +278,134 @@ export function DropboxFileBrowser({
     window.open(getDropboxWebUrl(entryPath), '_blank', 'noopener');
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDragStart = (e: React.DragEvent, entry: DropboxEntry) => {
+    const data = JSON.stringify({
+      path: entry.path,
+      name: entry.name,
+      isFolder: entry.isFolder,
+      sourceObject: objectApiName,
+      sourceRecord: recordId,
+    });
+    e.dataTransfer.setData('application/x-crm-dropbox-entry', data);
+    // Also set text/plain so cross-window works (some browsers need this)
+    e.dataTransfer.setData('text/plain', data);
+    e.dataTransfer.effectAllowed = 'copyMove';
+    setDraggingId(entry.id);
+
+    // Custom drag ghost
+    if (dragGhostRef.current) {
+      dragGhostRef.current.textContent = entry.isFolder ? `\uD83D\uDCC1 ${entry.name}` : `\uD83D\uDCC4 ${entry.name}`;
+      dragGhostRef.current.style.display = 'flex';
+      e.dataTransfer.setDragImage(dragGhostRef.current, 0, 0);
+      // Hide after a tick so it doesn't stay visible
+      requestAnimationFrame(() => {
+        if (dragGhostRef.current) dragGhostRef.current.style.display = 'none';
+      });
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDropTargetId(null);
+  };
+
+  const handleFolderDragOver = (e: React.DragEvent, folder: DropboxEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (folder.id !== draggingId) {
+      setDropTargetId(folder.id);
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleFolderDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
+    setDropTargetId(null);
+  };
+
+  const handleFolderDrop = async (e: React.DragEvent, targetFolder: DropboxEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropTargetId(null);
+    setDraggingId(null);
+
+    const crmData = e.dataTransfer.getData('application/x-crm-dropbox-entry') || e.dataTransfer.getData('text/plain');
+    if (!crmData) return;
+
+    try {
+      const source = JSON.parse(crmData);
+      if (source.path === targetFolder.path) return; // can't drop on self
+      setCopying(true);
+      setError(null);
+
+      // Build the destination path: target folder's full path + source file name
+      const fileName = source.path.split('/').pop();
+      const toPath = `${targetFolder.path}/${fileName}`;
+
+      // Use raw copy endpoint with full paths
+      await apiClient.copyDropboxFile({
+        fromPath: source.path,
+        toObjectApiName: objectApiName,
+        toRecordId: recordId,
+        toFolderName: folderName,
+        toSubPath: subPath ? `${subPath}/${targetFolder.name}` : targetFolder.name,
+      });
+      await loadFiles();
+    } catch (err: any) {
+      setError(err.message || 'Failed to copy file');
+    } finally {
+      setCopying(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
+    setDraggingId(null);
+    setDropTargetId(null);
+
+    // Check for internal CRM Dropbox drag (cross-record or same-record file copy)
+    const crmData = e.dataTransfer.getData('application/x-crm-dropbox-entry') || e.dataTransfer.getData('text/plain');
+    if (crmData) {
+      try {
+        const source = JSON.parse(crmData);
+        // Don't copy to the same folder
+        const destFolder = buildCurrentDropboxPath();
+        const sourceDir = source.path.substring(0, source.path.lastIndexOf('/'));
+        if (sourceDir.toLowerCase() === destFolder.toLowerCase()) return;
+
+        setCopying(true);
+        setError(null);
+        await apiClient.copyDropboxFile({
+          fromPath: source.path,
+          toObjectApiName: objectApiName,
+          toRecordId: recordId,
+          toFolderName: folderName,
+          toSubPath: subPath || undefined,
+        });
+        await loadFiles();
+      } catch (err: any) {
+        // If parsing fails, it's not our data — fall through to file upload
+        if (err instanceof SyntaxError) {
+          handleUpload(e.dataTransfer.files);
+          return;
+        }
+        setError(err.message || 'Failed to copy file');
+      } finally {
+        setCopying(false);
+      }
+      return;
+    }
+
+    // Fall back to OS file upload
     handleUpload(e.dataTransfer.files);
+  };
+
+  /** Build the full Dropbox path for the current folder view. */
+  const buildCurrentDropboxPath = () => {
+    const pathName = folderName || recordId;
+    const basePath = `/TischlerCRM/${objectApiName}/${pathName.replace(/[\\/:*?"<>|]/g, '_').trim()}`;
+    return currentPath.length > 0 ? `${basePath}/${currentPath.join('/')}` : basePath;
   };
 
   const handleSort = (field: SortField) => {
@@ -383,6 +511,12 @@ export function DropboxFileBrowser({
   // ── Connected — full file browser ──
   return (
     <div className="border border-gray-200 rounded-lg mt-4 overflow-visible relative">
+      {/* Hidden drag ghost */}
+      <div
+        ref={dragGhostRef}
+        style={{ display: 'none', position: 'fixed', top: -1000, left: -1000, pointerEvents: 'none' }}
+        className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-lg text-sm font-medium text-gray-800 whitespace-nowrap"
+      />
       {/* Header bar */}
       <div className="bg-gray-50 border-b border-gray-200 rounded-t-lg">
         <div className="flex items-center justify-between px-4 py-3">
@@ -521,6 +655,14 @@ export function DropboxFileBrowser({
         </div>
       )}
 
+      {/* Copying indicator */}
+      {copying && (
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+          <span className="text-xs text-blue-700">Copying file…</span>
+        </div>
+      )}
+
       {/* File table / drag-drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -551,12 +693,22 @@ export function DropboxFileBrowser({
               {filteredEntries.map((entry) => (
                 <tr
                   key={entry.id}
-                  className={`border-b border-gray-50 hover:bg-gray-50 group ${deletingId === entry.id ? 'opacity-50' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, entry)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={entry.isFolder ? (e) => handleFolderDragOver(e, entry) : undefined}
+                  onDragLeave={entry.isFolder ? handleFolderDragLeave : undefined}
+                  onDrop={entry.isFolder ? (e) => handleFolderDrop(e, entry) : undefined}
+                  className={`border-b border-gray-50 hover:bg-gray-50 group cursor-grab active:cursor-grabbing transition-colors
+                    ${deletingId === entry.id ? 'opacity-50' : ''}
+                    ${draggingId === entry.id ? 'opacity-40 bg-gray-100' : ''}
+                    ${dropTargetId === entry.id ? 'bg-blue-100 ring-2 ring-blue-400 ring-inset' : ''}
+                  `}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2 min-w-0">
                       {entry.isFolder ? (
-                        <FolderOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                        <FolderOpen className={`w-4 h-4 shrink-0 ${dropTargetId === entry.id ? 'text-blue-600' : 'text-blue-500'}`} />
                       ) : (
                         <File className="w-4 h-4 text-gray-400 shrink-0" />
                       )}
