@@ -1426,6 +1426,21 @@ export default function DynamicForm({
           locationValue = parts.length > 0 ? parts.join(', ') : '';
         }
         const hasTargets = targets.street || targets.city || targets.state || targets.postalCode || targets.country;
+        // When a sub-field changes, also recompose the LocationSearch field's
+        // own persisted value so it stays in sync with the sub-fields.
+        const handleLocationSubFieldChange = (targetKey: string, newVal: string) => {
+          handleFieldChange(targetKey, newVal);
+          // Recompose from current formData, overriding the key that just changed
+          const override: Record<string, string> = { [targetKey]: newVal };
+          const composed = [
+            targets.street ? (override[targets.street] ?? formData[targets.street] ?? '') : '',
+            targets.city ? (override[targets.city] ?? formData[targets.city] ?? '') : '',
+            targets.state ? (override[targets.state] ?? formData[targets.state] ?? '') : '',
+            targets.postalCode ? (override[targets.postalCode] ?? formData[targets.postalCode] ?? '') : '',
+            targets.country ? (override[targets.country] ?? formData[targets.country] ?? '') : '',
+          ].filter(Boolean).join(', ');
+          handleFieldChange(fieldDef.apiName, composed);
+        };
         inputElement = (
           <div className="space-y-2">
             <AddressAutocomplete
@@ -1450,7 +1465,7 @@ export default function DynamicForm({
                     <label className="block text-xs font-medium text-gray-500 mb-0.5">Street Address</label>
                     <Input
                       value={formData[targets.street] || ''}
-                      onChange={(e) => handleFieldChange(targets.street!, e.target.value)}
+                      onChange={(e) => handleLocationSubFieldChange(targets.street!, e.target.value)}
                       disabled={isReadOnly}
                       placeholder="Street Address"
                       className="bg-white"
@@ -1463,7 +1478,7 @@ export default function DynamicForm({
                       <label className="block text-xs font-medium text-gray-500 mb-0.5">City</label>
                       <Input
                         value={formData[targets.city] || ''}
-                        onChange={(e) => handleFieldChange(targets.city!, e.target.value)}
+                        onChange={(e) => handleLocationSubFieldChange(targets.city!, e.target.value)}
                         disabled={isReadOnly}
                         placeholder="City"
                         className="bg-white"
@@ -1475,7 +1490,7 @@ export default function DynamicForm({
                       <label className="block text-xs font-medium text-gray-500 mb-0.5">State / Province</label>
                       <Input
                         value={formData[targets.state] || ''}
-                        onChange={(e) => handleFieldChange(targets.state!, e.target.value)}
+                        onChange={(e) => handleLocationSubFieldChange(targets.state!, e.target.value)}
                         disabled={isReadOnly}
                         placeholder="State / Province"
                         className="bg-white"
@@ -1489,7 +1504,7 @@ export default function DynamicForm({
                       <label className="block text-xs font-medium text-gray-500 mb-0.5">Zip Code</label>
                       <Input
                         value={formData[targets.postalCode] || ''}
-                        onChange={(e) => handleFieldChange(targets.postalCode!, e.target.value)}
+                        onChange={(e) => handleLocationSubFieldChange(targets.postalCode!, e.target.value)}
                         disabled={isReadOnly}
                         placeholder="Zip Code"
                         className="bg-white"
@@ -1501,7 +1516,7 @@ export default function DynamicForm({
                       <label className="block text-xs font-medium text-gray-500 mb-0.5">Country</label>
                       <Input
                         value={formData[targets.country] || ''}
-                        onChange={(e) => handleFieldChange(targets.country!, e.target.value)}
+                        onChange={(e) => handleLocationSubFieldChange(targets.country!, e.target.value)}
                         disabled={isReadOnly}
                         placeholder="Country"
                         className="bg-white"
