@@ -2525,22 +2525,68 @@ export default function DynamicForm({
                       data: normalizedData,
                       pageLayoutId: inlineLayoutId || inlineCreateLayoutId,
                     });
-                    if (created && inlineCreateForField) {
-                      handleFieldChange(inlineCreateForField, created.id);
+                    if (created) {
                       const flat = recordsService.flattenRecord(created);
-                      const label = getRecordLabel(flat);
-                      setLookupQueries((prev) => ({ ...prev, [inlineCreateForField!]: typeof label === 'string' ? label : String(label) }));
 
-                      // Add the new record to the lookup cache so the
-                      // field immediately shows the label without a page reload.
-                      if (inlineCreateTarget) {
-                        setLookupRecordsCache((prev) => {
-                          const existing = prev[inlineCreateTarget!] || [];
-                          return {
-                            ...prev,
-                            [inlineCreateTarget!]: [...existing, { id: created.id, ...flat }],
-                          };
+                      // ── Ensure Dropbox folder structure exists (non-fatal) ──
+                      // When creating from a lookup "Create new", the user won't
+                      // be redirected to the record detail page, so the
+                      // DropboxFileBrowser auto-create never fires. Do it here.
+                      try {
+                        const numberKey = Object.keys(flat).find(
+                          k => k.toLowerCase().includes('number') && typeof flat[k] === 'string' && flat[k]
+                        );
+                        const autoNumber = numberKey ? String(flat[numberKey]) : '';
+                        let addrStr = '';
+                        const streetKey = Object.keys(flat).find(k => {
+                          const lk = k.toLowerCase();
+                          return lk === 'street_address' || lk === 'property_address' ||
+                                 lk.endsWith('__street_address') || lk.endsWith('__property_address');
                         });
+                        if (streetKey && typeof flat[streetKey] === 'string') addrStr = flat[streetKey];
+                        if (!addrStr) {
+                          const addrKey = Object.keys(flat).find(k => {
+                            const lk = k.toLowerCase();
+                            return lk === 'address' || lk.endsWith('__address');
+                          });
+                          if (addrKey) {
+                            let addr = flat[addrKey];
+                            if (typeof addr === 'string' && addr.startsWith('{')) {
+                              try { addr = JSON.parse(addr); } catch { /* ignore */ }
+                            }
+                            if (typeof addr === 'object' && addr !== null) {
+                              addrStr = (addr as any).street || (addr as any).address || '';
+                            } else if (typeof addr === 'string') addrStr = addr;
+                          }
+                        }
+                        const nameKey = Object.keys(flat).find(
+                          k => (k.toLowerCase() === 'name' || k.toLowerCase().endsWith('name')) &&
+                               typeof flat[k] === 'string' && flat[k]
+                        );
+                        const folderName = addrStr && autoNumber
+                          ? `${addrStr} (${autoNumber})`
+                          : addrStr || autoNumber || (nameKey ? String(flat[nameKey]) : '');
+                        if (folderName) {
+                          await apiClient.ensureDropboxFolder(inlineCreateTarget!, created.id, folderName);
+                        }
+                      } catch { /* Non-fatal — Dropbox may not be connected */ }
+
+                      if (inlineCreateForField) {
+                        handleFieldChange(inlineCreateForField, created.id);
+                        const label = getRecordLabel(flat);
+                        setLookupQueries((prev) => ({ ...prev, [inlineCreateForField!]: typeof label === 'string' ? label : String(label) }));
+
+                        // Add the new record to the lookup cache so the
+                        // field immediately shows the label without a page reload.
+                        if (inlineCreateTarget) {
+                          setLookupRecordsCache((prev) => {
+                            const existing = prev[inlineCreateTarget!] || [];
+                            return {
+                              ...prev,
+                              [inlineCreateTarget!]: [...existing, { id: created.id, ...flat }],
+                            };
+                          });
+                        }
                       }
                     }
                   } catch (err) {
