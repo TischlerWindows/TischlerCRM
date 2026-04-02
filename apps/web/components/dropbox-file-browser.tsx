@@ -98,9 +98,11 @@ export function DropboxFileBrowser({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [contextMenuId, setContextMenuId] = useState<string | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const dragGhostRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contextRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const subPath = currentPath.join('/');
 
@@ -109,11 +111,24 @@ export function DropboxFileBrowser({
     const handler = (e: MouseEvent) => {
       if (contextRef.current && !contextRef.current.contains(e.target as Node)) {
         setContextMenuId(null);
+        setContextMenuPos(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, entry: DropboxEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Position relative to the table container
+    const rect = tableRef.current?.getBoundingClientRect();
+    setContextMenuPos({
+      x: e.clientX - (rect?.left ?? 0),
+      y: e.clientY - (rect?.top ?? 0),
+    });
+    setContextMenuId(entry.id);
+  };
 
   const folderEnsured = useRef(false);
 
@@ -665,10 +680,11 @@ export function DropboxFileBrowser({
 
       {/* File table / drag-drop zone */}
       <div
+        ref={tableRef}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`min-h-[120px] transition ${dragOver ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : 'bg-white'}`}
+        className={`min-h-[120px] transition relative ${dragOver ? 'bg-blue-50 ring-2 ring-blue-300 ring-inset' : 'bg-white'}`}
       >
         {filteredEntries.length === 0 ? (
           <div className="p-10 text-center">
@@ -699,6 +715,7 @@ export function DropboxFileBrowser({
                   onDragOver={entry.isFolder ? (e) => handleFolderDragOver(e, entry) : undefined}
                   onDragLeave={entry.isFolder ? handleFolderDragLeave : undefined}
                   onDrop={entry.isFolder ? (e) => handleFolderDrop(e, entry) : undefined}
+                  onContextMenu={(e) => handleContextMenu(e, entry)}
                   className={`border-b border-gray-50 hover:bg-gray-50 group cursor-grab active:cursor-grabbing transition-colors
                     ${deletingId === entry.id ? 'opacity-50' : ''}
                     ${draggingId === entry.id ? 'opacity-40 bg-gray-100' : ''}
@@ -735,43 +752,60 @@ export function DropboxFileBrowser({
                   <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                     {entry.isFolder ? '—' : formatBytes(entry.size)}
                   </td>
-                  <td className="px-2 py-2.5 relative" ref={contextMenuId === entry.id ? contextRef : undefined}>
+                  <td className="px-2 py-2.5">
                     <button
-                      onClick={() => setContextMenuId(contextMenuId === entry.id ? null : entry.id)}
+                      onClick={(e) => {
+                        if (contextMenuId === entry.id && !contextMenuPos) {
+                          setContextMenuId(null);
+                        } else {
+                          setContextMenuPos(null);
+                          setContextMenuId(entry.id);
+                        }
+                      }}
                       className="p-1 text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition"
                     >
                       <MoreVertical className="w-4 h-4" />
                     </button>
-                    {contextMenuId === entry.id && (
-                      <div className="absolute right-2 top-8 z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]">
-                        {!entry.isFolder && (
-                          <button
-                            onClick={() => { handleDownload(entry); setContextMenuId(null); }}
-                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                          >
-                            <Download className="w-3.5 h-3.5" /> Download
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { openInDropbox(entry.path); setContextMenuId(null); }}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5" /> Open in Dropbox
-                        </button>
-                        <button
-                          onClick={() => handleDelete(entry)}
-                          className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Delete
-                        </button>
-                      </div>
-                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
+
+        {/* Shared context menu (right-click or dots) */}
+        {contextMenuId && (() => {
+          const entry = filteredEntries.find(e => e.id === contextMenuId);
+          if (!entry) return null;
+          const closeMenu = () => { setContextMenuId(null); setContextMenuPos(null); };
+          return (
+            <div
+              ref={contextRef}
+              style={contextMenuPos ? { position: 'absolute', left: contextMenuPos.x, top: contextMenuPos.y } : undefined}
+              className={`${contextMenuPos ? '' : 'absolute right-4 top-12'} z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]`}
+            >
+              <button
+                onClick={() => { handleDownload(entry); closeMenu(); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Download className="w-3.5 h-3.5" /> Download
+              </button>
+              <button
+                onClick={() => { openInDropbox(entry.path); closeMenu(); }}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Open in Dropbox
+              </button>
+              <div className="my-1 border-t border-gray-100" />
+              <button
+                onClick={() => { handleDelete(entry); closeMenu(); }}
+                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Footer with file count */}
