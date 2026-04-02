@@ -458,14 +458,19 @@ export default function DynamicForm({
     }
     if (record.email) return record.email;
     
-    // Lead/Opportunity/Project numbers
+    // Opportunity / Lead / Project names (prefer name over number)
+    if (record.opportunityName) return record.opportunityName;
+    if (record.leadName || record.contactName) return record.leadName || record.contactName;
+    if (record.projectName) return record.projectName;
+    if (record.productName) return record.productName;
+
+    // Lead/Opportunity/Project numbers (fallback when no name)
     if (record.leadNumber) return record.leadNumber;
     if (record.opportunityNumber) return record.opportunityNumber;
     if (record.projectNumber) return record.projectNumber;
     if (record.quoteNumber) return record.quoteNumber;
     if (record.serviceNumber) return record.serviceNumber;
     if (record.installationNumber) return record.installationNumber;
-    if (record.productName) return record.productName;
     
     // Handle address - could be string or object
     if (record.address) {
@@ -571,6 +576,9 @@ export default function DynamicForm({
     // Account → show phone or industry
     const phoneKey = keys.find(k => strip(k) === 'phone');
     if (phoneKey && record[phoneKey]) return String(record[phoneKey]);
+    // Opportunity/Lead/Project → show number as subtitle when name is the primary label
+    const numberKey = keys.find(k => strip(k) === 'opportunitynumber' || strip(k) === 'leadnumber' || strip(k) === 'projectnumber');
+    if (numberKey && record[numberKey] && String(record[numberKey]) !== primaryLabel) return String(record[numberKey]);
     // Fallback: show nothing rather than the raw ID
     return '';
   };
