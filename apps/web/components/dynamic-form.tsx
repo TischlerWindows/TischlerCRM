@@ -424,10 +424,28 @@ export default function DynamicForm({
 
   const getRecordLabel = (record: any) => {
     if (!record) return '';
-    
-    // Handle name object (Contact name with salutation, firstName, lastName)
-    if (record.name && typeof record.name === 'object') {
-      const nameObj = record.name;
+
+    const keys = Object.keys(record);
+
+    // Detect object prefix from keys (e.g., "Lead" from "Lead__contactName")
+    let prefix = '';
+    for (const k of keys) {
+      const idx = k.indexOf('__');
+      if (idx > 0) { prefix = k.substring(0, idx); break; }
+    }
+
+    // Helper: try prefixed then unprefixed field name
+    const pval = (field: string): any => {
+      if (prefix) {
+        const v = record[`${prefix}__${field}`];
+        if (v != null && v !== '') return v;
+      }
+      return record[field] ?? undefined;
+    };
+
+    // Handle CompositeText name object (Contact name with salutation, firstName, lastName)
+    const nameObj = pval('name');
+    if (nameObj && typeof nameObj === 'object') {
       const nameParts = [
         nameObj.salutation || nameObj.Contact__name_salutation,
         nameObj.firstName || nameObj.Contact__name_firstName,
@@ -435,90 +453,54 @@ export default function DynamicForm({
       ].filter(Boolean);
       if (nameParts.length > 0) return nameParts.join(' ');
     }
-    
-    // Handle simple name string
-    if (record.name && typeof record.name === 'string') return record.name;
-    
-    if (record.title) return record.title;
-    
-    // Account name - check multiple variations
-    if (record.accountName) return record.accountName;
-    if (record.Account__accountName) return record.Account__accountName;
-    
-    // Property number
-    if (record.propertyNumber) return record.propertyNumber;
-    if (record.Property__propertyNumber) return record.Property__propertyNumber;
-    
-    // Account number as fallback for accounts
-    if (record.accountNumber) return record.accountNumber;
-    
-    // Contact names
-    if (record.firstName || record.lastName) {
-      return `${record.firstName || ''} ${record.lastName || ''}`.trim();
-    }
-    if (record.email) return record.email;
-    
-    // Opportunity / Lead / Project names (prefer name over number)
-    if (record.opportunityName) return record.opportunityName;
-    if (record.leadName || record.contactName) return record.leadName || record.contactName;
-    if (record.projectName) return record.projectName;
-    if (record.productName) return record.productName;
 
-    // Lead/Opportunity/Project numbers (fallback when no name)
-    if (record.leadNumber) return record.leadNumber;
-    if (record.opportunityNumber) return record.opportunityNumber;
-    if (record.projectNumber) return record.projectNumber;
-    if (record.quoteNumber) return record.quoteNumber;
-    if (record.serviceNumber) return record.serviceNumber;
-    if (record.installationNumber) return record.installationNumber;
-    
+    // Handle simple name string
+    if (nameObj && typeof nameObj === 'string') return nameObj;
+
+    if (record.title) return record.title;
+
+    // Object-specific name fields (handles both prefixed & unprefixed)
+    if (pval('opportunityName')) return pval('opportunityName');
+    if (pval('contactName')) return pval('contactName');
+    if (pval('leadName')) return pval('leadName');
+    if (pval('projectName')) return pval('projectName');
+    if (pval('productName')) return pval('productName');
+    if (pval('accountName')) return pval('accountName');
+
+    // Property number
+    if (pval('propertyNumber')) return pval('propertyNumber');
+
+    // Account number as fallback for accounts
+    if (pval('accountNumber')) return pval('accountNumber');
+
+    // Contact names from individual fields
+    const firstName = pval('firstName') || pval('name_firstName');
+    const lastName = pval('lastName') || pval('name_lastName');
+    if (firstName || lastName) {
+      return `${firstName || ''} ${lastName || ''}`.trim();
+    }
+    if (pval('email') || pval('primaryEmail')) return pval('email') || pval('primaryEmail');
+
+    // Number fields as fallback (when no name field exists)
+    if (pval('leadNumber')) return pval('leadNumber');
+    if (pval('opportunityNumber')) return pval('opportunityNumber');
+    if (pval('projectNumber')) return pval('projectNumber');
+    if (pval('quoteNumber')) return pval('quoteNumber');
+    if (pval('serviceNumber')) return pval('serviceNumber');
+    if (pval('installationNumber')) return pval('installationNumber');
+
     // Handle address - could be string or object
-    if (record.address) {
-      if (typeof record.address === 'object') {
-        const addrParts = [record.address.street, record.address.city, record.address.state].filter(Boolean);
+    const addr = pval('address');
+    if (addr) {
+      if (typeof addr === 'object') {
+        const addrParts = [addr.street, addr.city, addr.state].filter(Boolean);
         if (addrParts.length > 0) return addrParts.join(', ');
       } else {
-        return record.address;
+        return addr;
       }
     }
-    
-    // Search for prefixed field names as last resort
-    const keys = Object.keys(record);
-    const firstNameKey = keys.find((key) => key.toLowerCase().endsWith('__firstname'));
-    const lastNameKey = keys.find((key) => key.toLowerCase().endsWith('__lastname'));
-    if (firstNameKey || lastNameKey) {
-      return `${record[firstNameKey || ''] || ''} ${record[lastNameKey || ''] || ''}`.trim();
-    }
-    const nameKey = keys.find((key) => key.toLowerCase().endsWith('__name'));
-    if (nameKey && record[nameKey]) {
-      const nameVal = record[nameKey];
-      if (typeof nameVal === 'object' && nameVal !== null) {
-        // CompositeText: extract display text from the object
-        const nameKeys = Object.keys(nameVal);
-        const findVal = (pattern: string) => {
-          const k = nameKeys.find(nk => nk.toLowerCase().includes(pattern));
-          return k ? nameVal[k] : undefined;
-        };
-        const parts = [
-          nameVal.salutation || findVal('salutation'),
-          nameVal.firstName || findVal('firstname'),
-          nameVal.lastName || findVal('lastname'),
-        ].filter(Boolean);
-        if (parts.length > 0) return parts.join(' ');
-        // Fallback: join all string values
-        const allStringVals = Object.values(nameVal).filter(v => typeof v === 'string' && v);
-        if (allStringVals.length > 0) return allStringVals.join(' ');
-      }
-      return String(nameVal);
-    }
-    const accountKey = keys.find((key) => key.toLowerCase().endsWith('__accountname'));
-    if (accountKey && record[accountKey]) return record[accountKey];
-    const propertyKey = keys.find((key) => key.toLowerCase().endsWith('__propertynumber'));
-    if (propertyKey && record[propertyKey]) return record[propertyKey];
-    const emailKey = keys.find((key) => key.toLowerCase().endsWith('__email'));
-    if (emailKey && record[emailKey]) return record[emailKey];
-    
-    // Final fallback - use any "name" or "number" field
+
+    // Fallback: scan all keys for name-like or number-like values
     const anyNameField = keys.find((key) => key.toLowerCase().includes('name') && record[key]);
     if (anyNameField && record[anyNameField]) {
       const val = record[anyNameField];
@@ -541,7 +523,7 @@ export default function DynamicForm({
     }
     const anyNumberField = keys.find((key) => key.toLowerCase().includes('number') && record[key]);
     if (anyNumberField && record[anyNumberField]) return String(record[anyNumberField]);
-    
+
     return String(record.id || 'Record');
   };
 
@@ -570,8 +552,8 @@ export default function DynamicForm({
         if (result !== primaryLabel) return result;
       }
     }
-    // Contact → show email
-    const emailKey = keys.find(k => strip(k) === 'email');
+    // Contact/Lead → show email
+    const emailKey = keys.find(k => strip(k) === 'email' || strip(k) === 'primaryemail');
     if (emailKey && record[emailKey] && record[emailKey] !== primaryLabel) return String(record[emailKey]);
     // Account → show phone or industry
     const phoneKey = keys.find(k => strip(k) === 'phone');
