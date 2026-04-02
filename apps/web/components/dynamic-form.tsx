@@ -1410,10 +1410,11 @@ export default function DynamicForm({
         break;
 
       case 'LocationSearch': {
-        // Build display value from saved target fields if the field's own value is empty
-        let locationValue = value as string | undefined;
+        // Always build display value from the target sub-fields (source of truth).
+        // The field's own persisted value is only a fallback when no targets exist.
         const targets = fieldDef.targetFields || {};
-        if (!locationValue && fieldDef.targetFields) {
+        let locationValue = value as string | undefined;
+        if (fieldDef.targetFields) {
           const tf = fieldDef.targetFields;
           const parts = [
             formData[tf.street ?? ''],
@@ -1422,7 +1423,7 @@ export default function DynamicForm({
             formData[tf.postalCode ?? ''],
             formData[tf.country ?? ''],
           ].filter(Boolean);
-          if (parts.length > 0) locationValue = parts.join(', ');
+          locationValue = parts.length > 0 ? parts.join(', ') : '';
         }
         const hasTargets = targets.street || targets.city || targets.state || targets.postalCode || targets.country;
         inputElement = (
