@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
+import { logAudit, extractIp } from '../audit.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -483,6 +484,26 @@ export async function recordRoutes(app: FastifyInstance) {
       },
     });
 
+    // Audit: log record creation
+    const recordName = normalizedData.name || normalizedData[`${apiName}__name`]
+      || normalizedData.accountName || normalizedData[`${apiName}__accountName`]
+      || normalizedData.contactName || normalizedData[`${apiName}__contactName`]
+      || normalizedData.opportunityName || normalizedData[`${apiName}__opportunityName`]
+      || normalizedData.leadName || normalizedData[`${apiName}__leadName`]
+      || normalizedData.projectName || normalizedData[`${apiName}__projectName`]
+      || normalizedData.productName || normalizedData[`${apiName}__productName`]
+      || normalizedData.propertyNumber || normalizedData[`${apiName}__propertyNumber`]
+      || record.id;
+    logAudit({
+      actorId: userId,
+      action: 'CREATE',
+      objectType: apiName,
+      objectId: record.id,
+      objectName: typeof recordName === 'string' ? recordName : String(recordName),
+      after: normalizedData,
+      ipAddress: extractIp(req),
+    });
+
     reply.code(201).send(record);
   });
 
@@ -527,8 +548,9 @@ export async function recordRoutes(app: FastifyInstance) {
       if (AUTO_NUMBER_FIELDS.has(stripped)) delete sanitizedUpdate[key];
     }
 
+    const beforeData = existingRecord.data as Record<string, any>;
     const mergedData = {
-      ...(existingRecord.data as Record<string, any>),
+      ...beforeData,
       ...sanitizedUpdate,
     };
 
@@ -556,6 +578,39 @@ export async function recordRoutes(app: FastifyInstance) {
       },
     });
 
+    // Audit: log record update (only changed fields)
+    const changedBefore: Record<string, any> = {};
+    const changedAfter: Record<string, any> = {};
+    for (const key of Object.keys(sanitizedUpdate)) {
+      const oldVal = beforeData[key];
+      const newVal = sanitizedUpdate[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedBefore[key] = oldVal;
+        changedAfter[key] = newVal;
+      }
+    }
+    if (Object.keys(changedAfter).length > 0) {
+      const recName = mergedData.name || mergedData[`${apiName}__name`]
+        || mergedData.accountName || mergedData[`${apiName}__accountName`]
+        || mergedData.contactName || mergedData[`${apiName}__contactName`]
+        || mergedData.opportunityName || mergedData[`${apiName}__opportunityName`]
+        || mergedData.leadName || mergedData[`${apiName}__leadName`]
+        || mergedData.projectName || mergedData[`${apiName}__projectName`]
+        || mergedData.productName || mergedData[`${apiName}__productName`]
+        || mergedData.propertyNumber || mergedData[`${apiName}__propertyNumber`]
+        || existingRecord.id;
+      logAudit({
+        actorId: userId,
+        action: 'UPDATE',
+        objectType: apiName,
+        objectId: existingRecord.id,
+        objectName: typeof recName === 'string' ? recName : String(recName),
+        before: changedBefore,
+        after: changedAfter,
+        ipAddress: extractIp(req),
+      });
+    }
+
     reply.send(record);
   });
 
@@ -580,6 +635,27 @@ export async function recordRoutes(app: FastifyInstance) {
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
     }
+
+    // Audit: log record deletion
+    const delData = existingRecord.data as Record<string, any>;
+    const delName = delData?.name || delData?.[`${apiName}__name`]
+      || delData?.accountName || delData?.[`${apiName}__accountName`]
+      || delData?.contactName || delData?.[`${apiName}__contactName`]
+      || delData?.opportunityName || delData?.[`${apiName}__opportunityName`]
+      || delData?.leadName || delData?.[`${apiName}__leadName`]
+      || delData?.projectName || delData?.[`${apiName}__projectName`]
+      || delData?.productName || delData?.[`${apiName}__productName`]
+      || delData?.propertyNumber || delData?.[`${apiName}__propertyNumber`]
+      || existingRecord.id;
+    logAudit({
+      actorId: userId,
+      action: 'DELETE',
+      objectType: apiName,
+      objectId: existingRecord.id,
+      objectName: typeof delName === 'string' ? delName : String(delName),
+      before: delData,
+      ipAddress: extractIp(req),
+    });
 
     await prisma.record.delete({
       where: { id: existingRecord.id },
