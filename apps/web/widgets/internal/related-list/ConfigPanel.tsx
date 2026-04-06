@@ -61,14 +61,26 @@ function Toggle({
   )
 }
 
-export default function RelatedListConfigPanel({ config, onChange }: ConfigPanelProps) {
+export default function RelatedListConfigPanel({ config, onChange, objectOptions }: ConfigPanelProps) {
   const [objects, setObjects] = useState<Array<{ apiName: string; label: string }>>([])
   const [fields, setFields] = useState<ObjectField[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingObjects, setLoadingObjects] = useState(false)
+  const [objectsError, setObjectsError] = useState<string | null>(null)
 
+  // Use objectOptions from props (schema store) when available; fall back to API call
   useEffect(() => {
-    apiClient.getObjects().then(objs => setObjects(objs.map(o => ({ apiName: o.apiName, label: o.label }))))
-  }, [])
+    if (objectOptions && objectOptions.length > 0) return
+    setLoadingObjects(true)
+    setObjectsError(null)
+    apiClient.getObjects()
+      .then(objs => setObjects(objs.map(o => ({ apiName: o.apiName, label: o.label }))))
+      .catch((e: Error) => {
+        console.error('[RelatedList] Failed to load objects:', e.message)
+        setObjectsError(e.message)
+      })
+      .finally(() => setLoadingObjects(false))
+  }, [objectOptions])
 
   useEffect(() => {
     const obj = config.objectApiName as string
@@ -76,8 +88,13 @@ export default function RelatedListConfigPanel({ config, onChange }: ConfigPanel
     setLoading(true)
     apiClient.getObject(obj)
       .then(o => setFields(o.fields ?? []))
+      .catch((e: Error) => console.error('[RelatedList] Failed to load fields:', e.message))
       .finally(() => setLoading(false))
   }, [config.objectApiName])
+
+  const effectiveObjects = (objectOptions && objectOptions.length > 0)
+    ? objectOptions.map(o => ({ apiName: o.value, label: o.label }))
+    : objects
 
   const selectCls = 'w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 px-2.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition'
   const inputCls = 'w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 px-2.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition'
@@ -109,8 +126,22 @@ export default function RelatedListConfigPanel({ config, onChange }: ConfigPanel
           onChange={e => onChange({ ...config, objectApiName: e.target.value, columns: [], linkField: '', sortField: '', filters: [] })}
         >
           <option value="">— Select object —</option>
-          {objects.map(o => <option key={o.apiName} value={o.apiName}>{o.label}</option>)}
+          {effectiveObjects.map(o => <option key={o.apiName} value={o.apiName}>{o.label}</option>)}
         </select>
+        {loadingObjects && <p className="text-[10px] text-gray-400 mt-0.5">Loading objects…</p>}
+        {objectsError && (
+          <p className="text-[10px] text-red-500 mt-0.5">
+            Failed to load objects.{' '}
+            <button type="button" onClick={() => {
+              setObjectsError(null)
+              setLoadingObjects(true)
+              apiClient.getObjects()
+                .then(objs => setObjects(objs.map(o => ({ apiName: o.apiName, label: o.label }))))
+                .catch((e: Error) => setObjectsError(e.message))
+                .finally(() => setLoadingObjects(false))
+            }} className="underline hover:text-red-700">Retry</button>
+          </p>
+        )}
       </div>
 
       {/* ── Custom Label ── */}

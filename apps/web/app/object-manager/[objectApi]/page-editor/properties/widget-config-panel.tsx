@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { SchemaRenderer } from '@/lib/widgets/schema-renderer';
 import { getWidgetById, getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader';
 import type { LayoutTab, LayoutSection, LayoutWidget } from '../types';
 import { useEditorStore } from '../editor-store';
+import { useSchemaStore } from '@/lib/schema-store';
 import { parseNumber } from './shared';
 
 interface WidgetConfigPanelProps {
@@ -24,6 +25,11 @@ interface WidgetConfigPanelProps {
 export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPanelProps) {
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const removeWidget = useEditorStore((s) => s.removeWidget);
+  const schema = useSchemaStore((s) => s.schema);
+  const objectOptions = useMemo(
+    () => (schema?.objects ?? []).map((o) => ({ value: o.apiName, label: o.label })),
+    [schema?.objects]
+  );
 
   return (
     <>
@@ -51,6 +57,7 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
             record={{}}
             integration={null}
             object={{ apiName: '', label: '', fields: objectFields }}
+            objectOptions={objectOptions}
           />
         );
       })()}
@@ -193,7 +200,7 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
                 record={{}}
                 integration={null}
                 object={{ apiName: '', label: '', fields: [] }}
-                objectOptions={[]}
+                objectOptions={objectOptions}
               />
             ) : manifest ? (
               <SchemaRenderer
