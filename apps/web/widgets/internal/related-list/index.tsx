@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Plus, Search, ChevronUp, ChevronDown, MoreHorizontal, Trash2, ExternalLink, LayoutGrid, List } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
+import { useSchemaStore } from '@/lib/schema-store'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -51,25 +52,44 @@ function listUrl(objectApiName: string, linkField: string, linkValue: string) {
 
 // ── Client-side filter engine ─────────────────────────────────────────
 
-function getFieldValue(row: Record<string, unknown>, field: string): unknown {
-  const data = (row.data as Record<string, unknown>) ?? {}
-  if (data[field] !== undefined) return data[field]
-  const fieldLower = field.toLowerCase()
-  for (const key of Object.keys(data)) {
-    if (key.toLowerCase() === fieldLower) return data[key]
-  }
-  const stripped = field.replace(/^[A-Za-z]+_/, '')
-  if (stripped !== field) {
-    const strippedLower = stripped.toLowerCase()
-    for (const key of Object.keys(data)) {
-      if (key.toLowerCase() === strippedLower) return data[key]
+// Flatten raw API record to top-level keys (same as recordsService.flattenRecord)
+function flattenRow(raw: Record<string, unknown>): Record<string, unknown> {
+  const data = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : {}
+  const flat: Record<string, unknown> = { id: raw.id }
+
+  // Build a case-insensitive lookup map for all data keys
+  for (const [key, value] of Object.entries(data)) {
+    flat[key] = value
+    flat[key.toLowerCase()] = value
+    // Strip double-underscore prefix (Deal__dealName → dealName)
+    const stripped = key.replace(/^[A-Za-z]+__/, '')
+    if (stripped !== key) {
+      flat[stripped] = value
+      flat[stripped.toLowerCase()] = value
+    }
+    // Strip single-underscore prefix (DEAL_DEALNAME → DEALNAME)
+    const singleStripped = key.replace(/^[A-Za-z]+_/, '')
+    if (singleStripped !== key && singleStripped !== stripped) {
+      flat[singleStripped] = value
+      flat[singleStripped.toLowerCase()] = value
     }
   }
-  return row[field]
+
+  // Top-level metadata
+  flat.createdAt = raw.createdAt
+  flat.updatedAt = raw.updatedAt
+  if (raw.createdBy && typeof raw.createdBy === 'object') {
+    flat.createdBy = (raw.createdBy as any).name || (raw.createdBy as any).email || 'Unknown'
+  }
+  return flat
+}
+
+function getVal(row: Record<string, unknown>, field: string): unknown {
+  return row[field] ?? row[field.toLowerCase()]
 }
 
 function applyFilter(row: Record<string, unknown>, rule: FilterRule): boolean {
-  const rawVal = getFieldValue(row, rule.field)
+  const rawVal = getVal(row, rule.field)
   const cellStr = rawVal !== null && rawVal !== undefined ? String(rawVal).toLowerCase() : ''
   const ruleVal = rule.value.toLowerCase()
 
@@ -94,7 +114,7 @@ function applyFilters(rows: Record<string, unknown>[], rules: FilterRule[]): Rec
 // ── Cell value helper ─────────────────────────────────────────────────
 
 function getCellValue(row: Record<string, unknown>, col: string): string {
-  const val = getFieldValue(row, col)
+  const val = getVal(row, col)
   return val !== undefined && val !== null ? String(val) : '—'
 }
 
@@ -122,6 +142,7 @@ function Skeleton() {
 
 export default function RelatedListWidget({ config, record }: WidgetProps) {
   const pathname = usePathname()
+  const schema = useSchemaStore((s) => s.schema)
   const {
     objectApiName,
     label,
@@ -150,6 +171,19 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     filters?: FilterRule[]
   }
 
+  // Build field label map for displaying nice column headers
+  const fieldLabelMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    const obj = schema?.objects?.find(o => o.apiName === objectApiName)
+    if (obj?.fields) {
+      for (const f of obj.fields) {
+        map[f.apiName] = f.label
+        map[f.apiName.toLowerCase()] = f.label
+      }
+    }
+    return map
+  }, [schema?.objects, objectApiName])
+
   const [allRows, setAllRows] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -175,7 +209,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     })
 
     apiClient.get<Record<string, unknown>[]>(`/objects/${objectApiName}/records?${params}`)
-      .then(data => setAllRows(Array.isArray(data) ? data : []))
+      .then(data => setAllRows(Array.isArray(data) ? data.map(flattenRow) : []))
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [objectApiName, linkField, sortField, sortDirection, recordId])
@@ -286,7 +320,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
                 >
                   {displayColumns.map(col => (
                     <div key={col} className="mb-1.5 last:mb-0">
-                      <p className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide">{col}</p>
+                      <p className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide">{fieldLabelMap[col] || fieldLabelMap[col.toLowerCase()] || col}</p>
                       <p className="text-xs font-medium text-brand-dark truncate">{getCellValue(row, col)}</p>
                     </div>
                   ))}
@@ -343,7 +377,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
                       onClick={() => handleSortColumn(col)}
                     >
                       <span className="inline-flex items-center gap-1">
-                        {col}
+                        {fieldLabelMap[col] || fieldLabelMap[col.toLowerCase()] || col}
                         {sortCol === col ? (
                           sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                         ) : (
