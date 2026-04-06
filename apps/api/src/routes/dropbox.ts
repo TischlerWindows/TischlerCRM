@@ -76,8 +76,8 @@ const OPPORTUNITY_SUBFOLDERS = [
   '6. Installation',
   '7. Final Shop Drawings',
   '8. Project Accounting',
-  'Photos/Site',
-  'Photos/Finished',
+  '9. Photos/Site',
+  '9. Photos/Finished',
 ];
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
