@@ -90,6 +90,7 @@ export default function DealsPage() {
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
+  const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
@@ -174,8 +175,13 @@ export default function DealsPage() {
   // Auto-open new record form when navigated from a related list with ?new=true
   useEffect(() => {
     if (searchParams.get('new') === 'true' && hasPageLayout && selectedLayoutId) {
+      // Extract prefill fields from URL (e.g., PropertyId=001EcZ28vn7mm0E)
+      const prefill: Record<string, any> = {}
+      searchParams.forEach((value, key) => {
+        if (key !== 'new') prefill[key] = value
+      })
+      setPrefillData(prefill)
       setShowDynamicForm(true)
-      // Clean the URL without triggering a re-render loop
       router.replace(pathname, { scroll: false })
     }
   }, [searchParams, hasPageLayout, selectedLayoutId, pathname, router])
@@ -907,11 +913,15 @@ export default function DealsPage() {
           open={showDynamicForm}
           onOpenChange={(open) => {
             setShowDynamicForm(open);
-            if (!open) setSelectedLayoutId(null);
+            if (!open) {
+              setSelectedLayoutId(null);
+              setPrefillData({});
+            }
           }}
           objectApiName="Deal"
           layoutType="create"
           layoutId={selectedLayoutId}
+          recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
           title="New Deal"
         />
