@@ -55,7 +55,7 @@ function listUrl(objectApiName: string, linkField: string, linkValue: string) {
 // Flatten raw API record to top-level keys (same as recordsService.flattenRecord)
 function flattenRow(raw: Record<string, unknown>): Record<string, unknown> {
   const data = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : {}
-  const flat: Record<string, unknown> = { id: raw.id }
+  const flat: Record<string, unknown> = {}
 
   // Build a case-insensitive lookup map for all data keys
   for (const [key, value] of Object.entries(data)) {
@@ -75,7 +75,8 @@ function flattenRow(raw: Record<string, unknown>): Record<string, unknown> {
     }
   }
 
-  // Top-level metadata
+  // System fields set AFTER data loop so they can never be overwritten
+  flat.id = raw.id
   flat.createdAt = raw.createdAt
   flat.updatedAt = raw.updatedAt
   if (raw.createdBy && typeof raw.createdBy === 'object') {
