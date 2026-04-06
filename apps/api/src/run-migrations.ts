@@ -24,7 +24,6 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_layout_field_presentation',
     sql: `ALTER TABLE "LayoutField" ADD COLUMN IF NOT EXISTS "presentation" JSONB`,
   },
-<<<<<<< HEAD
   {
     name: 'add_widget_settings',
     sql: `CREATE TABLE IF NOT EXISTS "WidgetSetting" (
