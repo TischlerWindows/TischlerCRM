@@ -33,14 +33,13 @@ function ColumnIcon({ count }: { count: 1 | 2 | 3 | 4 }) {
 }
 
 function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4; label: string }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `palette-panel-${columns}`,
     data: { type: 'palette-panel', columns, label },
   });
 
   const style: CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (
@@ -68,7 +67,7 @@ function DraggableFieldChip({
   field: FieldDef;
   isPlaced: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `field-${field.apiName}`,
     data: {
       type: 'palette-field',
@@ -78,8 +77,7 @@ function DraggableFieldChip({
   });
 
   const style: CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (

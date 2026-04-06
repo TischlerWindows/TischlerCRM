@@ -15,6 +15,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { Grid2x2, LayoutPanelLeft, Puzzle } from 'lucide-react';
 import { useEditorStore } from '../editor-store';
 import type { DragSource } from './types';
@@ -166,7 +167,7 @@ export function DndContextWrapper({
       onDragCancel={handleDragCancel}
     >
       {children}
-      <DragOverlay>{overlay}</DragOverlay>
+      <DragOverlay modifiers={[snapCenterToCursor]}>{overlay}</DragOverlay>
     </DndContext>
   );
 }

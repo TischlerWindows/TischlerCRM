@@ -48,7 +48,7 @@ function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.
   const widgetType = MANIFEST_ID_TO_WIDGET_TYPE[manifest.id] ?? (manifest.id as WidgetType);
   const Icon = getLucideIcon(manifest.icon);
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `widget-new-${widgetType}`,
     data: {
       type: 'palette-widget',
@@ -58,8 +58,7 @@ function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.
   });
 
   const style: CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (
@@ -93,7 +92,7 @@ function ExternalDraggableCard({
 }): JSX.Element {
   const Icon = getLucideIcon(manifest.icon);
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `widget-new-ext-${manifest.id}`,
     disabled: !enabled,
     data: {
@@ -105,8 +104,7 @@ function ExternalDraggableCard({
   });
 
   const style: CSSProperties = {
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    opacity: isDragging ? 0.55 : enabled ? 1 : 0.45,
+    opacity: isDragging ? 0 : enabled ? 1 : 0.45,
   };
 
   const disabledReason = !enabled
