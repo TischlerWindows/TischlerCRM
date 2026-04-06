@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import type { ConfigPanelProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
+import { useSchemaStore } from '@/lib/schema-store'
 
 interface ObjectField { apiName: string; label: string; type: string }
 
@@ -62,6 +63,7 @@ function Toggle({
 }
 
 export default function RelatedListConfigPanel({ config, onChange, objectOptions }: ConfigPanelProps) {
+  const schema = useSchemaStore((s) => s.schema)
   const [objects, setObjects] = useState<Array<{ apiName: string; label: string }>>([])
   const [fields, setFields] = useState<ObjectField[]>([])
   const [loading, setLoading] = useState(false)
@@ -82,15 +84,25 @@ export default function RelatedListConfigPanel({ config, onChange, objectOptions
       .finally(() => setLoadingObjects(false))
   }, [objectOptions])
 
+  // Load fields for the selected object — use schema store first, API as fallback
   useEffect(() => {
     const obj = config.objectApiName as string
     if (!obj) { setFields([]); return }
+
+    // Try schema store first (synchronous, no network needed)
+    const schemaObj = schema?.objects?.find(o => o.apiName === obj)
+    if (schemaObj?.fields?.length) {
+      setFields(schemaObj.fields.map(f => ({ apiName: f.apiName, label: f.label, type: String(f.type) })))
+      return
+    }
+
+    // Fallback to API
     setLoading(true)
     apiClient.getObject(obj)
       .then(o => setFields(o.fields ?? []))
       .catch((e: Error) => console.error('[RelatedList] Failed to load fields:', e.message))
       .finally(() => setLoading(false))
-  }, [config.objectApiName])
+  }, [config.objectApiName, schema?.objects])
 
   const effectiveObjects = (objectOptions && objectOptions.length > 0)
     ? objectOptions.map(o => ({ apiName: o.value, label: o.label }))
