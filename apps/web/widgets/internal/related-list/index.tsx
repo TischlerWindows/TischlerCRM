@@ -85,7 +85,21 @@ function flattenRow(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 function getVal(row: Record<string, unknown>, field: string): unknown {
-  return row[field] ?? row[field.toLowerCase()]
+  if (row[field] !== undefined) return row[field]
+  if (row[field.toLowerCase()] !== undefined) return row[field.toLowerCase()]
+  // Strip single-underscore prefix: DEAL_DEALNAME → DEALNAME → dealname
+  const stripped = field.replace(/^[A-Za-z]+_/, '')
+  if (stripped !== field) {
+    if (row[stripped] !== undefined) return row[stripped]
+    if (row[stripped.toLowerCase()] !== undefined) return row[stripped.toLowerCase()]
+  }
+  // Strip double-underscore prefix: Deal__dealName → dealName
+  const dblStripped = field.replace(/^[A-Za-z]+__/, '')
+  if (dblStripped !== field) {
+    if (row[dblStripped] !== undefined) return row[dblStripped]
+    if (row[dblStripped.toLowerCase()] !== undefined) return row[dblStripped.toLowerCase()]
+  }
+  return undefined
 }
 
 function applyFilter(row: Record<string, unknown>, rule: FilterRule): boolean {
