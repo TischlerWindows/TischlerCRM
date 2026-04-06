@@ -9,7 +9,6 @@ import {
   Settings,
   Grid3x3,
   Layout,
-  Zap,
   Square,
   List,
   Search as SearchIcon,
@@ -26,7 +25,6 @@ import PageEditor from './page-editor';
 import HomeLayoutEditor from './home-layout-editor';
 import FieldsRelationships from './fields-relationships';
 import SearchSettings from './search-settings';
-import WorkflowTriggers from './workflow-triggers';
 
 const SIDEBAR_SECTIONS = [
   // Data Model
@@ -100,13 +98,6 @@ const SIDEBAR_SECTIONS = [
   },
   
   // Automation
-  { 
-    id: 'workflow-triggers', 
-    label: 'Workflow Triggers', 
-    icon: Zap,
-    description: 'Workflow automation',
-    category: 'Automation'
-  },
   { 
     id: 'functions', 
     label: 'Functions / Scripts', 
@@ -420,11 +411,7 @@ export default function ObjectDetailPage() {
             <SearchSettings objectApiName={objectApi} />
           )}
 
-          {activeSection === 'workflow-triggers' && (
-            <WorkflowTriggers objectApiName={objectApi} />
-          )}
-
-          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && activeSection !== 'workflow-triggers' && (
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

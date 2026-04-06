@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   FileSpreadsheet,
@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
+import { recordsService } from '@/lib/records-service';
+import { DateInput } from '@/components/date-input';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -537,6 +539,7 @@ interface Summary {
   name: string;
   salesman: string;
   opportunityNumber: string;
+  linkedOpportunityId?: string;
   jobType: string;
   estimator: string;
   date: string;
@@ -562,6 +565,25 @@ interface Summary {
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
+  addOns: {
+    windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    entryDoor: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    magneticContact: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+  };
+  product: string;
+  productType: string;
+  productTypeOptions: string[];
+  woodType: string;
+  finish: string;
+  glassType: string;
+  muntinType: string;
+  spacerBars: string;
+  spacerBarColors: string;
+  projectContains: string[];
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -593,7 +615,13 @@ export default function SummaryPage() {
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  // Opportunity picker state
+  const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
+  const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
+  const [opportunitySearch, setOpportunitySearch] = useState('');
+  const [loadingOpportunities, setLoadingOpportunities] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     (async () => {
@@ -605,6 +633,18 @@ export default function SummaryPage() {
       setLoading(false);
     })();
   }, []);
+
+  // Auto-create summary from opportunity query params
+  useEffect(() => {
+    if (loading) return;
+    const opportunityId = searchParams.get('fromOpportunity');
+    if (!opportunityId) return;
+    const opportunityName = searchParams.get('opportunityName') || '';
+    const opportunityNumber = searchParams.get('opportunityNumber') || '';
+    // Clear query params so refreshing doesn't re-create
+    router.replace('/summary');
+    createNewSummary({ opportunityId, opportunityName, opportunityNumber });
+  }, [loading, searchParams]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -668,12 +708,37 @@ export default function SummaryPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const createNewSummary = () => {
+  const openOpportunityPicker = async () => {
+    setShowOpportunityPicker(true);
+    setOpportunitySearch('');
+    setLoadingOpportunities(true);
+    try {
+      const records = await recordsService.getRecords('Opportunity');
+      setOpportunityRecords(records.map(r => ({ id: r.id, ...r.data })));
+    } catch (err) {
+      console.error('Failed to load opportunities:', err);
+      setOpportunityRecords([]);
+    } finally {
+      setLoadingOpportunities(false);
+    }
+  };
+
+  const handleOpportunitySelected = (record: any) => {
+    setShowOpportunityPicker(false);
+    createNewSummary({
+      opportunityId: record.id,
+      opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
+      opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+    });
+  };
+
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
-      name: '',
+      name: opts?.opportunityName || '',
       salesman: '',
-      opportunityNumber: '',
+      opportunityNumber: opts?.opportunityNumber || '',
+      linkedOpportunityId: opts?.opportunityId || undefined,
       jobType: '',
       estimator: '',
       date: '',
@@ -771,6 +836,25 @@ export default function SummaryPage() {
         doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
+      addOns: {
+        windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        entryDoor: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        magneticContact: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+      },
+      product: '',
+      productType: '',
+      productTypeOptions: [],
+      woodType: '',
+      finish: '',
+      glassType: '',
+      muntinType: '',
+      spacerBars: '',
+      spacerBarColors: '',
+      projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -795,6 +879,259 @@ export default function SummaryPage() {
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
     setOpenDropdown(null);
+  };
+
+  // ── Print PDF — renders both pages into a new window and triggers print ──
+  const handlePrintPDF = () => {
+    if (!editingSummary) return;
+    const s = editingSummary;
+    const esc = (v: string | undefined | null) => (v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+    const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+    const p = (x: string | undefined) => parseFloat(x || '0') || 0;
+    const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
+
+    // Build row HTML for windows/doors tables
+    const buildDataRows = (rows: any[]) => rows.filter((r: any) =>
+      r.tusPosition || r.archPosition || r.qty || r.widthMM || r.heightMM || r.type || r.type2
+    ).map((r: any) => `<tr>
+      <td>${esc(r.tusPosition)}</td><td>${esc(r.archPosition)}</td><td class="r">${esc(r.qty)}</td>
+      <td class="r">${esc(r.widthMM)}</td><td class="r">${esc(r.heightMM)}</td>
+      <td class="r">${esc(r.widthFtIn)}</td><td class="r">${esc(r.heightFtIn)}</td>
+      <td class="r">${esc(r.sqFeetEach)}</td><td class="r">${esc(r.sqFeetTotal)}</td>
+      <td class="r">${esc(r.operableSashesEach)}</td><td class="r">${esc(r.operableSashesTotal)}</td>
+      <td class="r">${esc(r.qty2)}</td><td>${esc(r.type)}</td>
+      <td class="r">${esc(r.qty3)}</td><td>${esc(r.type2)}</td>
+      <td>${esc(r.specialRemarks)}</td>
+      <td class="r">${esc(r.fieldsEach)}</td><td class="r">${esc(r.fieldsTotal)}</td>
+      <td class="r">${esc(r.siteMullionsEach)}</td><td class="r">${esc(r.siteMullionsTotal)}</td>
+      <td class="r">${esc(r.netEuroEach)}</td><td class="r">${esc(r.netEuroTotal)}</td>
+      <td class="r mc">${esc(r.magneticContactUnit)}</td><td class="r mc">${esc(r.magneticContactPosition)}</td>
+      <td class="r snt">${esc(r.shadeBoxesNoSideTrimUnit)}</td><td class="r snt">${esc(r.shadeBoxesNoSideTrimPosition)}</td>
+      <td class="r swt">${esc(r.shadeBoxesWithSideTrimUnit)}</td><td class="r swt">${esc(r.shadeBoxesWithSideTrimPosition)}</td>
+      <td class="r ff">${esc(r.finalFinishUnit)}</td><td class="r ff">${esc(r.finalFinishPosition)}</td>
+    </tr>`).join('');
+
+    const dataTableHeaders = `<tr>
+      <th>TuS Pos.</th><th>Arch Pos.</th><th>Qty</th>
+      <th>W (MM)</th><th>H (MM)</th><th>W (Ft&In)</th><th>H (Ft&In)</th>
+      <th>Sq Ft (Ea)</th><th>Sq Ft (Tot)</th>
+      <th>Op. Sash (Ea)</th><th>Op. Sash (Tot)</th>
+      <th>Qty</th><th>Type</th><th>Qty</th><th>Type 2</th>
+      <th>Special Remarks</th>
+      <th>Fields (Ea)</th><th>Fields (Tot)</th>
+      <th># Site Mull. (Ea)</th><th># Site Mull. (Tot)</th>
+      <th>NET € (Ea)</th><th>NET € (Tot)</th>
+      <th class="mc">Mag. Ct. /Unit</th><th class="mc">Mag. Ct. /Pos</th>
+      <th class="snt">Shade No Trim /Unit</th><th class="snt">Shade No Trim /Pos</th>
+      <th class="swt">Shade W/ Trim /Unit</th><th class="swt">Shade W/ Trim /Pos</th>
+      <th class="ff">Final Fin. /Unit</th><th class="ff">Final Fin. /Pos</th>
+    </tr>`;
+
+    // Quote totals calculation
+    const ewQty = sumField(s.rows, 'qty'), ewFields = sumField(s.rows, 'fieldsTotal');
+    const ewSqFt = sumField(s.rows, 'sqFeetTotal'), ewNet = sumField(s.rows, 'netEuroTotal');
+    const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
+    const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
+    const tQty = ewQty + dQty, tFields = ewFields + dFields, tSqFt = ewSqFt + dSqFt, tNet = ewNet + dNet;
+    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    const calcRow = (net: number, cat: any) => {
+      const full = net ? p(cat?.full) / net : 0;
+      const disc = net ? p(cat?.pct) / net : 0;
+      const fn = net ? p(cat?.final) / net : 0;
+      const fa = net ? p(cat?.finalAdj) / net : 0;
+      return { full, disc, final: fn, finalAdj: fa };
+    };
+    const ewC = calcRow(ewNet, qt.euroWindows), dhC = calcRow(0, qt.doubleHung), edC = calcRow(dNet, qt.euroDoors);
+    const gtC = { full: ewC.full + dhC.full + edC.full, disc: ewC.disc + dhC.disc + edC.disc, final: ewC.final + dhC.final + edC.final, finalAdj: ewC.finalAdj + dhC.finalAdj + edC.finalAdj };
+    const qtSum = (f: string) => p((qt.euroWindows as any)?.[f]) + p((qt.doubleHung as any)?.[f]) + p((qt.euroDoors as any)?.[f]);
+
+    const quoteTotalRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any, calc: any) => `
+      <tr><td class="b">${label}</td><td class="r">${fmtInt(qty)}</td><td class="r">${fmtInt(fields)}</td>
+      <td class="r">${fmt(sqFt)}</td><td class="r">${net ? '€' + fmt(net) : '—'}</td>
+      <td class="r">${cat?.full || '—'}</td><td class="r">${cat?.pct || '—'}</td>
+      <td class="r">${cat?.final || '—'}</td><td class="r">${cat?.finalAdj || '—'}</td>
+      <td class="r cb">${calc.full ? '€' + fmt(calc.full) : '—'}</td><td class="r cb">${calc.disc ? '€' + fmt(calc.disc) : '—'}</td>
+      <td class="r cg">${calc.final ? fmt(calc.final) : '—'}</td><td class="r cp">${calc.finalAdj ? fmt(calc.finalAdj) : '—'}</td></tr>`;
+
+    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    const html = `<!DOCTYPE html><html><head><title>${esc(s.name)} — Summary</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; }
+  h1 { font-size: 14pt; margin-bottom: 2px; }
+  h2 { font-size: 11pt; margin: 10px 0 4px; border-bottom: 2px solid #1e3a5f; padding-bottom: 2px; color: #1e3a5f; }
+  h3 { font-size: 9pt; margin: 8px 0 3px; color: #333; }
+  .header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #ccc; }
+  .header .subtitle { font-size: 8pt; color: #666; }
+  .info-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
+  .info-grid .item { }
+  .info-grid .item .label { font-size: 7pt; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.3px; }
+  .info-grid .item .value { font-size: 9pt; padding: 2px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 7pt; }
+  th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; }
+  th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; }
+  .r { text-align: right; }
+  .b { font-weight: 600; }
+  .mc { background: #e8f5e9; }
+  .snt { background: #fff3e0; }
+  .swt { background: #e3f2fd; }
+  .ff { background: #fce4ec; }
+  .cb { background: #e3f2fd; }
+  .cg { background: #e8f5e9; }
+  .cp { background: #f3e5f5; }
+  .gt { font-weight: 700; background: #f5f5f5; }
+  .section-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; }
+  .section-card .heading { background: #f8f8f8; padding: 4px 8px; font-size: 9pt; font-weight: 600; border-bottom: 1px solid #ddd; }
+  .section-card .body { padding: 6px 8px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .field .fl { font-size: 7pt; font-weight: 600; color: #555; }
+  .field .fv { font-size: 8.5pt; padding: 1px 0; min-height: 14px; }
+  @media print {
+    @page { margin: 0.4in; }
+    .page1 { page: landscape; }
+    .page2 { page-break-before: always; }
+  }
+  @page { size: landscape; margin: 0.4in; }
+</style></head><body>
+
+<!-- PAGE 1: Data Entry -->
+<div class="page1">
+  <div class="header">
+    <h1>Quote Summary — Data Entry</h1>
+    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
+  </div>
+
+  <div class="info-grid">
+    <div class="item"><div class="label">Job Name</div><div class="value">${esc(s.name)}</div></div>
+    <div class="item"><div class="label">Salesman</div><div class="value">${esc(s.salesman)}</div></div>
+    <div class="item"><div class="label">Opportunity #</div><div class="value">${esc(s.opportunityNumber)}</div></div>
+    <div class="item"><div class="label">Job Type</div><div class="value">${esc(s.jobType)}</div></div>
+    <div class="item"><div class="label">Estimator</div><div class="value">${esc(s.estimator)}</div></div>
+    <div class="item"><div class="label">Date</div><div class="value">${dateStr}</div></div>
+  </div>
+
+  <h2>Windows</h2>
+  <table>${dataTableHeaders}${buildDataRows(s.rows)}</table>
+
+  <h2 style="margin-top:12px">Doors</h2>
+  <table>${dataTableHeaders}${buildDataRows(s.doorRows)}</table>
+</div>
+
+<!-- PAGE 2: Project Summary -->
+<div class="page2">
+  <div class="header">
+    <h1>Quote Summary — Project Summary</h1>
+    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Project Overview</div>
+    <div class="body">
+      <div class="three-col">
+        <div class="field"><div class="fl">Date</div><div class="fv">${dateStr}</div></div>
+        <div class="field"><div class="fl">Opportunity #</div><div class="fv">${esc(s.opportunityNumber)}</div></div>
+        <div class="field"><div class="fl">Project Name</div><div class="fv">${esc(s.name)}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Address</div><div class="fv">${esc(s.address)}</div></div>
+        <div class="field"><div class="fl">Salesman</div><div class="fv">${esc(s.salesman)}</div></div>
+        <div class="field"><div class="fl">Estimator</div><div class="fv">${esc(s.estimator)}</div></div>
+      </div>
+      <div class="two-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Quote Type</div><div class="fv">${s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—'}</div></div>
+        ${s.quoteType === 'requote' ? `<div class="field"><div class="fl">Description of Changes</div><div class="fv">${esc(s.requoteDescription)}</div></div>` : ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Product Specifications</div>
+    <div class="body">
+      <div class="three-col">
+        <div class="field"><div class="fl">Product</div><div class="fv">${esc(s.product || s.jobType)}</div></div>
+        <div class="field"><div class="fl">Product Type</div><div class="fv">${esc(s.productType)}</div></div>
+        <div class="field"><div class="fl">Options</div><div class="fv">${(s.productTypeOptions || []).map(esc).join(', ') || '—'}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Wood Type</div><div class="fv">${esc(s.woodType)}</div></div>
+        <div class="field"><div class="fl">Finish</div><div class="fv">${esc(s.finish)}</div></div>
+        <div class="field"><div class="fl">Glass Type</div><div class="fv">${esc(s.glassType)}</div></div>
+      </div>
+      <div class="three-col" style="margin-top:4px">
+        <div class="field"><div class="fl">Muntin Type</div><div class="fv">${esc(s.muntinType)}</div></div>
+        <div class="field"><div class="fl">Spacer Bars</div><div class="fv">${esc(s.spacerBars)}</div></div>
+        <div class="field"><div class="fl">Spacer Bar Colors</div><div class="fv">${esc(s.spacerBarColors)}</div></div>
+      </div>
+      <div class="field" style="margin-top:4px"><div class="fl">Project Contains</div><div class="fv">${(s.projectContains || []).map(esc).join(', ') || '—'}</div></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="heading">Quote Totals</div>
+    <div class="body" style="padding:0">
+      <table>
+        <thead><tr>
+          <th></th><th class="r">Qty</th><th class="r">Fields</th><th class="r">Sq Feet</th><th class="r">NET €</th>
+          <th class="r">Full</th><th class="r">%</th><th class="r">FINAL</th><th class="r">FINAL W/ ADJ</th>
+          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th class="r cp">Final W/ Adj</th>
+        </tr></thead>
+        <tbody>
+          ${quoteTotalRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows, ewC)}
+          ${quoteTotalRow('Double Hung', 0, 0, 0, 0, qt.doubleHung, dhC)}
+          ${quoteTotalRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors, edC)}
+          <tr class="gt"><td class="b">Grand Total</td><td class="r">${fmtInt(tQty)}</td><td class="r">${fmtInt(tFields)}</td>
+          <td class="r">${fmt(tSqFt)}</td><td class="r">${tNet ? '€' + fmt(tNet) : '—'}</td>
+          <td class="r">${qtSum('full') ? fmt(qtSum('full')) : '—'}</td><td class="r">${qtSum('pct') ? fmt(qtSum('pct')) : '—'}</td>
+          <td class="r">${qtSum('final') ? fmt(qtSum('final')) : '—'}</td><td class="r">${qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—'}</td>
+          <td class="r cb">${gtC.full ? '€' + fmt(gtC.full) : '—'}</td><td class="r cb">${gtC.disc ? '€' + fmt(gtC.disc) : '—'}</td>
+          <td class="r cg">${gtC.final ? fmt(gtC.final) : '—'}</td><td class="r cp">${gtC.finalAdj ? fmt(gtC.finalAdj) : '—'}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  ${(() => {
+    const ao = s.addOns || {} as any;
+    const v = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
+    const addOnRow = (label: string, key: string, hasQty: boolean, details: string) => `
+      <tr><td class="b">${label}</td><td class="r">${hasQty ? v(key, 'qty') : '—'}</td><td colspan="2">${details}</td>
+      <td class="r">${v(key, 'netEuro')}</td><td class="r">${v(key, 'full')}</td><td class="r">${v(key, 'pct')}</td><td class="r">${v(key, 'final')}</td>
+      <td class="r cb">${v(key, 'calcFull')}</td><td class="r cb">${v(key, 'calcDisc')}</td><td class="r cg">${v(key, 'calcFinal')}</td></tr>`;
+    return `
+  <div class="section-card">
+    <div class="heading">Add-On Items</div>
+    <div class="body" style="padding:0">
+      <table>
+        <thead><tr>
+          <th>Item</th><th class="r">Qty</th><th colspan="2">Details</th><th class="r">NET €</th>
+          <th class="r">Full</th><th class="r">%</th><th class="r">Final</th>
+          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th>
+        </tr></thead>
+        <tbody>
+          ${addOnRow('Window Screens', 'windowScreens', true, `Frame: ${v('windowScreens', 'frameType')} | Mesh: ${v('windowScreens', 'meshType')}`)}
+          ${addOnRow('Door Screen Sash', 'doorScreenSash', true, `Wood Frame: ${v('doorScreenSash', 'woodFrame')} | Mesh: ${v('doorScreenSash', 'meshType')}`)}
+          ${addOnRow('Entry Door', 'entryDoor', true, '—')}
+          ${addOnRow('Jamb Extensions', 'jambExtensions', false, '—')}
+          ${addOnRow('Magnetic Contact', 'magneticContact', false, '—')}
+          ${addOnRow('Final Finish', 'finalFinish', false, '—')}
+          ${addOnRow('Installation', 'installation', false, '—')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+  })()}
+</div>
+
+</body></html>`;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => { printWindow.print(); };
   };
 
   const handleSaveSummary = () => {
@@ -1748,7 +2085,7 @@ export default function SummaryPage() {
             <h3 className="text-lg font-medium text-gray-900">Summary Records</h3>
             <div className="flex gap-3">
               <button
-                onClick={createNewSummary}
+                onClick={openOpportunityPicker}
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -1929,6 +2266,78 @@ export default function SummaryPage() {
       </div>
     </div>
 
+    {/* Opportunity Picker Modal */}
+    {showOpportunityPicker && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Select Opportunity</h2>
+              <p className="text-sm text-gray-600 mt-1">Choose an Opportunity to link to this Summary</p>
+            </div>
+            <button
+              onClick={() => setShowOpportunityPicker(false)}
+              className="p-2 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4">
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search opportunities..."
+                value={opportunitySearch}
+                onChange={(e) => setOpportunitySearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+              {loadingOpportunities ? (
+                <div className="p-6 text-center text-gray-500">
+                  <div className="animate-spin w-6 h-6 border-2 border-brand-navy border-t-transparent rounded-full mx-auto mb-2" />
+                  Loading opportunities...
+                </div>
+              ) : opportunityRecords.filter(r => {
+                if (!opportunitySearch) return true;
+                const q = opportunitySearch.toLowerCase();
+                const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                return name.includes(q) || num.includes(q);
+              }).length === 0 ? (
+                <div className="p-6 text-center text-gray-500">
+                  <p className="text-sm">No opportunities found</p>
+                </div>
+              ) : (
+                opportunityRecords.filter(r => {
+                  if (!opportunitySearch) return true;
+                  const q = opportunitySearch.toLowerCase();
+                  const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                  const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                  return name.includes(q) || num.includes(q);
+                }).map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleOpportunitySelected(r)}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">
+                      {r.opportunityNumber || r.Opportunity__opportunityNumber || 'No Number'}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {r.opportunityName || r.Opportunity__opportunityName || 'Unnamed'}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1940,7 +2349,7 @@ export default function SummaryPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={handlePrintPDF}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Printer className="w-4 h-4 mr-2" />
@@ -2106,6 +2515,220 @@ export default function SummaryPage() {
                     </div>
                   </div>
 
+                  {/* Product Specifications */}
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Product Specifications</h3>
+                      <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
+                    </div>
+                    <div className="p-6 space-y-5">
+                      {/* Row 1: Product (auto-filled) */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                          {editingSummary.jobType || '—'}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Type on Page 1</p>
+                      </div>
+
+                      {/* Row 2: Product Type + Dependent Options */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+                        <select
+                          value={editingSummary.productType || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, productType: e.target.value, productTypeOptions: [] })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                        >
+                          <option value="">Select product type...</option>
+                          <option value="Double Hung Windows">Double Hung Windows</option>
+                          <option value="Inswing Windows">Inswing Windows</option>
+                          <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                          <option value="Swing Doors">Swing Doors</option>
+                          <option value="Lift Rolling Door">Lift Rolling Door</option>
+                        </select>
+                      </div>
+
+                      {editingSummary.productType && (() => {
+                        const optionsMap: Record<string, string[]> = {
+                          'Double Hung Windows': [
+                            '59 mm Sash',
+                            '66 mm Sash',
+                            '72 mm Sash',
+                            'Concealed Balance',
+                            'Weight and Chain Balance',
+                          ],
+                          'Inswing Windows': [
+                            'Concealed Corrosion Resistant',
+                          ],
+                          'Flush Outswing Windows': [
+                            'Corrosion Resistant Rough Hardware',
+                            'Hinge Finials',
+                          ],
+                          'Swing Doors': [
+                            'Siegenia Rough Hardware',
+                            'KFV Rough Hardware',
+                            'Hinge Finials',
+                            'Bronze Threshold',
+                          ],
+                          'Lift Rolling Door': [
+                            'Standard Hardware',
+                            'Stainless Steel Hardware',
+                          ],
+                        };
+                        const options = optionsMap[editingSummary.productType] || [];
+                        const selected = editingSummary.productTypeOptions || [];
+
+                        const toggle = (opt: string) => {
+                          const next = selected.includes(opt)
+                            ? selected.filter(o => o !== opt)
+                            : [...selected, opt];
+                          setEditingSummary({ ...editingSummary, productTypeOptions: next });
+                        };
+
+                        return (
+                          <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              {editingSummary.productType} Options
+                            </label>
+                            <div className="space-y-2">
+                              {options.map(opt => (
+                                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.includes(opt)}
+                                    onChange={() => toggle(opt)}
+                                    className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                  />
+                                  <span className="text-sm text-gray-700">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 3: Wood Type + Finish */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
+                          <select
+                            value={editingSummary.woodType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select wood type...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
+                          <select
+                            value={editingSummary.finish || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, finish: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select finish...</option>
+                            <option value="200">Same finish inside and outside (paint/paint or stain/stain) 200</option>
+                            <option value="510">Partial Split Finish (stain or painted exterior/clear or white dip interior) 510</option>
+                            <option value="610">Stain Exterior/Clear dip interior (Clear dip is considered &quot;no finish&quot;) 610</option>
+                            <option value="500">Split paint finish &amp; paint exterior Stain Interior 500</option>
+                            <option value="600">Split stain finish (Different stain colors inside and outside) 600</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Glass Type + Muntin Type */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                          <select
+                            value={editingSummary.glassType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select glass type...</option>
+                            {['1','2','2.1','3','4','5','6','7','7.1','7.2','8','9','10','11','12','13','14','15','17','18','22','22.1','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40'].map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Muntin Type</label>
+                          <select
+                            value={editingSummary.muntinType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, muntinType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select muntin type...</option>
+                            <option value="SDL">SDL</option>
+                            <option value="TDL">TDL</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 4: Spacer Bars + Spacer Bar Colors */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
+                          <select
+                            value={editingSummary.spacerBars || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bars...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
+                          <select
+                            value={editingSummary.spacerBarColors || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar colors...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row: Project Contains */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Project Contains</label>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {['Sliding Doors', 'Big Units', 'Requires Site Measurements'].map(opt => {
+                            const selected = editingSummary.projectContains || [];
+                            return (
+                              <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.includes(opt)}
+                                  onChange={() => {
+                                    const next = selected.includes(opt)
+                                      ? selected.filter((o: string) => o !== opt)
+                                      : [...selected, opt];
+                                    setEditingSummary({ ...editingSummary, projectContains: next });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Aggregate Summary Tables — side by side */}
                   {(() => {
                     const sumField = (rows: (SummaryRow | DoorRow)[], field: string) =>
@@ -2152,13 +2775,29 @@ export default function SummaryPage() {
                     };
 
                     return (
+                      <>
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                           <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: '11%' }} />
+                              <col style={{ width: '5%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                            </colgroup>
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
@@ -2251,7 +2890,191 @@ export default function SummaryPage() {
                           </table>
                         </div>
                       </div>
-                    );
+
+                      {/* ── Add-On Items ── */}
+                      {(() => {
+                        const ao = editingSummary.addOns || {} as any;
+                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
+                        const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
+                        const setAo = (key: string, field: string, value: string) => {
+                          setEditingSummary({
+                            ...editingSummary,
+                            addOns: {
+                              ...ao,
+                              windowScreens: ao.windowScreens || defaultAo,
+                              doorScreenSash: ao.doorScreenSash || defaultAo,
+                              entryDoor: ao.entryDoor || defaultAo,
+                              jambExtensions: ao.jambExtensions || defaultAo,
+                              magneticContact: ao.magneticContact || defaultAo,
+                              finalFinish: ao.finalFinish || defaultAo,
+                              installation: ao.installation || defaultAo,
+                              [key]: { ...getAo(key), [field]: value },
+                            },
+                          });
+                        };
+
+                        const inp = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        const inpLeft = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
+                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                              <h3 className="text-lg font-semibold text-gray-900">Add-On Items</h3>
+                              <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                                <colgroup>
+                                  <col style={{ width: '11%' }} />
+                                  <col style={{ width: '5%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                </colgroup>
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {/* Window Screens */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('windowScreens', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Door Screen Sash */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('doorScreenSash', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Entry Door */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('entryDoor', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Jamb Extensions */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('jambExtensions', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Magnetic Contact */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('magneticContact', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Final Finish */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('finalFinish', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Installation */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('installation', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>);
                   })()}
                 </div>
               )}
@@ -2327,10 +3150,9 @@ export default function SummaryPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Date <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={editingSummary.date}
-                    onChange={(e) => setEditingSummary({ ...editingSummary, date: e.target.value })}
+                    onChange={(iso) => setEditingSummary({ ...editingSummary, date: iso })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   />
                 </div>

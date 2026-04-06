@@ -84,13 +84,13 @@ const CORE_OBJECTS = [
     ],
   },
   {
-    apiName: 'Deal',
-    label: 'Deal',
-    pluralLabel: 'Deals',
-    description: 'Sales opportunities and deals',
+    apiName: 'Opportunity',
+    label: 'Opportunity',
+    pluralLabel: 'Opportunities',
+    description: 'Sales opportunities',
     fields: [
-      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', unique: true },
-      { apiName: 'dealName', label: 'Deal Name', type: 'Text', required: true },
+      { apiName: 'opportunityNumber', label: 'Opportunity Number', type: 'Text', unique: true },
+      { apiName: 'opportunityName', label: 'Opportunity Name', type: 'Text', required: true },
       { apiName: 'amount', label: 'Amount', type: 'Currency' },
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
@@ -150,6 +150,22 @@ const CORE_OBJECTS = [
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Scheduled' },
     ],
   },
+  {
+    apiName: 'WorkOrder',
+    label: 'Work Order',
+    pluralLabel: 'Work Orders',
+    description: 'Scheduled work orders for service and maintenance',
+    fields: [
+      { apiName: 'workOrderNumber', label: 'Work Order Number', type: 'Text', unique: true },
+      { apiName: 'name', label: 'Work Order', type: 'Text' },
+      { apiName: 'title', label: 'Title', type: 'TextArea' },
+      { apiName: 'workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
+      { apiName: 'workStatus', label: 'Work Status', type: 'Picklist', picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
+      { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
+      { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
+      { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
+    ],
+  },
 ];
 
 /**
@@ -160,6 +176,13 @@ const CORE_OBJECTS = [
  */
 export async function ensureCoreObjects(): Promise<void> {
   console.log('[ensure-core-objects] Checking core objects...');
+
+  // Clean up renamed objects (Deal→Opportunity rename)
+  const legacyDeal = await prisma.customObject.findFirst({ where: { apiName: 'Deal' } });
+  if (legacyDeal) {
+    await prisma.customObject.delete({ where: { id: legacyDeal.id } });
+    console.log('[ensure-core-objects] Removed legacy Deal object (renamed to Opportunity)');
+  }
 
   // Grab any existing user to use as the creator/modifier
   let systemUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
@@ -256,8 +279,8 @@ export async function ensureCoreObjects(): Promise<void> {
   try {
     const autoNumberFieldNames = [
       'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
-      'dealNumber', 'productCode', 'projectNumber', 'quoteNumber',
-      'serviceNumber', 'installationNumber',
+      'opportunityNumber', 'productCode', 'projectNumber', 'quoteNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber',
     ];
     await prisma.customField.updateMany({
       where: {
@@ -283,6 +306,26 @@ export async function ensureCoreObjects(): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);
+  }
+
+  // Fix: ensure Lead 'property' lookup field is required.
+  // Every Lead must be linked to a Property so Dropbox folder auto-creation works.
+  try {
+    const leadObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+    });
+    if (leadObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: leadObj.id,
+          apiName: 'property',
+          required: false,
+        },
+        data: { required: true },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
   }
 
   // Also sync any user-created objects from the schema settings to the DB.

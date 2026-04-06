@@ -32,6 +32,8 @@ import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
 import { widgetRoutes } from './routes/widgets.js';
 import { externalWidgetRouteModules } from './widgets/external/registry.js';
+import { dropboxRoutes } from './routes/dropbox.js';
+import { outlookRoutes } from './routes/outlook.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -87,6 +89,11 @@ export function buildApp() {
     credentials: false,
   });
 
+  // Allow raw binary uploads (used by Dropbox file upload)
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   // Serve Next.js static files (if built)
   const nextStaticPath = path.join(__dirname, '../../web/.next/static');
   if (fs.existsSync(nextStaticPath)) {
@@ -97,7 +104,7 @@ export function buildApp() {
   }
 
   // ── Health check ──────────────────────────────────────────────────────────
-  app.get('/health', async () => ({ ok: true, version: '2026-03-18-user-management' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-24-v4' }));
 
   // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
@@ -359,6 +366,7 @@ export function buildApp() {
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
+    if (routeUrl === '/dropbox/callback') return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -394,7 +402,7 @@ export function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'];
+    const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products'];
     const APP_KEYS = [
       'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
       'exportData','importData',
@@ -444,6 +452,8 @@ export function buildApp() {
   app.register(integrationRoutes);
   app.register(placesRoutes);
   app.register(widgetRoutes);
+  app.register(dropboxRoutes);
+  app.register(outlookRoutes);
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/
   for (const { widgetId, registerRoutes } of externalWidgetRouteModules) {

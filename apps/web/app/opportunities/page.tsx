@@ -37,10 +37,10 @@ import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 
-interface Deal {
+interface Opportunity {
   id: string;
-  dealNumber: string;
-  dealName: string;
+  opportunityNumber: string;
+  opportunityName: string;
   accountName: string;
   stage: string;
   value: number;
@@ -65,9 +65,10 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/opportunities' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
+  { name: 'Work Orders', href: '/workorders' },
 ];
 
 const financialModules = [
@@ -82,8 +83,8 @@ const analyticsModules = [
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
-export default function DealsPage() {
-  const [deals, setDeals] = useState<Deal[]>([]);
+export default function OpportunitiesPage() {
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -104,9 +105,9 @@ export default function DealsPage() {
   const { schema } = useSchemaStore();
   const { user } = useAuth();
   const { canAccess } = usePermissions();
-  const canCreateDeal = canAccess('Deal', 'create');
-  const canEditDeal = canAccess('Deal', 'edit');
-  const canDeleteDeal = canAccess('Deal', 'delete');
+  const canCreate = canAccess('Opportunity', 'create');
+  const canEdit = canAccess('Opportunity', 'edit');
+  const canDelete = canAccess('Opportunity', 'delete');
   
   const [editMode, setEditMode] = useState(false);
   const [tabs, setTabs] = useState<Array<{ name: string; href: string }>>([]);
@@ -118,20 +119,20 @@ export default function DealsPage() {
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
-  // Check if Deal object exists with page layouts
-  const dealObject = schema?.objects.find(obj => obj.apiName === 'Deal');
-  const isLookupLoaded = useLookupPreloader(dealObject);
-  const objectLabel = dealObject?.label || 'Deal';
-  const objectPluralLabel = dealObject?.pluralLabel || objectLabel + 's';
-  const pageLayouts = dealObject?.pageLayouts || [];
+  // Check if Opportunity object exists with page layouts
+  const oppObject = schema?.objects.find(obj => obj.apiName === 'Opportunity');
+  const lookupTick = useLookupPreloader(oppObject);
+  const objectLabel = oppObject?.label || 'Opportunity';
+  const objectPluralLabel = oppObject?.pluralLabel || objectLabel + 's';
+  const pageLayouts = oppObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
   // Dynamically generate available columns from schema
   const AVAILABLE_COLUMNS = useMemo(() => {
-    if (!dealObject?.fields) {
+    if (!oppObject?.fields) {
       return [
-        { id: 'dealNumber', label: 'Deal #', defaultVisible: true },
-        { id: 'dealName', label: 'Deal Name', defaultVisible: true },
+        { id: 'opportunityNumber', label: 'Opp #', defaultVisible: true },
+        { id: 'opportunityName', label: 'Opportunity Name', defaultVisible: true },
         { id: 'accountName', label: 'Account', defaultVisible: true },
         { id: 'stage', label: 'Stage', defaultVisible: true },
         { id: 'value', label: 'Value', defaultVisible: true },
@@ -145,8 +146,8 @@ export default function DealsPage() {
       ];
     }
 
-    return dealObject.fields.map((field, index) => {
-      const cleanApiName = field.apiName.replace('Deal__', '');
+    return oppObject.fields.map((field, index) => {
+      const cleanApiName = field.apiName.replace('Opportunity__', '');
       const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
       const defaultVisible = !isSystemField && index < 10;
       
@@ -156,13 +157,13 @@ export default function DealsPage() {
         defaultVisible
       };
     });
-  }, [dealObject]);
+  }, [oppObject]);
 
   // Load and persist layout selection
   useEffect(() => {
     if (hasPageLayout && !selectedLayoutId) {
       (async () => {
-        const savedLayoutId = await getPreference<string>('dealSelectedLayoutId');
+        const savedLayoutId = await getPreference<string>('opportunitySelectedLayoutId');
         if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
           setSelectedLayoutId(savedLayoutId);
         } else if (pageLayouts.length > 0) {
@@ -207,22 +208,22 @@ export default function DealsPage() {
     })();
   }, [schema]);
 
-  const fetchDeals = useCallback(async () => {
+  const fetchOpportunities = useCallback(async () => {
     try {
       setLoading(true);
       setFetchError(null);
-      const records = await recordsService.getRecords('Deal');
+      const records = await recordsService.getRecords('Opportunity');
       const flattenedRecords = recordsService.flattenRecords(records).map(record => ({
         ...record,
-        dealNumber: record.dealNumber || '',
+        opportunityNumber: record.opportunityNumber || '',
         createdBy: record.createdBy || 'System',
         createdAt: record.createdAt || new Date().toISOString(),
         lastModifiedBy: record.modifiedBy || 'System',
         lastModifiedAt: record.updatedAt || new Date().toISOString(),
       }));
-      setDeals(flattenedRecords as Deal[]);
+      setOpportunities(flattenedRecords as Opportunity[]);
     } catch (error) {
-      console.error('Failed to fetch deals from API:', error);
+      console.error('Failed to fetch opportunities from API:', error);
       setFetchError('Failed to load data. Please try refreshing the page.');
     } finally {
       setLoading(false);
@@ -231,7 +232,7 @@ export default function DealsPage() {
 
   useEffect(() => {
     (async () => {
-      const storedColumns = await getPreference<string[]>('dealsVisibleColumns');
+      const storedColumns = await getPreference<string[]>('opportunitiesVisibleColumns');
       if (storedColumns) {
         setVisibleColumns(storedColumns);
       } else {
@@ -240,9 +241,9 @@ export default function DealsPage() {
           .map(col => col.id);
         setVisibleColumns(defaultColumns);
       }
-      fetchDeals();
+      fetchOpportunities();
     })();
-  }, [fetchDeals]);
+  }, [fetchOpportunities]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -253,9 +254,9 @@ export default function DealsPage() {
     }
   };
 
-  const filteredDeals = deals.filter(deal => {
+  const filteredOpportunities = opportunities.filter(opp => {
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || Object.values(deal).some(value => {
+    const matchesSearch = !searchTerm || Object.values(opp).some(value => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
       if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);
@@ -268,13 +269,13 @@ export default function DealsPage() {
     
     switch (sidebarFilter) {
       case 'recent':
-        matchesSidebar = new Date(deal.lastModifiedAt) >= thirtyDaysAgo;
+        matchesSidebar = new Date(opp.lastModifiedAt) >= thirtyDaysAgo;
         break;
       case 'created-by-me':
-        matchesSidebar = deal.createdBy === 'Development User';
+        matchesSidebar = opp.createdBy === 'Development User';
         break;
       case 'favorites':
-        matchesSidebar = (deal as any).isFavorite === true;
+        matchesSidebar = (opp as any).isFavorite === true;
         break;
       case 'all':
       default:
@@ -324,7 +325,7 @@ export default function DealsPage() {
       : [...visibleColumns, columnId];
     
     setVisibleColumns(newVisibleColumns);
-    setPreference('dealsVisibleColumns', newVisibleColumns);
+    setPreference('opportunitiesVisibleColumns', newVisibleColumns);
   };
 
   const handleColumnDragStart = (index: number) => {
@@ -348,14 +349,14 @@ export default function DealsPage() {
 
   const handleColumnDragEnd = () => {
     setDraggedColumnIndex(null);
-    setPreference('dealsVisibleColumns', visibleColumns);
+    setPreference('opportunitiesVisibleColumns', visibleColumns);
   };
 
   const handleAddColumn = (columnId: string) => {
     if (!visibleColumns.includes(columnId)) {
       const newVisibleColumns = [...visibleColumns, columnId];
       setVisibleColumns(newVisibleColumns);
-      setPreference('dealsVisibleColumns', newVisibleColumns);
+      setPreference('opportunitiesVisibleColumns', newVisibleColumns);
     }
     setShowAddColumn(false);
   };
@@ -363,7 +364,7 @@ export default function DealsPage() {
   const handleRemoveColumn = (columnId: string) => {
     const newVisibleColumns = visibleColumns.filter(id => id !== columnId);
     setVisibleColumns(newVisibleColumns);
-    setPreference('dealsVisibleColumns', newVisibleColumns);
+    setPreference('opportunitiesVisibleColumns', newVisibleColumns);
   };
 
   const handleResetColumns = () => {
@@ -371,19 +372,19 @@ export default function DealsPage() {
       .filter(col => col.defaultVisible)
       .map(col => col.id);
     setVisibleColumns(defaultColumns);
-    setPreference('dealsVisibleColumns', defaultColumns);
+    setPreference('opportunitiesVisibleColumns', defaultColumns);
   };
 
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
-  const formatColumnValue = (deal: Deal, columnId: string) => {
-    void isLookupLoaded; // re-render after lookup cache loads
-    let value = (deal as any)[columnId];
+  const formatColumnValue = (opp: Opportunity, columnId: string) => {
+    void lookupTick; // re-render after lookup cache loads
+    let value = (opp as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value
-    const schemaFieldForFormula = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
+    const schemaFieldForFormula = oppObject?.fields?.find(f => f.apiName === `Opportunity__${columnId}` || f.apiName === columnId);
     if (schemaFieldForFormula?.type === 'Formula' && schemaFieldForFormula.formulaExpr) {
-      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, deal as any, dealObject);
+      const computed = evaluateFormulaForRecord(schemaFieldForFormula.formulaExpr, opp as any, oppObject);
       if (computed !== null && computed !== undefined) return String(computed);
       return '-';
     }
@@ -407,7 +408,7 @@ export default function DealsPage() {
     }
 
     if (typeof value === 'object') {
-      const schemaField = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
+      const schemaField = oppObject?.fields?.find(f => f.apiName === `Opportunity__${columnId}` || f.apiName === columnId);
       const fieldType = schemaField?.type;
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
@@ -421,16 +422,16 @@ export default function DealsPage() {
     }
     
     // Route remaining values through formatFieldValue for field-type-aware display
-    const schemaFieldFinal = dealObject?.fields?.find(f => f.apiName === `Deal__${columnId}` || f.apiName === columnId);
+    const schemaFieldFinal = oppObject?.fields?.find(f => f.apiName === `Opportunity__${columnId}` || f.apiName === columnId);
     if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
   };
 
   const handleDynamicFormSubmit = async (data: Record<string, any>, layoutId?: string) => {
     try {
-      // Map schema field names (e.g., Deal__dealName) to simple field names
+      // Map schema field names (e.g., Opportunity__opportunityName) to simple field names
       const normalizeFieldName = (fieldName: string): string => {
-        return fieldName.replace('Deal__', '');
+        return fieldName.replace('Opportunity__', '');
       };
 
       // Create normalized data object with simple field names
@@ -440,30 +441,31 @@ export default function DealsPage() {
         normalizedData[cleanKey] = value;
       });
 
-      // Generate unique deal number
-      const existingNumbers = deals
-        .map(d => d.dealNumber)
-        .filter(num => num.startsWith('DEAL'))
-        .map(num => parseInt(num.replace(/^DEAL-?/, ''), 10))
+      // Generate unique opportunity number
+      const existingNumbers = opportunities
+        .map(d => d.opportunityNumber)
+        .filter(num => num && num.startsWith('OPP'))
+        .map(num => parseInt(num.replace(/^OPP-?/, ''), 10))
         .filter(num => !isNaN(num));
       
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
-      const dealNumber = `DEAL${String(nextNumber).padStart(3, '0')}`;
+      const opportunityNumber = `OPP${String(nextNumber).padStart(4, '0')}`;
+
       
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
       
       const recordData = {
         ...normalizedData,
-        dealNumber,
+        opportunityNumber,
       };
 
-      const result = await recordsService.createRecord('Deal', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
+      const result = await recordsService.createRecord('Opportunity', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
       
-      const newDeal: Deal = {
+      const newOpp: Opportunity = {
         id: result.id,
-        dealNumber,
+        opportunityNumber,
         ...normalizedData,
         createdBy: currentUserName,
         createdAt: today,
@@ -471,37 +473,37 @@ export default function DealsPage() {
         lastModifiedAt: today
       };
 
-      const updatedDeals = [newDeal, ...deals];
-      setDeals(updatedDeals);
+      const updatedOpps = [newOpp, ...opportunities];
+      setOpportunities(updatedOpps);
       
       setShowDynamicForm(false);
       setSelectedLayoutId(null);
-      router.push(`/deals/${result.id}`);
+      router.push(`/opportunities/${result.id}`);
     } catch (error) {
-      console.error('Failed to create deal:', error);
+      console.error('Failed to create opportunity:', error);
       throw error;
     }
   };
 
-  const handleDeleteDeal = async (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm(`Are you sure you want to delete this ${objectLabel.toLowerCase()}?`)) {
       try {
-        await recordsService.deleteRecord('Deal', id);
-        const updatedDeals = deals.filter(d => d.id !== id);
-        setDeals(updatedDeals);
+        await recordsService.deleteRecord('Opportunity', id);
+        const updatedOpps = opportunities.filter(d => d.id !== id);
+        setOpportunities(updatedOpps);
       } catch (error) {
-        console.error('Failed to delete deal from API, trying locally:', error);
-        const updatedDeals = deals.filter(d => d.id !== id);
-        setDeals(updatedDeals);
+        console.error('Failed to Delete Opportunity from API, trying locally:', error);
+        const updatedOpps = opportunities.filter(d => d.id !== id);
+        setOpportunities(updatedOpps);
       }
     }
   };
 
   const handleToggleFavorite = (id: string) => {
-    const updatedDeals = deals.map(d => 
+    const updatedOpps = opportunities.map(d => 
       d.id === id ? { ...d, isFavorite: !d.isFavorite } : d
     );
-    setDeals(updatedDeals);
+    setOpportunities(updatedOpps);
     setOpenDropdown(null);
   };
 
@@ -556,7 +558,7 @@ export default function DealsPage() {
     );
   }
 
-  if (!canAccess('Deal', 'read')) {
+  if (!canAccess('Opportunity', 'read')) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -644,7 +646,7 @@ export default function DealsPage() {
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
             </button>
-            {canCreateDeal && (
+            {canCreate && (
             <button
               onClick={() => {
                 if (!hasPageLayout) {
@@ -688,7 +690,7 @@ export default function DealsPage() {
             <button onClick={() => { setFetchError(null); window.location.reload(); }} className="text-sm text-red-600 hover:text-red-800 font-medium">Retry</button>
           </div>
         )}
-        {/* Deals List */}
+        {/* opportunities List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
             <table className="w-full divide-y divide-gray-200">
@@ -719,51 +721,51 @@ export default function DealsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredDeals.map((deal) => (
-                  <tr key={deal.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/deals/${deal.id}`)}>
+                {filteredOpportunities.map((opp) => (
+                  <tr key={opp.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/opportunities/${opp.id}`)}>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
                       return (
                         <td key={column.id} className="px-6 py-4 text-sm text-gray-900">
-                          {column.id === 'dealNumber' ? (
-                            <Link href={`/deals/${deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
-                              {deal.dealNumber}
+                          {column.id === 'opportunityNumber' ? (
+                            <Link href={`/opportunities/${opp.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                              {opp.opportunityNumber}
                             </Link>
-                          ) : column.id === 'dealName' ? (
-                            <Link href={`/deals/${deal.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
-                              {deal.dealName}
+                          ) : column.id === 'opportunityName' ? (
+                            <Link href={`/opportunities/${opp.id}`} className="font-medium text-brand-navy hover:text-brand-dark">
+                              {opp.opportunityName}
                             </Link>
                           ) : column.id === 'stage' ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              deal.stage === 'Closed Won' ? 'bg-green-100 text-green-800' :
-                              deal.stage === 'Closed Lost' ? 'bg-red-100 text-red-800' :
-                              deal.stage === 'Negotiation' ? 'bg-blue-100 text-blue-800' :
-                              deal.stage === 'Contract Review' ? 'bg-[#e8eaf6] text-brand-dark' :
+                              opp.stage === 'Closed Won' ? 'bg-green-100 text-green-800' :
+                              opp.stage === 'Closed Lost' ? 'bg-red-100 text-red-800' :
+                              opp.stage === 'Negotiation' ? 'bg-blue-100 text-blue-800' :
+                              opp.stage === 'Contract Review' ? 'bg-[#e8eaf6] text-brand-dark' :
                               'bg-yellow-100 text-yellow-800'
                             }`}>
-                              {deal.stage}
+                              {opp.stage}
                             </span>
                           ) : (
-                            formatColumnValue(deal, column.id)
+                            formatColumnValue(opp, column.id)
                           )}
                         </td>
                       );
                     })}
                     <td className="px-6 py-4 text-sm relative" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => setOpenDropdown(openDropdown === deal.id ? null : deal.id)}
+                        onClick={() => setOpenDropdown(openDropdown === opp.id ? null : opp.id)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                       >
                         <MoreVertical className="w-5 h-5 text-gray-600" />
                       </button>
-                      {openDropdown === deal.id && (
+                      {openDropdown === opp.id && (
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
                           <div className="py-1">
-                            {canEditDeal && (
+                            {canEdit && (
                             <button
                               onClick={() => {
-                                router.push(`/deals/${deal.id}`);
+                                router.push(`/opportunities/${opp.id}`);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-brand-navy hover:bg-[#f0f1fa]"
@@ -772,10 +774,10 @@ export default function DealsPage() {
                               Edit
                             </button>
                             )}
-                            {canDeleteDeal && (
+                            {canDelete && (
                             <button
                               onClick={() => {
-                                handleDeleteDeal(deal.id);
+                                handleDelete(opp.id);
                                 setOpenDropdown(null);
                               }}
                               className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
@@ -790,10 +792,10 @@ export default function DealsPage() {
                     </td>
                     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                       <button
-                        onClick={() => handleToggleFavorite(deal.id)}
+                        onClick={() => handleToggleFavorite(opp.id)}
                         className="p-1 hover:bg-gray-100 rounded transition-colors"
                       >
-                        <Star className={`w-5 h-5 ${deal.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
+                        <Star className={`w-5 h-5 ${opp.isFavorite ? 'fill-yellow-400 text-yellow-400' : 'text-gray-400'}`} />
                       </button>
                     </td>
                   </tr>
@@ -803,7 +805,7 @@ export default function DealsPage() {
           </div>
         </div>
 
-        {filteredDeals.length === 0 && (
+        {filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
             <Target className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No {objectPluralLabel.toLowerCase()} found</h3>
@@ -826,7 +828,7 @@ export default function DealsPage() {
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-gray-700">
                   <p className="mb-3">
-                    To create new deals, you need to configure a page layout in the Page Editor first.
+                    To create new opportunities, you need to configure a page layout in the Page Editor first.
                   </p>
                   <p className="font-medium text-gray-900">
                     This allows you to:
@@ -848,7 +850,7 @@ export default function DealsPage() {
                 Cancel
               </button>
               <Link
-                href="/object-manager/Deal"
+                href="/object-manager/Opportunity"
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                 onClick={() => setShowNoLayoutsDialog(false)}
               >
@@ -867,7 +869,7 @@ export default function DealsPage() {
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Choose which form layout to use for creating a new deal
+                Choose which form layout to use for creating a New Opportunity
               </p>
             </div>
             <div className="p-6 space-y-3">
@@ -876,7 +878,7 @@ export default function DealsPage() {
                   key={layout.id}
                   onClick={() => {
                     setSelectedLayoutId(layout.id);
-                    setPreference('dealSelectedLayoutId', layout.id);
+                    setPreference('opportunitySelectedLayoutId', layout.id);
                     setShowLayoutSelector(false);
                     setShowDynamicForm(true);
                   }}
@@ -918,12 +920,12 @@ export default function DealsPage() {
               setPrefillData({});
             }
           }}
-          objectApiName="Deal"
+          objectApiName="Opportunity"
           layoutType="create"
           layoutId={selectedLayoutId}
           recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
-          title="New Deal"
+          title="New Opportunity"
         />
       )}
 

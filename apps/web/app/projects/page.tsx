@@ -64,9 +64,10 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/opportunities' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
+  { name: 'Work Orders', href: '/workorders' },
 ];
 
 const financialModules = [
@@ -177,7 +178,7 @@ export default function ProjectsPage() {
 
       if (schema?.objects) {
         const customObjs = schema.objects
-          .filter((obj: any) => !['Project', 'Contact', 'Account', 'Lead', 'Deal', 'Quote', 'Installation', 'Service', 'Product', 'Property'].includes(obj.apiName))
+          .filter((obj: any) => !['Project', 'Contact', 'Account', 'Lead', 'Opportunity', 'Quote', 'Installation', 'Service', 'Product', 'Property'].includes(obj.apiName))
           .map((obj: any) => ({
             name: obj.label,
             href: `/${obj.apiName.toLowerCase()}`

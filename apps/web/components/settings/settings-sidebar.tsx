@@ -17,7 +17,6 @@ import {
   ShieldAlert,
   Bell,
   WifiOff,
-  Zap,
   Plug,
   Puzzle,
   Search,
@@ -66,12 +65,6 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell, disabled: true },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
-    ],
-  },
-  {
-    title: 'Automation',
-    items: [
-      { name: 'Process Automation', href: '/automations', icon: Zap },
     ],
   },
 ];
@@ -152,10 +145,11 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           <input
-            type="text"
+            type="search"
             placeholder="Search settings..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            autoComplete="off"
             className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-gray-300 transition-colors"
           />
           {searchQuery && (

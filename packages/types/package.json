@@ -2,9 +2,13 @@
   "name": "@crm/types",
   "version": "0.0.1",
   "private": true,
-  "types": "src/index.ts",
+  "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

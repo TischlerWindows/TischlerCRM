@@ -14,6 +14,8 @@ import {
   EyeOff,
   AlertCircle,
   ExternalLink,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -218,10 +220,13 @@ interface ConfigPanelProps {
 
 function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProps) {
   const authType = integration.config?.authType || 'api_key';
+  const isOutlook = integration.provider === 'outlook';
   const [enabled, setEnabled] = useState(integration.enabled);
   const [apiKey, setApiKey] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [tenantId, setTenantId] = useState((integration.config?.tenantId as string) || '');
+  const [senderEmail, setSenderEmail] = useState((integration.config?.senderEmail as string) || '');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -236,6 +241,15 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
       } else {
         if (clientId.trim()) payload.clientId = clientId.trim();
         if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
+      }
+
+      // Save Outlook-specific config (tenantId + senderEmail) via config merge
+      if (isOutlook) {
+        payload.config = {
+          ...(integration.config || {}),
+          tenantId: tenantId.trim(),
+          senderEmail: senderEmail.trim(),
+        };
       }
 
       await apiClient.updateIntegration(integration.provider, payload);
@@ -283,6 +297,10 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
         </span>
       </label>
 
+      {/* Hidden honeypot fields to absorb browser autofill */}
+      <input type="text" name="prevent_autofill_username" autoComplete="username" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+      <input type="password" name="prevent_autofill_password" autoComplete="current-password" style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
+
       {/* Credentials — API key vs OAuth */}
       {authType === 'api_key' ? (
         <div className="mb-4">
@@ -292,6 +310,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type={showKey ? 'text' : 'password'}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="new-password"
               placeholder={integration.hasApiKey ? '••••••••  (already set — enter new to replace)' : 'Paste your API key'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -317,6 +336,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               type="text"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
+              autoComplete="new-password"
               placeholder={integration.hasClientId ? '(already set — enter new to replace)' : 'OAuth Client ID'}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
             />
@@ -328,6 +348,7 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
                 type={showKey ? 'text' : 'password'}
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}
+                autoComplete="new-password"
                 placeholder={integration.hasClientSecret ? '••••••••  (already set)' : 'OAuth Client Secret'}
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-3 pr-10 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
               />
@@ -340,10 +361,23 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-amber-600 bg-amber-50 rounded-md px-3 py-2 mb-4">
-            OAuth connect flow for {integration.displayName} will be available once client credentials are configured.
-          </p>
+          {!(integration.hasClientId || clientId.trim()) && !isOutlook && (
+            <p className="text-[11px] text-amber-600 bg-amber-50 rounded-md px-3 py-2 mb-4">
+              OAuth connect flow for {integration.displayName} will be available once client credentials are configured.
+            </p>
+          )}
         </>
+      )}
+
+      {/* Outlook-specific: Tenant ID + Sender Email + Test */}
+      {isOutlook && (
+        <OutlookAppOnlySection
+          integration={integration}
+          tenantId={tenantId}
+          setTenantId={setTenantId}
+          senderEmail={senderEmail}
+          setSenderEmail={setSenderEmail}
+        />
       )}
 
       {/* Actions */}
@@ -373,6 +407,94 @@ function ConfigPanel({ integration, onSave, onCancel, onError }: ConfigPanelProp
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Outlook app-only config fields + test ──────────────────────────
+
+function OutlookAppOnlySection({
+  integration,
+  tenantId,
+  setTenantId,
+  senderEmail,
+  setSenderEmail,
+}: {
+  integration: Integration;
+  tenantId: string;
+  setTenantId: (v: string) => void;
+  senderEmail: string;
+  setSenderEmail: (v: string) => void;
+}) {
+  const [sendingTest, setSendingTest] = useState(false);
+  const [testResult, setTestResult] = useState<string | null>(null);
+
+  const handleTestEmail = async () => {
+    setSendingTest(true);
+    setTestResult(null);
+    try {
+      const res = await apiClient.sendOutlookTestEmail();
+      setTestResult(res.message || 'Test email sent!');
+    } catch (err: any) {
+      setTestResult(err.message || 'Failed to send test email');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+      <h4 className="text-xs font-semibold text-brand-dark mb-3 flex items-center gap-1.5">
+        <Mail className="w-3.5 h-3.5" style={{ color: '#0078D4' }} />
+        App-Only Configuration
+      </h4>
+      <p className="text-[11px] text-brand-gray mb-3">
+        Uses application permissions — no personal sign-in required. The Azure AD app needs the <strong>Mail.Send</strong> application permission with admin consent.
+      </p>
+
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-brand-dark mb-1.5">Tenant ID</label>
+        <input
+          type="text"
+          value={tenantId}
+          onChange={(e) => setTenantId(e.target.value)}
+          placeholder="e.g. 12345678-abcd-efgh-ijkl-123456789abc"
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+        />
+        <p className="mt-1 text-[10px] text-brand-gray">Azure AD → App registrations → Overview → Directory (tenant) ID</p>
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-brand-dark mb-1.5">Sender Email</label>
+        <input
+          type="email"
+          value={senderEmail}
+          onChange={(e) => setSenderEmail(e.target.value)}
+          placeholder="e.g. crm@tischlerwindows.com"
+          className="w-full rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm text-brand-dark placeholder:text-gray-400 focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none transition"
+        />
+        <p className="mt-1 text-[10px] text-brand-gray">Shared mailbox or user mailbox that the app will send emails from</p>
+      </div>
+
+      {/* Test button — only works after credentials are saved */}
+      {integration.hasClientId && integration.hasClientSecret && integration.config?.tenantId && integration.config?.senderEmail && (
+        <div className="pt-2 border-t border-gray-200">
+          <div className="flex items-center gap-2 mt-2">
+            <button
+              onClick={handleTestEmail}
+              disabled={sendingTest}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white bg-[#0078D4] hover:bg-[#006CBE] transition disabled:opacity-50"
+            >
+              {sendingTest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Send Test Email
+            </button>
+            <span className="text-[11px] text-brand-gray">Sends a test to your CRM email</span>
+          </div>
+          {testResult && (
+            <p className="mt-2 text-[11px] text-brand-gray">{testResult}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

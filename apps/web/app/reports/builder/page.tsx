@@ -65,16 +65,18 @@ interface ReportFilter {
   value: any;
 }
 
+// Fallback object type definitions — only used when the schema hasn't loaded.
+// The dropdown reads from the live schema when available.
 const OBJECT_TYPES = [
   { value: 'Property', label: 'Properties', fields: ['propertyNumber', 'address', 'propertyType', 'status', 'owner', 'squareFeet', 'bedrooms', 'bathrooms'] },
   { value: 'Contact', label: 'Contacts', fields: ['contactNumber', 'firstName', 'lastName', 'email', 'phone', 'role', 'accountName'] },
   { value: 'Account', label: 'Accounts', fields: ['accountNumber', 'accountName', 'industry', 'type', 'phone', 'website', 'billingAddress'] },
   { value: 'Product', label: 'Products', fields: ['productCode', 'productName', 'category', 'unitPrice', 'stockQuantity', 'inStock', 'supplier'] },
   { value: 'Lead', label: 'Leads', fields: ['leadNumber', 'contactName', 'propertyAddress', 'source', 'stage', 'assignedTo', 'estimatedValue'] },
-  { value: 'Deal', label: 'Deals', fields: ['dealNumber', 'dealName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
+  { value: 'Opportunity', label: 'Opportunities', fields: ['opportunityNumber', 'opportunityName', 'accountName', 'stage', 'value', 'probability', 'closeDate', 'assignedTo'] },
   { value: 'Project', label: 'Projects', fields: ['projectNumber', 'projectName', 'status', 'startDate', 'expectedCompletion', 'assignedTeam', 'budget'] },
   { value: 'Service', label: 'Service', fields: ['serviceNumber', 'serviceName', 'accountName', 'serviceType', 'status', 'scheduledDate', 'priority'] },
-  { value: 'Quote', label: 'Quotes', fields: ['quoteNumber', 'quoteName', 'accountName', 'dealNumber', 'status', 'totalAmount', 'validUntil'] },
+  { value: 'Quote', label: 'Quotes', fields: ['quoteNumber', 'quoteName', 'accountName', 'opportunityNumber', 'status', 'totalAmount', 'validUntil'] },
   { value: 'Installation', label: 'Installations', fields: ['installationNumber', 'installationName', 'accountName', 'projectNumber', 'status', 'startDate', 'leadInstaller'] },
 ];
 
@@ -236,9 +238,12 @@ export default function ReportBuilderPage() {
           // Map records to use clean field names
           records = allRecords.slice(0, 10).map((record: any) => {
             const cleanRecord: any = {};
+            const data = record.data && typeof record.data === 'object' ? record.data : record;
             columns.forEach(col => {
               const cleanField = stripPrefix(col.field, objectType);
-              cleanRecord[col.field] = record[cleanField] || record[col.field];
+              // Try prefixed key in data, then clean key, then top-level fields
+              const prefixedKey = `${objectType}__${cleanField}`;
+              cleanRecord[col.field] = data[prefixedKey] ?? data[cleanField] ?? data[col.field] ?? record[cleanField] ?? record[col.field];
             });
             return cleanRecord;
           });
@@ -485,9 +490,14 @@ export default function ReportBuilderPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
                   >
                     <option value="">Select an object...</option>
-                    {OBJECT_TYPES.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
+                    {(schema?.objects && schema.objects.length > 0
+                      ? schema.objects.map(obj => (
+                          <option key={obj.apiName} value={obj.apiName}>{obj.pluralLabel || obj.label}</option>
+                        ))
+                      : OBJECT_TYPES.map(type => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))
+                    )}
                   </select>
                 </div>
                 

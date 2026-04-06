@@ -188,7 +188,7 @@ class ApiClient {
       // Guard against redirect loop: don't redirect if we're already on /login.
       if (response.status === 401 && typeof window !== 'undefined') {
         this.setToken(null);
-        sessionStorage.removeItem('user');
+        localStorage.removeItem('user');
         document.cookie = 'auth-token=; Max-Age=0; path=/;';
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
@@ -286,6 +286,14 @@ class ApiClient {
 
   async resendUserInvite(id: string): Promise<{ inviteUrl?: string; inviteSent: boolean }> {
     return this.post(`/admin/users/${id}/resend-invite`);
+  }
+
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
+  }
+
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
   }
 
   async getUserLoginHistory(id: string): Promise<LoginEventRow[]> {
@@ -686,6 +694,164 @@ class ApiClient {
         formattedAddress: string;
       };
     }>(`/places/details?${params}`);
+  }
+
+  // ── Outlook / Microsoft ────────────────────────────────────────────────────
+
+  async getOutlookStatus() {
+    return this.request<{
+      enabled: boolean;
+      configured: boolean;
+      connected: boolean;
+      senderEmail: string | null;
+      tenantId: string | null;
+    }>('/outlook/status');
+  }
+
+  async sendOutlookTestEmail() {
+    return this.request<{ sent: boolean; message: string }>('/outlook/test-email', { method: 'POST' });
+  }
+
+  // ── Dropbox ────────────────────────────────────────────────────────────────
+
+  async getDropboxConnectUrl() {
+    return this.request<{ url: string }>('/dropbox/connect');
+  }
+
+  async getDropboxStatus() {
+    return this.request<{
+      enabled: boolean;
+      configured: boolean;
+      connected: boolean;
+      externalEmail: string | null;
+      connectedAt: string | null;
+    }>('/dropbox/status');
+  }
+
+  async disconnectDropbox() {
+    return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });
+  }
+
+  async listDropboxFiles(objectApiName: string, recordId: string, subPath?: string, folderName?: string) {
+    const p = new URLSearchParams();
+    if (subPath) p.set('subPath', subPath);
+    if (folderName) p.set('folderName', folderName);
+    const qs = p.toString() ? `?${p.toString()}` : '';
+    return this.request<{
+      connected: boolean;
+      needsReauth?: boolean;
+      files: Array<{
+        id: string;
+        name: string;
+        path: string;
+        size: number;
+        modifiedAt: string | null;
+        isFolder: boolean;
+      }>;
+    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}${qs}`);
+  }
+
+  async getDropboxDownloadUrl(fileId: string) {
+    return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
+  }
+
+  async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string, folderName?: string) {
+    return this.request<{ id: string; name: string; path: string }>(`/dropbox/folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ name, subPath, folderName }),
+    });
+  }
+
+  async ensureDropboxFolder(objectApiName: string, recordId: string, folderName?: string) {
+    return this.request<{ created: boolean; path: string; exists?: boolean }>(
+      `/dropbox/ensure-folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`,
+      { method: 'POST', body: JSON.stringify({ folderName }) }
+    );
+  }
+
+  async ensureDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentRecordId: string;
+    parentFolderName?: string;
+    childObjectApiName: string;
+    childFolderName: string;
+  }) {
+    return this.request<{ created: boolean; path: string; reason?: string }>(
+      '/dropbox/ensure-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async renameDropboxFolder(opts: {
+    objectApiName: string;
+    recordId: string;
+    oldFolderName: string;
+    newFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async renameDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentFolderName: string;
+    childObjectApiName: string;
+    oldChildFolderName: string;
+    newChildFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async copyDropboxFile(opts: {
+    fromPath: string;
+    toObjectApiName: string;
+    toRecordId: string;
+    toFolderName?: string;
+    toSubPath?: string;
+  }) {
+    return this.request<{ success: boolean; path: string }>(
+      '/dropbox/copy',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async deleteDropboxFile(fileId: string) {
+    return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+  }
+
+  async uploadDropboxFile(objectApiName: string, recordId: string, file: File, subPath?: string, folderName?: string) {
+    const fileName = subPath ? `${subPath}/${file.name}` : file.name;
+    const p = new URLSearchParams({ fileName });
+    if (folderName) p.set('folderName', folderName);
+    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?${p.toString()}`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/octet-stream',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: file,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return resp.json() as Promise<{
+      id: string;
+      name: string;
+      path: string;
+      size: number;
+      modifiedAt: string;
+    }>;
   }
 }
 

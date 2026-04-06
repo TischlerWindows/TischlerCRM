@@ -96,9 +96,10 @@ const informationModules = [
 
 const pipelineModules = [
   { name: 'Leads', href: '/leads' },
-  { name: 'Deals', href: '/deals' },
+  { name: 'Opportunities', href: '/opportunities' },
   { name: 'Projects', href: '/projects' },
   { name: 'Service', href: '/service' },
+  { name: 'Work Orders', href: '/workorders' },
 ];
 
 const financialModules = [

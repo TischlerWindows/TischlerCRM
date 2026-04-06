@@ -33,7 +33,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const { value: recordSetup } = useRecordSetupContext();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isImpersonating, returnToAdmin } = useAuth();
   const { canAccess, hasAppPermission } = usePermissions();
   const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
@@ -53,7 +53,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/accounts': 'Account',
     '/products': 'Product',
     '/leads': 'Lead',
-    '/deals': 'Deal',
+    '/opportunities': 'Opportunity',
     '/projects': 'Project',
     '/service': 'Service',
     '/quotes': 'Quote',
@@ -100,7 +100,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/opportunities') ||
     pathname?.startsWith('/properties') ||
     pathname?.startsWith('/accounts') ||
-    pathname?.startsWith('/deals') ||
     pathname?.startsWith('/projects') ||
     pathname?.startsWith('/installations') ||
     pathname?.startsWith('/products') ||
@@ -108,11 +107,12 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/reports') ||
     pathname?.startsWith('/settings') ||
     pathname?.startsWith('/service') ||
+    pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
     pathname?.includes('demo');
 
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup') && !pathname?.match(/^\/automations\/.+/);
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   // Always refresh schema from the API on mount / when user changes.
   // The persisted Zustand cache provides a value for the very first paint
@@ -135,7 +135,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       }
 
       if (schema?.objects) {
-        const excludedObjects = new Set(['Home']);
+        const excludedObjects = new Set(['Home', 'Deal']);
         
         const builtInRoutes: Record<string, string> = {
           'Property': '/properties',
@@ -143,9 +143,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           'Account': '/accounts',
           'Product': '/products',
           'Lead': '/leads',
-          'Deal': '/deals',
+          'Opportunity': '/opportunities',
           'Project': '/projects',
           'Service': '/service',
+          'WorkOrder': '/workorders',
           'Quote': '/quotes',
           'Installation': '/installations',
         };
@@ -242,6 +243,18 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen flex flex-col bg-brand-light overflow-hidden">
+      {/* Impersonation banner */}
+      {isImpersonating && (
+        <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
+          <span>You are logged in as <strong>{user?.name ?? user?.email}</strong></span>
+          <button
+            onClick={() => { returnToAdmin(); window.location.href = '/settings/users'; }}
+            className="bg-white/20 hover:bg-white/30 text-white px-3 py-0.5 rounded-full transition-colors"
+          >
+            Return to Admin
+          </button>
+        </div>
+      )}
       {/* Global Header — Salesforce-style navy bar */}
       <header className="bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
         {/* Left: Logo + App Name */}

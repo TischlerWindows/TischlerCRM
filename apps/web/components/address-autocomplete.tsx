@@ -40,9 +40,12 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value ?? '');
 
-  // Sync external value into the input when it changes (e.g. on record load)
+  // Sync external value into the input whenever the parent changes it
+  // (e.g. on record load, or when the user edits sub-fields in the Address composite).
+  // We intentionally do NOT check against `query` here — the parent's value
+  // is the source of truth and must always override local typing state.
   useEffect(() => {
-    if (value !== undefined && value !== query) {
+    if (value !== undefined) {
       setQuery(value);
     }
   }, [value]);

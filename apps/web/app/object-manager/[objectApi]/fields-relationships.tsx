@@ -35,6 +35,7 @@ import { Textarea } from '@/components/ui/textarea';
   Save,
   AlertCircle,
   User,
+  Cloud,
 } from 'lucide-react';
 interface FieldsRelationshipsProps {
   objectApiName: string;
@@ -87,6 +88,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
 
   // Integration
   { value: 'LocationSearch', label: 'Location Search (Google Maps)', description: 'Google Places address autocomplete with map preview. Place on any page layout to auto-fill address fields when a location is selected. Requires the Google Maps integration to be configured.', category: 'Integration', icon: MapPin },
+  { value: 'DropboxFiles', label: 'Dropbox Files', description: 'Displays a file browser panel on the record page. Users can upload, browse, and download files stored in Dropbox. Each record gets its own folder. Requires the Dropbox integration to be configured.', category: 'Integration', icon: Cloud },
 ];
 
 export default function FieldsRelationships({ objectApiName }: FieldsRelationshipsProps) {
@@ -418,7 +420,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       {(() => {
                         const AUTO_NUMBER_FIELDS = new Set([
-                          'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+                          'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
                           'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
                           'serviceNumber', 'installationNumber',
                         ]);
