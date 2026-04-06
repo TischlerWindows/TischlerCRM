@@ -53,7 +53,6 @@ function buildFolderPath(objectApiName: string, recordId: string, folderName?: s
 const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
   { name: 'Leads' },
   { name: 'Service' },
-  { name: 'Photos', children: ['Site', 'Finished'] },
   { name: 'Project Books' },
 ];
 
@@ -77,6 +76,8 @@ const OPPORTUNITY_SUBFOLDERS = [
   '6. Installation',
   '7. Final Shop Drawings',
   '8. Project Accounting',
+  'Photos/Site',
+  'Photos/Finished',
 ];
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
