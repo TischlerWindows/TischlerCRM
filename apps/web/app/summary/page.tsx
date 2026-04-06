@@ -2916,111 +2916,127 @@ export default function SummaryPage() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Item</th>
-                                    <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                                    <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
                                     <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
                                     <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Final</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                   {/* Window Screens */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
-                                    <td className="px-1 py-1 w-16">{inp('windowScreens', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'full')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('windowScreens', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Door Screen Sash */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
-                                    <td className="px-1 py-1 w-16">{inp('doorScreenSash', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'full')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('doorScreenSash', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Entry Door */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
-                                    <td className="px-1 py-1 w-16">{inp('entryDoor', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'full')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('entryDoor', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Jamb Extensions */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
-                                    <td className="px-1 py-1"></td>
+                                    <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'full')}</td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('jambExtensions', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Magnetic Contact */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
-                                    <td className="px-1 py-1"></td>
+                                    <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('magneticContact', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Final Finish */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
-                                    <td className="px-1 py-1"></td>
+                                    <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'full')}</td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('finalFinish', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Installation */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
-                                    <td className="px-1 py-1"></td>
+                                    <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('installation', 'full')}</td>
                                     <td className="px-1 py-1">{inp('installation', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('installation', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('installation', 'calcFull')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                 </tbody>
                               </table>
