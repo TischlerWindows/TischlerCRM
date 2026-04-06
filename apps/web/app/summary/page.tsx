@@ -2782,7 +2782,22 @@ export default function SummaryPage() {
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: '11%' }} />
+                              <col style={{ width: '5%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                            </colgroup>
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
@@ -2913,7 +2928,22 @@ export default function SummaryPage() {
                               <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full text-sm">
+                              <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                                <colgroup>
+                                  <col style={{ width: '11%' }} />
+                                  <col style={{ width: '5%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                </colgroup>
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
