@@ -73,6 +73,14 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     };
   }
 
+  if (data.type === 'palette-field' && typeof data.fieldApiName === 'string') {
+    return {
+      kind: 'palette-field',
+      fieldApiName: data.fieldApiName,
+      label: typeof data.label === 'string' ? data.label : data.fieldApiName,
+    };
+  }
+
   if (activeId.startsWith('field-')) {
     const fieldApiName = activeId.replace(/^field-/, '');
     const label =

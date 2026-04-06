@@ -74,6 +74,7 @@ function DraggableFieldChip({
       fieldApiName: field.apiName,
       label: field.label,
     },
+    disabled: isPlaced,
   });
 
   const style: CSSProperties = {
@@ -85,9 +86,13 @@ function DraggableFieldChip({
       ref={setNodeRef}
       type="button"
       style={style}
-      {...listeners}
-      {...attributes}
-      className="flex w-full items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:bg-gray-50 active:cursor-grabbing"
+      {...(isPlaced ? {} : { ...listeners, ...attributes })}
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-left text-xs transition-colors',
+        isPlaced
+          ? 'cursor-not-allowed opacity-50'
+          : 'hover:bg-gray-50 active:cursor-grabbing',
+      )}
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-gray-700">{field.label}</span>
