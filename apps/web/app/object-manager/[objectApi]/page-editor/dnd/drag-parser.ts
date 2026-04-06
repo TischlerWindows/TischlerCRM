@@ -81,8 +81,8 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     };
   }
 
-  if (activeId.startsWith('field-')) {
-    const fieldApiName = activeId.replace(/^field-/, '');
+  if (activeId.startsWith('palette-field-') || activeId.startsWith('field-')) {
+    const fieldApiName = activeId.replace(/^(?:palette-)?field-/, '');
     const label =
       typeof data.field === 'object' &&
       data.field !== null &&
