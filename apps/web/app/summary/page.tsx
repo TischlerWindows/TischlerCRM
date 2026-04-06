@@ -565,6 +565,15 @@ interface Summary {
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
+  addOns: {
+    windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    entryDoor: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    magneticContact: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+  };
   product: string;
   productType: string;
   productTypeOptions: string[];
@@ -827,6 +836,15 @@ export default function SummaryPage() {
         doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
+      addOns: {
+        windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        entryDoor: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        magneticContact: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+      },
       product: '',
       productType: '',
       productTypeOptions: [],
@@ -1074,6 +1092,37 @@ export default function SummaryPage() {
       </table>
     </div>
   </div>
+
+  ${(() => {
+    const ao = s.addOns || {} as any;
+    const v = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
+    const addOnRow = (label: string, key: string, hasQty: boolean, details: string) => `
+      <tr><td class="b">${label}</td><td class="r">${hasQty ? v(key, 'qty') : '—'}</td><td colspan="2">${details}</td>
+      <td class="r">${v(key, 'netEuro')}</td><td class="r">${v(key, 'full')}</td><td class="r">${v(key, 'pct')}</td><td class="r">${v(key, 'final')}</td>
+      <td class="r cb">${v(key, 'calcFull')}</td><td class="r cb">${v(key, 'calcDisc')}</td><td class="r cg">${v(key, 'calcFinal')}</td></tr>`;
+    return `
+  <div class="section-card">
+    <div class="heading">Add-On Items</div>
+    <div class="body" style="padding:0">
+      <table>
+        <thead><tr>
+          <th>Item</th><th class="r">Qty</th><th colspan="2">Details</th><th class="r">NET €</th>
+          <th class="r">Full</th><th class="r">%</th><th class="r">Final</th>
+          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th>
+        </tr></thead>
+        <tbody>
+          ${addOnRow('Window Screens', 'windowScreens', true, `Frame: ${v('windowScreens', 'frameType')} | Mesh: ${v('windowScreens', 'meshType')}`)}
+          ${addOnRow('Door Screen Sash', 'doorScreenSash', true, `Wood Frame: ${v('doorScreenSash', 'woodFrame')} | Mesh: ${v('doorScreenSash', 'meshType')}`)}
+          ${addOnRow('Entry Door', 'entryDoor', true, '—')}
+          ${addOnRow('Jamb Extensions', 'jambExtensions', false, '—')}
+          ${addOnRow('Magnetic Contact', 'magneticContact', false, '—')}
+          ${addOnRow('Final Finish', 'finalFinish', false, '—')}
+          ${addOnRow('Installation', 'installation', false, '—')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+  })()}
 </div>
 
 </body></html>`;
@@ -2726,6 +2775,7 @@ export default function SummaryPage() {
                     };
 
                     return (
+                      <>
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                           <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
@@ -2825,7 +2875,160 @@ export default function SummaryPage() {
                           </table>
                         </div>
                       </div>
-                    );
+
+                      {/* ── Add-On Items ── */}
+                      {(() => {
+                        const ao = editingSummary.addOns || {} as any;
+                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
+                        const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
+                        const setAo = (key: string, field: string, value: string) => {
+                          setEditingSummary({
+                            ...editingSummary,
+                            addOns: {
+                              ...ao,
+                              windowScreens: ao.windowScreens || defaultAo,
+                              doorScreenSash: ao.doorScreenSash || defaultAo,
+                              entryDoor: ao.entryDoor || defaultAo,
+                              jambExtensions: ao.jambExtensions || defaultAo,
+                              magneticContact: ao.magneticContact || defaultAo,
+                              finalFinish: ao.finalFinish || defaultAo,
+                              installation: ao.installation || defaultAo,
+                              [key]: { ...getAo(key), [field]: value },
+                            },
+                          });
+                        };
+
+                        const inp = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        const inpLeft = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
+                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                              <h3 className="text-lg font-semibold text-gray-900">Add-On Items</h3>
+                              <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-48">Item</th>
+                                    <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                    <th className="px-2 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Final</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {/* Window Screens */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
+                                    <td className="px-1 py-1 w-16">{inp('windowScreens', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('windowScreens', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Door Screen Sash */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
+                                    <td className="px-1 py-1 w-16">{inp('doorScreenSash', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('doorScreenSash', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Entry Door */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
+                                    <td className="px-1 py-1 w-16">{inp('entryDoor', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('entryDoor', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Jamb Extensions */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('jambExtensions', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Magnetic Contact */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('magneticContact', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Final Finish */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('finalFinish', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'calcFinal')}</td>
+                                  </tr>
+                                  {/* Installation */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'final')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('installation', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>);
                   })()}
                 </div>
               )}
