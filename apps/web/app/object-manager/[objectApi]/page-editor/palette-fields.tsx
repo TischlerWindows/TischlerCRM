@@ -68,7 +68,7 @@ function DraggableFieldChip({
   isPlaced: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `field-${field.apiName}`,
+    id: `palette-field-${field.apiName}`,
     data: {
       type: 'palette-field',
       fieldApiName: field.apiName,

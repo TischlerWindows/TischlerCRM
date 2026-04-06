@@ -673,13 +673,32 @@ export const createLayoutSlice: StateCreator<
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   loadLayout: (layout) => {
+    const seen = new Set<string>();
+    const sanitized = {
+      ...layout,
+      tabs: layout.tabs.map((tab) => ({
+        ...tab,
+        regions: tab.regions.map((region) => ({
+          ...region,
+          panels: region.panels.map((panel) => ({
+            ...panel,
+            fields: panel.fields.filter((f) => {
+              if (seen.has(f.fieldApiName)) return false;
+              seen.add(f.fieldApiName);
+              return true;
+            }),
+          })),
+        })),
+      })),
+    };
+
     set({
-      layout,
+      layout: sanitized,
       selectedElement: null,
       isDirty: false,
       undoStack: [],
       redoStack: [],
-      activeTabId: layout.tabs[0]?.id ?? '',
+      activeTabId: sanitized.tabs[0]?.id ?? '',
     });
   },
 
