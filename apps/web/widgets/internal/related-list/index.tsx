@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Plus, Search, ChevronUp, ChevronDown, MoreHorizontal, Trash2, ExternalLink, LayoutGrid, List } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
@@ -30,24 +31,45 @@ const DEDICATED_ROUTES: Record<string, string> = {
   Service: '/service',
 }
 
-function recordUrl(objectApiName: string, recordId: string) {
+function recordUrl(objectApiName: string, recordId: string, fromPath?: string) {
   const prefix = DEDICATED_ROUTES[objectApiName]
-  if (prefix) return `${prefix}/${recordId}`
-  return `/objects/${objectApiName}/${recordId}`
+  const base = prefix ? `${prefix}/${recordId}` : `/objects/${objectApiName}/${recordId}`
+  return fromPath ? `${base}?from=${encodeURIComponent(fromPath)}` : base
 }
 
 function newRecordUrl(objectApiName: string, linkField: string, linkValue: string) {
-  return `/objects/${objectApiName}/new?${linkField}=${encodeURIComponent(linkValue)}`
+  const prefix = DEDICATED_ROUTES[objectApiName]
+  const base = prefix ?? `/objects/${objectApiName}`
+  return `${base}?new=true&${linkField}=${encodeURIComponent(linkValue)}`
 }
 
 function listUrl(objectApiName: string, linkField: string, linkValue: string) {
-  return `/objects/${objectApiName}?filter[${linkField}]=${encodeURIComponent(linkValue)}`
+  const prefix = DEDICATED_ROUTES[objectApiName]
+  const base = prefix ?? `/objects/${objectApiName}`
+  return `${base}?filter[${linkField}]=${encodeURIComponent(linkValue)}`
 }
 
 // ── Client-side filter engine ─────────────────────────────────────────
 
+function getFieldValue(row: Record<string, unknown>, field: string): unknown {
+  const data = (row.data as Record<string, unknown>) ?? {}
+  if (data[field] !== undefined) return data[field]
+  const fieldLower = field.toLowerCase()
+  for (const key of Object.keys(data)) {
+    if (key.toLowerCase() === fieldLower) return data[key]
+  }
+  const stripped = field.replace(/^[A-Za-z]+_/, '')
+  if (stripped !== field) {
+    const strippedLower = stripped.toLowerCase()
+    for (const key of Object.keys(data)) {
+      if (key.toLowerCase() === strippedLower) return data[key]
+    }
+  }
+  return row[field]
+}
+
 function applyFilter(row: Record<string, unknown>, rule: FilterRule): boolean {
-  const rawVal = (row.data as Record<string, unknown>)?.[rule.field] ?? row[rule.field]
+  const rawVal = getFieldValue(row, rule.field)
   const cellStr = rawVal !== null && rawVal !== undefined ? String(rawVal).toLowerCase() : ''
   const ruleVal = rule.value.toLowerCase()
 
@@ -72,7 +94,7 @@ function applyFilters(rows: Record<string, unknown>[], rules: FilterRule[]): Rec
 // ── Cell value helper ─────────────────────────────────────────────────
 
 function getCellValue(row: Record<string, unknown>, col: string): string {
-  const val = (row.data as Record<string, unknown>)?.[col] ?? row[col]
+  const val = getFieldValue(row, col)
   return val !== undefined && val !== null ? String(val) : '—'
 }
 
@@ -99,6 +121,7 @@ function Skeleton() {
 // ── Main widget ───────────────────────────────────────────────────────
 
 export default function RelatedListWidget({ config, record }: WidgetProps) {
+  const pathname = usePathname()
   const {
     objectApiName,
     label,
@@ -254,7 +277,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
           <div className="p-3 grid grid-cols-2 gap-3">
             {displayRows.map((row) => {
               const rowId = String(row.id)
-              const href = recordUrl(objectApiName, rowId)
+              const href = recordUrl(objectApiName, rowId, pathname)
               return (
                 <Link
                   key={rowId}
@@ -336,7 +359,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
               <tbody>
                 {displayRows.map((row) => {
                   const rowId = String(row.id)
-                  const href = recordUrl(objectApiName, rowId)
+                  const href = recordUrl(objectApiName, rowId, pathname)
                   const isMenuOpen = openRowMenu === rowId
                   return (
                     <tr

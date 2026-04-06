@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Target, 
@@ -99,6 +99,7 @@ export default function DealsPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
   const { canAccess } = usePermissions();
@@ -170,6 +171,14 @@ export default function DealsPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
+  // Auto-open new record form when navigated from a related list with ?new=true
+  useEffect(() => {
+    if (searchParams.get('new') === 'true' && hasPageLayout && selectedLayoutId) {
+      setShowDynamicForm(true)
+      // Clean the URL without triggering a re-render loop
+      router.replace(pathname, { scroll: false })
+    }
+  }, [searchParams, hasPageLayout, selectedLayoutId, pathname, router])
 
   useEffect(() => {
     (async () => {

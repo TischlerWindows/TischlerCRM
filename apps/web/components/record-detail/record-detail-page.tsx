@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Database } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -50,7 +50,13 @@ export default function RecordDetailPage({
   icon: IconComponent = Database,
 }: RecordDetailPageProps) {
   const params = useParams();
+  const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
+
+  // If navigated from a related list, use the `from` param for back navigation
+  const fromPath = searchParams.get('from');
+  const effectiveBackRoute = fromPath || backRoute;
+  const effectiveBackLabel = fromPath ? 'Back' : backLabel;
   const { canAccess } = usePermissions();
 
   const canEdit = canAccess(objectApiName, 'edit');
@@ -247,11 +253,11 @@ export default function RecordDetailPage({
             The {objectDef?.label?.toLowerCase() ?? 'record'} you&#39;re looking for doesn&#39;t exist.
           </p>
           <Link
-            href={backRoute}
+            href={effectiveBackRoute}
             className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to {backLabel}
+            {effectiveBackLabel}
           </Link>
         </div>
       </div>
@@ -298,11 +304,11 @@ export default function RecordDetailPage({
         {/* Header */}
         <div className="mb-8">
           <Link
-            href={backRoute}
+            href={effectiveBackRoute}
             className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back to {backLabel}
+            {effectiveBackLabel}
           </Link>
 
           {showHeaderCard && (
@@ -325,7 +331,7 @@ export default function RecordDetailPage({
                 </div>
                 <RecordActions
                   objectApiName={objectApiName}
-                  backRoute={backRoute}
+                  backRoute={effectiveBackRoute}
                   record={record}
                   rawRecord={rawRecord}
                   pageLayout={pageLayout}
