@@ -7,7 +7,7 @@ const STANDARD_LIST_ROUTES: Record<string, string> = {
   Account: '/accounts',
   Property: '/properties',
   Lead: '/leads',
-  Deal: '/deals',
+  Opportunity: '/opportunities',
   Product: '/products',
   Quote: '/quotes',
   Project: '/projects',

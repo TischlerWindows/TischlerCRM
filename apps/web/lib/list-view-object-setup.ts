@@ -26,7 +26,7 @@ export function resolveListViewObjectSetup(
     accounts: 'Account',
     products: 'Product',
     leads: 'Lead',
-    deals: 'Deal',
+    opportunities: 'Opportunity',
     projects: 'Project',
     service: 'Service',
     quotes: 'Quote',

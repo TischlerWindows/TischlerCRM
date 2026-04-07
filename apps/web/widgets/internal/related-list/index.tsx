@@ -24,7 +24,7 @@ const DEDICATED_ROUTES: Record<string, string> = {
   Account: '/accounts',
   Contact: '/contacts',
   Lead: '/leads',
-  Deal: '/deals',
+  Opportunity: '/opportunities',
   Project: '/projects',
   Product: '/products',
   Installation: '/installations',

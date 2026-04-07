@@ -44,9 +44,9 @@ export function getRecordLabel(record: any): string {
   }
   if (record.email) return record.email;
 
-  // Lead/Deal/Project numbers
+  // Lead/Opportunity/Project numbers
   if (record.leadNumber) return record.leadNumber;
-  if (record.dealNumber) return record.dealNumber;
+  if (record.opportunityNumber) return record.opportunityNumber;
   if (record.projectNumber) return record.projectNumber;
   if (record.quoteNumber) return record.quoteNumber;
   if (record.serviceNumber) return record.serviceNumber;

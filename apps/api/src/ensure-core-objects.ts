@@ -177,11 +177,24 @@ const CORE_OBJECTS = [
 export async function ensureCoreObjects(): Promise<void> {
   console.log('[ensure-core-objects] Checking core objects...');
 
-  // Clean up renamed objects (Deal→Opportunity rename)
+  // Rename Deal→Opportunity if the legacy name still exists
   const legacyDeal = await prisma.customObject.findFirst({ where: { apiName: 'Deal' } });
   if (legacyDeal) {
-    await prisma.customObject.delete({ where: { id: legacyDeal.id } });
-    console.log('[ensure-core-objects] Removed legacy Deal object (renamed to Opportunity)');
+    // Check if Opportunity already exists separately
+    const existingOpp = await prisma.customObject.findFirst({ where: { apiName: 'Opportunity' } });
+    if (existingOpp) {
+      // Both exist — migrate records from Deal to Opportunity, then delete Deal
+      await prisma.record.updateMany({ where: { objectId: legacyDeal.id }, data: { objectId: existingOpp.id } });
+      await prisma.customObject.delete({ where: { id: legacyDeal.id } });
+      console.log('[ensure-core-objects] Merged Deal records into Opportunity and removed Deal object');
+    } else {
+      // Rename Deal → Opportunity in place (preserves records + fields)
+      await prisma.customObject.update({
+        where: { id: legacyDeal.id },
+        data: { apiName: 'Opportunity', label: 'Opportunity', pluralLabel: 'Opportunities' },
+      });
+      console.log('[ensure-core-objects] Renamed Deal → Opportunity (preserved records)');
+    }
   }
 
   // Grab any existing user to use as the creator/modifier

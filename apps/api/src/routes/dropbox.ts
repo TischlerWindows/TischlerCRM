@@ -266,18 +266,43 @@ export async function tryEnsureLinkedFolder(
     const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
     if (!subfolder) return;
 
-    // Find the Property lookup value — check common field name patterns
-    const propertyId =
-      childData.property || childData[`${childObjectApiName}__property`] ||
-      childData.propertyId || childData[`${childObjectApiName}__propertyId`] ||
-      childData.relatedProperty || childData[`${childObjectApiName}__relatedProperty`];
-    if (!propertyId || typeof propertyId !== 'string') return;
+    // Dynamically find a Property lookup value in the record data.
+    // The record data has both prefixed ("Opportunity__property") and stripped
+    // ("property") keys, so we scan all values that look like a record ID
+    // whose key contains "property" (case-insensitive).
+    let propertyId: string | undefined;
+
+    // 1. Check well-known field names first (stripped prefix forms)
+    const wellKnown = ['property', 'propertyId', 'propertyAddress', 'relatedProperty'];
+    for (const key of wellKnown) {
+      const v = childData[key] ?? childData[`${childObjectApiName}__${key}`];
+      if (v && typeof v === 'string') { propertyId = v; break; }
+    }
+
+    // 2. Fallback: scan all keys for anything containing "property"
+    if (!propertyId) {
+      for (const [key, val] of Object.entries(childData)) {
+        if (key.toLowerCase().includes('property') && typeof val === 'string' && val) {
+          propertyId = val;
+          break;
+        }
+      }
+    }
+
+    if (!propertyId) return;
 
     const accessToken = await getAccessToken(userId);
     if (!accessToken) return; // Dropbox not connected
 
-    // Load the parent Property record to derive its folder name
-    const propertyRecord = await prisma.record.findFirst({ where: { id: propertyId } });
+    // Verify it's actually a Property record
+    const propertyObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+    });
+    if (!propertyObj) return;
+
+    const propertyRecord = await prisma.record.findFirst({
+      where: { id: propertyId, objectId: propertyObj.id },
+    });
     if (!propertyRecord) return;
     const propertyData = propertyRecord.data as Record<string, any>;
     const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
