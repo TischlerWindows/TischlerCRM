@@ -682,6 +682,25 @@ export async function recordRoutes(app: FastifyInstance) {
       ...sanitizedUpdate,
     };
 
+    // ── Re-derive propertyNumber when address changes on a Property ──
+    if (apiName.toLowerCase() === 'property') {
+      const oldAddr = extractAddressFromRecord(beforeData);
+      const newAddr = extractAddressFromRecord(mergedData);
+      if (oldAddr.state !== newAddr.state || oldAddr.country !== newAddr.country) {
+        const oldNumber: string = beforeData.propertyNumber
+          || beforeData.Property__propertyNumber || '';
+        // Keep the same sequence number, just swap the prefix
+        const seqMatch = oldNumber.match(/[A-Za-z]+(\d+)$/);
+        const seq = seqMatch ? seqMatch[1] : null;
+        if (seq) {
+          const newPrefix = getPropertyPrefix(newAddr);
+          const newPropertyNumber = `${newPrefix}${seq}`;
+          mergedData.propertyNumber = newPropertyNumber;
+          mergedData.Property__propertyNumber = newPropertyNumber;
+        }
+      }
+    }
+
     const record = await prisma.record.update({
       where: { id: existingRecord.id },
       data: {
