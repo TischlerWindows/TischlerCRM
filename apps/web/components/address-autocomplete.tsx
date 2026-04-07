@@ -39,11 +39,18 @@ export default function AddressAutocomplete({
   value,
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value ?? '');
+  const [isFocused, setIsFocused] = useState(false);
 
-  // We only need to seed the search bar with the initial value on mount.
-  // Subsequent value prop changes (from sibling sub-field edits) should NOT
-  // overwrite the search bar — the user may be typing a search query.
-  // When the user selects a new address, handleSelect already calls setQuery.
+  // Sync the search bar text from the parent value prop (built from
+  // sub-field values) — but only when the user is NOT actively typing
+  // in the search bar.  This gives two-way sync: sub-field edits update
+  // the search bar, and search-bar selections update the sub-fields.
+  useEffect(() => {
+    if (!isFocused && value !== undefined) {
+      setQuery(value);
+    }
+  }, [value, isFocused]);
+
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -136,7 +143,11 @@ export default function AddressAutocomplete({
         <Input
           value={query}
           onChange={handleInputChange}
-          onFocus={() => predictions.length > 0 && setIsOpen(true)}
+          onFocus={() => {
+            setIsFocused(true);
+            if (predictions.length > 0) setIsOpen(true);
+          }}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled || loadingDetails}
