@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { FieldDef } from '@/lib/schema';
 import AddressAutocomplete from '@/components/address-autocomplete';
@@ -22,6 +22,12 @@ function toAddressObject(raw: unknown): Record<string, any> {
   return {};
 }
 
+function addrKey(a: Record<string, any>): string {
+  return [a.street, a.city, a.state, a.postalCode, a.country, a.lat, a.lng]
+    .map((v) => v ?? '')
+    .join('|');
+}
+
 // ── Address field input ─────────────────────────────────────────────
 
 export function AddressInput({
@@ -35,11 +41,51 @@ export function AddressInput({
   onChange: (val: any) => void;
   disabled?: boolean;
 }) {
-  const addressValue = toAddressObject(value);
+  // Use LOCAL state so sub-field edits are always immediately visible,
+  // regardless of how fast the parent re-renders / propagates new props.
+  const [local, setLocal] = useState<Record<string, any>>(() => toAddressObject(value));
+
+  // Sync from parent when the parent value changes meaningfully
+  // (e.g. after autocomplete selection or when the dialog first opens)
+  useEffect(() => {
+    const incoming = toAddressObject(value);
+    if (addrKey(incoming) !== addrKey(local)) {
+      setLocal(incoming);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const handleSubField = useCallback(
+    (field: string, fieldValue: string) => {
+      setLocal((prev) => {
+        const next = { ...prev, [field]: fieldValue };
+        onChange(next);
+        return next;
+      });
+    },
+    [onChange],
+  );
+
+  const handleAutocomplete = useCallback(
+    (addr: any) => {
+      const next = {
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        postalCode: addr.postalCode,
+        country: addr.country,
+        lat: addr.lat,
+        lng: addr.lng,
+      };
+      setLocal(next);
+      onChange(next);
+    },
+    [onChange],
+  );
 
   // Build display string from current sub-field values so the search
   // bar always reflects the actual data (search is only for lookup).
-  const addressDisplay = [addressValue.street, addressValue.city, addressValue.state, addressValue.postalCode, addressValue.country].filter(Boolean).join(', ');
+  const addressDisplay = [local.street, local.city, local.state, local.postalCode, local.country].filter(Boolean).join(', ');
 
   return (
     <div className="space-y-2 border border-gray-300 rounded-lg p-3">
@@ -48,65 +94,40 @@ export function AddressInput({
           disabled={disabled}
           placeholder="Search for an address..."
           value={addressDisplay}
-          onAddressSelected={(addr) => {
-            onChange({
-              street: addr.street,
-              city: addr.city,
-              state: addr.state,
-              postalCode: addr.postalCode,
-              country: addr.country,
-              lat: addr.lat,
-              lng: addr.lng,
-            });
-          }}
+          onAddressSelected={handleAutocomplete}
         />
       )}
       <Input
         placeholder="Street"
-        value={addressValue.street || ''}
-        onChange={(e) => {
-          const v = e.target.value;
-          onChange({ ...addressValue, street: v });
-        }}
+        value={local.street || ''}
+        onChange={(e) => handleSubField('street', e.target.value)}
         disabled={disabled}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="City"
-          value={addressValue.city || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({ ...addressValue, city: v });
-          }}
+          value={local.city || ''}
+          onChange={(e) => handleSubField('city', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="State/Province"
-          value={addressValue.state || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({ ...addressValue, state: v });
-          }}
+          value={local.state || ''}
+          onChange={(e) => handleSubField('state', e.target.value)}
           disabled={disabled}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="Postal Code"
-          value={addressValue.postalCode || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({ ...addressValue, postalCode: v });
-          }}
+          value={local.postalCode || ''}
+          onChange={(e) => handleSubField('postalCode', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="Country"
-          value={addressValue.country || ''}
-          onChange={(e) => {
-            const v = e.target.value;
-            onChange({ ...addressValue, country: v });
-          }}
+          value={local.country || ''}
+          onChange={(e) => handleSubField('country', e.target.value)}
           disabled={disabled}
         />
       </div>
