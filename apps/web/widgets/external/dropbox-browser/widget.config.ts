@@ -6,7 +6,7 @@ export const config: WidgetManifest = {
   description: 'Browse, upload, and manage Dropbox files linked to the current record.',
   icon: 'FolderOpen',
   category: 'external',
-  integration: 'dropbox',
+  integration: null,
   defaultDisplayMode: 'full',
   configSchema: [
     {
