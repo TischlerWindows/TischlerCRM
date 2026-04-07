@@ -40,6 +40,8 @@ export interface WidgetManifest {
   integration: string | null          // provider ID or null
   defaultDisplayMode: DisplayMode
   configSchema: SchemaField[]
+  /** If true the widget won't appear in the page-editor palette */
+  hideFromPalette?: boolean
 }
 
 // Stored in layout JSON for external widget placements
