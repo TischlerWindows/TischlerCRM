@@ -41,14 +41,6 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
   const recordId = (record.id as string) || ''
   const objectApiName = object.apiName
 
-  if (!recordId) {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-        Save the record first to use Dropbox.
-      </div>
-    )
-  }
-
   // Use explicit config if set, otherwise derive from record data
   const folderName = (config.folderName as string) || deriveDropboxFolderName(record)
 
