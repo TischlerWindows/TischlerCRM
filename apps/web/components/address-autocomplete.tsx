@@ -40,15 +40,10 @@ export default function AddressAutocomplete({
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value ?? '');
 
-  // Sync external value into the input whenever the parent changes it
-  // (e.g. on record load, or when the user edits sub-fields in the Address composite).
-  // We intentionally do NOT check against `query` here — the parent's value
-  // is the source of truth and must always override local typing state.
-  useEffect(() => {
-    if (value !== undefined) {
-      setQuery(value);
-    }
-  }, [value]);
+  // We only need to seed the search bar with the initial value on mount.
+  // Subsequent value prop changes (from sibling sub-field edits) should NOT
+  // overwrite the search bar — the user may be typing a search query.
+  // When the user selects a new address, handleSelect already calls setQuery.
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
