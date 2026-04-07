@@ -347,8 +347,14 @@ export default function DynamicForm({
   };
 
   // ── handleFieldChange ─────────────────────────────────────────
-  const handleFieldChange = (fieldApiName: string, value: any) => {
+  const handleFieldChange = (fieldApiName: string, valueOrFn: any) => {
     setFormData((prev) => {
+      // Support functional updaters so callers can derive the next
+      // value from the latest state (avoids stale-closure problems).
+      const value =
+        typeof valueOrFn === 'function'
+          ? valueOrFn(prev[fieldApiName])
+          : valueOrFn;
       const next = { ...prev, [fieldApiName]: value };
       const stripped = fieldApiName.replace(/^[A-Za-z]+__/, '');
       if (stripped !== fieldApiName) {
