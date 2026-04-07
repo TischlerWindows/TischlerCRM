@@ -130,9 +130,12 @@ export function DropboxFileBrowser({
     setContextMenuId(entry.id);
   };
 
-  const folderEnsured = useRef(false);
+  const folderEnsuredKey = useRef<string>('');
 
   const loadFiles = useCallback(async () => {
+    // Don't load until we have a real record ID
+    if (!recordId) return;
+
     try {
       const s = await apiClient.getDropboxStatus();
       setStatus(s);
@@ -142,9 +145,12 @@ export function DropboxFileBrowser({
         return;
       }
 
-      // Auto-create the record folder — await so listing happens after folder exists
-      if (!folderEnsured.current) {
-        folderEnsured.current = true;
+      // Auto-create the record folder — await so listing happens after folder exists.
+      // Track by recordId+folderName so we re-ensure if the name changes
+      // (e.g. record data loads after initial mount with empty props).
+      const ensureKey = `${recordId}::${folderName}`;
+      if (folderEnsuredKey.current !== ensureKey) {
+        folderEnsuredKey.current = ensureKey;
         try {
           await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
         } catch { /* non-fatal — folder may already exist */ }
@@ -172,9 +178,10 @@ export function DropboxFileBrowser({
   }, [objectApiName, recordId, subPath, folderName]);
 
   useEffect(() => {
+    if (!recordId) return; // Wait for real record data
     setLoading(true);
     loadFiles();
-  }, [loadFiles]);
+  }, [loadFiles, recordId]);
 
   const handleConnect = async () => {
     try {
