@@ -727,9 +727,10 @@ export async function recordRoutes(app: FastifyInstance) {
     });
 
     // ── Rename Dropbox folder if the derived name changed ──
-    // Fire-and-forget — don't block the response on Dropbox API
-    tryRenameDropboxFolder(userId, apiName, existingRecord.id, beforeData, mergedData)
-      .catch(() => {}); // swallow to avoid unhandled rejection
+    // Await so the rename completes before the client re-renders the widget
+    try {
+      await tryRenameDropboxFolder(userId, apiName, existingRecord.id, beforeData, mergedData);
+    } catch { /* non-fatal — Dropbox errors must not block record updates */ }
 
     // Audit: log record update (only changed fields)
     const changedBefore: Record<string, any> = {};

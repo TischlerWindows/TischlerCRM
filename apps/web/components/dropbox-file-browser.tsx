@@ -131,8 +131,9 @@ export function DropboxFileBrowser({
   };
 
   const folderEnsuredKey = useRef<string>('');
+  const isFirstEnsure = useRef(true);
 
-  const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async (retryCount = 0) => {
     // Don't load until we have a real record ID
     if (!recordId) return;
 
@@ -145,15 +146,22 @@ export function DropboxFileBrowser({
         return;
       }
 
-      // Auto-create the record folder — await so listing happens after folder exists.
-      // Track by recordId+folderName so we re-ensure if the name changes
-      // (e.g. record data loads after initial mount with empty props).
+      // Auto-create the record folder — but only on initial load.
+      // When the folder name changes (record was renamed), the server-side
+      // PUT handler renames the Dropbox folder before responding, so we
+      // just need to list files under the new name.
       const ensureKey = `${recordId}::${folderName}`;
+      const nameChanged = folderEnsuredKey.current !== '' && folderEnsuredKey.current !== ensureKey;
       if (folderEnsuredKey.current !== ensureKey) {
+        const first = isFirstEnsure.current;
+        isFirstEnsure.current = false;
         folderEnsuredKey.current = ensureKey;
-        try {
-          await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
-        } catch { /* non-fatal — folder may already exist */ }
+        // Only call ensureDropboxFolder on first mount, not on renames
+        if (first) {
+          try {
+            await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+          } catch { /* non-fatal — folder may already exist */ }
+        }
       }
 
       try {
@@ -163,8 +171,19 @@ export function DropboxFileBrowser({
           setEntries([]);
           return;
         }
+        // If folder was just renamed and listing is empty, retry a few times
+        // to allow the server-side rename to propagate
+        if (nameChanged && result.files.length === 0 && retryCount < 3) {
+          await new Promise(r => setTimeout(r, 1500));
+          return loadFiles(retryCount + 1);
+        }
         setEntries(result.files);
       } catch (fileErr: any) {
+        // If listing fails after rename, retry to allow propagation
+        if (nameChanged && retryCount < 3) {
+          await new Promise(r => setTimeout(r, 1500));
+          return loadFiles(retryCount + 1);
+        }
         console.error('[DropboxFileBrowser] file listing failed:', fileErr);
         setError(fileErr.message || 'Failed to load files');
       }
