@@ -149,6 +149,35 @@ export function getRecordLabel(record: any): string {
   return String(record.id || 'Record');
 }
 
+// ── getRecordSubtext ─────────────────────────────────────────────────
+// Returns an optional secondary line for lookup dropdown items.
+
+export function getRecordSubtext(record: any): string {
+  if (!record) return '';
+
+  // Property: show address as subtext
+  const addr = record.address || record.Property__address;
+  if (addr) {
+    if (typeof addr === 'object') {
+      const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+      if (parts.length > 0) return parts.join(', ');
+    } else if (typeof addr === 'string') {
+      return addr;
+    }
+  }
+
+  // Contact: show email as subtext
+  const email = record.email || record.Contact__email;
+  if (email && typeof email === 'string') return email;
+
+  // Account: show account number as subtext
+  if (record.accountNumber || record.Account__accountNumber) {
+    return record.accountNumber || record.Account__accountNumber;
+  }
+
+  return '';
+}
+
 // ── getLookupTargetApi ──────────────────────────────────────────────
 
 export function getLookupTargetApi(
@@ -232,6 +261,8 @@ export function LookupSearch({
     if (!labelStr) return true;
     const query = lookupQuery.toLowerCase();
     if (labelStr.toLowerCase().includes(query)) return true;
+    const sub = getRecordSubtext(record);
+    if (sub && sub.toLowerCase().includes(query)) return true;
     return Object.values(record).some(
       (val) => typeof val === 'string' && val.toLowerCase().includes(query),
     );
@@ -288,7 +319,9 @@ export function LookupSearch({
                   <div className="font-medium text-gray-900 truncate">
                     {displayLabel}
                   </div>
-                  <div className="text-xs text-gray-500">{record.id}</div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {getRecordSubtext(record) || record.id}
+                  </div>
                 </button>
               );
             })
