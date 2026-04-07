@@ -131,7 +131,6 @@ export function DropboxFileBrowser({
   };
 
   const folderEnsuredKey = useRef<string>('');
-  const prevFolderName = useRef<string | undefined>(undefined);
 
   const loadFiles = useCallback(async () => {
     // Don't load until we have a real record ID
@@ -151,34 +150,10 @@ export function DropboxFileBrowser({
       // (e.g. record data loads after initial mount with empty props).
       const ensureKey = `${recordId}::${folderName}`;
       if (folderEnsuredKey.current !== ensureKey) {
-        const oldName = prevFolderName.current;
         folderEnsuredKey.current = ensureKey;
-        prevFolderName.current = folderName;
-
-        // If we had a previous folder name and it changed, rename instead of creating new
-        if (oldName && folderName && oldName !== folderName) {
-          try {
-            const result = await apiClient.renameDropboxFolder({
-              objectApiName,
-              recordId,
-              oldFolderName: oldName,
-              newFolderName: folderName,
-            });
-            // If old folder wasn't found, ensure the new one exists
-            if (!result.renamed && result.reason !== 'new_folder_exists') {
-              await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
-            }
-          } catch {
-            // Rename failed — fall back to ensuring the new folder exists
-            try {
-              await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
-            } catch { /* non-fatal */ }
-          }
-        } else {
-          try {
-            await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
-          } catch { /* non-fatal — folder may already exist */ }
-        }
+        try {
+          await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+        } catch { /* non-fatal — folder may already exist */ }
       }
 
       try {
