@@ -98,6 +98,7 @@ export function renderValue(
   fieldDef: FieldDef | undefined,
   record: Record<string, any> | null,
   isLookupLoaded: boolean,
+  compact = false,
 ): React.ReactNode {
   // Auto-parse JSON strings
   let value = rawValue;
@@ -123,7 +124,7 @@ export function renderValue(
       resolve(tf.country),
     ].filter(Boolean).join(', ');
 
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+    if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
         <LocationMapPreview
           lat={lat}
@@ -243,7 +244,7 @@ export function renderValue(
     const addressText = parts.length > 0 ? parts.join(', ') : '-';
     const lat = Number(value.lat);
     const lng = Number(value.lng);
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+    if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
         <div className="space-y-2">
           <span>{addressText}</span>
@@ -285,6 +286,7 @@ interface MemoizedFieldValueProps {
   fieldDef: FieldDef | undefined;
   record: Record<string, any> | null;
   isLookupLoaded: boolean;
+  compact?: boolean;
 }
 
 function MemoizedFieldValueInner({
@@ -293,10 +295,11 @@ function MemoizedFieldValueInner({
   fieldDef,
   record,
   isLookupLoaded,
+  compact,
 }: MemoizedFieldValueProps) {
   const rendered = React.useMemo(
-    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded),
-    [apiName, rawValue, fieldDef, record, isLookupLoaded],
+    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded, compact),
+    [apiName, rawValue, fieldDef, record, isLookupLoaded, compact],
   );
   return <>{rendered}</>;
 }
