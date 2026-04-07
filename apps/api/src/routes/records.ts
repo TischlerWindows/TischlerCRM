@@ -3,7 +3,7 @@ import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
-import { tryRenameDropboxFolder } from './dropbox.js';
+import { tryRenameDropboxFolder, tryEnsureLinkedFolder } from './dropbox.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -541,6 +541,11 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
+    // ── Ensure linked Dropbox folder inside parent Property ──
+    try {
+      await tryEnsureLinkedFolder(userId, apiName, record.id, normalizedData);
+    } catch { /* non-fatal */ }
+
     reply.code(201).send(record);
   });
 
@@ -731,6 +736,11 @@ export async function recordRoutes(app: FastifyInstance) {
     try {
       await tryRenameDropboxFolder(userId, apiName, existingRecord.id, beforeData, mergedData);
     } catch { /* non-fatal — Dropbox errors must not block record updates */ }
+
+    // ── Ensure linked Dropbox folder if Property lookup was set/changed ──
+    try {
+      await tryEnsureLinkedFolder(userId, apiName, existingRecord.id, mergedData);
+    } catch { /* non-fatal */ }
 
     // Audit: log record update (only changed fields)
     const changedBefore: Record<string, any> = {};

@@ -250,6 +250,75 @@ export async function tryRenameDropboxFolder(
   }
 }
 
+/**
+ * When a child record (Opportunity, Lead, WorkOrder) is created or updated
+ * with a Property lookup, ensure the linked folder exists inside the parent
+ * Property's Dropbox folder.  Fire-and-forget — errors are logged only.
+ */
+export async function tryEnsureLinkedFolder(
+  userId: string,
+  childObjectApiName: string,
+  childRecordId: string,
+  childData: Record<string, any>,
+): Promise<void> {
+  try {
+    // Only applies to object types that have a subfolder mapping
+    const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
+    if (!subfolder) return;
+
+    // Find the Property lookup value — check common field name patterns
+    const propertyId =
+      childData.property || childData[`${childObjectApiName}__property`] ||
+      childData.propertyId || childData[`${childObjectApiName}__propertyId`] ||
+      childData.relatedProperty || childData[`${childObjectApiName}__relatedProperty`];
+    if (!propertyId || typeof propertyId !== 'string') return;
+
+    const accessToken = await getAccessToken(userId);
+    if (!accessToken) return; // Dropbox not connected
+
+    // Load the parent Property record to derive its folder name
+    const propertyRecord = await prisma.record.findFirst({ where: { id: propertyId } });
+    if (!propertyRecord) return;
+    const propertyData = propertyRecord.data as Record<string, any>;
+    const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
+
+    // Derive child folder name
+    const childFolderName = deriveDropboxFolderName(childData, childRecordId);
+
+    const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
+    const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+    const childPath = `${parentPath}/${subfolder}/${safeName}`;
+
+    let created = false;
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', {
+        path: childPath,
+        autorename: false,
+      });
+      created = true;
+    } catch (err: any) {
+      if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+        throw err;
+      }
+      // Already exists — fine
+    }
+
+    // Create subfolders for Opportunity records
+    if (created && childObjectApiName === 'Opportunity') {
+      for (const sf of OPPORTUNITY_SUBFOLDERS) {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: `${childPath}/${sf}`,
+            autorename: false,
+          });
+        } catch { /* folder already exists — ignore */ }
+      }
+    }
+  } catch (err: any) {
+    console.error('[dropbox] tryEnsureLinkedFolder failed (non-fatal):', err.message);
+  }
+}
+
 // ── Routes ─────────────────────────────────────────────────────────
 
 export async function dropboxRoutes(app: FastifyInstance) {
