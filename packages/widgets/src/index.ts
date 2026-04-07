@@ -4,5 +4,5 @@
  * (`apps/web/widgets/external/registry.ts`) and the API registry
  * (`apps/api/src/widgets/external/registry.ts`).
  */
-export const EXTERNAL_WIDGET_IDS = ['demo-widget'] as const
+export const EXTERNAL_WIDGET_IDS = ['demo-widget', 'dropbox-browser'] as const
 export type ExternalWidgetId = (typeof EXTERNAL_WIDGET_IDS)[number]
