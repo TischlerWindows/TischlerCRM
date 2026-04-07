@@ -37,6 +37,7 @@ import {
 import { cn, evaluateFormulaForRecord } from '@/lib/utils';
 
 import { AddressInput, LocationSearchInput, GeolocationInput } from './address-field';
+import AddressAutocomplete from '@/components/address-autocomplete';
 import {
   PicklistInput,
   MultiPicklistInput,
@@ -399,16 +400,107 @@ export function FieldInput({
       break;
 
     // ── Address ──────────────────────────────────────────────
-    case 'Address':
+    // Render sub-fields directly (same pattern as CompositeText)
+    // so edits go through the same onFieldChange path that works
+    // for every other field type.
+    case 'Address': {
+      const addrObj =
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? value
+          : (() => {
+              if (typeof value === 'string') {
+                try { const p = JSON.parse(value); return typeof p === 'object' && p ? p : {}; } catch { return {}; }
+              }
+              return {};
+            })();
+
+      const addrDisplay = [addrObj.street, addrObj.city, addrObj.state, addrObj.postalCode, addrObj.country]
+        .filter(Boolean)
+        .join(', ');
+
       inputElement = (
-        <AddressInput
-          fieldDef={fieldDef}
-          value={value}
-          onChange={(val) => onFieldChange(fieldDef.apiName, val)}
-          disabled={isReadOnly}
-        />
+        <div className="space-y-2 border border-gray-300 rounded-lg p-3">
+          {!isReadOnly && (
+            <AddressAutocomplete
+              disabled={isReadOnly}
+              placeholder="Search for an address..."
+              value={addrDisplay}
+              onAddressSelected={(addr) => {
+                onFieldChange(fieldDef.apiName, {
+                  street: addr.street,
+                  city: addr.city,
+                  state: addr.state,
+                  postalCode: addr.postalCode,
+                  country: addr.country,
+                  lat: addr.lat,
+                  lng: addr.lng,
+                });
+              }}
+            />
+          )}
+          <Input
+            placeholder="Street"
+            value={addrObj.street || ''}
+            onChange={(e) =>
+              onFieldChange(fieldDef.apiName, {
+                ...addrObj,
+                street: e.target.value,
+              })
+            }
+            disabled={isReadOnly}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Input
+              placeholder="City"
+              value={addrObj.city || ''}
+              onChange={(e) =>
+                onFieldChange(fieldDef.apiName, {
+                  ...addrObj,
+                  city: e.target.value,
+                })
+              }
+              disabled={isReadOnly}
+            />
+            <Input
+              placeholder="State/Province"
+              value={addrObj.state || ''}
+              onChange={(e) =>
+                onFieldChange(fieldDef.apiName, {
+                  ...addrObj,
+                  state: e.target.value,
+                })
+              }
+              disabled={isReadOnly}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Input
+              placeholder="Postal Code"
+              value={addrObj.postalCode || ''}
+              onChange={(e) =>
+                onFieldChange(fieldDef.apiName, {
+                  ...addrObj,
+                  postalCode: e.target.value,
+                })
+              }
+              disabled={isReadOnly}
+            />
+            <Input
+              placeholder="Country"
+              value={addrObj.country || ''}
+              onChange={(e) =>
+                onFieldChange(fieldDef.apiName, {
+                  ...addrObj,
+                  country: e.target.value,
+                })
+              }
+              disabled={isReadOnly}
+            />
+          </div>
+        </div>
       );
       break;
+    }
 
     // ── LocationSearch ───────────────────────────────────────
     case 'LocationSearch' as FieldType:
