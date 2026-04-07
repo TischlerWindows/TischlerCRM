@@ -7,6 +7,7 @@ export const config: WidgetManifest = {
   icon: 'FolderOpen',
   category: 'external',
   integration: null,
+  hideFromPalette: true,
   defaultDisplayMode: 'full',
   configSchema: [
     {

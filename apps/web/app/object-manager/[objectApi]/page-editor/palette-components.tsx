@@ -180,7 +180,7 @@ export function PaletteComponents({
             <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
               External
             </div>
-            {externalWidgets.map((manifest) => {
+            {externalWidgets.filter((m) => !m.hideFromPalette).map((manifest) => {
               const enabled =
                 enabledExternalWidgetIds.includes(manifest.id) &&
                 (manifest.integration === null || connectedProviders.includes(manifest.integration));
