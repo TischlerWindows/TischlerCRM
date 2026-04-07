@@ -1,67 +1,41 @@
-import type { FieldDef, FormattingRule, PageLayout } from '@/lib/schema';
-import type { CanvasField, CanvasSection, CanvasTab } from './types';
+import type { EditorState } from './editor-store';
+import type { PageLayout } from './types';
 
-export function buildPageLayoutFromCanvas(params: {
-  editingLayoutId: string | null;
-  layoutName: string;
-  tabs: CanvasTab[];
-  sections: CanvasSection[];
-  fields: CanvasField[];
-  objectFields: FieldDef[];
-  formattingRules: FormattingRule[];
-}): PageLayout {
-  const {
-    editingLayoutId,
-    layoutName,
-    tabs,
-    sections,
-    fields,
-    objectFields,
-    formattingRules,
-  } = params;
+function stripNullish(obj: Record<string, unknown>): void {
+  for (const key of Object.keys(obj)) {
+    if (obj[key] === undefined || obj[key] === null) {
+      delete obj[key];
+    }
+  }
+}
 
-  const fieldMap = new Map(objectFields.map((f) => [f.apiName, f]));
+/**
+ * Minimal cleanup before saving — strips undefined/null style fields from a layout.
+ * Returns a new PageLayout safe to pass to updateObject().
+ */
+export function buildPageLayout(layout: PageLayout): PageLayout {
+  const clone = structuredClone(layout);
+  for (const tab of clone.tabs) {
+    for (const region of tab.regions) {
+      if (region.style) stripNullish(region.style as Record<string, unknown>);
+      for (const panel of region.panels) {
+        if (panel.style) stripNullish(panel.style as Record<string, unknown>);
+        for (const field of panel.fields) {
+          if (field.labelStyle) stripNullish(field.labelStyle as Record<string, unknown>);
+          if (field.valueStyle) stripNullish(field.valueStyle as Record<string, unknown>);
+        }
+      }
+    }
+  }
+  return clone;
+}
 
-  return {
-    id: editingLayoutId || `layout-${Date.now()}`,
-    name: layoutName,
-    layoutType: 'edit',
-    tabs: tabs.map((tab) => ({
-      id: tab.id,
-      label: tab.label,
-      order: tab.order,
-      sections: sections
-        .filter((s) => s.tabId === tab.id)
-        .map((section) => ({
-          id: section.id,
-          label: section.label,
-          columns: section.columns,
-          order: section.order,
-          description: section.description,
-          fields: fields
-            .filter((f) => f.sectionId === section.id)
-            .map((f) => {
-              const fieldDef = fieldMap.get(f.fieldApiName);
-              const base = {
-                apiName: f.fieldApiName,
-                column: f.column,
-                order: f.order,
-                colSpan: f.colSpan > 1 ? f.colSpan : undefined,
-                rowSpan: f.rowSpan > 1 ? f.rowSpan : undefined,
-                presentation:
-                  f.presentation && Object.keys(f.presentation).length > 0
-                    ? f.presentation
-                    : undefined,
-              };
-              if (!fieldDef) return base;
-              const { apiName, ...rest } = fieldDef;
-              return { ...rest, ...base };
-            }),
-          visibleIf: section.visibleIf,
-          showInRecord: section.showInRecord,
-          showInTemplate: section.showInTemplate,
-        })),
-    })),
-    formattingRules: formattingRules.length > 0 ? formattingRules : undefined,
-  };
+/**
+ * Initializes editor state from a loaded PageLayout.
+ * Returns only the fields needed to hydrate the store.
+ */
+export function initEditorFromLayout(
+  layout: PageLayout,
+): Pick<EditorState, 'layout' | 'isDirty' | 'selectedElement' | 'undoStack' | 'redoStack'> {
+  return { layout, isDirty: false, selectedElement: null, undoStack: [], redoStack: [] };
 }

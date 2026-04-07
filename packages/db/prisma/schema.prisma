@@ -565,6 +565,18 @@ model Integration {
   @@index([category])
 }
 
+model WidgetSetting {
+  id        String   @id @default(cuid())
+  orgId     String
+  widgetId  String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, widgetId])
+  @@index([orgId])
+}
+
 // Per-user integration connection (OAuth tokens, sync state)
 model UserIntegration {
   id            String      @id

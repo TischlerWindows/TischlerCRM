@@ -211,9 +211,23 @@ export async function recordRoutes(app: FastifyInstance) {
   // Get all records for an object
   app.get('/objects/:apiName/records', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const rawQuery = req.query as { limit?: string; offset?: string };
+    const rawQuery = req.query as {
+      limit?: string;
+      offset?: string;
+      orderBy?: string;
+      orderDir?: string;
+      filter?: Record<string, string>;
+    };
     const limit = Math.min(Math.max(Number(rawQuery.limit) || 50, 1), 200);
     const offset = Math.max(Number(rawQuery.offset) || 0, 0);
+
+    // bracket-notation filter params: filter[fieldApiName]=value
+    const filters: Array<[string, string]> = rawQuery.filter
+      ? Object.entries(rawQuery.filter).filter(([, v]) => v !== undefined && v !== '')
+      : [];
+
+    const orderByField = rawQuery.orderBy ?? null;
+    const orderDir: 'asc' | 'desc' = rawQuery.orderDir === 'asc' ? 'asc' : 'desc';
 
     const userId = req.user!.sub;
     const userRole = req.user!.role;
@@ -228,8 +242,20 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
+    // Build JSON path filter conditions for the data column (PostgreSQL)
+    const jsonFilters = filters.map(([field, value]) => ({
+      data: { path: [field], equals: value },
+    }));
+
+    // When a custom orderBy is requested, fetch a larger batch for JS sorting
+    const needsJsSort = orderByField !== null;
+    const fetchLimit = needsJsSort ? Math.min(limit * 10, 500) : limit;
+
     const records = await prisma.record.findMany({
-      where: { objectId: object.id },
+      where: {
+        objectId: object.id,
+        ...(jsonFilters.length > 0 ? { AND: jsonFilters } : {}),
+      },
       include: {
         pageLayout: {
           select: {
@@ -254,11 +280,21 @@ export async function recordRoutes(app: FastifyInstance) {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
+      take: fetchLimit,
+      skip: needsJsSort ? 0 : offset,
     });
 
-    reply.send(records);
+    // Application-level sort when a data-field orderBy is provided
+    let result: typeof records = records;
+    if (needsJsSort) {
+      result = [...records].sort((a, b) => {
+        const aVal = String((a.data as Record<string, unknown>)?.[orderByField] ?? '');
+        const bVal = String((b.data as Record<string, unknown>)?.[orderByField] ?? '');
+        return orderDir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+      }).slice(offset, offset + limit);
+    }
+
+    reply.send(result);
   });
 
   // Get single record — accepts either a standardized recordId or a UUID
@@ -505,6 +541,98 @@ export async function recordRoutes(app: FastifyInstance) {
     });
 
     reply.code(201).send(record);
+  });
+
+  // ── Bulk migrate per-record layout overrides ────────────────────────────
+  // POST /objects/:apiName/records/page-layout/migrate
+  // Body: { fromPageLayoutId: string }
+  // Finds all records on this object whose stored layout FK or data._pageLayoutId
+  // matches `fromPageLayoutId`, then clears both so they fall back to the
+  // record-type / default layout going forward.
+  app.post('/objects/:apiName/records/page-layout/migrate', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const { fromPageLayoutId } = req.body as { fromPageLayoutId?: string };
+
+    if (!fromPageLayoutId) {
+      return reply.code(400).send({ error: 'fromPageLayoutId is required' });
+    }
+
+    const userRole = req.user!.role;
+    if (userRole !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Only admins can perform layout migrations' });
+    }
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+
+    if (!object) {
+      return reply.code(404).send({ error: 'Object not found' });
+    }
+
+    // Collect record IDs to migrate in two passes:
+    // 1. Records whose FK column matches
+    // 2. Records whose JSON data._pageLayoutId matches (those skipped FK storage)
+    const BATCH_SIZE = 500;
+    let updatedCount = 0;
+    let skip = 0;
+
+    // Pass 1 — FK column match
+    while (true) {
+      const batch = await prisma.record.findMany({
+        where: { objectId: object.id, pageLayoutId: fromPageLayoutId },
+        select: { id: true, data: true },
+        take: BATCH_SIZE,
+        skip,
+      });
+
+      if (batch.length === 0) break;
+
+      for (const rec of batch) {
+        const cleaned = { ...(rec.data as Record<string, any>) };
+        delete cleaned._pageLayoutId;
+        await prisma.record.update({
+          where: { id: rec.id },
+          data: { pageLayoutId: null, data: cleaned },
+        });
+      }
+
+      updatedCount += batch.length;
+      if (batch.length < BATCH_SIZE) break;
+      skip += BATCH_SIZE;
+    }
+
+    // Pass 2 — JSON blob match (records where FK was null / non-UUID but _pageLayoutId was stored)
+    skip = 0;
+    while (true) {
+      const batch = await prisma.record.findMany({
+        where: {
+          objectId: object.id,
+          pageLayoutId: null, // FK already cleared records are excluded; only touch un-cleared ones
+          data: { path: ['_pageLayoutId'], equals: fromPageLayoutId },
+        },
+        select: { id: true, data: true },
+        take: BATCH_SIZE,
+        skip,
+      });
+
+      if (batch.length === 0) break;
+
+      for (const rec of batch) {
+        const cleaned = { ...(rec.data as Record<string, any>) };
+        delete cleaned._pageLayoutId;
+        await prisma.record.update({
+          where: { id: rec.id },
+          data: { data: cleaned },
+        });
+      }
+
+      updatedCount += batch.length;
+      if (batch.length < BATCH_SIZE) break;
+      skip += BATCH_SIZE;
+    }
+
+    return reply.send({ updatedCount });
   });
 
   app.put('/objects/:apiName/records/:recordId', async (req, reply) => {

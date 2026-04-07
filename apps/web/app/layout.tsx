@@ -9,6 +9,7 @@ import AppWrapper from './app-wrapper';
 import { AuthProvider } from '@/lib/auth-context';
 import { PermissionsProvider } from '@/lib/permissions-context';
 import { ProtectedRouteWrapper } from '@/lib/protected-route-wrapper';
+import { ToastProvider } from '@/components/toast';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -17,7 +18,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <AuthProvider>
           <PermissionsProvider>
             <ProtectedRouteWrapper>
-              <AppWrapper>{children}</AppWrapper>
+              <ToastProvider>
+                <AppWrapper>{children}</AppWrapper>
+              </ToastProvider>
             </ProtectedRouteWrapper>
           </PermissionsProvider>
         </AuthProvider>

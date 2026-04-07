@@ -1,12 +1,5 @@
-'use client';
-
-import { ReactNode } from 'react';
-import { ToastProvider } from '@/components/toast';
+import type { ReactNode } from 'react';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <ToastProvider>
-      {children}
-    </ToastProvider>
-  );
+  return <>{children}</>;
 }

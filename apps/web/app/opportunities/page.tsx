@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Target, 
@@ -91,6 +91,7 @@ export default function OpportunitiesPage() {
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
+  const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
@@ -100,6 +101,7 @@ export default function OpportunitiesPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
   const { canAccess } = usePermissions();
@@ -171,6 +173,19 @@ export default function OpportunitiesPage() {
     }
   }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
+  // Auto-open new record form when navigated from a related list with ?new=true
+  useEffect(() => {
+    if (searchParams.get('new') === 'true' && hasPageLayout && selectedLayoutId) {
+      // Extract prefill fields from URL (e.g., PropertyId=001EcZ28vn7mm0E)
+      const prefill: Record<string, any> = {}
+      searchParams.forEach((value, key) => {
+        if (key !== 'new') prefill[key] = value
+      })
+      setPrefillData(prefill)
+      setShowDynamicForm(true)
+      router.replace(pathname, { scroll: false })
+    }
+  }, [searchParams, hasPageLayout, selectedLayoutId, pathname, router])
 
   useEffect(() => {
     (async () => {
@@ -876,7 +891,7 @@ export default function OpportunitiesPage() {
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.sections.length, 0)} sections
+                      {layout.tabs.reduce((acc, tab) => acc + tab.regions.length, 0)} sections
                     </div>
                   </div>
                 </button>
@@ -900,11 +915,15 @@ export default function OpportunitiesPage() {
           open={showDynamicForm}
           onOpenChange={(open) => {
             setShowDynamicForm(open);
-            if (!open) setSelectedLayoutId(null);
+            if (!open) {
+              setSelectedLayoutId(null);
+              setPrefillData({});
+            }
           }}
           objectApiName="Opportunity"
           layoutType="create"
           layoutId={selectedLayoutId}
+          recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
           title="New Opportunity"
         />

@@ -133,21 +133,23 @@ export interface RecordType {
   name: string;
   description?: string;
   default?: boolean;
+  /** @deprecated Use layout assignment rules instead; retained for backward compatibility */
   pageLayoutId?: string;
 }
 
-/** Allowlisted label colors — mapped to Tailwind in `layout-presentation.ts` */
+/** @deprecated Use PanelField.labelStyle / ValueStyle in the new Region→Panel→Field hierarchy */
 export type LabelColorToken = 'default' | 'brand' | 'muted' | 'danger' | 'success';
 
-/** Layout-scoped field label styling (not stored on FieldDef) */
+/** @deprecated Use PanelField.labelStyle in the new Region→Panel→Field hierarchy */
 export interface PageFieldPresentation {
   labelBold?: boolean;
   labelColorToken?: LabelColorToken;
 }
 
 export type FormattingRuleTarget =
-  | { kind: 'field'; fieldApiName: string }
-  | { kind: 'section'; sectionId: string };
+  | { kind: 'field'; fieldApiName: string; panelId: string }
+  | { kind: 'panel'; panelId: string }
+  | { kind: 'region'; regionId: string };
 
 export type FieldHighlightToken = 'none' | 'subtle' | 'attention' | 'positive' | 'critical';
 
@@ -175,12 +177,123 @@ export interface PageLayoutExtensions {
   [key: string]: unknown;
 }
 
-export interface PageSection {
+// ── Widget system ──────────────────────────────────────────────
+
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget';
+
+export type RelatedListFilterOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'contains'
+  | 'not_contains'
+  | 'greater_than'
+  | 'less_than'
+  | 'is_empty'
+  | 'is_not_empty';
+
+export interface RelatedListFilter {
+  field: string;
+  operator: RelatedListFilterOperator;
+  value: string;
+}
+
+export interface RelatedListConfig {
+  type: 'RelatedList';
+  relatedObjectApiName: string;
+  relationshipFieldApiName: string;
+  displayColumns: string[];
+  sortField?: string;
+  sortDirection?: 'asc' | 'desc';
+  maxRows?: number;
+  /** Custom header label shown in the widget header. Falls back to object label when absent. */
+  label?: string;
+  objectApiName?: string;
+  columns?: string[];
+  linkField?: string;
+  rowLimit?: number;
+  showSearch?: boolean;
+  /** 'list' renders a table; 'tile' renders a card grid. Defaults to 'list'. */
+  viewMode?: 'list' | 'tile';
+  /** Show the action bar (New button) above the list. */
+  showActionBar?: boolean;
+  /** Show a "New" button in the action bar pre-filling the link field. */
+  showNewButton?: boolean;
+  /** Admin-defined filters applied after fetch (users cannot override). Up to 10. */
+  filters?: RelatedListFilter[];
+}
+
+export interface CustomComponentConfig {
+  type: 'CustomComponent';
+  componentId: string;
+  props?: Record<string, unknown>;
+}
+
+export interface ActivityFeedConfig {
+  type: 'ActivityFeed';
+  maxItems?: number;
+}
+
+export interface FileFolderConfig {
+  type: 'FileFolder';
+  provider: 'dropbox' | 'google-drive' | 'local';
+  folderId?: string;
+}
+
+/** Layout-only blank vertical space (builder + preview) */
+export interface SpacerConfig {
+  type: 'Spacer';
+  /** Minimum height in CSS pixels */
+  minHeightPx?: number;
+}
+
+export interface HeaderHighlightsConfig {
+  type: 'HeaderHighlights';
+  /** Up to 6 field API names to display as highlight badges */
+  fieldApiNames: string[];
+  /** Which action buttons to show in the highlights bar. Defaults to edit + delete when absent. */
+  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print'>;
+}
+
+export interface ExternalWidgetLayoutConfig {
+  type: 'ExternalWidget';
+  externalWidgetId: string;
+  displayMode: 'full' | 'column';
+  config: Record<string, unknown>;
+}
+
+export type WidgetConfig =
+  | RelatedListConfig
+  | CustomComponentConfig
+  | ActivityFeedConfig
+  | FileFolderConfig
+  | SpacerConfig
+  | HeaderHighlightsConfig
+  | ExternalWidgetLayoutConfig;
+
+export interface PageWidget {
+  id: string;
+  widgetType: WidgetType;
+  column: number;
+  order: number;
+  colSpan?: number;
+  rowSpan?: number;
+  config: WidgetConfig;
+  /** Tab canvas placement (12-column grid); omit when widget is inside a section only */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
+}
+
+// ── Page layout sections ───────────────────────────────────────
+
+export interface LegacyPageSection {
   id: string;
   label: string;
-  columns: 1 | 2 | 3;
+  columns: 1 | 2 | 3 | 4;
   order: number;
-  fields: PageField[];
+  fields: LegacyPageField[];
+  widgets?: PageWidget[];
   /** Shown under the section title in form/detail when supported */
   description?: string;
   visibleIf?: ConditionExpr[];
@@ -188,39 +301,169 @@ export interface PageSection {
   showInRecord?: boolean;
   /** When false, the section is hidden in the create/edit form template */
   showInTemplate?: boolean;
+  /**
+   * Sections with the same id render side-by-side in one row (builder + runtime).
+   * Omit or use unique ids per row for full-width stacked sections.
+   */
+  layoutRowId?: string;
+  /** Flex grow weight within the row (default 1). */
+  rowWeight?: number;
+  /**
+   * Tab canvas placement (12-column grid). Legacy layouts without these fields are inferred at load
+   * from `layoutRowId` + `rowWeight` (see `normalizeCanvasTabGrids` / `resolveTabCanvasItems`).
+   */
+  gridColumn?: number;
+  gridColumnSpan?: number;
+  gridRow?: number;
+  gridRowSpan?: number;
 }
 
+/** @deprecated Use LegacyPageSection — alias retained for backward compatibility */
+export type PageSection = LegacyPageSection;
+
 /**
- * A field reference inside a page layout section.
+ * A field reference inside a legacy page layout section.
  *
  * Self-contained: every rendering-relevant property from the parent
  * FieldDef is embedded directly so DynamicForm never needs to cross-
  * reference `object.fields` at render time.  The enrichment happens
  * once during schema load (see `enrichLayoutFieldDefs` in schema-service).
  */
-export type PageField = {
+export type LegacyPageField = {
   apiName: string;
   column: number;
   order: number;
   colSpan?: number;
   rowSpan?: number;
-  presentation?: PageFieldPresentation;
 } & Partial<Omit<FieldDef, 'apiName'>>;
 
-export interface PageTab {
+/** @deprecated Use LegacyPageField — alias retained for backward compatibility */
+export type PageField = LegacyPageField;
+
+export interface LegacyPageTab {
   id: string;
   label: string;
   order: number;
-  sections: PageSection[];
+  sections: LegacyPageSection[];
+  /** Widgets on the tab canvas (not inside a section), e.g. related lists above the fold */
+  widgets?: PageWidget[];
+}
+
+/** @deprecated Use LegacyPageTab — alias retained for backward compatibility */
+export type PageTab = LegacyPageTab;
+
+// ── New page editor hierarchy (Region → Panel → Field) ─────────────
+
+export interface RegionStyle {
+  background?: string;
+  borderColor?: string;
+  borderStyle?: 'solid' | 'dashed' | 'none';
+  shadow?: 'sm' | 'md' | 'none';
+  borderRadius?: 'none' | 'sm' | 'lg';
+}
+
+export interface PanelStyle {
+  headerBackground?: string;
+  headerTextColor?: string;
+  headerBold?: boolean;
+  headerItalic?: boolean;
+  headerUppercase?: boolean;
+  bodyBackground?: string;
+}
+
+export interface LabelStyle {
+  color?: string;
+  bold?: boolean;
+  italic?: boolean;
+  uppercase?: boolean;
+}
+
+export interface ValueStyle {
+  color?: string;
+  background?: string;
+  bold?: boolean;
+  italic?: boolean;
+}
+
+export interface PanelField {
+  fieldApiName: string;
+  labelOverride?: string;
+  colSpan: number;
+  order: number;
+  labelStyle: LabelStyle;
+  valueStyle: ValueStyle;
+  behavior: 'none' | 'required' | 'readOnly' | 'hidden';
+}
+
+export interface LayoutPanel {
+  id: string;
+  label: string;
+  order: number;
+  columns: 1 | 2 | 3 | 4;
+  style: PanelStyle;
+  fields: PanelField[];
+  hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+}
+
+export interface LayoutWidget {
+  id: string;
+  widgetType: WidgetType;
+  order: number;
+  config: WidgetConfig;
+}
+
+export interface LayoutSection {
+  id: string;
+  label: string;
+  gridColumn: number;
+  gridColumnSpan: number;
+  gridRow: number;
+  gridRowSpan: number;
+  style: RegionStyle;
+  panels: LayoutPanel[];
+  widgets: LayoutWidget[];
+  hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+}
+
+export interface LayoutTab {
+  id: string;
+  label: string;
+  order: number;
+  regions: LayoutSection[];
 }
 
 export interface PageLayout {
   id: string;
   name: string;
-  layoutType: 'create' | 'edit'; // New Record vs Existing Record
-  tabs: PageTab[];
+  objectApi?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  active?: boolean;
+  isDefault?: boolean;
+  roles?: string[];
+  layoutType?: 'create' | 'edit';
+  tabs: LayoutTab[];
+  /** Up to ~6 field API names shown in record header highlights strip */
+  highlightFields?: string[];
   formattingRules?: FormattingRule[];
   /** Optional DB mirror / forward-compatible bag */
+  extensions?: PageLayoutExtensions;
+}
+
+/** Legacy PageLayout shape — tabs use the old PageTab/PageSection/PageField hierarchy */
+export interface LegacyPageLayout {
+  id: string;
+  name: string;
+  objectApi?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  active?: boolean;
+  isDefault?: boolean;
+  roles?: string[];
+  layoutType?: 'create' | 'edit';
+  tabs: LegacyPageTab[];
+  highlightFields?: string[];
+  formattingRules?: FormattingRule[];
   extensions?: PageLayoutExtensions;
 }
 
@@ -266,9 +509,26 @@ export interface SchemaVersion {
   description?: string;
 }
 
+export type TemplatePanelDef = Omit<LayoutPanel, 'fields'>;
+export type TemplateSectionDef = Omit<LayoutSection, 'panels' | 'widgets'> & {
+  panels: TemplatePanelDef[];
+};
+export type TemplateTabDef = Omit<LayoutTab, 'regions'> & { regions: TemplateSectionDef[] };
+
+/** Structural skeleton of a saved layout template (no field data) */
+export interface CustomLayoutTemplate {
+  id: string;
+  name: string;
+  objectApi: string;
+  tabs: TemplateTabDef[];
+  createdAt: string;
+}
+
 export interface OrgSchema {
   version: number; // increment on save
   objects: ObjectDef[];
+  flows?: FlowDefinition[];
+  customLayoutTemplates?: CustomLayoutTemplate[];
   updatedAt: string;
   createdBy?: string;
 }
@@ -470,17 +730,21 @@ export function createDefaultPageLayout(objectApiName: string): PageLayout {
         id: generateId(),
         label: 'Details',
         order: 0,
-        sections: [
+        regions: [
           {
             id: generateId(),
-            label: 'Information',
-            columns: 2,
-            order: 0,
-            fields: []
-          }
-        ]
-      }
-    ]
+            label: 'Main',
+            gridColumn: 1,
+            gridColumnSpan: 12,
+            gridRow: 1,
+            gridRowSpan: 1,
+            style: {},
+            panels: [],
+            widgets: [],
+          },
+        ],
+      },
+    ],
   };
 }
 

@@ -30,6 +30,8 @@ import { auditLogRoutes } from './routes/audit-log.js';
 import { recycleBinRoutes } from './routes/recycle-bin.js';
 import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
+import { widgetRoutes } from './routes/widgets.js';
+import { externalWidgetRouteModules } from './widgets/external/registry.js';
 import { dropboxRoutes } from './routes/dropbox.js';
 import { outlookRoutes } from './routes/outlook.js';
 
@@ -449,8 +451,32 @@ export function buildApp() {
   app.register(recycleBinRoutes);
   app.register(integrationRoutes);
   app.register(placesRoutes);
+  app.register(widgetRoutes);
   app.register(dropboxRoutes);
   app.register(outlookRoutes);
+
+  // Register per-widget server-side route modules under /api/widgets/:widgetId/
+  for (const { widgetId, registerRoutes } of externalWidgetRouteModules) {
+    app.register(
+      async (instance) => { await registerRoutes(instance) },
+      { prefix: `/widgets/${widgetId}` }
+    );
+  }
+
+  // Populate widgetContext for widget routes
+  app.decorateRequest('widgetContext', null);
+  app.addHook('preHandler', async (request) => {
+    const pathOnly = (request.url ?? '').split('?')[0] ?? '';
+    if (!pathOnly.startsWith('/widgets/') || pathOnly === '/widgets') return;
+    const widgetId = pathOnly.split('/')[2];
+    const user = (request as any).user;
+    if (!user || !widgetId) return;
+    (request as any).widgetContext = {
+      orgId: user.sub,
+      userId: user.sub,
+      integrationToken: null,
+    };
+  });
 
   return app;
 }

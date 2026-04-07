@@ -151,7 +151,7 @@ export default function PropertiesPage() {
   
   // Check if Property object exists with page layouts
   const propertyObject = schema?.objects.find(obj => obj.apiName === 'Property');
-  const lookupTick = useLookupPreloader(propertyObject);
+  const isLookupLoaded = useLookupPreloader(propertyObject);
   const pageLayouts = propertyObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -412,7 +412,7 @@ export default function PropertiesPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (property: Property, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value = (property as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

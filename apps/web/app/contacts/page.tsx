@@ -124,7 +124,7 @@ export default function ContactsPage() {
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
   
   const contactObject = schema?.objects.find(obj => obj.apiName === 'Contact');
-  const lookupTick = useLookupPreloader(contactObject);
+  const isLookupLoaded = useLookupPreloader(contactObject);
   const pageLayouts = contactObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -311,7 +311,7 @@ export default function ContactsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (contact: Contact, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value: any = contact[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

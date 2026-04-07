@@ -468,6 +468,16 @@ class ApiClient {
     });
   }
 
+  async migrateRecordLayouts(objectApiName: string, fromPageLayoutId: string): Promise<{ updatedCount: number }> {
+    return this.request<{ updatedCount: number }>(
+      `/objects/${objectApiName}/records/page-layout/migrate`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ fromPageLayoutId }),
+      },
+    );
+  }
+
   // Reports
   async getReports() {
     return this.request<any[]>('/reports');
@@ -644,6 +654,18 @@ class ApiClient {
 
   async getMyConnections() {
     return this.request<any[]>('/integrations/me/connections');
+  }
+
+  // Widgets
+  async getWidgetSettings(): Promise<Array<{ widgetId: string; enabled: boolean }>> {
+    return this.request('/widgets');
+  }
+
+  async updateWidgetSetting(widgetId: string, enabled: boolean): Promise<void> {
+    return this.request(`/widgets/${encodeURIComponent(widgetId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
   }
 
   // Google Places (proxied through backend — API key never reaches the browser)

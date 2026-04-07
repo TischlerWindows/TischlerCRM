@@ -147,7 +147,7 @@ export default function AccountsPage() {
   
   // Check if Account object exists with page layouts
   const accountObject = schema?.objects.find(obj => obj.apiName === 'Account');
-  const lookupTick = useLookupPreloader(accountObject);
+  const isLookupLoaded = useLookupPreloader(accountObject);
   const pageLayouts = accountObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
 
@@ -393,7 +393,7 @@ export default function AccountsPage() {
   const isColumnVisible = (columnId: string) => visibleColumns.includes(columnId);
 
   const formatColumnValue = (account: Account, columnId: string) => {
-    void lookupTick; // re-render after lookup cache loads
+    void isLookupLoaded; // re-render after lookup cache loads
     let value = (account as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value

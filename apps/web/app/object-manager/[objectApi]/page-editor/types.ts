@@ -1,47 +1,48 @@
-import type { FieldType, ConditionExpr, PageFieldPresentation } from '@/lib/schema';
+import type {
+  ConditionExpr,
+  FormattingRule,
+  FormattingRuleTarget,
+  FieldHighlightToken,
+  LayoutTab,
+  LayoutSection,
+  LayoutPanel,
+  PanelField,
+  LayoutWidget,
+  RegionStyle,
+  PanelStyle,
+  LabelStyle,
+  ValueStyle,
+  TemplatePanelDef,
+  TemplateSectionDef,
+  TemplateTabDef,
+  CustomLayoutTemplate,
+  PageLayout,
+} from '@/lib/schema';
 
-export type ColumnCount = 1 | 2 | 3;
-
-export interface CanvasField {
-  id: string;
-  fieldApiName: string;
-  sectionId: string;
-  column: number;
-  order: number;
-  colSpan: number;
-  rowSpan: number;
-  presentation?: PageFieldPresentation;
-}
-
-export interface CanvasSection {
-  id: string;
-  label: string;
-  tabId: string;
-  columns: ColumnCount;
-  order: number;
-  collapsed: boolean;
-  description?: string;
-  visibleIf?: ConditionExpr[];
-  showInRecord: boolean;
-  showInTemplate: boolean;
-}
-
-export interface CanvasTab {
-  id: string;
-  label: string;
-  order: number;
-}
-
-export interface DraggedField {
-  id: string;
-  label: string;
-  apiName: string;
-  type: FieldType;
-  required: boolean;
-}
+export type {
+  ConditionExpr,
+  FormattingRule,
+  FormattingRuleTarget,
+  FieldHighlightToken,
+  LayoutTab,
+  LayoutSection,
+  LayoutPanel,
+  PanelField,
+  LayoutWidget,
+  RegionStyle,
+  PanelStyle,
+  LabelStyle,
+  ValueStyle,
+  TemplatePanelDef,
+  TemplateSectionDef,
+  TemplateTabDef,
+  CustomLayoutTemplate,
+  PageLayout,
+};
 
 export type SelectedElement =
-  | { type: 'tab'; id: string }
-  | { type: 'section'; id: string }
-  | { type: 'field'; id: string }
+  | { type: 'region'; id: string }
+  | { type: 'panel'; id: string }
+  | { type: 'field'; id: string; panelId: string }
+  | { type: 'widget'; id: string }
   | null;

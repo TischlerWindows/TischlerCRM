@@ -4,7 +4,19 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { HelpCircle, Cog, Edit3, GripVertical, X, LogOut, ChevronDown, Bell } from 'lucide-react';
+import {
+  HelpCircle,
+  Cog,
+  Edit3,
+  GripVertical,
+  X,
+  LogOut,
+  Bell,
+  Settings,
+  Database,
+  ExternalLink,
+  Edit,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
@@ -12,10 +24,13 @@ import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
+import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
+import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
-export default function AppWrapper({ children }: { children: React.ReactNode }) {
+function AppWrapperInner({ children }: { children: React.ReactNode }) {
+  const { value: recordSetup } = useRecordSetupContext();
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout, isImpersonating, returnToAdmin } = useAuth();
@@ -29,6 +44,7 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSetupMenu, setShowSetupMenu] = useState(false);
 
   // Map tab hrefs to CRM object apiNames for permission filtering
   const hrefToObjectMap: Record<string, string> = {
@@ -204,6 +220,23 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
     saveTabConfiguration(newTabs);
   };
 
+  const canCustomize = hasAppPermission('customizeApplication');
+
+  const setupObjectTarget = useMemo(() => {
+    if (recordSetup?.objectApiName && recordSetup.objectApiName !== 'Home') {
+      return {
+        objectApiName: recordSetup.objectApiName,
+        pageLayoutId: recordSetup.pageLayoutId,
+      };
+    }
+    return resolveListViewObjectSetup(pathname, schema?.objects);
+  }, [recordSetup, pathname, schema?.objects]);
+
+  const showEditObject =
+    canCustomize && !!setupObjectTarget?.objectApiName && setupObjectTarget.objectApiName !== 'Home';
+  const showEditPage =
+    canCustomize && !!setupObjectTarget?.objectApiName && !!setupObjectTarget.pageLayoutId;
+
   if (!shouldShowHeadbar) {
     return <>{children}</>;
   }
@@ -260,7 +293,11 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
             <button
               className="p-2 rounded-md hover:bg-white/10 transition-colors"
               title="Notifications"
-              onClick={() => { setShowNotifications(!showNotifications); setShowHelp(false); }}
+              onClick={() => {
+                setShowNotifications(!showNotifications);
+                setShowHelp(false);
+                setShowSetupMenu(false);
+              }}
             >
               <Bell className="w-[18px] h-[18px] text-white/80" />
             </button>
@@ -281,7 +318,11 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
             <button
               className="p-2 rounded-md hover:bg-white/10 transition-colors"
               title="Help"
-              onClick={() => { setShowHelp(!showHelp); setShowNotifications(false); }}
+              onClick={() => {
+                setShowHelp(!showHelp);
+                setShowNotifications(false);
+                setShowSetupMenu(false);
+              }}
             >
               <HelpCircle className="w-[18px] h-[18px] text-white/80" />
             </button>
@@ -297,13 +338,97 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
               </div>
             )}
           </div>
-          <Link
-            href="/settings"
-            className="p-2 rounded-md hover:bg-white/10 transition-colors"
-            aria-label="Settings"
-          >
-            <Cog className="w-[18px] h-[18px] text-white/80" />
-          </Link>
+          <div className="relative">
+            <button
+              type="button"
+              className="p-2 rounded-md hover:bg-white/10 transition-colors"
+              aria-label="Setup menu"
+              aria-expanded={showSetupMenu}
+              onClick={() => {
+                setShowSetupMenu(!showSetupMenu);
+                setShowNotifications(false);
+                setShowHelp(false);
+              }}
+            >
+              <Cog className="w-[18px] h-[18px] text-white/80" />
+            </button>
+            {showSetupMenu && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-[45] cursor-default bg-black/20"
+                  aria-label="Close setup menu"
+                  onClick={() => setShowSetupMenu(false)}
+                />
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">Setup Menu</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupMenu(false)}
+                      className="p-1 rounded-md hover:bg-gray-100 text-gray-500"
+                      aria-label="Close"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowSetupMenu(false);
+                        router.push('/settings');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                    >
+                      <Settings className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                      <span className="flex-1">Settings</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    </button>
+                  </div>
+                  {(showEditObject || showEditPage) && (
+                    <>
+                      <div className="border-t border-gray-200 my-1" />
+                      <div className="py-1">
+                        {showEditPage && setupObjectTarget?.pageLayoutId && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSetupMenu(false);
+                              router.push(
+                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}/page-editor/${encodeURIComponent(setupObjectTarget.pageLayoutId!)}`
+                              );
+                            }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                          >
+                            <Edit className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <span className="flex-1">Edit Page</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                          </button>
+                        )}
+                        {showEditObject && setupObjectTarget && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowSetupMenu(false);
+                              router.push(
+                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}`
+                              );
+                            }}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
+                          >
+                            <Database className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <span className="flex-1">Edit Object</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
           {/* User Menu */}
           {user && (
@@ -439,5 +564,13 @@ export default function AppWrapper({ children }: { children: React.ReactNode }) 
         </div>
       )}
     </div>
+  );
+}
+
+export default function AppWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <RecordSetupProvider>
+      <AppWrapperInner>{children}</AppWrapperInner>
+    </RecordSetupProvider>
   );
 }
