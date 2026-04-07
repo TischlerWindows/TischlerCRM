@@ -186,6 +186,70 @@ async function dropboxApi(
   return resp.json();
 }
 
+// ── Derive Dropbox folder name from record data ───────────────────
+// Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
+function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string): string {
+  // Find auto-number field
+  const numberKey = Object.keys(recordData).find(
+    (k) => k.toLowerCase().includes('number') && typeof recordData[k] === 'string' && recordData[k],
+  );
+  const autoNumber = numberKey ? (recordData[numberKey] as string) : '';
+
+  // Find address field and extract street text
+  const addrKey = Object.keys(recordData).find(
+    (k) => k.toLowerCase() === 'address' || k.toLowerCase().endsWith('__address'),
+  );
+  let addrStr = '';
+  if (addrKey) {
+    const raw = recordData[addrKey];
+    if (typeof raw === 'string') {
+      addrStr = raw;
+    } else if (raw && typeof raw === 'object') {
+      addrStr = [raw.street, raw.city, raw.state].filter(Boolean).join(', ');
+    }
+  }
+
+  if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`;
+  if (addrStr) return addrStr;
+  if (autoNumber) return autoNumber;
+  return recordId;
+}
+
+/**
+ * Attempt to rename a Dropbox folder when a record's derived name changes.
+ * Fire-and-forget — errors are logged but do not propagate.
+ */
+export async function tryRenameDropboxFolder(
+  userId: string,
+  objectApiName: string,
+  recordId: string,
+  beforeData: Record<string, any>,
+  afterData: Record<string, any>,
+): Promise<void> {
+  try {
+    const oldName = deriveDropboxFolderName(beforeData, recordId);
+    const newName = deriveDropboxFolderName(afterData, recordId);
+
+    if (oldName === newName) return;
+
+    const accessToken = await getAccessToken(userId);
+    if (!accessToken) return; // Dropbox not connected — nothing to rename
+
+    const oldPath = buildFolderPath(objectApiName, recordId, oldName);
+    const newPath = buildFolderPath(objectApiName, recordId, newName);
+
+    await dropboxApi(accessToken, '/files/move_v2', {
+      from_path: oldPath,
+      to_path: newPath,
+      autorename: false,
+      allow_ownership_transfer: false,
+    });
+  } catch (err: any) {
+    // Non-fatal — old folder might not exist yet, or new path already exists
+    console.error('[dropbox] tryRenameDropboxFolder failed (non-fatal):', err.message);
+  }
+}
+
 // ── Routes ─────────────────────────────────────────────────────────
 
 export async function dropboxRoutes(app: FastifyInstance) {

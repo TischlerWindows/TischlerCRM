@@ -3,6 +3,7 @@ import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
+import { tryRenameDropboxFolder } from './dropbox.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -724,6 +725,11 @@ export async function recordRoutes(app: FastifyInstance) {
         },
       },
     });
+
+    // ── Rename Dropbox folder if the derived name changed ──
+    // Fire-and-forget — don't block the response on Dropbox API
+    tryRenameDropboxFolder(userId, apiName, existingRecord.id, beforeData, mergedData)
+      .catch(() => {}); // swallow to avoid unhandled rejection
 
     // Audit: log record update (only changed fields)
     const changedBefore: Record<string, any> = {};
