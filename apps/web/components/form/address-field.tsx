@@ -1,9 +1,26 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { FieldDef } from '@/lib/schema';
 import AddressAutocomplete from '@/components/address-autocomplete';
+
+// ── helpers ─────────────────────────────────────────────────────────
+
+/** Normalise any value into a plain address object. */
+function toAddressObject(raw: unknown): Record<string, any> {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
+  if (typeof raw === 'string') {
+    try {
+      const p = JSON.parse(raw);
+      return typeof p === 'object' && p ? p : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 // ── Address field input ─────────────────────────────────────────────
 
@@ -18,7 +35,32 @@ export function AddressInput({
   onChange: (val: any) => void;
   disabled?: boolean;
 }) {
-  const addressValue = value || {};
+  const addressValue = toAddressObject(value);
+
+  // Keep a ref to the latest address so sub-field callbacks never see stale data.
+  const addrRef = useRef(addressValue);
+  useEffect(() => { addrRef.current = addressValue; });
+
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
+
+  const handleSubField = useCallback((field: string, fieldValue: string) => {
+    onChangeRef.current({ ...addrRef.current, [field]: fieldValue });
+  }, []);
+
+  const handleAutocomplete = useCallback((addr: any) => {
+    onChangeRef.current({
+      ...addrRef.current,
+      street: addr.street,
+      city: addr.city,
+      state: addr.state,
+      postalCode: addr.postalCode,
+      country: addr.country,
+      lat: addr.lat,
+      lng: addr.lng,
+    });
+  }, []);
+
   // Build display string from current sub-field values so the search
   // bar always reflects the actual data (search is only for lookup).
   const addressDisplay = [addressValue.street, addressValue.city, addressValue.state, addressValue.postalCode, addressValue.country].filter(Boolean).join(', ');
@@ -30,37 +72,26 @@ export function AddressInput({
           disabled={disabled}
           placeholder="Search for an address..."
           value={addressDisplay}
-          onAddressSelected={(addr) => {
-            onChange({
-              ...addressValue,
-              street: addr.street,
-              city: addr.city,
-              state: addr.state,
-              postalCode: addr.postalCode,
-              country: addr.country,
-              lat: addr.lat,
-              lng: addr.lng,
-            });
-          }}
+          onAddressSelected={handleAutocomplete}
         />
       )}
       <Input
         placeholder="Street"
         value={addressValue.street || ''}
-        onChange={(e) => onChange({ ...addressValue, street: e.target.value })}
+        onChange={(e) => handleSubField('street', e.target.value)}
         disabled={disabled}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="City"
           value={addressValue.city || ''}
-          onChange={(e) => onChange({ ...addressValue, city: e.target.value })}
+          onChange={(e) => handleSubField('city', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="State/Province"
           value={addressValue.state || ''}
-          onChange={(e) => onChange({ ...addressValue, state: e.target.value })}
+          onChange={(e) => handleSubField('state', e.target.value)}
           disabled={disabled}
         />
       </div>
@@ -68,17 +99,13 @@ export function AddressInput({
         <Input
           placeholder="Postal Code"
           value={addressValue.postalCode || ''}
-          onChange={(e) =>
-            onChange({ ...addressValue, postalCode: e.target.value })
-          }
+          onChange={(e) => handleSubField('postalCode', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="Country"
           value={addressValue.country || ''}
-          onChange={(e) =>
-            onChange({ ...addressValue, country: e.target.value })
-          }
+          onChange={(e) => handleSubField('country', e.target.value)}
           disabled={disabled}
         />
       </div>
