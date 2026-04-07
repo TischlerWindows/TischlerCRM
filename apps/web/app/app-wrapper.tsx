@@ -135,7 +135,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       }
 
       if (schema?.objects) {
-        const excludedObjects = new Set(['Home', 'Deal']);
+        const excludedObjects = new Set(['Home']);
         
         const builtInRoutes: Record<string, string> = {
           'Property': '/properties',

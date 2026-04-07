@@ -7,7 +7,7 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   Account: '003',
   Product: '004',
   Lead: '005',
-  Deal: '006',
+  Opportunity: '006',
   Project: '007',
   Service: '008',
   Quote: '009',
