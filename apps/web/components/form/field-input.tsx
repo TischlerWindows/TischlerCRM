@@ -438,7 +438,8 @@ export function FieldInput({
               }}
             />
           )}
-          <Input
+          <input
+            type="text"
             placeholder="Street"
             value={addrObj.street || ''}
             onChange={(e) =>
@@ -448,9 +449,12 @@ export function FieldInput({
               })
             }
             disabled={isReadOnly}
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1 }}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Input
+            <input
+              type="text"
               placeholder="City"
               value={addrObj.city || ''}
               onChange={(e) =>
@@ -460,8 +464,11 @@ export function FieldInput({
                 })
               }
               disabled={isReadOnly}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1 }}
             />
-            <Input
+            <input
+              type="text"
               placeholder="State/Province"
               value={addrObj.state || ''}
               onChange={(e) =>
@@ -471,10 +478,13 @@ export function FieldInput({
                 })
               }
               disabled={isReadOnly}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1 }}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Input
+            <input
+              type="text"
               placeholder="Postal Code"
               value={addrObj.postalCode || ''}
               onChange={(e) =>
@@ -484,8 +494,11 @@ export function FieldInput({
                 })
               }
               disabled={isReadOnly}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1 }}
             />
-            <Input
+            <input
+              type="text"
               placeholder="Country"
               value={addrObj.country || ''}
               onChange={(e) =>
@@ -495,6 +508,8 @@ export function FieldInput({
                 })
               }
               disabled={isReadOnly}
+              className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              style={{ pointerEvents: 'auto', position: 'relative', zIndex: 1 }}
             />
           </div>
         </div>
