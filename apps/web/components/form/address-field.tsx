@@ -19,6 +19,9 @@ export function AddressInput({
   disabled?: boolean;
 }) {
   const addressValue = value || {};
+  // Build display string from current sub-field values so the search
+  // bar always reflects the actual data (search is only for lookup).
+  const addressDisplay = [addressValue.street, addressValue.city, addressValue.state, addressValue.postalCode, addressValue.country].filter(Boolean).join(', ');
 
   return (
     <div className="space-y-2 border border-gray-300 rounded-lg p-3">
@@ -26,6 +29,7 @@ export function AddressInput({
         <AddressAutocomplete
           disabled={disabled}
           placeholder="Search for an address..."
+          value={addressDisplay}
           onAddressSelected={(addr) => {
             onChange({
               ...addressValue,
