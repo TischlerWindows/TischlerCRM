@@ -92,7 +92,7 @@ export default function DynamicFormDialog({
           </DialogHeader>
           <div
             className="overflow-hidden"
-            style={{ height: 'calc(90vh - 80px)' }}
+            style={{ height: 'calc(90vh - 80px)', pointerEvents: 'auto' }}
             onChange={() => { formTouchedRef.current = true; }}
             onClick={(e) => {
               // Mark touched on interactive element clicks (selects, checkboxes, picklists)
