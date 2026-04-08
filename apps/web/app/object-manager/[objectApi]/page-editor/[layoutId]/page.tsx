@@ -1,11 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { EditorPage } from '../editor';
 
-/**
- * Next.js route entry point for the page editor.
- * All editor logic lives in ../editor/ modules.
- */
 export default function PageEditorRoute() {
-  return <EditorPage />;
+  return (
+    <Suspense>
+      <EditorPage />
+    </Suspense>
+  );
 }

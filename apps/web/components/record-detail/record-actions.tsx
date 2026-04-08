@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -50,6 +50,7 @@ export function RecordActions({
   onRecordUpdated,
 }: RecordActionsProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { showToast } = useToast();
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -197,7 +198,7 @@ export function RecordActions({
                 <div className="fixed inset-0 z-overlay" onClick={() => setShowAdminMenu(false)} />
                 <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal">
                   <Link
-                    href={`/object-manager/${encodeURIComponent(objectApiName)}`}
+                    href={`/object-manager/${encodeURIComponent(objectApiName)}?returnTo=${encodeURIComponent(pathname)}`}
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                     onClick={() => setShowAdminMenu(false)}
                   >
@@ -207,7 +208,7 @@ export function RecordActions({
                   </Link>
                   {pageLayout && (
                     <Link
-                      href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}`}
+                      href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}?returnTo=${encodeURIComponent(pathname)}`}
                       className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setShowAdminMenu(false)}
                     >

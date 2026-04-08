@@ -15,6 +15,8 @@ export function EditorToolbar({
   onPreview,
   onOpenRules,
   onRequestNavigate,
+  backHref,
+  backLabel,
   objectManagerHref,
   objectListHref: _objectListHref,
   objectListLabel: _objectListLabel,
@@ -24,6 +26,8 @@ export function EditorToolbar({
   onPreview: () => void;
   onOpenRules: () => void;
   onRequestNavigate: (href: string) => void;
+  backHref: string;
+  backLabel: string;
   objectManagerHref: string;
   objectListHref: string | null;
   objectListLabel: string;
@@ -239,11 +243,11 @@ export function EditorToolbar({
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
-            onClick={() => onRequestNavigate(objectManagerHref)}
+            onClick={() => onRequestNavigate(backHref)}
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-brand-navy"
           >
             <ArrowLeft className="h-4 w-4" />
-            Layouts
+            {backLabel}
           </button>
           <div className="h-5 w-px bg-gray-200" />
           {isEditingName ? (

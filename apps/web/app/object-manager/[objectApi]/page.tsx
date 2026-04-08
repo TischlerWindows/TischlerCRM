@@ -140,6 +140,7 @@ export default function ObjectDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const initialLayoutId = searchParams.get('layoutId');
   const sectionParam = searchParams.get('section');
+  const returnTo = searchParams.get('returnTo');
 
   useEffect(() => {
     setSelectedObject(objectApi);
@@ -202,9 +203,9 @@ export default function ObjectDetailPage() {
         {/* Header */}
         <div className="h-[48px] bg-brand-navy flex items-center justify-between px-3 flex-shrink-0">
           {!sidebarCollapsed && (
-            <Link href="/object-manager" className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors">
+            <Link href={returnTo || '/object-manager'} className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors">
               <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs font-semibold">Object Manager</span>
+              <span className="text-xs font-semibold">{returnTo ? 'Back' : 'Object Manager'}</span>
             </Link>
           )}
           <button
