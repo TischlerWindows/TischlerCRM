@@ -142,9 +142,11 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
     }
     if (objectType === 'Lead') {
       const leadNum = record.leadNumber || record.Lead__leadNumber;
+      const contactName = record.contactName || record.Lead__contactName;
       const leadFn = record.firstName || record.Lead__firstName || '';
       const leadLn = record.lastName || record.Lead__lastName || '';
-      const leadName = `${leadFn} ${leadLn}`.trim();
+      const rawLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
+      const leadName = contactName || `${leadFn} ${rawLn}`.trim();
       if (leadNum && leadName) return `${leadNum} - ${leadName}`;
       return leadNum || leadName || record.name || stringValue;
     }

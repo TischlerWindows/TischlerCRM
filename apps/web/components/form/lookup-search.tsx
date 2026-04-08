@@ -38,12 +38,14 @@ export function getRecordLabel(record: any): string {
   // Account number as fallback for accounts
   if (record.accountNumber) return record.accountNumber;
 
-  // Lead: show leadNumber - firstName lastName
+  // Lead: show leadNumber - contactName (or firstName lastName)
   const leadNum = record.leadNumber || record.Lead__leadNumber;
   if (leadNum) {
+    const contactName = record.contactName || record.Lead__contactName;
     const fn = record.firstName || record.Lead__firstName || '';
     const ln = record.lastName || record.Lead__lastName || '';
-    const leadName = `${fn} ${ln}`.trim();
+    const rawLn = ln && ln !== 'N/A' ? ln : '';
+    const leadName = contactName || `${fn} ${rawLn}`.trim();
     return leadName ? `${leadNum} - ${leadName}` : leadNum;
   }
 
