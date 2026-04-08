@@ -79,6 +79,15 @@ export default function RecordDetailPage({
       return next;
     });
   }, []);
+  const [collapsedWidgetIds, setCollapsedWidgetIds] = useState<Set<string>>(new Set());
+  const toggleWidgetCollapse = useCallback((widgetId: string) => {
+    setCollapsedWidgetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(widgetId)) next.delete(widgetId);
+      else next.add(widgetId);
+      return next;
+    });
+  }, []);
   const objectDef: ObjectDef | undefined = schema?.objects.find(
     (o) => o.apiName.toLowerCase() === objectApiName.toLowerCase(),
   );
@@ -420,6 +429,8 @@ export default function RecordDetailPage({
                       setSectionToggles={setSectionToggles}
                       collapsedPanelIds={collapsedPanelIds}
                       togglePanelCollapse={togglePanelCollapse}
+                      collapsedWidgetIds={collapsedWidgetIds}
+                      toggleWidgetCollapse={toggleWidgetCollapse}
                     />
                   );
                 })()
@@ -437,6 +448,8 @@ export default function RecordDetailPage({
                     setSectionToggles={setSectionToggles}
                     collapsedPanelIds={collapsedPanelIds}
                     togglePanelCollapse={togglePanelCollapse}
+                    collapsedWidgetIds={collapsedWidgetIds}
+                    toggleWidgetCollapse={toggleWidgetCollapse}
                   />
                 ))
             }
