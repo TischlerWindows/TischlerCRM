@@ -170,6 +170,9 @@ class LocalStorageSchemaService implements SchemaService {
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
 
+        // Ensure system field definitions are up-to-date (type, readOnly, etc.)
+        migratedSchema = this.migrateSystemFieldTypes(migratedSchema);
+
         // Self-contained layouts: embed full FieldDef into every PageField
         // so DynamicForm never needs to cross-reference object.fields.
         migratedSchema = this.enrichLayoutFieldDefs(migratedSchema);
@@ -696,6 +699,29 @@ class LocalStorageSchemaService implements SchemaService {
       }
     }
     return schema;
+  }
+
+  /**
+   * Migrate system field definitions so persisted schemas match the
+   * canonical types defined in SYSTEM_FIELDS (e.g. CreatedById → LookupUser).
+   */
+  private migrateSystemFieldTypes(schema: OrgSchema): OrgSchema {
+    const canonical = new Map(SYSTEM_FIELDS.map(f => [f.apiName, f]));
+    let changed = false;
+
+    for (const obj of schema.objects) {
+      for (let i = 0; i < obj.fields.length; i++) {
+        const sf = canonical.get(obj.fields[i].apiName);
+        if (!sf) continue;
+        const cur = obj.fields[i];
+        if (cur.type !== sf.type || cur.readOnly !== sf.readOnly) {
+          obj.fields[i] = { ...cur, type: sf.type, readOnly: sf.readOnly };
+          changed = true;
+        }
+      }
+    }
+
+    return changed ? { ...schema, updatedAt: new Date().toISOString() } : schema;
   }
 
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {

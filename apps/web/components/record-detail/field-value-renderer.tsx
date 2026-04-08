@@ -19,6 +19,7 @@ const LOOKUP_ROUTE_MAP: Record<string, string> = {
   Project: 'projects',
   Service: 'service',
   Installation: 'installations',
+  User: 'settings/users',
 };
 
 // ── getFieldDef ────────────────────────────────────────────────────────
