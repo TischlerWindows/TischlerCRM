@@ -48,8 +48,9 @@ export function getRecordLabel(record: any): string {
   }
   if (record.email) return record.email;
 
-  // Opportunity/Project numbers
-  if (record.opportunityNumber) return record.opportunityNumber;
+  // Opportunity: show just opportunity number as label (name goes in subtext)
+  const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
+  if (oppNum) return oppNum;
   if (record.projectNumber) return record.projectNumber;
   if (record.quoteNumber) return record.quoteNumber;
   if (record.serviceNumber) return record.serviceNumber;
@@ -181,6 +182,10 @@ export function getRecordSubtext(record: any): string {
   const rawLeadLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
   const leadFullName = `${leadFn} ${rawLeadLn}`.trim();
   if (leadFullName) return leadFullName;
+
+  // Opportunity: show opportunity name as subtext
+  const oppName = record.opportunityName || record.Opportunity__opportunityName;
+  if (oppName) return oppName;
 
   // Account: show account number as subtext
   if (record.accountNumber || record.Account__accountNumber) {
