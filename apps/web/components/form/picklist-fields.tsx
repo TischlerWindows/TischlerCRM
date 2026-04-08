@@ -16,11 +16,13 @@ export function PicklistTextDropdown({
   value,
   onChange,
   disabled,
+  colors,
 }: {
   options: string[];
   value: string;
   onChange: (val: string) => void;
   disabled?: boolean;
+  colors?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,7 +48,13 @@ export function PicklistTextDropdown({
           disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
         )}
       >
-        <span className="break-words whitespace-normal flex-1">
+        <span className="break-words whitespace-normal flex-1 flex items-center gap-2">
+          {value && colors?.[value] && (
+            <span
+              className="w-3 h-3 rounded-full shrink-0"
+              style={{ backgroundColor: colors[value] }}
+            />
+          )}
           {value || <span className="text-gray-500">-- Select --</span>}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" />
@@ -69,7 +77,7 @@ export function PicklistTextDropdown({
             <div
               key={option}
               className={cn(
-                'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal',
+                'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal flex items-center gap-2',
                 value === option && 'bg-blue-50 font-medium',
               )}
               onClick={() => {
@@ -77,7 +85,13 @@ export function PicklistTextDropdown({
                 setOpen(false);
               }}
             >
-              {option}
+              {colors?.[option] && (
+                <span
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: colors[option] }}
+                />
+              )}
+              <span>{option}</span>
             </div>
           ))}
         </div>
@@ -143,25 +157,102 @@ export function PicklistInput({
     formData,
     visibilityCtx,
   );
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
+  const hasColors = colors && Object.keys(colors).length > 0;
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // If no colors are configured, use a native select for simplicity
+  if (!hasColors) {
+    return (
+      <select
+        id={fieldDef.apiName}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className={cn(
+          'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent',
+          error && 'border-red-500',
+        )}
+      >
+        <option value="">-- Select --</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    );
+  }
 
   return (
-    <select
-      id={fieldDef.apiName}
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      className={cn(
-        'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent',
-        error && 'border-red-500',
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
+        className={cn(
+          'w-full min-h-[2.5rem] px-3 py-2 text-left border rounded-lg bg-white',
+          'focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent focus:outline-none',
+          'flex items-center justify-between gap-2',
+          error ? 'border-red-500' : 'border-gray-300',
+          disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
+        )}
+      >
+        <span className="flex items-center gap-2 flex-1 min-w-0">
+          {value && colors[value] && (
+            <span
+              className="w-3 h-3 rounded-full shrink-0"
+              style={{ backgroundColor: colors[value] }}
+            />
+          )}
+          <span className={cn('truncate', !value && 'text-gray-500')}>
+            {value || '-- Select --'}
+          </span>
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div
+            className={cn(
+              'px-3 py-2 cursor-pointer hover:bg-gray-100 text-gray-500',
+              !value && 'bg-blue-50',
+            )}
+            onClick={() => { onChange(''); setOpen(false); }}
+          >
+            -- Select --
+          </div>
+          {options.map((option) => (
+            <div
+              key={option}
+              className={cn(
+                'px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center gap-2',
+                value === option && 'bg-blue-50 font-medium',
+              )}
+              onClick={() => { onChange(option); setOpen(false); }}
+            >
+              {colors[option] && (
+                <span
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: colors[option] }}
+                />
+              )}
+              <span>{option}</span>
+            </div>
+          ))}
+        </div>
       )}
-    >
-      <option value="">-- Select --</option>
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
+    </div>
   );
 }
 
@@ -188,6 +279,7 @@ export function MultiPicklistInput({
     formData,
     visibilityCtx,
   );
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
   const selectedValues: string[] = value
     ? value.split(';').map((v: string) => v.trim()).filter(Boolean)
     : [];
@@ -212,6 +304,12 @@ export function MultiPicklistInput({
             disabled={disabled}
             className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
           />
+          {colors?.[option] && (
+            <span
+              className="w-3 h-3 rounded-full shrink-0"
+              style={{ backgroundColor: colors[option] }}
+            />
+          )}
           <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
             {option}
           </label>
@@ -250,12 +348,15 @@ export function PicklistTextInput({
       : { picklist: '', text: '' };
   const ptPosition = (fieldDef as any).picklistPosition || 'left';
 
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
+
   const picklistSelect = (
     <PicklistTextDropdown
       options={options}
       value={ptValue.picklist || ''}
       onChange={(val) => onChange({ ...ptValue, picklist: val })}
       disabled={disabled}
+      colors={colors}
     />
   );
   const textInput = (

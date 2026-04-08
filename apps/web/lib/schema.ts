@@ -70,6 +70,7 @@ export interface FieldDef {
   min?: number;
   max?: number;
   picklistValues?: string[];
+  picklistColors?: Record<string, string>; // option value → hex color (e.g. "#ef4444")
   picklistPosition?: 'left' | 'right';  // for PicklistText: which side gets the dropdown
   defaultValue?: any;
   helpText?: string;

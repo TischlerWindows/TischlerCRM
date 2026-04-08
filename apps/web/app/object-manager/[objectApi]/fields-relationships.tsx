@@ -114,6 +114,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     displayFormat: '',
     formulaExpr: '',
     picklistValues: [] as string[],
+    picklistColors: {} as Record<string, string>,
     picklistPosition: 'left' as 'left' | 'right',
     relationshipName: '',
     lookupObject: '',
@@ -187,6 +188,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFormat: '',
       formulaExpr: '',
       picklistValues: [],
+      picklistColors: {},
       picklistPosition: 'left' as 'left' | 'right',
       relationshipName: '',
       lookupObject: '',
@@ -220,6 +222,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFormat: cloned.autoNumber?.displayFormat || '',
       formulaExpr: cloned.formulaExpr || '',
       picklistValues: cloned.picklistValues ? [...cloned.picklistValues] : [],
+      picklistColors: (cloned as any).picklistColors ? { ...(cloned as any).picklistColors } : {},
       picklistPosition: (cloned as any).picklistPosition || 'left',
       relationshipName: cloned.relationshipName || '',
       lookupObject: cloned.lookupObject || '',
@@ -288,6 +291,13 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     }
     if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup') {
       newField.picklistValues = [...formData.picklistValues];
+      // Only save picklistColors if any color is set
+      const colors = Object.fromEntries(
+        Object.entries(formData.picklistColors).filter(([k, v]) => v && formData.picklistValues.includes(k))
+      );
+      if (Object.keys(colors).length > 0) {
+        (newField as any).picklistColors = colors;
+      }
     }
     if (t === 'PicklistText' || t === 'PicklistLookup') {
       (newField as any).picklistPosition = formData.picklistPosition;
@@ -805,6 +815,42 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                       <p className="text-xs text-gray-500 mt-1">
                         Enter each option on a new line.
                       </p>
+                      {formData.picklistValues.filter(v => v.trim()).length > 0 && (
+                        <div className="mt-3 space-y-1">
+                          <Label>Option Colors</Label>
+                          <p className="text-xs text-gray-500 mb-2">Click a color swatch to assign a color to each option. Colors are shown in forms.</p>
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                            {formData.picklistValues.filter(v => v.trim()).map((val) => (
+                              <div key={val} className="flex items-center gap-2">
+                                <input
+                                  type="color"
+                                  value={formData.picklistColors[val] || '#d1d5db'}
+                                  onChange={(e) => setFormData({
+                                    ...formData,
+                                    picklistColors: { ...formData.picklistColors, [val]: e.target.value }
+                                  })}
+                                  className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
+                                  title={`Color for "${val}"`}
+                                />
+                                <span className="text-sm text-gray-700">{val}</span>
+                                {formData.picklistColors[val] && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = { ...formData.picklistColors };
+                                      delete updated[val];
+                                      setFormData({ ...formData, picklistColors: updated });
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
+                                  >
+                                    clear
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -838,6 +884,41 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <p className="text-xs text-gray-500 mt-1">
                           Enter each option on a new line.
                         </p>
+                        {formData.picklistValues.filter(v => v.trim()).length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            <Label>Option Colors</Label>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                              {formData.picklistValues.filter(v => v.trim()).map((val) => (
+                                <div key={val} className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={formData.picklistColors[val] || '#d1d5db'}
+                                    onChange={(e) => setFormData({
+                                      ...formData,
+                                      picklistColors: { ...formData.picklistColors, [val]: e.target.value }
+                                    })}
+                                    className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
+                                    title={`Color for "${val}"`}
+                                  />
+                                  <span className="text-sm text-gray-700">{val}</span>
+                                  {formData.picklistColors[val] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = { ...formData.picklistColors };
+                                        delete updated[val];
+                                        setFormData({ ...formData, picklistColors: updated });
+                                      }}
+                                      className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
+                                    >
+                                      clear
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>
@@ -952,6 +1033,41 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         <p className="text-xs text-gray-500 mt-1">
                           Enter each option on a new line.
                         </p>
+                        {formData.picklistValues.filter(v => v.trim()).length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            <Label>Option Colors</Label>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                              {formData.picklistValues.filter(v => v.trim()).map((val) => (
+                                <div key={val} className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={formData.picklistColors[val] || '#d1d5db'}
+                                    onChange={(e) => setFormData({
+                                      ...formData,
+                                      picklistColors: { ...formData.picklistColors, [val]: e.target.value }
+                                    })}
+                                    className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0.5"
+                                    title={`Color for "${val}"`}
+                                  />
+                                  <span className="text-sm text-gray-700">{val}</span>
+                                  {formData.picklistColors[val] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updated = { ...formData.picklistColors };
+                                        delete updated[val];
+                                        setFormData({ ...formData, picklistColors: updated });
+                                      }}
+                                      className="text-xs text-gray-400 hover:text-gray-600 ml-auto"
+                                    >
+                                      clear
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                         <p className="text-xs font-medium text-gray-700 mb-2">Preview</p>
