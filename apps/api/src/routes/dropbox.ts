@@ -63,7 +63,9 @@ const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
 const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
   Lead: 'Leads',
   Opportunity: 'Project Books',
+  Project: 'Project Books',
   WorkOrder: 'Service',
+  Service: 'Service',
 };
 
 /** Subfolders created inside each Opportunity folder. */
@@ -328,8 +330,8 @@ export async function tryEnsureLinkedFolder(
       // Already exists — fine
     }
 
-    // Create subfolders for Opportunity records
-    if (created && childObjectApiName === 'Opportunity') {
+    // Create subfolders for Opportunity / Project records
+    if (created && (childObjectApiName === 'Opportunity' || childObjectApiName === 'Project')) {
       for (const sf of OPPORTUNITY_SUBFOLDERS) {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
@@ -868,8 +870,8 @@ export async function dropboxRoutes(app: FastifyInstance) {
       // Already exists — fine
     }
 
-    // Create subfolders for Opportunity records
-    if (created && childObjectApiName === 'Opportunity') {
+    // Create subfolders for Opportunity / Project records
+    if (created && (childObjectApiName === 'Opportunity' || childObjectApiName === 'Project')) {
       for (const sf of OPPORTUNITY_SUBFOLDERS) {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
