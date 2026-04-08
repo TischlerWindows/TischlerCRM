@@ -151,7 +151,10 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
       return leadNum || leadName || record.name || stringValue;
     }
     if (objectType === 'Opportunity') {
-      return record.opportunityNumber || record.opportunityName || record.name || stringValue;
+      const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
+      const oppName = record.opportunityName || record.Opportunity__opportunityName;
+      if (oppNum && oppName) return `${oppNum} - ${oppName}`;
+      return oppNum || oppName || record.name || stringValue;
     }
     if (objectType === 'Product') {
       return record.productName || record.name || stringValue;
