@@ -38,14 +38,22 @@ export function getRecordLabel(record: any): string {
   // Account number as fallback for accounts
   if (record.accountNumber) return record.accountNumber;
 
+  // Lead: show leadNumber - firstName lastName
+  const leadNum = record.leadNumber || record.Lead__leadNumber;
+  if (leadNum) {
+    const fn = record.firstName || record.Lead__firstName || '';
+    const ln = record.lastName || record.Lead__lastName || '';
+    const leadName = `${fn} ${ln}`.trim();
+    return leadName ? `${leadNum} - ${leadName}` : leadNum;
+  }
+
   // Contact names
   if (record.firstName || record.lastName) {
     return `${record.firstName || ''} ${record.lastName || ''}`.trim();
   }
   if (record.email) return record.email;
 
-  // Lead/Opportunity/Project numbers
-  if (record.leadNumber) return record.leadNumber;
+  // Opportunity/Project numbers
   if (record.opportunityNumber) return record.opportunityNumber;
   if (record.projectNumber) return record.projectNumber;
   if (record.quoteNumber) return record.quoteNumber;

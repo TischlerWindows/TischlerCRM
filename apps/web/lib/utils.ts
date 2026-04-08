@@ -141,7 +141,12 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
       return record.propertyNumber || record.Property__propertyNumber || record.name || stringValue;
     }
     if (objectType === 'Lead') {
-      return record.leadNumber || record.name || stringValue;
+      const leadNum = record.leadNumber || record.Lead__leadNumber;
+      const leadFn = record.firstName || record.Lead__firstName || '';
+      const leadLn = record.lastName || record.Lead__lastName || '';
+      const leadName = `${leadFn} ${leadLn}`.trim();
+      if (leadNum && leadName) return `${leadNum} - ${leadName}`;
+      return leadNum || leadName || record.name || stringValue;
     }
     if (objectType === 'Opportunity') {
       return record.opportunityNumber || record.opportunityName || record.name || stringValue;
