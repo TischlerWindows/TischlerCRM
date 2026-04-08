@@ -604,6 +604,84 @@ export async function dropboxRoutes(app: FastifyInstance) {
     reply.code(204).send();
   });
 
+  // ── Resolve the correct Dropbox folder path for a record ──
+  // For records linked to a Property (Lead, Opportunity, etc.), returns the
+  // path inside the parent Property folder instead of the top-level path.
+  app.get('/dropbox/resolve-path/:objectApiName/:recordId', async (req, reply) => {
+    const user = req.user;
+    if (!user) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
+
+    try {
+      // Fetch the record data
+      const obj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: objectApiName, mode: 'insensitive' } },
+      });
+      if (!obj) return reply.send({ linked: false });
+
+      const record = await prisma.record.findFirst({
+        where: { id: recordId, objectId: obj.id },
+      });
+      if (!record) return reply.send({ linked: false });
+
+      const recordData = record.data as Record<string, any>;
+
+      // Check if this object type has a linked subfolder mapping
+      const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
+      if (!subfolder) {
+        return reply.send({ linked: false });
+      }
+
+      // Find the property lookup value
+      let propertyId: string | undefined;
+      const wellKnown = ['property', 'propertyId', 'propertyAddress', 'relatedProperty'];
+      for (const key of wellKnown) {
+        const v = recordData[key] ?? recordData[`${objectApiName}__${key}`];
+        if (v && typeof v === 'string') { propertyId = v; break; }
+      }
+      if (!propertyId) {
+        for (const [key, val] of Object.entries(recordData)) {
+          if (key.toLowerCase().includes('property') && typeof val === 'string' && val) {
+            propertyId = val;
+            break;
+          }
+        }
+      }
+
+      if (!propertyId) {
+        return reply.send({ linked: false });
+      }
+
+      // Verify the Property record exists
+      const propertyObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+      });
+      if (!propertyObj) return reply.send({ linked: false });
+
+      const propertyRecord = await prisma.record.findFirst({
+        where: { id: propertyId, objectId: propertyObj.id },
+      });
+      if (!propertyRecord) return reply.send({ linked: false });
+
+      const propertyData = propertyRecord.data as Record<string, any>;
+      const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
+      const childFolderName = deriveDropboxFolderName(recordData, recordId);
+
+      reply.send({
+        linked: true,
+        parentObjectApiName: 'Property',
+        parentRecordId: propertyId,
+        parentFolderName,
+        subfolder,
+        childFolderName,
+      });
+    } catch (err: any) {
+      req.log.error(err, 'resolve-path failed');
+      reply.send({ linked: false });
+    }
+  });
+
   // ── List files in a record folder ──
   app.get('/dropbox/files/:objectApiName/:recordId', async (req, reply) => {
     const user = req.user;
@@ -795,6 +873,64 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
+    // ── If this record type is linked to a Property, ensure the linked
+    //    subfolder instead of creating a top-level folder. ──
+    const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
+    if (subfolder) {
+      // Look up the record to find its Property reference
+      const obj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: objectApiName, mode: 'insensitive' } },
+      });
+      if (obj) {
+        const record = await prisma.record.findFirst({
+          where: { id: recordId, objectId: obj.id },
+        });
+        if (record) {
+          const rData = record.data as Record<string, any>;
+          let propertyId: string | undefined;
+          const wellKnown = ['property', 'propertyId', 'propertyAddress', 'relatedProperty'];
+          for (const key of wellKnown) {
+            const v = rData[key] ?? rData[`${objectApiName}__${key}`];
+            if (v && typeof v === 'string') { propertyId = v; break; }
+          }
+          if (!propertyId) {
+            for (const [key, val] of Object.entries(rData)) {
+              if (key.toLowerCase().includes('property') && typeof val === 'string' && val) {
+                propertyId = val; break;
+              }
+            }
+          }
+
+          if (propertyId) {
+            const propertyObj = await prisma.customObject.findFirst({
+              where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+            });
+            const propertyRecord = propertyObj
+              ? await prisma.record.findFirst({ where: { id: propertyId, objectId: propertyObj.id } })
+              : null;
+            if (propertyRecord) {
+              const pData = propertyRecord.data as Record<string, any>;
+              const parentFolderName = deriveDropboxFolderName(pData, propertyId);
+              const childFolderName = folderName || deriveDropboxFolderName(rData, recordId);
+              const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
+              const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+              const childPath = `${parentPath}/${subfolder}/${safeName}`;
+
+              // Ensure the parent Property folder + subfolder exist
+              for (const p of [parentPath, `${parentPath}/${subfolder}`, childPath]) {
+                try {
+                  await dropboxApi(accessToken, '/files/create_folder_v2', { path: p, autorename: false });
+                } catch { /* already exists */ }
+              }
+
+              return reply.send({ created: true, path: childPath, linked: true });
+            }
+          }
+        }
+      }
+    }
+
+    // ── Default: create top-level folder (Property, Account, Contact, etc.) ──
     const folderPath = buildFolderPath(objectApiName, recordId, folderName);
 
     let created = false;
