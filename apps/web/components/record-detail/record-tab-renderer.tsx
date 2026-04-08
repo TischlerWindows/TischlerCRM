@@ -40,6 +40,9 @@ export interface RecordTabRendererProps {
   /** Panel-level collapse state (for new model) */
   collapsedPanelIds: Set<string>;
   togglePanelCollapse: (panelId: string) => void;
+  /** Widget-level collapse state */
+  collapsedWidgetIds: Set<string>;
+  toggleWidgetCollapse: (widgetId: string) => void;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -70,6 +73,8 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
     isLookupLoaded,
     collapsedPanelIds,
     togglePanelCollapse,
+    collapsedWidgetIds,
+    toggleWidgetCollapse,
   } = props;
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
@@ -94,6 +99,8 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
         const regionStyle: React.CSSProperties = {
           gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
+          gridRow: `${region.gridRow ?? 1} / span ${region.gridRowSpan ?? 1}`,
+          alignSelf: 'start',
           ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
           ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
           ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
@@ -205,6 +212,8 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                 widgets={sortedWidgets as any}
                 record={record ?? undefined}
                 objectDef={buildObjectDefPayload(objectDef)}
+                collapsedWidgetIds={collapsedWidgetIds}
+                toggleWidgetCollapse={toggleWidgetCollapse}
               />
             )}
           </div>
@@ -227,6 +236,8 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
     isLookupLoaded,
     sectionToggles,
     setSectionToggles,
+    collapsedWidgetIds,
+    toggleWidgetCollapse,
   } = props;
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
@@ -293,6 +304,8 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
                 widgets={[g]}
                 record={record ?? undefined}
                 objectDef={buildObjectDefPayload(objectDef)}
+                collapsedWidgetIds={collapsedWidgetIds}
+                toggleWidgetCollapse={toggleWidgetCollapse}
               />
             </div>
           );

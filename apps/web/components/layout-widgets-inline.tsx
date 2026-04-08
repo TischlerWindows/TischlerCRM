@@ -1,10 +1,11 @@
 'use client'
 
 import React from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader'
 import { resolveConfig } from '@/lib/widgets/merge-resolver'
 import { externalWidgets } from '@/widgets/external/registry'
-import type { PageWidget } from '@/lib/schema'
+import type { PageWidget, WidgetConfig } from '@/lib/schema'
 import type { WidgetProps } from '@/lib/widgets/types'
 
 function WidgetDisabledPlaceholder({ widgetId }: { widgetId: string }) {
@@ -101,6 +102,37 @@ const STUB_OBJECT = {
   fields: [] as Array<{ apiName: string; label: string; type: string }>,
 }
 
+const NON_COLLAPSIBLE_TYPES = new Set(['Spacer', 'HeaderHighlights'])
+
+const PROVIDER_LABELS: Record<string, string> = {
+  dropbox: 'Dropbox',
+  'google-drive': 'Google Drive',
+  local: 'Files',
+}
+
+function getWidgetLabel(config: WidgetConfig): string {
+  switch (config.type) {
+    case 'RelatedList':
+      return config.label || config.relatedObjectApiName || 'Related List'
+    case 'FileFolder':
+      return PROVIDER_LABELS[config.provider] || 'Files'
+    case 'ActivityFeed':
+      return 'Activity Feed'
+    case 'ExternalWidget': {
+      const reg = getExternalRegistration(config.externalWidgetId)
+      return reg?.manifest.name || config.externalWidgetId
+    }
+    case 'CustomComponent':
+      return config.componentId || 'Widget'
+    case 'Spacer':
+      return 'Spacer'
+    case 'HeaderHighlights':
+      return 'Highlights'
+    default:
+      return 'Widget'
+  }
+}
+
 interface LayoutWidgetsInlineProps {
   widgets?: PageWidget[]
   enabledIds?: string[]
@@ -112,6 +144,9 @@ interface LayoutWidgetsInlineProps {
   orgId?: string
   /** Integration connection state keyed by provider ID */
   integrations?: Record<string, { isConnected: boolean }>
+  /** Widget-level collapse state */
+  collapsedWidgetIds?: Set<string>
+  toggleWidgetCollapse?: (widgetId: string) => void
 }
 
 function getIntegrationContext(
@@ -121,6 +156,39 @@ function getIntegrationContext(
   if (!provider) return null
   const state = integrations?.[provider]
   return { provider, isConnected: state?.isConnected ?? false }
+}
+
+function CollapsibleWidgetWrapper({
+  widgetId,
+  label,
+  isCollapsed,
+  onToggle,
+  children,
+}: {
+  widgetId: string
+  label: string
+  isCollapsed: boolean
+  onToggle: (id: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="overflow-hidden">
+      <button
+        type="button"
+        onClick={() => onToggle(widgetId)}
+        className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 transition-colors text-left"
+        aria-label={isCollapsed ? `Expand ${label} widget` : `Collapse ${label} widget`}
+        aria-expanded={!isCollapsed}
+      >
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        {isCollapsed
+          ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+          : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+        }
+      </button>
+      {!isCollapsed && children}
+    </div>
+  )
 }
 
 /**
@@ -133,6 +201,8 @@ export function LayoutWidgetsInline({
   objectDef,
   orgId = '',
   integrations,
+  collapsedWidgetIds,
+  toggleWidgetCollapse,
 }: LayoutWidgetsInlineProps) {
   if (!widgets?.length) return null
 
@@ -140,53 +210,54 @@ export function LayoutWidgetsInline({
   const sorted = [...widgets].sort((a, b) => a.order - b.order)
   const liveRecord = record ?? STUB_RECORD
   const liveObject = objectDef ?? STUB_OBJECT
+  const canCollapse = collapsedWidgetIds != null && toggleWidgetCollapse != null
 
   return (
     <div className="mb-4 flex flex-col gap-3">
       {sorted.map((w) => {
         const config = w.config
+        const isCollapsible = canCollapse && !NON_COLLAPSIBLE_TYPES.has(config.type)
+        const isCollapsed = isCollapsible && collapsedWidgetIds!.has(w.id)
+        const label = getWidgetLabel(config)
+
+        let content: React.ReactNode = null
 
         if (config.type === 'ExternalWidget') {
           const { externalWidgetId, displayMode, config: widgetConfig } = config
           const registration = getExternalRegistration(externalWidgetId)
 
           if (!registration) {
-            return (
+            content = (
               <WidgetInvalidConfigFallback
                 key={w.id}
                 widgetType="ExternalWidget"
                 externalWidgetId={externalWidgetId}
               />
             )
+          } else if (!effectiveEnabledIds.includes(externalWidgetId)) {
+            content = <WidgetDisabledPlaceholder key={w.id} widgetId={externalWidgetId} />
+          } else {
+            const { Component } = registration
+            const resolvedConfig = resolveConfig(widgetConfig, liveRecord)
+            const integration = getIntegrationContext(registration.manifest.integration, integrations)
+
+            content = (
+              <WidgetErrorBoundary key={w.id}>
+                <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
+                  <Component
+                    config={resolvedConfig}
+                    record={liveRecord}
+                    object={liveObject}
+                    integration={integration}
+                    displayMode={displayMode}
+                    orgId={orgId}
+                  />
+                </React.Suspense>
+              </WidgetErrorBoundary>
+            )
           }
-
-          if (!effectiveEnabledIds.includes(externalWidgetId)) {
-            return <WidgetDisabledPlaceholder key={w.id} widgetId={externalWidgetId} />
-          }
-
-          const { Component } = registration
-          const resolvedConfig = resolveConfig(widgetConfig, liveRecord)
-          const integration = getIntegrationContext(registration.manifest.integration, integrations)
-
-          return (
-            <WidgetErrorBoundary key={w.id}>
-              <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
-                <Component
-                  config={resolvedConfig}
-                  record={liveRecord}
-                  object={liveObject}
-                  integration={integration}
-                  displayMode={displayMode}
-                  orgId={orgId}
-                />
-              </React.Suspense>
-            </WidgetErrorBoundary>
-          )
-        }
-
-        // Internal widgets — CustomComponent is kept as legacy fallback
-        if (config.type === 'CustomComponent') {
-          return (
+        } else if (config.type === 'CustomComponent') {
+          content = (
             <div
               key={w.id}
               className="p-3 rounded-lg border border-dashed border-blue-200 bg-blue-50/50 text-sm text-blue-900"
@@ -197,36 +268,52 @@ export function LayoutWidgetsInline({
                 : null}
             </div>
           )
+        } else {
+          const registration = getInternalRegistrationByType(config.type)
+
+          if (!registration) {
+            content = (
+              <WidgetInvalidConfigFallback key={w.id} widgetType={config.type} />
+            )
+          } else {
+            const { Component } = registration
+            const rawConfig = registration.transformConfig
+              ? registration.transformConfig(config as unknown as Record<string, unknown>)
+              : (config as unknown as Record<string, unknown>)
+            const resolvedConfig = resolveConfig(rawConfig, liveRecord)
+
+            content = (
+              <WidgetErrorBoundary key={w.id}>
+                <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
+                  <Component
+                    config={resolvedConfig}
+                    record={liveRecord}
+                    object={liveObject}
+                    integration={null}
+                    displayMode="full"
+                    orgId={orgId}
+                  />
+                </React.Suspense>
+              </WidgetErrorBoundary>
+            )
+          }
         }
 
-        const registration = getInternalRegistrationByType(config.type)
-
-        if (!registration) {
+        if (isCollapsible) {
           return (
-            <WidgetInvalidConfigFallback key={w.id} widgetType={config.type} />
+            <CollapsibleWidgetWrapper
+              key={w.id}
+              widgetId={w.id}
+              label={label}
+              isCollapsed={isCollapsed}
+              onToggle={toggleWidgetCollapse!}
+            >
+              {content}
+            </CollapsibleWidgetWrapper>
           )
         }
 
-        const { Component } = registration
-        const rawConfig = registration.transformConfig
-          ? registration.transformConfig(config as unknown as Record<string, unknown>)
-          : (config as unknown as Record<string, unknown>)
-        const resolvedConfig = resolveConfig(rawConfig, liveRecord)
-
-        return (
-          <WidgetErrorBoundary key={w.id}>
-            <React.Suspense fallback={<WidgetLoadingPlaceholder />}>
-              <Component
-                config={resolvedConfig}
-                record={liveRecord}
-                object={liveObject}
-                integration={null}
-                displayMode="full"
-                orgId={orgId}
-              />
-            </React.Suspense>
-          </WidgetErrorBoundary>
-        )
+        return <React.Fragment key={w.id}>{content}</React.Fragment>
       })}
     </div>
   )
