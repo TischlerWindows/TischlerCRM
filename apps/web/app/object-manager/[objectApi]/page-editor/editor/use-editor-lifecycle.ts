@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   generateId,
   type FieldDef,
@@ -116,6 +116,8 @@ export interface EditorLifecycle {
   handleTemplateSelect: (tabs: TemplateTabDef[]) => void;
 
   /* Navigation hrefs */
+  backHref: string;
+  backLabel: string;
   objectManagerHref: string;
   objectListHref: string | null;
   objectListLabel: string;
@@ -140,10 +142,13 @@ export interface EditorLifecycle {
 export function useEditorLifecycle(): EditorLifecycle {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const objectApiName = toParamValue(params.objectApi);
   const layoutId = toParamValue(params.layoutId);
   const routeKey = `${objectApiName}::${layoutId}`;
   const { showToast } = useToast();
+
+  const returnTo = searchParams.get('returnTo');
 
   const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
@@ -392,6 +397,9 @@ export function useEditorLifecycle(): EditorLifecycle {
   const objectListHref = getObjectListHref(objectApiName);
   const objectListLabel = object?.pluralLabel || object?.label || objectApiName;
 
+  const backHref = returnTo || objectManagerHref;
+  const backLabel = returnTo ? 'Back' : 'Layouts';
+
   return {
     object,
     allFields,
@@ -410,6 +418,8 @@ export function useEditorLifecycle(): EditorLifecycle {
     handleAddSection,
     handleTemplateSelect,
 
+    backHref,
+    backLabel,
     objectManagerHref,
     objectListHref,
     objectListLabel,

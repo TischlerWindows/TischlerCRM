@@ -37,6 +37,8 @@ export default function EditorPage() {
         onPreview={() => lifecycle.setShowPreview(true)}
         onOpenRules={() => lifecycle.setShowFormattingRulesDialog(true)}
         onRequestNavigate={lifecycle.requestNavigate}
+        backHref={lifecycle.backHref}
+        backLabel={lifecycle.backLabel}
         objectManagerHref={lifecycle.objectManagerHref}
         objectListHref={lifecycle.objectListHref}
         objectListLabel={lifecycle.objectListLabel}
