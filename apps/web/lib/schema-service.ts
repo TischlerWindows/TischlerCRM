@@ -1717,6 +1717,14 @@ class LocalStorageSchemaService implements SchemaService {
       type: 'Text',
       maxLength: 255
     });
+    ensureField({
+      id: generateId(),
+      apiName: 'Opportunity__lead',
+      label: 'Lead',
+      type: 'Lookup',
+      lookupObject: 'Lead',
+      relationshipName: 'Leads'
+    });
 
     const mergedFields = requiredFields.length > 0
       ? [...opp.fields, ...requiredFields]
@@ -3098,6 +3106,22 @@ class LocalStorageSchemaService implements SchemaService {
           label: 'Description',
           type: 'LongTextArea',
           maxLength: 10000
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__property',
+          label: 'Property',
+          type: 'Lookup',
+          lookupObject: 'Property',
+          relationshipName: 'Properties'
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__opportunity',
+          label: 'Opportunity',
+          type: 'Lookup',
+          lookupObject: 'Opportunity',
+          relationshipName: 'Opportunities'
         }
       ]
     ));

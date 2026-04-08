@@ -97,6 +97,7 @@ const CORE_OBJECTS = [
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
       { apiName: 'probability', label: 'Probability (%)', type: 'Percent' },
       { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'lead', label: 'Lead', type: 'Lookup' },
     ],
   },
   {
@@ -112,6 +113,7 @@ const CORE_OBJECTS = [
       { apiName: 'endDate', label: 'End Date', type: 'Date' },
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'Planning' },
       { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'opportunity', label: 'Opportunity', type: 'Lookup' },
     ],
   },
   {
