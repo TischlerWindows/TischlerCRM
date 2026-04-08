@@ -155,11 +155,19 @@ class RecordsService {
     return {
       id: record.id,
       ...stripped,
+      // Convenience keys for list/table columns
       createdBy: record.createdBy?.name || record.createdBy?.email || 'Unknown',
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       pageLayoutId: resolvedPageLayoutId,
+      // System-field aliases so layout fields (CreatedDate, CreatedById, etc.)
+      // resolve to the correct DB-level values in forms and detail views.
+      Id: record.id,
+      CreatedDate: record.createdAt,
+      LastModifiedDate: record.updatedAt,
+      CreatedById: record.createdBy?.id ?? '',
+      LastModifiedById: record.modifiedBy?.id ?? '',
     };
   }
 

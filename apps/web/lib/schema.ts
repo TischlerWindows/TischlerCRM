@@ -567,7 +567,8 @@ const _SYSTEM_FIELDS: FieldDef[] = [
     id: 'id',
     apiName: 'Id',
     label: 'Record ID',
-    type: 'text',
+    type: 'Text',
+    readOnly: true,
     required: true,
     unique: true,
     helpText: 'System-generated unique identifier'
@@ -576,30 +577,32 @@ const _SYSTEM_FIELDS: FieldDef[] = [
     id: 'createdDate',
     apiName: 'CreatedDate',
     label: 'Created Date',
-    type: 'datetime',
+    type: 'DateTime',
+    readOnly: true,
     helpText: 'Date and time when record was created'
   },
   {
     id: 'lastModifiedDate',
     apiName: 'LastModifiedDate', 
     label: 'Last Modified Date',
-    type: 'datetime',
+    type: 'DateTime',
+    readOnly: true,
     helpText: 'Date and time when record was last modified'
   },
   {
     id: 'createdBy',
     apiName: 'CreatedById',
     label: 'Created By',
-    type: 'lookup',
-    lookupObject: 'User',
+    type: 'LookupUser',
+    readOnly: true,
     helpText: 'User who created this record'
   },
   {
     id: 'lastModifiedBy',
     apiName: 'LastModifiedById',
     label: 'Last Modified By', 
-    type: 'lookup',
-    lookupObject: 'User',
+    type: 'LookupUser',
+    readOnly: true,
     helpText: 'User who last modified this record'
   }
 ];
