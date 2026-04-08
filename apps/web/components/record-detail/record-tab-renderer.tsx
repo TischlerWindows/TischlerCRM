@@ -18,7 +18,6 @@ import {
 } from '@/lib/layout-presentation';
 import {
   resolveTabCanvasItems,
-  gridItemStyle,
   TAB_GRID_COLUMNS,
 } from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
@@ -60,6 +59,86 @@ function buildObjectDefPayload(objectDef: ObjectDef | undefined) {
   };
 }
 
+// ── Column track grouping ─────────────────────────────────────────────
+
+interface GridPlacement {
+  gridColumn: number;
+  gridColumnSpan: number;
+  gridRow: number;
+}
+
+interface ColumnTrack<T> {
+  startCol: number;
+  span: number;
+  items: T[];
+}
+
+type LayoutBand<T> =
+  | { kind: 'full-width'; items: T[] }
+  | { kind: 'columns'; tracks: ColumnTrack<T>[] };
+
+/**
+ * Groups items into independent column tracks so that items in different
+ * columns stack independently (not affected by sibling column height).
+ * Full-width items break the multi-column flow and become standalone bands.
+ */
+function groupIntoColumnTracks<T>(
+  items: T[],
+  getPlacement: (item: T) => GridPlacement,
+  totalColumns: number = TAB_GRID_COLUMNS,
+): LayoutBand<T>[] {
+  const sorted = [...items].sort((a, b) => {
+    const pa = getPlacement(a);
+    const pb = getPlacement(b);
+    return pa.gridRow - pb.gridRow || pa.gridColumn - pb.gridColumn;
+  });
+
+  const bands: LayoutBand<T>[] = [];
+  let pendingPartial: T[] = [];
+
+  const flushPartial = () => {
+    if (pendingPartial.length === 0) return;
+    const trackMap = new Map<number, { span: number; items: T[] }>();
+    for (const item of pendingPartial) {
+      const p = getPlacement(item);
+      const existing = trackMap.get(p.gridColumn);
+      if (existing) {
+        existing.items.push(item);
+        existing.span = Math.max(existing.span, p.gridColumnSpan);
+      } else {
+        trackMap.set(p.gridColumn, { span: p.gridColumnSpan, items: [item] });
+      }
+    }
+    const tracks: ColumnTrack<T>[] = [...trackMap.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([startCol, { span, items: trackItems }]) => ({
+        startCol,
+        span,
+        items: trackItems.sort((x, y) => getPlacement(x).gridRow - getPlacement(y).gridRow),
+      }));
+    bands.push({ kind: 'columns', tracks });
+    pendingPartial = [];
+  };
+
+  for (const item of sorted) {
+    const p = getPlacement(item);
+    if (p.gridColumnSpan >= totalColumns) {
+      flushPartial();
+      const last = bands[bands.length - 1];
+      if (last?.kind === 'full-width') {
+        last.items.push(item);
+      } else {
+        bands.push({ kind: 'full-width', items: [item] });
+      }
+    } else {
+      pendingPartial.push(item);
+    }
+  }
+  flushPartial();
+
+  return bands;
+}
+
 // ── NEW model renderer: tab.regions ────────────────────────────────────
 
 function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
@@ -79,143 +158,167 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
   const regions = (tab as any).regions as LayoutSection[];
-  const sortedRegions = [...regions].sort(
-    (a, b) => (a.gridRow ?? 0) - (b.gridRow ?? 0) || (a.gridColumn ?? 0) - (b.gridColumn ?? 0),
+
+  const visibleRegions = regions.filter((region) => {
+    if (region.hidden) return false;
+    const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
+    return !regionFx?.hidden;
+  });
+
+  const bands = groupIntoColumnTracks(
+    visibleRegions,
+    (r) => ({
+      gridColumn: r.gridColumn ?? 1,
+      gridColumnSpan: r.gridColumnSpan ?? TAB_GRID_COLUMNS,
+      gridRow: r.gridRow ?? 1,
+    }),
   );
 
-  return (
-    <div
-      key={tab.id ?? ti}
-      className="region-grid grid grid-cols-1 md:grid-cols-12 gap-4"
-    >
-      {sortedRegions.map((region) => {
-        if (region.hidden) return null;
+  // Render a single region's inner content (panels + widgets)
+  const renderRegion = (region: LayoutSection) => {
+    const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
+    const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
 
-        const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
-        if (regionFx?.hidden) return null;
+    const regionStyle: React.CSSProperties = {
+      ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
+      ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
+      ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
+      borderRadius: region.style?.borderRadius === 'lg' ? 12 : region.style?.borderRadius === 'sm' ? 6 : undefined,
+      boxShadow: region.style?.shadow === 'md'
+        ? '0 10px 24px rgba(15,23,42,.14)'
+        : region.style?.shadow === 'sm'
+          ? '0 1px 3px rgba(15,23,42,.12)'
+          : undefined,
+    };
 
-        const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
-        const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
+    return (
+      <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
+        {/* Panels */}
+        {sortedPanels.map((panel: any) => {
+          if (panel.hidden) return null;
+          const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
+          if (panelFx?.hidden) return null;
 
-        const regionStyle: React.CSSProperties = {
-          gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
-          gridRow: `${region.gridRow ?? 1} / span ${region.gridRowSpan ?? 1}`,
-          alignSelf: 'start',
-          ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
-          ...(region.style?.borderColor ? { borderColor: region.style.borderColor } : {}),
-          ...(region.style?.borderStyle ? { borderStyle: region.style.borderStyle } : {}),
-          borderRadius: region.style?.borderRadius === 'lg' ? 12 : region.style?.borderRadius === 'sm' ? 6 : undefined,
-          boxShadow: region.style?.shadow === 'md'
-            ? '0 10px 24px rgba(15,23,42,.14)'
-            : region.style?.shadow === 'sm'
-              ? '0 1px 3px rgba(15,23,42,.12)'
-              : undefined,
-        };
+          const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
+          const visibleFields = sortedFields.filter((f: any) => {
+            if (f.behavior === 'hidden') return false;
+            const fd = getFieldDef(f.fieldApiName, objectDef);
+            if (!fd) return false;
+            if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
+            const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+            if (fFx?.hidden) return false;
+            return true;
+          });
 
-        return (
-          <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
-            {/* Panels */}
-            {sortedPanels.map((panel: any) => {
-              if (panel.hidden) return null;
-              const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
-              if (panelFx?.hidden) return null;
+          if (visibleFields.length === 0) return null;
 
-              const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
-              const visibleFields = sortedFields.filter((f: any) => {
-                if (f.behavior === 'hidden') return false;
-                const fd = getFieldDef(f.fieldApiName, objectDef);
-                if (!fd) return false;
-                if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
-                const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
-                if (fFx?.hidden) return false;
-                return true;
-              });
+          const headerStyle: React.CSSProperties = {
+            ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
+            ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
+            fontWeight: panel.style?.headerBold ? 700 : undefined,
+            fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
+            textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+          };
+          const bodyStyle: React.CSSProperties = {
+            ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
+          };
 
-              if (visibleFields.length === 0) return null;
-
-              const headerStyle: React.CSSProperties = {
-                ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
-                ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
-                fontWeight: panel.style?.headerBold ? 700 : undefined,
-                fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
-                textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
-              };
-              const bodyStyle: React.CSSProperties = {
-                ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
-              };
-
-              const isPanelCollapsed = collapsedPanelIds.has(panel.id);
-              return (
-                <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => togglePanelCollapse(panel.id)}
-                    className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-                    style={headerStyle}
-                    aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
-                    aria-expanded={!isPanelCollapsed}
-                  >
-                    <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
-                    {isPanelCollapsed
-                      ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
-                      : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
-                    }
-                  </button>
-                  {!isPanelCollapsed && (
-                    <div
-                      className="panel-field-grid grid gap-x-6 gap-y-4 p-4"
-                      style={{
-                        ...bodyStyle,
-                        gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
-                      }}
-                    >
-                      {visibleFields.map((f: any) => {
-                        const fd = getFieldDef(f.fieldApiName, objectDef);
-                        if (!fd) return null;
-                        const raw = getRecordValue(f.fieldApiName, record, fd, formulaValues);
-                        const labelStyle: React.CSSProperties = {
-                          ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
-                          fontWeight: f.labelStyle?.bold ? 700 : undefined,
-                          fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
-                          textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
-                        };
-                        const valueStyle: React.CSSProperties = {
-                          ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
-                          ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
-                          fontWeight: f.valueStyle?.bold ? 700 : undefined,
-                          fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
-                        };
-                        const displayLabel = f.labelOverride || fd.label;
-                        return (
-                          <div
-                            key={f.fieldApiName}
-                            style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
-                          >
-                            <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
-                              {displayLabel}
-                            </div>
-                            <div className="text-sm text-gray-900" style={valueStyle}>
-                              <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+          const isPanelCollapsed = collapsedPanelIds.has(panel.id);
+          return (
+            <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => togglePanelCollapse(panel.id)}
+                className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                style={headerStyle}
+                aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
+                aria-expanded={!isPanelCollapsed}
+              >
+                <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
+                {isPanelCollapsed
+                  ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                  : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                }
+              </button>
+              {!isPanelCollapsed && (
+                <div
+                  className="panel-field-grid grid gap-x-6 gap-y-4 p-4"
+                  style={{
+                    ...bodyStyle,
+                    gridTemplateColumns: `repeat(${panel.columns}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {visibleFields.map((f: any) => {
+                    const fd = getFieldDef(f.fieldApiName, objectDef);
+                    if (!fd) return null;
+                    const raw = getRecordValue(f.fieldApiName, record, fd, formulaValues);
+                    const labelStyle: React.CSSProperties = {
+                      ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
+                      fontWeight: f.labelStyle?.bold ? 700 : undefined,
+                      fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
+                      textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                    };
+                    const valueStyle: React.CSSProperties = {
+                      ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
+                      ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
+                      fontWeight: f.valueStyle?.bold ? 700 : undefined,
+                      fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
+                    };
+                    const displayLabel = f.labelOverride || fd.label;
+                    return (
+                      <div
+                        key={f.fieldApiName}
+                        style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                      >
+                        <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
+                          {displayLabel}
+                        </div>
+                        <div className="text-sm text-gray-900" style={valueStyle}>
+                          <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              )}
+            </div>
+          );
+        })}
 
-            {/* Widgets */}
-            {sortedWidgets.length > 0 && (
-              <LayoutWidgetsInline
-                widgets={sortedWidgets as any}
-                record={record ?? undefined}
-                objectDef={buildObjectDefPayload(objectDef)}
-                collapsedWidgetIds={collapsedWidgetIds}
-                toggleWidgetCollapse={toggleWidgetCollapse}
-              />
-            )}
+        {/* Widgets */}
+        {sortedWidgets.length > 0 && (
+          <LayoutWidgetsInline
+            widgets={sortedWidgets as any}
+            record={record ?? undefined}
+            objectDef={buildObjectDefPayload(objectDef)}
+            collapsedWidgetIds={collapsedWidgetIds}
+            toggleWidgetCollapse={toggleWidgetCollapse}
+          />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div key={tab.id ?? ti} className="flex flex-col gap-4">
+      {bands.map((band, bi) => {
+        if (band.kind === 'full-width') {
+          return <React.Fragment key={`fw-${bi}`}>{band.items.map(renderRegion)}</React.Fragment>;
+        }
+        if (band.tracks.length === 1) {
+          return <React.Fragment key={`band-${bi}`}>{band.tracks[0].items.map(renderRegion)}</React.Fragment>;
+        }
+        return (
+          <div key={`band-${bi}`} className="flex flex-col md:flex-row gap-4">
+            {band.tracks.map((track) => (
+              <div
+                key={`track-${track.startCol}`}
+                className="flex flex-col gap-4 min-w-0"
+                style={{ flex: track.span }}
+              >
+                {track.items.map(renderRegion)}
+              </div>
+            ))}
           </div>
         );
       })}
@@ -281,227 +384,248 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
     return isSectionShown(item.section);
   });
 
-  return (
-    <div
-      key={tab.id ?? ti}
-      className="region-grid grid grid-cols-1 md:grid-cols-12 gap-4 mb-6"
-    >
-      {visibleItems.map((item) => {
-        if (item.kind === 'widget') {
-          const g = item.widget;
-          return (
-            <div
-              key={g.id}
-              className="min-w-0"
-              style={gridItemStyle({
-                gridColumn: g.gridColumn ?? 1,
-                gridColumnSpan: g.gridColumnSpan ?? TAB_GRID_COLUMNS,
-                gridRow: g.gridRow ?? 1,
-                gridRowSpan: g.gridRowSpan ?? 1,
-              })}
-            >
-              <LayoutWidgetsInline
-                widgets={[g]}
-                record={record ?? undefined}
-                objectDef={buildObjectDefPayload(objectDef)}
-                collapsedWidgetIds={collapsedWidgetIds}
-                toggleWidgetCollapse={toggleWidgetCollapse}
-              />
-            </div>
-          );
-        }
+  function getItemPlacement(item: (typeof visibleItems)[0]): GridPlacement {
+    if (item.kind === 'widget') {
+      return {
+        gridColumn: item.widget.gridColumn ?? 1,
+        gridColumnSpan: item.widget.gridColumnSpan ?? TAB_GRID_COLUMNS,
+        gridRow: item.widget.gridRow ?? 1,
+      };
+    }
+    return {
+      gridColumn: item.section.gridColumn ?? 1,
+      gridColumnSpan: item.section.gridColumnSpan ?? TAB_GRID_COLUMNS,
+      gridRow: item.section.gridRow ?? 1,
+    };
+  }
 
-        const section = item.section;
-        const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
-        for (let c = 0; c < section.columns; c++) {
-          columnArrays[c] = section.fields
-            .filter((f: PageField) => f.column === c)
-            .sort((a: PageField, b: PageField) => a.order - b.order)
-            .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
-            .filter((entry) => entry.fieldDef != null)
-            .filter(({ layoutField, fieldDef }) => {
-              if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
-              const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
-              if (fFx?.hidden) return false;
-              return true;
-            });
-        }
+  const bands = groupIntoColumnTracks(visibleItems, getItemPlacement);
 
-        const hasSpanning = section.fields.some(
-          (f: any) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1,
-        );
+  const renderLegacyItem = (item: (typeof visibleItems)[0]) => {
+    if (item.kind === 'widget') {
+      const g = item.widget;
+      return (
+        <div key={g.id} className="min-w-0">
+          <LayoutWidgetsInline
+            widgets={[g]}
+            record={record ?? undefined}
+            objectDef={buildObjectDefPayload(objectDef)}
+            collapsedWidgetIds={collapsedWidgetIds}
+            toggleWidgetCollapse={toggleWidgetCollapse}
+          />
+        </div>
+      );
+    }
 
-        const sectionKey = `${ti}-${section.id}`;
-        const isCollapsed = sectionToggles[sectionKey] === false;
+    const section = item.section;
+    const columnArrays: { layoutField: typeof section.fields[0]; fieldDef: FieldDef }[][] = [];
+    for (let c = 0; c < section.columns; c++) {
+      columnArrays[c] = section.fields
+        .filter((f: PageField) => f.column === c)
+        .sort((a: PageField, b: PageField) => a.order - b.order)
+        .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
+        .filter((entry) => entry.fieldDef != null)
+        .filter(({ layoutField, fieldDef }) => {
+          if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+          const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+          if (fFx?.hidden) return false;
+          return true;
+        });
+    }
 
-        const toggleSection = () => {
-          if (!isCollapsed) {
-            setSectionToggles((prev) => ({ ...prev, [sectionKey]: false }));
-          } else {
-            setSectionToggles((prev) => {
-              const next = { ...prev };
-              delete next[sectionKey];
-              return next;
-            });
-          }
-        };
+    const hasSpanning = section.fields.some(
+      (f: any) => ((f as any).colSpan ?? 1) > 1 || ((f as any).rowSpan ?? 1) > 1,
+    );
 
-        return (
-          <div
-            key={section.id}
-            className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
-            style={gridItemStyle({
-              gridColumn: section.gridColumn ?? 1,
-              gridColumnSpan: section.gridColumnSpan ?? TAB_GRID_COLUMNS,
-              gridRow: section.gridRow ?? 1,
-              gridRowSpan: section.gridRowSpan ?? 1,
-            })}
-          >
-            <button
-              type="button"
-              onClick={toggleSection}
-              className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
-              aria-label={isCollapsed ? `Expand ${section.label} section` : `Collapse ${section.label} section`}
-              aria-expanded={!isCollapsed}
-            >
-              <div className="text-left">
-                <h3 className="font-medium text-gray-900">{section.label}</h3>
-                {section.description ? (
-                  <p className="text-xs text-gray-500 mt-0.5 font-normal">
-                    {section.description}
-                  </p>
-                ) : null}
-              </div>
-              {isCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-gray-500" aria-hidden="true" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden="true" />
-              )}
-            </button>
+    const sectionKey = `${ti}-${section.id}`;
+    const isCollapsed = sectionToggles[sectionKey] === false;
 
-            {!isCollapsed && (
-              <div className="p-6">
-                {hasSpanning ? (() => {
-                  const allFields = section.fields
-                    .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
-                    .filter((e: any) => e.fieldDef != null)
-                    .filter(({ layoutField, fieldDef }: any) => {
-                      if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
-                      const fx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
-                      return !fx?.hidden;
-                    });
-                  const occupied = new Set<string>();
-                  const colGroups: typeof allFields[] = [];
-                  for (let c = 0; c < section.columns; c++) {
-                    colGroups[c] = allFields
-                      .filter((e: any) => e.layoutField.column === c)
-                      .sort((a: any, b: any) => a.layoutField.order - b.layoutField.order);
-                  }
-                  const placed: (typeof allFields[0] & { gridRow: number; colSpan: number; rowSpan: number })[] = [];
-                  for (let c = 0; c < section.columns; c++) {
-                    for (const entry of (colGroups[c] ?? [])) {
-                      const f = entry.layoutField;
-                      const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
-                      const rs = (f as any).rowSpan ?? 1;
-                      let row = 1;
-                      search: while (true) {
-                        for (let dr = 0; dr < rs; dr++) {
-                          for (let dc = 0; dc < cs; dc++) {
-                            if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
-                          }
-                        }
-                        break;
-                      }
-                      placed.push({ ...entry, gridRow: row, colSpan: cs, rowSpan: rs });
-                      for (let dr = 0; dr < rs; dr++) {
-                        for (let dc = 0; dc < cs; dc++) {
-                          occupied.add(`${row + dr},${f.column + dc}`);
-                        }
+    const toggleSection = () => {
+      if (!isCollapsed) {
+        setSectionToggles((prev) => ({ ...prev, [sectionKey]: false }));
+      } else {
+        setSectionToggles((prev) => {
+          const next = { ...prev };
+          delete next[sectionKey];
+          return next;
+        });
+      }
+    };
+
+    return (
+      <div
+        key={section.id}
+        className="bg-white rounded-lg border border-gray-200 overflow-hidden min-w-0"
+      >
+        <button
+          type="button"
+          onClick={toggleSection}
+          className="w-full flex items-center justify-between bg-gray-50 px-6 py-3 border-b border-gray-200 hover:bg-gray-100 transition-colors"
+          aria-label={isCollapsed ? `Expand ${section.label} section` : `Collapse ${section.label} section`}
+          aria-expanded={!isCollapsed}
+        >
+          <div className="text-left">
+            <h3 className="font-medium text-gray-900">{section.label}</h3>
+            {section.description ? (
+              <p className="text-xs text-gray-500 mt-0.5 font-normal">
+                {section.description}
+              </p>
+            ) : null}
+          </div>
+          {isCollapsed ? (
+            <ChevronRight className="h-4 w-4 text-gray-500" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-gray-500" aria-hidden="true" />
+          )}
+        </button>
+
+        {!isCollapsed && (
+          <div className="p-6">
+            {hasSpanning ? (() => {
+              const allFields = section.fields
+                .map((f: PageField) => ({ layoutField: f, fieldDef: getFieldDef(f.apiName, objectDef, f)! }))
+                .filter((e: any) => e.fieldDef != null)
+                .filter(({ layoutField, fieldDef }: any) => {
+                  if (!evaluateVisibility(fieldDef.visibleIf, layoutVisibilityData)) return false;
+                  const fx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                  return !fx?.hidden;
+                });
+              const occupied = new Set<string>();
+              const colGroups: typeof allFields[] = [];
+              for (let c = 0; c < section.columns; c++) {
+                colGroups[c] = allFields
+                  .filter((e: any) => e.layoutField.column === c)
+                  .sort((a: any, b: any) => a.layoutField.order - b.layoutField.order);
+              }
+              const placed: (typeof allFields[0] & { gridRow: number; colSpan: number; rowSpan: number })[] = [];
+              for (let c = 0; c < section.columns; c++) {
+                for (const entry of (colGroups[c] ?? [])) {
+                  const f = entry.layoutField;
+                  const cs = Math.min((f as any).colSpan ?? 1, section.columns - f.column);
+                  const rs = (f as any).rowSpan ?? 1;
+                  let row = 1;
+                  search: while (true) {
+                    for (let dr = 0; dr < rs; dr++) {
+                      for (let dc = 0; dc < cs; dc++) {
+                        if (occupied.has(`${row + dr},${f.column + dc}`)) { row++; continue search; }
                       }
                     }
+                    break;
                   }
-                  return (
-                    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
-                      {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
-                        const value = getRecordValue(layoutField.apiName, record, fieldDef, formulaValues);
-                        const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
-                        const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
-                        const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
-                        const labelCn = labelPresentationClassName((layoutField as any).presentation);
-                        return (
-                          <div
-                            key={layoutField.apiName}
-                            style={{
-                              gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
-                              gridRow: `${gridRow} / span ${rowSpan}`,
-                              display: 'flex',
-                              flexDirection: 'column',
-                            }}
-                            className={hl || undefined}
-                          >
-                            <dt className={`text-sm ${labelCn}`}>
-                              {fieldDef.label}
-                              {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
-                              {fFx?.readOnly ? (
-                                <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
-                              ) : null}
-                            </dt>
-                            <dd
-                              className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
-                              style={rowSpan > 1 ? { flex: 1 } : undefined}
-                            >
-                              <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
-                              {badgeC ? <span className={badgeC}>Status</span> : null}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })() : (
-                <div
-                  className={`grid gap-6 ${
-                    section.columns === 1
-                      ? 'grid-cols-1'
-                      : section.columns === 2
-                        ? 'grid-cols-1 md:grid-cols-2'
-                        : section.columns === 4
-                          ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
-                          : 'grid-cols-1 md:grid-cols-3'
-                  }`}
-                >
-                  {columnArrays.map((colFields, colIdx) => (
-                    <div key={`col-${colIdx}`} className="flex flex-col gap-4">
-                      {colFields.map(({ layoutField, fieldDef }) => {
-                        const value = getRecordValue(layoutField.apiName, record, fieldDef, formulaValues);
-                        const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
-                        const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
-                        const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
-                        const labelCn = labelPresentationClassName((layoutField as any).presentation);
-                        return (
-                          <div key={layoutField.apiName} className={hl || undefined}>
-                            <dt className={`text-sm ${labelCn}`}>
-                              {fieldDef.label}
-                              {fieldDef.required && (
-                                <span className="text-red-500 ml-1">*</span>
-                              )}
-                              {fFx?.readOnly ? (
-                                <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
-                              ) : null}
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                              <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
-                              {badgeC ? <span className={badgeC}>Status</span> : null}
-                            </dd>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+                  placed.push({ ...entry, gridRow: row, colSpan: cs, rowSpan: rs });
+                  for (let dr = 0; dr < rs; dr++) {
+                    for (let dc = 0; dc < cs; dc++) {
+                      occupied.add(`${row + dr},${f.column + dc}`);
+                    }
+                  }
+                }
+              }
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gridAutoRows: 'minmax(60px, auto)', gap: '1.5rem' }}>
+                  {placed.map(({ layoutField, fieldDef, gridRow, colSpan, rowSpan }) => {
+                    const value = getRecordValue(layoutField.apiName, record, fieldDef, formulaValues);
+                    const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                    const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                    const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                    const labelCn = labelPresentationClassName((layoutField as any).presentation);
+                    return (
+                      <div
+                        key={layoutField.apiName}
+                        style={{
+                          gridColumn: `${layoutField.column + 1} / span ${Math.min(colSpan, section.columns - layoutField.column)}`,
+                          gridRow: `${gridRow} / span ${rowSpan}`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                        }}
+                        className={hl || undefined}
+                      >
+                        <dt className={`text-sm ${labelCn}`}>
+                          {fieldDef.label}
+                          {fieldDef.required && <span className="text-red-500 ml-1">*</span>}
+                          {fFx?.readOnly ? (
+                            <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
+                          ) : null}
+                        </dt>
+                        <dd
+                          className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
+                          style={rowSpan > 1 ? { flex: 1 } : undefined}
+                        >
+                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
+                          {badgeC ? <span className={badgeC}>Status</span> : null}
+                        </dd>
+                      </div>
+                    );
+                  })}
                 </div>
-                )}
-              </div>
+              );
+            })() : (
+            <div
+              className={`grid gap-6 ${
+                section.columns === 1
+                  ? 'grid-cols-1'
+                  : section.columns === 2
+                    ? 'grid-cols-1 md:grid-cols-2'
+                    : section.columns === 4
+                      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+                      : 'grid-cols-1 md:grid-cols-3'
+              }`}
+            >
+              {columnArrays.map((colFields, colIdx) => (
+                <div key={`col-${colIdx}`} className="flex flex-col gap-4">
+                  {colFields.map(({ layoutField, fieldDef }) => {
+                    const value = getRecordValue(layoutField.apiName, record, fieldDef, formulaValues);
+                    const fFx = getFormattingEffectsForField(pageLayout, layoutField.apiName, layoutVisibilityData);
+                    const hl = fieldHighlightWrapperClass(fFx?.highlightToken);
+                    const badgeC = fFx?.badge ? badgePillClass(fFx.badge) : '';
+                    const labelCn = labelPresentationClassName((layoutField as any).presentation);
+                    return (
+                      <div key={layoutField.apiName} className={hl || undefined}>
+                        <dt className={`text-sm ${labelCn}`}>
+                          {fieldDef.label}
+                          {fieldDef.required && (
+                            <span className="text-red-500 ml-1">*</span>
+                          )}
+                          {fFx?.readOnly ? (
+                            <span className="ml-2 text-xs font-normal text-gray-400">(read-only)</span>
+                          ) : null}
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
+                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
+                          {badgeC ? <span className={badgeC}>Status</span> : null}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
             )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div key={tab.id ?? ti} className="flex flex-col gap-4 mb-6">
+      {bands.map((band, bi) => {
+        if (band.kind === 'full-width') {
+          return <React.Fragment key={`fw-${bi}`}>{band.items.map(renderLegacyItem)}</React.Fragment>;
+        }
+        if (band.tracks.length === 1) {
+          return <React.Fragment key={`band-${bi}`}>{band.tracks[0].items.map(renderLegacyItem)}</React.Fragment>;
+        }
+        return (
+          <div key={`band-${bi}`} className="flex flex-col md:flex-row gap-4">
+            {band.tracks.map((track) => (
+              <div
+                key={`track-${track.startCol}`}
+                className="flex flex-col gap-4 min-w-0"
+                style={{ flex: track.span }}
+              >
+                {track.items.map(renderLegacyItem)}
+              </div>
+            ))}
           </div>
         );
       })}
