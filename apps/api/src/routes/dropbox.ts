@@ -218,6 +218,51 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
 }
 
 /**
+ * For a Project (or similar) record that has no direct PropertyId,
+ * look it up via the linked Opportunity.
+ */
+async function resolvePropertyIdViaOpportunity(
+  recordData: Record<string, any>,
+  objectApiName: string,
+): Promise<string | undefined> {
+  // Find Opportunity lookup in the record data
+  let oppId: string | undefined;
+  for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+    const v = recordData[key] ?? recordData[`${objectApiName}__${key}`];
+    if (v && typeof v === 'string') { oppId = v; break; }
+  }
+  if (!oppId) {
+    for (const [k, v] of Object.entries(recordData)) {
+      if (k.toLowerCase().includes('opportunity') && !k.toLowerCase().includes('number') && !k.toLowerCase().includes('name') && typeof v === 'string' && v) {
+        oppId = v; break;
+      }
+    }
+  }
+  if (!oppId) return undefined;
+
+  const oppObj = await prisma.customObject.findFirst({
+    where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+  });
+  if (!oppObj) return undefined;
+
+  const oppRecord = await prisma.record.findFirst({
+    where: { id: oppId, objectId: oppObj.id },
+  });
+  if (!oppRecord) return undefined;
+
+  const oppData = oppRecord.data as Record<string, any>;
+  // Find PropertyId in the Opportunity's data
+  for (const key of ['property', 'propertyId', 'PropertyId', 'propertyAddress', 'relatedProperty']) {
+    const v = oppData[key] ?? oppData[`Opportunity__${key}`];
+    if (v && typeof v === 'string') return v;
+  }
+  for (const [k, v] of Object.entries(oppData)) {
+    if (k.toLowerCase().includes('property') && typeof v === 'string' && v) return v;
+  }
+  return undefined;
+}
+
+/**
  * Attempt to rename a Dropbox folder when a record's derived name changes.
  * Fire-and-forget — errors are logged but do not propagate.
  */
@@ -294,6 +339,11 @@ export async function tryEnsureLinkedFolder(
           break;
         }
       }
+    }
+
+    // 3. For Project, fall back to the linked Opportunity's PropertyId
+    if (!propertyId && childObjectApiName === 'Project') {
+      propertyId = await resolvePropertyIdViaOpportunity(childData, childObjectApiName);
     }
 
     if (!propertyId) {
@@ -820,6 +870,11 @@ export async function dropboxRoutes(app: FastifyInstance) {
             break;
           }
         }
+      }
+
+      // For Project, fall back to the linked Opportunity's PropertyId
+      if (!propertyId && objectApiName === 'Project') {
+        propertyId = await resolvePropertyIdViaOpportunity(recordData, objectApiName);
       }
 
       if (!propertyId) {
