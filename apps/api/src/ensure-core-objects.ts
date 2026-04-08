@@ -81,6 +81,7 @@ const CORE_OBJECTS = [
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
       { apiName: 'leadSource', label: 'Lead Source', type: 'Picklist', picklistValues: ['Web', 'Phone', 'Referral', 'Partner', 'Other'] },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['New', 'Contacted', 'Qualified', 'Converted', 'Lost'], defaultValue: 'New' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
   {
@@ -95,6 +96,7 @@ const CORE_OBJECTS = [
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
       { apiName: 'probability', label: 'Probability (%)', type: 'Percent' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
   {
@@ -109,6 +111,7 @@ const CORE_OBJECTS = [
       { apiName: 'startDate', label: 'Start Date', type: 'Date' },
       { apiName: 'endDate', label: 'End Date', type: 'Date' },
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'Planning' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
   {
@@ -164,6 +167,7 @@ const CORE_OBJECTS = [
       { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
       { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
       { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
 ];
