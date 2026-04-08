@@ -38,16 +38,9 @@ export function getRecordLabel(record: any): string {
   // Account number as fallback for accounts
   if (record.accountNumber) return record.accountNumber;
 
-  // Lead: show leadNumber - contactName (or firstName lastName)
+  // Lead: show just lead number as label (contactName goes in subtext)
   const leadNum = record.leadNumber || record.Lead__leadNumber;
-  if (leadNum) {
-    const contactName = record.contactName || record.Lead__contactName;
-    const fn = record.firstName || record.Lead__firstName || '';
-    const ln = record.lastName || record.Lead__lastName || '';
-    const rawLn = ln && ln !== 'N/A' ? ln : '';
-    const leadName = contactName || `${fn} ${rawLn}`.trim();
-    return leadName ? `${leadNum} - ${leadName}` : leadNum;
-  }
+  if (leadNum) return leadNum;
 
   // Contact names
   if (record.firstName || record.lastName) {
@@ -179,6 +172,15 @@ export function getRecordSubtext(record: any): string {
   // Contact: show email as subtext
   const email = record.email || record.Contact__email;
   if (email && typeof email === 'string') return email;
+
+  // Lead: show contactName as subtext
+  const leadContactName = record.contactName || record.Lead__contactName;
+  if (leadContactName) return leadContactName;
+  const leadFn = record.firstName || record.Lead__firstName || '';
+  const leadLn = record.lastName || record.Lead__lastName || '';
+  const rawLeadLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
+  const leadFullName = `${leadFn} ${rawLeadLn}`.trim();
+  if (leadFullName) return leadFullName;
 
   // Account: show account number as subtext
   if (record.accountNumber || record.Account__accountNumber) {
@@ -329,9 +331,11 @@ export function LookupSearch({
                   <div className="font-medium text-gray-900 truncate">
                     {displayLabel}
                   </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {getRecordSubtext(record) || record.id}
-                  </div>
+                  {(getRecordSubtext(record)) && (
+                    <div className="text-xs text-gray-500 truncate">
+                      {getRecordSubtext(record)}
+                    </div>
+                  )}
                 </button>
               );
             })
