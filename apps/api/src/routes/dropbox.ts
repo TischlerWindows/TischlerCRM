@@ -264,9 +264,14 @@ export async function tryEnsureLinkedFolder(
   childData: Record<string, any>,
 ): Promise<void> {
   try {
+    console.log(`[dropbox] tryEnsureLinkedFolder called: object=${childObjectApiName}, recordId=${childRecordId}, userId=${userId}`);
+
     // Only applies to object types that have a subfolder mapping
     const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
-    if (!subfolder) return;
+    if (!subfolder) {
+      console.log(`[dropbox] No subfolder mapping for ${childObjectApiName}, skipping`);
+      return;
+    }
 
     // Dynamically find a Property lookup value in the record data.
     // The record data has both prefixed ("Opportunity__property") and stripped
@@ -291,21 +296,52 @@ export async function tryEnsureLinkedFolder(
       }
     }
 
-    if (!propertyId) return;
+    if (!propertyId) {
+      console.log(`[dropbox] No property ID found in child data keys: ${Object.keys(childData).filter(k => k.toLowerCase().includes('prop')).join(', ')}`);
+      return;
+    }
+    console.log(`[dropbox] Found propertyId=${propertyId} for ${childObjectApiName} ${childRecordId}`);
 
-    const accessToken = await getAccessToken(userId);
-    if (!accessToken) return; // Dropbox not connected
+    // Try to get access token for the creating user first, then fall back to
+    // any org-level Dropbox-connected user so folder creation isn't blocked
+    // when the current user hasn't connected Dropbox.
+    let accessToken = await getAccessToken(userId);
+    if (!accessToken) {
+      console.log(`[dropbox] User ${userId} not Dropbox-connected, trying org-level fallback`);
+      const connections = await prisma.integrationConnection.findMany({
+        where: { provider: 'dropbox', accessToken: { not: null } },
+        select: { userId: true },
+        take: 5,
+      });
+      for (const conn of connections) {
+        accessToken = await getAccessToken(conn.userId);
+        if (accessToken) {
+          console.log(`[dropbox] Using fallback Dropbox token from user ${conn.userId}`);
+          break;
+        }
+      }
+      if (!accessToken) {
+        console.log('[dropbox] No Dropbox-connected user found in org, skipping');
+        return;
+      }
+    }
 
     // Verify it's actually a Property record
     const propertyObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Property', mode: 'insensitive' } },
     });
-    if (!propertyObj) return;
+    if (!propertyObj) {
+      console.log('[dropbox] Property custom object not found');
+      return;
+    }
 
     const propertyRecord = await prisma.record.findFirst({
       where: { id: propertyId, objectId: propertyObj.id },
     });
-    if (!propertyRecord) return;
+    if (!propertyRecord) {
+      console.log(`[dropbox] Property record ${propertyId} not found (objectId=${propertyObj.id})`);
+      return;
+    }
     const propertyData = propertyRecord.data as Record<string, any>;
     const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
 
@@ -316,6 +352,8 @@ export async function tryEnsureLinkedFolder(
     const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
     const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
+    console.log(`[dropbox] Creating linked folder: ${childPath}`);
+
     let created = false;
     try {
       await dropboxApi(accessToken, '/files/create_folder_v2', {
@@ -323,10 +361,12 @@ export async function tryEnsureLinkedFolder(
         autorename: false,
       });
       created = true;
+      console.log(`[dropbox] Successfully created linked folder: ${childPath}`);
     } catch (err: any) {
       if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
         throw err;
       }
+      console.log(`[dropbox] Linked folder already exists: ${childPath}`);
       // Already exists — fine
     }
 
