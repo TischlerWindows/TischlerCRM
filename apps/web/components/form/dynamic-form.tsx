@@ -1049,10 +1049,11 @@ export default function DynamicForm({
                       );
                     }
                     const region = item.region;
-                    return region.panels
+                    const visiblePanels = region.panels
                       .filter((p) => !p.hidden)
-                      .sort((a, b) => a.order - b.order)
-                      .map((panelItem) => {
+                      .sort((a, b) => a.order - b.order);
+                    return visiblePanels
+                      .map((panelItem, panelIdx) => {
                         const isCollapsed = collapsedSections.has(panelItem.id);
                         return (
                           <div
@@ -1062,8 +1063,10 @@ export default function DynamicForm({
                               gridColumn: region.gridColumn ?? 1,
                               gridColumnSpan:
                                 region.gridColumnSpan ?? TAB_GRID_COLUMNS,
-                              gridRow: region.gridRow ?? 1,
-                              gridRowSpan: region.gridRowSpan ?? 1,
+                              gridRow: visiblePanels.length > 1
+                                ? (region.gridRow ?? 1) + panelIdx
+                                : region.gridRow ?? 1,
+                              gridRowSpan: 1,
                             })}
                           >
                             <button
