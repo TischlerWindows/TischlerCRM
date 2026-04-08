@@ -348,10 +348,84 @@ export async function tryEnsureLinkedFolder(
     const propertyData = propertyRecord.data as Record<string, any>;
     const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
 
+    const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
+
+    // ── Special handling: Project linked to an Opportunity ──
+    // Don't create a separate Project folder — use the linked Opportunity's
+    // existing folder and copy Estimation → Project Management within it.
+    if (childObjectApiName === 'Project') {
+      let oppId: string | undefined;
+      for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+        const v = childData[key] ?? childData[`Project__${key}`];
+        if (v && typeof v === 'string') { oppId = v; break; }
+      }
+      if (!oppId) {
+        for (const [key, val] of Object.entries(childData)) {
+          if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
+            oppId = val; break;
+          }
+        }
+      }
+
+      if (oppId) {
+        // Linked to an Opportunity — copy files within the Opportunity's folder
+        const oppObj = await prisma.customObject.findFirst({
+          where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+        });
+        if (oppObj) {
+          const oppRecord = await prisma.record.findFirst({
+            where: { id: oppId, objectId: oppObj.id },
+          });
+          if (oppRecord) {
+            const oppData = oppRecord.data as Record<string, any>;
+            const oppFolderName = deriveDropboxFolderName(oppData, oppId);
+            const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+            const oppPath = `${parentPath}/Project Books/${safeOpp}`;
+            const estimationPath = `${oppPath}/1. Estimation`;
+            const projectMgmtPath = `${oppPath}/4. Project Management`;
+
+            console.log(`[dropbox] Project linked to Opportunity — copying ${estimationPath} → ${projectMgmtPath}`);
+
+            try {
+              const result = await dropboxApi(accessToken, '/files/list_folder', {
+                path: estimationPath,
+                limit: 2000,
+              }) as { entries: Array<{ '.tag': string; path_display: string; name: string }> };
+
+              if (result.entries && result.entries.length > 0) {
+                console.log(`[dropbox] Copying ${result.entries.length} items from Estimation → Project Management`);
+                for (const entry of result.entries) {
+                  try {
+                    await dropboxApi(accessToken, '/files/copy_v2', {
+                      from_path: entry.path_display,
+                      to_path: `${projectMgmtPath}/${entry.name}`,
+                      autorename: true,
+                    });
+                  } catch (err: any) {
+                    console.error(`[dropbox] Failed to copy ${entry.name}: ${err.message}`);
+                  }
+                }
+                console.log(`[dropbox] Finished copying files to ${projectMgmtPath}`);
+              } else {
+                console.log(`[dropbox] Estimation folder empty: ${estimationPath}`);
+              }
+            } catch (err: any) {
+              if (err.message?.includes('409') || err.message?.includes('not_found')) {
+                console.log(`[dropbox] Estimation folder not found: ${estimationPath}`);
+              } else {
+                console.error('[dropbox] Copy failed (non-fatal):', err.message);
+              }
+            }
+            return; // Done — no separate Project folder needed
+          }
+        }
+      }
+      // No linked Opportunity — fall through to create a standalone Project folder
+    }
+
     // Derive child folder name
     const childFolderName = deriveDropboxFolderName(childData, childRecordId);
 
-    const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
     const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
     const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
@@ -373,8 +447,8 @@ export async function tryEnsureLinkedFolder(
       // Already exists — fine
     }
 
-    // Create subfolders for Opportunity / Project records
-    if (created && (childObjectApiName === 'Opportunity' || childObjectApiName === 'Project')) {
+    // Create subfolders for Opportunity records
+    if (created && childObjectApiName === 'Opportunity') {
       for (const sf of OPPORTUNITY_SUBFOLDERS) {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
@@ -386,8 +460,7 @@ export async function tryEnsureLinkedFolder(
     }
 
     // ── Copy files from related record folder ──
-    // Opportunity linked to Lead  → copy Lead folder → 1. Estimation
-    // Project linked to Opportunity → copy Opportunity/1. Estimation → 4. Project Management
+    // Opportunity linked to Lead → copy Lead folder → 1. Estimation
     if (created) {
       try {
         await tryCopyLinkedRecordFiles(accessToken, childObjectApiName, childData, childPath, parentPath);
@@ -403,7 +476,7 @@ export async function tryEnsureLinkedFolder(
 /**
  * Copy files from a related record's Dropbox folder into the newly created folder.
  *   - Opportunity with Lead lookup → copy Lead folder contents → Opportunity/1. Estimation
- *   - Project with Opportunity lookup → copy Opportunity/1. Estimation → Project/4. Project Management
+ * (Project copying is handled directly in tryEnsureLinkedFolder.)
  */
 async function tryCopyLinkedRecordFiles(
   accessToken: string,
@@ -447,41 +520,6 @@ async function tryCopyLinkedRecordFiles(
           sourcePath = `${parentPropertyPath}/Leads/${safeLead}`;
           destPath = `${childPath}/1. Estimation`;
           console.log(`[dropbox] Will copy Lead files: ${sourcePath} → ${destPath}`);
-        }
-      }
-    }
-  } else if (childObjectApiName === 'Project') {
-    // Find the Opportunity lookup
-    let oppId: string | undefined;
-    for (const key of ['opportunity', 'opportunityId', 'relatedOpportunity']) {
-      const v = childData[key] ?? childData[`Project__${key}`];
-      if (v && typeof v === 'string') { oppId = v; break; }
-    }
-    if (!oppId) {
-      for (const [key, val] of Object.entries(childData)) {
-        if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
-          oppId = val; break;
-        }
-      }
-    }
-
-    if (oppId) {
-      // Find the Opportunity record to derive its folder name
-      const oppObj = await prisma.customObject.findFirst({
-        where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
-      });
-      if (oppObj) {
-        const oppRecord = await prisma.record.findFirst({
-          where: { id: oppId, objectId: oppObj.id },
-        });
-        if (oppRecord) {
-          const oppData = oppRecord.data as Record<string, any>;
-          const oppFolderName = deriveDropboxFolderName(oppData, oppId);
-          const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
-          // Opportunity folder lives under: /TischlerCRM/Property/{prop}/Project Books/{oppFolder}
-          sourcePath = `${parentPropertyPath}/Project Books/${safeOpp}/1. Estimation`;
-          destPath = `${childPath}/4. Project Management`;
-          console.log(`[dropbox] Will copy Opportunity Estimation files: ${sourcePath} → ${destPath}`);
         }
       }
     }

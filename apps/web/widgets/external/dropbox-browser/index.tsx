@@ -66,8 +66,8 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
           // Opportunity → open directly into 1. Estimation subfolder
           subPath = `${subPath}/1. Estimation`
         } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
-          // Project → open the linked Opportunity's full folder
-          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
+          // Project → open the linked Opportunity's Project Management subfolder
+          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}/4. Project Management`
         }
 
         setResolved({
