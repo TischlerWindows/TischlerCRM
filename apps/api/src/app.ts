@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import serveStatic from '@fastify/static';
+import qs from 'qs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -69,7 +70,11 @@ function buildInviteUrl(inviteToken: string): string {
 export function buildApp() {
   // H-1: bodyLimit — the settings endpoint stores the full OrgSchema as a single
   // JSON blob which can easily reach several MB with many objects/layouts.
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: 10 * 1024 * 1024,
+    querystringParser: (str) => qs.parse(str),
+  });
 
   // H-2: security headers — must be registered before CORS
   app.register(helmet, { contentSecurityPolicy: false });
