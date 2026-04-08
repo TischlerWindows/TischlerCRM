@@ -384,8 +384,143 @@ export async function tryEnsureLinkedFolder(
         } catch { /* folder already exists — ignore */ }
       }
     }
+
+    // ── Copy files from related record folder ──
+    // Opportunity linked to Lead  → copy Lead folder → 1. Estimation
+    // Project linked to Opportunity → copy Opportunity/1. Estimation → 4. Project Management
+    if (created) {
+      try {
+        await tryCopyLinkedRecordFiles(accessToken, childObjectApiName, childData, childPath, parentPath);
+      } catch (copyErr: any) {
+        console.error('[dropbox] tryCopyLinkedRecordFiles failed (non-fatal):', copyErr.message);
+      }
+    }
   } catch (err: any) {
     console.error('[dropbox] tryEnsureLinkedFolder failed (non-fatal):', err.message);
+  }
+}
+
+/**
+ * Copy files from a related record's Dropbox folder into the newly created folder.
+ *   - Opportunity with Lead lookup → copy Lead folder contents → Opportunity/1. Estimation
+ *   - Project with Opportunity lookup → copy Opportunity/1. Estimation → Project/4. Project Management
+ */
+async function tryCopyLinkedRecordFiles(
+  accessToken: string,
+  childObjectApiName: string,
+  childData: Record<string, any>,
+  childPath: string,
+  parentPropertyPath: string,
+): Promise<void> {
+  let sourcePath: string | undefined;
+  let destPath: string | undefined;
+
+  if (childObjectApiName === 'Opportunity') {
+    // Find the Lead lookup
+    let leadId: string | undefined;
+    for (const key of ['lead', 'leadId', 'relatedLead']) {
+      const v = childData[key] ?? childData[`Opportunity__${key}`];
+      if (v && typeof v === 'string') { leadId = v; break; }
+    }
+    if (!leadId) {
+      for (const [key, val] of Object.entries(childData)) {
+        if (key.toLowerCase().includes('lead') && !key.toLowerCase().includes('number') && typeof val === 'string' && val) {
+          leadId = val; break;
+        }
+      }
+    }
+
+    if (leadId) {
+      // Find the Lead record to derive its folder name
+      const leadObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+      });
+      if (leadObj) {
+        const leadRecord = await prisma.record.findFirst({
+          where: { id: leadId, objectId: leadObj.id },
+        });
+        if (leadRecord) {
+          const leadData = leadRecord.data as Record<string, any>;
+          const leadFolderName = deriveDropboxFolderName(leadData, leadId);
+          const safeLead = leadFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+          // Lead folder lives under: /TischlerCRM/Property/{prop}/Leads/{leadFolder}
+          sourcePath = `${parentPropertyPath}/Leads/${safeLead}`;
+          destPath = `${childPath}/1. Estimation`;
+          console.log(`[dropbox] Will copy Lead files: ${sourcePath} → ${destPath}`);
+        }
+      }
+    }
+  } else if (childObjectApiName === 'Project') {
+    // Find the Opportunity lookup
+    let oppId: string | undefined;
+    for (const key of ['opportunity', 'opportunityId', 'relatedOpportunity']) {
+      const v = childData[key] ?? childData[`Project__${key}`];
+      if (v && typeof v === 'string') { oppId = v; break; }
+    }
+    if (!oppId) {
+      for (const [key, val] of Object.entries(childData)) {
+        if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
+          oppId = val; break;
+        }
+      }
+    }
+
+    if (oppId) {
+      // Find the Opportunity record to derive its folder name
+      const oppObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+      });
+      if (oppObj) {
+        const oppRecord = await prisma.record.findFirst({
+          where: { id: oppId, objectId: oppObj.id },
+        });
+        if (oppRecord) {
+          const oppData = oppRecord.data as Record<string, any>;
+          const oppFolderName = deriveDropboxFolderName(oppData, oppId);
+          const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+          // Opportunity folder lives under: /TischlerCRM/Property/{prop}/Project Books/{oppFolder}
+          sourcePath = `${parentPropertyPath}/Project Books/${safeOpp}/1. Estimation`;
+          destPath = `${childPath}/4. Project Management`;
+          console.log(`[dropbox] Will copy Opportunity Estimation files: ${sourcePath} → ${destPath}`);
+        }
+      }
+    }
+  }
+
+  if (!sourcePath || !destPath) return;
+
+  // List all files/folders in the source folder and copy each to the destination
+  try {
+    const result = await dropboxApi(accessToken, '/files/list_folder', {
+      path: sourcePath,
+      limit: 2000,
+    }) as { entries: Array<{ '.tag': string; path_display: string; name: string }> };
+
+    if (!result.entries || result.entries.length === 0) {
+      console.log(`[dropbox] Source folder empty or not found: ${sourcePath}`);
+      return;
+    }
+
+    console.log(`[dropbox] Copying ${result.entries.length} items from ${sourcePath} → ${destPath}`);
+    for (const entry of result.entries) {
+      try {
+        await dropboxApi(accessToken, '/files/copy_v2', {
+          from_path: entry.path_display,
+          to_path: `${destPath}/${entry.name}`,
+          autorename: true,
+        });
+      } catch (err: any) {
+        console.error(`[dropbox] Failed to copy ${entry.name}: ${err.message}`);
+      }
+    }
+    console.log(`[dropbox] Finished copying files to ${destPath}`);
+  } catch (err: any) {
+    // Source folder may not exist — that's OK
+    if (err.message?.includes('409') || err.message?.includes('not_found')) {
+      console.log(`[dropbox] Source folder not found: ${sourcePath}`);
+      return;
+    }
+    throw err;
   }
 }
 
