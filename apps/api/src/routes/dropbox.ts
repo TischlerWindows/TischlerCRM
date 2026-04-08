@@ -308,16 +308,19 @@ export async function tryEnsureLinkedFolder(
     let accessToken = await getAccessToken(userId);
     if (!accessToken) {
       console.log(`[dropbox] User ${userId} not Dropbox-connected, trying org-level fallback`);
-      const connections = await prisma.integrationConnection.findMany({
-        where: { provider: 'dropbox', accessToken: { not: null } },
-        select: { userId: true },
-        take: 5,
-      });
-      for (const conn of connections) {
-        accessToken = await getAccessToken(conn.userId);
-        if (accessToken) {
-          console.log(`[dropbox] Using fallback Dropbox token from user ${conn.userId}`);
-          break;
+      const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+      if (integration) {
+        const connections = await prisma.userIntegration.findMany({
+          where: { integrationId: integration.id, accessToken: { not: null } },
+          select: { userId: true },
+          take: 5,
+        });
+        for (const conn of connections) {
+          accessToken = await getAccessToken(conn.userId);
+          if (accessToken) {
+            console.log(`[dropbox] Using fallback Dropbox token from user ${conn.userId}`);
+            break;
+          }
         }
       }
       if (!accessToken) {
