@@ -49,13 +49,16 @@ export function PicklistTextDropdown({
         )}
       >
         <span className="break-words whitespace-normal flex-1 flex items-center gap-2">
-          {value && colors?.[value] && (
+          {value ? (
             <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: colors[value] }}
-            />
+              className="px-2 py-0.5 rounded text-sm"
+              style={colors?.[value] ? { backgroundColor: colors[value] + '33', color: colors[value] } : undefined}
+            >
+              {value}
+            </span>
+          ) : (
+            <span className="text-gray-500">-- Select --</span>
           )}
-          {value || <span className="text-gray-500">-- Select --</span>}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" />
       </button>
@@ -85,13 +88,16 @@ export function PicklistTextDropdown({
                 setOpen(false);
               }}
             >
-              {colors?.[option] && (
+              {colors?.[option] ? (
                 <span
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: colors[option] }}
-                />
+                  className="px-2 py-0.5 rounded text-sm"
+                  style={{ backgroundColor: colors[option] + '33', color: colors[option] }}
+                >
+                  {option}
+                </span>
+              ) : (
+                <span>{option}</span>
               )}
-              <span>{option}</span>
             </div>
           ))}
         </div>
@@ -209,15 +215,16 @@ export function PicklistInput({
         )}
       >
         <span className="flex items-center gap-2 flex-1 min-w-0">
-          {value && colors[value] && (
+          {value ? (
             <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: colors[value] }}
-            />
+              className="px-2 py-0.5 rounded text-sm truncate"
+              style={colors[value] ? { backgroundColor: colors[value] + '33', color: colors[value] } : undefined}
+            >
+              {value}
+            </span>
+          ) : (
+            <span className="text-gray-500 truncate">-- Select --</span>
           )}
-          <span className={cn('truncate', !value && 'text-gray-500')}>
-            {value || '-- Select --'}
-          </span>
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
       </button>
@@ -241,13 +248,12 @@ export function PicklistInput({
               )}
               onClick={() => { onChange(option); setOpen(false); }}
             >
-              {colors[option] && (
-                <span
-                  className="w-3 h-3 rounded-full shrink-0"
-                  style={{ backgroundColor: colors[option] }}
-                />
-              )}
-              <span>{option}</span>
+              <span
+                className="px-2 py-0.5 rounded text-sm"
+                style={colors[option] ? { backgroundColor: colors[option] + '33', color: colors[option] } : undefined}
+              >
+                {option}
+              </span>
             </div>
           ))}
         </div>
@@ -304,15 +310,19 @@ export function MultiPicklistInput({
             disabled={disabled}
             className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
           />
-          {colors?.[option] && (
-            <span
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: colors[option] }}
-            />
+          {colors?.[option] ? (
+            <label
+              htmlFor={`${fieldDef.apiName}-${option}`}
+              className="text-sm px-2 py-0.5 rounded cursor-pointer"
+              style={{ backgroundColor: colors[option] + '33', color: colors[option] }}
+            >
+              {option}
+            </label>
+          ) : (
+            <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
+              {option}
+            </label>
           )}
-          <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
-            {option}
-          </label>
         </div>
       ))}
     </div>
