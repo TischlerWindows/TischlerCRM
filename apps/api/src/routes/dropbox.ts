@@ -803,6 +803,37 @@ export async function dropboxRoutes(app: FastifyInstance) {
       const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
       const childFolderName = deriveDropboxFolderName(recordData, recordId);
 
+      // For Project, also resolve the linked Opportunity folder name
+      let linkedOpportunityFolderName: string | undefined;
+      if (objectApiName === 'Project') {
+        let oppId: string | undefined;
+        for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+          const v = recordData[key] ?? recordData[`Project__${key}`];
+          if (v && typeof v === 'string') { oppId = v; break; }
+        }
+        if (!oppId) {
+          for (const [k, v] of Object.entries(recordData)) {
+            if (k.toLowerCase().includes('opportunity') && !k.toLowerCase().includes('name') && !k.toLowerCase().includes('number') && typeof v === 'string' && v) {
+              oppId = v; break;
+            }
+          }
+        }
+        if (oppId) {
+          const oppObj = await prisma.customObject.findFirst({
+            where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+          });
+          if (oppObj) {
+            const oppRecord = await prisma.record.findFirst({
+              where: { id: oppId, objectId: oppObj.id },
+            });
+            if (oppRecord) {
+              const oppData = oppRecord.data as Record<string, any>;
+              linkedOpportunityFolderName = deriveDropboxFolderName(oppData, oppId);
+            }
+          }
+        }
+      }
+
       reply.send({
         linked: true,
         parentObjectApiName: 'Property',
@@ -810,6 +841,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         parentFolderName,
         subfolder,
         childFolderName,
+        ...(linkedOpportunityFolderName ? { linkedOpportunityFolderName } : {}),
       });
     } catch (err: any) {
       req.log.error(err, 'resolve-path failed');
