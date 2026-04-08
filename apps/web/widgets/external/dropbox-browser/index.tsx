@@ -60,11 +60,21 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
     apiClient.resolveDropboxPath(objectApiName, recordId).then((res) => {
       if (cancelled) return
       if (res.linked && res.parentObjectApiName && res.parentRecordId && res.parentFolderName && res.subfolder && res.childFolderName) {
+        let subPath = `${res.subfolder}/${res.childFolderName}`
+
+        if (objectApiName === 'Opportunity') {
+          // Opportunity → open directly into 1. Estimation subfolder
+          subPath = `${subPath}/1. Estimation`
+        } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
+          // Project → open the linked Opportunity's full folder
+          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
+        }
+
         setResolved({
           objectApiName: res.parentObjectApiName,
           recordId: res.parentRecordId,
           folderName: res.parentFolderName,
-          defaultSubPath: `${res.subfolder}/${res.childFolderName}`,
+          defaultSubPath: subPath,
         })
       } else {
         setResolved({

@@ -777,6 +777,7 @@ class ApiClient {
       parentFolderName?: string;
       subfolder?: string;
       childFolderName?: string;
+      linkedOpportunityFolderName?: string;
     }>(
       `/dropbox/resolve-path/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`
     );
