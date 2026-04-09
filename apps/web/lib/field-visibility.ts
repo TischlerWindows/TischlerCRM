@@ -41,9 +41,15 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
 
   switch (condition.op) {
     case '==':
+      if (Array.isArray(condition.right)) {
+        return condition.right.includes(leftValue);
+      }
       return leftValue === condition.right;
     
     case '!=':
+      if (Array.isArray(condition.right)) {
+        return !condition.right.includes(leftValue);
+      }
       return leftValue !== condition.right;
     
     case '>':
