@@ -421,7 +421,7 @@ export default function DynamicForm({
   // ── Wizard sections ───────────────────────────────────────────
   const wizardSections = (() => {
     if (layoutType !== 'create') return [];
-    const allSections: { section: LayoutPanel; tabLabel: string }[] = [];
+    const allSections: { section: LayoutPanel; tabLabel: string; regionLabel: string }[] = [];
     layout.tabs.forEach((tab) => {
       tab.regions.forEach((region) => {
         region.panels
@@ -444,7 +444,7 @@ export default function DynamicForm({
               !secFx?.hidden &&
               !panel.hidden
             ) {
-              allSections.push({ section: panel, tabLabel: tab.label });
+              allSections.push({ section: panel, tabLabel: tab.label, regionLabel: region.label });
             }
           });
       });
@@ -896,9 +896,9 @@ export default function DynamicForm({
                             ? 'text-brand-navy font-semibold'
                             : 'text-gray-500',
                         )}
-                        title={ws.section.label}
+                        title={ws.regionLabel || ws.section.label}
                       >
-                        {ws.section.label}
+                        {ws.regionLabel || ws.section.label}
                       </span>
                     </div>
                     <div
@@ -969,7 +969,7 @@ export default function DynamicForm({
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-4 bg-gray-100 rounded-t-lg">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {wizardSections[currentStep]!.section.label}
+                  {wizardSections[currentStep]!.regionLabel || wizardSections[currentStep]!.section.label}
                 </h3>
                 {(wizardSections[currentStep]!.section as any).description ? (
                   <p className="text-xs text-gray-500 mt-1">
