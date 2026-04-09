@@ -49,13 +49,14 @@ function createBlankLayout(objectApi: string): PageLayout {
   };
 }
 
-function createDefaultRegion(regionCount: number): LayoutSection {
+function createDefaultRegion(regions: LayoutSection[]): LayoutSection {
+  const maxRow = regions.reduce((max, r) => Math.max(max, r.gridRow + r.gridRowSpan - 1), 0);
   return {
     id: `region-${Date.now()}`,
-    label: `Section ${regionCount + 1}`,
+    label: `Section ${regions.length + 1}`,
     gridColumn: 1,
     gridColumnSpan: 12,
-    gridRow: regionCount + 1,
+    gridRow: maxRow + 1,
     gridRowSpan: 1,
     style: {},
     panels: [],
@@ -370,7 +371,7 @@ export function useEditorLifecycle(): EditorLifecycle {
   /* ---- Add section ---- */
   const handleAddSection = useCallback(() => {
     if (!activeTab) return;
-    const region = createDefaultRegion(activeTab.regions.length);
+    const region = createDefaultRegion(activeTab.regions);
     addSection(region, activeTab.id);
     setSelectedElement({ type: 'region', id: region.id });
   }, [activeTab, addSection, setSelectedElement]);
