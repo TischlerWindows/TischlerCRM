@@ -20,6 +20,17 @@ function getOptionColor(
   return index % 2 === 0 ? ALT_COLOR_A : ALT_COLOR_B;
 }
 
+/** Return black or white depending on perceived luminance of a hex color. */
+function contrastText(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  // Perceived luminance (ITU-R BT.709)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#000000' : '#ffffff';
+}
+
 // ── PicklistTextDropdown ─────────────────────────────────────────────
 // Custom dropdown for PicklistText / PicklistLookup that allows the
 // selected value to wrap (unlike a native <select>).
@@ -61,24 +72,8 @@ export function PicklistTextDropdown({
           disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
         )}
       >
-        <span className="break-words whitespace-normal flex-1 flex items-center gap-2">
-          {value ? (
-            (() => {
-              const idx = options.indexOf(value);
-              const c = getOptionColor(value, idx >= 0 ? idx : 0, colors);
-              const isWhite = c === ALT_COLOR_A;
-              return (
-                <span
-                  className="px-2 py-0.5 rounded text-sm"
-                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
-                >
-                  {value}
-                </span>
-              );
-            })()
-          ) : (
-            <span className="text-gray-500">-- Select --</span>
-          )}
+        <span className="break-words whitespace-normal flex-1 text-sm">
+          {value || <span className="text-gray-500">-- Select --</span>}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" />
       </button>
@@ -103,20 +98,17 @@ export function PicklistTextDropdown({
               <div
                 key={option}
                 className={cn(
-                  'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal flex items-center gap-2',
-                  value === option && 'bg-blue-50 font-medium',
+                  'px-3 py-2 cursor-pointer break-words whitespace-normal text-sm',
+                  value === option && 'font-medium',
+                  isWhite && 'hover:bg-gray-100',
                 )}
+                style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
                 onClick={() => {
                   onChange(option);
                   setOpen(false);
                 }}
               >
-                <span
-                  className="px-2 py-0.5 rounded text-sm"
-                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
-                >
-                  {option}
-                </span>
+                {option}
               </div>
             );
           })}
@@ -210,24 +202,8 @@ export function PicklistInput({
           disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
         )}
       >
-        <span className="flex items-center gap-2 flex-1 min-w-0">
-          {value ? (
-            (() => {
-              const idx = options.indexOf(value);
-              const c = getOptionColor(value, idx >= 0 ? idx : 0, colors);
-              const isWhite = c === ALT_COLOR_A;
-              return (
-                <span
-                  className="px-2 py-0.5 rounded text-sm truncate"
-                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
-                >
-                  {value}
-                </span>
-              );
-            })()
-          ) : (
-            <span className="text-gray-500 truncate">-- Select --</span>
-          )}
+        <span className="flex-1 min-w-0 text-sm truncate">
+          {value || <span className="text-gray-500 truncate">-- Select --</span>}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
       </button>
@@ -249,17 +225,14 @@ export function PicklistInput({
               <div
                 key={option}
                 className={cn(
-                  'px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center gap-2',
-                  value === option && 'bg-blue-50 font-medium',
+                  'px-3 py-2 cursor-pointer text-sm',
+                  value === option && 'font-medium',
+                  isWhite && 'hover:bg-gray-100',
                 )}
+                style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
                 onClick={() => { onChange(option); setOpen(false); }}
               >
-                <span
-                  className="px-2 py-0.5 rounded text-sm"
-                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
-                >
-                  {option}
-                </span>
+                {option}
               </div>
             );
           })}
@@ -303,7 +276,11 @@ export function MultiPicklistInput({
         const c = getOptionColor(option, idx, colors);
         const isWhite = c === ALT_COLOR_A;
         return (
-          <div key={option} className="flex items-center space-x-2 py-1">
+          <div
+            key={option}
+            className="flex items-center space-x-2 py-1 px-2 rounded"
+            style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
+          >
             <input
               type="checkbox"
               id={`${fieldDef.apiName}-${option}`}
@@ -322,8 +299,7 @@ export function MultiPicklistInput({
             />
             <label
               htmlFor={`${fieldDef.apiName}-${option}`}
-              className="text-sm px-2 py-0.5 rounded cursor-pointer"
-              style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
+              className="text-sm cursor-pointer"
             >
               {option}
             </label>
