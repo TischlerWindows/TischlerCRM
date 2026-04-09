@@ -7,6 +7,19 @@ import { FieldDef } from '@/lib/schema';
 import { cn } from '@/lib/utils';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 
+// ── Default alternating row colors ──────────────────────────────────
+const ALT_COLOR_A = '#ffffff';   // white
+const ALT_COLOR_B = '#dbeafe';   // light blue (tailwind blue-100)
+
+function getOptionColor(
+  option: string,
+  index: number,
+  customColors?: Record<string, string>,
+): string {
+  if (customColors?.[option]) return customColors[option];
+  return index % 2 === 0 ? ALT_COLOR_A : ALT_COLOR_B;
+}
+
 // ── PicklistTextDropdown ─────────────────────────────────────────────
 // Custom dropdown for PicklistText / PicklistLookup that allows the
 // selected value to wrap (unlike a native <select>).
@@ -50,12 +63,19 @@ export function PicklistTextDropdown({
       >
         <span className="break-words whitespace-normal flex-1 flex items-center gap-2">
           {value ? (
-            <span
-              className="px-2 py-0.5 rounded text-sm"
-              style={colors?.[value] ? { backgroundColor: colors[value] + '33', color: colors[value] } : undefined}
-            >
-              {value}
-            </span>
+            (() => {
+              const idx = options.indexOf(value);
+              const c = getOptionColor(value, idx >= 0 ? idx : 0, colors);
+              const isWhite = c === ALT_COLOR_A;
+              return (
+                <span
+                  className="px-2 py-0.5 rounded text-sm"
+                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
+                >
+                  {value}
+                </span>
+              );
+            })()
           ) : (
             <span className="text-gray-500">-- Select --</span>
           )}
@@ -76,30 +96,30 @@ export function PicklistTextDropdown({
           >
             -- Select --
           </div>
-          {options.map((option) => (
-            <div
-              key={option}
-              className={cn(
-                'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal flex items-center gap-2',
-                value === option && 'bg-blue-50 font-medium',
-              )}
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-            >
-              {colors?.[option] ? (
+          {options.map((option, idx) => {
+            const c = getOptionColor(option, idx, colors);
+            const isWhite = c === ALT_COLOR_A;
+            return (
+              <div
+                key={option}
+                className={cn(
+                  'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal flex items-center gap-2',
+                  value === option && 'bg-blue-50 font-medium',
+                )}
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+              >
                 <span
                   className="px-2 py-0.5 rounded text-sm"
-                  style={{ backgroundColor: colors[option] + '33', color: colors[option] }}
+                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
                 >
                   {option}
                 </span>
-              ) : (
-                <span>{option}</span>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -164,7 +184,6 @@ export function PicklistInput({
     visibilityCtx,
   );
   const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
-  const hasColors = colors && Object.keys(colors).length > 0;
 
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -176,29 +195,6 @@ export function PicklistInput({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // If no colors are configured, use a native select for simplicity
-  if (!hasColors) {
-    return (
-      <select
-        id={fieldDef.apiName}
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        className={cn(
-          'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent',
-          error && 'border-red-500',
-        )}
-      >
-        <option value="">-- Select --</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    );
-  }
 
   return (
     <div ref={ref} className="relative">
@@ -216,12 +212,19 @@ export function PicklistInput({
       >
         <span className="flex items-center gap-2 flex-1 min-w-0">
           {value ? (
-            <span
-              className="px-2 py-0.5 rounded text-sm truncate"
-              style={colors[value] ? { backgroundColor: colors[value] + '33', color: colors[value] } : undefined}
-            >
-              {value}
-            </span>
+            (() => {
+              const idx = options.indexOf(value);
+              const c = getOptionColor(value, idx >= 0 ? idx : 0, colors);
+              const isWhite = c === ALT_COLOR_A;
+              return (
+                <span
+                  className="px-2 py-0.5 rounded text-sm truncate"
+                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
+                >
+                  {value}
+                </span>
+              );
+            })()
           ) : (
             <span className="text-gray-500 truncate">-- Select --</span>
           )}
@@ -239,23 +242,27 @@ export function PicklistInput({
           >
             -- Select --
           </div>
-          {options.map((option) => (
-            <div
-              key={option}
-              className={cn(
-                'px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center gap-2',
-                value === option && 'bg-blue-50 font-medium',
-              )}
-              onClick={() => { onChange(option); setOpen(false); }}
-            >
-              <span
-                className="px-2 py-0.5 rounded text-sm"
-                style={colors[option] ? { backgroundColor: colors[option] + '33', color: colors[option] } : undefined}
+          {options.map((option, idx) => {
+            const c = getOptionColor(option, idx, colors);
+            const isWhite = c === ALT_COLOR_A;
+            return (
+              <div
+                key={option}
+                className={cn(
+                  'px-3 py-2 cursor-pointer hover:bg-gray-100 flex items-center gap-2',
+                  value === option && 'bg-blue-50 font-medium',
+                )}
+                onClick={() => { onChange(option); setOpen(false); }}
               >
-                {option}
-              </span>
-            </div>
-          ))}
+                <span
+                  className="px-2 py-0.5 rounded text-sm"
+                  style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
+                >
+                  {option}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -292,39 +299,37 @@ export function MultiPicklistInput({
 
   return (
     <div className="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto">
-      {options.map((option) => (
-        <div key={option} className="flex items-center space-x-2 py-1">
-          <input
-            type="checkbox"
-            id={`${fieldDef.apiName}-${option}`}
-            checked={selectedValues.includes(option)}
-            onChange={(e) => {
-              let newValues = [...selectedValues];
-              if (e.target.checked) {
-                newValues.push(option);
-              } else {
-                newValues = newValues.filter((v) => v !== option);
-              }
-              onChange(newValues.join(';'));
-            }}
-            disabled={disabled}
-            className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-          />
-          {colors?.[option] ? (
+      {options.map((option, idx) => {
+        const c = getOptionColor(option, idx, colors);
+        const isWhite = c === ALT_COLOR_A;
+        return (
+          <div key={option} className="flex items-center space-x-2 py-1">
+            <input
+              type="checkbox"
+              id={`${fieldDef.apiName}-${option}`}
+              checked={selectedValues.includes(option)}
+              onChange={(e) => {
+                let newValues = [...selectedValues];
+                if (e.target.checked) {
+                  newValues.push(option);
+                } else {
+                  newValues = newValues.filter((v) => v !== option);
+                }
+                onChange(newValues.join(';'));
+              }}
+              disabled={disabled}
+              className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+            />
             <label
               htmlFor={`${fieldDef.apiName}-${option}`}
               className="text-sm px-2 py-0.5 rounded cursor-pointer"
-              style={{ backgroundColor: colors[option] + '33', color: colors[option] }}
+              style={isWhite ? undefined : { backgroundColor: c + '33', color: c }}
             >
               {option}
             </label>
-          ) : (
-            <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
-              {option}
-            </label>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
