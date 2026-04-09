@@ -760,6 +760,7 @@ export function FieldInput({
             })
           }
           disabled={isReadOnly}
+          colors={(fieldDef as any).picklistColors as Record<string, string> | undefined}
         />
       );
 
