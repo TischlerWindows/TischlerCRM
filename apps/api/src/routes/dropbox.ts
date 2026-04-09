@@ -274,17 +274,111 @@ export async function tryRenameDropboxFolder(
   afterData: Record<string, any>,
 ): Promise<void> {
   try {
-    const oldName = deriveDropboxFolderName(beforeData, recordId);
-    const newName = deriveDropboxFolderName(afterData, recordId);
+    const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
+    const isLinked = !!subfolder;
 
-    if (oldName === newName) return;
+    // --- Get an access token ---
+    let accessToken = await getAccessToken(userId);
+    if (!accessToken) {
+      const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+      if (integration) {
+        const connections = await prisma.userIntegration.findMany({
+          where: { integrationId: integration.id, accessToken: { not: null } },
+          select: { userId: true },
+          take: 5,
+        });
+        for (const conn of connections) {
+          accessToken = await getAccessToken(conn.userId);
+          if (accessToken) break;
+        }
+      }
+      if (!accessToken) return;
+    }
 
-    const accessToken = await getAccessToken(userId);
-    if (!accessToken) return; // Dropbox not connected — nothing to rename
+    if (!isLinked) {
+      // ── Top-level object (Property, etc.) ──
+      const oldName = deriveDropboxFolderName(beforeData, recordId);
+      const newName = deriveDropboxFolderName(afterData, recordId);
+      if (oldName === newName) return;
 
-    const oldPath = buildFolderPath(objectApiName, recordId, oldName);
-    const newPath = buildFolderPath(objectApiName, recordId, newName);
+      const oldPath = buildFolderPath(objectApiName, recordId, oldName);
+      const newPath = buildFolderPath(objectApiName, recordId, newName);
 
+      console.log(`[dropbox] Renaming top-level folder: ${oldPath} → ${newPath}`);
+      await dropboxApi(accessToken, '/files/move_v2', {
+        from_path: oldPath,
+        to_path: newPath,
+        autorename: false,
+        allow_ownership_transfer: false,
+      });
+      return;
+    }
+
+    // ── Linked object (Lead, Opportunity, Project, WorkOrder, Service) ──
+    // Projects linked to Opportunities don't have their own folder, skip.
+    if (objectApiName === 'Project') {
+      let oppId: string | undefined;
+      for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+        const v = afterData[key] ?? afterData[`Project__${key}`];
+        if (v && typeof v === 'string') { oppId = v; break; }
+      }
+      if (oppId) return; // Project uses Opportunity's folder — nothing to rename
+    }
+
+    // Helper to resolve propertyId from record data
+    const findPropertyId = async (data: Record<string, any>): Promise<string | undefined> => {
+      let propId: string | undefined;
+      const wellKnown = ['property', 'propertyId', 'propertyAddress', 'relatedProperty'];
+      for (const key of wellKnown) {
+        const v = data[key] ?? data[`${objectApiName}__${key}`];
+        if (v && typeof v === 'string') { propId = v; break; }
+      }
+      if (!propId) {
+        for (const [k, v] of Object.entries(data)) {
+          if (k.toLowerCase().includes('property') && typeof v === 'string' && v) {
+            propId = v; break;
+          }
+        }
+      }
+      if (!propId && objectApiName === 'Project') {
+        propId = await resolvePropertyIdViaOpportunity(data, objectApiName);
+      }
+      return propId;
+    };
+
+    const oldPropertyId = await findPropertyId(beforeData);
+    const newPropertyId = await findPropertyId(afterData);
+
+    // Need at least one property ID to work with
+    if (!oldPropertyId && !newPropertyId) return;
+
+    const oldChildName = deriveDropboxFolderName(beforeData, recordId);
+    const newChildName = deriveDropboxFolderName(afterData, recordId);
+
+    // Resolve Property folder paths
+    const propertyObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+    });
+    if (!propertyObj) return;
+
+    const buildLinkedPath = async (propId: string, childName: string): Promise<string | null> => {
+      const propRecord = await prisma.record.findFirst({
+        where: { id: propId, objectId: propertyObj!.id },
+      });
+      if (!propRecord) return null;
+      const propData = propRecord.data as Record<string, any>;
+      const propFolderName = deriveDropboxFolderName(propData, propId);
+      const parentPath = buildFolderPath('Property', propId, propFolderName);
+      const safeChild = childName.replace(/[\\/:*?"<>|]/g, '_').trim();
+      return `${parentPath}/${subfolder}/${safeChild}`;
+    };
+
+    const oldPath = oldPropertyId ? await buildLinkedPath(oldPropertyId, oldChildName) : null;
+    const newPath = newPropertyId ? await buildLinkedPath(newPropertyId, newChildName) : null;
+
+    if (!oldPath || !newPath || oldPath === newPath) return;
+
+    console.log(`[dropbox] Moving linked folder: ${oldPath} → ${newPath}`);
     await dropboxApi(accessToken, '/files/move_v2', {
       from_path: oldPath,
       to_path: newPath,
