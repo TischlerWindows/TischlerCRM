@@ -112,6 +112,31 @@ function recordUrl(objectApiName: string, recordId: string) {
   return prefix ? `${prefix}/${recordId}` : `/objects/${objectApiName}/${recordId}`
 }
 
+// ── Module-level cache ────────────────────────────────────────────────
+// Survives component unmount/remount (collapse/expand) within the same
+// SPA session.  Cleared automatically on full page reload.
+
+interface TeamMembersCacheEntry {
+  rawMembers: TeamMemberRecord[]
+  contactNames: NameMap
+  accountNames: NameMap
+  parentNames: NameMap
+  timestamp: number
+}
+
+const teamMembersCache = new Map<string, TeamMembersCacheEntry>()
+const MAX_CACHE_ENTRIES = 20
+
+function cacheKey(objectApiName: string, recordId: string, rollup: boolean): string {
+  return `${objectApiName}:${recordId}:${rollup}`
+}
+
+function evictOldestIfNeeded() {
+  if (teamMembersCache.size <= MAX_CACHE_ENTRIES) return
+  const oldest = teamMembersCache.keys().next().value
+  if (oldest !== undefined) teamMembersCache.delete(oldest)
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function getField(rec: TeamMemberRecord, field: string): unknown {
@@ -284,12 +309,15 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
 
-  // ── State ──
-  const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>([])
-  const [contactNames, setContactNames] = useState<NameMap>(new Map())
-  const [accountNames, setAccountNames] = useState<NameMap>(new Map())
+  // ── Cache-aware state init ──
+  const _cacheKey = recordId ? cacheKey(objectApiName, recordId, !!rollupFromProperty) : null
+  const _cached = _cacheKey ? teamMembersCache.get(_cacheKey) : null
+
+  const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>(_cached?.rawMembers ?? [])
+  const [contactNames, setContactNames] = useState<NameMap>(_cached?.contactNames ?? new Map())
+  const [accountNames, setAccountNames] = useState<NameMap>(_cached?.accountNames ?? new Map())
   /** Maps parentRecordId → display name for "via" labels */
-  const [parentNames, setParentNames] = useState<NameMap>(new Map())
+  const [parentNames, setParentNames] = useState<NameMap>(_cached?.parentNames ?? new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -309,7 +337,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   // ── 5b: Data Fetching ──
   const fetchTeamMembers = useCallback(async () => {
     if (!recordId || !isSupported) return
-    setLoading(true)
+    // Only show loading skeleton when there is no cached data to display
+    const k = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+    if (!teamMembersCache.has(k)) setLoading(true)
     setError(null)
 
     try {
@@ -424,6 +454,18 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       setContactNames(cNames)
       setAccountNames(aNames)
       setParentNames(pNames)
+
+      // Persist to module-level cache for instant restore on remount
+      const ck = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+      teamMembersCache.delete(ck) // refresh insertion order (LRU)
+      teamMembersCache.set(ck, {
+        rawMembers: members,
+        contactNames: cNames,
+        accountNames: aNames,
+        parentNames: pNames,
+        timestamp: Date.now(),
+      })
+      evictOldestIfNeeded()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team members')
     } finally {
@@ -598,6 +640,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const saveEdit = async () => {
     if (!editingId) return
     setSaving(true)
+    if (_cacheKey) teamMembersCache.delete(_cacheKey) // invalidate before refetch
     try {
       await apiClient.put(`/objects/TeamMember/records/${editingId}`, {
         data: {
@@ -622,6 +665,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   // ── 5i: Delete handler ──
   const handleDelete = async (memberId: string) => {
     setDeletingId(memberId)
+    if (_cacheKey) teamMembersCache.delete(_cacheKey) // invalidate before refetch
     try {
       await apiClient.delete(`/objects/TeamMember/records/${memberId}`)
       setDeleteTarget(null)
