@@ -150,7 +150,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
         </div>
       )}
 
-      {activeTab === 'visibility' && selection.kind !== 'widget' && <VisibilityTab selection={selection} />}
+      {activeTab === 'visibility' && selection.kind !== 'widget' && <VisibilityTab selection={selection} availableFields={availableFields} />}
       {activeTab === 'rules' && selection.kind !== 'widget' && <RulesTab selection={selection} layout={layout} />}
     </div>
   );

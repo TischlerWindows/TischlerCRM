@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
+import { reportError } from '@/lib/error-reporter';
 
 export default function GlobalError({
   error,
@@ -12,6 +13,12 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('Unhandled error:', error);
+    reportError({
+      message: error.message || 'Unknown error',
+      stack: error.stack,
+      source: 'client',
+      metadata: { digest: error.digest },
+    });
   }, [error]);
 
   return (

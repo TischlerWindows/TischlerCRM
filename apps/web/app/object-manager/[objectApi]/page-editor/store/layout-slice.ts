@@ -676,6 +676,7 @@ export const createLayoutSlice: StateCreator<
     const seen = new Set<string>();
     const sanitized = {
       ...layout,
+      formattingRules: layout.formattingRules ?? [],
       tabs: layout.tabs.map((tab) => ({
         ...tab,
         regions: tab.regions.map((region) => ({

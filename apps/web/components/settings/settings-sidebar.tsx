@@ -22,6 +22,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -45,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Profiles', href: '/settings/profiles', icon: Shield },
       { name: 'Departments', href: '/settings/departments', icon: Building2 },
       { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
+      { name: 'Error Log', href: '/settings/error-log', icon: AlertTriangle },
       { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
       { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
       { name: 'Backups', href: '/settings/backups', icon: Database },

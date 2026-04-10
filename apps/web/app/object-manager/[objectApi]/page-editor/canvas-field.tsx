@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Eye } from 'lucide-react';
 import type { PanelField } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasErrorBoundary } from './canvas-error-boundary';
@@ -32,10 +33,25 @@ function toBehaviorLabel(behavior: PanelField['behavior']): string {
   }
 }
 
+const EMPTY_RULES: never[] = [];
+
 export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const resizeField = useEditorStore((s) => s.resizeField);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
+
+  const hasVisibilityRule = useMemo(
+    () =>
+      formattingRules.some(
+        (r) =>
+          r.active !== false &&
+          r.target.kind === 'field' &&
+          r.target.fieldApiName === field.fieldApiName &&
+          r.when.length > 0,
+      ),
+    [formattingRules, field.fieldApiName],
+  );
 
   const [dragSpan, setDragSpan] = useState<number | null>(null);
   const resizeSessionRef = useRef<{
@@ -205,6 +221,11 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
             {field.behavior !== 'none' && (
               <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
                 {toBehaviorLabel(field.behavior)}
+              </span>
+            )}
+            {hasVisibilityRule && (
+              <span className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600" title="Has visibility rule">
+                <Eye className="h-2.5 w-2.5" />
               </span>
             )}
             <span

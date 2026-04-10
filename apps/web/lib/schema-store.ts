@@ -66,6 +66,11 @@ export interface SchemaStore {
   updateValidationRule: (objectApi: string, ruleId: string, updates: Partial<ValidationRule>) => void;
   deleteValidationRule: (objectApi: string, ruleId: string) => void;
   
+  // Workflow rule operations
+  addWorkflowRule: (objectApi: string, rule: Omit<WorkflowRule, 'id'>) => string;
+  updateWorkflowRule: (objectApi: string, ruleId: string, updates: Partial<WorkflowRule>) => void;
+  deleteWorkflowRule: (objectApi: string, ruleId: string) => void;
+  
   // Schema versioning
   getVersionHistory: () => Promise<OrgSchema[]>;
   rollbackToVersion: (version: number) => Promise<void>;
@@ -880,6 +885,88 @@ export const useSchemaStore = create<SchemaStore>()(
             ? {
                 ...obj,
                 validationRules: obj.validationRules.filter(rule => rule.id !== ruleId),
+                updatedAt: new Date().toISOString()
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Add workflow rule
+      addWorkflowRule: (objectApi, ruleData) => {
+        const { schema } = get();
+        if (!schema) return '';
+
+        const ruleId = generateId();
+        const newRule = { ...ruleData, id: ruleId };
+
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi 
+            ? { 
+                ...obj, 
+                workflowRules: [...(obj.workflowRules || []), newRule],
+                updatedAt: new Date().toISOString()
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+
+        return ruleId;
+      },
+
+      // Update workflow rule
+      updateWorkflowRule: (objectApi, ruleId, updates) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi 
+            ? {
+                ...obj,
+                workflowRules: (obj.workflowRules || []).map(rule =>
+                  rule.id === ruleId ? { ...rule, ...updates } : rule
+                ),
+                updatedAt: new Date().toISOString()
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Delete workflow rule
+      deleteWorkflowRule: (objectApi, ruleId) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi 
+            ? {
+                ...obj,
+                workflowRules: (obj.workflowRules || []).filter(rule => rule.id !== ruleId),
                 updatedAt: new Date().toISOString()
               }
             : obj

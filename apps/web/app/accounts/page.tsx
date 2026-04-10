@@ -894,7 +894,7 @@ export default function AccountsPage() {
                     <div className="font-medium text-gray-900">{layout.name}</div>
                     <div className="text-sm text-gray-500 mt-1">
                       {layout.tabs?.length || 0} {(layout.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.sections?.length || 0), 0) || 0} sections
+                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.regions?.length || tab.sections?.length || 0), 0) || 0} sections
                     </div>
                   </div>
                 </button>

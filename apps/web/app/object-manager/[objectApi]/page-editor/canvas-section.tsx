@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasPanel } from './canvas-panel';
@@ -30,6 +30,8 @@ const REGION_SHADOW: Record<'none' | 'sm' | 'md', string> = {
   md: '0 10px 24px rgba(15, 23, 42, 0.14)',
 };
 
+const EMPTY_RULES: never[] = [];
+
 export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
@@ -37,6 +39,20 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const addPanel = useEditorStore((s) => s.addPanel);
   const removeSection = useEditorStore((s) => s.removeSection);
   const resizeSection = useEditorStore((s) => s.resizeSection);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
+
+  const hasVisibilityRule = useMemo(
+    () =>
+      ((region as any).visibleIf?.length > 0) ||
+      formattingRules.some(
+        (r) =>
+          r.active !== false &&
+          r.target.kind === 'region' &&
+          r.target.regionId === region.id &&
+          r.when.length > 0,
+      ),
+    [formattingRules, region.id, (region as any).visibleIf],
+  );
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [draftLabel, setDraftLabel] = useState(region.label);
@@ -304,6 +320,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
               <span className="shrink-0 rounded-full bg-gray-200 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-gray-500">
                 {region.gridColumnSpan} cols
               </span>
+              {hasVisibilityRule && (
+                <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-semibold text-orange-600" title="Has visibility rule">
+                  <Eye className="h-3 w-3" /> Conditional
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -417,6 +438,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           <span className="shrink-0 rounded-full bg-brand-navy/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-navy">
             {region.gridColumnSpan} cols
           </span>
+          {hasVisibilityRule && (
+            <span className="shrink-0 flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600" title="Has visibility rule">
+              <Eye className="h-3 w-3" /> Conditional
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
