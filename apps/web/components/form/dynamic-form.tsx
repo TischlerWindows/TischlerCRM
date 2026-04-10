@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 import {
-  getFormattingEffectsForSection,
+  getFormattingEffectsForPanel,
+  getFormattingEffectsForRegion,
 } from '@/lib/layout-formatting';
 import {
   resolveTabCanvasItems,
@@ -432,16 +433,23 @@ export default function DynamicForm({
               formData,
               visibilityCtx,
             );
-            const secFx = getFormattingEffectsForSection(
+            const regionFx = getFormattingEffectsForRegion(
               layout,
               region.id,
+              formData,
+              visibilityCtx,
+            );
+            const panelFx = getFormattingEffectsForPanel(
+              layout,
+              panel.id,
               formData,
               visibilityCtx,
             );
             if (
               isVisible &&
               (region as any).showInTemplate !== false &&
-              !secFx?.hidden &&
+              !regionFx?.hidden &&
+              !panelFx?.hidden &&
               !panel.hidden
             ) {
               allSections.push({ section: panel, tabLabel: tab.label, regionLabel: region.label });
@@ -1012,13 +1020,13 @@ export default function DynamicForm({
                 );
                 if (!isRegionVisible) return false;
                 if ((region as any).showInTemplate === false) return false;
-                const secFx = getFormattingEffectsForSection(
+                const regionFx = getFormattingEffectsForRegion(
                   layout,
                   region.id,
                   formData,
                   visibilityCtx,
                 );
-                if (secFx?.hidden) return false;
+                if (regionFx?.hidden) return false;
                 if (region.hidden) return false;
                 return true;
               });
@@ -1050,7 +1058,12 @@ export default function DynamicForm({
                     }
                     const region = item.region;
                     const visiblePanels = region.panels
-                      .filter((p) => !p.hidden)
+                      .filter((p) => {
+                        if (p.hidden) return false;
+                        const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
+                        if (panelFx?.hidden) return false;
+                        return true;
+                      })
                       .sort((a, b) => a.order - b.order);
                     return visiblePanels
                       .map((panelItem, panelIdx) => {
@@ -1127,17 +1140,22 @@ export default function DynamicForm({
                 );
                 if (!isRegionVisible) return [];
                 if ((region as any).showInTemplate === false) return [];
-                const secFx = getFormattingEffectsForSection(
+                const regionFx = getFormattingEffectsForRegion(
                   layout,
                   region.id,
                   formData,
                   visibilityCtx,
                 );
-                if (secFx?.hidden) return [];
+                if (regionFx?.hidden) return [];
 
                 return region.panels
                   .sort((a, b) => a.order - b.order)
-                  .filter((p) => !p.hidden)
+                  .filter((p) => {
+                    if (p.hidden) return false;
+                    const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
+                    if (panelFx?.hidden) return false;
+                    return true;
+                  })
                   .map((panelItem) => {
                     const columnArrays: FieldDef[][] = [];
                     for (let ci = 0; ci < panelItem.columns; ci++) {
