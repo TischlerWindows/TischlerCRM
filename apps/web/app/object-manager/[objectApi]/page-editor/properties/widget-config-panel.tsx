@@ -25,6 +25,7 @@ interface WidgetConfigPanelProps {
 export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPanelProps) {
   const updateWidget = useEditorStore((s) => s.updateWidget);
   const removeWidget = useEditorStore((s) => s.removeWidget);
+  const layoutObjectApi = useEditorStore((s) => s.layout.objectApi);
   const schema = useSchemaStore((s) => s.schema);
   const objectOptions = useMemo(
     () => (schema?.objects ?? []).map((o) => ({ value: o.apiName, label: o.label })),
@@ -59,7 +60,7 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
             }
             record={{}}
             integration={null}
-            object={{ apiName: '', label: '', fields: objectFields }}
+            object={{ apiName: layoutObjectApi, label: '', fields: objectFields }}
             objectOptions={objectOptions}
           />
         );
