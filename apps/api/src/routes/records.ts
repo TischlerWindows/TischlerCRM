@@ -449,10 +449,11 @@ export async function recordRoutes(app: FastifyInstance) {
         return val && String(val).trim() ? String(val) : null;
       };
 
-      // Contact required
+      // Contact or Account required
       const contactVal = getTeamMemberField(normalizedData, 'contact');
-      if (!contactVal) {
-        return reply.code(400).send({ error: 'Contact is required for TeamMember records.' });
+      const accountVal = getTeamMemberField(normalizedData, 'account');
+      if (!contactVal && !accountVal) {
+        return reply.code(400).send({ error: 'Either a contact or an account is required for TeamMember records.' });
       }
 
       // Exactly one parent required
@@ -465,34 +466,70 @@ export async function recordRoutes(app: FastifyInstance) {
       // Duplicate prevention
       const parentField = setParents[0];
       const parentValue = getTeamMemberField(normalizedData, parentField)!;
-      const duplicate = await prisma.record.findFirst({
-        where: {
-          objectId: object.id,
-          data: { path: ['contact'], equals: contactVal },
-        },
-      });
-      if (duplicate) {
-        const dupData = duplicate.data as Record<string, any> | null;
-        if (dupData) {
-          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-          if (dupParent && String(dupParent) === parentValue) {
-            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+      if (contactVal) {
+        // Check duplicates based on contact + parent
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            data: { path: ['contact'], equals: contactVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
           }
         }
-      }
-      // Also check with prefixed contact key
-      const duplicates = await prisma.record.findMany({
-        where: {
-          objectId: object.id,
-          data: { path: [`TeamMember__contact`], equals: contactVal },
-        },
-      });
-      for (const dup of duplicates) {
-        const dupData = dup.data as Record<string, any> | null;
-        if (dupData) {
-          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-          if (dupParent && String(dupParent) === parentValue) {
-            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+        // Also check with prefixed contact key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            data: { path: [`TeamMember__contact`], equals: contactVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+      } else if (accountVal) {
+        // Check duplicates based on account + parent (account-only team member)
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            data: { path: ['account'], equals: accountVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
+        // Also check with prefixed account key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            data: { path: [`TeamMember__account`], equals: accountVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
           }
         }
       }
@@ -753,10 +790,11 @@ export async function recordRoutes(app: FastifyInstance) {
         return val && String(val).trim() ? String(val) : null;
       };
 
-      // Contact required
+      // Contact or Account required
       const contactVal = getTeamMemberField(mergedData, 'contact');
-      if (!contactVal) {
-        return reply.code(400).send({ error: 'Contact is required for TeamMember records.' });
+      const accountVal = getTeamMemberField(mergedData, 'account');
+      if (!contactVal && !accountVal) {
+        return reply.code(400).send({ error: 'Either a contact or an account is required for TeamMember records.' });
       }
 
       // Exactly one parent required
@@ -769,36 +807,74 @@ export async function recordRoutes(app: FastifyInstance) {
       // Duplicate prevention (exclude the current record)
       const parentField = setParents[0];
       const parentValue = getTeamMemberField(mergedData, parentField)!;
-      const duplicate = await prisma.record.findFirst({
-        where: {
-          objectId: object.id,
-          id: { not: existingRecord.id },
-          data: { path: ['contact'], equals: contactVal },
-        },
-      });
-      if (duplicate) {
-        const dupData = duplicate.data as Record<string, any> | null;
-        if (dupData) {
-          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-          if (dupParent && String(dupParent) === parentValue) {
-            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+      if (contactVal) {
+        // Check duplicates based on contact + parent
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            data: { path: ['contact'], equals: contactVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
           }
         }
-      }
-      // Also check with prefixed contact key
-      const duplicates = await prisma.record.findMany({
-        where: {
-          objectId: object.id,
-          id: { not: existingRecord.id },
-          data: { path: [`TeamMember__contact`], equals: contactVal },
-        },
-      });
-      for (const dup of duplicates) {
-        const dupData = dup.data as Record<string, any> | null;
-        if (dupData) {
-          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-          if (dupParent && String(dupParent) === parentValue) {
-            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+        // Also check with prefixed contact key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            data: { path: [`TeamMember__contact`], equals: contactVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+      } else if (accountVal) {
+        // Check duplicates based on account + parent (account-only team member)
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            data: { path: ['account'], equals: accountVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
+        // Also check with prefixed account key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            data: { path: [`TeamMember__account`], equals: accountVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
           }
         }
       }

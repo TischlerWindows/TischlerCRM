@@ -3,7 +3,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import {
   Plus, Search, Users, X, Edit2, Trash2, Copy,
-  Check, Building2, UserCircle,
+  Check, Building2, UserCircle, ArrowLeft, ChevronRight,
+  Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
@@ -16,6 +17,9 @@ interface TeamMemberRecord {
   createdAt?: string
   updatedAt?: string
 }
+
+/** ID → display name cache for resolved lookups */
+type NameMap = Map<string, string>
 
 interface ViaSource {
   objectApiName: string
@@ -124,7 +128,42 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
 
 function getRecordName(raw: Record<string, unknown>): string {
   const d = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : raw
+  // Check prefixed name fields first (e.g. Contact__name, Account__name)
+  for (const key of Object.keys(d)) {
+    if (key.endsWith('__name') || key.endsWith('__firstName')) {
+      const val = d[key]
+      if (val && String(val).trim()) {
+        // Try to build "first last" for contacts
+        const prefix = key.replace(/__(?:name|firstName)$/, '')
+        const lastName = d[`${prefix}__lastName`]
+        if (lastName) return `${String(val)} ${String(lastName)}`
+        return String(val)
+      }
+    }
+  }
+  // Plain fields
+  if (d.firstName && d.lastName) return `${String(d.firstName)} ${String(d.lastName)}`
   return String(d.name || d.title || d.label || raw.id || 'Unnamed')
+}
+
+/** Batch-resolve a set of record IDs into display names */
+async function resolveNames(objectApiName: string, ids: string[]): Promise<NameMap> {
+  const map: NameMap = new Map()
+  if (ids.length === 0) return map
+  // Fetch records individually (the filter API doesn't support IN queries)
+  // Use Promise.allSettled to tolerate failures
+  const results = await Promise.allSettled(
+    ids.map(id =>
+      apiClient.get<Record<string, unknown>>(`/objects/${objectApiName}/records/${id}`)
+    )
+  )
+  for (let i = 0; i < ids.length; i++) {
+    const r = results[i]
+    if (r.status === 'fulfilled' && r.value) {
+      map.set(ids[i], getRecordName(r.value as Record<string, unknown>))
+    }
+  }
+  return map
 }
 
 // ── Skeleton ───────────────────────────────────────────────────────────
@@ -163,6 +202,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
   // ── State ──
   const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>([])
+  const [contactNames, setContactNames] = useState<NameMap>(new Map())
+  const [accountNames, setAccountNames] = useState<NameMap>(new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -186,6 +227,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     setError(null)
 
     try {
+      let members: TeamMemberRecord[] = []
+
       if (!rollupFromProperty) {
         // Self-only mode
         const fieldName = OBJECT_TO_FIELD[objectApiName]
@@ -193,7 +236,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         const data = await apiClient.get<TeamMemberRecord[]>(
           `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
         )
-        setRawMembers(Array.isArray(data) ? data : [])
+        members = Array.isArray(data) ? data : []
       } else {
         // Rollup mode: gather from Property tree
         let propertyId = ''
@@ -217,9 +260,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           const data = await apiClient.get<TeamMemberRecord[]>(
             `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
           )
-          setRawMembers(Array.isArray(data) ? data : [])
-          return
-        }
+          members = Array.isArray(data) ? data : []
+        } else {
 
         // Phase 1: fetch child record IDs in parallel
         const childResults = await Promise.allSettled(
@@ -281,8 +323,28 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           }
         }
 
-        setRawMembers(allMembers)
+        members = allMembers
+        } // end else (has propertyId)
       }
+
+      // ── Resolve contact/account names ──
+      const contactIds = new Set<string>()
+      const accountIds = new Set<string>()
+      for (const m of members) {
+        const cid = getLookupId(m, 'contact')
+        const aid = getLookupId(m, 'account')
+        if (cid) contactIds.add(cid)
+        if (aid) accountIds.add(aid)
+      }
+
+      const [cNames, aNames] = await Promise.all([
+        resolveNames('Contact', Array.from(contactIds)),
+        resolveNames('Account', Array.from(accountIds)),
+      ])
+
+      setRawMembers(members)
+      setContactNames(cNames)
+      setAccountNames(aNames)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team members')
     } finally {
@@ -304,9 +366,9 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
     for (const member of rawMembers) {
       const contactId = getLookupId(member, 'contact')
-      const contactName = getLookupName(member, 'contact') || getStr(member, 'contactName')
+      const contactName = (contactId && contactNames.get(contactId)) || getLookupName(member, 'contact') || getStr(member, 'contactName')
       const accountId = getLookupId(member, 'account')
-      const accountName = getLookupName(member, 'account') || getStr(member, 'accountName')
+      const accountName = (accountId && accountNames.get(accountId)) || getLookupName(member, 'account') || getStr(member, 'accountName')
       const role = getStr(member, 'role')
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
@@ -400,7 +462,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [rawMembers, currentField, recordId])
+  }, [rawMembers, currentField, recordId, contactNames, accountNames])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
@@ -1022,7 +1084,9 @@ function AccountTile({
   )
 }
 
-// ── 5f: Add Team Member Modal ──────────────────────────────────────────
+// ── 5f: Add Team Member Modal (Multi-step Salesforce-style) ───────────
+
+type AddStep = 'choose' | 'contact-search' | 'contact-create' | 'contact-form' | 'account-search' | 'account-contacts'
 
 function AddTeamMemberModal({
   objectApiName,
@@ -1035,21 +1099,46 @@ function AddTeamMemberModal({
   onClose: () => void
   onSaved: () => void
 }) {
+  const [step, setStep] = useState<AddStep>('choose')
+
+  // Contact search state
   const [contactSearch, setContactSearch] = useState('')
   const [contactResults, setContactResults] = useState<Record<string, unknown>[]>([])
   const [selectedContact, setSelectedContact] = useState<Record<string, unknown> | null>(null)
-  const [accountSearch, setAccountSearch] = useState('')
-  const [accountResults, setAccountResults] = useState<Record<string, unknown>[]>([])
-  const [selectedAccount, setSelectedAccount] = useState<Record<string, unknown> | null>(null)
+  const [searching, setSearching] = useState(false)
+
+  // Contact create state
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  // Contact form (role/flags) state
   const [role, setRole] = useState('')
   const [primaryContact, setPrimaryContact] = useState(false)
   const [contractHolder, setContractHolder] = useState(false)
-  const [searching, setSearching] = useState(false)
+
+  // Account search state
+  const [accountSearch, setAccountSearch] = useState('')
+  const [accountResults, setAccountResults] = useState<Record<string, unknown>[]>([])
+  const [selectedAccount, setSelectedAccount] = useState<Record<string, unknown> | null>(null)
+
+  // Account contacts state
+  const [accountContacts, setAccountContacts] = useState<Record<string, unknown>[]>([])
+  const [loadingAccountContacts, setLoadingAccountContacts] = useState(false)
+  const [accountRole, setAccountRole] = useState('')
+  const [accountPrimary, setAccountPrimary] = useState(false)
+  const [accountContractHolder, setAccountContractHolder] = useState(false)
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set())
+  const [contactRoles, setContactRoles] = useState<Record<string, string>>({})
+
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Debounced contact search
   useEffect(() => {
+    if (step !== 'contact-search') return
     if (contactSearch.trim().length < 2) {
       setContactResults([])
       return
@@ -1068,15 +1157,17 @@ function AddTeamMemberModal({
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [contactSearch])
+  }, [contactSearch, step])
 
   // Debounced account search
   useEffect(() => {
+    if (step !== 'account-search') return
     if (accountSearch.trim().length < 2) {
       setAccountResults([])
       return
     }
     const timer = setTimeout(async () => {
+      setSearching(true)
       try {
         const data = await apiClient.get<Record<string, unknown>[]>(
           `/objects/Account/records/search?q=${encodeURIComponent(accountSearch.trim())}`
@@ -1084,195 +1175,522 @@ function AddTeamMemberModal({
         setAccountResults(Array.isArray(data) ? data : [])
       } catch {
         setAccountResults([])
+      } finally {
+        setSearching(false)
       }
     }, 300)
     return () => clearTimeout(timer)
-  }, [accountSearch])
+  }, [accountSearch, step])
 
-  const handleSave = async () => {
-    if (!selectedContact) {
-      setError('Contact is required')
+  // Fetch contacts belonging to selected account
+  useEffect(() => {
+    if (step !== 'account-contacts' || !selectedAccount) return
+    const accountId = String(selectedAccount.id)
+    setLoadingAccountContacts(true)
+    apiClient.get<Record<string, unknown>[]>(
+      `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId)}&limit=200`
+    )
+      .then(data => setAccountContacts(Array.isArray(data) ? data : []))
+      .catch(() => setAccountContacts([]))
+      .finally(() => setLoadingAccountContacts(false))
+  }, [step, selectedAccount])
+
+  const handleSelectContact = (contact: Record<string, unknown>) => {
+    setSelectedContact(contact)
+    setContactSearch('')
+    setContactResults([])
+    setStep('contact-form')
+  }
+
+  const handleCreateContact = async () => {
+    if (!newLastName.trim()) {
+      setError('Last name is required')
       return
     }
+    setCreating(true)
+    setError(null)
+    try {
+      const payload: Record<string, unknown> = {
+        lastName: newLastName.trim(),
+      }
+      if (newFirstName.trim()) payload.firstName = newFirstName.trim()
+      if (newEmail.trim()) payload.email = newEmail.trim()
+      if (newPhone.trim()) payload.phone = newPhone.trim()
+
+      const created = await apiClient.post<Record<string, unknown>>(
+        '/objects/Contact/records',
+        { data: payload }
+      )
+      setSelectedContact(created)
+      setStep('contact-form')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create contact')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleSaveContactMember = async () => {
+    if (!selectedContact) return
     if (!role) {
       setError('Role is required')
       return
     }
-
     setSaving(true)
     setError(null)
     try {
       const parentField = OBJECT_TO_FIELD[objectApiName]
-      const payload: Record<string, unknown> = {
-        [parentField]: recordId,
-        role,
-        primaryContact,
-        contractHolder,
-      }
-      if (selectedContact) {
-        payload.contact = String(selectedContact.id)
-      }
-      if (selectedAccount) {
-        payload.account = String(selectedAccount.id)
-      }
-
-      await apiClient.post('/objects/TeamMember/records', { data: payload })
+      await apiClient.post('/objects/TeamMember/records', {
+        data: {
+          [parentField]: recordId,
+          contact: String(selectedContact.id),
+          role,
+          primaryContact,
+          contractHolder,
+        },
+      })
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to create team member')
+      setError(e instanceof Error ? e.message : 'Failed to add team member')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSaveAccountMembers = async () => {
+    if (!selectedAccount) return
+    if (!accountRole && selectedContactIds.size === 0) {
+      setError('Select a role for the account or select individual contacts')
+      return
+    }
+    // Validate: each selected contact needs a role
+    for (const cid of selectedContactIds) {
+      if (!contactRoles[cid]) {
+        setError('Please select a role for each selected contact')
+        return
+      }
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const parentField = OBJECT_TO_FIELD[objectApiName]
+      const accountId = String(selectedAccount.id)
+
+      // Add account as team member if a role is set
+      if (accountRole) {
+        await apiClient.post('/objects/TeamMember/records', {
+          data: {
+            [parentField]: recordId,
+            account: accountId,
+            role: accountRole,
+            primaryContact: accountPrimary,
+            contractHolder: accountContractHolder,
+          },
+        })
+      }
+
+      // Add each selected contact as team member
+      for (const contactId of selectedContactIds) {
+        try {
+          await apiClient.post('/objects/TeamMember/records', {
+            data: {
+              [parentField]: recordId,
+              contact: contactId,
+              account: accountId,
+              role: contactRoles[contactId] || 'Other',
+              primaryContact: false,
+              contractHolder: false,
+            },
+          })
+        } catch {
+          // Skip duplicates, continue with others
+        }
+      }
+
+      onSaved()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to add team members')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleContactSelection = (contactId: string) => {
+    setSelectedContactIds(prev => {
+      const next = new Set(prev)
+      if (next.has(contactId)) next.delete(contactId)
+      else next.add(contactId)
+      return next
+    })
   }
 
   const inputCls = 'w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition'
 
   return (
     <ModalOverlay onClose={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-brand-dark">Add Team Member</h3>
+      <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* ── Header ── */}
+        <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+          {step !== 'choose' && (
+            <button
+              type="button"
+              onClick={() => {
+                if (step === 'contact-form') setStep('contact-search')
+                else if (step === 'contact-create') setStep('contact-search')
+                else if (step === 'account-contacts') setStep('account-search')
+                else setStep('choose')
+                setError(null)
+              }}
+              className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <h3 className="text-sm font-semibold text-brand-dark flex-1">
+            {step === 'choose' && 'Add Team Member'}
+            {step === 'contact-search' && 'Search Contacts'}
+            {step === 'contact-create' && 'Create New Contact'}
+            {step === 'contact-form' && 'Add Contact as Team Member'}
+            {step === 'account-search' && 'Search Accounts'}
+            {step === 'account-contacts' && 'Select Account Contacts'}
+          </h3>
           <button type="button" onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* Contact search */}
-          <div>
-            <label className="block text-[11px] font-semibold text-brand-dark mb-1">Contact</label>
-            {selectedContact ? (
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-brand-navy/20 bg-brand-navy/5 text-xs text-brand-dark">
-                <UserCircle className="w-3.5 h-3.5 text-brand-navy" />
-                <span className="flex-1">{getRecordName(selectedContact)}</span>
-                <button type="button" onClick={() => { setSelectedContact(null); setContactSearch('') }} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-3 h-3" />
+          {/* ──────── Step: Choose type ──────── */}
+          {step === 'choose' && (
+            <>
+              <p className="text-xs text-brand-gray text-center">What would you like to add?</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep('contact-search')}
+                  className="flex flex-col items-center gap-3 rounded-xl border-2 border-gray-200 bg-gray-50 p-6 text-center transition hover:border-brand-navy/40 hover:bg-brand-navy/5"
+                >
+                  <UserCircle className="w-10 h-10 text-brand-navy" />
+                  <span className="text-sm font-semibold text-brand-dark">Contact</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep('account-search')}
+                  className="flex flex-col items-center gap-3 rounded-xl border-2 border-gray-200 bg-gray-50 p-6 text-center transition hover:border-brand-navy/40 hover:bg-brand-navy/5"
+                >
+                  <Building2 className="w-10 h-10 text-brand-navy" />
+                  <div>
+                    <span className="text-sm font-semibold text-brand-dark block">Account</span>
+                    <span className="text-[10px] text-brand-gray">Add account contacts</span>
+                  </div>
                 </button>
               </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={contactSearch}
-                  onChange={e => setContactSearch(e.target.value)}
-                  placeholder="Search contacts..."
-                />
-                {searching && (
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">Searching...</div>
-                )}
-                {contactResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-10 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    {contactResults.map(r => (
+            </>
+          )}
+
+          {/* ──────── Step: Contact search ──────── */}
+          {step === 'contact-search' && (
+            <>
+              <div>
+                <label className="block text-[11px] font-semibold text-brand-dark mb-1">
+                  <span className="text-red-500">*</span> Search Contacts
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    className={`${inputCls} pl-8`}
+                    value={contactSearch}
+                    onChange={e => setContactSearch(e.target.value)}
+                    placeholder="Type to search contacts..."
+                    autoFocus
+                  />
+                  {searching && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">Searching...</div>
+                  )}
+                </div>
+              </div>
+
+              {contactResults.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
+                  {contactResults.map(r => {
+                    const name = getRecordName(r)
+                    const d = (r.data && typeof r.data === 'object') ? r.data as Record<string, unknown> : r
+                    const email = String(d.email || d.Contact__email || '')
+                    const phone = String(d.phone || d.Contact__phone || '')
+                    return (
                       <button
                         key={String(r.id)}
                         type="button"
-                        onClick={() => { setSelectedContact(r); setContactSearch(''); setContactResults([]) }}
-                        className="w-full text-left px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                        onClick={() => handleSelectContact(r)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center gap-2"
                       >
-                        {getRecordName(r)}
+                        <UserCircle className="w-5 h-5 text-gray-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium text-brand-dark truncate">{name}</div>
+                          {(email || phone) && (
+                            <div className="text-[10px] text-brand-gray truncate">
+                              {[email, phone].filter(Boolean).join(' \u00b7 ')}
+                            </div>
+                          )}
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
                       </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                    )
+                  })}
+                </div>
+              )}
 
-          {/* Account search */}
-          <div>
-            <label className="block text-[11px] font-semibold text-brand-dark mb-1">Account <span className="text-gray-400 font-normal">(optional)</span></label>
-            {selectedAccount ? (
-              <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-brand-navy/20 bg-brand-navy/5 text-xs text-brand-dark">
-                <Building2 className="w-3.5 h-3.5 text-brand-navy" />
-                <span className="flex-1">{getRecordName(selectedAccount)}</span>
-                <button type="button" onClick={() => { setSelectedAccount(null); setAccountSearch('') }} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-3 h-3" />
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setStep('contact-create'); setError(null) }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:underline"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Create New Contact
                 </button>
               </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="text"
-                  className={inputCls}
-                  value={accountSearch}
-                  onChange={e => setAccountSearch(e.target.value)}
-                  placeholder="Search accounts..."
-                />
-                {accountResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-10 max-h-40 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                    {accountResults.map(r => (
-                      <button
-                        key={String(r.id)}
-                        type="button"
-                        onClick={() => { setSelectedAccount(r); setAccountSearch(''); setAccountResults([]) }}
-                        className="w-full text-left px-3 py-2 text-xs text-brand-dark hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                      >
-                        {getRecordName(r)}
-                      </button>
-                    ))}
+            </>
+          )}
+
+          {/* ──────── Step: Create new contact ──────── */}
+          {step === 'contact-create' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-brand-dark mb-1">First Name</label>
+                  <input type="text" className={inputCls} value={newFirstName} onChange={e => setNewFirstName(e.target.value)} placeholder="First name" autoFocus />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-brand-dark mb-1"><span className="text-red-500">*</span> Last Name</label>
+                  <input type="text" className={inputCls} value={newLastName} onChange={e => setNewLastName(e.target.value)} placeholder="Last name" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-brand-dark mb-1 flex items-center gap-1"><Mail className="w-3 h-3" /> Email</label>
+                <input type="email" className={inputCls} value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="email@example.com" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-brand-dark mb-1 flex items-center gap-1"><Phone className="w-3 h-3" /> Phone</label>
+                <input type="tel" className={inputCls} value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="(555) 123-4567" />
+              </div>
+
+              {error && <p className="text-xs text-red-600">{error}</p>}
+
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setStep('contact-search')} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateContact}
+                  disabled={creating}
+                  className="px-3 py-1.5 rounded-lg bg-brand-navy text-xs font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+                >
+                  {creating ? 'Creating...' : 'Create & Continue'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ──────── Step: Contact form (role + flags) ──────── */}
+          {step === 'contact-form' && selectedContact && (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-navy/20 bg-brand-navy/5 text-xs text-brand-dark">
+                <UserCircle className="w-4 h-4 text-brand-navy shrink-0" />
+                <span className="font-medium flex-1">{getRecordName(selectedContact)}</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-brand-dark mb-1"><span className="text-red-500">*</span> Role</label>
+                <select value={role} onChange={e => setRole(e.target.value)} className={inputCls}>
+                  <option value="">-- Select Role --</option>
+                  {ROLE_PICKLIST.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-1.5 text-xs text-brand-dark cursor-pointer">
+                  <input type="checkbox" checked={primaryContact} onChange={e => setPrimaryContact(e.target.checked)} className="rounded border-gray-300" />
+                  Primary Contact
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-brand-dark cursor-pointer">
+                  <input type="checkbox" checked={contractHolder} onChange={e => setContractHolder(e.target.checked)} className="rounded border-gray-300" />
+                  Contract Holder
+                </label>
+              </div>
+
+              {error && <p className="text-xs text-red-600">{error}</p>}
+
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveContactMember}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg bg-brand-navy text-xs font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+                >
+                  {saving ? 'Adding...' : 'Add Member'}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* ──────── Step: Account search ──────── */}
+          {step === 'account-search' && (
+            <>
+              <div>
+                <label className="block text-[11px] font-semibold text-brand-dark mb-1">
+                  <span className="text-red-500">*</span> Search Accounts
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    className={`${inputCls} pl-8`}
+                    value={accountSearch}
+                    onChange={e => setAccountSearch(e.target.value)}
+                    placeholder="Type to search accounts..."
+                    autoFocus
+                  />
+                  {searching && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">Searching...</div>
+                  )}
+                </div>
+              </div>
+
+              {accountResults.length > 0 && (
+                <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
+                  {accountResults.map(r => (
+                    <button
+                      key={String(r.id)}
+                      type="button"
+                      onClick={() => {
+                        setSelectedAccount(r)
+                        setAccountSearch('')
+                        setAccountResults([])
+                        setStep('account-contacts')
+                      }}
+                      className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center gap-2"
+                    >
+                      <Building2 className="w-5 h-5 text-gray-400 shrink-0" />
+                      <span className="text-xs font-medium text-brand-dark flex-1 truncate">{getRecordName(r)}</span>
+                      <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ──────── Step: Account contacts selection ──────── */}
+          {step === 'account-contacts' && selectedAccount && (
+            <>
+              {/* Account header */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-brand-navy/20 bg-brand-navy/5">
+                <Building2 className="w-4 h-4 text-brand-navy shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-brand-dark">{getRecordName(selectedAccount)}</div>
+                  <div className="text-[10px] text-brand-gray">Add the account as a team member and/or select individual contacts</div>
+                </div>
+              </div>
+
+              {/* Add Account as Team Member */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                <h4 className="text-[11px] font-semibold text-brand-dark">Add Account as Team Member</h4>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-brand-gray mb-0.5">Account Role</label>
+                    <select value={accountRole} onChange={e => setAccountRole(e.target.value)} className={inputCls}>
+                      <option value="">Select Role for Account</option>
+                      {ROLE_PICKLIST.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </div>
+                  <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer mt-3.5">
+                    <input type="checkbox" checked={accountPrimary} onChange={e => setAccountPrimary(e.target.checked)} className="rounded border-gray-300" />
+                    Primary
+                  </label>
+                  <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer mt-3.5">
+                    <input type="checkbox" checked={accountContractHolder} onChange={e => setAccountContractHolder(e.target.checked)} className="rounded border-gray-300" />
+                    Contract Holder
+                  </label>
+                </div>
+              </div>
+
+              {/* Individual Contacts */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                <h4 className="text-[11px] font-semibold text-brand-dark">Add Individual Contacts</h4>
+                {loadingAccountContacts ? (
+                  <div className="py-3 text-center text-xs text-brand-gray animate-pulse">Loading contacts...</div>
+                ) : accountContacts.length === 0 ? (
+                  <p className="text-[10px] text-gray-400 py-2">No contacts found for this account</p>
+                ) : (
+                  <div className="max-h-48 overflow-y-auto space-y-2">
+                    {accountContacts.map(c => {
+                      const cid = String(c.id)
+                      const name = getRecordName(c)
+                      const d = (c.data && typeof c.data === 'object') ? c.data as Record<string, unknown> : c
+                      const email = String(d.email || d.Contact__email || '')
+                      const phone = String(d.phone || d.Contact__phone || '')
+                      const isSelected = selectedContactIds.has(cid)
+                      return (
+                        <div key={cid} className={`rounded-lg border p-2.5 transition ${isSelected ? 'border-brand-navy/30 bg-white' : 'border-gray-200 bg-white/50'}`}>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleContactSelection(cid)}
+                              className="rounded border-gray-300"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-medium text-brand-dark truncate">{name}</div>
+                              {(email || phone) && (
+                                <div className="text-[10px] text-brand-gray truncate">
+                                  {[email, phone].filter(Boolean).join('\u00b7 ')}
+                                </div>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <div className="shrink-0">
+                                <label className="block text-[10px] text-brand-gray">Role</label>
+                                <select
+                                  value={contactRoles[cid] || ''}
+                                  onChange={e => setContactRoles(prev => ({ ...prev, [cid]: e.target.value }))}
+                                  className="rounded border border-gray-200 bg-white px-1.5 py-1 text-[10px] text-brand-dark outline-none focus:border-brand-navy"
+                                >
+                                  <option value="">Select Role</option>
+                                  {ROLE_PICKLIST.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Role */}
-          <div>
-            <label className="block text-[11px] font-semibold text-brand-dark mb-1">Role *</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              className={inputCls}
-            >
-              <option value="">-- Select Role --</option>
-              {ROLE_PICKLIST.map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
+              {error && <p className="text-xs text-red-600">{error}</p>}
 
-          {/* Checkboxes */}
-          <div className="flex items-center gap-6">
-            <label className="flex items-center gap-1.5 text-xs text-brand-dark cursor-pointer">
-              <input
-                type="checkbox"
-                checked={primaryContact}
-                onChange={e => setPrimaryContact(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Primary Contact
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-brand-dark cursor-pointer">
-              <input
-                type="checkbox"
-                checked={contractHolder}
-                onChange={e => setContractHolder(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              Contract Holder
-            </label>
-          </div>
-
-          {error && <p className="text-xs text-red-600">{error}</p>}
-        </div>
-
-        <div className="px-5 py-3 border-t border-gray-100 flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="px-3 py-1.5 rounded-lg bg-brand-navy text-xs font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
-          >
-            {saving ? 'Adding...' : 'Add Member'}
-          </button>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs font-medium text-brand-gray hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveAccountMembers}
+                  disabled={saving || (!accountRole && selectedContactIds.size === 0)}
+                  className="px-3 py-1.5 rounded-lg bg-brand-navy text-xs font-medium text-white hover:bg-brand-navy/90 disabled:opacity-50"
+                >
+                  {saving ? 'Adding...' : 'Add Members'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </ModalOverlay>
@@ -1489,7 +1907,7 @@ function CopyTeamModal({
                         <div key={String(m.id)} className="px-3 py-2 text-xs text-brand-dark flex items-center gap-2">
                           <UserCircle className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                           <span className="flex-1 truncate">
-                            {getLookupName(m, 'contact') || getLookupName(m, 'account') || 'Unknown'}
+                            {getLookupName(m, 'contact') || getLookupName(m, 'account') || getLookupId(m, 'contact') || getLookupId(m, 'account') || 'Unknown'}
                           </span>
                           <span className="text-[10px] text-brand-gray">{getStr(m, 'role')}</span>
                         </div>
