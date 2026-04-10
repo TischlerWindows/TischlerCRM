@@ -160,7 +160,11 @@ async function resolveNames(objectApiName: string, ids: string[]): Promise<NameM
   for (let i = 0; i < ids.length; i++) {
     const r = results[i]
     if (r.status === 'fulfilled' && r.value) {
-      map.set(ids[i], getRecordName(r.value as Record<string, unknown>))
+      const name = getRecordName(r.value as Record<string, unknown>)
+      // Only store if we got a real name, not just the ID echoed back
+      if (name && name !== ids[i] && name !== 'Unnamed') {
+        map.set(ids[i], name)
+      }
     }
   }
   return map
@@ -366,9 +370,17 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
     for (const member of rawMembers) {
       const contactId = getLookupId(member, 'contact')
-      const contactName = (contactId && contactNames.get(contactId)) || getLookupName(member, 'contact') || getStr(member, 'contactName')
+      const contactName =
+        (contactId && contactNames.get(contactId)) ||  // resolved via API
+        getLookupName(member, 'contact') ||              // embedded object
+        getStr(member, 'contactName') ||                 // denormalized field
+        getStr(member, 'TeamMember__contactName')        // prefixed denormalized field
       const accountId = getLookupId(member, 'account')
-      const accountName = (accountId && accountNames.get(accountId)) || getLookupName(member, 'account') || getStr(member, 'accountName')
+      const accountName =
+        (accountId && accountNames.get(accountId)) ||
+        getLookupName(member, 'account') ||
+        getStr(member, 'accountName') ||
+        getStr(member, 'TeamMember__accountName')
       const role = getStr(member, 'role')
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
@@ -428,8 +440,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       }
 
-      // Merge account
-      if (accountId) {
+      // Merge account — only account-only members (no contact) get their own
+      // tile in the Accounts column.  Contact-linked members contribute to the
+      // Contacts column only (they already show the account as a subtitle).
+      const isAccountOnly = accountId && !contactId
+      if (isAccountOnly) {
         const existing = accountMap.get(accountId)
         if (existing) {
           if (role && !existing.roles.includes(role)) existing.roles.push(role)
@@ -1244,6 +1259,7 @@ function AddTeamMemberModal({
         data: {
           [parentField]: recordId,
           contact: String(selectedContact.id),
+          contactName: getRecordName(selectedContact),
           role,
           primaryContact,
           contractHolder,
@@ -1276,17 +1292,26 @@ function AddTeamMemberModal({
       const parentField = OBJECT_TO_FIELD[objectApiName]
       const accountId = String(selectedAccount.id)
 
+      const acctName = getRecordName(selectedAccount)
+
       // Add account as team member if a role is set
       if (accountRole) {
         await apiClient.post('/objects/TeamMember/records', {
           data: {
             [parentField]: recordId,
             account: accountId,
+            accountName: acctName,
             role: accountRole,
             primaryContact: accountPrimary,
             contractHolder: accountContractHolder,
           },
         })
+      }
+
+      // Build contact name lookup from the fetched account contacts
+      const contactNameMap = new Map<string, string>()
+      for (const c of accountContacts) {
+        contactNameMap.set(String(c.id), getRecordName(c))
       }
 
       // Add each selected contact as team member
@@ -1296,7 +1321,9 @@ function AddTeamMemberModal({
             data: {
               [parentField]: recordId,
               contact: contactId,
+              contactName: contactNameMap.get(contactId) || '',
               account: accountId,
+              accountName: acctName,
               role: contactRoles[contactId] || 'Other',
               primaryContact: false,
               contractHolder: false,
