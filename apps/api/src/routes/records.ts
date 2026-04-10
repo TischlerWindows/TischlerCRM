@@ -4,6 +4,7 @@ import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
 import { tryRenameDropboxFolder, tryEnsureLinkedFolder } from './dropbox.js';
+import { runWorkflows } from '../workflow-engine.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -546,6 +547,15 @@ export async function recordRoutes(app: FastifyInstance) {
       await tryEnsureLinkedFolder(userId, apiName, record.id, normalizedData);
     } catch { /* non-fatal */ }
 
+    // ── Workflow automation ──
+    runWorkflows({
+      event: 'create',
+      objectApi: apiName,
+      recordId: record.id,
+      recordData: normalizedData,
+      userId,
+    }).catch(() => { /* non-fatal — workflow errors must not break record creation */ });
+
     reply.code(201).send(record);
   });
 
@@ -774,6 +784,16 @@ export async function recordRoutes(app: FastifyInstance) {
         ipAddress: extractIp(req),
       });
     }
+
+    // ── Workflow automation ──
+    runWorkflows({
+      event: 'update',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: mergedData,
+      beforeData,
+      userId,
+    }).catch(() => { /* non-fatal */ });
 
     reply.send(record);
   });

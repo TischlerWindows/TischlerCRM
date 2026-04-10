@@ -17,7 +17,8 @@ import {
   Code,
   GitBranch,
   CheckCircle2,
-  Palette
+  Palette,
+  Zap
 } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ import PageEditor from './page-editor';
 import HomeLayoutEditor from './home-layout-editor';
 import FieldsRelationships from './fields-relationships';
 import SearchSettings from './search-settings';
+import WorkflowTriggers from './workflow-triggers';
 
 const SIDEBAR_SECTIONS = [
   // Data Model
@@ -104,6 +106,14 @@ const SIDEBAR_SECTIONS = [
     icon: Code,
     description: 'Custom functions and scripts',
     category: 'Automation'
+  },
+  { 
+    id: 'workflow-rules', 
+    label: 'Workflow Rules', 
+    icon: Zap,
+    description: 'Automate actions when records change',
+    category: 'Automation',
+    featured: true
   },
   
   // Security & Access
@@ -412,7 +422,13 @@ export default function ObjectDetailPage() {
             <SearchSettings objectApiName={objectApi} />
           )}
 
-          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && (
+          {activeSection === 'workflow-rules' && (
+            <div className="px-6 py-6">
+              <WorkflowTriggers objectApiName={objectApi} />
+            </div>
+          )}
+
+          {activeSection !== 'details' && activeSection !== 'fields' && activeSection !== 'page-editor' && activeSection !== 'home-layout' && activeSection !== 'search-settings' && activeSection !== 'workflow-rules' && (
             <div className="max-w-6xl">
               <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

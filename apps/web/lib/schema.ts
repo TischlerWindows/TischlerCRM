@@ -129,6 +129,45 @@ export interface ValidationRule {
   condition: string; // boolean expression using field apiNames
 }
 
+// ── Workflow Automation ────────────────────────────────────────────
+
+export type WorkflowTriggerType = 'onCreate' | 'onCreateOrEdit' | 'onCreateOrEditToMeetCriteria';
+
+export interface FieldUpdateAction {
+  type: 'FieldUpdate';
+  fieldApiName: string;
+  value: any;
+}
+
+export interface EmailAlertAction {
+  type: 'EmailAlert';
+  toField?: string;
+  toAddress?: string;
+  subject: string;
+  body: string;
+}
+
+export interface TaskAction {
+  type: 'Task';
+  subject: string;
+  priority?: 'High' | 'Normal' | 'Low';
+  dueInDays?: number;
+  assignToUserId?: string;
+  description?: string;
+}
+
+export type WorkflowAction = FieldUpdateAction | EmailAlertAction | TaskAction;
+
+export interface WorkflowRule {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  triggerType: WorkflowTriggerType;
+  conditions: ConditionExpr[];
+  actions: WorkflowAction[];
+}
+
 export interface RecordType {
   id: string;
   name: string;
@@ -480,6 +519,7 @@ export interface ObjectDef {
   recordTypes: RecordType[];
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
+  workflowRules?: WorkflowRule[];
   /** Global search configuration — which fields are searched and how results display */
   searchConfig?: {
     /** Whether this object appears in the universal search bar */
@@ -525,6 +565,14 @@ export interface CustomLayoutTemplate {
   objectApi: string;
   tabs: TemplateTabDef[];
   createdAt: string;
+}
+
+/** Placeholder for future visual-flow builder (not yet implemented) */
+export interface FlowDefinition {
+  id: string;
+  name: string;
+  objectApi: string;
+  active: boolean;
 }
 
 export interface OrgSchema {
