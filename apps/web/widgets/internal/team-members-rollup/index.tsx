@@ -128,22 +128,36 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
 
 function getRecordName(raw: Record<string, unknown>): string {
   const d = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : raw
-  // Check prefixed name fields first (e.g. Contact__name, Account__name)
+
+  // 1. Check for Contact-style first+last name fields (prefixed or plain)
   for (const key of Object.keys(d)) {
-    if (key.endsWith('__name') || key.endsWith('__firstName')) {
+    if (key.endsWith('__firstName') || key === 'firstName') {
       const val = d[key]
       if (val && String(val).trim()) {
-        // Try to build "first last" for contacts
-        const prefix = key.replace(/__(?:name|firstName)$/, '')
-        const lastName = d[`${prefix}__lastName`]
+        const prefix = key.replace(/__firstName$/, '')
+        const lastName = d[`${prefix}__lastName`] || d.lastName
         if (lastName) return `${String(val)} ${String(lastName)}`
         return String(val)
       }
     }
   }
-  // Plain fields
+
+  // 2. Check for prefixed name fields (e.g. Account__accountName, Account__name, Contact__name)
+  for (const key of Object.keys(d)) {
+    const lower = key.toLowerCase()
+    if ((lower.endsWith('name') || lower.endsWith('__name')) && !lower.includes('firstname') && !lower.includes('lastname')) {
+      const val = d[key]
+      if (val && typeof val === 'string' && val.trim()) return val
+    }
+  }
+
+  // 3. Plain fields
   if (d.firstName && d.lastName) return `${String(d.firstName)} ${String(d.lastName)}`
-  return String(d.name || d.title || d.label || raw.id || 'Unnamed')
+  if (d.name && typeof d.name === 'string' && d.name.trim()) return d.name
+  if (d.title && typeof d.title === 'string' && d.title.trim()) return d.title as string
+  if (d.label && typeof d.label === 'string' && (d.label as string).trim()) return d.label as string
+
+  return 'Unnamed'
 }
 
 /** Batch-resolve a set of record IDs into display names */
@@ -208,6 +222,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [rawMembers, setRawMembers] = useState<TeamMemberRecord[]>([])
   const [contactNames, setContactNames] = useState<NameMap>(new Map())
   const [accountNames, setAccountNames] = useState<NameMap>(new Map())
+  /** Maps parentRecordId → display name for "via" labels */
+  const [parentNames, setParentNames] = useState<NameMap>(new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -331,24 +347,46 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         } // end else (has propertyId)
       }
 
-      // ── Resolve contact/account names ──
+      // ── Resolve contact/account/parent names ──
       const contactIds = new Set<string>()
       const accountIds = new Set<string>()
+      // parentIds grouped by object type for batch resolution
+      const parentIdsByType: Record<string, Set<string>> = {}
       for (const m of members) {
         const cid = getLookupId(m, 'contact')
         const aid = getLookupId(m, 'account')
         if (cid) contactIds.add(cid)
         if (aid) accountIds.add(aid)
+        // Collect parent record IDs for "via" labels
+        for (const [objType, fieldKey] of Object.entries(OBJECT_TO_FIELD)) {
+          const pid = getLookupId(m, fieldKey)
+          if (pid) {
+            if (!parentIdsByType[objType]) parentIdsByType[objType] = new Set()
+            parentIdsByType[objType].add(pid)
+          }
+        }
       }
 
-      const [cNames, aNames] = await Promise.all([
+      // Resolve all names in parallel
+      const parentResolvers = Object.entries(parentIdsByType).map(
+        ([objType, ids]) => resolveNames(objType, Array.from(ids))
+      )
+      const [cNames, aNames, ...parentResults] = await Promise.all([
         resolveNames('Contact', Array.from(contactIds)),
         resolveNames('Account', Array.from(accountIds)),
+        ...parentResolvers,
       ])
+
+      // Merge all parent names into one map
+      const pNames: NameMap = new Map()
+      for (const pMap of parentResults) {
+        for (const [id, name] of pMap) pNames.set(id, name)
+      }
 
       setRawMembers(members)
       setContactNames(cNames)
       setAccountNames(aNames)
+      setParentNames(pNames)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team members')
     } finally {
@@ -392,12 +430,13 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       const viaSources: ViaSource[] = []
       for (const [objType, fieldKey] of Object.entries(OBJECT_TO_FIELD)) {
         const parentId = getLookupId(member, fieldKey)
-        const parentName = getLookupName(member, fieldKey)
         if (parentId) {
+          const resolvedName = parentNames.get(parentId)
+          const embeddedName = getLookupName(member, fieldKey)
           viaSources.push({
             objectApiName: objType,
             recordId: parentId,
-            recordName: parentName || objType,
+            recordName: resolvedName || embeddedName || objType,
           })
         }
       }
@@ -477,7 +516,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [rawMembers, currentField, recordId, contactNames, accountNames])
+  }, [rawMembers, currentField, recordId, contactNames, accountNames, parentNames])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
@@ -837,7 +876,7 @@ function ContactTile({
           )}
         </div>
         {canEdit && !isEditing && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => onStartEdit(contact.ownedMemberIds[0])}
@@ -984,7 +1023,7 @@ function AccountTile({
           </Link>
         </div>
         {canEdit && !isEditing && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => onStartEdit(account.ownedMemberIds[0])}
