@@ -39,7 +39,8 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
 
       {(selection.widget.config.type === 'RelatedList' ||
         selection.widget.config.type === 'HeaderHighlights' ||
-        selection.widget.config.type === 'TeamMembersRollup') && (() => {
+        selection.widget.config.type === 'TeamMembersRollup' ||
+        selection.widget.config.type === 'TeamMemberAssociations') && (() => {
         const InternalPanel = getInternalRegistrationByType(selection.widget.config.type)?.ConfigPanel;
         if (!InternalPanel) return null;
         const objectFields = (availableFields ?? []).map((f) => ({

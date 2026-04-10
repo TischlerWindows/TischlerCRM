@@ -44,6 +44,9 @@ export function sortedWidgets(region: LayoutSection): LayoutWidget[] {
 
 // ── Widget type guard ───────────────────────────────────────────────────────
 
+// IMPORTANT: Add every WidgetType value here when registering a new widget.
+// This set validates drag ids at runtime. A missing entry causes the widget
+// to silently fail to drop from the palette.
 const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'RelatedList',
   'CustomComponent',
@@ -52,6 +55,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'Spacer',
   'HeaderHighlights',
   'TeamMembersRollup',
+  'TeamMemberAssociations',
   'ExternalWidget',
 ]);
 

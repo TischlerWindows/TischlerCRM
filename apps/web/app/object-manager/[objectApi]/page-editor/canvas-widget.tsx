@@ -33,6 +33,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   Spacer: Minus,
   HeaderHighlights: Sparkles,
   TeamMembersRollup: Users,
+  TeamMemberAssociations: Users,
   ExternalWidget: Puzzle,
 };
 
@@ -44,6 +45,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   Spacer: 'Spacer',
   HeaderHighlights: 'Header Highlights',
   TeamMembersRollup: 'Team Members',
+  TeamMemberAssociations: 'Team Member Associations',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
@@ -69,6 +71,8 @@ function summarizeWidget(widget: LayoutWidget): string {
     }
     case 'TeamMembersRollup':
       return `Team Members${widget.config.rollupFromProperty ? ' (Rollup)' : ''}`;
+    case 'TeamMemberAssociations':
+      return 'Associations for Contact / Account';
     case 'ExternalWidget': {
       const manifest = getWidgetById(widget.config.externalWidgetId);
       return manifest?.description ?? widget.config.externalWidgetId;
