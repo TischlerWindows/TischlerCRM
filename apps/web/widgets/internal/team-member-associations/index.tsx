@@ -112,6 +112,49 @@ function getBool(raw: Record<string, unknown>, field: string): boolean {
   return v === true || v === 'true'
 }
 
+/**
+ * Robustly extract the Property ID from a child record (Opportunity, Project, etc.).
+ * The same field can be stored under multiple key variants depending on how the
+ * record was created (POST normalization keeps both prefixed and bare forms, but
+ * PUT merges without stripping, so only the submitted key may exist).
+ *
+ * Mirrors the pattern used by the Dropbox route (`apps/api/src/routes/dropbox.ts`).
+ */
+function resolvePropertyId(raw: Record<string, unknown>, childObjectApiName: string): string {
+  const d = (raw.data && typeof raw.data === 'object')
+    ? raw.data as Record<string, unknown>
+    : raw
+
+  // Explicit candidates in priority order
+  const candidates = [
+    'property',
+    `${childObjectApiName}__property`,
+    'propertyId',
+    `${childObjectApiName}__propertyId`,
+    'property_id',
+    `${childObjectApiName}__property_id`,
+  ]
+
+  for (const key of candidates) {
+    const v = d[key]
+    if (!v) continue
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (typeof v === 'object' && v !== null && 'id' in v) return String((v as { id: unknown }).id)
+  }
+
+  // Last resort: scan all keys for anything that normalises to "property" or "propertyid"
+  for (const key of Object.keys(d)) {
+    const normalised = key.toLowerCase().replace(/[^a-z]/g, '')
+    if (normalised === 'property' || normalised === 'propertyid') {
+      const v = d[key]
+      if (typeof v === 'string' && v.trim()) return v.trim()
+      if (typeof v === 'object' && v !== null && 'id' in v) return String((v as { id: unknown }).id)
+    }
+  }
+
+  return ''
+}
+
 /** Best-effort display name from any record shape */
 function getRecordName(raw: Record<string, unknown>): string {
   const d = (raw.data && typeof raw.data === 'object')
@@ -567,7 +610,8 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       for (const result of childRecordResults) {
         if (result.status === 'fulfilled' && result.value.data) {
           const { entry, data } = result.value
-          const propertyId = getLookupId(data, 'property')
+          // Use the robust resolver that tries all known field name variants
+          const propertyId = resolvePropertyId(data, entry.objectApiName)
           const recordName = getRecordName(data)
           childMeta.set(entry.childRecordId, { propertyId, recordName })
         }
