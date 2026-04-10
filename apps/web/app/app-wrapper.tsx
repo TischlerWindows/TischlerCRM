@@ -26,6 +26,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
 import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
+import { installGlobalErrorHandler } from '@/lib/error-reporter';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -124,6 +125,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       loadSchema();
     }
   }, [loadSchema, user]);
+
+  useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
 
   useEffect(() => {
     (async () => {

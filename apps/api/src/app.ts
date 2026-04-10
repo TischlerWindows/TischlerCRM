@@ -34,6 +34,7 @@ import { placesRoutes } from './routes/places.js';
 import { widgetRoutes } from './routes/widgets.js';
 import { externalWidgetRouteModules } from './widgets/external/registry.js';
 import { dropboxRoutes } from './routes/dropbox.js';
+import { errorLogRoutes } from './routes/error-log.js';
 import { outlookRoutes } from './routes/outlook.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -458,6 +459,7 @@ export function buildApp() {
   app.register(placesRoutes);
   app.register(widgetRoutes);
   app.register(dropboxRoutes);
+  app.register(errorLogRoutes);
   app.register(outlookRoutes);
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/
