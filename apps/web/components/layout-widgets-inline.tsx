@@ -128,6 +128,8 @@ function getWidgetLabel(config: WidgetConfig): string {
       return 'Spacer'
     case 'HeaderHighlights':
       return 'Highlights'
+    case 'Path':
+      return 'Path'
     default:
       return 'Widget'
   }
