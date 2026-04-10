@@ -219,7 +219,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -324,6 +324,15 @@ export interface TeamMemberAssociationsConfig {
   };
 }
 
+export interface PathConfig {
+  type: 'Path';
+  pathId: string;
+  showLabel: boolean;
+  showGuidance: boolean;
+  showKeyFields: boolean;
+  compact: boolean;
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -333,7 +342,8 @@ export type WidgetConfig =
   | HeaderHighlightsConfig
   | ExternalWidgetLayoutConfig
   | TeamMembersRollupConfig
-  | TeamMemberAssociationsConfig;
+  | TeamMemberAssociationsConfig
+  | PathConfig;
 
 export interface PageWidget {
   id: string;
@@ -534,6 +544,28 @@ export interface LegacyPageLayout {
   extensions?: PageLayoutExtensions;
 }
 
+// ── Path definitions ────────────────────────────────────────────────────────
+
+export interface PathStage {
+  id: string;
+  name: string;
+  order: number;
+  category: 'active' | 'closed-won' | 'closed-lost';
+  guidance?: string;
+  keyFields?: string[];
+}
+
+export interface PathDef {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  trackingFieldApiName: string;
+  stages: PathStage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ObjectDef {
   id: string;
   apiName: string;
@@ -545,6 +577,7 @@ export interface ObjectDef {
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
   workflowRules?: WorkflowRule[];
+  paths?: PathDef[];
   /** Global search configuration — which fields are searched and how results display */
   searchConfig?: {
     /** Whether this object appears in the universal search bar */
