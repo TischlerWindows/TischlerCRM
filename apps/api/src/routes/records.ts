@@ -403,6 +403,7 @@ export async function recordRoutes(app: FastifyInstance) {
       serviceNumber: 'SRV',
       installationNumber: 'INST',
       workOrderNumber: 'WO',
+      teamMemberNumber: 'TM',
     };
     for (const field of object.fields) {
       if (field.apiName in autoNumberFormats && !normalizedData[field.apiName]) {
@@ -432,12 +433,68 @@ export async function recordRoutes(app: FastifyInstance) {
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber') ? 4 : 3;
+        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber') ? 4 : 3;
         const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
         normalizedData[field.apiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent
         const prefixedKey = `${apiName}__${field.apiName}`;
         normalizedData[prefixedKey] = generatedNum;
+      }
+    }
+
+    // ---- TeamMember validations (POST) ----
+    if (apiName === 'TeamMember') {
+      const getTeamMemberField = (data: Record<string, any>, fieldName: string): string | null => {
+        const val = data[fieldName] || data[`TeamMember__${fieldName}`];
+        return val && String(val).trim() ? String(val) : null;
+      };
+
+      // Contact required
+      const contactVal = getTeamMemberField(normalizedData, 'contact');
+      if (!contactVal) {
+        return reply.code(400).send({ error: 'Contact is required for TeamMember records.' });
+      }
+
+      // Exactly one parent required
+      const parentFields = ['property', 'opportunity', 'project', 'workOrder', 'installation'];
+      const setParents = parentFields.filter(f => getTeamMemberField(normalizedData, f) !== null);
+      if (setParents.length !== 1) {
+        return reply.code(400).send({ error: 'Exactly one parent is required. Set one of: property, opportunity, project, workOrder, installation.' });
+      }
+
+      // Duplicate prevention
+      const parentField = setParents[0];
+      const parentValue = getTeamMemberField(normalizedData, parentField)!;
+      const duplicate = await prisma.record.findFirst({
+        where: {
+          objectId: object.id,
+          data: { path: ['contact'], equals: contactVal },
+        },
+      });
+      if (duplicate) {
+        const dupData = duplicate.data as Record<string, any> | null;
+        if (dupData) {
+          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+          if (dupParent && String(dupParent) === parentValue) {
+            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+          }
+        }
+      }
+      // Also check with prefixed contact key
+      const duplicates = await prisma.record.findMany({
+        where: {
+          objectId: object.id,
+          data: { path: [`TeamMember__contact`], equals: contactVal },
+        },
+      });
+      for (const dup of duplicates) {
+        const dupData = dup.data as Record<string, any> | null;
+        if (dupData) {
+          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+          if (dupParent && String(dupParent) === parentValue) {
+            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+          }
+        }
       }
     }
 
@@ -530,6 +587,7 @@ export async function recordRoutes(app: FastifyInstance) {
       || normalizedData.projectName || normalizedData[`${apiName}__projectName`]
       || normalizedData.productName || normalizedData[`${apiName}__productName`]
       || normalizedData.propertyNumber || normalizedData[`${apiName}__propertyNumber`]
+      || normalizedData.teamMemberNumber || normalizedData[`${apiName}__teamMemberNumber`]
       || record.id;
     logAudit({
       actorId: userId,
@@ -674,7 +732,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const AUTO_NUMBER_FIELDS = new Set([
       'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
-      'serviceNumber', 'installationNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
     ]);
     const sanitizedUpdate = { ...updateData };
     for (const key of Object.keys(sanitizedUpdate)) {
@@ -687,6 +745,64 @@ export async function recordRoutes(app: FastifyInstance) {
       ...beforeData,
       ...sanitizedUpdate,
     };
+
+    // ---- TeamMember validations (PUT) ----
+    if (apiName === 'TeamMember') {
+      const getTeamMemberField = (data: Record<string, any>, fieldName: string): string | null => {
+        const val = data[fieldName] || data[`TeamMember__${fieldName}`];
+        return val && String(val).trim() ? String(val) : null;
+      };
+
+      // Contact required
+      const contactVal = getTeamMemberField(mergedData, 'contact');
+      if (!contactVal) {
+        return reply.code(400).send({ error: 'Contact is required for TeamMember records.' });
+      }
+
+      // Exactly one parent required
+      const parentFields = ['property', 'opportunity', 'project', 'workOrder', 'installation'];
+      const setParents = parentFields.filter(f => getTeamMemberField(mergedData, f) !== null);
+      if (setParents.length !== 1) {
+        return reply.code(400).send({ error: 'Exactly one parent is required. Set one of: property, opportunity, project, workOrder, installation.' });
+      }
+
+      // Duplicate prevention (exclude the current record)
+      const parentField = setParents[0];
+      const parentValue = getTeamMemberField(mergedData, parentField)!;
+      const duplicate = await prisma.record.findFirst({
+        where: {
+          objectId: object.id,
+          id: { not: existingRecord.id },
+          data: { path: ['contact'], equals: contactVal },
+        },
+      });
+      if (duplicate) {
+        const dupData = duplicate.data as Record<string, any> | null;
+        if (dupData) {
+          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+          if (dupParent && String(dupParent) === parentValue) {
+            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+          }
+        }
+      }
+      // Also check with prefixed contact key
+      const duplicates = await prisma.record.findMany({
+        where: {
+          objectId: object.id,
+          id: { not: existingRecord.id },
+          data: { path: [`TeamMember__contact`], equals: contactVal },
+        },
+      });
+      for (const dup of duplicates) {
+        const dupData = dup.data as Record<string, any> | null;
+        if (dupData) {
+          const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+          if (dupParent && String(dupParent) === parentValue) {
+            return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+          }
+        }
+      }
+    }
 
     // ── Re-derive propertyNumber when address changes on a Property ──
     if (apiName.toLowerCase() === 'property') {
@@ -762,6 +878,7 @@ export async function recordRoutes(app: FastifyInstance) {
         || mergedData.projectName || mergedData[`${apiName}__projectName`]
         || mergedData.productName || mergedData[`${apiName}__productName`]
         || mergedData.propertyNumber || mergedData[`${apiName}__propertyNumber`]
+        || mergedData.teamMemberNumber || mergedData[`${apiName}__teamMemberNumber`]
         || existingRecord.id;
       logAudit({
         actorId: userId,
@@ -810,6 +927,7 @@ export async function recordRoutes(app: FastifyInstance) {
       || delData?.projectName || delData?.[`${apiName}__projectName`]
       || delData?.productName || delData?.[`${apiName}__productName`]
       || delData?.propertyNumber || delData?.[`${apiName}__propertyNumber`]
+      || delData?.teamMemberNumber || delData?.[`${apiName}__teamMemberNumber`]
       || existingRecord.id;
     logAudit({
       actorId: userId,

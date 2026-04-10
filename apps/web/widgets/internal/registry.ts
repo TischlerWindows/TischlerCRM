@@ -5,8 +5,10 @@ import { config as activityFeedManifest } from './activity-feed/widget.config'
 import { config as headerHighlightsManifest } from './header-highlights/widget.config'
 import { config as fileFolderManifest } from './file-folder/widget.config'
 import { config as relatedListManifest } from './related-list/widget.config'
+import { config as teamMembersRollupManifest } from './team-members-rollup/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
+import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
 
 export const internalWidgetRegistrations: WidgetRegistration[] = [
   {
@@ -37,6 +39,12 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'RelatedList',
     Component: dynamic(() => import('./related-list/index')),
     ConfigPanel: RelatedListConfigPanel,
+  },
+  {
+    manifest: teamMembersRollupManifest,
+    widgetConfigType: 'TeamMembersRollup',
+    Component: dynamic(() => import('./team-members-rollup/index')),
+    ConfigPanel: TeamMembersRollupConfigPanel,
   },
 ]
 

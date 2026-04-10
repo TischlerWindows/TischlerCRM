@@ -18,6 +18,7 @@ import {
   Puzzle,
   Rows3,
   List,
+  Users,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
@@ -31,6 +32,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   CustomComponent: Component,
   Spacer: Minus,
   HeaderHighlights: Sparkles,
+  TeamMembersRollup: Users,
   ExternalWidget: Puzzle,
 };
 
@@ -41,6 +43,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   CustomComponent: 'Custom Component',
   Spacer: 'Spacer',
   HeaderHighlights: 'Header Highlights',
+  TeamMembersRollup: 'Team Members',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
@@ -64,6 +67,8 @@ function summarizeWidget(widget: LayoutWidget): string {
       const extraCount = fields.length - preview.length;
       return extraCount > 0 ? `${preview.join(', ')} +${extraCount}` : preview.join(', ');
     }
+    case 'TeamMembersRollup':
+      return `Team Members${widget.config.rollupFromProperty ? ' (Rollup)' : ''}`;
     case 'ExternalWidget': {
       const manifest = getWidgetById(widget.config.externalWidgetId);
       return manifest?.description ?? widget.config.externalWidgetId;

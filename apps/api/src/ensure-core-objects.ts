@@ -172,6 +172,26 @@ const CORE_OBJECTS = [
       { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
+  {
+    apiName: 'TeamMember',
+    label: 'Team Member',
+    pluralLabel: 'Team Members',
+    description: 'Junction object linking contacts and accounts to properties, opportunities, projects, work orders, and installations',
+    fields: [
+      { apiName: 'teamMemberNumber', label: 'Team Member Number', type: 'Text', unique: true },
+      { apiName: 'contact', label: 'Contact', type: 'Lookup' },
+      { apiName: 'account', label: 'Account', type: 'Lookup' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'opportunity', label: 'Opportunity', type: 'Lookup' },
+      { apiName: 'project', label: 'Project', type: 'Lookup' },
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup' },
+      { apiName: 'installation', label: 'Installation', type: 'Lookup' },
+      { apiName: 'role', label: 'Role', type: 'Picklist', required: true, picklistValues: ['Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer', 'Property Manager', 'Sales Rep', 'Installer', 'Inspector', 'Engineer', 'Other'] },
+      { apiName: 'primaryContact', label: 'Primary Contact', type: 'Checkbox' },
+      { apiName: 'contractHolder', label: 'Contract Holder', type: 'Checkbox' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+    ],
+  },
 ];
 
 /**
@@ -299,7 +319,7 @@ export async function ensureCoreObjects(): Promise<void> {
     const autoNumberFieldNames = [
       'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
       'opportunityNumber', 'productCode', 'projectNumber', 'quoteNumber',
-      'serviceNumber', 'installationNumber', 'workOrderNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
     ];
     await prisma.customField.updateMany({
       where: {
