@@ -7,10 +7,12 @@ import { config as fileFolderManifest } from './file-folder/widget.config'
 import { config as relatedListManifest } from './related-list/widget.config'
 import { config as teamMembersRollupManifest } from './team-members-rollup/widget.config'
 import { config as teamMemberAssociationsManifest } from './team-member-associations/widget.config'
+import { config as pathManifest } from './path/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
 import TeamMemberAssociationsConfigPanel from './team-member-associations/ConfigPanel'
+import PathConfigPanel from './path/ConfigPanel'
 
 export const internalWidgetRegistrations: WidgetRegistration[] = [
   {
@@ -53,6 +55,12 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'TeamMemberAssociations',
     Component: dynamic(() => import('./team-member-associations/index')),
     ConfigPanel: TeamMemberAssociationsConfigPanel,
+  },
+  {
+    manifest: pathManifest,
+    widgetConfigType: 'Path',
+    Component: dynamic(() => import('./path/index')),
+    ConfigPanel: PathConfigPanel,
   },
 ]
 
