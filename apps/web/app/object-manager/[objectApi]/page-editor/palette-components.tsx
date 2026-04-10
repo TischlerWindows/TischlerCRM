@@ -42,6 +42,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'file-folder': 'FileFolder',
   'spacer': 'Spacer',
   'custom-component': 'CustomComponent',
+  'team-members-rollup': 'TeamMembersRollup',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

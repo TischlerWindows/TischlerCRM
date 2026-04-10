@@ -3393,6 +3393,33 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
+    // 12. Team Member (junction object linking contacts/accounts to parent objects)
+    objects.push(createBasicObject(
+      'TeamMember',
+      'Team Member',
+      'Team Members',
+      'Junction object linking contacts and accounts to properties, opportunities, projects, work orders, and installations',
+      [
+        // ── Auto-number ──
+        { id: generateId(), apiName: 'TeamMember__teamMemberNumber', label: 'Team Member Number', type: 'AutoNumber', autoNumber: { displayFormat: 'TM{0000}', startingNumber: 1 } },
+        // ── Contact / Account ──
+        { id: generateId(), apiName: 'TeamMember__contact', label: 'Contact', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'TeamMember__account', label: 'Account', type: 'Lookup', lookupObject: 'Account' },
+        // ── Parent Lookups ──
+        { id: generateId(), apiName: 'TeamMember__property', label: 'Property', type: 'Lookup', lookupObject: 'Property' },
+        { id: generateId(), apiName: 'TeamMember__opportunity', label: 'Opportunity', type: 'Lookup', lookupObject: 'Opportunity' },
+        { id: generateId(), apiName: 'TeamMember__project', label: 'Project', type: 'Lookup', lookupObject: 'Project' },
+        { id: generateId(), apiName: 'TeamMember__workOrder', label: 'Work Order', type: 'Lookup', lookupObject: 'WorkOrder' },
+        { id: generateId(), apiName: 'TeamMember__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation' },
+        // ── Role & Flags ──
+        { id: generateId(), apiName: 'TeamMember__role', label: 'Role', type: 'Picklist', required: true, picklistValues: ['Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer', 'Property Manager', 'Sales Rep', 'Installer', 'Inspector', 'Engineer', 'Other'] },
+        { id: generateId(), apiName: 'TeamMember__primaryContact', label: 'Primary Contact', type: 'Checkbox' },
+        { id: generateId(), apiName: 'TeamMember__contractHolder', label: 'Contract Holder', type: 'Checkbox' },
+        // ── Notes ──
+        { id: generateId(), apiName: 'TeamMember__notes', label: 'Notes', type: 'LongTextArea', maxLength: 10000 },
+      ]
+    ));
+
     const baseSchema: OrgSchema = {
       version: 1,
       objects,

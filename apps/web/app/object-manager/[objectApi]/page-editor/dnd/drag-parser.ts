@@ -51,6 +51,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'FileFolder',
   'Spacer',
   'HeaderHighlights',
+  'TeamMembersRollup',
   'ExternalWidget',
 ]);
 
