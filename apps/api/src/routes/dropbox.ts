@@ -706,6 +706,83 @@ async function tryCopyLinkedRecordFiles(
   }
 }
 
+// ── Ensure Property root folder + subfolders on record creation ────
+
+/**
+ * When a Property record is created (from any path — record page, inline
+ * lookup, API, etc.), ensure its Dropbox root folder and default
+ * subfolders (Leads, Service, Project Books) are created.
+ * Fire-and-forget — errors are logged only.
+ */
+export async function tryEnsurePropertyRootFolder(
+  userId: string,
+  recordId: string,
+  recordData: Record<string, any>,
+): Promise<void> {
+  try {
+    let accessToken = await getAccessToken(userId);
+    if (!accessToken) {
+      const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+      if (integration) {
+        const connections = await prisma.userIntegration.findMany({
+          where: { integrationId: integration.id, accessToken: { not: null } },
+          select: { userId: true },
+          take: 5,
+        });
+        for (const conn of connections) {
+          accessToken = await getAccessToken(conn.userId);
+          if (accessToken) break;
+        }
+      }
+      if (!accessToken) return;
+    }
+
+    const folderName = deriveDropboxFolderName(recordData, recordId);
+    const folderPath = buildFolderPath('Property', recordId, folderName);
+
+    // Create root folder
+    let created = false;
+    try {
+      await dropboxApi(accessToken, '/files/create_folder_v2', {
+        path: folderPath,
+        autorename: false,
+      });
+      created = true;
+    } catch (err: any) {
+      if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+        console.error('[dropbox] Property root folder creation failed:', err.message);
+        return;
+      }
+    }
+
+    // Create subfolders only when the root folder was newly created
+    if (created) {
+      for (const sf of PROPERTY_SUBFOLDERS) {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: `${folderPath}/${sf.name}`,
+            autorename: false,
+          });
+        } catch { /* already exists */ }
+      }
+      for (const sf of PROPERTY_SUBFOLDERS) {
+        if (sf.children) {
+          for (const child of sf.children) {
+            try {
+              await dropboxApi(accessToken, '/files/create_folder_v2', {
+                path: `${folderPath}/${sf.name}/${child}`,
+                autorename: false,
+              });
+            } catch { /* already exists */ }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[dropbox] tryEnsurePropertyRootFolder failed (non-fatal):', err.message);
+  }
+}
+
 // ── Routes ─────────────────────────────────────────────────────────
 
 export async function dropboxRoutes(app: FastifyInstance) {

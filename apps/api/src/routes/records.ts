@@ -3,7 +3,7 @@ import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
-import { tryRenameDropboxFolder, tryEnsureLinkedFolder } from './dropbox.js';
+import { tryRenameDropboxFolder, tryEnsureLinkedFolder, tryEnsurePropertyRootFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
 import { z } from 'zod';
 
@@ -407,7 +407,9 @@ export async function recordRoutes(app: FastifyInstance) {
       teamMemberNumber: 'TM',
     };
     for (const field of object.fields) {
-      if (field.apiName in autoNumberFormats && !normalizedData[field.apiName]) {
+      const currentVal = normalizedData[field.apiName];
+      const isEmpty = !currentVal || currentVal === 'N/A';
+      if (field.apiName in autoNumberFormats && isEmpty) {
         // For propertyNumber, derive a smart prefix from address data
         const prefix = field.apiName === 'propertyNumber'
           ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
@@ -641,6 +643,12 @@ export async function recordRoutes(app: FastifyInstance) {
     try {
       await tryEnsureLinkedFolder(userId, apiName, record.id, normalizedData);
     } catch { /* non-fatal */ }
+
+    // ── Ensure Property root folder + subfolders when a Property is created ──
+    if (apiName.toLowerCase() === 'property') {
+      tryEnsurePropertyRootFolder(userId, record.id, normalizedData)
+        .catch(() => { /* non-fatal */ });
+    }
 
     // ── Workflow automation ──
     runWorkflows({
