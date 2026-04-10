@@ -272,6 +272,13 @@ export interface TeamMembersRollupConfig {
 export interface TeamMemberAssociationsConfig {
   type: 'TeamMemberAssociations';
   label?: string;
+  displayFields?: {
+    Property?: string[];
+    Opportunity?: string[];
+    Project?: string[];
+    WorkOrder?: string[];
+    Installation?: string[];
+  };
 }
 
 export type WidgetConfig =

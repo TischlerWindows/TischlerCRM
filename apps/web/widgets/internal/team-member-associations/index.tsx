@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { Network, Edit2, Trash2, Check, X, Home, CornerDownRight } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
+import type { TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ interface AssociationRow {
   objectApiName: string
   parentRecordId: string
   parentRecordName: string
+  parentRecordData: Record<string, unknown>
   role: string
   isPrimary: boolean
   isContractHolder: boolean
@@ -25,11 +27,12 @@ interface AssociationRow {
 interface PropertyGroup {
   propertyId: string
   propertyName: string
-  /** TeamMember record directly on this Property (if any) */
+  propertyData: Record<string, unknown>
   direct: AssociationRow | null
-  /** TeamMember records on child objects (Opp/Project/etc.) under this Property */
   children: AssociationRow[]
 }
+
+type DisplayFieldsConfig = NonNullable<TeamMemberAssociationsConfig['displayFields']>
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -125,7 +128,6 @@ function resolvePropertyId(raw: Record<string, unknown>, childObjectApiName: str
     ? raw.data as Record<string, unknown>
     : raw
 
-  // Explicit candidates in priority order
   const candidates = [
     'property',
     `${childObjectApiName}__property`,
@@ -161,6 +163,7 @@ function getRecordName(raw: Record<string, unknown>): string {
     ? raw.data as Record<string, unknown>
     : raw
 
+  // First/last name pairs
   for (const key of Object.keys(d)) {
     if (key.endsWith('__firstName') || key === 'firstName') {
       const val = d[key]
@@ -173,6 +176,7 @@ function getRecordName(raw: Record<string, unknown>): string {
     }
   }
 
+  // Fields ending in 'name' (opportunityName, projectName, etc.)
   for (const key of Object.keys(d)) {
     const lower = key.toLowerCase()
     if (
@@ -186,7 +190,38 @@ function getRecordName(raw: Record<string, unknown>): string {
 
   if (d.name && typeof d.name === 'string' && d.name.trim()) return d.name
   if (d.title && typeof d.title === 'string' && d.title.trim()) return d.title as string
+
+  // Auto-number fields: propertyNumber, opportunityNumber, projectNumber, etc.
+  // These are the primary identifiers in the CRM and the only meaningful label for
+  // objects like Property that have no separate "name" field.
+  for (const key of Object.keys(d)) {
+    const bare = key.replace(/^[A-Za-z]+__/, '').toLowerCase()
+    if (bare.endsWith('number') && !bare.includes('phone') && !bare.includes('mobile')) {
+      const val = d[key]
+      if (val && typeof val === 'string' && val.trim()) return val
+    }
+  }
+
   return 'Unnamed'
+}
+
+// ── Field display helper ────────────────────────────────────────────────
+
+function FieldDisplay({ data, fields }: { data: Record<string, unknown>; fields: string[] }) {
+  if (!fields.length) return null
+  const items = fields
+    .map(f => ({ field: f, value: getField(data, f) }))
+    .filter(({ value }) => value != null && String(value).trim() !== '')
+  if (!items.length) return null
+  return (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+      {items.map(({ field, value }) => (
+        <span key={field} className="text-[10px] text-brand-gray">
+          {String(value)}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 // ── Skeleton ───────────────────────────────────────────────────────────
@@ -309,11 +344,13 @@ function InlineEditForm({
   )
 }
 
-// ── Single association row (shared by direct and child rows) ───────────
+// ── Single association row ─────────────────────────────────────────────
 
 interface AssocRowProps {
   assoc: AssociationRow
   isChild: boolean
+  /** Configured display fields for this row's object type */
+  fieldValues: string[]
   editingId: string | null
   editRole: string
   editPrimary: boolean
@@ -329,7 +366,7 @@ interface AssocRowProps {
 }
 
 function AssocRow({
-  assoc, isChild,
+  assoc, isChild, fieldValues,
   editingId, editRole, editPrimary, editContractHolder, saving,
   onStartEdit, onSaveEdit, onCancelEdit, onEditRole, onEditPrimary, onEditContractHolder,
   onDelete,
@@ -339,13 +376,11 @@ function AssocRow({
   return (
     <div className={`group ${isChild ? 'ml-5 pl-3 border-l-2 border-gray-200' : ''}`}>
       <div className="flex items-start gap-1.5">
-        {/* connector arrow for child rows */}
         {isChild && (
           <CornerDownRight className="w-3 h-3 text-gray-300 shrink-0 mt-0.5" />
         )}
 
         <div className="flex-1 min-w-0">
-          {/* Header line: record name link + type badge */}
           {isChild && (
             <div className="flex items-center gap-1.5 flex-wrap">
               <Link
@@ -358,14 +393,17 @@ function AssocRow({
             </div>
           )}
 
-          {/* For direct (Property-level) rows show a subtle label */}
           {!isChild && (
             <span className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide">
               Direct association
             </span>
           )}
 
-          {/* Edit form or read-only badges */}
+          {/* Configured display fields for the child record */}
+          {isChild && fieldValues.length > 0 && (
+            <FieldDisplay data={assoc.parentRecordData} fields={fieldValues} />
+          )}
+
           {isEditing ? (
             <InlineEditForm
               role={editRole}
@@ -387,7 +425,6 @@ function AssocRow({
           )}
         </div>
 
-        {/* Hover actions */}
         {!isEditing && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
@@ -421,28 +458,43 @@ type EditHandlers = Pick<AssocRowProps,
   'onEditRole' | 'onEditPrimary' | 'onEditContractHolder' | 'onDelete'
 >
 
-function PropertyGroupTile({ group, ...edit }: { group: PropertyGroup } & EditHandlers) {
+function PropertyGroupTile({
+  group,
+  displayFields,
+  ...edit
+}: { group: PropertyGroup; displayFields: DisplayFieldsConfig } & EditHandlers) {
+  const propertyFields = displayFields.Property ?? []
+
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm p-3 transition-all space-y-2">
       {/* Property header */}
       <div className="flex items-center gap-1.5">
-        <Home className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-        <Link
-          href={recordUrl('Property', group.propertyId)}
-          className="text-xs font-semibold text-brand-dark hover:text-brand-navy hover:underline truncate"
-        >
-          {group.propertyName}
-        </Link>
+        <Home className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" />
+        <div className="flex-1 min-w-0">
+          <Link
+            href={recordUrl('Property', group.propertyId)}
+            className="text-xs font-semibold text-brand-dark hover:text-brand-navy hover:underline block truncate"
+          >
+            {group.propertyName}
+          </Link>
+          <FieldDisplay data={group.propertyData} fields={propertyFields} />
+        </div>
       </div>
 
       {/* Direct property-level association */}
       {group.direct && (
-        <AssocRow assoc={group.direct} isChild={false} {...edit} />
+        <AssocRow assoc={group.direct} isChild={false} fieldValues={[]} {...edit} />
       )}
 
       {/* Child associations (Opp, Project, etc.) */}
       {group.children.map(child => (
-        <AssocRow key={child.memberId} assoc={child} isChild {...edit} />
+        <AssocRow
+          key={child.memberId}
+          assoc={child}
+          isChild
+          fieldValues={displayFields[child.objectApiName as keyof DisplayFieldsConfig] ?? []}
+          {...edit}
+        />
       ))}
     </div>
   )
@@ -450,8 +502,13 @@ function PropertyGroupTile({ group, ...edit }: { group: PropertyGroup } & EditHa
 
 // ── Flat tile (child record with no property) ──────────────────────────
 
-function FlatTile({ assoc, ...edit }: { assoc: AssociationRow } & EditHandlers) {
+function FlatTile({
+  assoc,
+  displayFields,
+  ...edit
+}: { assoc: AssociationRow; displayFields: DisplayFieldsConfig } & EditHandlers) {
   const isEditing = edit.editingId === assoc.memberId
+  const fieldValues = displayFields[assoc.objectApiName as keyof DisplayFieldsConfig] ?? []
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm p-3 transition-all group">
@@ -466,6 +523,10 @@ function FlatTile({ assoc, ...edit }: { assoc: AssociationRow } & EditHandlers) 
             </Link>
             <ObjectBadge objectApiName={assoc.objectApiName} />
           </div>
+
+          {fieldValues.length > 0 && (
+            <FieldDisplay data={assoc.parentRecordData} fields={fieldValues} />
+          )}
 
           {isEditing ? (
             <InlineEditForm
@@ -516,7 +577,9 @@ function FlatTile({ assoc, ...edit }: { assoc: AssociationRow } & EditHandlers) 
 // ── Main Widget ────────────────────────────────────────────────────────
 
 export default function TeamMemberAssociationsWidget({ config, record, object }: WidgetProps) {
-  const { label } = config as { type: string; label?: string }
+  const typedConfig = config as TeamMemberAssociationsConfig
+  const { label } = typedConfig
+  const displayFields: DisplayFieldsConfig = typedConfig.displayFields ?? {}
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
@@ -567,7 +630,6 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       }
 
       // ── Phase 2: Resolve child records to find their parent Property ──
-      // Partition: direct-property vs child-type
       type DirectEntry = { member: TeamMemberRecord; propertyId: string }
       type ChildEntry  = {
         member: TeamMemberRecord
@@ -595,7 +657,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         }
       }
 
-      // Fetch each child record to get its property link and display name
+      // Fetch each child record to get its property link, display name, and full data
       const childRecordResults = await Promise.allSettled(
         childEntries.map(entry =>
           apiClient
@@ -605,19 +667,22 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         )
       )
 
-      // Build map: childRecordId → { propertyId, recordName }
-      const childMeta = new Map<string, { propertyId: string; recordName: string }>()
+      // Build map: childRecordId → { propertyId, recordName, recordData }
+      const childMeta = new Map<string, {
+        propertyId: string
+        recordName: string
+        recordData: Record<string, unknown>
+      }>()
       for (const result of childRecordResults) {
         if (result.status === 'fulfilled' && result.value.data) {
           const { entry, data } = result.value
-          // Use the robust resolver that tries all known field name variants
           const propertyId = resolvePropertyId(data, entry.objectApiName)
           const recordName = getRecordName(data)
-          childMeta.set(entry.childRecordId, { propertyId, recordName })
+          childMeta.set(entry.childRecordId, { propertyId, recordName, recordData: data })
         }
       }
 
-      // ── Phase 3: Batch-resolve Property display names ──
+      // ── Phase 3: Batch-resolve Property display names and data ──
       const propertyIds = new Set<string>()
       for (const { propertyId } of directEntries) propertyIds.add(propertyId)
       for (const meta of childMeta.values()) {
@@ -625,13 +690,16 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       }
 
       const propertyNames = new Map<string, string>()
+      const propertyDataMap = new Map<string, Record<string, unknown>>()
+
       await Promise.allSettled(
         Array.from(propertyIds).map(pid =>
           apiClient
             .get<Record<string, unknown>>(`/objects/Property/records/${pid}`)
             .then(data => {
-              const name = getRecordName(data as Record<string, unknown>)
-              propertyNames.set(pid, name || pid)
+              const d = data as Record<string, unknown>
+              propertyNames.set(pid, getRecordName(d) || pid)
+              propertyDataMap.set(pid, d)
             })
         )
       )
@@ -644,6 +712,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           groupMap.set(propertyId, {
             propertyId,
             propertyName: propertyNames.get(propertyId) ?? propertyId,
+            propertyData: propertyDataMap.get(propertyId) ?? {},
             direct: null,
             children: [],
           })
@@ -660,6 +729,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           objectApiName: 'Property',
           parentRecordId: propertyId,
           parentRecordName: propertyNames.get(propertyId) ?? propertyId,
+          parentRecordData: propertyDataMap.get(propertyId) ?? {},
           role: getStr(raw, 'role'),
           isPrimary: getBool(raw, 'primaryContact'),
           isContractHolder: getBool(raw, 'contractHolder'),
@@ -679,6 +749,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           objectApiName: entry.objectApiName,
           parentRecordId: entry.childRecordId,
           parentRecordName: recordName,
+          parentRecordData: meta?.recordData ?? {},
           role: getStr(raw, 'role'),
           isPrimary: getBool(raw, 'primaryContact'),
           isContractHolder: getBool(raw, 'contractHolder'),
@@ -808,12 +879,15 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           </div>
         ) : (
           <div className="p-3 space-y-2">
-            {/* Property-grouped tiles */}
             {propertyGroups.map(group => (
-              <PropertyGroupTile key={group.propertyId} group={group} {...editHandlers} />
+              <PropertyGroupTile
+                key={group.propertyId}
+                group={group}
+                displayFields={displayFields}
+                {...editHandlers}
+              />
             ))}
 
-            {/* Flat tiles (no property) */}
             {flatTiles.length > 0 && (
               <>
                 {propertyGroups.length > 0 && (
@@ -822,7 +896,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
                   </p>
                 )}
                 {flatTiles.map(assoc => (
-                  <FlatTile key={assoc.memberId} assoc={assoc} {...editHandlers} />
+                  <FlatTile
+                    key={assoc.memberId}
+                    assoc={assoc}
+                    displayFields={displayFields}
+                    {...editHandlers}
+                  />
                 ))}
               </>
             )}
