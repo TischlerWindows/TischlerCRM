@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { ConfigPanelProps } from '@/lib/widgets/types';
 import { useSchemaStore } from '@/lib/schema-store';
 import { Label } from '@/components/ui/label';
@@ -16,8 +16,14 @@ export default function PathConfigPanel({ config, onChange, object }: ConfigPane
   const showKeyFields = (config.showKeyFields as boolean) ?? true;
   const compact = (config.compact as boolean) ?? false;
 
-  // Auto-select if only one path exists
+  // Auto-select if only one path exists and persist to config
   const effectivePathId = pathId || (paths.length === 1 ? paths[0].id : '');
+
+  useEffect(() => {
+    if (!pathId && paths.length === 1) {
+      onChange({ ...config, pathId: paths[0].id });
+    }
+  }, [pathId, paths.length]);
 
   return (
     <div className="space-y-4">

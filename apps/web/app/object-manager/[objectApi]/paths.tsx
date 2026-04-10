@@ -186,7 +186,7 @@ export default function Paths({ objectApiName }: PathsProps) {
 
               <div className="flex items-center gap-3">
                 <div className="hidden sm:flex gap-0.5">
-                  {path.stages
+                  {[...path.stages]
                     .sort((a, b) => a.order - b.order)
                     .map((stage, i) => (
                       <div

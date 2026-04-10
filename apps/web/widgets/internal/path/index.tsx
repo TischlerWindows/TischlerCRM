@@ -60,6 +60,8 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       });
       // Update the record in-place so the UI re-renders immediately
       record[pathDef!.trackingFieldApiName] = stage.id;
+    } catch {
+      // Revert not needed — mutation only happens after API success above
     } finally {
       setUpdating(false);
       setPopoverStageId(null);
