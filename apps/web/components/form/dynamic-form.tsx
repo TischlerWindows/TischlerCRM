@@ -450,7 +450,8 @@ export default function DynamicForm({
               (region as any).showInTemplate !== false &&
               !regionFx?.hidden &&
               !panelFx?.hidden &&
-              !panel.hidden
+              !panel.hidden &&
+              evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx)
             ) {
               allSections.push({ section: panel, tabLabel: tab.label, regionLabel: region.label });
             }
@@ -1060,6 +1061,7 @@ export default function DynamicForm({
                     const visiblePanels = region.panels
                       .filter((p) => {
                         if (p.hidden) return false;
+                        if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
                         const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                         if (panelFx?.hidden) return false;
                         return true;
@@ -1152,6 +1154,7 @@ export default function DynamicForm({
                   .sort((a, b) => a.order - b.order)
                   .filter((p) => {
                     if (p.hidden) return false;
+                    if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
                     const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                     if (panelFx?.hidden) return false;
                     return true;

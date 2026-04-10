@@ -41,6 +41,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
 
   const hasVisibilityRule = useMemo(
     () =>
+      ((region as any).visibleIf?.length > 0) ||
       formattingRules.some(
         (r) =>
           r.active !== false &&
@@ -48,7 +49,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           r.target.regionId === region.id &&
           r.when.length > 0,
       ),
-    [formattingRules, region.id],
+    [formattingRules, region.id, (region as any).visibleIf],
   );
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);

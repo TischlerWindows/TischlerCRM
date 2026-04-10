@@ -25,6 +25,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
 
   const hasVisibilityRule = useMemo(
     () =>
+      ((panel as any).visibleIf?.length > 0) ||
       formattingRules.some(
         (r) =>
           r.active !== false &&
@@ -32,7 +33,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
           r.target.panelId === panel.id &&
           r.when.length > 0,
       ),
-    [formattingRules, panel.id],
+    [formattingRules, panel.id, (panel as any).visibleIf],
   );
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);

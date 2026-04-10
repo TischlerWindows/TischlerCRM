@@ -404,6 +404,7 @@ export interface LayoutPanel {
   style: PanelStyle;
   fields: PanelField[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
 }
 
 export interface LayoutWidget {
@@ -424,6 +425,7 @@ export interface LayoutSection {
   panels: LayoutPanel[];
   widgets: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
 }
 
 export interface LayoutTab {

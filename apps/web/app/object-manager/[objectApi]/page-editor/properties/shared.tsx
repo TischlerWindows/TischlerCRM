@@ -3,6 +3,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
 import type { LayoutTab, LayoutSection, LayoutPanel, PanelField, LayoutWidget, PageLayout } from '../types';
 import { useEditorStore } from '../editor-store';
 
@@ -161,7 +162,7 @@ export function TabBar({
   );
 }
 
-export function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
+export function VisibilityTab({ selection, availableFields = [] }: { selection: ResolvedSelection; availableFields?: import('@/lib/schema').FieldDef[] }) {
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const updateSection = useEditorStore((s) => s.updateSection);
   const updateField = useEditorStore((s) => s.updateField);
@@ -186,6 +187,31 @@ export function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
     } else if (selection.kind === 'region') {
       updateSection(selection.region.id, { hidden: hide });
     }
+  };
+
+  // visibleIf conditions for regions and panels
+  const visibleIfConditions: import('@/lib/schema').ConditionExpr[] =
+    selection.kind === 'region'
+      ? (selection.region as any).visibleIf ?? []
+      : selection.kind === 'panel'
+      ? (selection.panel as any).visibleIf ?? []
+      : [];
+
+  const handleSaveConditions = (conditions: import('@/lib/schema').ConditionExpr[]) => {
+    if (selection.kind === 'region') {
+      updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+    } else if (selection.kind === 'panel') {
+      updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+    }
+  };
+
+  // Build a fake FieldDef so we can reuse FieldVisibilityRuleEditor
+  const fakeField: import('@/lib/schema').FieldDef = {
+    id: 'visibility-conditions',
+    apiName: '__visibility__',
+    label: 'Visibility conditions',
+    type: 'Text',
+    visibleIf: visibleIfConditions,
   };
 
   return (
@@ -216,37 +242,22 @@ export function VisibilityTab({ selection }: { selection: ResolvedSelection }) {
         </div>
       </div>
 
-      <div className="border-t border-gray-100 pt-3">
-        <div className="text-xs text-gray-500 mb-2">
-          For conditional show/hide based on record values, use Formatting Rules.
+      {(selection.kind === 'region' || selection.kind === 'panel') && (
+        <div className="border-t border-gray-100 pt-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+            Show only when
+          </div>
+          <div className="text-[11px] text-gray-500 mb-2">
+            When conditions are set, this {selection.kind === 'region' ? 'section' : 'panel'} is hidden by default and only shown when <strong>all</strong> conditions are met.
+          </div>
+          <FieldVisibilityRuleEditor
+            field={fakeField}
+            availableFields={availableFields}
+            onSave={handleSaveConditions}
+            onCancel={() => {}}
+          />
         </div>
-        <button
-          type="button"
-          className="w-full rounded-md border border-dashed border-gray-300 py-1.5 text-xs text-gray-600 hover:bg-gray-50"
-          onClick={() => {
-            window.dispatchEvent(
-              new CustomEvent('open-formatting-rules', {
-                detail: {
-                  targetFilter: {
-                    type: selection.kind === 'field' ? 'field' : selection.kind,
-                    id:
-                      selection.kind === 'field'
-                        ? selection.field.fieldApiName
-                        : selection.kind === 'panel'
-                        ? selection.panel.id
-                        : selection.kind === 'region'
-                        ? selection.region.id
-                        : '',
-                    panelId: selection.kind === 'field' ? selection.panel.id : undefined,
-                  },
-                },
-              })
-            );
-          }}
-        >
-          + Add condition rule
-        </button>
-      </div>
+      )}
     </div>
   );
 }

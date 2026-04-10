@@ -161,6 +161,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
   const visibleRegions = regions.filter((region) => {
     if (region.hidden) return false;
+    if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData)) return false;
     const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
     return !regionFx?.hidden;
   });
@@ -196,6 +197,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
         {/* Panels */}
         {sortedPanels.map((panel: any) => {
           if (panel.hidden) return null;
+          if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
           const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
 
