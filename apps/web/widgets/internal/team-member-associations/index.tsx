@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Network, Edit2, Trash2, Check, X } from 'lucide-react'
+import { Network, Edit2, Trash2, Check, X, Home, CornerDownRight } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 
@@ -10,36 +10,52 @@ import { apiClient } from '@/lib/api-client'
 interface TeamMemberRecord {
   id: string
   data: Record<string, unknown>
-  createdAt?: string
-  updatedAt?: string
 }
 
-interface ResolvedAssociation {
-  /** The TeamMember junction record ID */
+interface AssociationRow {
   memberId: string
-  /** Object type of the parent record */
   objectApiName: string
-  /** ID of the parent record */
   parentRecordId: string
-  /** Resolved display name of the parent record */
   parentRecordName: string
   role: string
   isPrimary: boolean
   isContractHolder: boolean
 }
 
+interface PropertyGroup {
+  propertyId: string
+  propertyName: string
+  /** TeamMember record directly on this Property (if any) */
+  direct: AssociationRow | null
+  /** TeamMember records on child objects (Opp/Project/etc.) under this Property */
+  children: AssociationRow[]
+}
+
 // ── Constants ──────────────────────────────────────────────────────────
 
 const SUPPORTED_OBJECTS = ['Contact', 'Account']
 
-/** Maps object API name → TeamMember lookup field name */
-const PARENT_FIELDS: Array<{ objectApiName: string; fieldName: string; label: string }> = [
-  { objectApiName: 'Property',     fieldName: 'property',     label: 'Property' },
+const CHILD_FIELD_MAP: Array<{ objectApiName: string; fieldName: string; label: string }> = [
   { objectApiName: 'Opportunity',  fieldName: 'opportunity',  label: 'Opportunity' },
   { objectApiName: 'Project',      fieldName: 'project',      label: 'Project' },
   { objectApiName: 'WorkOrder',    fieldName: 'workOrder',    label: 'Work Order' },
   { objectApiName: 'Installation', fieldName: 'installation', label: 'Installation' },
 ]
+
+const OBJECT_LABELS: Record<string, string> = {
+  Property:     'Property',
+  Opportunity:  'Opportunity',
+  Project:      'Project',
+  WorkOrder:    'Work Order',
+  Installation: 'Installation',
+}
+
+const BADGE_COLORS: Record<string, string> = {
+  Opportunity:  'bg-blue-100 text-blue-700',
+  Project:      'bg-teal-100 text-teal-700',
+  WorkOrder:    'bg-amber-100 text-amber-700',
+  Installation: 'bg-orange-100 text-orange-700',
+}
 
 const ROLE_PICKLIST = [
   'Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer',
@@ -47,17 +63,17 @@ const ROLE_PICKLIST = [
 ]
 
 const DEDICATED_ROUTES: Record<string, string> = {
-  Property: '/properties',
-  Account: '/accounts',
-  Contact: '/contacts',
-  Lead: '/leads',
-  Opportunity: '/opportunities',
-  Project: '/projects',
-  Product: '/products',
+  Property:     '/properties',
+  Account:      '/accounts',
+  Contact:      '/contacts',
+  Lead:         '/leads',
+  Opportunity:  '/opportunities',
+  Project:      '/projects',
+  Product:      '/products',
   Installation: '/installations',
-  Quote: '/quotes',
-  Service: '/service',
-  WorkOrder: '/work-orders',
+  Quote:        '/quotes',
+  Service:      '/service',
+  WorkOrder:    '/work-orders',
 }
 
 function recordUrl(objectApiName: string, recordId: string) {
@@ -65,30 +81,38 @@ function recordUrl(objectApiName: string, recordId: string) {
   return prefix ? `${prefix}/${recordId}` : `/objects/${objectApiName}/${recordId}`
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// ── Generic field helpers ──────────────────────────────────────────────
 
-function getField(rec: TeamMemberRecord, field: string): unknown {
-  const d = rec.data ?? {}
+/** Extract a field from any record shape (plain or with .data blob), tolerating prefixed keys */
+function getField(raw: Record<string, unknown>, field: string): unknown {
+  const d = (raw.data && typeof raw.data === 'object')
+    ? raw.data as Record<string, unknown>
+    : raw
   if (d[field] !== undefined) return d[field]
   for (const key of Object.keys(d)) {
-    const stripped = key.replace(/^[A-Za-z]+__/, '')
-    if (stripped === field) return d[key]
+    if (key.replace(/^[A-Za-z]+__/, '') === field) return d[key]
   }
   return undefined
 }
 
-function getStr(rec: TeamMemberRecord, field: string): string {
-  const v = getField(rec, field)
-  return v !== null && v !== undefined ? String(v) : ''
-}
-
-function getLookupId(rec: TeamMemberRecord, field: string): string {
-  const v = getField(rec, field)
+function getLookupId(raw: Record<string, unknown>, field: string): string {
+  const v = getField(raw, field)
   if (!v) return ''
   if (typeof v === 'object' && v !== null && 'id' in v) return String((v as { id: unknown }).id)
   return String(v)
 }
 
+function getStr(raw: Record<string, unknown>, field: string): string {
+  const v = getField(raw, field)
+  return v != null ? String(v) : ''
+}
+
+function getBool(raw: Record<string, unknown>, field: string): boolean {
+  const v = getField(raw, field)
+  return v === true || v === 'true'
+}
+
+/** Best-effort display name from any record shape */
 function getRecordName(raw: Record<string, unknown>): string {
   const d = (raw.data && typeof raw.data === 'object')
     ? raw.data as Record<string, unknown>
@@ -99,7 +123,7 @@ function getRecordName(raw: Record<string, unknown>): string {
       const val = d[key]
       if (val && String(val).trim()) {
         const prefix = key.replace(/__firstName$/, '')
-        const lastName = d[`${prefix}__lastName`] || d.lastName
+        const lastName = d[`${prefix}__lastName`] ?? d.lastName
         if (lastName) return `${String(val)} ${String(lastName)}`
         return String(val)
       }
@@ -110,19 +134,15 @@ function getRecordName(raw: Record<string, unknown>): string {
     const lower = key.toLowerCase()
     if (
       (lower.endsWith('name') || lower.endsWith('__name')) &&
-      !lower.includes('firstname') &&
-      !lower.includes('lastname')
+      !lower.includes('firstname') && !lower.includes('lastname')
     ) {
       const val = d[key]
       if (val && typeof val === 'string' && val.trim()) return val
     }
   }
 
-  if (d.firstName && d.lastName) return `${String(d.firstName)} ${String(d.lastName)}`
   if (d.name && typeof d.name === 'string' && d.name.trim()) return d.name
   if (d.title && typeof d.title === 'string' && d.title.trim()) return d.title as string
-  if (d.label && typeof d.label === 'string' && (d.label as string).trim()) return d.label as string
-
   return 'Unnamed'
 }
 
@@ -135,33 +155,318 @@ function Skeleton() {
         <div className="h-4 bg-gray-100 rounded w-1/3" />
         <div className="h-4 bg-gray-100 rounded w-12 ml-auto" />
       </div>
-      {[1, 2, 3].map(i => (
-        <div key={i} className="px-4 py-3 border-b border-gray-50 flex gap-4">
-          <div className="h-3 bg-gray-100 rounded w-1/3" />
-          <div className="h-3 bg-gray-100 rounded w-1/5" />
-          <div className="h-3 bg-gray-100 rounded w-1/4" />
+      <div className="p-3 space-y-3">
+        {[1, 2].map(i => (
+          <div key={i} className="rounded-lg border border-gray-100 p-3 space-y-2">
+            <div className="h-3 bg-gray-100 rounded w-1/2" />
+            <div className="h-2 bg-gray-100 rounded w-2/3 ml-5" />
+            <div className="h-2 bg-gray-100 rounded w-1/2 ml-5" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Object type badge ──────────────────────────────────────────────────
+
+function ObjectBadge({ objectApiName }: { objectApiName: string }) {
+  const cls = BADGE_COLORS[objectApiName] ?? 'bg-gray-100 text-gray-600'
+  return (
+    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
+      {OBJECT_LABELS[objectApiName] ?? objectApiName}
+    </span>
+  )
+}
+
+// ── Role + flag badges ─────────────────────────────────────────────────
+
+function AssocBadges({ role, isPrimary, isContractHolder }: {
+  role: string
+  isPrimary: boolean
+  isContractHolder: boolean
+}) {
+  return (
+    <div className="flex flex-wrap gap-1 mt-0.5">
+      {role && (
+        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy">
+          {role}
+        </span>
+      )}
+      {isPrimary && (
+        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+          Primary
+        </span>
+      )}
+      {isContractHolder && (
+        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
+          Contract Holder
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── Inline edit form ───────────────────────────────────────────────────
+
+function InlineEditForm({
+  role, isPrimary, isContractHolder, saving,
+  onRole, onPrimary, onContractHolder, onSave, onCancel,
+}: {
+  role: string
+  isPrimary: boolean
+  isContractHolder: boolean
+  saving: boolean
+  onRole: (v: string) => void
+  onPrimary: (v: boolean) => void
+  onContractHolder: (v: boolean) => void
+  onSave: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <select
+        value={role}
+        onChange={e => onRole(e.target.value)}
+        className="w-full rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-brand-dark outline-none focus:border-brand-navy"
+      >
+        <option value="">-- Select Role --</option>
+        {ROLE_PICKLIST.map(r => <option key={r} value={r}>{r}</option>)}
+      </select>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
+          <input type="checkbox" checked={isPrimary} onChange={e => onPrimary(e.target.checked)} className="rounded border-gray-300" />
+          Primary
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
+          <input type="checkbox" checked={isContractHolder} onChange={e => onContractHolder(e.target.checked)} className="rounded border-gray-300" />
+          Contract Holder
+        </label>
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={saving}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-brand-navy text-white text-[10px] font-medium hover:bg-brand-navy/90 disabled:opacity-50"
+        >
+          <Check className="w-3 h-3" />
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center gap-1 px-2 py-1 rounded border border-gray-200 text-[10px] text-brand-gray hover:bg-gray-50"
+        >
+          <X className="w-3 h-3" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Single association row (shared by direct and child rows) ───────────
+
+interface AssocRowProps {
+  assoc: AssociationRow
+  isChild: boolean
+  editingId: string | null
+  editRole: string
+  editPrimary: boolean
+  editContractHolder: boolean
+  saving: boolean
+  onStartEdit: (assoc: AssociationRow) => void
+  onSaveEdit: () => void
+  onCancelEdit: () => void
+  onEditRole: (v: string) => void
+  onEditPrimary: (v: boolean) => void
+  onEditContractHolder: (v: boolean) => void
+  onDelete: (memberId: string) => void
+}
+
+function AssocRow({
+  assoc, isChild,
+  editingId, editRole, editPrimary, editContractHolder, saving,
+  onStartEdit, onSaveEdit, onCancelEdit, onEditRole, onEditPrimary, onEditContractHolder,
+  onDelete,
+}: AssocRowProps) {
+  const isEditing = editingId === assoc.memberId
+
+  return (
+    <div className={`group ${isChild ? 'ml-5 pl-3 border-l-2 border-gray-200' : ''}`}>
+      <div className="flex items-start gap-1.5">
+        {/* connector arrow for child rows */}
+        {isChild && (
+          <CornerDownRight className="w-3 h-3 text-gray-300 shrink-0 mt-0.5" />
+        )}
+
+        <div className="flex-1 min-w-0">
+          {/* Header line: record name link + type badge */}
+          {isChild && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Link
+                href={recordUrl(assoc.objectApiName, assoc.parentRecordId)}
+                className="text-xs font-semibold text-brand-navy hover:underline"
+              >
+                {assoc.parentRecordName}
+              </Link>
+              <ObjectBadge objectApiName={assoc.objectApiName} />
+            </div>
+          )}
+
+          {/* For direct (Property-level) rows show a subtle label */}
+          {!isChild && (
+            <span className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide">
+              Direct association
+            </span>
+          )}
+
+          {/* Edit form or read-only badges */}
+          {isEditing ? (
+            <InlineEditForm
+              role={editRole}
+              isPrimary={editPrimary}
+              isContractHolder={editContractHolder}
+              saving={saving}
+              onRole={onEditRole}
+              onPrimary={onEditPrimary}
+              onContractHolder={onEditContractHolder}
+              onSave={onSaveEdit}
+              onCancel={onCancelEdit}
+            />
+          ) : (
+            <AssocBadges
+              role={assoc.role}
+              isPrimary={assoc.isPrimary}
+              isContractHolder={assoc.isContractHolder}
+            />
+          )}
         </div>
+
+        {/* Hover actions */}
+        {!isEditing && (
+          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => onStartEdit(assoc)}
+              className="p-1 rounded text-gray-400 hover:text-brand-navy hover:bg-gray-100"
+              title="Edit"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(assoc.memberId)}
+              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+              title="Remove"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Property group tile ────────────────────────────────────────────────
+
+type EditHandlers = Pick<AssocRowProps,
+  'editingId' | 'editRole' | 'editPrimary' | 'editContractHolder' | 'saving' |
+  'onStartEdit' | 'onSaveEdit' | 'onCancelEdit' |
+  'onEditRole' | 'onEditPrimary' | 'onEditContractHolder' | 'onDelete'
+>
+
+function PropertyGroupTile({ group, ...edit }: { group: PropertyGroup } & EditHandlers) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm p-3 transition-all space-y-2">
+      {/* Property header */}
+      <div className="flex items-center gap-1.5">
+        <Home className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+        <Link
+          href={recordUrl('Property', group.propertyId)}
+          className="text-xs font-semibold text-brand-dark hover:text-brand-navy hover:underline truncate"
+        >
+          {group.propertyName}
+        </Link>
+      </div>
+
+      {/* Direct property-level association */}
+      {group.direct && (
+        <AssocRow assoc={group.direct} isChild={false} {...edit} />
+      )}
+
+      {/* Child associations (Opp, Project, etc.) */}
+      {group.children.map(child => (
+        <AssocRow key={child.memberId} assoc={child} isChild {...edit} />
       ))}
     </div>
   )
 }
 
-// ── Object Type Badge ──────────────────────────────────────────────────
+// ── Flat tile (child record with no property) ──────────────────────────
 
-const BADGE_COLORS: Record<string, string> = {
-  Property:     'bg-purple-100 text-purple-700',
-  Opportunity:  'bg-blue-100 text-blue-700',
-  Project:      'bg-teal-100 text-teal-700',
-  WorkOrder:    'bg-amber-100 text-amber-700',
-  Installation: 'bg-orange-100 text-orange-700',
-}
+function FlatTile({ assoc, ...edit }: { assoc: AssociationRow } & EditHandlers) {
+  const isEditing = edit.editingId === assoc.memberId
 
-function ObjectBadge({ objectApiName, label }: { objectApiName: string; label: string }) {
-  const cls = BADGE_COLORS[objectApiName] ?? 'bg-gray-100 text-gray-600'
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
-      {label}
-    </span>
+    <div className="rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm p-3 transition-all group">
+      <div className="flex items-start gap-1.5">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Link
+              href={recordUrl(assoc.objectApiName, assoc.parentRecordId)}
+              className="text-xs font-semibold text-brand-navy hover:underline"
+            >
+              {assoc.parentRecordName}
+            </Link>
+            <ObjectBadge objectApiName={assoc.objectApiName} />
+          </div>
+
+          {isEditing ? (
+            <InlineEditForm
+              role={edit.editRole}
+              isPrimary={edit.editPrimary}
+              isContractHolder={edit.editContractHolder}
+              saving={edit.saving}
+              onRole={edit.onEditRole}
+              onPrimary={edit.onEditPrimary}
+              onContractHolder={edit.onEditContractHolder}
+              onSave={edit.onSaveEdit}
+              onCancel={edit.onCancelEdit}
+            />
+          ) : (
+            <AssocBadges
+              role={assoc.role}
+              isPrimary={assoc.isPrimary}
+              isContractHolder={assoc.isContractHolder}
+            />
+          )}
+        </div>
+
+        {!isEditing && (
+          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => edit.onStartEdit(assoc)}
+              className="p-1 rounded text-gray-400 hover:text-brand-navy hover:bg-gray-100"
+              title="Edit"
+            >
+              <Edit2 className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => edit.onDelete(assoc.memberId)}
+              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
+              title="Remove"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -169,17 +474,17 @@ function ObjectBadge({ objectApiName, label }: { objectApiName: string; label: s
 
 export default function TeamMemberAssociationsWidget({ config, record, object }: WidgetProps) {
   const { label } = config as { type: string; label?: string }
-
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
   const isSupported = SUPPORTED_OBJECTS.includes(objectApiName)
 
   // ── State ──
-  const [associations, setAssociations] = useState<ResolvedAssociation[]>([])
+  const [propertyGroups, setPropertyGroups] = useState<PropertyGroup[]>([])
+  const [flatTiles, setFlatTiles] = useState<AssociationRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Inline edit state
+  // Inline-edit state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editRole, setEditRole] = useState('')
   const [editPrimary, setEditPrimary] = useState(false)
@@ -190,17 +495,15 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // ── Data Fetching ──
+  // ── 3-phase data fetch ──
   const fetchAssociations = useCallback(async () => {
     if (!recordId || !isSupported) return
     setLoading(true)
     setError(null)
 
     try {
-      // Determine which lookup field points to this object type
+      // ── Phase 1: Fetch TeamMember records for this contact/account ──
       const linkField = objectApiName === 'Contact' ? 'contact' : 'account'
-
-      // Fetch all TeamMember records linked to this contact/account (try both plain and prefixed)
       const [plain, prefixed] = await Promise.all([
         apiClient.get<TeamMemberRecord[]>(
           `/objects/TeamMember/records?filter[${linkField}]=${encodeURIComponent(recordId)}&limit=200`
@@ -213,77 +516,144 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       // Deduplicate
       const seen = new Set<string>()
       const members: TeamMemberRecord[] = []
-      for (const m of [...(Array.isArray(plain) ? plain : []), ...(Array.isArray(prefixed) ? prefixed : [])]) {
-        if (!seen.has(String(m.id))) {
-          seen.add(String(m.id))
-          members.push(m)
-        }
+      for (const m of [
+        ...(Array.isArray(plain) ? plain : []),
+        ...(Array.isArray(prefixed) ? prefixed : []),
+      ]) {
+        if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
       }
 
-      // Group parent record IDs by object type for batch resolution
-      const parentIdsByType: Record<string, { memberId: string; parentId: string }[]> = {}
+      // ── Phase 2: Resolve child records to find their parent Property ──
+      // Partition: direct-property vs child-type
+      type DirectEntry = { member: TeamMemberRecord; propertyId: string }
+      type ChildEntry  = {
+        member: TeamMemberRecord
+        objectApiName: string
+        fieldName: string
+        childRecordId: string
+      }
+
+      const directEntries: DirectEntry[] = []
+      const childEntries: ChildEntry[] = []
+
       for (const member of members) {
-        for (const { objectApiName: parentType, fieldName } of PARENT_FIELDS) {
-          const parentId = getLookupId(member, fieldName)
-          if (parentId) {
-            if (!parentIdsByType[parentType]) parentIdsByType[parentType] = []
-            parentIdsByType[parentType].push({ memberId: String(member.id), parentId })
+        const raw = member as unknown as Record<string, unknown>
+        const propertyId = getLookupId(raw, 'property')
+        if (propertyId) {
+          directEntries.push({ member, propertyId })
+          continue
+        }
+        for (const { objectApiName: childType, fieldName } of CHILD_FIELD_MAP) {
+          const childId = getLookupId(raw, fieldName)
+          if (childId) {
+            childEntries.push({ member, objectApiName: childType, fieldName, childRecordId: childId })
+            break
           }
         }
       }
 
-      // Batch-resolve record names per object type
-      const namesByType: Record<string, Map<string, string>> = {}
-      await Promise.all(
-        Object.entries(parentIdsByType).map(async ([parentType, entries]) => {
-          const uniqueIds = Array.from(new Set(entries.map(e => e.parentId)))
-          const nameMap = new Map<string, string>()
-          await Promise.allSettled(
-            uniqueIds.map(id =>
-              apiClient
-                .get<Record<string, unknown>>(`/objects/${parentType}/records/${id}`)
-                .then(data => {
-                  const name = getRecordName(data as Record<string, unknown>)
-                  if (name && name !== id && name !== 'Unnamed') nameMap.set(id, name)
-                })
-            )
-          )
-          namesByType[parentType] = nameMap
-        })
+      // Fetch each child record to get its property link and display name
+      const childRecordResults = await Promise.allSettled(
+        childEntries.map(entry =>
+          apiClient
+            .get<Record<string, unknown>>(`/objects/${entry.objectApiName}/records/${entry.childRecordId}`)
+            .then(data => ({ entry, data }))
+            .catch(() => ({ entry, data: null as Record<string, unknown> | null }))
+        )
       )
 
-      // Build resolved associations from member records
-      const resolved: ResolvedAssociation[] = []
-      for (const member of members) {
-        for (const { objectApiName: parentType, fieldName } of PARENT_FIELDS) {
-          const parentId = getLookupId(member, fieldName)
-          if (!parentId) continue
-
-          const nameMap = namesByType[parentType]
-          const resolvedName = nameMap?.get(parentId) ?? parentId
-
-          resolved.push({
-            memberId: String(member.id),
-            objectApiName: parentType,
-            parentRecordId: parentId,
-            parentRecordName: resolvedName,
-            role: getStr(member, 'role'),
-            isPrimary: getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true',
-            isContractHolder: getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true',
-          })
+      // Build map: childRecordId → { propertyId, recordName }
+      const childMeta = new Map<string, { propertyId: string; recordName: string }>()
+      for (const result of childRecordResults) {
+        if (result.status === 'fulfilled' && result.value.data) {
+          const { entry, data } = result.value
+          const propertyId = getLookupId(data, 'property')
+          const recordName = getRecordName(data)
+          childMeta.set(entry.childRecordId, { propertyId, recordName })
         }
       }
 
-      // Sort by object type order then by name
-      const typeOrder = PARENT_FIELDS.map(f => f.objectApiName)
-      resolved.sort((a, b) => {
-        const ai = typeOrder.indexOf(a.objectApiName)
-        const bi = typeOrder.indexOf(b.objectApiName)
-        if (ai !== bi) return ai - bi
-        return a.parentRecordName.localeCompare(b.parentRecordName)
-      })
+      // ── Phase 3: Batch-resolve Property display names ──
+      const propertyIds = new Set<string>()
+      for (const { propertyId } of directEntries) propertyIds.add(propertyId)
+      for (const meta of childMeta.values()) {
+        if (meta.propertyId) propertyIds.add(meta.propertyId)
+      }
 
-      setAssociations(resolved)
+      const propertyNames = new Map<string, string>()
+      await Promise.allSettled(
+        Array.from(propertyIds).map(pid =>
+          apiClient
+            .get<Record<string, unknown>>(`/objects/Property/records/${pid}`)
+            .then(data => {
+              const name = getRecordName(data as Record<string, unknown>)
+              propertyNames.set(pid, name || pid)
+            })
+        )
+      )
+
+      // ── Build PropertyGroup map ──
+      const groupMap = new Map<string, PropertyGroup>()
+
+      const getOrCreate = (propertyId: string): PropertyGroup => {
+        if (!groupMap.has(propertyId)) {
+          groupMap.set(propertyId, {
+            propertyId,
+            propertyName: propertyNames.get(propertyId) ?? propertyId,
+            direct: null,
+            children: [],
+          })
+        }
+        return groupMap.get(propertyId)!
+      }
+
+      // Direct property associations
+      for (const { member, propertyId } of directEntries) {
+        const raw = member as unknown as Record<string, unknown>
+        const group = getOrCreate(propertyId)
+        group.direct = {
+          memberId: String(member.id),
+          objectApiName: 'Property',
+          parentRecordId: propertyId,
+          parentRecordName: propertyNames.get(propertyId) ?? propertyId,
+          role: getStr(raw, 'role'),
+          isPrimary: getBool(raw, 'primaryContact'),
+          isContractHolder: getBool(raw, 'contractHolder'),
+        }
+      }
+
+      // Child associations
+      const newFlatTiles: AssociationRow[] = []
+      for (const entry of childEntries) {
+        const raw = entry.member as unknown as Record<string, unknown>
+        const meta = childMeta.get(entry.childRecordId)
+        const recordName = meta?.recordName ?? entry.childRecordId
+        const propertyId = meta?.propertyId ?? ''
+
+        const row: AssociationRow = {
+          memberId: String(entry.member.id),
+          objectApiName: entry.objectApiName,
+          parentRecordId: entry.childRecordId,
+          parentRecordName: recordName,
+          role: getStr(raw, 'role'),
+          isPrimary: getBool(raw, 'primaryContact'),
+          isContractHolder: getBool(raw, 'contractHolder'),
+        }
+
+        if (propertyId) {
+          getOrCreate(propertyId).children.push(row)
+        } else {
+          newFlatTiles.push(row)
+        }
+      }
+
+      // Sort groups alphabetically by property name
+      const sorted = Array.from(groupMap.values()).sort((a, b) =>
+        a.propertyName.localeCompare(b.propertyName)
+      )
+
+      setPropertyGroups(sorted)
+      setFlatTiles(newFlatTiles)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load associations')
     } finally {
@@ -295,8 +665,8 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     fetchAssociations()
   }, [fetchAssociations])
 
-  // ── Inline edit handlers ──
-  const startEdit = (assoc: ResolvedAssociation) => {
+  // ── Edit handlers ──
+  const startEdit = (assoc: AssociationRow) => {
     setEditingId(assoc.memberId)
     setEditRole(assoc.role)
     setEditPrimary(assoc.isPrimary)
@@ -308,11 +678,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     setSaving(true)
     try {
       await apiClient.put(`/objects/TeamMember/records/${editingId}`, {
-        data: {
-          role: editRole,
-          primaryContact: editPrimary,
-          contractHolder: editContractHolder,
-        },
+        data: { role: editRole, primaryContact: editPrimary, contractHolder: editContractHolder },
       })
       setEditingId(null)
       await fetchAssociations()
@@ -337,12 +703,25 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     }
   }
 
-  // Group label for each parent type
-  const parentFieldLabels = useMemo(() => {
-    const m: Record<string, string> = {}
-    for (const { objectApiName: t, label: l } of PARENT_FIELDS) m[t] = l
-    return m
-  }, [])
+  // ── Shared edit props passed down to every row ──
+  const editHandlers: EditHandlers = {
+    editingId,
+    editRole,
+    editPrimary,
+    editContractHolder,
+    saving,
+    onStartEdit: startEdit,
+    onSaveEdit: saveEdit,
+    onCancelEdit: () => setEditingId(null),
+    onEditRole: setEditRole,
+    onEditPrimary: setEditPrimary,
+    onEditContractHolder: setEditContractHolder,
+    onDelete: setDeleteTarget,
+  }
+
+  const totalCount =
+    propertyGroups.reduce((n, g) => n + (g.direct ? 1 : 0) + g.children.length, 0) +
+    flatTiles.length
 
   // ── Unsupported object ──
   if (!isSupported) {
@@ -353,7 +732,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     )
   }
 
-  if (loading && associations.length === 0) return <Skeleton />
+  if (loading && propertyGroups.length === 0 && flatTiles.length === 0) return <Skeleton />
 
   if (error) {
     return (
@@ -373,170 +752,36 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           <Network className="w-4 h-4 text-brand-gray" />
           <h3 className="text-xs font-semibold text-brand-dark flex-1">{widgetLabel}</h3>
           <span className="text-[11px] text-brand-gray tabular-nums">
-            {associations.length} record{associations.length !== 1 ? 's' : ''}
+            {totalCount} association{totalCount !== 1 ? 's' : ''}
           </span>
         </div>
 
         {/* ── Body ── */}
-        {associations.length === 0 ? (
+        {totalCount === 0 ? (
           <div className="p-8 text-center">
             <Network className="w-8 h-8 text-gray-200 mx-auto mb-2" />
             <p className="text-xs text-brand-gray">No associated records found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  <th className="px-4 py-2 text-left font-semibold text-brand-gray uppercase tracking-wide text-[10px]">
-                    Related To
-                  </th>
-                  <th className="px-4 py-2 text-left font-semibold text-brand-gray uppercase tracking-wide text-[10px]">
-                    Type
-                  </th>
-                  <th className="px-4 py-2 text-left font-semibold text-brand-gray uppercase tracking-wide text-[10px]">
-                    Role
-                  </th>
-                  <th className="px-4 py-2 text-left font-semibold text-brand-gray uppercase tracking-wide text-[10px]">
-                    Flags
-                  </th>
-                  <th className="w-16 px-2 py-2" aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {associations.map(assoc => {
-                  const isEditing = editingId === assoc.memberId
-                  return (
-                    <tr
-                      key={assoc.memberId}
-                      className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors group"
-                    >
-                      {/* Related To */}
-                      <td className="px-4 py-2.5 font-medium">
-                        <Link
-                          href={recordUrl(assoc.objectApiName, assoc.parentRecordId)}
-                          className="text-brand-navy hover:underline"
-                        >
-                          {assoc.parentRecordName}
-                        </Link>
-                      </td>
+          <div className="p-3 space-y-2">
+            {/* Property-grouped tiles */}
+            {propertyGroups.map(group => (
+              <PropertyGroupTile key={group.propertyId} group={group} {...editHandlers} />
+            ))}
 
-                      {/* Type badge */}
-                      <td className="px-4 py-2.5">
-                        <ObjectBadge
-                          objectApiName={assoc.objectApiName}
-                          label={parentFieldLabels[assoc.objectApiName] ?? assoc.objectApiName}
-                        />
-                      </td>
-
-                      {/* Role — editable */}
-                      <td className="px-4 py-2.5 text-brand-dark">
-                        {isEditing ? (
-                          <select
-                            value={editRole}
-                            onChange={e => setEditRole(e.target.value)}
-                            className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-brand-dark outline-none focus:border-brand-navy"
-                          >
-                            <option value="">-- Select --</option>
-                            {ROLE_PICKLIST.map(r => (
-                              <option key={r} value={r}>{r}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          assoc.role || <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-
-                      {/* Flags — editable */}
-                      <td className="px-4 py-2.5">
-                        {isEditing ? (
-                          <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={editPrimary}
-                                onChange={e => setEditPrimary(e.target.checked)}
-                                className="rounded border-gray-300"
-                              />
-                              Primary
-                            </label>
-                            <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={editContractHolder}
-                                onChange={e => setEditContractHolder(e.target.checked)}
-                                className="rounded border-gray-300"
-                              />
-                              Contract Holder
-                            </label>
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-1">
-                            {assoc.isPrimary && (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
-                                Primary
-                              </span>
-                            )}
-                            {assoc.isContractHolder && (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
-                                Contract Holder
-                              </span>
-                            )}
-                            {!assoc.isPrimary && !assoc.isContractHolder && (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-2 py-2">
-                        {isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={saveEdit}
-                              disabled={saving}
-                              className="p-1 rounded text-green-600 hover:bg-green-50 disabled:opacity-50"
-                              title="Save"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingId(null)}
-                              className="p-1 rounded text-gray-400 hover:bg-gray-100"
-                              title="Cancel"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(assoc)}
-                              className="p-1 rounded text-gray-400 hover:text-brand-navy hover:bg-gray-100"
-                              title="Edit"
-                            >
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget(assoc.memberId)}
-                              className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50"
-                              title="Remove"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            {/* Flat tiles (no property) */}
+            {flatTiles.length > 0 && (
+              <>
+                {propertyGroups.length > 0 && (
+                  <p className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide px-1 pt-1">
+                    Other
+                  </p>
+                )}
+                {flatTiles.map(assoc => (
+                  <FlatTile key={assoc.memberId} assoc={assoc} {...editHandlers} />
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -549,7 +794,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
             <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
               <p className="text-sm font-semibold text-brand-dark">Remove association?</p>
               <p className="text-xs text-brand-gray">
-                This will remove this team member assignment from the related record. The record itself is not affected.
+                This removes the team member assignment from the related record. The record itself is not affected.
               </p>
               <div className="flex gap-2 justify-end">
                 <button
@@ -565,7 +810,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
                   onClick={() => handleDelete(deleteTarget)}
                   className="px-3 py-1.5 rounded-lg bg-red-600 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
                 >
-                  {deletingId === deleteTarget ? 'Removing...' : 'Remove'}
+                  {deletingId === deleteTarget ? 'Removing…' : 'Remove'}
                 </button>
               </div>
             </div>
