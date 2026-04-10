@@ -267,6 +267,10 @@ export interface TeamMembersRollupConfig {
   rollupFromProperty?: boolean;
   label?: string;
   supportedObjects?: string[];
+  displayFields?: {
+    Contact?: string[];
+    Account?: string[];
+  };
 }
 
 export interface TeamMemberAssociationsConfig {

@@ -5,6 +5,7 @@ import { Network, Edit2, Trash2, Check, X, Home, CornerDownRight } from 'lucide-
 import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
+import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -88,14 +89,7 @@ function recordUrl(objectApiName: string, recordId: string) {
 
 /** Extract a field from any record shape (plain or with .data blob), tolerating prefixed keys */
 function getField(raw: Record<string, unknown>, field: string): unknown {
-  const d = (raw.data && typeof raw.data === 'object')
-    ? raw.data as Record<string, unknown>
-    : raw
-  if (d[field] !== undefined) return d[field]
-  for (const key of Object.keys(d)) {
-    if (key.replace(/^[A-Za-z]+__/, '') === field) return d[key]
-  }
-  return undefined
+  return getFieldValue(raw, field)
 }
 
 function getLookupId(raw: Record<string, unknown>, field: string): string {
@@ -203,25 +197,6 @@ function getRecordName(raw: Record<string, unknown>): string {
   }
 
   return 'Unnamed'
-}
-
-// ── Field display helper ────────────────────────────────────────────────
-
-function FieldDisplay({ data, fields }: { data: Record<string, unknown>; fields: string[] }) {
-  if (!fields.length) return null
-  const items = fields
-    .map(f => ({ field: f, value: getField(data, f) }))
-    .filter(({ value }) => value != null && String(value).trim() !== '')
-  if (!items.length) return null
-  return (
-    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-      {items.map(({ field, value }) => (
-        <span key={field} className="text-[10px] text-brand-gray">
-          {String(value)}
-        </span>
-      ))}
-    </div>
-  )
 }
 
 // ── Skeleton ───────────────────────────────────────────────────────────

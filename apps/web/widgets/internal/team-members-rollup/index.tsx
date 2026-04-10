@@ -7,7 +7,9 @@ import {
   Phone, Mail,
 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
+import type { TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
+import { FieldDisplay } from '../shared/FieldDisplay'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -30,6 +32,7 @@ interface ViaSource {
 interface MergedContact {
   contactId: string
   contactName: string
+  contactData: Record<string, unknown>
   accountId?: string
   accountName?: string
   roles: string[]
@@ -45,6 +48,7 @@ interface MergedContact {
 interface MergedAccount {
   accountId: string
   accountName: string
+  accountData: Record<string, unknown>
   roles: string[]
   viaSources: ViaSource[]
   isPrimary: boolean
@@ -116,11 +120,16 @@ function recordUrl(objectApiName: string, recordId: string) {
 // Survives component unmount/remount (collapse/expand) within the same
 // SPA session.  Cleared automatically on full page reload.
 
+/** ID → full record data cache */
+type RecordMap = Map<string, Record<string, unknown>>
+
 interface TeamMembersCacheEntry {
   rawMembers: TeamMemberRecord[]
   contactNames: NameMap
   accountNames: NameMap
   parentNames: NameMap
+  contactRecords: RecordMap
+  accountRecords: RecordMap
   timestamp: number
 }
 
@@ -209,12 +218,11 @@ function getRecordName(raw: Record<string, unknown>): string {
   return 'Unnamed'
 }
 
-/** Batch-resolve a set of record IDs into display names */
-async function resolveNames(objectApiName: string, ids: string[]): Promise<NameMap> {
-  const map: NameMap = new Map()
-  if (ids.length === 0) return map
-  // Fetch records individually (the filter API doesn't support IN queries)
-  // Use Promise.allSettled to tolerate failures
+/** Batch-resolve a set of record IDs into display names and full record data */
+async function resolveRecords(objectApiName: string, ids: string[]): Promise<{ names: NameMap; records: RecordMap }> {
+  const names: NameMap = new Map()
+  const records: RecordMap = new Map()
+  if (ids.length === 0) return { names, records }
   const results = await Promise.allSettled(
     ids.map(id =>
       apiClient.get<Record<string, unknown>>(`/objects/${objectApiName}/records/${id}`)
@@ -223,14 +231,21 @@ async function resolveNames(objectApiName: string, ids: string[]): Promise<NameM
   for (let i = 0; i < ids.length; i++) {
     const r = results[i]
     if (r.status === 'fulfilled' && r.value) {
-      const name = getRecordName(r.value as Record<string, unknown>)
-      // Only store if we got a real name, not just the ID echoed back
+      const data = r.value as Record<string, unknown>
+      const name = getRecordName(data)
       if (name && name !== ids[i] && name !== 'Unnamed') {
-        map.set(ids[i], name)
+        names.set(ids[i], name)
       }
+      records.set(ids[i], data)
     }
   }
-  return map
+  return { names, records }
+}
+
+/** Batch-resolve a set of record IDs into display names only (for parent/via labels) */
+async function resolveNames(objectApiName: string, ids: string[]): Promise<NameMap> {
+  const { names } = await resolveRecords(objectApiName, ids)
+  return names
 }
 
 /** Fetch records of `objectType` linked to `parentId` via any field variant
@@ -303,7 +318,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const {
     rollupFromProperty = false,
     label,
-  } = config as { type: string; rollupFromProperty?: boolean; label?: string }
+    displayFields: configDisplayFields,
+  } = config as TeamMembersRollupConfig
+
+  const contactDisplayFields = configDisplayFields?.Contact ?? []
+  const accountDisplayFields = configDisplayFields?.Account ?? []
 
   const objectApiName = object.apiName
   const recordId = record?.id ? String(record.id) : null
@@ -318,6 +337,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [accountNames, setAccountNames] = useState<NameMap>(_cached?.accountNames ?? new Map())
   /** Maps parentRecordId → display name for "via" labels */
   const [parentNames, setParentNames] = useState<NameMap>(_cached?.parentNames ?? new Map())
+  const [contactRecords, setContactRecords] = useState<RecordMap>(_cached?.contactRecords ?? new Map())
+  const [accountRecords, setAccountRecords] = useState<RecordMap>(_cached?.accountRecords ?? new Map())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -434,15 +455,20 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       }
 
-      // Resolve all names in parallel
+      // Resolve all names in parallel; contacts/accounts also fetch full records
       const parentResolvers = Object.entries(parentIdsByType).map(
         ([objType, ids]) => resolveNames(objType, Array.from(ids))
       )
-      const [cNames, aNames, ...parentResults] = await Promise.all([
-        resolveNames('Contact', Array.from(contactIds)),
-        resolveNames('Account', Array.from(accountIds)),
+      const [cResolved, aResolved, ...parentResults] = await Promise.all([
+        resolveRecords('Contact', Array.from(contactIds)),
+        resolveRecords('Account', Array.from(accountIds)),
         ...parentResolvers,
       ])
+
+      const cNames = cResolved.names
+      const aNames = aResolved.names
+      const cRecords = cResolved.records
+      const aRecords = aResolved.records
 
       // Merge all parent names into one map
       const pNames: NameMap = new Map()
@@ -454,6 +480,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       setContactNames(cNames)
       setAccountNames(aNames)
       setParentNames(pNames)
+      setContactRecords(cRecords)
+      setAccountRecords(aRecords)
 
       // Persist to module-level cache for instant restore on remount
       const ck = cacheKey(objectApiName, recordId, !!rollupFromProperty)
@@ -463,6 +491,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         contactNames: cNames,
         accountNames: aNames,
         parentNames: pNames,
+        contactRecords: cRecords,
+        accountRecords: aRecords,
         timestamp: Date.now(),
       })
       evictOldestIfNeeded()
@@ -546,6 +576,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           contactMap.set(contactId, {
             contactId,
             contactName: contactName || 'Unknown Contact',
+            contactData: contactRecords.get(contactId) ?? {},
             accountId: accountId || undefined,
             accountName: accountName || undefined,
             roles: role ? [role] : [],
@@ -579,6 +610,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           accountMap.set(accountId, {
             accountId,
             accountName: accountName || 'Unknown Account',
+            accountData: accountRecords.get(accountId) ?? {},
             roles: role ? [role] : [],
             viaSources,
             isPrimary,
@@ -595,7 +627,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [rawMembers, currentField, recordId, contactNames, accountNames, parentNames])
+  }, [rawMembers, currentField, recordId, contactNames, accountNames, parentNames, contactRecords, accountRecords])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
@@ -785,6 +817,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                     <ContactTile
                       key={c.contactId}
                       contact={c}
+                      displayFields={contactDisplayFields}
                       editingId={editingId}
                       editRole={editRole}
                       editPrimary={editPrimary}
@@ -817,6 +850,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                     <AccountTile
                       key={a.accountId}
                       account={a}
+                      displayFields={accountDisplayFields}
                       editingId={editingId}
                       editRole={editRole}
                       editPrimary={editPrimary}
@@ -905,6 +939,7 @@ function ModalOverlay({ onClose, children }: { onClose: () => void; children: Re
 // ── Contact Tile ───────────────────────────────────────────────────────
 
 interface TileEditProps {
+  displayFields: string[]
   editingId: string | null
   editRole: string
   editPrimary: boolean
@@ -921,6 +956,7 @@ interface TileEditProps {
 
 function ContactTile({
   contact,
+  displayFields,
   editingId,
   editRole,
   editPrimary,
@@ -954,6 +990,9 @@ function ContactTile({
             >
               {contact.accountName}
             </Link>
+          )}
+          {displayFields.length > 0 && (
+            <FieldDisplay data={contact.contactData} fields={displayFields} />
           )}
         </div>
         {canEdit && !isEditing && (
@@ -1076,6 +1115,7 @@ function ContactTile({
 
 function AccountTile({
   account,
+  displayFields,
   editingId,
   editRole,
   editPrimary,
@@ -1102,6 +1142,9 @@ function AccountTile({
           >
             {account.accountName}
           </Link>
+          {displayFields.length > 0 && (
+            <FieldDisplay data={account.accountData} fields={displayFields} />
+          )}
         </div>
         {canEdit && !isEditing && (
           <div className="flex items-center gap-1 shrink-0">
