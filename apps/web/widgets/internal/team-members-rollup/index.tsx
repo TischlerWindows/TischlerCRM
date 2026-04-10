@@ -57,12 +57,33 @@ interface MergedAccount {
 
 const SUPPORTED_OBJECTS = ['Property', 'Opportunity', 'Project', 'WorkOrder', 'Installation']
 
+/** Plain field name used in TeamMember data to reference the parent */
 const OBJECT_TO_FIELD: Record<string, string> = {
   Property: 'property',
   Opportunity: 'opportunity',
   Project: 'project',
   WorkOrder: 'workOrder',
   Installation: 'installation',
+}
+
+/** Auto-generated lookup field name used by ensureRelationshipFields
+ *  (e.g. PropertyId, OpportunityId) — this is the field actually stored
+ *  in the data column when records are linked through the UI. */
+const OBJECT_TO_LOOKUP_FIELD: Record<string, string> = {
+  Property: 'PropertyId',
+  Opportunity: 'OpportunityId',
+  Project: 'ProjectId',
+  WorkOrder: 'WorkOrderId',
+  Installation: 'InstallationId',
+}
+
+/** Reverse mapping: plain field name → auto-generated lookup field name */
+const FIELD_TO_LOOKUP: Record<string, string> = {
+  property: 'PropertyId',
+  opportunity: 'OpportunityId',
+  project: 'ProjectId',
+  workOrder: 'WorkOrderId',
+  installation: 'InstallationId',
 }
 
 const CHILD_OBJECT_TYPES = ['Opportunity', 'Project', 'WorkOrder', 'Installation']
@@ -101,6 +122,9 @@ function getField(rec: TeamMemberRecord, field: string): unknown {
     const stripped = key.replace(/^[A-Za-z]+__/, '')
     if (stripped === field) return d[key]
   }
+  // Try auto-generated lookup field name (e.g. property → PropertyId)
+  const lookupField = FIELD_TO_LOOKUP[field]
+  if (lookupField && d[lookupField] !== undefined) return d[lookupField]
   return undefined
 }
 
@@ -184,6 +208,48 @@ async function resolveNames(objectApiName: string, ids: string[]): Promise<NameM
   return map
 }
 
+/** Fetch records of `objectType` linked to `parentId` via any field variant
+ *  for `parentObjectType`.  Tries plain, prefixed, and auto-lookup names,
+ *  deduplicates by ID. */
+async function fetchLinkedRecords<T extends { id?: unknown }>(
+  objectType: string,
+  parentObjectType: string,
+  parentId: string,
+): Promise<T[]> {
+  const plain = OBJECT_TO_FIELD[parentObjectType]
+  const lookupField = OBJECT_TO_LOOKUP_FIELD[parentObjectType]
+  const queries: Promise<T[]>[] = []
+  if (plain) {
+    queries.push(
+      apiClient.get<T[]>(
+        `/objects/${objectType}/records?filter[${plain}]=${encodeURIComponent(parentId)}&limit=200`
+      ).catch(() => [] as T[])
+    )
+    queries.push(
+      apiClient.get<T[]>(
+        `/objects/${objectType}/records?filter[${objectType}__${plain}]=${encodeURIComponent(parentId)}&limit=200`
+      ).catch(() => [] as T[])
+    )
+  }
+  if (lookupField) {
+    queries.push(
+      apiClient.get<T[]>(
+        `/objects/${objectType}/records?filter[${lookupField}]=${encodeURIComponent(parentId)}&limit=200`
+      ).catch(() => [] as T[])
+    )
+  }
+  const results = await Promise.all(queries)
+  const seen = new Set<string>()
+  const items: T[] = []
+  for (const batch of results) {
+    for (const item of (Array.isArray(batch) ? batch : [])) {
+      const id = String(item.id)
+      if (!seen.has(id)) { seen.add(id); items.push(item) }
+    }
+  }
+  return items
+}
+
 // ── Skeleton ───────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -250,22 +316,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       let members: TeamMemberRecord[] = []
 
       if (!rollupFromProperty) {
-        // Self-only mode — try both plain and prefixed field names
-        const fieldName = OBJECT_TO_FIELD[objectApiName]
-        if (!fieldName) throw new Error(`No lookup field for ${objectApiName}`)
-        const [plain, prefixed] = await Promise.all([
-          apiClient.get<TeamMemberRecord[]>(
-            `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-          ).catch(() => [] as TeamMemberRecord[]),
-          apiClient.get<TeamMemberRecord[]>(
-            `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-          ).catch(() => [] as TeamMemberRecord[]),
-        ])
-        const seen = new Set<string>()
-        members = []
-        for (const m of [...(Array.isArray(plain) ? plain : []), ...(Array.isArray(prefixed) ? prefixed : [])]) {
-          if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
-        }
+        // Self-only mode — try plain, prefixed, and auto-lookup field names
+        members = await fetchLinkedRecords<TeamMemberRecord>('TeamMember', objectApiName, recordId)
       } else {
         // Rollup mode: gather from Property tree
         let propertyId = ''
@@ -278,9 +330,12 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             : record as Record<string, unknown>
           const propField =
             recData.property ||
+            recData.PropertyId ||
+            recData.propertyId ||
+            recData.property_id ||
             recData[`${objectApiName}__property`] ||
-            // Also check flattened data at the top level
-            (record as Record<string, unknown>).property
+            (record as Record<string, unknown>).property ||
+            (record as Record<string, unknown>).PropertyId
           if (propField && typeof propField === 'object' && propField !== null && 'id' in propField) {
             propertyId = String((propField as { id: unknown }).id)
           } else if (propField) {
@@ -289,108 +344,44 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
 
         if (!propertyId) {
-          // No property linked, fall back to self-only (try both field name variants)
-          const fieldName = OBJECT_TO_FIELD[objectApiName]
-          if (!fieldName) throw new Error(`No lookup field for ${objectApiName}`)
-          const [p, px] = await Promise.all([
-            apiClient.get<TeamMemberRecord[]>(
-              `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-            ).catch(() => [] as TeamMemberRecord[]),
-            apiClient.get<TeamMemberRecord[]>(
-              `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-            ).catch(() => [] as TeamMemberRecord[]),
-          ])
-          const seen = new Set<string>()
-          members = []
-          for (const m of [...(Array.isArray(p) ? p : []), ...(Array.isArray(px) ? px : [])]) {
-            if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
-          }
+          // No property linked, fall back to self-only
+          members = await fetchLinkedRecords<TeamMemberRecord>('TeamMember', objectApiName, recordId)
         } else {
+          // Phase 1: fetch child record IDs in parallel (tries all field variants)
+          const childRecordsByType: Record<string, Record<string, unknown>[]> = {}
+          await Promise.all(CHILD_OBJECT_TYPES.map(async type => {
+            childRecordsByType[type] = await fetchLinkedRecords<Record<string, unknown>>(type, 'Property', propertyId)
+          }))
 
-        // Phase 1: fetch child record IDs in parallel
-        // Try both plain `property` and prefixed `Type__property` filters since
-        // the data column may store either form depending on how the record was
-        // created.
-        const childResults = await Promise.allSettled(
-          CHILD_OBJECT_TYPES.flatMap(type => [
-            apiClient.get<Record<string, unknown>[]>(
-              `/objects/${type}/records?filter[property]=${encodeURIComponent(propertyId)}&limit=200`
-            ).catch(() => [] as Record<string, unknown>[]),
-            apiClient.get<Record<string, unknown>[]>(
-              `/objects/${type}/records?filter[${type}__property]=${encodeURIComponent(propertyId)}&limit=200`
-            ).catch(() => [] as Record<string, unknown>[]),
+          // Phase 2: fetch team members in parallel
+          const propertyMembersPromise = fetchLinkedRecords<TeamMemberRecord>('TeamMember', 'Property', propertyId)
+
+          const childMemberPromises: Promise<TeamMemberRecord[]>[] = []
+          for (const type of CHILD_OBJECT_TYPES) {
+            for (const rec of (childRecordsByType[type] ?? [])) {
+              childMemberPromises.push(
+                fetchLinkedRecords<TeamMemberRecord>('TeamMember', type, String(rec.id))
+              )
+            }
+          }
+
+          const [propertyMembers, ...childMemberBatches] = await Promise.all([
+            propertyMembersPromise,
+            ...childMemberPromises,
           ])
-        )
 
-        const childRecordsByType: Record<string, Record<string, unknown>[]> = {}
-        CHILD_OBJECT_TYPES.forEach((type, i) => {
-          const plainResult = childResults[i * 2]
-          const prefixedResult = childResults[i * 2 + 1]
-          const plain = plainResult.status === 'fulfilled' && Array.isArray(plainResult.value) ? plainResult.value : []
-          const prefixed = prefixedResult.status === 'fulfilled' && Array.isArray(prefixedResult.value) ? prefixedResult.value : []
-          // Merge and deduplicate
-          const seen = new Set<string>()
-          const merged: Record<string, unknown>[] = []
-          for (const rec of [...plain, ...prefixed]) {
-            const rid = String(rec.id)
-            if (!seen.has(rid)) { seen.add(rid); merged.push(rec) }
+          // Deduplicate all members
+          const seenIds = new Set<string>()
+          members = []
+          for (const m of propertyMembers) {
+            if (!seenIds.has(String(m.id))) { seenIds.add(String(m.id)); members.push(m) }
           }
-          childRecordsByType[type] = merged
-        })
-
-        // Phase 2: fetch team members in parallel
-        const memberFetches: Promise<TeamMemberRecord[]>[] = []
-
-        // Property's own team members (try both plain and prefixed)
-        memberFetches.push(
-          apiClient.get<TeamMemberRecord[]>(
-            `/objects/TeamMember/records?filter[property]=${encodeURIComponent(propertyId)}&limit=200`
-          ).catch(() => [] as TeamMemberRecord[])
-        )
-        memberFetches.push(
-          apiClient.get<TeamMemberRecord[]>(
-            `/objects/TeamMember/records?filter[TeamMember__property]=${encodeURIComponent(propertyId)}&limit=200`
-          ).catch(() => [] as TeamMemberRecord[])
-        )
-
-        // Child record team members (try both plain and prefixed)
-        for (const type of CHILD_OBJECT_TYPES) {
-          const records = childRecordsByType[type]
-          const fieldName = OBJECT_TO_FIELD[type]
-          if (!fieldName) continue
-          for (const rec of records) {
-            const childId = String(rec.id)
-            memberFetches.push(
-              apiClient.get<TeamMemberRecord[]>(
-                `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(childId)}&limit=200`
-              ).catch(() => [] as TeamMemberRecord[])
-            )
-            memberFetches.push(
-              apiClient.get<TeamMemberRecord[]>(
-                `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(childId)}&limit=200`
-              ).catch(() => [] as TeamMemberRecord[])
-            )
-          }
-        }
-
-        const allResults = await Promise.allSettled(memberFetches)
-        const allMembers: TeamMemberRecord[] = []
-        const seenIds = new Set<string>()
-
-        for (const result of allResults) {
-          if (result.status === 'fulfilled') {
-            const arr = Array.isArray(result.value) ? result.value : []
-            for (const m of arr) {
-              if (!seenIds.has(String(m.id))) {
-                seenIds.add(String(m.id))
-                allMembers.push(m)
-              }
+          for (const batch of childMemberBatches) {
+            for (const m of batch) {
+              if (!seenIds.has(String(m.id))) { seenIds.add(String(m.id)); members.push(m) }
             }
           }
         }
-
-        members = allMembers
-        } // end else (has propertyId)
       }
 
       // ── Resolve contact/account/parent names ──
