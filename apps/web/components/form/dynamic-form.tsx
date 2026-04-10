@@ -326,6 +326,10 @@ export default function DynamicForm({
     apiName: string,
     pageField?: PageField,
   ): FieldDef | undefined => {
+    // Always look up the canonical schema field — it's the source of
+    // truth for picklistValues, picklistColors, picklistDependencies, etc.
+    const schemaField = object.fields.find((f) => f.apiName === apiName);
+
     if (pageField && pageField.type && pageField.label) {
       const {
         column,
@@ -340,11 +344,15 @@ export default function DynamicForm({
         ...fieldProps,
         apiName,
         type: normalizeFieldType(fieldProps.type!),
+        // Prefer canonical schema values for picklist data — layout copies
+        // can become stale or corrupted.
+        ...(schemaField?.picklistValues ? { picklistValues: schemaField.picklistValues } : {}),
+        ...(schemaField?.picklistColors ? { picklistColors: schemaField.picklistColors } : {}),
+        ...(schemaField?.picklistDependencies ? { picklistDependencies: schemaField.picklistDependencies } : {}),
       } as FieldDef;
     }
-    const raw = object.fields.find((f) => f.apiName === apiName);
-    if (!raw) return undefined;
-    return { ...raw, type: normalizeFieldType(raw.type) };
+    if (!schemaField) return undefined;
+    return { ...schemaField, type: normalizeFieldType(schemaField.type) };
   };
 
   // ── handleFieldChange ─────────────────────────────────────────
