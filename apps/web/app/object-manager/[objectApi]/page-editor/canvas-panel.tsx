@@ -16,12 +16,14 @@ interface CanvasPanelProps {
   regionId: string;
 }
 
+const EMPTY_RULES: never[] = [];
+
 export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const removePanel = useEditorStore((s) => s.removePanel);
-  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? []);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
 
   const hasVisibilityRule = useMemo(
     () =>

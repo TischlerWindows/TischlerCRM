@@ -33,11 +33,13 @@ function toBehaviorLabel(behavior: PanelField['behavior']): string {
   }
 }
 
+const EMPTY_RULES: never[] = [];
+
 export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const resizeField = useEditorStore((s) => s.resizeField);
-  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? []);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
 
   const hasVisibilityRule = useMemo(
     () =>

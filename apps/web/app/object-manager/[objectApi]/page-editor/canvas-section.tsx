@@ -30,6 +30,8 @@ const REGION_SHADOW: Record<'none' | 'sm' | 'md', string> = {
   md: '0 10px 24px rgba(15, 23, 42, 0.14)',
 };
 
+const EMPTY_RULES: never[] = [];
+
 export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
@@ -37,7 +39,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const addPanel = useEditorStore((s) => s.addPanel);
   const removeSection = useEditorStore((s) => s.removeSection);
   const resizeSection = useEditorStore((s) => s.resizeSection);
-  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? []);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
 
   const hasVisibilityRule = useMemo(
     () =>
