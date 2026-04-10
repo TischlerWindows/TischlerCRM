@@ -986,7 +986,7 @@ export default function DynamicForm({
             <div className="bg-white rounded-lg border border-gray-200">
               <div className="p-4 bg-gray-100 rounded-t-lg">
                 <h3 className="text-lg font-semibold text-gray-900">
-                  {wizardSections[currentStep]!.regionLabel || wizardSections[currentStep]!.section.label}
+                  {wizardSections[currentStep]!.section.label || wizardSections[currentStep]!.regionLabel}
                 </h3>
                 {(wizardSections[currentStep]!.section as any).description ? (
                   <p className="text-xs text-gray-500 mt-1">
