@@ -180,7 +180,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -269,6 +269,11 @@ export interface TeamMembersRollupConfig {
   supportedObjects?: string[];
 }
 
+export interface TeamMemberAssociationsConfig {
+  type: 'TeamMemberAssociations';
+  label?: string;
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -277,7 +282,8 @@ export type WidgetConfig =
   | SpacerConfig
   | HeaderHighlightsConfig
   | ExternalWidgetLayoutConfig
-  | TeamMembersRollupConfig;
+  | TeamMembersRollupConfig
+  | TeamMemberAssociationsConfig;
 
 export interface PageWidget {
   id: string;
