@@ -35,6 +35,10 @@ function getLucideIcon(name: string): ElementType {
   return LUCIDE_ICON_MAP[name] ?? Puzzle;
 }
 
+// IMPORTANT: Every internal widget manifest id must have an entry here.
+// Without an entry the drag id defaults to the kebab-case manifest id, which
+// fails the WidgetType allowlist check in drag-parser.ts and silently drops
+// the drag. Add a row here whenever you register a new internal widget.
 const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'related-list': 'RelatedList',
   'activity-feed': 'ActivityFeed',
@@ -42,6 +46,8 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'file-folder': 'FileFolder',
   'spacer': 'Spacer',
   'custom-component': 'CustomComponent',
+  'team-members-rollup': 'TeamMembersRollup',
+  'team-member-associations': 'TeamMemberAssociations',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

@@ -19,6 +19,8 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   CustomComponent: { type: 'CustomComponent', componentId: '' },
   Spacer: { type: 'Spacer', minHeightPx: 32 },
   HeaderHighlights: { type: 'HeaderHighlights', fieldApiNames: [] },
+  TeamMembersRollup: { type: 'TeamMembersRollup' },
+  TeamMemberAssociations: { type: 'TeamMemberAssociations' },
   ExternalWidget: { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} },
 };
 

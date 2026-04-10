@@ -257,7 +257,7 @@ export default function DashboardPage() {
           'Quote': '/quotes',
           'Installation': '/installations',
         };
-        const excludedObjects = new Set(['Home']);
+        const excludedObjects = new Set(['Home', 'TeamMember']);
         const objectTabs = schema.objects
           .filter(obj => !excludedObjects.has(obj.apiName))
           .map(obj => ({

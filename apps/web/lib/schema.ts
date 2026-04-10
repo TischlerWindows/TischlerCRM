@@ -219,7 +219,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -301,6 +301,29 @@ export interface ExternalWidgetLayoutConfig {
   config: Record<string, unknown>;
 }
 
+export interface TeamMembersRollupConfig {
+  type: 'TeamMembersRollup';
+  rollupFromProperty?: boolean;
+  label?: string;
+  supportedObjects?: string[];
+  displayFields?: {
+    Contact?: string[];
+    Account?: string[];
+  };
+}
+
+export interface TeamMemberAssociationsConfig {
+  type: 'TeamMemberAssociations';
+  label?: string;
+  displayFields?: {
+    Property?: string[];
+    Opportunity?: string[];
+    Project?: string[];
+    WorkOrder?: string[];
+    Installation?: string[];
+  };
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -308,7 +331,9 @@ export type WidgetConfig =
   | FileFolderConfig
   | SpacerConfig
   | HeaderHighlightsConfig
-  | ExternalWidgetLayoutConfig;
+  | ExternalWidgetLayoutConfig
+  | TeamMembersRollupConfig
+  | TeamMemberAssociationsConfig;
 
 export interface PageWidget {
   id: string;

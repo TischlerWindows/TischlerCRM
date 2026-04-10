@@ -195,10 +195,10 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
     return (
       <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
         {/* Panels */}
-        {sortedPanels.map((panel: any) => {
-          if (panel.hidden) return null;
-          if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
-          const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
+          {sortedPanels.map((panel: any) => {
+            if (panel.hidden) return null;
+            if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
+            const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
 
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
