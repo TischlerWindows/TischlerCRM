@@ -250,22 +250,37 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       let members: TeamMemberRecord[] = []
 
       if (!rollupFromProperty) {
-        // Self-only mode
+        // Self-only mode — try both plain and prefixed field names
         const fieldName = OBJECT_TO_FIELD[objectApiName]
         if (!fieldName) throw new Error(`No lookup field for ${objectApiName}`)
-        const data = await apiClient.get<TeamMemberRecord[]>(
-          `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-        )
-        members = Array.isArray(data) ? data : []
+        const [plain, prefixed] = await Promise.all([
+          apiClient.get<TeamMemberRecord[]>(
+            `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
+          ).catch(() => [] as TeamMemberRecord[]),
+          apiClient.get<TeamMemberRecord[]>(
+            `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
+          ).catch(() => [] as TeamMemberRecord[]),
+        ])
+        const seen = new Set<string>()
+        members = []
+        for (const m of [...(Array.isArray(plain) ? plain : []), ...(Array.isArray(prefixed) ? prefixed : [])]) {
+          if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
+        }
       } else {
         // Rollup mode: gather from Property tree
         let propertyId = ''
         if (objectApiName === 'Property') {
           propertyId = recordId
         } else {
-          const propField = (record as Record<string, unknown>).data
-            ? ((record as Record<string, unknown>).data as Record<string, unknown>).property
-            : (record as Record<string, unknown>).property
+          // Look for the property reference under multiple possible field names
+          const recData = (record as Record<string, unknown>).data
+            ? (record as Record<string, unknown>).data as Record<string, unknown>
+            : record as Record<string, unknown>
+          const propField =
+            recData.property ||
+            recData[`${objectApiName}__property`] ||
+            // Also check flattened data at the top level
+            (record as Record<string, unknown>).property
           if (propField && typeof propField === 'object' && propField !== null && 'id' in propField) {
             propertyId = String((propField as { id: unknown }).id)
           } else if (propField) {
@@ -274,45 +289,71 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
 
         if (!propertyId) {
-          // No property linked, fall back to self-only
+          // No property linked, fall back to self-only (try both field name variants)
           const fieldName = OBJECT_TO_FIELD[objectApiName]
           if (!fieldName) throw new Error(`No lookup field for ${objectApiName}`)
-          const data = await apiClient.get<TeamMemberRecord[]>(
-            `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
-          )
-          members = Array.isArray(data) ? data : []
+          const [p, px] = await Promise.all([
+            apiClient.get<TeamMemberRecord[]>(
+              `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
+            ).catch(() => [] as TeamMemberRecord[]),
+            apiClient.get<TeamMemberRecord[]>(
+              `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(recordId)}&limit=200`
+            ).catch(() => [] as TeamMemberRecord[]),
+          ])
+          const seen = new Set<string>()
+          members = []
+          for (const m of [...(Array.isArray(p) ? p : []), ...(Array.isArray(px) ? px : [])]) {
+            if (!seen.has(String(m.id))) { seen.add(String(m.id)); members.push(m) }
+          }
         } else {
 
         // Phase 1: fetch child record IDs in parallel
+        // Try both plain `property` and prefixed `Type__property` filters since
+        // the data column may store either form depending on how the record was
+        // created.
         const childResults = await Promise.allSettled(
-          CHILD_OBJECT_TYPES.map(type =>
+          CHILD_OBJECT_TYPES.flatMap(type => [
             apiClient.get<Record<string, unknown>[]>(
               `/objects/${type}/records?filter[property]=${encodeURIComponent(propertyId)}&limit=200`
-            )
-          )
+            ).catch(() => [] as Record<string, unknown>[]),
+            apiClient.get<Record<string, unknown>[]>(
+              `/objects/${type}/records?filter[${type}__property]=${encodeURIComponent(propertyId)}&limit=200`
+            ).catch(() => [] as Record<string, unknown>[]),
+          ])
         )
 
         const childRecordsByType: Record<string, Record<string, unknown>[]> = {}
         CHILD_OBJECT_TYPES.forEach((type, i) => {
-          const result = childResults[i]
-          if (result.status === 'fulfilled' && Array.isArray(result.value)) {
-            childRecordsByType[type] = result.value
-          } else {
-            childRecordsByType[type] = []
+          const plainResult = childResults[i * 2]
+          const prefixedResult = childResults[i * 2 + 1]
+          const plain = plainResult.status === 'fulfilled' && Array.isArray(plainResult.value) ? plainResult.value : []
+          const prefixed = prefixedResult.status === 'fulfilled' && Array.isArray(prefixedResult.value) ? prefixedResult.value : []
+          // Merge and deduplicate
+          const seen = new Set<string>()
+          const merged: Record<string, unknown>[] = []
+          for (const rec of [...plain, ...prefixed]) {
+            const rid = String(rec.id)
+            if (!seen.has(rid)) { seen.add(rid); merged.push(rec) }
           }
+          childRecordsByType[type] = merged
         })
 
         // Phase 2: fetch team members in parallel
         const memberFetches: Promise<TeamMemberRecord[]>[] = []
 
-        // Property's own team members
+        // Property's own team members (try both plain and prefixed)
         memberFetches.push(
           apiClient.get<TeamMemberRecord[]>(
             `/objects/TeamMember/records?filter[property]=${encodeURIComponent(propertyId)}&limit=200`
           ).catch(() => [] as TeamMemberRecord[])
         )
+        memberFetches.push(
+          apiClient.get<TeamMemberRecord[]>(
+            `/objects/TeamMember/records?filter[TeamMember__property]=${encodeURIComponent(propertyId)}&limit=200`
+          ).catch(() => [] as TeamMemberRecord[])
+        )
 
-        // Child record team members
+        // Child record team members (try both plain and prefixed)
         for (const type of CHILD_OBJECT_TYPES) {
           const records = childRecordsByType[type]
           const fieldName = OBJECT_TO_FIELD[type]
@@ -322,6 +363,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             memberFetches.push(
               apiClient.get<TeamMemberRecord[]>(
                 `/objects/TeamMember/records?filter[${fieldName}]=${encodeURIComponent(childId)}&limit=200`
+              ).catch(() => [] as TeamMemberRecord[])
+            )
+            memberFetches.push(
+              apiClient.get<TeamMemberRecord[]>(
+                `/objects/TeamMember/records?filter[TeamMember__${fieldName}]=${encodeURIComponent(childId)}&limit=200`
               ).catch(() => [] as TeamMemberRecord[])
             )
           }
