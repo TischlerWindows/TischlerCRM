@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
@@ -197,13 +198,23 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       ? (selection.panel as any).visibleIf ?? []
       : [];
 
-  const handleSaveConditions = (conditions: import('@/lib/schema').ConditionExpr[]) => {
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => { if (savedTimer.current) clearTimeout(savedTimer.current); };
+  }, []);
+
+  const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[]) => {
     if (selection.kind === 'region') {
       updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
     } else if (selection.kind === 'panel') {
       updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
     }
-  };
+    setSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 3000);
+  }, [selection, updateSection, updatePanel]);
 
   // Build a fake FieldDef so we can reuse FieldVisibilityRuleEditor
   const fakeField: import('@/lib/schema').FieldDef = {
@@ -256,6 +267,12 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
             onSave={handleSaveConditions}
             onCancel={() => {}}
           />
+          {saved && (
+            <div className="mt-2 flex items-center gap-1.5 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs font-medium text-green-700 animate-in fade-in duration-200">
+              <Check className="h-3.5 w-3.5" />
+              Visibility rules saved
+            </div>
+          )}
         </div>
       )}
     </div>
