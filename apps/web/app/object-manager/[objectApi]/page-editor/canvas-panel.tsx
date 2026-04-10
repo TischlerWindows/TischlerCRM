@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useDroppable, useDndMonitor } from '@dnd-kit/core';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { GripVertical, Eye, Pencil, Trash2 } from 'lucide-react';
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { LayoutPanel } from './types';
@@ -21,6 +21,19 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const removePanel = useEditorStore((s) => s.removePanel);
+  const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? []);
+
+  const hasVisibilityRule = useMemo(
+    () =>
+      formattingRules.some(
+        (r) =>
+          r.active !== false &&
+          r.target.kind === 'panel' &&
+          r.target.panelId === panel.id &&
+          r.when.length > 0,
+      ),
+    [formattingRules, panel.id],
+  );
 
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [draftLabel, setDraftLabel] = useState(panel.label);
@@ -180,6 +193,11 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
           <span className="rounded-full bg-brand-navy/10 px-2 py-0.5 text-xs font-semibold text-brand-navy">
             {panel.columns} cols
           </span>
+          {hasVisibilityRule && (
+            <span className="flex items-center gap-0.5 rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600" title="Has visibility rule">
+              <Eye className="h-3 w-3" /> Conditional
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <button
