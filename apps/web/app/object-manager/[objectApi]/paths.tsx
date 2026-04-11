@@ -316,7 +316,7 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
     const exists = current.find(f => f.fieldApiName === fieldApi);
     const updated = exists
       ? current.filter(f => f.fieldApiName !== fieldApi)
-      : [...current, { fieldApiName: fieldApi, required: false }];
+      : [...current, { fieldApiName: fieldApi, required: true }];
     updateStage(stageId, { transitionFields: updated });
   }
 

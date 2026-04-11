@@ -122,13 +122,8 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   }
 
   function tryAdvance(stage: PathStage, idx: number) {
-    if (isClosed) {
-      setConfirmReopen(stage);
-      setPopoverStageId(null);
-      setPopoverRect(null);
-      return;
-    }
-
+    // Always check transition fields first — even when reopening from a closed state,
+    // if the TARGET stage has transition fields they must be filled
     const tf = stage.transitionFields;
     if (tf && tf.length > 0) {
       const initial: Record<string, string> = {};
@@ -138,6 +133,14 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       });
       setTransitionValues(initial);
       setTransitionTarget(stage);
+      setPopoverStageId(null);
+      setPopoverRect(null);
+      return;
+    }
+
+    // If currently closed and target has no transition fields, confirm reopen
+    if (isClosed) {
+      setConfirmReopen(stage);
       setPopoverStageId(null);
       setPopoverRect(null);
       return;
@@ -170,8 +173,9 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   }
 
   function handleStageClick(stage: PathStage, idx: number) {
+    // In closed state, route through tryAdvance so transition fields are checked
     if (isClosed) {
-      setConfirmReopen(stage);
+      tryAdvance(stage, idx);
       return;
     }
 
