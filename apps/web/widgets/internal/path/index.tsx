@@ -138,7 +138,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
             }
           } else {
             // Active state coloring
-            if (isCompleted) { bg = 'bg-[#1e3a5f]'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
+            if (isCompleted) { bg = 'bg-brand-navy'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
             else if (isCurrent) { bg = 'bg-blue-500'; text = 'text-white font-semibold'; }
             else if (isClosedWonStage && isFuture) { bg = 'bg-green-50'; text = 'text-green-700'; }
             else if (isClosedLostStage && isFuture) { bg = 'bg-red-50'; text = 'text-red-700'; }

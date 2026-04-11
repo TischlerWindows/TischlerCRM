@@ -99,14 +99,16 @@ function ToggleOption({
       </div>
       <button
         type="button"
+        role="switch"
+        aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors shrink-0 ${
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
           checked ? 'bg-brand-navy' : 'bg-gray-300'
         }`}
       >
         <span
-          className={`inline-block h-3 w-3 rounded-full bg-white transition-transform ${
-            checked ? 'translate-x-3.5' : 'translate-x-0.5'
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+            checked ? 'translate-x-[18px]' : 'translate-x-[3px]'
           }`}
         />
       </button>
