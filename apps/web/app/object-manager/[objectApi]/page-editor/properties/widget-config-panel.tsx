@@ -234,6 +234,40 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
         );
       })()}
 
+      {selection.widget.config.type !== 'Spacer' &&
+        selection.widget.config.type !== 'HeaderHighlights' && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-gray-600">Collapsible</Label>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => updateWidget(selection.widget.id, { collapsible: true })}
+              className={`flex-1 py-1.5 font-medium transition-colors ${
+                selection.widget.collapsible !== false
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => updateWidget(selection.widget.id, { collapsible: false })}
+              className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-200 ${
+                selection.widget.collapsible === false
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              No
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            When disabled, the widget header bar is removed.
+          </p>
+        </div>
+      )}
+
       <div className="border-t border-gray-200 pt-3">
         <Button
           type="button"

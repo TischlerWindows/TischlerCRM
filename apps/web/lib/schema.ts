@@ -353,6 +353,8 @@ export interface PageWidget {
   colSpan?: number;
   rowSpan?: number;
   config: WidgetConfig;
+  /** When false the collapsible header bar is hidden and content renders directly. */
+  collapsible?: boolean;
   /** Tab canvas placement (12-column grid); omit when widget is inside a section only */
   gridColumn?: number;
   gridColumnSpan?: number;
@@ -486,6 +488,8 @@ export interface LayoutWidget {
   widgetType: WidgetType;
   order: number;
   config: WidgetConfig;
+  /** When false the collapsible header bar is hidden and content renders directly. */
+  collapsible?: boolean;
 }
 
 export interface LayoutSection {
