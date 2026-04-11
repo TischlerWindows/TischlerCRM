@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Check, Star, X } from 'lucide-react';
 import type { WidgetProps } from '@/lib/widgets/types';
 import type { PathDef, PathStage, PathTransitionField } from '@/lib/schema';
@@ -31,13 +31,22 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   const compact = (config.compact as boolean) ?? false;
 
   const [popoverStageId, setPopoverStageId] = useState<string | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; width: number } | null>(null);
   const [confirmBack, setConfirmBack] = useState<PathStage | null>(null);
+  const [confirmReopen, setConfirmReopen] = useState<PathStage | null>(null);
   const [updating, setUpdating] = useState(false);
   const [hoveredStageId, setHoveredStageId] = useState<string | null>(null);
-  // Transition fields modal state
   const [transitionTarget, setTransitionTarget] = useState<PathStage | null>(null);
   const [transitionValues, setTransitionValues] = useState<Record<string, string>>({});
+
+  const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const setStageRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) stageRefs.current.set(id, el);
+    else stageRefs.current.delete(id);
+  }, []);
 
   // Find the path definition from schema
   const objectDef = schema?.objects.find(o => o.apiName === object.apiName);
@@ -48,6 +57,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
     function handleClick(e: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         setPopoverStageId(null);
+        setPopoverPos(null);
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -82,16 +92,13 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       const updateData: Record<string, unknown> = {
         [pathDef!.trackingFieldApiName]: stage.id,
       };
-      // Update stage-entered-at timestamp
       if (pathDef!.stageEnteredAtFieldApiName) {
         updateData[pathDef!.stageEnteredAtFieldApiName] = new Date().toISOString();
       }
-      // Include any transition field values
       if (extraFields) {
         Object.assign(updateData, extraFields);
       }
       await apiClient.updateRecord(object.apiName, recordId, updateData);
-      // Optimistic in-place update
       record[pathDef!.trackingFieldApiName] = stage.id;
       if (pathDef!.stageEnteredAtFieldApiName) {
         record[pathDef!.stageEnteredAtFieldApiName] = updateData[pathDef!.stageEnteredAtFieldApiName];
@@ -104,17 +111,26 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
     } finally {
       setUpdating(false);
       setPopoverStageId(null);
+      setPopoverPos(null);
       setConfirmBack(null);
+      setConfirmReopen(null);
       setTransitionTarget(null);
       setTransitionValues({});
     }
   }
 
   function tryAdvance(stage: PathStage, idx: number) {
+    // If currently in a closed state, always confirm reopen regardless of compact mode
+    if (isClosed) {
+      setConfirmReopen(stage);
+      setPopoverStageId(null);
+      setPopoverPos(null);
+      return;
+    }
+
     // Check if target stage has transition fields
     const tf = stage.transitionFields;
     if (tf && tf.length > 0) {
-      // Pre-populate with existing record values
       const initial: Record<string, string> = {};
       tf.forEach(f => {
         const existing = record[f.fieldApiName];
@@ -123,21 +139,45 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       setTransitionValues(initial);
       setTransitionTarget(stage);
       setPopoverStageId(null);
+      setPopoverPos(null);
       return;
     }
+
     // No transition fields — check backward
     if (idx < effectiveIdx) {
       setConfirmBack(stage);
+      setPopoverStageId(null);
+      setPopoverPos(null);
     } else {
       advanceToStage(stage);
     }
   }
 
+  function openPopover(stage: PathStage) {
+    const stageEl = stageRefs.current.get(stage.id);
+    const containerEl = containerRef.current;
+    if (stageEl && containerEl) {
+      const stageRect = stageEl.getBoundingClientRect();
+      const containerRect = containerEl.getBoundingClientRect();
+      setPopoverPos({
+        left: stageRect.left - containerRect.left + stageRect.width / 2,
+        width: containerRect.width,
+      });
+    }
+    setPopoverStageId(popoverStageId === stage.id ? null : stage.id);
+  }
+
   function handleStageClick(stage: PathStage, idx: number) {
+    // In closed state, always confirm regardless of compact mode
+    if (isClosed) {
+      setConfirmReopen(stage);
+      return;
+    }
+
     if (compact) {
       tryAdvance(stage, idx);
     } else {
-      setPopoverStageId(popoverStageId === stage.id ? null : stage.id);
+      openPopover(stage);
     }
   }
 
@@ -148,7 +188,6 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   function handleTransitionSubmit() {
     if (!transitionTarget) return;
     const tf = transitionTarget.transitionFields || [];
-    // Validate required fields
     const allFilled = tf.every(f => !f.required || (transitionValues[f.fieldApiName]?.trim()));
     if (!allFilled) return;
     advanceToStage(transitionTarget, transitionValues);
@@ -160,7 +199,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   if (isLost) statusLabel = 'Closed Lost';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div ref={containerRef} className="bg-white border border-gray-200 rounded-lg p-4 relative">
       {/* Path name label */}
       {showLabel && (
         <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2.5">
@@ -190,16 +229,18 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
           let icon: React.ReactNode = null;
 
           if (isClosed) {
+            // Tinted view — all stages visible, colored by outcome
             if (isWon) {
-              if (isCompleted) { bg = 'bg-green-900'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
-              else if (isCurrent && isClosedWonStage) { bg = 'bg-green-500'; text = 'text-white font-bold'; icon = <Star className="w-3 h-3 mr-0.5" />; }
-              else { bg = 'bg-gray-100'; text = 'text-gray-300'; }
+              if (isCompleted) { bg = 'bg-green-800'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
+              else if (isCurrent) { bg = 'bg-green-500'; text = 'text-white font-bold'; icon = <Star className="w-3 h-3 mr-0.5" />; }
+              else { bg = 'bg-green-100'; text = 'text-green-400'; }
             } else {
-              if (isCompleted) { bg = 'bg-red-900'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
-              else if (isCurrent && isClosedLostStage) { bg = 'bg-red-500'; text = 'text-white font-bold'; icon = <X className="w-3 h-3 mr-0.5" />; }
-              else { bg = 'bg-gray-100'; text = 'text-gray-300'; }
+              if (isCompleted) { bg = 'bg-red-800'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
+              else if (isCurrent) { bg = 'bg-red-500'; text = 'text-white font-bold'; icon = <X className="w-3 h-3 mr-0.5" />; }
+              else { bg = 'bg-red-100'; text = 'text-red-400'; }
             }
           } else {
+            // Active state coloring
             if (isCompleted) { bg = 'bg-brand-navy'; text = 'text-white'; icon = <Check className="w-3 h-3 mr-0.5" />; }
             else if (isCurrent) { bg = 'bg-blue-500'; text = 'text-white font-semibold'; }
             else if (isClosedWonStage && isFuture) { bg = 'bg-green-50'; text = 'text-green-700'; }
@@ -217,6 +258,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
           return (
             <div
               key={stage.id}
+              ref={(el) => setStageRef(stage.id, el)}
               className={cn(
                 'flex-1 flex items-center justify-center text-xs cursor-pointer transition-opacity relative',
                 bg, text,
@@ -247,7 +289,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
         })}
       </div>
 
-      {/* Popover */}
+      {/* Popover — positioned under clicked stage */}
       {!compact && popoverStageId && (() => {
         const stage = sortedStages.find(s => s.id === popoverStageId);
         const stageIdx = sortedStages.findIndex(s => s.id === popoverStageId);
@@ -255,9 +297,26 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
         const keyFields = (showKeyFields && stage.keyFields) || [];
         const guidance = showGuidance ? stage.guidance : undefined;
 
+        // Calculate popover left offset, clamped to container bounds
+        const popoverWidth = 320; // max-w-sm ≈ 384, but content is usually ~320
+        let left = popoverPos ? popoverPos.left : 0;
+        const containerWidth = popoverPos?.width ?? 0;
+        // Clamp so popover doesn't overflow
+        const halfPopover = popoverWidth / 2;
+        if (left - halfPopover < 0) left = halfPopover;
+        if (left + halfPopover > containerWidth) left = containerWidth - halfPopover;
+
         return (
-          <div ref={popoverRef} className="relative mt-2">
-            <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm">
+          <div
+            ref={popoverRef}
+            className="absolute z-30 mt-2"
+            style={{ left: left, transform: 'translateX(-50%)' }}
+          >
+            {/* Arrow */}
+            <div
+              className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-200 rotate-45"
+            />
+            <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-4 w-[320px] relative">
               <div className="font-semibold text-sm text-gray-900 mb-3">{stage.name}</div>
 
               {keyFields.length > 0 && (
@@ -395,6 +454,36 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
                 className="px-3 py-1.5 text-sm font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600"
               >
                 Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reopen from closed state confirmation */}
+      {confirmReopen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
+            <h3 className="font-semibold text-gray-900 mb-2">Reopen this record?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This will change the status from <strong>{isWon ? 'Closed Won' : 'Closed Lost'}</strong> and
+              move to <strong>{confirmReopen.name}</strong>.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmReopen(null)}
+                className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => advanceToStage(confirmReopen)}
+                className={cn(
+                  'px-3 py-1.5 text-sm font-medium text-white rounded-md',
+                  isWon ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                )}
+              >
+                Reopen
               </button>
             </div>
           </div>
