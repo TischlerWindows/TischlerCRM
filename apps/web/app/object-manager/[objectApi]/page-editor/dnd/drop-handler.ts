@@ -22,6 +22,7 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   TeamMembersRollup: { type: 'TeamMembersRollup' },
   TeamMemberAssociations: { type: 'TeamMemberAssociations' },
   ExternalWidget: { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} },
+  Path: { type: 'Path', pathId: '', showLabel: true, showGuidance: true, showKeyFields: true, compact: false },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────

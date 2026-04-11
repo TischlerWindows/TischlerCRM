@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition, CustomLayoutTemplate } from './schema';
+import { OrgSchema, ObjectDef, FieldDef, ValidationRule, WorkflowRule, RecordType, PageLayout, FlowDefinition, CustomLayoutTemplate, PathDef } from './schema';
 import { schemaService } from './schema-service';
 import { apiClient } from './api-client';
 import { recordsService } from './records-service';
@@ -70,7 +70,12 @@ export interface SchemaStore {
   addWorkflowRule: (objectApi: string, rule: Omit<WorkflowRule, 'id'>) => string;
   updateWorkflowRule: (objectApi: string, ruleId: string, updates: Partial<WorkflowRule>) => void;
   deleteWorkflowRule: (objectApi: string, ruleId: string) => void;
-  
+
+  // Path operations
+  addPath: (objectApi: string, path: Omit<PathDef, 'id' | 'createdAt' | 'updatedAt' | 'trackingFieldApiName' | 'stageEnteredAtFieldApiName'>) => string;
+  updatePath: (objectApi: string, pathId: string, updates: Partial<PathDef>) => void;
+  deletePath: (objectApi: string, pathId: string) => void;
+
   // Schema versioning
   getVersionHistory: () => Promise<OrgSchema[]>;
   rollbackToVersion: (version: number) => Promise<void>;
@@ -976,6 +981,100 @@ export const useSchemaStore = create<SchemaStore>()(
           ...schema,
           objects: updatedObjects,
           updatedAt: new Date().toISOString()
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Add path
+      addPath: (objectApi, pathData) => {
+        const { schema } = get();
+        if (!schema) return '';
+
+        const pathId = generateId();
+        const trackingFieldApiName = `__path_${pathId}_stage`;
+        const stageEnteredAtFieldApiName = `__path_${pathId}_stageEnteredAt`;
+        const now = new Date().toISOString();
+        const newPath: PathDef = {
+          ...pathData,
+          id: pathId,
+          trackingFieldApiName,
+          stageEnteredAtFieldApiName,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi
+            ? {
+                ...obj,
+                paths: [...(obj.paths || []), newPath],
+                updatedAt: now,
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: now,
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+
+        return pathId;
+      },
+
+      // Update path
+      updatePath: (objectApi, pathId, updates) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const now = new Date().toISOString();
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi
+            ? {
+                ...obj,
+                paths: (obj.paths || []).map(p =>
+                  p.id === pathId ? { ...p, ...updates, updatedAt: now } : p
+                ),
+                updatedAt: now,
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: now,
+        };
+
+        set({ schema: updatedSchema });
+        schemaService.saveSchema(updatedSchema);
+      },
+
+      // Delete path
+      deletePath: (objectApi, pathId) => {
+        const { schema } = get();
+        if (!schema) return;
+
+        const now = new Date().toISOString();
+        const updatedObjects = schema.objects.map(obj =>
+          obj.apiName === objectApi
+            ? {
+                ...obj,
+                paths: (obj.paths || []).filter(p => p.id !== pathId),
+                updatedAt: now,
+              }
+            : obj
+        );
+
+        const updatedSchema = {
+          ...schema,
+          objects: updatedObjects,
+          updatedAt: now,
         };
 
         set({ schema: updatedSchema });

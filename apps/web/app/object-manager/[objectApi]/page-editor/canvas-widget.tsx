@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { LayoutWidget } from './types';
 import { useEditorStore } from './editor-store';
 import { getWidgetById } from '@/lib/widgets/registry-loader';
+import { useSchemaStore } from '@/lib/schema-store';
 import { CanvasErrorBoundary } from './canvas-error-boundary';
 import {
   Sparkles,
@@ -19,6 +20,7 @@ import {
   Rows3,
   List,
   Users,
+  GitBranch,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
@@ -35,6 +37,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   TeamMembersRollup: Users,
   TeamMemberAssociations: Users,
   ExternalWidget: Puzzle,
+  Path: GitBranch,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -46,6 +49,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   HeaderHighlights: 'Header Highlights',
   TeamMembersRollup: 'Team Members',
   TeamMemberAssociations: 'Team Member Associations',
+  Path: 'Path',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
@@ -76,6 +80,12 @@ function summarizeWidget(widget: LayoutWidget): string {
     case 'ExternalWidget': {
       const manifest = getWidgetById(widget.config.externalWidgetId);
       return manifest?.description ?? widget.config.externalWidgetId;
+    }
+    case 'Path': {
+      const schema = useSchemaStore.getState().schema;
+      const obj = schema?.objects.find(o => (o.paths || []).some(p => p.id === widget.config.pathId));
+      const path = obj?.paths?.find(p => p.id === widget.config.pathId);
+      return path?.name || 'No path selected';
     }
     default:
       return '';

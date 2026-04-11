@@ -128,6 +128,8 @@ function getWidgetLabel(config: WidgetConfig): string {
       return 'Spacer'
     case 'HeaderHighlights':
       return 'Highlights'
+    case 'Path':
+      return 'Path'
     default:
       return 'Widget'
   }
@@ -216,7 +218,7 @@ export function LayoutWidgetsInline({
     <div className="mb-4 flex flex-col gap-3">
       {sorted.map((w) => {
         const config = w.config
-        const isCollapsible = canCollapse && !NON_COLLAPSIBLE_TYPES.has(config.type)
+        const isCollapsible = canCollapse && !NON_COLLAPSIBLE_TYPES.has(config.type) && w.collapsible !== false
         const isCollapsed = isCollapsible && collapsedWidgetIds!.has(w.id)
         const label = getWidgetLabel(config)
 

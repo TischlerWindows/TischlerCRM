@@ -119,6 +119,7 @@ function normalizeWidget(rawWidget: unknown, widgetIndex: number): LayoutWidget 
     widgetType,
     order: typeof candidate.order === 'number' ? candidate.order : widgetIndex,
     config: parseWidgetConfig(widgetType, candidate.config),
+    ...(typeof candidate.collapsible === 'boolean' ? { collapsible: candidate.collapsible } : {}),
   };
 }
 
@@ -163,6 +164,7 @@ function toLayoutWidget(pageWidget: PageWidget, widgetIndex: number): LayoutWidg
     widgetType: pageWidget.widgetType,
     order: typeof pageWidget.order === 'number' ? pageWidget.order : widgetIndex,
     config: parseWidgetConfig(pageWidget.widgetType, pageWidget.config),
+    ...(typeof pageWidget.collapsible === 'boolean' ? { collapsible: pageWidget.collapsible } : {}),
   };
 }
 
