@@ -72,7 +72,7 @@ export interface SchemaStore {
   deleteWorkflowRule: (objectApi: string, ruleId: string) => void;
 
   // Path operations
-  addPath: (objectApi: string, path: Omit<PathDef, 'id' | 'createdAt' | 'updatedAt' | 'trackingFieldApiName'>) => string;
+  addPath: (objectApi: string, path: Omit<PathDef, 'id' | 'createdAt' | 'updatedAt' | 'trackingFieldApiName' | 'stageEnteredAtFieldApiName'>) => string;
   updatePath: (objectApi: string, pathId: string, updates: Partial<PathDef>) => void;
   deletePath: (objectApi: string, pathId: string) => void;
 
@@ -994,11 +994,13 @@ export const useSchemaStore = create<SchemaStore>()(
 
         const pathId = generateId();
         const trackingFieldApiName = `__path_${pathId}_stage`;
+        const stageEnteredAtFieldApiName = `__path_${pathId}_stageEnteredAt`;
         const now = new Date().toISOString();
         const newPath: PathDef = {
           ...pathData,
           id: pathId,
           trackingFieldApiName,
+          stageEnteredAtFieldApiName,
           createdAt: now,
           updatedAt: now,
         };

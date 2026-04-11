@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useSchemaStore } from '@/lib/schema-store';
 import { cn } from '@/lib/utils';
-import type { PathDef, PathStage } from '@/lib/schema';
+import type { PathDef, PathStage, PathTransitionField } from '@/lib/schema';
 
 interface PathsProps {
   objectApiName: string;
@@ -257,6 +257,7 @@ interface PathEditorProps {
 function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: PathEditorProps) {
   const [expandedStageId, setExpandedStageId] = useState<string | null>(null);
   const [fieldSearch, setFieldSearch] = useState('');
+  const [transitionFieldSearch, setTransitionFieldSearch] = useState('');
 
   function updateStage(stageId: string, updates: Partial<PathStage>) {
     onChange({
@@ -306,6 +307,26 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
       ? current.filter(f => f !== fieldApi)
       : [...current, fieldApi];
     updateStage(stageId, { keyFields: updated });
+  }
+
+  function toggleTransitionField(stageId: string, fieldApi: string) {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const current = stage.transitionFields || [];
+    const exists = current.find(f => f.fieldApiName === fieldApi);
+    const updated = exists
+      ? current.filter(f => f.fieldApiName !== fieldApi)
+      : [...current, { fieldApiName: fieldApi, required: false }];
+    updateStage(stageId, { transitionFields: updated });
+  }
+
+  function toggleTransitionRequired(stageId: string, fieldApi: string) {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const updated = (stage.transitionFields || []).map(f =>
+      f.fieldApiName === fieldApi ? { ...f, required: !f.required } : f
+    );
+    updateStage(stageId, { transitionFields: updated });
   }
 
   const sortedStages = [...path.stages].sort((a, b) => a.order - b.order);
@@ -529,6 +550,78 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
                         onChange={e => updateStage(stage.id, { guidance: e.target.value })}
                         placeholder="Tips and guidance for completing this stage..."
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                        Transition Fields
+                        <span className="font-normal normal-case text-gray-400 ml-1">
+                          — shown in a popup when entering this stage
+                        </span>
+                      </label>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {(stage.transitionFields || []).map(tf => {
+                          const field = objectFields.find(f => f.apiName === tf.fieldApiName);
+                          return (
+                            <span
+                              key={tf.fieldApiName}
+                              className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1 text-xs text-amber-800"
+                            >
+                              {field?.label || tf.fieldApiName}
+                              <button
+                                onClick={() => toggleTransitionRequired(stage.id, tf.fieldApiName)}
+                                className={cn(
+                                  'text-[10px] font-bold rounded px-1',
+                                  tf.required
+                                    ? 'text-red-600 bg-red-50'
+                                    : 'text-gray-400 bg-gray-100'
+                                )}
+                                title={tf.required ? 'Required — click to make optional' : 'Optional — click to make required'}
+                              >
+                                {tf.required ? 'REQ' : 'OPT'}
+                              </button>
+                              <button
+                                onClick={() => toggleTransitionField(stage.id, tf.fieldApiName)}
+                                className="text-gray-400 hover:text-gray-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="relative">
+                        <input
+                          className="w-full rounded-md border border-dashed border-gray-400 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy"
+                          value={transitionFieldSearch}
+                          onChange={e => setTransitionFieldSearch(e.target.value)}
+                          placeholder="+ Search fields to add as transition fields..."
+                        />
+                        {transitionFieldSearch && (
+                          <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                            {objectFields
+                              .filter(f =>
+                                !f.apiName.startsWith('__') &&
+                                !(stage.transitionFields || []).some(tf => tf.fieldApiName === f.apiName) &&
+                                (f.label.toLowerCase().includes(transitionFieldSearch.toLowerCase()) ||
+                                 f.apiName.toLowerCase().includes(transitionFieldSearch.toLowerCase()))
+                              )
+                              .slice(0, 10)
+                              .map(f => (
+                                <button
+                                  key={f.apiName}
+                                  className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50"
+                                  onClick={() => {
+                                    toggleTransitionField(stage.id, f.apiName);
+                                    setTransitionFieldSearch('');
+                                  }}
+                                >
+                                  {f.label} <span className="text-gray-400">({f.apiName})</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {path.stages.length > 1 && (

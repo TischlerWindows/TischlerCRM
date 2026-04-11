@@ -546,6 +546,11 @@ export interface LegacyPageLayout {
 
 // ── Path definitions ────────────────────────────────────────────────────────
 
+export interface PathTransitionField {
+  fieldApiName: string;
+  required?: boolean;
+}
+
 export interface PathStage {
   id: string;
   name: string;
@@ -553,6 +558,7 @@ export interface PathStage {
   category: 'active' | 'closed-won' | 'closed-lost';
   guidance?: string;
   keyFields?: string[];
+  transitionFields?: PathTransitionField[];
 }
 
 export interface PathDef {
@@ -561,6 +567,7 @@ export interface PathDef {
   description?: string;
   active: boolean;
   trackingFieldApiName: string;
+  stageEnteredAtFieldApiName: string;
   stages: PathStage[];
   createdAt: string;
   updatedAt: string;
