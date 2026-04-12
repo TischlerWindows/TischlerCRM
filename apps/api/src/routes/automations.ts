@@ -8,6 +8,24 @@ import { getAllControllers } from '../lib/controllers/registry-loader.js'
 const triggerIds: readonly string[] = TRIGGER_IDS
 const controllerIds: readonly string[] = CONTROLLER_IDS
 
+/** Safely query trigger settings — returns empty array if table doesn't exist yet */
+async function loadTriggerSettings(orgId: string): Promise<Array<{ triggerId: string; enabled: boolean }>> {
+  try {
+    return await prisma.triggerSetting.findMany({ where: { orgId } })
+  } catch {
+    return []
+  }
+}
+
+/** Safely query controller settings — returns empty array if table doesn't exist yet */
+async function loadControllerSettings(orgId: string): Promise<Array<{ controllerId: string; enabled: boolean }>> {
+  try {
+    return await prisma.controllerSetting.findMany({ where: { orgId } })
+  } catch {
+    return []
+  }
+}
+
 export async function automationRoutes(app: FastifyInstance) {
   // GET /automations/triggers — list all triggers with enabled state (admin only)
   app.get('/automations/triggers', async (request, reply) => {
@@ -16,24 +34,19 @@ export async function automationRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Only admins can manage automations.' })
     }
 
-    try {
-      const orgId = user.sub as string
-      const settings = await prisma.triggerSetting.findMany({ where: { orgId } })
-      const settingsMap = Object.fromEntries(settings.map((s: any) => [s.triggerId, s.enabled]))
+    const orgId = user.sub as string
+    const settings = await loadTriggerSettings(orgId)
+    const settingsMap = Object.fromEntries(settings.map((s) => [s.triggerId, s.enabled]))
 
-      return getAllTriggers().map((t) => ({
-        triggerId: t.id,
-        enabled: settingsMap[t.id] ?? false,
-        name: t.name,
-        description: t.description,
-        icon: t.icon,
-        objectApiName: t.objectApiName,
-        events: t.events,
-      }))
-    } catch (err: any) {
-      app.log.error(err, 'GET /automations/triggers failed')
-      return reply.code(500).send({ error: 'Failed to load trigger settings' })
-    }
+    return getAllTriggers().map((t) => ({
+      triggerId: t.id,
+      enabled: settingsMap[t.id] ?? false,
+      name: t.name,
+      description: t.description,
+      icon: t.icon,
+      objectApiName: t.objectApiName,
+      events: t.events,
+    }))
   })
 
   // PUT /automations/triggers/:triggerId — toggle enabled state (admin only)
@@ -63,7 +76,7 @@ export async function automationRoutes(app: FastifyInstance) {
         return { triggerId, enabled }
       } catch (err: any) {
         app.log.error(err, 'PUT /automations/triggers/:triggerId failed')
-        return reply.code(500).send({ error: 'Failed to update trigger setting' })
+        return reply.code(500).send({ error: 'Failed to update trigger setting. Migration may be pending.' })
       }
     }
   )
@@ -75,24 +88,19 @@ export async function automationRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'Only admins can manage automations.' })
     }
 
-    try {
-      const orgId = user.sub as string
-      const settings = await prisma.controllerSetting.findMany({ where: { orgId } })
-      const settingsMap = Object.fromEntries(settings.map((s: any) => [s.controllerId, s.enabled]))
+    const orgId = user.sub as string
+    const settings = await loadControllerSettings(orgId)
+    const settingsMap = Object.fromEntries(settings.map((s) => [s.controllerId, s.enabled]))
 
-      return getAllControllers().map((c) => ({
-        controllerId: c.id,
-        enabled: settingsMap[c.id] ?? false,
-        name: c.name,
-        description: c.description,
-        icon: c.icon,
-        objectApiName: c.objectApiName,
-        routePrefix: c.routePrefix,
-      }))
-    } catch (err: any) {
-      app.log.error(err, 'GET /automations/controllers failed')
-      return reply.code(500).send({ error: 'Failed to load controller settings' })
-    }
+    return getAllControllers().map((c) => ({
+      controllerId: c.id,
+      enabled: settingsMap[c.id] ?? false,
+      name: c.name,
+      description: c.description,
+      icon: c.icon,
+      objectApiName: c.objectApiName,
+      routePrefix: c.routePrefix,
+    }))
   })
 
   // PUT /automations/controllers/:controllerId — toggle enabled state (admin only)
@@ -122,7 +130,7 @@ export async function automationRoutes(app: FastifyInstance) {
         return { controllerId, enabled }
       } catch (err: any) {
         app.log.error(err, 'PUT /automations/controllers/:controllerId failed')
-        return reply.code(500).send({ error: 'Failed to update controller setting' })
+        return reply.code(500).send({ error: 'Failed to update controller setting. Migration may be pending.' })
       }
     }
   )
