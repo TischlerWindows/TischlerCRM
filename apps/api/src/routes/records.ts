@@ -5,6 +5,7 @@ import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
 import { tryRenameDropboxFolder, tryEnsureLinkedFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
+import { runTriggers } from '../lib/triggers/trigger-engine.js';
 import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
@@ -651,6 +652,17 @@ export async function recordRoutes(app: FastifyInstance) {
       userId,
     }).catch(() => { /* non-fatal — workflow errors must not break record creation */ });
 
+    // ── Trigger automation ──
+    runTriggers({
+      event: 'create',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: record.id,
+      recordData: normalizedData,
+      userId,
+      orgId: userId,
+    }).catch(() => { /* non-fatal — trigger errors must not break record creation */ });
+
     reply.code(201).send(record);
   });
 
@@ -982,6 +994,18 @@ export async function recordRoutes(app: FastifyInstance) {
       recordData: mergedData,
       beforeData,
       userId,
+    }).catch(() => { /* non-fatal */ });
+
+    // ── Trigger automation ──
+    runTriggers({
+      event: 'update',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: mergedData,
+      beforeData,
+      userId,
+      orgId: userId,
     }).catch(() => { /* non-fatal */ });
 
     reply.send(record);

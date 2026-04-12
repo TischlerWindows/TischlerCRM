@@ -20,6 +20,8 @@
     "@crm/storage": "workspace:*",
     "@crm/types": "workspace:*",
     "@crm/widgets": "workspace:*",
+    "@crm/triggers": "workspace:*",
+    "@crm/controllers": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/static": "^8.0.0",

@@ -36,12 +36,18 @@ importers:
 
   apps/api:
     dependencies:
+      '@crm/controllers':
+        specifier: workspace:*
+        version: link:../../packages/controllers
       '@crm/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@crm/storage':
         specifier: workspace:*
         version: link:../../packages/storage
+      '@crm/triggers':
+        specifier: workspace:*
+        version: link:../../packages/triggers
       '@crm/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -213,6 +219,12 @@ importers:
         specifier: 5.4.5
         version: 5.4.5
 
+  packages/controllers:
+    devDependencies:
+      typescript:
+        specifier: 5.4.5
+        version: 5.4.5
+
   packages/db:
     dependencies:
       '@prisma/client':
@@ -230,6 +242,12 @@ importers:
         version: 5.4.5
 
   packages/storage:
+    devDependencies:
+      typescript:
+        specifier: 5.4.5
+        version: 5.4.5
+
+  packages/triggers:
     devDependencies:
       typescript:
         specifier: 5.4.5
