@@ -146,13 +146,15 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
         }
       }
 
-      // Fetch tech expenses for this junction
+      // Fetch tech expenses for this junction, sorted by weekNumber
       let expenses: any[] = []
       if (techExpenseObjectId) {
-        expenses = await findRecordsByObjectAndField(
+        expenses = (await findRecordsByObjectAndField(
           techExpenseObjectId,
           'installationTechnician',
           junction.id,
+        )).sort((a: any, b: any) =>
+          ((a.data as Record<string, any>).weekNumber ?? 0) - ((b.data as Record<string, any>).weekNumber ?? 0)
         )
       }
 
@@ -656,6 +658,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // ====================================================================
   app.delete('/:installationId/technicians/:junctionId', async (request, reply) => {
     const { installationId, junctionId } = request.params as { installationId: string; junctionId: string }
+
+    // Validate junction belongs to this installation
+    const junctionRecord = await prisma.record.findUnique({ where: { id: junctionId } })
+    if (!junctionRecord) return reply.code(404).send({ error: 'Junction not found' })
+    const jData = junctionRecord.data as Record<string, any>
+    if (jData.installation !== installationId) {
+      return reply.code(400).send({ error: 'Junction does not belong to this installation' })
+    }
 
     // Delete all tech expense records linked to this junction
     const techExpenseObjectId = await getObjectId('InstallationTechExpense')
