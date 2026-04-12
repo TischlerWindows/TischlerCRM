@@ -219,7 +219,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -333,6 +333,10 @@ export interface PathConfig {
   compact: boolean;
 }
 
+export interface InstallationCostGridConfig {
+  type: 'InstallationCostGrid';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -343,7 +347,8 @@ export type WidgetConfig =
   | ExternalWidgetLayoutConfig
   | TeamMembersRollupConfig
   | TeamMemberAssociationsConfig
-  | PathConfig;
+  | PathConfig
+  | InstallationCostGridConfig;
 
 export interface PageWidget {
   id: string;

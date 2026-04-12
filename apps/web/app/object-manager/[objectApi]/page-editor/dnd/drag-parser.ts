@@ -58,6 +58,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'TeamMemberAssociations',
   'ExternalWidget',
   'Path',
+  'InstallationCostGrid',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {

@@ -8,6 +8,7 @@ import { config as relatedListManifest } from './related-list/widget.config'
 import { config as teamMembersRollupManifest } from './team-members-rollup/widget.config'
 import { config as teamMemberAssociationsManifest } from './team-member-associations/widget.config'
 import { config as pathManifest } from './path/widget.config'
+import { config as installationCostGridManifest } from './installation-cost-grid/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -61,6 +62,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'Path',
     Component: dynamic(() => import('./path/index')),
     ConfigPanel: PathConfigPanel,
+  },
+  {
+    manifest: installationCostGridManifest,
+    widgetConfigType: 'InstallationCostGrid',
+    Component: dynamic(() => import('./installation-cost-grid/index')),
   },
 ]
 
