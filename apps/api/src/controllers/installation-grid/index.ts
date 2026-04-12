@@ -351,11 +351,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const { installationId } = request.params as { installationId: string }
     const user = (request as any).user
 
+    try {
     const installation = await prisma.record.findUnique({ where: { id: installationId } })
     if (!installation) {
       return reply.code(404).send({ error: 'Installation not found' })
     }
     const instData = installation.data as Record<string, any>
+
+    // Guard: need at least startDate to add weeks
+    if (!instData.startDate && !instData.endDate) {
+      return reply.code(400).send({ error: 'Installation must have start and end dates before adding weeks. Set dates on the Installation record first.' })
+    }
 
     const [costObjectId, junctionObjectId, techExpenseObjectId] = await Promise.all([
       getObjectId('InstallationCost'),
@@ -363,7 +369,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       getObjectId('InstallationTechExpense'),
     ])
     if (!costObjectId) {
-      return reply.code(500).send({ error: 'InstallationCost object not found' })
+      return reply.code(500).send({ error: 'InstallationCost object not found. Ensure the database has been seeded.' })
     }
 
     // Find max weekNumber
@@ -391,10 +397,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       end.setDate(end.getDate() + 6)
       weekStartDate = start.toISOString().split('T')[0]!
       weekEndDate = end.toISOString().split('T')[0]!
-    } else {
-      // Fallback: extend endDate by 7 days
+    } else if (instData.endDate) {
+      // No existing weeks but has endDate — start from there
       const start = new Date(instData.endDate)
       start.setDate(start.getDate() + 1)
+      const end = new Date(start)
+      end.setDate(end.getDate() + 6)
+      weekStartDate = start.toISOString().split('T')[0]!
+      weekEndDate = end.toISOString().split('T')[0]!
+    } else {
+      // Has startDate but no endDate — start from startDate
+      const start = new Date(instData.startDate)
       const end = new Date(start)
       end.setDate(end.getDate() + 6)
       weekStartDate = start.toISOString().split('T')[0]!
@@ -455,6 +468,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     })
 
     return { weekNumber: newWeekNumber, weekStartDate, weekEndDate }
+    } catch (err: any) {
+      request.log.error(err, 'POST weeks/add failed')
+      return reply.code(500).send({ error: err.message || 'Failed to add week' })
+    }
   })
 
   // ====================================================================
