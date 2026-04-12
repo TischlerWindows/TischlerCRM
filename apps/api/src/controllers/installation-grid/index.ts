@@ -50,13 +50,12 @@ async function findRecordsByObjectAndField(
   fieldName: string,
   fieldValue: string,
 ): Promise<Array<{ id: string; data: any }>> {
-  const all = await prisma.record.findMany({
-    where: { objectId },
+  return prisma.record.findMany({
+    where: {
+      objectId,
+      data: { path: [fieldName], equals: fieldValue },
+    },
     select: { id: true, data: true },
-  })
-  return all.filter((r: any) => {
-    const d = r.data as Record<string, any>
-    return d[fieldName] === fieldValue
   })
 }
 
@@ -100,6 +99,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // 1. GET /:installationId/data — Full data wrapper
   // ====================================================================
   app.get('/:installationId/data', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const user = (request as any).user
 
@@ -174,12 +174,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       techExpenses,
       weekCount: costs.length,
     }
+    } catch (err: any) {
+      request.log.error(err, 'GET data failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 2. PUT /:installationId/costs — Bulk update cost records
   // ====================================================================
   app.put('/:installationId/costs', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const { updates } = request.body as { updates: Array<{ id: string; [k: string]: any }> }
     const user = (request as any).user
@@ -200,7 +205,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       for (const [key, value] of Object.entries(update)) {
         if (key === 'id') continue
         if (!COST_FIELDS.includes(key)) continue
-        patch[key] = round2(Number(value))
+        const numVal = Number(value)
+        if (isNaN(numVal)) continue
+        patch[key] = round2(numVal)
       }
 
       if (Object.keys(patch).length > 0) {
@@ -216,12 +223,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { updated: count }
+    } catch (err: any) {
+      request.log.error(err, 'PUT costs failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 3. PUT /:installationId/tech-expenses — Bulk update tech expense records
   // ====================================================================
   app.put('/:installationId/tech-expenses', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const { updates } = request.body as { updates: Array<{ id: string; [k: string]: any }> }
     const user = (request as any).user
@@ -242,7 +254,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       for (const [key, value] of Object.entries(update)) {
         if (key === 'id') continue
         if (!TECH_EXPENSE_ALLOWED.includes(key)) continue
-        patch[key] = round2(Number(value))
+        const numVal = Number(value)
+        if (isNaN(numVal)) continue
+        patch[key] = round2(numVal)
       }
 
       if (Object.keys(patch).length > 0) {
@@ -258,12 +272,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { updated: count }
+    } catch (err: any) {
+      request.log.error(err, 'PUT tech-expenses failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 4. POST /:installationId/recalculate — Recalculate totals
   // ====================================================================
   app.post('/:installationId/recalculate', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const user = (request as any).user
 
@@ -342,6 +361,10 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       finalProfit,
       techExpenseTotal: round2(techExpenseTotal),
     }
+    } catch (err: any) {
+      request.log.error(err, 'POST recalculate failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
@@ -359,7 +382,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const instData = installation.data as Record<string, any>
 
     // Guard: need at least startDate to add weeks
-    if (!instData.startDate && !instData.endDate) {
+    if (!instData.startDate || !instData.endDate) {
       return reply.code(400).send({ error: 'Installation must have start and end dates before adding weeks. Set dates on the Installation record first.' })
     }
 
@@ -478,6 +501,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   // 6. POST /:installationId/weeks/remove — Remove last week
   // ====================================================================
   app.post('/:installationId/weeks/remove', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const user = (request as any).user
 
@@ -533,6 +557,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     // Shorten endDate by 7 days
+    if (!instData.endDate) {
+      return reply.code(400).send({ error: 'Installation endDate is missing' })
+    }
     const currentEnd = new Date(instData.endDate)
     currentEnd.setDate(currentEnd.getDate() - 7)
     const newEndDate = currentEnd.toISOString().split('T')[0]!
@@ -546,12 +573,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     })
 
     return { removedWeek: maxWeek, remainingWeeks: existingCosts.length - 1 }
+    } catch (err: any) {
+      request.log.error(err, 'POST weeks/remove failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 7. GET /:installationId/technicians — List assigned technicians
   // ====================================================================
   app.get('/:installationId/technicians', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
 
     const [junctionObjectId, techObjectId] = await Promise.all([
@@ -584,12 +616,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return result
+    } catch (err: any) {
+      request.log.error(err, 'GET technicians failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 8. POST /:installationId/technicians — Assign technician
   // ====================================================================
   app.post('/:installationId/technicians', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const { technicianId } = request.body as { technicianId: string }
     const user = (request as any).user
@@ -668,12 +705,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { junctionId, technicianId, technicianName, assignedHourlyRate: hourlyRate }
+    } catch (err: any) {
+      request.log.error(err, 'POST technicians failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 9. DELETE /:installationId/technicians/:junctionId — Remove technician
   // ====================================================================
   app.delete('/:installationId/technicians/:junctionId', async (request, reply) => {
+    try {
     const { installationId, junctionId } = request.params as { installationId: string; junctionId: string }
 
     // Validate junction belongs to this installation
@@ -701,12 +743,17 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     await prisma.record.delete({ where: { id: junctionId } })
 
     return { deleted: true }
+    } catch (err: any) {
+      request.log.error(err, 'DELETE technicians failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 
   // ====================================================================
   // 10. PUT /:installationId/estimates — Update estimated costs
   // ====================================================================
   app.put('/:installationId/estimates', async (request, reply) => {
+    try {
     const { installationId } = request.params as { installationId: string }
     const body = request.body as Record<string, any>
     const user = (request as any).user
@@ -720,7 +767,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const patch: Record<string, any> = {}
     for (const [key, value] of Object.entries(body)) {
       if (!ESTIMATED_FIELDS.includes(key)) continue
-      patch[key] = round2(Number(value))
+      const numVal = Number(value)
+      if (isNaN(numVal)) continue
+      patch[key] = round2(numVal)
     }
 
     if (Object.keys(patch).length > 0) {
@@ -734,5 +783,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { updated: true }
+    } catch (err: any) {
+      request.log.error(err, 'PUT estimates failed')
+      return reply.code(500).send({ error: err.message || 'Internal server error' })
+    }
   })
 }

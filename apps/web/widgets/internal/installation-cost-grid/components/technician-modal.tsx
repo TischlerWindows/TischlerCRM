@@ -37,8 +37,8 @@ export function TechnicianModal({ installationId, techExpenses, onAssign, onRemo
 
   const loadTechnicians = async () => {
     try {
-      const result = await apiClient.get<{ records: TechnicianRecord[] }>('/objects/Technician/records')
-      setAllTechnicians(result.records || [])
+      const result = await apiClient.get<TechnicianRecord[]>('/objects/Technician/records')
+      setAllTechnicians(Array.isArray(result) ? result : [])
     } catch {
       setAllTechnicians([])
     } finally {
@@ -61,9 +61,8 @@ export function TechnicianModal({ installationId, techExpenses, onAssign, onRemo
     if (!newName.trim() || !newRate.trim()) return
     setCreating(true)
     try {
-      const result = await apiClient.request('/objects/Technician/records', {
-        method: 'POST',
-        body: JSON.stringify({ technicianName: newName.trim(), hourlyRate: parseFloat(newRate) || 0, status: 'Active' }),
+      const result = await apiClient.post('/objects/Technician/records', {
+        data: { technicianName: newName.trim(), hourlyRate: parseFloat(newRate) || 0, status: 'Active' },
       }) as any
       if (result?.id) await onAssign(result.id)
       setNewName('')

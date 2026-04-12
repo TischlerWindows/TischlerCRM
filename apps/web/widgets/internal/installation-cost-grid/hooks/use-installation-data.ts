@@ -64,19 +64,13 @@ export function useInstallationData(installationId: string | undefined) {
     try {
       const costUpdates = Object.entries(dirty.costs).map(([id, fields]) => ({ id, ...fields }))
       if (costUpdates.length > 0) {
-        await apiClient.request(`${BASE}/${installationId}/costs`, {
-          method: 'PUT',
-          body: JSON.stringify({ updates: costUpdates }),
-        })
+        await apiClient.put(`${BASE}/${installationId}/costs`, { updates: costUpdates })
       }
       const expenseUpdates = Object.entries(dirty.techExpenses).map(([id, fields]) => ({ id, ...fields }))
       if (expenseUpdates.length > 0) {
-        await apiClient.request(`${BASE}/${installationId}/tech-expenses`, {
-          method: 'PUT',
-          body: JSON.stringify({ updates: expenseUpdates }),
-        })
+        await apiClient.put(`${BASE}/${installationId}/tech-expenses`, { updates: expenseUpdates })
       }
-      await apiClient.request(`${BASE}/${installationId}/recalculate`, { method: 'POST' })
+      await apiClient.post(`${BASE}/${installationId}/recalculate`)
       setDirty({ costs: {}, techExpenses: {} })
       await load()
     } catch (err: any) {
@@ -88,43 +82,45 @@ export function useInstallationData(installationId: string | undefined) {
 
   const addWeek = useCallback(async () => {
     if (!installationId) return
+    setError(null)
     try {
-      await apiClient.request(`${BASE}/${installationId}/weeks/add`, { method: 'POST' })
+      await apiClient.post(`${BASE}/${installationId}/weeks/add`)
       await load()
     } catch (err: any) { setError(err.message || 'Failed to add week') }
   }, [installationId, load])
 
   const removeWeek = useCallback(async () => {
     if (!installationId) return
+    setError(null)
     try {
-      await apiClient.request(`${BASE}/${installationId}/weeks/remove`, { method: 'POST' })
+      await apiClient.post(`${BASE}/${installationId}/weeks/remove`)
       await load()
     } catch (err: any) { setError(err.message || 'Failed to remove week') }
   }, [installationId, load])
 
   const recalculate = useCallback(async () => {
     if (!installationId) return
+    setError(null)
     try {
-      await apiClient.request(`${BASE}/${installationId}/recalculate`, { method: 'POST' })
+      await apiClient.post(`${BASE}/${installationId}/recalculate`)
       await load()
     } catch (err: any) { setError(err.message || 'Failed to recalculate') }
   }, [installationId, load])
 
   const assignTechnician = useCallback(async (technicianId: string) => {
     if (!installationId) return
+    setError(null)
     try {
-      await apiClient.request(`${BASE}/${installationId}/technicians`, {
-        method: 'POST',
-        body: JSON.stringify({ technicianId }),
-      })
+      await apiClient.post(`${BASE}/${installationId}/technicians`, { technicianId })
       await load()
     } catch (err: any) { setError(err.message || 'Failed to assign technician') }
   }, [installationId, load])
 
   const removeTechnician = useCallback(async (junctionId: string) => {
     if (!installationId) return
+    setError(null)
     try {
-      await apiClient.request(`${BASE}/${installationId}/technicians/${junctionId}`, { method: 'DELETE' })
+      await apiClient.delete(`${BASE}/${installationId}/technicians/${junctionId}`)
       await load()
     } catch (err: any) { setError(err.message || 'Failed to remove technician') }
   }, [installationId, load])

@@ -58,17 +58,17 @@ async function getObjectId(apiName: string): Promise<string | null> {
 async function findRecordsByObjectAndField(
   objectId: string, fieldName: string, fieldValue: string
 ): Promise<Array<{ id: string; data: any }>> {
-  const all = await prisma.record.findMany({
-    where: { objectId },
+  return prisma.record.findMany({
+    where: {
+      objectId,
+      data: { path: [fieldName], equals: fieldValue },
+    },
     select: { id: true, data: true },
-  })
-  return all.filter((r: any) => {
-    const d = r.data as Record<string, any>
-    return d[fieldName] === fieldValue
   })
 }
 
 export const handler: TriggerHandler = async (ctx: TriggerContext) => {
+  try {
   const { recordId, recordData, userId, orgId } = ctx
 
   // Guard: must have valid dates
@@ -175,4 +175,8 @@ export const handler: TriggerHandler = async (ctx: TriggerContext) => {
   }
 
   return null // Side effects only, no field updates
+  } catch (err) {
+    console.error('[create-installation-costs] Trigger failed:', err)
+    return null
+  }
 }
