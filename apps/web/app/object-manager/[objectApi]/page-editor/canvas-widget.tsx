@@ -21,6 +21,7 @@ import {
   List,
   Users,
   GitBranch,
+  Table2,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
@@ -38,6 +39,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   TeamMemberAssociations: Users,
   ExternalWidget: Puzzle,
   Path: GitBranch,
+  InstallationCostGrid: Table2,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -50,9 +52,11 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   TeamMembersRollup: 'Team Members',
   TeamMemberAssociations: 'Team Member Associations',
   Path: 'Path',
+  InstallationCostGrid: 'Installation Cost Grid',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
+  if (!widget.config?.type) return '';
   switch (widget.config.type) {
     case 'RelatedList':
       return widget.config.relatedObjectApiName || 'No related object selected';
@@ -87,6 +91,8 @@ function summarizeWidget(widget: LayoutWidget): string {
       const path = obj?.paths?.find(p => p.id === widget.config.pathId);
       return path?.name || 'No path selected';
     }
+    case 'InstallationCostGrid':
+      return 'Weekly cost tracking and technician labor expenses';
     default:
       return '';
   }

@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Home,
   Plug,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -33,15 +34,18 @@ export default function SettingsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [usersData, profilesData, deptsData] = await Promise.all([
+        const [usersData, profilesData, deptsData, triggersData, controllersData] = await Promise.all([
           apiClient.get<any[]>('/admin/users').catch(() => []),
           apiClient.get<any[]>('/profiles').catch(() => []),
           apiClient.get<any[]>('/departments').catch(() => []),
+          apiClient.get<any[]>('/automations/triggers').catch(() => []),
+          apiClient.get<any[]>('/automations/controllers').catch(() => []),
         ]);
         setCounts({
           users: usersData.length,
           profiles: profilesData.length,
           departments: deptsData.length,
+          automations: triggersData.length + controllersData.length,
         });
       } catch {
         // fail silently
@@ -62,6 +66,7 @@ export default function SettingsPage() {
     { title: 'Security', icon: Lock, href: '/settings/security', description: 'Login history and access monitoring', color: '#059669' },
     { title: 'Backups', icon: Database, href: '/settings/backups', description: 'Database snapshots and restore', color: '#d97706' },
     { title: 'Integrations', icon: Plug, href: '/settings/integrations', description: 'Connect Google Maps, Dropbox, Outlook & more', color: '#4285F4' },
+    { title: 'Automations', icon: Zap, href: '/settings/automations', count: counts.automations, description: 'Manage code-based triggers and controllers', color: '#f59e0b' },
   ];
 
   return (

@@ -584,6 +584,30 @@ model WidgetSetting {
   @@index([orgId])
 }
 
+model TriggerSetting {
+  id        String   @id @default(cuid())
+  orgId     String
+  triggerId String
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, triggerId])
+  @@index([orgId])
+}
+
+model ControllerSetting {
+  id           String   @id @default(cuid())
+  orgId        String
+  controllerId String
+  enabled      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([orgId, controllerId])
+  @@index([orgId])
+}
+
 // Per-user integration connection (OAuth tokens, sync state)
 model UserIntegration {
   id            String      @id

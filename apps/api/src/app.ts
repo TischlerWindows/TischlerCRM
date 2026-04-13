@@ -33,6 +33,8 @@ import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
 import { widgetRoutes } from './routes/widgets.js';
 import { externalWidgetRouteModules } from './widgets/external/registry.js';
+import { automationRoutes } from './routes/automations.js';
+import { controllerRegistrations } from './controllers/registry.js';
 import { dropboxRoutes } from './routes/dropbox.js';
 import { errorLogRoutes } from './routes/error-log.js';
 import { outlookRoutes } from './routes/outlook.js';
@@ -461,12 +463,21 @@ export function buildApp() {
   app.register(dropboxRoutes);
   app.register(errorLogRoutes);
   app.register(outlookRoutes);
+  app.register(automationRoutes);
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/
   for (const { widgetId, registerRoutes } of externalWidgetRouteModules) {
     app.register(
       async (instance) => { await registerRoutes(instance) },
       { prefix: `/widgets/${widgetId}` }
+    );
+  }
+
+  // Register per-controller server-side route modules
+  for (const { manifest, registerRoutes } of controllerRegistrations) {
+    app.register(
+      async (instance) => { await registerRoutes(instance) },
+      { prefix: manifest.routePrefix }
     );
   }
 

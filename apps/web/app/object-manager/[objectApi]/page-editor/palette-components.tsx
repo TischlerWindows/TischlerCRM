@@ -49,6 +49,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'team-members-rollup': 'TeamMembersRollup',
   'team-member-associations': 'TeamMemberAssociations',
   'path': 'Path',
+  'installation-cost-grid': 'InstallationCostGrid',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {

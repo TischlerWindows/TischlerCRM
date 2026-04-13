@@ -678,6 +678,29 @@ class ApiClient {
     });
   }
 
+  // Automations (Triggers & Controllers)
+  async getTriggerSettings() {
+    return this.request<Array<{ triggerId: string; enabled: boolean; name: string; description: string; icon: string; objectApiName: string; events: string[] }>>('/automations/triggers');
+  }
+
+  async updateTriggerSetting(triggerId: string, enabled: boolean): Promise<void> {
+    return this.request(`/automations/triggers/${encodeURIComponent(triggerId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  async getControllerSettings() {
+    return this.request<Array<{ controllerId: string; enabled: boolean; name: string; description: string; icon: string; objectApiName: string; routePrefix: string }>>('/automations/controllers');
+  }
+
+  async updateControllerSetting(controllerId: string, enabled: boolean): Promise<void> {
+    return this.request(`/automations/controllers/${encodeURIComponent(controllerId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
   // Google Places (proxied through backend — API key never reaches the browser)
   async placesAutocomplete(input: string, sessionToken: string) {
     const params = new URLSearchParams({ input, sessionToken });

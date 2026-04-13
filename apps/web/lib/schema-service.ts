@@ -166,6 +166,7 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureProductTemplateLayout(migratedSchema);
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
         migratedSchema = this.ensureOpportunityTemplateLayout(migratedSchema);
+        migratedSchema = this.ensureInstallationCostObjects(migratedSchema);
 
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
@@ -3449,7 +3450,7 @@ class LocalStorageSchemaService implements SchemaService {
     } catch {
       // Settings may not exist yet
     }
-    
+
     // Also clear any remaining localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
@@ -3457,14 +3458,202 @@ class LocalStorageSchemaService implements SchemaService {
       localStorage.removeItem('schema-store');
       localStorage.removeItem('propertyLayoutAssociations');
     }
-    
+
     // Create fresh schema with all new fields
     const freshSchema = this.createSampleData();
-    
+
     // Save to API
     await this.saveSchema(freshSchema);
-    
+
     return freshSchema;
+  }
+
+  private ensureInstallationCostObjects(schema: OrgSchema): OrgSchema {
+    let updated = false;
+    const objects = [...schema.objects];
+    const now = new Date().toISOString();
+
+    // 1. Find Installation object and add missing fields
+    const instIdx = objects.findIndex(o => o.apiName === 'Installation');
+    if (instIdx >= 0) {
+      const inst = objects[instIdx];
+      const existingApiNames = new Set(inst.fields.map((f: FieldDef) => f.apiName));
+
+      const newFields: FieldDef[] = [
+        // Core
+        { id: generateId(), apiName: 'Installation__startDate', label: 'Start Date', type: 'Date', custom: true },
+        { id: generateId(), apiName: 'Installation__endDate', label: 'End Date', type: 'Date', custom: true },
+        { id: generateId(), apiName: 'Installation__project', label: 'Project', type: 'Lookup', lookupObject: 'Project', custom: true },
+        { id: generateId(), apiName: 'Installation__installationBudget', label: 'Installation Budget', type: 'Currency', custom: true },
+        // Calculated (read-only)
+        { id: generateId(), apiName: 'Installation__finalCost', label: 'Final Cost', type: 'Currency', readOnly: true, custom: true },
+        { id: generateId(), apiName: 'Installation__finalProfit', label: 'Final Profit', type: 'Currency', readOnly: true, custom: true },
+        { id: generateId(), apiName: 'Installation__techExpenseTotal', label: 'Tech Expense Total', type: 'Currency', readOnly: true, custom: true },
+        // Estimated costs
+        { id: generateId(), apiName: 'Installation__estimatedLaborCost', label: 'Estimated Labor Cost', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedHotel', label: 'Estimated Hotel', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedTravelExp', label: 'Estimated Travel Expense', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMileage', label: 'Estimated Mileage', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedPerDiem', label: 'Estimated Per Diem', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedFlights', label: 'Estimated Flights', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedCarRental', label: 'Estimated Car Rental', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedParking', label: 'Estimated Parking', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedEquipment', label: 'Estimated Equipment', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMiscellaneous', label: 'Estimated Miscellaneous', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWaterproofing', label: 'Estimated Waterproofing', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWoodBucks', label: 'Estimated Wood Bucks', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedAirportTransportation', label: 'Estimated Airport Transportation', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMaterials', label: 'Estimated Materials', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedContainerUnload', label: 'Estimated Container Unload', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedLaborHours', label: 'Estimated Labor Hours', type: 'Number', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWaterproofingLabor', label: 'Estimated WP Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency', custom: true },
+      ].filter((f: FieldDef) => !existingApiNames.has(f.apiName));
+
+      if (newFields.length > 0) {
+        objects[instIdx] = {
+          ...inst,
+          fields: [...inst.fields, ...newFields],
+          updatedAt: now,
+        };
+        updated = true;
+      }
+    }
+
+    // 2. Add missing objects
+    const existingObjectNames = new Set(objects.map((o: ObjectDef) => o.apiName));
+
+    const addObjectIfMissing = (
+      apiName: string,
+      label: string,
+      pluralLabel: string,
+      description: string,
+      fields: FieldDef[]
+    ) => {
+      if (existingObjectNames.has(apiName)) return;
+
+      const customFields = fields.map((field: FieldDef) => ({ ...field, custom: true }));
+      const layoutId = generateId();
+      const recordTypeId = generateId();
+
+      const panelFields = customFields.map((f: FieldDef, i: number) => ({
+        fieldApiName: f.apiName,
+        colSpan: 1,
+        order: i,
+        labelStyle: {},
+        valueStyle: {},
+        behavior: 'none' as const,
+      }));
+
+      const newObj: ObjectDef = {
+        id: generateId(),
+        apiName,
+        label,
+        pluralLabel,
+        description,
+        fields: [...cloneSystemFields(), ...customFields],
+        recordTypes: [{ id: recordTypeId, name: 'Master', default: true }],
+        pageLayouts: [{
+          id: layoutId,
+          name: `${apiName} Layout`,
+          layoutType: 'edit' as const,
+          tabs: [{
+            id: generateId(),
+            label: 'Details',
+            order: 0,
+            regions: [{
+              id: generateId(),
+              label: 'Information',
+              gridColumn: 1,
+              gridColumnSpan: 12,
+              gridRow: 1,
+              gridRowSpan: 1,
+              panels: [{
+                id: generateId(),
+                label: 'Details',
+                order: 0,
+                columns: 2 as 1 | 2 | 3 | 4,
+                style: {},
+                fields: panelFields,
+              }],
+              widgets: [],
+            }],
+          }],
+        }],
+        validationRules: [],
+        defaultRecordTypeId: recordTypeId,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      objects.push(newObj);
+      existingObjectNames.add(apiName);
+      updated = true;
+    };
+
+    // Technician
+    addObjectIfMissing('Technician', 'Technician', 'Technicians', 'Installation technicians for cost analysis', [
+      { id: generateId(), apiName: 'Technician__technicianName', label: 'Technician Name', type: 'Text', required: true, custom: true },
+      { id: generateId(), apiName: 'Technician__hourlyRate', label: 'Hourly Rate', type: 'Currency', required: true, custom: true },
+      { id: generateId(), apiName: 'Technician__phone', label: 'Phone', type: 'Phone', custom: true },
+      { id: generateId(), apiName: 'Technician__email', label: 'Email', type: 'Email', custom: true },
+      { id: generateId(), apiName: 'Technician__status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active', custom: true },
+    ]);
+
+    // InstallationTechnician junction
+    addObjectIfMissing('InstallationTechnician', 'Installation Technician', 'Installation Technicians', 'Junction linking technicians to installations with frozen hourly rate', [
+      { id: generateId(), apiName: 'InstallationTechnician__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechnician__technician', label: 'Technician', type: 'Lookup', lookupObject: 'Technician', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechnician__assignedHourlyRate', label: 'Assigned Hourly Rate', type: 'Currency', required: true, custom: true },
+    ]);
+
+    // InstallationCost
+    addObjectIfMissing('InstallationCost', 'Installation Cost', 'Installation Costs', 'Weekly project-level cost records', [
+      { id: generateId(), apiName: 'InstallationCost__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekNumber', label: 'Week Number', type: 'Number', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekStartDate', label: 'Week Start Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekEndDate', label: 'Week End Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__flightsActual', label: 'Flights', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__lodgingActual', label: 'Lodging', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__carRental', label: 'Car Rental', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__airportTransportation', label: 'Airport Transportation', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__parking', label: 'Parking', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__equipment', label: 'Equipment', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__miscellaneousExpenses', label: 'Miscellaneous', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__waterproofing', label: 'Waterproofing', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__woodBucks', label: 'Wood Bucks', type: 'Currency', custom: true },
+    ]);
+
+    // InstallationTechExpense
+    addObjectIfMissing('InstallationTechExpense', 'Installation Tech Expense', 'Installation Tech Expenses', 'Per-technician weekly labor hours and expenses', [
+      { id: generateId(), apiName: 'InstallationTechExpense__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__installationTechnician', label: 'Installation Technician', type: 'Lookup', lookupObject: 'InstallationTechnician', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekNumber', label: 'Week Number', type: 'Number', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekStartDate', label: 'Week Start Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekEndDate', label: 'Week End Date', type: 'Date', required: true, custom: true },
+      // Labor hours
+      { id: generateId(), apiName: 'InstallationTechExpense__containerUnload', label: 'Container Unload', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__woodbucks', label: 'Woodbucks', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__waterproofing', label: 'Waterproofing', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__installationLabor', label: 'Installation Labor', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__travel', label: 'Travel', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__waterTesting', label: 'Water Testing', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__sills', label: 'Sills', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finishCaulking', label: 'Finish Caulking', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__screenLutronShades', label: 'Screen/Lutron/Shades', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__punchListWork', label: 'Punch List Work', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finishHardware', label: 'Finish Hardware', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finalAdjustments', label: 'Final Adjustments', type: 'Number', custom: true },
+      // Expenses
+      { id: generateId(), apiName: 'InstallationTechExpense__perDiem', label: 'Per Diem', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__mileage', label: 'Mileage', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__materials', label: 'Materials', type: 'Currency', custom: true },
+    ]);
+
+    if (!updated) return schema;
+    return { ...schema, objects, updatedAt: now };
   }
 }
 
