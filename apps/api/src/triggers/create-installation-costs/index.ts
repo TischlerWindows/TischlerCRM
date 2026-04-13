@@ -8,40 +8,49 @@ const MS_PER_DAY = 86400000
 
 /**
  * Calculate week boundaries for an installation date range.
- * Uses Sunday-based boundaries aligned to a fixed reference date.
+ * Matches the Salesforce InstallationTriggerHandler logic exactly:
+ *   - First week runs from startDate to the next Sunday (inclusive)
+ *   - Subsequent weeks run Monday→Sunday (7 days)
+ *   - Last week is trimmed to endDate
+ * Uses a reference Sunday (March 17, 2024) to determine day-of-week.
  */
 function calculateWeeks(startDate: Date, endDate: Date): Array<{ weekNumber: number; start: Date; end: Date }> {
   const weeks: Array<{ weekNumber: number; start: Date; end: Date }> = []
 
-  // Find the first Sunday on or after startDate
-  const daysSinceRef = Math.floor((startDate.getTime() - REFERENCE_SUNDAY.getTime()) / MS_PER_DAY)
-  const daysUntilSunday = (7 - (daysSinceRef % 7)) % 7
-  const firstSunday = new Date(startDate.getTime() + daysUntilSunday * MS_PER_DAY)
+  let weekStart = new Date(startDate)
+  let weekNumber = 1
+  let isFirstWeek = true
 
-  let weekNum = 1
+  while (weekStart.getTime() <= endDate.getTime()) {
+    let weekEnd: Date
 
-  if (firstSunday.getTime() > startDate.getTime() && firstSunday.getTime() <= endDate.getTime()) {
-    // Partial first week: startDate → day before firstSunday
+    if (isFirstWeek) {
+      // Salesforce: startDayOfWeek = mod(REFERENCE_SUNDAY.daysBetween(weekStart), 7) + 1
+      // weekEnd = weekStart.addDays(7 - startDayOfWeek + 1)
+      const daysSinceRef = Math.floor((weekStart.getTime() - REFERENCE_SUNDAY.getTime()) / MS_PER_DAY)
+      const startDayOfWeek = ((daysSinceRef % 7) + 7) % 7 + 1 // 1=Sun, 2=Mon, ... 7=Sat
+      const daysToAdd = 7 - startDayOfWeek + 1
+      weekEnd = new Date(weekStart.getTime() + daysToAdd * MS_PER_DAY)
+      isFirstWeek = false
+    } else {
+      // Subsequent weeks: weekStart + 6 days (Mon→Sun)
+      weekEnd = new Date(weekStart.getTime() + 6 * MS_PER_DAY)
+    }
+
+    // Trim last week to endDate
+    if (weekEnd.getTime() > endDate.getTime()) {
+      weekEnd = new Date(endDate)
+    }
+
     weeks.push({
-      weekNumber: weekNum++,
-      start: new Date(startDate),
-      end: new Date(firstSunday.getTime() - MS_PER_DAY),
+      weekNumber,
+      start: new Date(weekStart),
+      end: new Date(weekEnd),
     })
-  }
 
-  // Full weeks + final partial
-  let current = firstSunday.getTime() <= startDate.getTime()
-    ? new Date(startDate)
-    : firstSunday
-
-  while (current.getTime() <= endDate.getTime()) {
-    const weekEnd = new Date(current.getTime() + 6 * MS_PER_DAY)
-    weeks.push({
-      weekNumber: weekNum++,
-      start: new Date(current),
-      end: weekEnd > endDate ? new Date(endDate) : weekEnd,
-    })
-    current = new Date(current.getTime() + 7 * MS_PER_DAY)
+    // Next week starts the day after this week ends
+    weekStart = new Date(weekEnd.getTime() + MS_PER_DAY)
+    weekNumber++
   }
 
   return weeks

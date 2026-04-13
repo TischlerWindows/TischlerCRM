@@ -3,10 +3,13 @@
  * Executes code-based triggers on record lifecycle events.
  * Runs alongside the existing workflow engine as a complementary system
  * for complex logic that can't be expressed as simple conditions + actions.
+ *
+ * Opt-OUT model: all registered triggers fire by default. They only stop
+ * firing if an admin explicitly disables them in Settings > Automations.
  */
 
 import { prisma } from '@crm/db/client';
-import { getActiveTriggers } from './registry-loader.js';
+import { triggerRegistrations } from '../../triggers/registry.js';
 import type { TriggerEvent, TriggerContext } from './types.js';
 
 interface RunTriggersInput {
@@ -30,24 +33,23 @@ export async function runTriggers(input: RunTriggersInput): Promise<Record<strin
   // 1. Map phase + event to TriggerEvent
   const triggerEvent = `${phase}${event.charAt(0).toUpperCase()}${event.slice(1)}` as TriggerEvent;
 
-  // 2. Load enabled trigger IDs for this org
-  let enabledSettings: Array<{ triggerId: string }>;
+  // 2. Load explicitly disabled trigger IDs for this org
+  //    Opt-OUT model: triggers fire by default unless disabled
+  const disabledIds = new Set<string>();
   try {
-    enabledSettings = await prisma.triggerSetting.findMany({
-      where: { orgId, enabled: true },
+    const disabledSettings = await prisma.triggerSetting.findMany({
+      where: { orgId, enabled: false },
       select: { triggerId: true },
     });
+    for (const s of disabledSettings) disabledIds.add(s.triggerId);
   } catch {
-    // Table may not exist yet during development; fail silently
-    return null;
+    // Table may not exist yet — treat all triggers as enabled
   }
 
-  if (enabledSettings.length === 0) return null;
-
-  const enabledIds = enabledSettings.map(s => s.triggerId);
-
-  // 3. Get active trigger registrations for this object
-  const activeRegistrations = getActiveTriggers(objectApi, enabledIds);
+  // 3. Get all trigger registrations for this object, excluding disabled ones
+  const activeRegistrations = triggerRegistrations.filter(
+    r => r.manifest.objectApiName === objectApi && !disabledIds.has(r.manifest.id)
+  );
   if (activeRegistrations.length === 0) return null;
 
   // 4. Filter to triggers that listen for this specific event
