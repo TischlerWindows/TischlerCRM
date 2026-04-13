@@ -57,26 +57,52 @@ interface WorkflowRule {
 // ── Condition evaluator ───────────────────────────────────────────
 
 function evaluateCondition(cond: ConditionExpr, data: Record<string, any>): boolean {
-  const fieldVal = data[cond.left];
+  const rawVal = data[cond.left];
   const target = cond.right;
 
+  // Normalise multi-picklist values (stored as "A;B;C") into arrays
+  const isMulti =
+    Array.isArray(rawVal) ||
+    (typeof rawVal === 'string' && rawVal.includes(';'));
+  const parts: string[] | null = isMulti
+    ? (Array.isArray(rawVal) ? rawVal : rawVal.split(/\s*;\s*/).filter(Boolean))
+    : null;
+
   switch (cond.op) {
-    case '==':  return String(fieldVal ?? '') === String(target ?? '');
-    case '!=':  return String(fieldVal ?? '') !== String(target ?? '');
-    case '>':   return Number(fieldVal) > Number(target);
-    case '<':   return Number(fieldVal) < Number(target);
-    case '>=':  return Number(fieldVal) >= Number(target);
-    case '<=':  return Number(fieldVal) <= Number(target);
+    case '==':
+      if (parts) {
+        return Array.isArray(target)
+          ? parts.some(v => target.includes(v))
+          : parts.includes(String(target ?? ''));
+      }
+      return String(rawVal ?? '') === String(target ?? '');
+    case '!=':
+      if (parts) {
+        return Array.isArray(target)
+          ? !parts.some(v => target.includes(v))
+          : !parts.includes(String(target ?? ''));
+      }
+      return String(rawVal ?? '') !== String(target ?? '');
+    case '>':   return Number(rawVal) > Number(target);
+    case '<':   return Number(rawVal) < Number(target);
+    case '>=':  return Number(rawVal) >= Number(target);
+    case '<=':  return Number(rawVal) <= Number(target);
     case 'CONTAINS':
-      return typeof fieldVal === 'string' && typeof target === 'string'
-        && fieldVal.toLowerCase().includes(target.toLowerCase());
+      if (parts) return parts.some(v => typeof target === 'string' && v.toLowerCase().includes(target.toLowerCase()));
+      return typeof rawVal === 'string' && typeof target === 'string'
+        && rawVal.toLowerCase().includes(target.toLowerCase());
     case 'STARTS_WITH':
-      return typeof fieldVal === 'string' && typeof target === 'string'
-        && fieldVal.toLowerCase().startsWith(target.toLowerCase());
+      if (parts) return parts.some(v => typeof target === 'string' && v.toLowerCase().startsWith(target.toLowerCase()));
+      return typeof rawVal === 'string' && typeof target === 'string'
+        && rawVal.toLowerCase().startsWith(target.toLowerCase());
     case 'IN':
-      return Array.isArray(target) && target.includes(fieldVal);
+      if (parts) return Array.isArray(target) && parts.some(v => target.includes(v));
+      return Array.isArray(target) && target.includes(rawVal);
     case 'INCLUDES':
-      return Array.isArray(fieldVal) && fieldVal.includes(target);
+      if (parts) {
+        return Array.isArray(target) ? parts.some(v => target.includes(v)) : parts.includes(target);
+      }
+      return Array.isArray(rawVal) && rawVal.includes(target);
     default:
       return false;
   }

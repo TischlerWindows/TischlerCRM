@@ -468,6 +468,16 @@ class ApiClient {
     });
   }
 
+  async importRecords(objectApiName: string, records: Record<string, any>[]): Promise<{ created: number; errors: Array<{ row: number; error: string }> }> {
+    return this.request<{ created: number; errors: Array<{ row: number; error: string }> }>(
+      `/objects/${objectApiName}/records/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ records }),
+      },
+    );
+  }
+
   async migrateRecordLayouts(objectApiName: string, fromPageLayoutId: string): Promise<{ updatedCount: number }> {
     return this.request<{ updatedCount: number }>(
       `/objects/${objectApiName}/records/page-layout/migrate`,

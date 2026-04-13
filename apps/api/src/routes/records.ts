@@ -3,7 +3,7 @@ import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
 import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
 import { logAudit, extractIp } from '../audit.js';
-import { tryRenameDropboxFolder, tryEnsureLinkedFolder } from './dropbox.js';
+import { tryRenameDropboxFolder, tryEnsureLinkedFolder, tryEnsurePropertyRootFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
 import { runTriggers } from '../lib/triggers/trigger-engine.js';
 import { z } from 'zod';
@@ -103,7 +103,7 @@ export async function recordRoutes(app: FastifyInstance) {
       if (!customObj) return [];
 
       const records = await prisma.record.findMany({
-        where: { objectId: customObj.id },
+        where: { objectId: customObj.id, deletedAt: null },
         take: 50,
       });
 
@@ -187,6 +187,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
       },
       include: {
         createdBy: {
@@ -257,6 +258,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
         ...(jsonFilters.length > 0 ? { AND: jsonFilters } : {}),
       },
       include: {
@@ -318,7 +320,7 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     const record = await prisma.record.findFirst({
-      where: { id: idParam, objectId: object.id },
+      where: { id: idParam, objectId: object.id, deletedAt: null },
       include: {
         pageLayout: {
           select: {
@@ -406,15 +408,18 @@ export async function recordRoutes(app: FastifyInstance) {
       installationNumber: 'INST',
       workOrderNumber: 'WO',
       teamMemberNumber: 'TM',
+      taskNumber: 'TSK',
     };
     for (const field of object.fields) {
-      if (field.apiName in autoNumberFormats && !normalizedData[field.apiName]) {
+      const currentVal = normalizedData[field.apiName];
+      const isEmpty = !currentVal || currentVal === 'N/A';
+      if (field.apiName in autoNumberFormats && isEmpty) {
         // For propertyNumber, derive a smart prefix from address data
         const prefix = field.apiName === 'propertyNumber'
           ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
           : autoNumberFormats[field.apiName];
         const existing = await prisma.record.findMany({
-          where: { objectId: object.id },
+          where: { objectId: object.id, deletedAt: null },
           select: { data: true },
         });
         let maxNum = 0;
@@ -435,7 +440,7 @@ export async function recordRoutes(app: FastifyInstance) {
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber') ? 4 : 3;
+        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
         const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
         normalizedData[field.apiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent
@@ -473,6 +478,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicate = await prisma.record.findFirst({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: ['contact'], equals: contactVal },
           },
         });
@@ -489,6 +495,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicates = await prisma.record.findMany({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: [`TeamMember__contact`], equals: contactVal },
           },
         });
@@ -506,6 +513,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicate = await prisma.record.findFirst({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: ['account'], equals: accountVal },
           },
         });
@@ -522,6 +530,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicates = await prisma.record.findMany({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: [`TeamMember__account`], equals: accountVal },
           },
         });
@@ -643,6 +652,12 @@ export async function recordRoutes(app: FastifyInstance) {
       await tryEnsureLinkedFolder(userId, apiName, record.id, normalizedData);
     } catch { /* non-fatal */ }
 
+    // ── Ensure Property root folder + subfolders when a Property is created ──
+    if (apiName.toLowerCase() === 'property') {
+      tryEnsurePropertyRootFolder(userId, record.id, normalizedData)
+        .catch(() => { /* non-fatal */ });
+    }
+
     // ── Workflow automation ──
     runWorkflows({
       event: 'create',
@@ -703,7 +718,7 @@ export async function recordRoutes(app: FastifyInstance) {
     // Pass 1 — FK column match
     while (true) {
       const batch = await prisma.record.findMany({
-        where: { objectId: object.id, pageLayoutId: fromPageLayoutId },
+        where: { objectId: object.id, pageLayoutId: fromPageLayoutId, deletedAt: null },
         select: { id: true, data: true },
         take: BATCH_SIZE,
         skip,
@@ -732,6 +747,7 @@ export async function recordRoutes(app: FastifyInstance) {
         where: {
           objectId: object.id,
           pageLayoutId: null, // FK already cleared records are excluded; only touch un-cleared ones
+          deletedAt: null,
           data: { path: ['_pageLayoutId'], equals: fromPageLayoutId },
         },
         select: { id: true, data: true },
@@ -781,7 +797,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -792,6 +808,7 @@ export async function recordRoutes(app: FastifyInstance) {
       'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
       'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
+      'taskNumber',
     ]);
     const sanitizedUpdate = { ...updateData };
     for (const key of Object.keys(sanitizedUpdate)) {
@@ -834,6 +851,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: ['contact'], equals: contactVal },
           },
         });
@@ -850,6 +868,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: [`TeamMember__contact`], equals: contactVal },
           },
         });
@@ -867,6 +886,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: ['account'], equals: accountVal },
           },
         });
@@ -883,6 +903,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: [`TeamMember__account`], equals: accountVal },
           },
         });
@@ -1027,7 +1048,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -1055,11 +1076,184 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    await prisma.record.delete({
+    await prisma.record.update({
       where: { id: existingRecord.id },
+      data: { deletedAt: new Date(), deletedById: userId },
     });
 
     reply.code(204).send();
+  });
+
+  // ── Bulk import records (CSV import) ──────────────────────────────────
+  // POST /objects/:apiName/records/import
+  // Body: { records: Array<Record<string, any>> }
+  // Returns: { created: number, errors: Array<{ row: number, error: string }> }
+  app.post('/objects/:apiName/records/import', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const { records: rows } = req.body as { records?: Record<string, any>[] };
+
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return reply.code(400).send({ error: 'Request body must contain a non-empty "records" array.' });
+    }
+
+    // Hard limit to prevent abuse
+    if (rows.length > 5000) {
+      return reply.code(400).send({ error: 'Maximum 5,000 records per import.' });
+    }
+
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+
+    // Check create permission on the object
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records on this object.' });
+
+    // Check importData app permission (non-admin users)
+    if (userRole !== 'ADMIN') {
+      const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+      const perms = (user?.profile?.permissions as any) || {};
+      if (!perms?.app?.importData) {
+        return reply.code(403).send({ error: 'You do not have the Import Data permission.' });
+      }
+    }
+
+    // Load the object + fields
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+      include: { fields: { where: { isActive: true } } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    // Prepare auto-number info once
+    const autoNumberFormats: Record<string, string> = {
+      accountNumber: 'A', propertyNumber: 'P', contactNumber: 'C',
+      leadNumber: 'LEAD', opportunityNumber: 'OPP', productCode: 'PROD',
+      projectNumber: 'PRJ', quoteNumber: 'QTE', serviceNumber: 'SRV',
+      installationNumber: 'INST', workOrderNumber: 'WO', teamMemberNumber: 'TM',
+      taskNumber: 'TSK',
+    };
+
+    // Pre-fetch existing records for auto-number sequence
+    let maxAutoNumbers: Record<string, number> = {};
+    const autoNumberFields = object.fields.filter(f => f.apiName in autoNumberFormats);
+    if (autoNumberFields.length > 0) {
+      const existing = await prisma.record.findMany({
+        where: { objectId: object.id, deletedAt: null },
+        select: { data: true },
+      });
+      for (const field of autoNumberFields) {
+        const prefix = autoNumberFormats[field.apiName]!;
+        const prefixRegex = field.apiName === 'propertyNumber'
+          ? /^[A-Za-z]+-?(\d+)$/
+          : new RegExp(`^${prefix}-?(\\d+)$`);
+        let maxNum = 0;
+        for (const rec of existing) {
+          const recData = rec.data as Record<string, any> | null;
+          if (!recData) continue;
+          for (const [k, v] of Object.entries(recData)) {
+            const stripped = k.replace(/^[A-Za-z]+__/, '');
+            if (stripped === field.apiName && typeof v === 'string') {
+              const m = v.match(prefixRegex);
+              if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
+            }
+          }
+        }
+        maxAutoNumbers[field.apiName] = maxNum;
+      }
+    }
+
+    const autoGeneratedFieldNames = new Set(Object.keys(autoNumberFormats));
+    const requiredFields = object.fields.filter(
+      f => f.required && !autoGeneratedFieldNames.has(f.apiName)
+    );
+
+    let created = 0;
+    const errors: Array<{ row: number; error: string }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const rawData = rows[i]!;
+
+        // Normalize keys
+        const normalizedData: Record<string, any> = {};
+        for (const [key, value] of Object.entries(rawData)) {
+          if (value === '' || value === null || value === undefined) continue; // skip empty
+          normalizedData[key] = value;
+          const stripped = key.replace(/^[A-Za-z]+__/, '');
+          if (stripped !== key) normalizedData[stripped] = value;
+        }
+
+        // Auto-generate number fields
+        for (const field of autoNumberFields) {
+          const currentVal = normalizedData[field.apiName];
+          const isEmpty = !currentVal || currentVal === 'N/A';
+          if (isEmpty) {
+            const prefix = field.apiName === 'propertyNumber'
+              ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
+              : autoNumberFormats[field.apiName]!;
+            const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
+            maxAutoNumbers[field.apiName] = (maxAutoNumbers[field.apiName] || 0) + 1;
+            const generatedNum = `${prefix}${String(maxAutoNumbers[field.apiName]).padStart(padWidth, '0')}`;
+            normalizedData[field.apiName] = generatedNum;
+            normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+          }
+        }
+
+        // Validate required fields
+        const camelPrefix = apiName.charAt(0).toLowerCase() + apiName.slice(1);
+        const missing = requiredFields.filter(f => {
+          const nd = normalizedData;
+          const direct = nd[f.apiName];
+          const unprefixed = nd[f.apiName.replace(/^[A-Za-z]+__/, '')];
+          const objectPrefixed = nd[`${apiName}__${f.apiName}`];
+          const camelKey = `${camelPrefix}${f.apiName.charAt(0).toUpperCase()}${f.apiName.slice(1)}`;
+          const camelCased = nd[camelKey];
+          const hasValue = (v: any) => v !== undefined && v !== null;
+          return !hasValue(direct) && !hasValue(unprefixed) && !hasValue(objectPrefixed) && !hasValue(camelCased);
+        });
+
+        if (missing.length > 0) {
+          errors.push({ row: i + 1, error: `Missing required fields: ${missing.map(f => f.apiName).join(', ')}` });
+          continue;
+        }
+
+        // Generate record ID
+        let recordIdValue: string;
+        try {
+          recordIdValue = generateRecordId(apiName);
+        } catch {
+          registerRecordIdPrefix(apiName);
+          recordIdValue = generateRecordId(apiName);
+        }
+
+        await prisma.record.create({
+          data: {
+            id: recordIdValue,
+            objectId: object.id,
+            data: normalizedData,
+            createdById: userId,
+            modifiedById: userId,
+          },
+        });
+
+        created++;
+      } catch (err: any) {
+        errors.push({ row: i + 1, error: err.message || 'Unknown error' });
+      }
+    }
+
+    // Audit: log the import
+    logAudit({
+      actorId: userId,
+      action: 'IMPORT',
+      objectType: apiName,
+      objectId: object.id,
+      objectName: `Imported ${created} ${apiName} records`,
+      after: { totalRows: rows.length, created, errorCount: errors.length },
+      ipAddress: extractIp(req),
+    });
+
+    reply.send({ created, errors });
   });
 
 }

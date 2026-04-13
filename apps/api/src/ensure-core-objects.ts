@@ -278,7 +278,6 @@ const CORE_OBJECTS = [
       { apiName: 'weekNumber', label: 'Week Number', type: 'Number', required: true },
       { apiName: 'weekStartDate', label: 'Week Start Date', type: 'Date', required: true },
       { apiName: 'weekEndDate', label: 'Week End Date', type: 'Date', required: true },
-      // Labor hours
       { apiName: 'containerUnload', label: 'Container Unload', type: 'Number' },
       { apiName: 'woodbucks', label: 'Woodbucks', type: 'Number' },
       { apiName: 'waterproofing', label: 'Waterproofing', type: 'Number' },
@@ -291,10 +290,26 @@ const CORE_OBJECTS = [
       { apiName: 'punchListWork', label: 'Punch List Work', type: 'Number' },
       { apiName: 'finishHardware', label: 'Finish Hardware', type: 'Number' },
       { apiName: 'finalAdjustments', label: 'Final Adjustments', type: 'Number' },
-      // Expenses
       { apiName: 'perDiem', label: 'Per Diem', type: 'Currency' },
       { apiName: 'mileage', label: 'Mileage', type: 'Currency' },
       { apiName: 'materials', label: 'Materials', type: 'Currency' },
+    ],
+  },
+  {
+    apiName: 'Task',
+    label: 'Task',
+    pluralLabel: 'Tasks',
+    description: 'Tasks and activities',
+    fields: [
+      { apiName: 'taskNumber', label: 'Task Number', type: 'Text', unique: true },
+      { apiName: 'subject', label: 'Subject', type: 'Text', required: true },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Open' },
+      { apiName: 'priority', label: 'Priority', type: 'Picklist', picklistValues: ['High', 'Normal', 'Low'], defaultValue: 'Normal' },
+      { apiName: 'dueDate', label: 'Due Date', type: 'Date' },
+      { apiName: 'description', label: 'Description', type: 'LongTextArea' },
+      { apiName: 'assignedToUserId', label: 'Assigned To', type: 'Lookup' },
+      { apiName: 'relatedObjectApi', label: 'Related Object', type: 'Text' },
+      { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
     ],
   },
 ];

@@ -69,6 +69,7 @@ model User {
   modifiedLayouts        PageLayout[]      @relation("ModifiedLayouts")
   createdRecords         Record[]          @relation("CreatedRecords")
   modifiedRecords        Record[]          @relation("ModifiedRecords")
+  deletedRecords         Record[]          @relation("RecordDeletedBy")
   createdReports         Report[]          @relation("CreatedReports")
   modifiedReports        Report[]          @relation("ModifiedReports")
   createdFolders         ReportFolder[]    @relation("CreatedFolders")
@@ -377,10 +378,16 @@ model Record {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  // Soft delete
+  deletedAt    DateTime?
+  deletedBy    User?     @relation("RecordDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedById  String?
+
   @@index([objectId])
   @@index([pageLayoutId])
   @@index([createdAt])
   @@index([updatedAt])
+  @@index([deletedAt])
 }
 
 // ============================================

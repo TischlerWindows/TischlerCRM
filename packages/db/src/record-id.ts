@@ -35,6 +35,9 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   UserPreference: '029',
   Integration: '030',
   UserIntegration: '031',
+  WorkOrder: '032',
+  TeamMember: '033',
+  Task: '034',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
