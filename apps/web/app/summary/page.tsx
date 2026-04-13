@@ -971,7 +971,7 @@ export default function SummaryPage() {
   .info-grid .item .value { font-size: 9pt; padding: 2px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
   th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; }
+  th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; white-space: normal; word-wrap: break-word; line-height: 1.15; }
   .r { text-align: right; }
   .b { font-weight: 600; }
   .mc { background: #e8f5e9; }
@@ -1968,15 +1968,16 @@ export default function SummaryPage() {
             padding: 2px 1px;
             text-align: left;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
           }
           
           th {
             background-color: #f3f4f6 !important;
             font-weight: 600;
-            position: sticky;
-            top: 0;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.15;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
           
           /* Section breaks */
