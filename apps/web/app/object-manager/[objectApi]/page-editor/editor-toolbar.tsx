@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Eye, Plus, Redo2, Save, Undo2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Redo2, Save, Settings, Undo2, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
 import { selectUndoCount, selectRedoCount } from './store';
 import type { PageLayout } from './types';
@@ -41,6 +41,9 @@ export function EditorToolbar({
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
+  const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
+  const previewMode = useEditorStore((s) => s.previewMode);
+  const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
@@ -316,15 +319,29 @@ export function EditorToolbar({
                           className="w-24 bg-transparent text-sm font-medium text-white outline-none"
                         />
                       ) : (
-                        <span
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setDraftTabLabel(tab.label);
-                            setEditingTabId(tab.id);
-                          }}
-                          title="Double-click to rename"
-                        >
-                          {tab.label}
+                        <span className="inline-flex items-center gap-1">
+                          <span
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setDraftTabLabel(tab.label);
+                              setEditingTabId(tab.id);
+                            }}
+                            title="Double-click to rename"
+                          >
+                            {tab.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedElement({ type: 'tab', id: tab.id });
+                            }}
+                            className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                            aria-label={`${tab.label} tab settings`}
+                            title="Tab properties"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </button>
                         </span>
                       )
                     ) : (
@@ -462,6 +479,35 @@ export function EditorToolbar({
               <span className="ml-1 text-xs text-gray-500">({redoCount})</span>
             )}
           </Button>
+          <div className="flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5" role="radiogroup" aria-label="Preview mode">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={previewMode === 'existing'}
+              onClick={() => setPreviewMode('existing')}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                previewMode === 'existing'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Existing Record
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={previewMode === 'new'}
+              onClick={() => setPreviewMode('new')}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                previewMode === 'new'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              New Record
+            </button>
+          </div>
+
           <Button variant="outline" size="sm" type="button" onClick={onPreview}>
             <Eye className="mr-1.5 h-4 w-4" />
             Preview

@@ -6,6 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Eye, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { LayoutPanel, LayoutSection } from './types';
 import { useEditorStore } from './editor-store';
+import type { PreviewMode } from './store/selection-slice';
 import { CanvasPanel } from './canvas-panel';
 import { CanvasWidgetCard } from './canvas-widget';
 import { CanvasErrorBoundary } from './canvas-error-boundary';
@@ -40,6 +41,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
   const removeSection = useEditorStore((s) => s.removeSection);
   const resizeSection = useEditorStore((s) => s.resizeSection);
   const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
+  const previewMode = useEditorStore((s) => s.previewMode);
+
+  const isHiddenInPreviewMode =
+    (previewMode === 'new' && region.hideOnNew) ||
+    (previewMode === 'existing' && region.hideOnExisting);
 
   const hasVisibilityRule = useMemo(
     () =>
@@ -255,9 +261,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
-          {region.hidden ? (
+          {region.hidden || isHiddenInPreviewMode ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
-              <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+              <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+                {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : 'Existing'} Record` : 'Hidden'}
+              </span>
             </div>
           ) : null}
 
@@ -374,9 +382,11 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {region.hidden ? (
+      {region.hidden || isHiddenInPreviewMode ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
-          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+            {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : 'Existing'} Record` : 'Hidden'}
+          </span>
         </div>
       ) : null}
 

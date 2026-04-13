@@ -101,3 +101,22 @@ export function getFormattingEffectsForRegion(
   }
   return null;
 }
+
+export function getFormattingEffectsForTab(
+  layout: PageLayout | null | undefined,
+  tabId: string,
+  data: RecordData,
+  context?: VisibilityContext
+): FormattingRule['effects'] | null {
+  const rules = getLayoutFormattingRules(layout)
+    .filter((r) => r.active !== false)
+    .filter((r) => r.target.kind === 'tab' && r.target.tabId === tabId)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  for (const rule of rules) {
+    if (evaluateVisibility(rule.when, data, context)) {
+      return rule.effects;
+    }
+  }
+  return null;
+}

@@ -43,6 +43,7 @@ export type ResolvedSelection =
       field: PanelField;
     }
   | { kind: 'widget'; tab: LayoutTab; region: LayoutSection; widget: LayoutWidget }
+  | { kind: 'tab'; tab: LayoutTab }
   | null;
 
 export interface FloatingPropertiesProps {
@@ -163,13 +164,92 @@ export function TabBar({
   );
 }
 
+/* ---------- Hide on New/Existing checkboxes ---------- */
+
+function getHideOnHelperText(
+  hideOnNew: boolean | undefined,
+  hideOnExisting: boolean | undefined,
+  elementLabel: string,
+): string | null {
+  if (hideOnNew && hideOnExisting) {
+    return `This ${elementLabel} is hidden everywhere. Consider using formatting rules instead.`;
+  }
+  if (hideOnNew) {
+    return `This ${elementLabel} will only appear after the record is saved.`;
+  }
+  if (hideOnExisting) {
+    return `This ${elementLabel} will only appear on the New Record form.`;
+  }
+  return null;
+}
+
+export function HideOnCheckboxes({
+  hideOnNew,
+  hideOnExisting,
+  onChange,
+  elementLabel,
+}: {
+  hideOnNew?: boolean;
+  hideOnExisting?: boolean;
+  onChange: (patch: { hideOnNew?: boolean; hideOnExisting?: boolean }) => void;
+  elementLabel: string;
+}) {
+  const helperText = getHideOnHelperText(hideOnNew, hideOnExisting, elementLabel);
+
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+        Record Visibility
+      </div>
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!hideOnNew}
+            onChange={(e) => onChange({ hideOnNew: e.target.checked || undefined })}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Hide on New Record
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={!!hideOnExisting}
+            onChange={(e) => onChange({ hideOnExisting: e.target.checked || undefined })}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Hide on Existing Record
+        </label>
+      </div>
+      {helperText && (
+        <p className="mt-1.5 text-[11px] text-gray-400 italic">{helperText}</p>
+      )}
+    </div>
+  );
+}
+
 export function VisibilityTab({ selection, availableFields = [] }: { selection: ResolvedSelection; availableFields?: import('@/lib/schema').FieldDef[] }) {
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const updateSection = useEditorStore((s) => s.updateSection);
   const updateField = useEditorStore((s) => s.updateField);
+  const updateTab = useEditorStore((s) => s.updateTab);
 
   if (!selection) return null;
   if (selection.kind === 'widget') return null;
+
+  // For tabs, only show the HideOnCheckboxes (no always show/hide or visibleIf)
+  if (selection.kind === 'tab') {
+    return (
+      <div className="overflow-y-auto flex-1 p-3 space-y-4">
+        <HideOnCheckboxes
+          hideOnNew={selection.tab.hideOnNew}
+          hideOnExisting={selection.tab.hideOnExisting}
+          onChange={(patch) => updateTab(selection.tab.id, patch)}
+          elementLabel="tab"
+        />
+      </div>
+    );
+  }
 
   const isHidden =
     selection.kind === 'field'
@@ -251,6 +331,45 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
             Always hide
           </button>
         </div>
+      </div>
+
+      <div className="border-t border-gray-100 pt-3">
+        <HideOnCheckboxes
+          hideOnNew={
+            selection.kind === 'field'
+              ? selection.field.hideOnNew
+              : selection.kind === 'panel'
+              ? selection.panel.hideOnNew
+              : selection.kind === 'region'
+              ? selection.region.hideOnNew
+              : undefined
+          }
+          hideOnExisting={
+            selection.kind === 'field'
+              ? selection.field.hideOnExisting
+              : selection.kind === 'panel'
+              ? selection.panel.hideOnExisting
+              : selection.kind === 'region'
+              ? selection.region.hideOnExisting
+              : undefined
+          }
+          onChange={(patch) => {
+            if (selection.kind === 'field') {
+              updateField(selection.field.fieldApiName, selection.panel.id, patch);
+            } else if (selection.kind === 'panel') {
+              updatePanel(selection.panel.id, patch);
+            } else if (selection.kind === 'region') {
+              updateSection(selection.region.id, patch);
+            }
+          }}
+          elementLabel={
+            selection.kind === 'field'
+              ? 'field'
+              : selection.kind === 'panel'
+              ? 'panel'
+              : 'section'
+          }
+        />
       </div>
 
       {(selection.kind === 'region' || selection.kind === 'panel') && (

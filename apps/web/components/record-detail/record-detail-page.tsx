@@ -10,7 +10,7 @@ import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
-import { getFormattingEffectsForField } from '@/lib/layout-formatting';
+import { getFormattingEffectsForField, getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import { useRecordSetupContext } from '@/lib/record-setup-context';
@@ -387,9 +387,18 @@ export default function RecordDetailPage({
           <div className="space-y-4">
             {/* Tab navigation */}
             {pageLayout.tabs.length > 1 && (() => {
-              const sortedTabsForNav = [...pageLayout.tabs].sort((a: any, b: any) =>
-                (a.order ?? 0) - (b.order ?? 0),
-              );
+              const sortedTabsForNav = [...pageLayout.tabs]
+                .filter((tab: any) => {
+                  // Hide tabs with hideOnExisting flag (detail page = existing record)
+                  if (tab.hideOnExisting) return false;
+                  // Hide tabs via formatting rules
+                  const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                  if (tabFx?.hidden) return false;
+                  return true;
+                })
+                .sort((a: any, b: any) =>
+                  (a.order ?? 0) - (b.order ?? 0),
+                );
               return (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {sortedTabsForNav.map((tab: any, idx: number) => (
@@ -412,9 +421,16 @@ export default function RecordDetailPage({
             {/* Render tabs */}
             {pageLayout.tabs.length > 1
               ? (() => {
-                  const sortedTabsForRender = [...pageLayout.tabs].sort((a: any, b: any) =>
-                    (a.order ?? 0) - (b.order ?? 0),
-                  );
+                  const sortedTabsForRender = [...pageLayout.tabs]
+                    .filter((tab: any) => {
+                      if (tab.hideOnExisting) return false;
+                      const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                      if (tabFx?.hidden) return false;
+                      return true;
+                    })
+                    .sort((a: any, b: any) =>
+                      (a.order ?? 0) - (b.order ?? 0),
+                    );
                   const tab = sortedTabsForRender[activeTabIdx] ?? sortedTabsForRender[0];
                   return (
                     <RecordTabRenderer
@@ -434,7 +450,14 @@ export default function RecordDetailPage({
                     />
                   );
                 })()
-              : pageLayout.tabs.map((tab, ti) => (
+              : pageLayout.tabs
+                  .filter((tab: any) => {
+                    if (tab.hideOnExisting) return false;
+                    const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                    if (tabFx?.hidden) return false;
+                    return true;
+                  })
+                  .map((tab, ti) => (
                   <RecordTabRenderer
                     key={(tab as any).id ?? ti}
                     tab={tab}

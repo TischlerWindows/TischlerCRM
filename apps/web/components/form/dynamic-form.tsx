@@ -53,6 +53,16 @@ export interface DynamicFormProps {
   onCancel?: () => void;
 }
 
+/** Returns true if an element should be hidden based on record lifecycle state. */
+function isHiddenByLifecycle(
+  element: { hideOnNew?: boolean; hideOnExisting?: boolean },
+  mode: 'create' | 'edit',
+): boolean {
+  if (mode === 'create' && element.hideOnNew) return true;
+  if (mode === 'edit' && element.hideOnExisting) return true;
+  return false;
+}
+
 // ── DynamicForm ─────────────────────────────────────────────────────
 
 export default function DynamicForm({
@@ -183,10 +193,12 @@ export default function DynamicForm({
   }, [object, layoutId, layoutType]);
 
   useEffect(() => {
-    if (layout && layout.tabs.length > 0 && !activeTab && layout.tabs[0]) {
-      setActiveTab(layout.tabs[0].id);
+    if (layout && layout.tabs.length > 0 && !activeTab) {
+      const firstVisible = layout.tabs.find((t) => !isHiddenByLifecycle(t as any, layoutType));
+      if (firstVisible) setActiveTab(firstVisible.id);
+      else if (layout.tabs[0]) setActiveTab(layout.tabs[0].id);
     }
-  }, [layout, activeTab]);
+  }, [layout, activeTab, layoutType]);
 
   // Auto-populate AutoUser fields
   useEffect(() => {
@@ -394,9 +406,13 @@ export default function DynamicForm({
       fieldDef: FieldDef;
     }> = [];
     layout.tabs.forEach((tab) => {
+      if (isHiddenByLifecycle(tab as any, layoutType)) return;
       tab.regions.forEach((region) => {
+        if (isHiddenByLifecycle(region as any, layoutType)) return;
         region.panels.forEach((panel) => {
+          if (isHiddenByLifecycle(panel as any, layoutType)) return;
           panel.fields.forEach((field) => {
+            if (isHiddenByLifecycle(field as any, layoutType)) return;
             const fd = getFieldDef(field.fieldApiName, field as any);
             if (fd) pairs.push({ panelField: field, fieldDef: fd });
           });
@@ -432,7 +448,9 @@ export default function DynamicForm({
     if (layoutType !== 'create') return [];
     const allSections: { section: LayoutPanel; tabLabel: string; regionLabel: string }[] = [];
     layout.tabs.forEach((tab) => {
+      if (isHiddenByLifecycle(tab as any, layoutType)) return;
       tab.regions.forEach((region) => {
+        if (isHiddenByLifecycle(region as any, layoutType)) return;
         region.panels
           .sort((a, b) => a.order - b.order)
           .forEach((panel) => {
@@ -459,6 +477,7 @@ export default function DynamicForm({
               !regionFx?.hidden &&
               !panelFx?.hidden &&
               !panel.hidden &&
+              !isHiddenByLifecycle(panel as any, layoutType) &&
               evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx)
             ) {
               allSections.push({ section: panel, tabLabel: tab.label, regionLabel: region.label });
@@ -745,6 +764,7 @@ export default function DynamicForm({
       rowSpan: number;
     }[] = [];
     for (const f of panel.fields) {
+      if (isHiddenByLifecycle(f as any, layoutType)) continue;
       const fd = getFieldDef(f.fieldApiName, f as any);
       if (fd) {
         gridFields.push({
@@ -962,7 +982,9 @@ export default function DynamicForm({
         {/* Tabs */}
         {!isWizardMode && layout.tabs.length > 1 && (
           <div className="flex gap-2 border-b px-6 pt-4 bg-white">
-            {layout.tabs.map((tab) => (
+            {layout.tabs
+              .filter((tab) => !isHiddenByLifecycle(tab as any, layoutType))
+              .map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -1019,9 +1041,11 @@ export default function DynamicForm({
                   // belong on the record detail page (rendered post-creation).
                   const cfg = (item.widget as any).config;
                   if (cfg?.type === 'ExternalWidget') return false;
+                  if (isHiddenByLifecycle(item.widget as any, layoutType)) return false;
                   return true;
                 }
                 const region = item.region;
+                if (isHiddenByLifecycle(region as any, layoutType)) return false;
                 const isRegionVisible = evaluateVisibility(
                   (region as any).visibleIf,
                   formData,
@@ -1069,6 +1093,7 @@ export default function DynamicForm({
                     const visiblePanels = region.panels
                       .filter((p) => {
                         if (p.hidden) return false;
+                        if (isHiddenByLifecycle(p as any, layoutType)) return false;
                         if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
                         const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
                         if (panelFx?.hidden) return false;
@@ -1168,9 +1193,12 @@ export default function DynamicForm({
                     return true;
                   })
                   .map((panelItem) => {
+                    const lifecycleFields = panelItem.fields.filter(
+                      (f) => !isHiddenByLifecycle(f as any, layoutType),
+                    );
                     const columnArrays: FieldDef[][] = [];
                     for (let ci = 0; ci < panelItem.columns; ci++) {
-                      columnArrays[ci] = panelItem.fields
+                      columnArrays[ci] = lifecycleFields
                         .filter(
                           (f) =>
                             ((f as any).column ??

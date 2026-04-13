@@ -10,6 +10,7 @@ import {
   getFormattingEffectsForPanel,
   getFormattingEffectsForRegion,
   getFormattingEffectsForSection,
+  getFormattingEffectsForTab,
 } from '@/lib/layout-formatting';
 import {
   badgePillClass,
@@ -161,6 +162,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
   const visibleRegions = regions.filter((region) => {
     if (region.hidden) return false;
+    if ((region as any).hideOnExisting) return false;
     if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData)) return false;
     const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
     return !regionFx?.hidden;
@@ -178,7 +180,9 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
   // Render a single region's inner content (panels + widgets)
   const renderRegion = (region: LayoutSection) => {
     const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
-    const sortedWidgets = [...(region.widgets ?? [])].sort((a: any, b: any) => a.order - b.order);
+    const sortedWidgets = [...(region.widgets ?? [])]
+      .filter((w: any) => !w.hideOnExisting)
+      .sort((a: any, b: any) => a.order - b.order);
 
     const regionStyle: React.CSSProperties = {
       ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
@@ -197,6 +201,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
         {/* Panels */}
           {sortedPanels.map((panel: any) => {
             if (panel.hidden) return null;
+            if (panel.hideOnExisting) return null;
             if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
             const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
@@ -204,6 +209,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
+            if (f.hideOnExisting) return false;
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;

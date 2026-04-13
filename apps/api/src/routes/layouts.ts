@@ -26,6 +26,7 @@ const conditionExprSchema = z.object({
 const formattingRuleTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('field'), fieldApiName: z.string() }),
   z.object({ kind: z.literal('section'), sectionId: z.string() }),
+  z.object({ kind: z.literal('tab'), tabId: z.string() }),
 ]);
 
 const formattingRuleSchema = z.object({
@@ -62,6 +63,8 @@ const layoutFieldSchema = z.object({
   colSpan: z.number().min(1).max(3).optional(),
   rowSpan: z.number().min(1).max(6).optional(),
   presentation: fieldPresentationSchema.optional(),
+  hideOnNew: z.boolean().optional(),
+  hideOnExisting: z.boolean().optional(),
 });
 
 const layoutSectionSchema = z.object({
@@ -74,6 +77,8 @@ const layoutSectionSchema = z.object({
   visibleIf: z.array(conditionExprSchema).optional(),
   description: z.string().max(500).optional().nullable(),
   fields: z.array(layoutFieldSchema),
+  hideOnNew: z.boolean().optional(),
+  hideOnExisting: z.boolean().optional(),
 });
 
 const layoutTabSchema = z.object({
@@ -81,6 +86,8 @@ const layoutTabSchema = z.object({
   label: z.string(),
   order: z.number(),
   sections: z.array(layoutSectionSchema),
+  hideOnNew: z.boolean().optional(),
+  hideOnExisting: z.boolean().optional(),
 });
 
 const extensionsObjectSchema = z

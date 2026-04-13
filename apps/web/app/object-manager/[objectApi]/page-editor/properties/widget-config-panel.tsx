@@ -10,7 +10,7 @@ import { getWidgetById, getExternalRegistration, getInternalRegistrationByType }
 import type { LayoutTab, LayoutSection, LayoutWidget } from '../types';
 import { useEditorStore } from '../editor-store';
 import { useSchemaStore } from '@/lib/schema-store';
-import { parseNumber } from './shared';
+import { parseNumber, HideOnCheckboxes } from './shared';
 
 interface WidgetConfigPanelProps {
   selection: {
@@ -267,6 +267,15 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
           </p>
         </div>
       )}
+
+      <div className="border-t border-gray-200 pt-3">
+        <HideOnCheckboxes
+          hideOnNew={selection.widget.hideOnNew}
+          hideOnExisting={selection.widget.hideOnExisting}
+          onChange={(patch) => updateWidget(selection.widget.id, patch)}
+          elementLabel="widget"
+        />
+      </div>
 
       <div className="border-t border-gray-200 pt-3">
         <Button
