@@ -7,18 +7,19 @@ import { KpiBar } from './components/kpi-bar'
 import { Toolbar } from './components/toolbar'
 import { ProjectCostsTab } from './components/project-costs-tab'
 import { TechniciansTab } from './components/technicians-tab'
-import { SummaryTab } from './components/summary-tab'
+import { VarianceReportTab } from './components/variance-report-tab'
+import { ExecutiveSummaryTab } from './components/executive-summary-tab'
 import { TechnicianModal } from './components/technician-modal'
 import { num } from './utils/calculations'
 
-type Tab = 'costs' | 'technicians' | 'summary'
+type Tab = 'costs' | 'technicians' | 'variance' | 'executive'
 
 export default function InstallationCostGridWidget({ record }: WidgetProps) {
   const installationId = record?.id ? String(record.id) : undefined
   const {
     data, loading, error, saving, isDirty, dirty,
-    setCostField, setTechExpenseField,
-    save, addWeek, removeWeek, recalculate,
+    setCostField, setTechExpenseField, setEstimateField,
+    save, saveEstimates, addWeek, removeWeek, recalculate,
     assignTechnician, removeTechnician, reload,
   } = useInstallationData(installationId)
 
@@ -50,7 +51,8 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'costs', label: 'Project Costs' },
     { id: 'technicians', label: `Technicians (${techCount})` },
-    { id: 'summary', label: 'Summary' },
+    { id: 'variance', label: 'Variance Report' },
+    { id: 'executive', label: 'Executive Summary' },
   ]
 
   return (
@@ -98,8 +100,23 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
         {activeTab === 'technicians' && (
           <TechniciansTab techExpenses={data.techExpenses} dirtyExpenses={dirty.techExpenses} onFieldChange={setTechExpenseField} />
         )}
-        {activeTab === 'summary' && (
-          <SummaryTab costs={data.costs} techExpenses={data.techExpenses} dirtyCosts={dirty.costs} dirtyExpenses={dirty.techExpenses} />
+        {activeTab === 'variance' && (
+          <VarianceReportTab
+            installationData={instData}
+            costs={data.costs}
+            techExpenses={data.techExpenses}
+            dirtyEstimates={dirty.estimates}
+            onEstimateChange={setEstimateField}
+            onSaveEstimates={saveEstimates}
+            saving={saving}
+          />
+        )}
+        {activeTab === 'executive' && (
+          <ExecutiveSummaryTab
+            installationData={instData}
+            costs={data.costs}
+            techExpenses={data.techExpenses}
+          />
         )}
       </div>
 

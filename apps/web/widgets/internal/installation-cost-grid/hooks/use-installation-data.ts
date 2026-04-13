@@ -16,6 +16,7 @@ interface InstallationData {
 interface DirtyState {
   costs: Record<string, Record<string, number>>
   techExpenses: Record<string, Record<string, number>>
+  estimates: Record<string, number>
 }
 
 export function useInstallationData(installationId: string | undefined) {
@@ -23,9 +24,9 @@ export function useInstallationData(installationId: string | undefined) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState<DirtyState>({ costs: {}, techExpenses: {} })
+  const [dirty, setDirty] = useState<DirtyState>({ costs: {}, techExpenses: {}, estimates: {} })
 
-  const isDirty = Object.keys(dirty.costs).length > 0 || Object.keys(dirty.techExpenses).length > 0
+  const isDirty = Object.keys(dirty.costs).length > 0 || Object.keys(dirty.techExpenses).length > 0 || Object.keys(dirty.estimates).length > 0
 
   const load = useCallback(async () => {
     if (!installationId) return
@@ -57,6 +58,28 @@ export function useInstallationData(installationId: string | undefined) {
     }))
   }, [])
 
+  const setEstimateField = useCallback((field: string, value: number) => {
+    setDirty(prev => ({
+      ...prev,
+      estimates: { ...prev.estimates, [field]: value },
+    }))
+  }, [])
+
+  const saveEstimates = useCallback(async () => {
+    if (!installationId || Object.keys(dirty.estimates).length === 0) return
+    setSaving(true)
+    setError(null)
+    try {
+      await apiClient.put(`${BASE}/${installationId}/estimates`, dirty.estimates)
+      setDirty(prev => ({ ...prev, estimates: {} }))
+      await load()
+    } catch (err: any) {
+      setError(err.message || 'Failed to save estimates')
+    } finally {
+      setSaving(false)
+    }
+  }, [installationId, dirty.estimates, load])
+
   const save = useCallback(async () => {
     if (!installationId) return
     setSaving(true)
@@ -70,8 +93,11 @@ export function useInstallationData(installationId: string | undefined) {
       if (expenseUpdates.length > 0) {
         await apiClient.put(`${BASE}/${installationId}/tech-expenses`, { updates: expenseUpdates })
       }
+      if (Object.keys(dirty.estimates).length > 0) {
+        await apiClient.put(`${BASE}/${installationId}/estimates`, dirty.estimates)
+      }
       await apiClient.post(`${BASE}/${installationId}/recalculate`)
-      setDirty({ costs: {}, techExpenses: {} })
+      setDirty({ costs: {}, techExpenses: {}, estimates: {} })
       await load()
     } catch (err: any) {
       setError(err.message || 'Failed to save')
@@ -127,8 +153,8 @@ export function useInstallationData(installationId: string | undefined) {
 
   return {
     data, loading, error, saving, isDirty, dirty,
-    setCostField, setTechExpenseField,
-    save, addWeek, removeWeek, recalculate,
+    setCostField, setTechExpenseField, setEstimateField,
+    save, saveEstimates, addWeek, removeWeek, recalculate,
     assignTechnician, removeTechnician, reload: load,
   }
 }
