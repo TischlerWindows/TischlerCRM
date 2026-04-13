@@ -40,6 +40,11 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const resizeField = useEditorStore((s) => s.resizeField);
   const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
+  const previewMode = useEditorStore((s) => s.previewMode);
+
+  const isHiddenInPreviewMode =
+    (previewMode === 'new' && field.hideOnNew) ||
+    (previewMode === 'existing' && field.hideOnExisting);
 
   const hasVisibilityRule = useMemo(
     () =>
@@ -192,7 +197,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
         isSelected
           ? 'border-brand-navy bg-brand-navy/5 shadow-sm'
           : 'border-gray-200 hover:border-gray-300'
-      }`}
+      } ${isHiddenInPreviewMode ? 'opacity-40' : ''}`}
       onClick={(event) => {
         event.stopPropagation();
         setSelectedElement({
@@ -221,6 +226,11 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
             {field.behavior !== 'none' && (
               <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
                 {toBehaviorLabel(field.behavior)}
+              </span>
+            )}
+            {isHiddenInPreviewMode && (
+              <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-blue-600">
+                {previewMode === 'new' ? 'Hide on New' : 'Hide on Edit'}
               </span>
             )}
             {hasVisibilityRule && (

@@ -11,6 +11,7 @@ import { RegionProperties } from './region-properties';
 import { PanelProperties } from './panel-properties';
 import { FieldProperties } from './field-properties';
 import { WidgetConfigPanel } from './widget-config-panel';
+import { TabProperties } from './tab-properties';
 
 export function FloatingProperties({ onClose, availableFields = [] }: FloatingPropertiesProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -28,6 +29,10 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
     if (!selectedElement) return null;
 
     for (const tab of layout.tabs) {
+      if (selectedElement.type === 'tab' && selectedElement.id === tab.id) {
+        return { kind: 'tab', tab };
+      }
+
       for (const region of tab.regions) {
         if (selectedElement.type === 'region' && selectedElement.id === region.id) {
           return { kind: 'region', tab, region };
@@ -79,6 +84,9 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
       if (selection.kind === 'region') {
         return rule.target.kind === 'region' && rule.target.regionId === selection.region.id;
       }
+      if (selection.kind === 'tab') {
+        return rule.target.kind === 'tab' && rule.target.tabId === selection.tab.id;
+      }
       return false;
     }).length;
   }, [layout.formattingRules, selection]);
@@ -122,6 +130,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
           {selection.kind === 'panel' && 'Panel Properties'}
           {selection.kind === 'field' && 'Field Properties'}
           {selection.kind === 'widget' && 'Widget Properties'}
+          {selection.kind === 'tab' && 'Tab Properties'}
         </div>
         <Button
           type="button"
@@ -147,6 +156,7 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
           {selection.kind === 'widget' && (
             <WidgetConfigPanel selection={selection} availableFields={availableFields} />
           )}
+          {selection.kind === 'tab' && <TabProperties selection={selection} />}
         </div>
       )}
 

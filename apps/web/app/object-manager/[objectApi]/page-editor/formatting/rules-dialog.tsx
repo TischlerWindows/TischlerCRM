@@ -26,6 +26,7 @@ import type {
   FieldTargetOption,
   PanelTargetOption,
   RegionTargetOption,
+  TabTargetOption,
   TargetOptions,
 } from './types';
 import {
@@ -169,12 +170,17 @@ export function FormattingRulesDialog({
 
   const fieldLabelMap = useMemo(() => buildFieldLabelMap(objectFields), [objectFields]);
 
-  const { fieldTargets, panelTargets, regionTargets } = useMemo(() => {
+  const { fieldTargets, panelTargets, regionTargets, tabTargets } = useMemo(() => {
     const nextFieldTargets: FieldTargetOption[] = [];
     const nextPanelTargets: PanelTargetOption[] = [];
     const nextRegionTargets: RegionTargetOption[] = [];
+    const nextTabTargets: TabTargetOption[] = [];
 
     for (const tab of layout.tabs) {
+      nextTabTargets.push({
+        tabId: tab.id,
+        label: tab.label,
+      });
       for (const region of tab.regions) {
         nextRegionTargets.push({
           regionId: region.id,
@@ -201,6 +207,7 @@ export function FormattingRulesDialog({
       fieldTargets: nextFieldTargets,
       panelTargets: nextPanelTargets,
       regionTargets: nextRegionTargets,
+      tabTargets: nextTabTargets,
     };
   }, [layout, fieldLabelMap]);
 
@@ -260,9 +267,10 @@ export function FormattingRulesDialog({
   const hasFieldTargetOptions = fieldTargets.length > 0;
   const hasPanelTargetOptions = panelTargets.length > 0;
   const hasRegionTargetOptions = regionTargets.length > 0;
+  const hasTabTargetOptions = tabTargets.length > 0;
   const hasAnyValidTargetOptions =
-    hasFieldTargetOptions || hasPanelTargetOptions || hasRegionTargetOptions;
-  const targetOptions: TargetOptions = { fieldTargets, panelTargets, regionTargets };
+    hasFieldTargetOptions || hasPanelTargetOptions || hasRegionTargetOptions || hasTabTargetOptions;
+  const targetOptions: TargetOptions = { fieldTargets, panelTargets, regionTargets, tabTargets };
   const hasInvalidOrUnresolvedTargets = working.some(
     (rule) => !isTargetValid(rule.target, targetOptions),
   );
@@ -275,7 +283,7 @@ export function FormattingRulesDialog({
 
   const addRule = () => {
     if (!hasAnyValidTargetOptions) return;
-    let defaultTarget = resolveDefaultTarget(fieldTargets, panelTargets, regionTargets);
+    let defaultTarget = resolveDefaultTarget(fieldTargets, panelTargets, regionTargets, tabTargets);
     if (targetFilter) {
       if (targetFilter.type === 'panel') {
         const match = panelTargets.find((p) => p.panelId === targetFilter.id);
@@ -391,6 +399,7 @@ export function FormattingRulesDialog({
                         fieldTargets,
                         panelTargets,
                         regionTargets,
+                        tabTargets,
                       )}
                       onToggleActive={(next) =>
                         updateRule(rule.id, (current) => ({ ...current, active: next }))
@@ -417,6 +426,7 @@ export function FormattingRulesDialog({
                             fieldTargets,
                             panelTargets,
                             regionTargets,
+                            tabTargets,
                           )}
                           onToggleActive={(next) =>
                             updateRule(rule.id, (current) => ({ ...current, active: next }))
@@ -444,9 +454,11 @@ export function FormattingRulesDialog({
                   fieldTargets={fieldTargets}
                   panelTargets={panelTargets}
                   regionTargets={regionTargets}
+                  tabTargets={tabTargets}
                   hasFieldTargetOptions={hasFieldTargetOptions}
                   hasPanelTargetOptions={hasPanelTargetOptions}
                   hasRegionTargetOptions={hasRegionTargetOptions}
+                  hasTabTargetOptions={hasTabTargetOptions}
                   onUpdateRule={updateRule}
                 />
 

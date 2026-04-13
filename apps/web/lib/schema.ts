@@ -189,7 +189,8 @@ export interface PageFieldPresentation {
 export type FormattingRuleTarget =
   | { kind: 'field'; fieldApiName: string; panelId: string }
   | { kind: 'panel'; panelId: string }
-  | { kind: 'region'; regionId: string };
+  | { kind: 'region'; regionId: string }
+  | { kind: 'tab'; tabId: string };
 
 export type FieldHighlightToken = 'none' | 'subtle' | 'attention' | 'positive' | 'critical';
 
@@ -475,6 +476,8 @@ export interface PanelField {
   labelStyle: LabelStyle;
   valueStyle: ValueStyle;
   behavior: 'none' | 'required' | 'readOnly' | 'hidden';
+  hideOnNew?: boolean;       // Hide on New Record form
+  hideOnExisting?: boolean;  // Hide on Existing Record
 }
 
 export interface LayoutPanel {
@@ -486,6 +489,8 @@ export interface LayoutPanel {
   fields: PanelField[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
   visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  hideOnNew?: boolean;       // Hide on New Record form
+  hideOnExisting?: boolean;  // Hide on Existing Record
 }
 
 export interface LayoutWidget {
@@ -495,6 +500,8 @@ export interface LayoutWidget {
   config: WidgetConfig;
   /** When false the collapsible header bar is hidden and content renders directly. */
   collapsible?: boolean;
+  hideOnNew?: boolean;       // Hide on New Record form
+  hideOnExisting?: boolean;  // Hide on Existing Record
 }
 
 export interface LayoutSection {
@@ -509,6 +516,8 @@ export interface LayoutSection {
   widgets: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
   visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  hideOnNew?: boolean;       // Hide on New Record form
+  hideOnExisting?: boolean;  // Hide on Existing Record
 }
 
 export interface LayoutTab {
@@ -516,6 +525,8 @@ export interface LayoutTab {
   label: string;
   order: number;
   regions: LayoutSection[];
+  hideOnNew?: boolean;       // Hide on New Record form
+  hideOnExisting?: boolean;  // Hide on Existing Record
 }
 
 export interface PageLayout {

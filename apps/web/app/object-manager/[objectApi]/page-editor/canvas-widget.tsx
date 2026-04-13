@@ -102,6 +102,11 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const removeWidget = useEditorStore((s) => s.removeWidget);
+  const previewMode = useEditorStore((s) => s.previewMode);
+
+  const isHiddenInPreviewMode =
+    (previewMode === 'new' && (widget as any).hideOnNew) ||
+    (previewMode === 'existing' && (widget as any).hideOnExisting);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: widget.id,
     data: { type: 'widget', widgetId: widget.id },
@@ -135,7 +140,7 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
       tabIndex={0}
       aria-label={`Select ${widgetLabel} widget card`}
       data-editor-sortable-id={widget.id}
-      className={`group rounded-lg border bg-white p-2.5 transition-all ${
+      className={`group rounded-lg border bg-white p-2.5 transition-all ${isHiddenInPreviewMode ? 'opacity-40 ' : ''}${
         isSelected
           ? 'border-brand-navy/60 ring-1 ring-brand-navy/20'
           : 'border-gray-200 hover:border-brand-navy/30'

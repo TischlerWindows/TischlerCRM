@@ -9,6 +9,7 @@ import type {
   FieldTargetOption,
   PanelTargetOption,
   RegionTargetOption,
+  TabTargetOption,
   TargetKind,
   TargetOptions,
 } from './types';
@@ -34,7 +35,7 @@ export function reindexRulesPreserveOrder(rules: FormattingRule[]): FormattingRu
 }
 
 export function isTargetKind(value: string): value is TargetKind {
-  return value === 'field' || value === 'panel' || value === 'region';
+  return value === 'field' || value === 'panel' || value === 'region' || value === 'tab';
 }
 
 export function isBadgeToken(value: string): value is BadgeToken {
@@ -61,6 +62,9 @@ export function isTargetValid(target: FormattingRuleTarget, options: TargetOptio
   if (target.kind === 'panel') {
     return options.panelTargets.some((option) => option.panelId === target.panelId);
   }
+  if (target.kind === 'tab') {
+    return options.tabTargets.some((option) => option.tabId === target.tabId);
+  }
   return options.regionTargets.some((option) => option.regionId === target.regionId);
 }
 
@@ -78,6 +82,7 @@ export function resolveDefaultTarget(
   fieldTargets: FieldTargetOption[],
   panelTargets: PanelTargetOption[],
   regionTargets: RegionTargetOption[],
+  tabTargets?: TabTargetOption[],
 ): FormattingRuleTarget {
   const firstField = fieldTargets[0];
   if (firstField) {
@@ -101,6 +106,13 @@ export function resolveDefaultTarget(
       regionId: firstRegion.regionId,
     };
   }
+  const firstTab = tabTargets?.[0];
+  if (firstTab) {
+    return {
+      kind: 'tab',
+      tabId: firstTab.tabId,
+    };
+  }
   return {
     kind: 'region',
     regionId: '',
@@ -113,6 +125,7 @@ export function buildTargetForKind(
   fieldTargets: FieldTargetOption[],
   panelTargets: PanelTargetOption[],
   regionTargets: RegionTargetOption[],
+  tabTargets?: TabTargetOption[],
 ): FormattingRuleTarget {
   if (kind === 'field') {
     if (current.kind === 'field') return current;
@@ -131,6 +144,14 @@ export function buildTargetForKind(
       panelId: first?.panelId ?? '',
     };
   }
+  if (kind === 'tab') {
+    if (current.kind === 'tab') return current;
+    const first = tabTargets?.[0];
+    return {
+      kind: 'tab',
+      tabId: first?.tabId ?? '',
+    };
+  }
   if (current.kind === 'region') return current;
   const first = regionTargets[0];
   return {
@@ -144,6 +165,7 @@ export function summarizeTarget(
   fieldTargets: FieldTargetOption[],
   panelTargets: PanelTargetOption[],
   regionTargets: RegionTargetOption[],
+  tabTargets?: TabTargetOption[],
 ): string {
   if (target.kind === 'field') {
     const match = fieldTargets.find(
@@ -157,6 +179,10 @@ export function summarizeTarget(
   if (target.kind === 'panel') {
     const match = panelTargets.find((option) => option.panelId === target.panelId);
     return match ? `Panel: ${match.label}` : `Panel: ${target.panelId || 'Unknown'}`;
+  }
+  if (target.kind === 'tab') {
+    const match = tabTargets?.find((option) => option.tabId === target.tabId);
+    return match ? `Tab: ${match.label}` : `Tab: ${target.tabId || 'Unknown'}`;
   }
   const match = regionTargets.find((option) => option.regionId === target.regionId);
   return match ? `Region: ${match.label}` : `Region: ${target.regionId || 'Unknown'}`;

@@ -24,6 +24,11 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
   const updatePanel = useEditorStore((s) => s.updatePanel);
   const removePanel = useEditorStore((s) => s.removePanel);
   const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
+  const previewMode = useEditorStore((s) => s.previewMode);
+
+  const isHiddenInPreviewMode =
+    (previewMode === 'new' && (panel as any).hideOnNew) ||
+    (previewMode === 'existing' && (panel as any).hideOnExisting);
 
   const hasVisibilityRule = useMemo(
     () =>
@@ -130,9 +135,11 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
       )}
       data-region-id={regionId}
     >
-      {panel.hidden ? (
+      {panel.hidden || isHiddenInPreviewMode ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
-          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">Hidden</span>
+          <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
+            {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : 'Existing'} Record` : 'Hidden'}
+          </span>
         </div>
       ) : null}
 

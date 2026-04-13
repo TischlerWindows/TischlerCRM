@@ -17,7 +17,7 @@ import type {
   FormattingRule,
   FormattingRuleTarget,
 } from '@/lib/schema';
-import type { FieldTargetOption, PanelTargetOption, RegionTargetOption } from './types';
+import type { FieldTargetOption, PanelTargetOption, RegionTargetOption, TabTargetOption } from './types';
 import {
   buildTargetForKind,
   isTargetKind,
@@ -31,9 +31,11 @@ interface ConditionBuilderProps {
   fieldTargets: FieldTargetOption[];
   panelTargets: PanelTargetOption[];
   regionTargets: RegionTargetOption[];
+  tabTargets: TabTargetOption[];
   hasFieldTargetOptions: boolean;
   hasPanelTargetOptions: boolean;
   hasRegionTargetOptions: boolean;
+  hasTabTargetOptions: boolean;
   onUpdateRule: (id: string, updater: (rule: FormattingRule) => FormattingRule) => void;
 }
 
@@ -43,9 +45,11 @@ export function ConditionBuilder({
   fieldTargets,
   panelTargets,
   regionTargets,
+  tabTargets,
   hasFieldTargetOptions,
   hasPanelTargetOptions,
   hasRegionTargetOptions,
+  hasTabTargetOptions,
   onUpdateRule,
 }: ConditionBuilderProps) {
   const fakeFieldForEditor: FieldDef = {
@@ -86,6 +90,7 @@ export function ConditionBuilder({
                 fieldTargets,
                 panelTargets,
                 regionTargets,
+                tabTargets,
               ),
             }));
           }}
@@ -102,6 +107,9 @@ export function ConditionBuilder({
             </SelectItem>
             <SelectItem value="region" disabled={!hasRegionTargetOptions}>
               Region
+            </SelectItem>
+            <SelectItem value="tab" disabled={!hasTabTargetOptions}>
+              Tab
             </SelectItem>
           </SelectContent>
         </Select>
@@ -186,6 +194,32 @@ export function ConditionBuilder({
             <SelectContent>
               {regionTargets.map((option) => (
                 <SelectItem key={option.regionId} value={option.regionId}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {rule.target.kind === 'tab' && (
+        <div className="space-y-2">
+          <Label>Tab target</Label>
+          <Select
+            value={rule.target.tabId}
+            onValueChange={(tabId) =>
+              onUpdateRule(rule.id, (current) => ({
+                ...current,
+                target: { kind: 'tab', tabId },
+              }))
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Choose tab target" />
+            </SelectTrigger>
+            <SelectContent>
+              {tabTargets.map((option) => (
+                <SelectItem key={option.tabId} value={option.tabId}>
                   {option.label}
                 </SelectItem>
               ))}
