@@ -1,3 +1,7 @@
+/**
+ * Automations settings page — lists registered triggers and controllers
+ * with per-item enable/disable toggles (opt-out model).
+ */
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';

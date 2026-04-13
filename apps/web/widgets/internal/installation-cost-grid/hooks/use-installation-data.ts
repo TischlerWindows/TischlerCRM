@@ -1,3 +1,8 @@
+/**
+ * Data hook for the Installation Cost Grid widget.
+ * Fetches costs, tech expenses, and technicians; exposes field setters,
+ * save/reload actions, and dirty-state tracking.
+ */
 import { useState, useCallback, useEffect } from 'react'
 import { apiClient } from '@/lib/api-client'
 

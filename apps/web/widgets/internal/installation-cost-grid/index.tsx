@@ -1,3 +1,8 @@
+/**
+ * Installation Cost Grid widget — main entry point.
+ * Renders KPI bar, tabbed views (costs, technicians, variance, executive),
+ * and the technician assignment modal for a single Installation record.
+ */
 'use client'
 import { useState } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'

@@ -1,3 +1,7 @@
+/**
+ * Internal widget registry — maps widget type keys to lazy-loaded components,
+ * config panels, and manifest metadata for the page builder and renderer.
+ */
 import dynamic from 'next/dynamic'
 import type { WidgetRegistration } from '@/lib/widgets/types'
 import { config as spacerManifest } from './spacer/widget.config'
