@@ -19,9 +19,11 @@ import {
   ChevronDown,
   Database,
   GripVertical,
-  X
+  X,
+  Upload,
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import CsvImportDialog from '@/components/csv-import-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
@@ -47,7 +49,7 @@ export default function CustomObjectRecordsPage() {
   const params = useParams();
   const slug = params.slug as string;
   const { user } = useAuth();
-  const { canAccess } = usePermissions();
+  const { canAccess, hasAppPermission } = usePermissions();
   const router = useRouter();
   
   const [records, setRecords] = useState<CustomRecord[]>([]);
@@ -58,6 +60,7 @@ export default function CustomObjectRecordsPage() {
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -617,6 +620,15 @@ export default function CustomObjectRecordsPage() {
         <div className="mb-6 flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">{objectDef.label} Records</h3>
           <div className="flex gap-3">
+            {hasAppPermission('importData') && (
+              <button
+                onClick={() => setShowImportDialog(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Upload className="w-5 h-5 mr-2" />
+                Import
+              </button>
+            )}
             <button
               onClick={() => setShowFilterSettings(true)}
               className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
@@ -975,6 +987,15 @@ export default function CustomObjectRecordsPage() {
           onSubmit={handleDynamicFormSubmit}
         />
       )}
+
+      {/* CSV Import */}
+      <CsvImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        objectApiName={objectDef.apiName}
+        objectLabel={objectDef.label}
+        onImportComplete={() => window.location.reload()}
+      />
     </div>
     </div>
   );

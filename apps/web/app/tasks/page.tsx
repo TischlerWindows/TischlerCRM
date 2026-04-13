@@ -22,8 +22,10 @@ import {
   ChevronDown,
   GripVertical,
   Filter,
+  Upload,
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
+import CsvImportDialog from '@/components/csv-import-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
@@ -62,6 +64,7 @@ export default function TasksPage() {
   const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'all' | 'open' | 'my-tasks' | 'overdue' | 'completed'>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -71,7 +74,7 @@ export default function TasksPage() {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
 
   const { schema, loadSchema } = useSchemaStore();
-  const { canAccess } = usePermissions();
+  const { canAccess, hasAppPermission } = usePermissions();
   const canCreateTask = canAccess('Task', 'create');
   const canEditTask = canAccess('Task', 'edit');
   const canDeleteTask = canAccess('Task', 'delete');
@@ -472,7 +475,16 @@ export default function TasksPage() {
                   </button>
                 </div>
               )}
+              {hasAppPermission('importData') && (
               <button
+                onClick={() => setShowImportDialog(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Upload className="w-5 h-5 mr-2" />
+                Import
+              </button>
+            )}
+            <button
                 onClick={() => setShowFilterSettings(true)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
@@ -791,7 +803,16 @@ export default function TasksPage() {
             </div>
           </div>
         )}
+      {/* CSV Import */}
+      <CsvImportDialog
+        open={showImportDialog}
+        onOpenChange={setShowImportDialog}
+        objectApiName="Task"
+        objectLabel="Task"
+        onImportComplete={() => fetchTasks()}
+      />
       </div>
     </div>
   );
 }
+
