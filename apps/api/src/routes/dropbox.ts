@@ -188,6 +188,82 @@ async function dropboxApi(
   return resp.json();
 }
 
+// ── Folder ID tracking helpers ────────────────────────────────────
+// Store the Dropbox folder ID on a record so we can track renames.
+
+/** Persist a Dropbox folder ID on a record's JSON data. */
+async function storeFolderIdOnRecord(recordId: string, folderId: string): Promise<void> {
+  try {
+    const record = await prisma.record.findFirst({ where: { id: recordId } });
+    if (!record) return;
+    const data = record.data as Record<string, any>;
+    if (data._dropboxFolderId === folderId) return; // Already stored
+    await prisma.record.update({
+      where: { id: recordId },
+      data: { data: { ...data, _dropboxFolderId: folderId } },
+    });
+    console.log(`[dropbox] Stored folder ID ${folderId} on record ${recordId}`);
+  } catch (err: any) {
+    console.error(`[dropbox] Failed to store folder ID on record ${recordId}:`, err.message);
+  }
+}
+
+/**
+ * Resolve the actual Dropbox folder for a record using its stored folder ID.
+ * Returns the current Dropbox metadata (which reflects renames) or null.
+ */
+async function resolveStoredFolder(
+  accessToken: string,
+  recordId: string,
+): Promise<{ found: true; folderName: string; folderId: string; fullPath: string } | { found: false } | null> {
+  try {
+    const record = await prisma.record.findFirst({ where: { id: recordId } });
+    if (!record) return null;
+    const data = record.data as Record<string, any>;
+    const storedFolderId = data._dropboxFolderId;
+    if (!storedFolderId) return null; // No folder ID stored yet
+    try {
+      const metadata = await dropboxApi(accessToken, '/files/get_metadata', {
+        path: storedFolderId,
+      }) as { '.tag': string; id: string; name: string; path_display: string };
+      if (metadata['.tag'] !== 'folder') return { found: false };
+      return {
+        found: true,
+        folderName: metadata.name,
+        folderId: metadata.id,
+        fullPath: metadata.path_display,
+      };
+    } catch {
+      // Folder was deleted or ID is invalid
+      console.log(`[dropbox] Stored folder ID ${storedFolderId} for record ${recordId} no longer valid`);
+      return { found: false };
+    }
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Try to look up an existing folder at a given path and store its ID on the record.
+ * Used for backfilling folder IDs on records that were created before tracking.
+ */
+async function backfillFolderId(
+  accessToken: string,
+  recordId: string,
+  folderPath: string,
+): Promise<void> {
+  try {
+    const record = await prisma.record.findFirst({ where: { id: recordId } });
+    if (!record) return;
+    const data = record.data as Record<string, any>;
+    if (data._dropboxFolderId) return; // Already has an ID
+    const metadata = await dropboxApi(accessToken, '/files/get_metadata', {
+      path: folderPath,
+    }) as { id: string };
+    await storeFolderIdOnRecord(recordId, metadata.id);
+  } catch { /* non-fatal — folder may not exist */ }
+}
+
 // ── Derive Dropbox folder name from record data ───────────────────
 // Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
 function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string): string {
@@ -575,20 +651,30 @@ export async function tryEnsureLinkedFolder(
 
     console.log(`[dropbox] Creating linked folder: ${childPath}`);
 
+    // Check if the child record already has a tracked folder
+    const existingChildFolder = await resolveStoredFolder(accessToken, childRecordId);
+    if (existingChildFolder?.found) {
+      console.log(`[dropbox] Linked folder already tracked for ${childRecordId} at ${existingChildFolder.fullPath}`);
+      return; // Folder exists (possibly renamed) — nothing to create
+    }
+
     let created = false;
     try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', {
+      const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
         path: childPath,
         autorename: false,
-      });
+      }) as { metadata: { id: string; name: string; path_display: string } };
       created = true;
       console.log(`[dropbox] Successfully created linked folder: ${childPath}`);
+      // Store the Dropbox folder ID on the child record for rename tracking
+      await storeFolderIdOnRecord(childRecordId, result.metadata.id);
     } catch (err: any) {
       if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
         throw err;
       }
       console.log(`[dropbox] Linked folder already exists: ${childPath}`);
-      // Already exists — fine
+      // Already exists — backfill its ID if not already stored
+      await backfillFolderId(accessToken, childRecordId, childPath);
     }
 
     // Create subfolders for Opportunity records
@@ -740,19 +826,30 @@ export async function tryEnsurePropertyRootFolder(
     const folderName = deriveDropboxFolderName(recordData, recordId);
     const folderPath = buildFolderPath('Property', recordId, folderName);
 
+    // Check if the record already has a tracked folder (handles rename detection)
+    const existingFolder = await resolveStoredFolder(accessToken, recordId);
+    if (existingFolder?.found) {
+      console.log(`[dropbox] Property folder already tracked for ${recordId} at ${existingFolder.fullPath}`);
+      return; // Folder exists (possibly renamed) — nothing to create
+    }
+
     // Create root folder
     let created = false;
     try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', {
+      const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
         path: folderPath,
         autorename: false,
-      });
+      }) as { metadata: { id: string; name: string; path_display: string } };
       created = true;
+      // Store the Dropbox folder ID on the record for rename tracking
+      await storeFolderIdOnRecord(recordId, result.metadata.id);
     } catch (err: any) {
       if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
         console.error('[dropbox] Property root folder creation failed:', err.message);
         return;
       }
+      // Folder already exists — backfill its ID if not already stored
+      await backfillFolderId(accessToken, recordId, folderPath);
     }
 
     // Create subfolders only when the root folder was newly created
@@ -1064,8 +1161,23 @@ export async function dropboxRoutes(app: FastifyInstance) {
       if (!propertyRecord) return reply.send({ linked: false });
 
       const propertyData = propertyRecord.data as Record<string, any>;
-      const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
-      const childFolderName = deriveDropboxFolderName(recordData, recordId);
+      let parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
+      let childFolderName = deriveDropboxFolderName(recordData, recordId);
+
+      // Resolve actual folder names from stored Dropbox folder IDs (handles renames)
+      const accessToken = await getAccessToken(user.sub);
+      if (accessToken) {
+        // Check if Property folder was renamed in Dropbox
+        const parentFolder = await resolveStoredFolder(accessToken, propertyId);
+        if (parentFolder?.found) {
+          parentFolderName = parentFolder.folderName;
+        }
+        // Check if child folder was renamed in Dropbox
+        const childFolder = await resolveStoredFolder(accessToken, recordId);
+        if (childFolder?.found) {
+          childFolderName = childFolder.folderName;
+        }
+      }
 
       // For Project, also resolve the linked Opportunity folder name
       let linkedOpportunityFolderName: string | undefined;
@@ -1093,6 +1205,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
             if (oppRecord) {
               const oppData = oppRecord.data as Record<string, any>;
               linkedOpportunityFolderName = deriveDropboxFolderName(oppData, oppId);
+              // Check if Opportunity folder was renamed in Dropbox
+              if (accessToken) {
+                const oppFolder = await resolveStoredFolder(accessToken, oppId);
+                if (oppFolder?.found) {
+                  linkedOpportunityFolderName = oppFolder.folderName;
+                }
+              }
             }
           }
         }
@@ -1125,7 +1244,14 @@ export async function dropboxRoutes(app: FastifyInstance) {
       return reply.send({ connected: false, files: [] });
     }
 
-    const basePath = buildFolderPath(objectApiName, recordId, folderName);
+    // Resolve actual folder path — prefer stored folder ID to handle renames
+    let basePath: string;
+    const storedFolder = await resolveStoredFolder(accessToken, recordId);
+    if (storedFolder?.found) {
+      basePath = storedFolder.fullPath;
+    } else {
+      basePath = buildFolderPath(objectApiName, recordId, folderName);
+    }
     const folderPath = subPath ? `${basePath}/${subPath}` : basePath;
 
     try {
@@ -1304,6 +1430,17 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
+    // ── Check if this record already has a tracked Dropbox folder ID ──
+    // This prevents duplicate folder creation when a folder was renamed in Dropbox.
+    const storedFolder = await resolveStoredFolder(accessToken, recordId);
+    if (storedFolder?.found) {
+      return reply.send({
+        created: false,
+        path: storedFolder.fullPath,
+        folderName: storedFolder.folderName,
+      });
+    }
+
     // ── If this record type is linked to a Property, ensure the linked
     //    subfolder instead of creating a top-level folder. ──
     const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
@@ -1341,20 +1478,43 @@ export async function dropboxRoutes(app: FastifyInstance) {
               : null;
             if (propertyRecord) {
               const pData = propertyRecord.data as Record<string, any>;
-              const parentFolderName = deriveDropboxFolderName(pData, propertyId);
+
+              // Resolve parent Property folder via stored ID (handles renames)
+              let parentPath: string;
+              const parentFolder = await resolveStoredFolder(accessToken, propertyId);
+              if (parentFolder?.found) {
+                parentPath = parentFolder.fullPath;
+              } else {
+                const parentFolderName = deriveDropboxFolderName(pData, propertyId);
+                parentPath = buildFolderPath('Property', propertyId, parentFolderName);
+              }
+
               const childFolderName = folderName || deriveDropboxFolderName(rData, recordId);
-              const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
               const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
               // Ensure the parent Property folder + subfolder exist
+              let childFolderId: string | undefined;
               for (const p of [parentPath, `${parentPath}/${subfolder}`, childPath]) {
                 try {
-                  await dropboxApi(accessToken, '/files/create_folder_v2', { path: p, autorename: false });
+                  const result = await dropboxApi(accessToken, '/files/create_folder_v2', { path: p, autorename: false }) as { metadata: { id: string } };
+                  // Store the child folder ID (last one in the loop)
+                  if (p === childPath) childFolderId = result.metadata.id;
+                  // Store the parent folder ID if it was just created
+                  if (p === parentPath) await storeFolderIdOnRecord(propertyId, result.metadata.id);
                 } catch { /* already exists */ }
               }
+              // Store child folder ID
+              if (childFolderId) {
+                await storeFolderIdOnRecord(recordId, childFolderId);
+              } else {
+                // Child already existed — backfill its ID
+                await backfillFolderId(accessToken, recordId, childPath);
+              }
+              // Backfill parent ID if not stored
+              await backfillFolderId(accessToken, propertyId, parentPath);
 
-              return reply.send({ created: true, path: childPath, linked: true });
+              return reply.send({ created: true, path: childPath, linked: true, folderName: childFolderName });
             }
           }
         }
@@ -1366,17 +1526,21 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     let created = false;
     try {
-      await dropboxApi(accessToken, '/files/create_folder_v2', {
+      const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
         path: folderPath,
         autorename: false,
-      });
+      }) as { metadata: { id: string; name: string; path_display: string } };
       created = true;
+      // Store the Dropbox folder ID on the record for rename tracking
+      await storeFolderIdOnRecord(recordId, result.metadata.id);
     } catch (err: any) {
       // 409 conflict means the folder already exists — that's fine
       if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
         app.log.error(err, 'Dropbox ensure folder failed');
         return reply.code(500).send({ error: 'Failed to ensure folder' });
       }
+      // Backfill folder ID if not already stored
+      await backfillFolderId(accessToken, recordId, folderPath);
     }
 
     // Create subfolder structure for Property records — only when folder is newly created
@@ -1404,7 +1568,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
       }
     }
 
-    reply.send({ created, path: folderPath });
+    reply.send({ created, path: folderPath, folderName: folderName || undefined });
   });
 
   // ── Delete file or folder ──

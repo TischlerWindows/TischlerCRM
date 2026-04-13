@@ -132,6 +132,8 @@ export function DropboxFileBrowser({
 
   const folderEnsuredKey = useRef<string>('');
   const isFirstEnsure = useRef(true);
+  // Tracks the actual Dropbox folder name (may differ from prop if folder was renamed in Dropbox)
+  const effectiveFolderName = useRef<string | undefined>(folderName);
 
   const loadFiles = useCallback(async (retryCount = 0) => {
     // Don't load until we have a real record ID
@@ -159,13 +161,18 @@ export function DropboxFileBrowser({
         // Only call ensureDropboxFolder on first mount, not on renames
         if (first) {
           try {
-            await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+            const ensureResult = await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+            // If the server reports the actual folder name (e.g. after a rename
+            // in Dropbox), use it for subsequent file listings.
+            if (ensureResult?.folderName) {
+              effectiveFolderName.current = ensureResult.folderName;
+            }
           } catch { /* non-fatal — folder may already exist */ }
         }
       }
 
       try {
-        const result = await apiClient.listDropboxFiles(objectApiName, recordId, subPath || undefined, folderName);
+        const result = await apiClient.listDropboxFiles(objectApiName, recordId, subPath || undefined, effectiveFolderName.current);
         if (result.needsReauth) {
           setStatus({ ...s, connected: false, needsReauth: true });
           setEntries([]);
@@ -236,7 +243,7 @@ export function DropboxFileBrowser({
     try {
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file, subPath || undefined, folderName);
+        if (file) await apiClient.uploadDropboxFile(objectApiName, recordId, file, subPath || undefined, effectiveFolderName.current);
       }
       await loadFiles();
     } catch (err: any) {
@@ -274,7 +281,7 @@ export function DropboxFileBrowser({
     if (!newFolderName.trim()) return;
     setCreatingFolder(true);
     try {
-      await apiClient.createDropboxFolder(objectApiName, recordId, newFolderName.trim(), subPath || undefined, folderName);
+      await apiClient.createDropboxFolder(objectApiName, recordId, newFolderName.trim(), subPath || undefined, effectiveFolderName.current);
       setNewFolderName('');
       setShowNewFolder(false);
       await loadFiles();
@@ -301,7 +308,7 @@ export function DropboxFileBrowser({
       const folderPath = entryPath.substring(0, entryPath.lastIndexOf('/'));
       return `https://www.dropbox.com/home${folderPath}`;
     }
-    const pathName = folderName || recordId;
+    const pathName = effectiveFolderName.current || folderName || recordId;
     const basePath = `/TischlerCRM/${objectApiName}/${pathName}`;
     const full = currentPath.length > 0 ? `${basePath}/${currentPath.join('/')}` : basePath;
     return `https://www.dropbox.com/home${full}`;
@@ -314,7 +321,7 @@ export function DropboxFileBrowser({
 
   const openInDropbox = async (entryPath?: string) => {
     try {
-      await apiClient.ensureDropboxFolder(objectApiName, recordId, folderName);
+      await apiClient.ensureDropboxFolder(objectApiName, recordId, effectiveFolderName.current);
     } catch { /* non-fatal */ }
     window.open(getDropboxWebUrl(entryPath), '_blank', 'noopener');
   };
