@@ -913,19 +913,19 @@ export default function SummaryPage() {
     </tr>`).join('');
 
     const dataTableHeaders = `<tr>
-      <th>TuS Pos.</th><th>Arch Pos.</th><th>Qty</th>
-      <th>W (MM)</th><th>H (MM)</th><th>W (Ft&In)</th><th>H (Ft&In)</th>
-      <th>Sq Ft (Ea)</th><th>Sq Ft (Tot)</th>
-      <th>Op. Sash (Ea)</th><th>Op. Sash (Tot)</th>
-      <th>Qty</th><th>Type</th><th>Qty</th><th>Type 2</th>
-      <th>Special Remarks</th>
-      <th>Fields (Ea)</th><th>Fields (Tot)</th>
-      <th># Site Mull. (Ea)</th><th># Site Mull. (Tot)</th>
-      <th>NET € (Ea)</th><th>NET € (Tot)</th>
-      <th class="mc">Mag. Ct. /Unit</th><th class="mc">Mag. Ct. /Pos</th>
-      <th class="snt">Shade No Trim /Unit</th><th class="snt">Shade No Trim /Pos</th>
-      <th class="swt">Shade W/ Trim /Unit</th><th class="swt">Shade W/ Trim /Pos</th>
-      <th class="ff">Final Fin. /Unit</th><th class="ff">Final Fin. /Pos</th>
+      <th style="width:4%">TuS Pos.</th><th style="width:4%">Arch Pos.</th><th style="width:2.5%">Qty</th>
+      <th style="width:3.5%">W (MM)</th><th style="width:3.5%">H (MM)</th><th style="width:4%">W (Ft&In)</th><th style="width:4%">H (Ft&In)</th>
+      <th style="width:3.5%">Sq Ft (Ea)</th><th style="width:3.5%">Sq Ft (Tot)</th>
+      <th style="width:3.5%">Op. Sash (Ea)</th><th style="width:3.5%">Op. Sash (Tot)</th>
+      <th style="width:2.5%">Qty</th><th style="width:3%">Type</th><th style="width:2.5%">Qty</th><th style="width:3%">Type 2</th>
+      <th style="width:6%">Special Remarks</th>
+      <th style="width:3%">Fields (Ea)</th><th style="width:3%">Fields (Tot)</th>
+      <th style="width:3%"># Site Mull. (Ea)</th><th style="width:3%"># Site Mull. (Tot)</th>
+      <th style="width:4%">NET € (Ea)</th><th style="width:4%">NET € (Tot)</th>
+      <th style="width:3.5%" class="mc">Mag. Ct. /Unit</th><th style="width:3.5%" class="mc">Mag. Ct. /Pos</th>
+      <th style="width:3.5%" class="snt">Shade No Trim /Unit</th><th style="width:3.5%" class="snt">Shade No Trim /Pos</th>
+      <th style="width:3.5%" class="swt">Shade W/ Trim /Unit</th><th style="width:3.5%" class="swt">Shade W/ Trim /Pos</th>
+      <th style="width:3.5%" class="ff">Final Fin. /Unit</th><th style="width:3.5%" class="ff">Final Fin. /Pos</th>
     </tr>`;
 
     // Quote totals calculation
@@ -969,8 +969,8 @@ export default function SummaryPage() {
   .info-grid .item { }
   .info-grid .item .label { font-size: 7pt; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.3px; }
   .info-grid .item .value { font-size: 9pt; padding: 2px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 7pt; }
-  th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
+  th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; }
   .r { text-align: right; }
   .b { font-weight: 600; }
@@ -990,11 +990,15 @@ export default function SummaryPage() {
   .field .fl { font-size: 7pt; font-weight: 600; color: #555; }
   .field .fv { font-size: 8.5pt; padding: 1px 0; min-height: 14px; }
   @media print {
-    @page { margin: 0.4in; }
+    @page { margin: 0.3in; }
     .page1 { page: landscape; }
     .page2 { page-break-before: always; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page1 table { font-size: 5.5pt; }
+    .page1 th { font-size: 5pt; }
+    .page1 th, .page1 td { padding: 1px 2px; }
   }
-  @page { size: landscape; margin: 0.4in; }
+  @page { size: landscape; margin: 0.3in; }
 </style></head><body>
 
 <!-- PAGE 1: Data Entry -->
@@ -1945,8 +1949,9 @@ export default function SummaryPage() {
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8px;
+            font-size: 6.5px;
             page-break-inside: auto;
+            table-layout: fixed;
           }
           
           thead {
@@ -1960,8 +1965,11 @@ export default function SummaryPage() {
           
           th, td {
             border: 1px solid #d1d5db;
-            padding: 4px 2px;
+            padding: 2px 1px;
             text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
           
           th {
