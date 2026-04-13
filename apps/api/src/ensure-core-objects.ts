@@ -178,6 +178,11 @@ const CORE_OBJECTS = [
       { apiName: 'estimatedAirportTransportation', label: 'Estimated Airport Transportation', type: 'Currency' },
       { apiName: 'estimatedMaterials', label: 'Estimated Materials', type: 'Currency' },
       { apiName: 'estimatedContainerUnload', label: 'Estimated Container Unload', type: 'Currency' },
+      { apiName: 'estimatedLaborHours', label: 'Estimated Labor Hours', type: 'Number' },
+      { apiName: 'estimatedWaterproofingLabor', label: 'Estimated WP Labor', type: 'Currency' },
+      { apiName: 'estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency' },
+      { apiName: 'estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency' },
+      { apiName: 'estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency' },
     ],
   },
   {

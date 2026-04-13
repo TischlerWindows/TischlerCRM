@@ -27,6 +27,8 @@ const ESTIMATED_FIELDS = [
   'estimatedCarRental', 'estimatedParking', 'estimatedEquipment',
   'estimatedMiscellaneous', 'estimatedWaterproofing', 'estimatedWoodBucks',
   'estimatedAirportTransportation', 'estimatedMaterials', 'estimatedContainerUnload',
+  'estimatedLaborHours', 'estimatedWaterproofingLabor', 'estimatedWoodBucksLabor',
+  'estimatedTravelTime', 'estimatedInternalLabor',
 ]
 
 /* ------------------------------------------------------------------ */

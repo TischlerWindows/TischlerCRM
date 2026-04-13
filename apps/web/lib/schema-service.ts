@@ -3505,6 +3505,11 @@ class LocalStorageSchemaService implements SchemaService {
         { id: generateId(), apiName: 'Installation__estimatedAirportTransportation', label: 'Estimated Airport Transportation', type: 'Currency', custom: true },
         { id: generateId(), apiName: 'Installation__estimatedMaterials', label: 'Estimated Materials', type: 'Currency', custom: true },
         { id: generateId(), apiName: 'Installation__estimatedContainerUnload', label: 'Estimated Container Unload', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedLaborHours', label: 'Estimated Labor Hours', type: 'Number', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWaterproofingLabor', label: 'Estimated WP Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency', custom: true },
       ].filter((f: FieldDef) => !existingApiNames.has(f.apiName));
 
       if (newFields.length > 0) {

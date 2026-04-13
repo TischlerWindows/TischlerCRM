@@ -80,3 +80,81 @@ export function techWeeklyCost(data: Record<string, any>, hourlyRate: number, di
 export function costWeeklyTotal(data: Record<string, any>, dirty?: Record<string, number>): number {
   return sumFields(data, COST_FIELDS, dirty)
 }
+
+// ── Variance Report categories (18 rows matching Salesforce) ──────────
+
+export interface VarianceCategory {
+  label: string
+  estimatedField: string
+  type: 'currency' | 'hours'
+  isSubcategory?: boolean
+  laborField?: string
+  costField?: string
+  expenseField?: string
+}
+
+export const VARIANCE_CATEGORIES: VarianceCategory[] = [
+  { label: 'Labor Hours', estimatedField: 'estimatedLaborHours', type: 'hours' },
+  { label: 'Technician Labor Cost', estimatedField: 'estimatedLaborCost', type: 'currency' },
+  { label: 'Waterproofing Labor Cost', estimatedField: 'estimatedWaterproofingLabor', type: 'currency', isSubcategory: true, laborField: 'waterproofing' },
+  { label: 'Woodbucks Labor Cost', estimatedField: 'estimatedWoodBucksLabor', type: 'currency', isSubcategory: true, laborField: 'woodbucks' },
+  { label: 'Travel Time', estimatedField: 'estimatedTravelTime', type: 'currency', laborField: 'travel' },
+  { label: 'Flights', estimatedField: 'estimatedFlights', type: 'currency', costField: 'flightsActual' },
+  { label: 'Lodging', estimatedField: 'estimatedHotel', type: 'currency', costField: 'lodgingActual' },
+  { label: 'Airport Transportation', estimatedField: 'estimatedAirportTransportation', type: 'currency', costField: 'airportTransportation' },
+  { label: 'Car Rental', estimatedField: 'estimatedCarRental', type: 'currency', costField: 'carRental' },
+  { label: 'Parking', estimatedField: 'estimatedParking', type: 'currency', costField: 'parking' },
+  { label: 'Equipment', estimatedField: 'estimatedEquipment', type: 'currency', costField: 'equipment' },
+  { label: 'Miscellaneous', estimatedField: 'estimatedMiscellaneous', type: 'currency', costField: 'miscellaneousExpenses' },
+  { label: 'Waterproofing', estimatedField: 'estimatedWaterproofing', type: 'currency', costField: 'waterproofing' },
+  { label: 'Woodbucks', estimatedField: 'estimatedWoodBucks', type: 'currency', costField: 'woodBucks' },
+  { label: 'Per Diem', estimatedField: 'estimatedPerDiem', type: 'currency', expenseField: 'perDiem' },
+  { label: 'Mileage', estimatedField: 'estimatedMileage', type: 'currency', expenseField: 'mileage' },
+  { label: 'Materials', estimatedField: 'estimatedMaterials', type: 'currency', expenseField: 'materials' },
+  { label: 'Internal TUS Labor', estimatedField: 'estimatedInternalLabor', type: 'currency' },
+]
+
+export function calculateActual(
+  category: VarianceCategory,
+  costs: Array<{ id: string; data: Record<string, any> }>,
+  techExpenses: Record<string, { technician: { assignedHourlyRate: number }; expenses: Array<{ id: string; data: Record<string, any> }> }>,
+): number {
+  if (category.costField) {
+    let total = 0
+    for (const cost of costs) total += num(cost.data[category.costField])
+    return total
+  }
+  if (category.expenseField) {
+    let total = 0
+    for (const { expenses } of Object.values(techExpenses)) {
+      for (const exp of expenses) total += num(exp.data[category.expenseField!])
+    }
+    return total
+  }
+  if (category.laborField) {
+    let total = 0
+    for (const { technician, expenses } of Object.values(techExpenses)) {
+      for (const exp of expenses) {
+        total += num(exp.data[category.laborField!]) * technician.assignedHourlyRate
+      }
+    }
+    return total
+  }
+  if (category.label === 'Labor Hours') {
+    let total = 0
+    for (const { expenses } of Object.values(techExpenses)) {
+      for (const exp of expenses) total += totalHours(exp.data)
+    }
+    return total
+  }
+  if (category.label === 'Technician Labor Cost') {
+    let total = 0
+    for (const { technician, expenses } of Object.values(techExpenses)) {
+      for (const exp of expenses) {
+        total += totalHours(exp.data) * technician.assignedHourlyRate
+      }
+    }
+    return total
+  }
+  return 0
+}
