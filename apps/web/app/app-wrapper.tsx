@@ -59,6 +59,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/service': 'Service',
     '/quotes': 'Quote',
     '/installations': 'Installation',
+    '/tasks': 'Task',
   };
 
   // Also map custom object tabs (href like /objects/myobject) dynamically

@@ -407,6 +407,7 @@ export async function recordRoutes(app: FastifyInstance) {
       installationNumber: 'INST',
       workOrderNumber: 'WO',
       teamMemberNumber: 'TM',
+      taskNumber: 'TSK',
     };
     for (const field of object.fields) {
       const currentVal = normalizedData[field.apiName];
@@ -438,7 +439,7 @@ export async function recordRoutes(app: FastifyInstance) {
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber') ? 4 : 3;
+        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
         const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
         normalizedData[field.apiName] = generatedNum;
         // Also set the prefixed key so the stored JSON is consistent
@@ -795,6 +796,7 @@ export async function recordRoutes(app: FastifyInstance) {
       'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
       'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
+      'taskNumber',
     ]);
     const sanitizedUpdate = { ...updateData };
     for (const key of Object.keys(sanitizedUpdate)) {

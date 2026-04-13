@@ -192,6 +192,23 @@ const CORE_OBJECTS = [
       { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
     ],
   },
+  {
+    apiName: 'Task',
+    label: 'Task',
+    pluralLabel: 'Tasks',
+    description: 'Tasks and activities',
+    fields: [
+      { apiName: 'taskNumber', label: 'Task Number', type: 'Text', unique: true },
+      { apiName: 'subject', label: 'Subject', type: 'Text', required: true },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Open' },
+      { apiName: 'priority', label: 'Priority', type: 'Picklist', picklistValues: ['High', 'Normal', 'Low'], defaultValue: 'Normal' },
+      { apiName: 'dueDate', label: 'Due Date', type: 'Date' },
+      { apiName: 'description', label: 'Description', type: 'LongTextArea' },
+      { apiName: 'assignedToUserId', label: 'Assigned To', type: 'Lookup' },
+      { apiName: 'relatedObjectApi', label: 'Related Object', type: 'Text' },
+      { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
+    ],
+  },
 ];
 
 /**
