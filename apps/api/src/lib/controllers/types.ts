@@ -1,3 +1,7 @@
+/**
+ * Controller type definitions.
+ * Each controller exposes a manifest (metadata) and a Fastify route registrar.
+ */
 import type { FastifyInstance } from 'fastify'
 
 export interface ControllerManifest {

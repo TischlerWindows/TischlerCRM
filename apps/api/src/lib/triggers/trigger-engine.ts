@@ -6,6 +6,8 @@
  *
  * Opt-OUT model: all registered triggers fire by default. They only stop
  * firing if an admin explicitly disables them in Settings > Automations.
+ *
+ * Flow: records.ts → runTriggers() → registry → handler
  */
 
 import { prisma } from '@crm/db/client';

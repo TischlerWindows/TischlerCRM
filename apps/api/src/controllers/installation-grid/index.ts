@@ -1,3 +1,8 @@
+/**
+ * Installation Grid Controller
+ * Provides CRUD endpoints for installation cost tracking:
+ * technicians, weekly costs, tech expenses, and rollup summaries.
+ */
 import type { FastifyInstance } from 'fastify'
 import { prisma } from '@crm/db/client'
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id'

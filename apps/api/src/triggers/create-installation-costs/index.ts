@@ -1,3 +1,9 @@
+/**
+ * create-installation-costs trigger
+ * Fires afterCreate/afterUpdate on Installation records.
+ * Auto-generates weekly InstallationCost and InstallationTechExpense rows
+ * when startDate and endDate are populated, matching Salesforce week logic.
+ */
 import { prisma } from '@crm/db/client'
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id'
 import type { TriggerHandler, TriggerContext } from '../../lib/triggers/types.js'
