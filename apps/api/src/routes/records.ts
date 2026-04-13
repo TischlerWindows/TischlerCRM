@@ -102,7 +102,7 @@ export async function recordRoutes(app: FastifyInstance) {
       if (!customObj) return [];
 
       const records = await prisma.record.findMany({
-        where: { objectId: customObj.id },
+        where: { objectId: customObj.id, deletedAt: null },
         take: 50,
       });
 
@@ -186,6 +186,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
       },
       include: {
         createdBy: {
@@ -256,6 +257,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
         ...(jsonFilters.length > 0 ? { AND: jsonFilters } : {}),
       },
       include: {
@@ -317,7 +319,7 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     const record = await prisma.record.findFirst({
-      where: { id: idParam, objectId: object.id },
+      where: { id: idParam, objectId: object.id, deletedAt: null },
       include: {
         pageLayout: {
           select: {
@@ -415,7 +417,7 @@ export async function recordRoutes(app: FastifyInstance) {
           ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
           : autoNumberFormats[field.apiName];
         const existing = await prisma.record.findMany({
-          where: { objectId: object.id },
+          where: { objectId: object.id, deletedAt: null },
           select: { data: true },
         });
         let maxNum = 0;
@@ -474,6 +476,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicate = await prisma.record.findFirst({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: ['contact'], equals: contactVal },
           },
         });
@@ -490,6 +493,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicates = await prisma.record.findMany({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: [`TeamMember__contact`], equals: contactVal },
           },
         });
@@ -507,6 +511,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicate = await prisma.record.findFirst({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: ['account'], equals: accountVal },
           },
         });
@@ -523,6 +528,7 @@ export async function recordRoutes(app: FastifyInstance) {
         const duplicates = await prisma.record.findMany({
           where: {
             objectId: object.id,
+            deletedAt: null,
             data: { path: [`TeamMember__account`], equals: accountVal },
           },
         });
@@ -699,7 +705,7 @@ export async function recordRoutes(app: FastifyInstance) {
     // Pass 1 — FK column match
     while (true) {
       const batch = await prisma.record.findMany({
-        where: { objectId: object.id, pageLayoutId: fromPageLayoutId },
+        where: { objectId: object.id, pageLayoutId: fromPageLayoutId, deletedAt: null },
         select: { id: true, data: true },
         take: BATCH_SIZE,
         skip,
@@ -728,6 +734,7 @@ export async function recordRoutes(app: FastifyInstance) {
         where: {
           objectId: object.id,
           pageLayoutId: null, // FK already cleared records are excluded; only touch un-cleared ones
+          deletedAt: null,
           data: { path: ['_pageLayoutId'], equals: fromPageLayoutId },
         },
         select: { id: true, data: true },
@@ -777,7 +784,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -830,6 +837,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: ['contact'], equals: contactVal },
           },
         });
@@ -846,6 +854,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: [`TeamMember__contact`], equals: contactVal },
           },
         });
@@ -863,6 +872,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: ['account'], equals: accountVal },
           },
         });
@@ -879,6 +889,7 @@ export async function recordRoutes(app: FastifyInstance) {
           where: {
             objectId: object.id,
             id: { not: existingRecord.id },
+            deletedAt: null,
             data: { path: [`TeamMember__account`], equals: accountVal },
           },
         });
@@ -1011,7 +1022,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -1039,8 +1050,9 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    await prisma.record.delete({
+    await prisma.record.update({
       where: { id: existingRecord.id },
+      data: { deletedAt: new Date(), deletedById: userId },
     });
 
     reply.code(204).send();
