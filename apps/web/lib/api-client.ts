@@ -824,6 +824,9 @@ class ApiClient {
       subfolder?: string;
       childFolderName?: string;
       linkedOpportunityFolderName?: string;
+      isRequote?: boolean;
+      parentOpportunityNumber?: string;
+      parentOpportunityFolderName?: string;
     }>(
       `/dropbox/resolve-path/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`
     );

@@ -351,6 +351,35 @@ async function findExistingFolderInDropbox(
   }
 }
 
+/**
+ * Build an Opportunity folder name in the format "OPP0001 (Name)" or
+ * "OPP0001 (Name) - Requote 1". Falls back to just the number if no name.
+ */
+function deriveOpportunityFolderName(data: Record<string, any>): string {
+  let oppNum = '';
+  let oppName = '';
+  for (const [k, v] of Object.entries(data)) {
+    const stripped = k.replace(/^[A-Za-z]+__/, '');
+    if (stripped === 'opportunityNumber' && typeof v === 'string' && v) {
+      oppNum = v;
+    }
+    if ((stripped === 'opportunityName' || stripped === 'name') && typeof v === 'string' && v) {
+      oppName = v;
+    }
+  }
+  if (!oppNum) return '';
+  // Strip requote suffix from both number and name to rebuild cleanly
+  const baseNum = oppNum.replace(/\s*-\s*Requote\s*\d+$/i, '');
+  const requoteMatch = oppNum.match(/(\s*-\s*Requote\s*\d+)$/i);
+  const requoteSuffix = requoteMatch ? requoteMatch[1] : '';
+  // Strip requote suffix from name if present (we'll re-add from number)
+  const baseName = oppName.replace(/\s*-\s*Requote\s*\d+$/i, '').trim();
+  if (baseName) {
+    return `${baseNum} (${baseName})${requoteSuffix}`;
+  }
+  return oppNum;
+}
+
 // ── Derive Dropbox folder name from record data ───────────────────
 // Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
 function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string): string {
@@ -515,8 +544,15 @@ export async function tryRenameDropboxFolder(
     // Need at least one property ID to work with
     if (!oldPropertyId && !newPropertyId) return;
 
-    const oldChildName = deriveDropboxFolderName(beforeData, recordId);
-    const newChildName = deriveDropboxFolderName(afterData, recordId);
+    let oldChildName: string;
+    let newChildName: string;
+    if (objectApiName === 'Opportunity') {
+      oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId);
+      newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId);
+    } else {
+      oldChildName = deriveDropboxFolderName(beforeData, recordId);
+      newChildName = deriveDropboxFolderName(afterData, recordId);
+    }
 
     // Resolve Property folder paths
     const propertyObj = await prisma.customObject.findFirst({
@@ -720,7 +756,7 @@ export async function tryEnsureLinkedFolder(
             if (oppFolder?.found) {
               oppFolderName = oppFolder.folderName;
             } else {
-              oppFolderName = deriveDropboxFolderName(oppData, oppId);
+              oppFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
             }
             const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
             const oppPath = `${parentPath}/Project Books/${safeOpp}`;
@@ -769,16 +805,8 @@ export async function tryEnsureLinkedFolder(
     // Derive child folder name
     let childFolderName: string;
     if (childObjectApiName === 'Opportunity') {
-      // Use just the opportunity number (e.g. "OPP0001" or "OPP0001 - Requote 1")
-      let oppNum = '';
-      for (const [k, v] of Object.entries(childData)) {
-        const stripped = k.replace(/^[A-Za-z]+__/, '');
-        if (stripped === 'opportunityNumber' && typeof v === 'string') {
-          oppNum = v;
-          break;
-        }
-      }
-      childFolderName = oppNum || deriveDropboxFolderName(childData, childRecordId);
+      // Use opportunity number + name (e.g. "OPP0001 (Test)" or "OPP0001 (Test) - Requote 1")
+      childFolderName = deriveOpportunityFolderName(childData) || deriveDropboxFolderName(childData, childRecordId);
     } else {
       childFolderName = deriveDropboxFolderName(childData, childRecordId);
     }
@@ -799,8 +827,39 @@ export async function tryEnsureLinkedFolder(
         return;
       }
 
-      const requotePath = `${parentPath}/${subfolder}/${parentOppNumber}/1. Estimation/${safeName}`;
-      const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppNumber}/1. Estimation/${parentOppNumber}`;
+      // Resolve the parent OPP folder name via stored ID (handles name changes)
+      let parentOppFolderName = parentOppNumber;
+      const oppObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+      });
+      if (oppObj) {
+        // Find the parent OPP record by its opportunity number
+        const allOpps = await prisma.record.findMany({
+          where: { objectId: oppObj.id, deletedAt: null },
+          select: { id: true, data: true },
+        });
+        for (const opp of allOpps) {
+          const oppData = opp.data as Record<string, any> | null;
+          if (!oppData) continue;
+          for (const [k, v] of Object.entries(oppData)) {
+            const stripped = k.replace(/^[A-Za-z]+__/, '');
+            if (stripped === 'opportunityNumber' && v === childData._parentOpportunityNumber) {
+              // Found the parent — resolve its folder via stored ID first
+              const parentOppFolder = await resolveStoredFolder(accessToken, opp.id);
+              if (parentOppFolder?.found) {
+                parentOppFolderName = parentOppFolder.folderName;
+              } else {
+                parentOppFolderName = (deriveOpportunityFolderName(oppData) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+              }
+              break;
+            }
+          }
+          if (parentOppFolderName !== parentOppNumber) break;
+        }
+      }
+
+      const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${safeName}`;
+      const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${parentOppFolderName}`;
       console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
 
       let requoteCreated = false;
@@ -1390,18 +1449,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
       const propertyData = propertyRecord.data as Record<string, any>;
       let parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
 
-      // For Opportunity, use just the opportunity number as the folder name
+      // For Opportunity, use opportunity number + name as the folder name
       let childFolderName: string;
       if (objectApiName === 'Opportunity') {
-        let oppNum = '';
-        for (const [k, v] of Object.entries(recordData)) {
-          const stripped = k.replace(/^[A-Za-z]+__/, '');
-          if (stripped === 'opportunityNumber' && typeof v === 'string') {
-            oppNum = v;
-            break;
-          }
-        }
-        childFolderName = oppNum || deriveDropboxFolderName(recordData, recordId);
+        childFolderName = deriveOpportunityFolderName(recordData) || deriveDropboxFolderName(recordData, recordId);
       } else {
         childFolderName = deriveDropboxFolderName(recordData, recordId);
       }
@@ -1452,7 +1503,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
             });
             if (oppRecord) {
               const oppData = oppRecord.data as Record<string, any>;
-              linkedOpportunityFolderName = deriveDropboxFolderName(oppData, oppId);
+              linkedOpportunityFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
               // Check if Opportunity folder was renamed in Dropbox
               if (accessToken) {
                 const oppFolder = await resolveStoredFolder(accessToken, oppId);
@@ -1465,6 +1516,43 @@ export async function dropboxRoutes(app: FastifyInstance) {
         }
       }
 
+      // For requotes, resolve the parent OPP folder name (with opportunity name)
+      let parentOpportunityFolderName: string | undefined;
+      if (objectApiName === 'Opportunity' && recordData._isRequote && recordData._parentOpportunityNumber) {
+        const pOppNum = recordData._parentOpportunityNumber as string;
+        parentOpportunityFolderName = pOppNum; // fallback to just the number
+        const oppObj2 = await prisma.customObject.findFirst({
+          where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+        });
+        if (oppObj2) {
+          const allOpps = await prisma.record.findMany({
+            where: { objectId: oppObj2.id, deletedAt: null },
+            select: { id: true, data: true },
+          });
+          for (const opp of allOpps) {
+            const oppData = opp.data as Record<string, any> | null;
+            if (!oppData) continue;
+            for (const [k, v] of Object.entries(oppData)) {
+              const stripped = k.replace(/^[A-Za-z]+__/, '');
+              if (stripped === 'opportunityNumber' && v === pOppNum) {
+                if (accessToken) {
+                  const oppFolder = await resolveStoredFolder(accessToken, opp.id);
+                  if (oppFolder?.found) {
+                    parentOpportunityFolderName = oppFolder.folderName;
+                  } else {
+                    parentOpportunityFolderName = deriveOpportunityFolderName(oppData) || pOppNum;
+                  }
+                } else {
+                  parentOpportunityFolderName = deriveOpportunityFolderName(oppData) || pOppNum;
+                }
+                break;
+              }
+            }
+            if (parentOpportunityFolderName !== pOppNum) break;
+          }
+        }
+      }
+
       reply.send({
         linked: true,
         parentObjectApiName: 'Property',
@@ -1473,7 +1561,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         subfolder,
         childFolderName,
         ...(linkedOpportunityFolderName ? { linkedOpportunityFolderName } : {}),
-        ...(recordData._isRequote ? { isRequote: true, parentOpportunityNumber: recordData._parentOpportunityNumber } : {}),
+        ...(recordData._isRequote ? { isRequote: true, parentOpportunityNumber: recordData._parentOpportunityNumber, parentOpportunityFolderName } : {}),
       });
     } catch (err: any) {
       req.log.error(err, 'resolve-path failed');
