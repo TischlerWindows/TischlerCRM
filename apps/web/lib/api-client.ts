@@ -462,6 +462,12 @@ class ApiClient {
     });
   }
 
+  async createRequote(objectApiName: string, recordId: string) {
+    return this.request<any>(`/objects/${objectApiName}/records/${recordId}/requote`, {
+      method: 'POST',
+    });
+  }
+
   async deleteRecord(objectApiName: string, recordId: string) {
     return this.request<void>(`/objects/${objectApiName}/records/${recordId}`, {
       method: 'DELETE',

@@ -62,10 +62,7 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
       if (res.linked && res.parentObjectApiName && res.parentRecordId && res.parentFolderName && res.subfolder && res.childFolderName) {
         let subPath = `${res.subfolder}/${res.childFolderName}`
 
-        if (objectApiName === 'Opportunity') {
-          // Opportunity → open directly into 1. Estimation subfolder
-          subPath = `${subPath}/1. Estimation`
-        } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
+        if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
           // Project → open the linked Opportunity's full folder
           subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
         }

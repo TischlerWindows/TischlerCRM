@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer } from 'lucide-react';
+import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer, RefreshCw } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
@@ -56,6 +57,7 @@ export function RecordActions({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
+  const [isRequoting, setIsRequoting] = useState(false);
 
   // Lock body scroll when the admin menu overlay is open
   useEffect(() => {
@@ -137,6 +139,23 @@ export function RecordActions({
     }
   };
 
+  const handleRequote = async () => {
+    if (!record || !rawRecord) return;
+    setIsRequoting(true);
+    try {
+      const requoted = await apiClient.createRequote(objectApiName, record.id);
+      if (requoted) {
+        showToast('Requote created successfully', 'success');
+        router.push(`/${backRoute.replace(/^\//, '').split('/')[0]}/${requoted.id}`);
+      }
+    } catch (err) {
+      console.error('Failed to create requote:', err);
+      showToast('Failed to create requote. Please try again.', 'error');
+    } finally {
+      setIsRequoting(false);
+    }
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -163,6 +182,16 @@ export function RecordActions({
           >
             <Copy className="w-4 h-4 mr-1.5" />
             {isCloning ? 'Cloning\u2026' : 'Clone'}
+          </button>
+        )}
+        {objectApiName === 'Opportunity' && canEdit && (
+          <button
+            onClick={handleRequote}
+            disabled={isRequoting}
+            className="inline-flex items-center px-4 py-2 border border-blue-300 rounded-lg text-sm font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`w-4 h-4 mr-1.5 ${isRequoting ? 'animate-spin' : ''}`} />
+            {isRequoting ? 'Creating\u2026' : 'Create Requote'}
           </button>
         )}
         {showPrint && (

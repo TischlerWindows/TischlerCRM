@@ -681,6 +681,127 @@ export async function recordRoutes(app: FastifyInstance) {
     reply.code(201).send(record);
   });
 
+  // ── Create Requote of an Opportunity ────────────────────────────────────
+  // POST /objects/Opportunity/records/:id/requote
+  // Clones the Opportunity record and names it "OPP#### - Requote N"
+  app.post('/objects/:apiName/records/:id/requote', async (req, reply) => {
+    const { apiName, id } = req.params as { apiName: string; id: string };
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+
+    if (apiName !== 'Opportunity') {
+      return reply.code(400).send({ error: 'Requote is only available for Opportunity records' });
+    }
+
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records for this object' });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+      include: { fields: { where: { isActive: true } } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    // Fetch the source record
+    const sourceRecord = await prisma.record.findFirst({
+      where: { id, objectId: object.id, deletedAt: null },
+    });
+    if (!sourceRecord) return reply.code(404).send({ error: 'Source record not found' });
+
+    const sourceData = { ...(sourceRecord.data as Record<string, any>) };
+
+    // Find the opportunity number from the source record
+    let oppNumber = '';
+    for (const [k, v] of Object.entries(sourceData)) {
+      const stripped = k.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber' && typeof v === 'string') {
+        oppNumber = v;
+        break;
+      }
+    }
+    // If the source is itself a requote, extract the base opportunity number
+    const baseOppNumber = oppNumber.replace(/\s*-\s*Requote\s*\d+$/i, '');
+
+    // Count existing requotes for this base opportunity number
+    const allRecords = await prisma.record.findMany({
+      where: { objectId: object.id, deletedAt: null },
+      select: { data: true },
+    });
+    let maxRequoteNum = 0;
+    for (const rec of allRecords) {
+      const recData = rec.data as Record<string, any> | null;
+      if (!recData) continue;
+      for (const [k, v] of Object.entries(recData)) {
+        const stripped = k.replace(/^[A-Za-z]+__/, '');
+        if (stripped === 'opportunityNumber' && typeof v === 'string') {
+          const m = v.match(new RegExp(`^${baseOppNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*Requote\\s*(\\d+)$`, 'i'));
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxRequoteNum) maxRequoteNum = num;
+          }
+        }
+      }
+    }
+    const requoteNum = maxRequoteNum + 1;
+    const newOppNumber = `${baseOppNumber} - Requote ${requoteNum}`;
+
+    // Clone the data and update the opportunity number
+    const cloneData = { ...sourceData };
+    // Remove internal tracking fields
+    delete cloneData._dropboxFolderId;
+    // Update opportunityNumber fields
+    for (const key of Object.keys(cloneData)) {
+      const stripped = key.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber') {
+        cloneData[key] = newOppNumber;
+      }
+    }
+    if (!cloneData.opportunityNumber) {
+      cloneData.opportunityNumber = newOppNumber;
+    }
+
+    // Also update name to include requote
+    for (const key of Object.keys(cloneData)) {
+      const stripped = key.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityName' || stripped === 'name') {
+        const origName = String(cloneData[key] || '');
+        const baseName = origName.replace(/\s*-\s*Requote\s*\d+$/i, '');
+        cloneData[key] = `${baseName} - Requote ${requoteNum}`;
+      }
+    }
+
+    // Generate a new record ID
+    const newId = generateRecordId(apiName);
+
+    // Create the requote record
+    const record = await prisma.record.create({
+      data: {
+        id: newId,
+        objectId: object.id,
+        data: cloneData,
+        pageLayoutId: sourceRecord.pageLayoutId,
+      },
+    });
+
+    // Audit log
+    logAudit({
+      actorId: userId,
+      action: 'CREATE',
+      objectType: apiName,
+      objectId: record.id,
+      objectName: newOppNumber,
+      after: cloneData,
+      ipAddress: extractIp(req),
+    });
+
+    // Ensure linked Dropbox folder
+    try {
+      await tryEnsureLinkedFolder(userId, apiName, record.id, cloneData);
+    } catch { /* non-fatal */ }
+
+    reply.code(201).send(record);
+  });
+
   // ── Bulk migrate per-record layout overrides ────────────────────────────
   // POST /objects/:apiName/records/page-layout/migrate
   // Body: { fromPageLayoutId: string }

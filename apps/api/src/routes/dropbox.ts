@@ -731,7 +731,21 @@ export async function tryEnsureLinkedFolder(
     }
 
     // Derive child folder name
-    const childFolderName = deriveDropboxFolderName(childData, childRecordId);
+    let childFolderName: string;
+    if (childObjectApiName === 'Opportunity') {
+      // Use just the opportunity number (e.g. "OPP0001" or "OPP0001 - Requote 1")
+      let oppNum = '';
+      for (const [k, v] of Object.entries(childData)) {
+        const stripped = k.replace(/^[A-Za-z]+__/, '');
+        if (stripped === 'opportunityNumber' && typeof v === 'string') {
+          oppNum = v;
+          break;
+        }
+      }
+      childFolderName = oppNum || deriveDropboxFolderName(childData, childRecordId);
+    } else {
+      childFolderName = deriveDropboxFolderName(childData, childRecordId);
+    }
 
     const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
     const childPath = `${parentPath}/${subfolder}/${safeName}`;
@@ -1257,7 +1271,22 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
       const propertyData = propertyRecord.data as Record<string, any>;
       let parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
-      let childFolderName = deriveDropboxFolderName(recordData, recordId);
+
+      // For Opportunity, use just the opportunity number as the folder name
+      let childFolderName: string;
+      if (objectApiName === 'Opportunity') {
+        let oppNum = '';
+        for (const [k, v] of Object.entries(recordData)) {
+          const stripped = k.replace(/^[A-Za-z]+__/, '');
+          if (stripped === 'opportunityNumber' && typeof v === 'string') {
+            oppNum = v;
+            break;
+          }
+        }
+        childFolderName = oppNum || deriveDropboxFolderName(recordData, recordId);
+      } else {
+        childFolderName = deriveDropboxFolderName(recordData, recordId);
+      }
 
       // Resolve actual folder names from stored Dropbox folder IDs (handles renames)
       const accessToken = await getAccessToken(user.sub);
@@ -1630,7 +1659,16 @@ export async function dropboxRoutes(app: FastifyInstance) {
                 }
               }
 
-              const childFolderName = folderName || deriveDropboxFolderName(rData, recordId);
+              const childFolderName = folderName || (objectApiName === 'Opportunity'
+                ? (() => {
+                    let oppNum = '';
+                    for (const [k, v] of Object.entries(rData)) {
+                      const stripped = k.replace(/^[A-Za-z]+__/, '');
+                      if (stripped === 'opportunityNumber' && typeof v === 'string') { oppNum = v; break; }
+                    }
+                    return oppNum || deriveDropboxFolderName(rData, recordId);
+                  })()
+                : deriveDropboxFolderName(rData, recordId));
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
               const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
