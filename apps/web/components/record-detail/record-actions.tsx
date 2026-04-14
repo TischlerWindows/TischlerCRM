@@ -151,10 +151,21 @@ export function RecordActions({
     }
   };
 
-  const handleRequoteClick = () => {
-    // Pre-fill with existing opportunity name
+  const handleRequoteClick = async () => {
+    // Determine the base opportunity name (strip any existing "- Requote N" suffix)
     const existing = record?.Opportunity__opportunityName || record?.opportunityName || record?.name || '';
-    setRequoteName(existing);
+    const baseName = String(existing).replace(/\s*-\s*Requote\s*\d+$/i, '');
+
+    // Fetch versions to figure out the next requote number
+    let nextNum = 1;
+    try {
+      const res = await apiClient.getRequoteVersions(objectApiName, record!.id);
+      // Versions include the base OPP + all requotes; requote count = total - 1
+      const requoteCount = Math.max(0, (res.versions?.length || 1) - 1);
+      nextNum = requoteCount + 1;
+    } catch { /* default to 1 */ }
+
+    setRequoteName(`${baseName} - Requote ${nextNum}`);
     setShowRequotePrompt(true);
   };
 
