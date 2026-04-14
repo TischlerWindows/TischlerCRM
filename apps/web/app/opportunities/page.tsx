@@ -258,6 +258,9 @@ export default function OpportunitiesPage() {
   };
 
   const filteredOpportunities = opportunities.filter(opp => {
+    // Hide requote records from the main list
+    if ((opp as any)._isRequote) return false;
+
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || Object.values(opp).some(value => {
       if (value === null || value === undefined) return false;

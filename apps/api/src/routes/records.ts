@@ -749,6 +749,9 @@ export async function recordRoutes(app: FastifyInstance) {
     const cloneData = { ...sourceData };
     // Remove internal tracking fields
     delete cloneData._dropboxFolderId;
+    // Mark as a requote with metadata for filtering/linking
+    cloneData._isRequote = true;
+    cloneData._parentOpportunityNumber = baseOppNumber;
     // Update opportunityNumber fields
     for (const key of Object.keys(cloneData)) {
       const stripped = key.replace(/^[A-Za-z]+__/, '');
@@ -806,6 +809,76 @@ export async function recordRoutes(app: FastifyInstance) {
     } catch { /* non-fatal */ }
 
     reply.code(201).send(record);
+  });
+
+  // ── Get requote versions for an Opportunity ──────────────────────────────
+  // GET /objects/Opportunity/records/:id/requote-versions
+  // Returns the original opportunity + all requotes sharing the same base number
+  app.get('/objects/:apiName/records/:id/requote-versions', async (req, reply) => {
+    const { apiName, id } = req.params as { apiName: string; id: string };
+    if (apiName !== 'Opportunity') return reply.send({ versions: [] });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+    if (!object) return reply.send({ versions: [] });
+
+    const currentRecord = await prisma.record.findFirst({
+      where: { id, objectId: object.id, deletedAt: null },
+    });
+    if (!currentRecord) return reply.send({ versions: [] });
+
+    const currentData = currentRecord.data as Record<string, any>;
+
+    // Find the opportunity number
+    let oppNumber = '';
+    for (const [k, v] of Object.entries(currentData)) {
+      const stripped = k.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber' && typeof v === 'string') {
+        oppNumber = v; break;
+      }
+    }
+
+    // Get the base opportunity number (strip "- Requote N")
+    const baseOppNumber = oppNumber.replace(/\s*-\s*Requote\s*\d+$/i, '');
+
+    // Find all records with this base number
+    const allRecords = await prisma.record.findMany({
+      where: { objectId: object.id, deletedAt: null },
+      select: { id: true, data: true },
+    });
+
+    const versions: Array<{ id: string; label: string; isCurrent: boolean }> = [];
+    for (const rec of allRecords) {
+      const recData = rec.data as Record<string, any> | null;
+      if (!recData) continue;
+      let recOppNum = '';
+      for (const [k, v] of Object.entries(recData)) {
+        const stripped = k.replace(/^[A-Za-z]+__/, '');
+        if (stripped === 'opportunityNumber' && typeof v === 'string') {
+          recOppNum = v; break;
+        }
+      }
+      // Match: exact base number or base number + "- Requote N"
+      if (recOppNum === baseOppNumber || recOppNum.match(new RegExp(`^${baseOppNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*Requote\\s*\\d+$`, 'i'))) {
+        versions.push({
+          id: rec.id,
+          label: recOppNum,
+          isCurrent: rec.id === id,
+        });
+      }
+    }
+
+    // Sort: original first, then requotes by number
+    versions.sort((a, b) => {
+      const aMatch = a.label.match(/Requote\s*(\d+)$/i);
+      const bMatch = b.label.match(/Requote\s*(\d+)$/i);
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
+      return aNum - bNum;
+    });
+
+    reply.send({ versions });
   });
 
   // ── Bulk migrate per-record layout overrides ────────────────────────────

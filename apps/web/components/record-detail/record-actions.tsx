@@ -146,8 +146,9 @@ export function RecordActions({
     try {
       const requoted = await apiClient.createRequote(objectApiName, record.id);
       if (requoted) {
-        showToast('Requote created successfully', 'success');
-        router.push(`/${backRoute.replace(/^\//, '').split('/')[0]}/${requoted.id}`);
+        showToast('Requote created successfully — use the version selector to open it', 'success');
+        // Reload the page to refresh the version selector
+        router.refresh();
       }
     } catch (err) {
       console.error('Failed to create requote:', err);

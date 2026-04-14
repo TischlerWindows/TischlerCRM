@@ -469,6 +469,12 @@ class ApiClient {
     });
   }
 
+  async getRequoteVersions(objectApiName: string, recordId: string) {
+    return this.request<{ versions: Array<{ id: string; label: string; isCurrent: boolean }> }>(
+      `/objects/${objectApiName}/records/${recordId}/requote-versions`
+    );
+  }
+
   async deleteRecord(objectApiName: string, recordId: string) {
     return this.request<void>(`/objects/${objectApiName}/records/${recordId}`, {
       method: 'DELETE',
