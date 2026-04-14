@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer, RefreshCw } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
@@ -52,12 +52,21 @@ export function RecordActions({
 }: RecordActionsProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { showToast } = useToast();
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isRequoting, setIsRequoting] = useState(false);
+
+  // Auto-open edit form when navigated with ?edit=true (e.g. after requote)
+  useEffect(() => {
+    if (searchParams.get('edit') === 'true' && record && pageLayout) {
+      setShowEditForm(true);
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, record, pageLayout, pathname, router]);
 
   // Lock body scroll when the admin menu overlay is open
   useEffect(() => {
@@ -146,9 +155,8 @@ export function RecordActions({
     try {
       const requoted = await apiClient.createRequote(objectApiName, record.id);
       if (requoted) {
-        showToast('Requote created successfully — use the version selector to open it', 'success');
-        // Reload the page to refresh the version selector
-        router.refresh();
+        showToast('Requote created — opening in edit mode', 'success');
+        router.push(`/${backRoute.replace(/^\//, '').split('/')[0]}/${requoted.id}?edit=true`);
       }
     } catch (err) {
       console.error('Failed to create requote:', err);
