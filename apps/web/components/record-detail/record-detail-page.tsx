@@ -74,7 +74,10 @@ function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: st
                 onClick={() => {
                   setOpen(false);
                   if (!v.isCurrent) {
-                    router.push(`/${objectApiName.toLowerCase()}s/${v.id}`);
+                    const slug = objectApiName.toLowerCase().endsWith('y')
+                      ? objectApiName.toLowerCase().slice(0, -1) + 'ies'
+                      : objectApiName.toLowerCase() + 's';
+                    router.push(`/${slug}/${v.id}`);
                   }
                 }}
                 className={`w-full text-left px-4 py-2 text-sm transition-colors ${
