@@ -198,6 +198,20 @@ class LocalStorageSchemaService implements SchemaService {
       }
     } catch (err) {
       console.warn('[Schema] Could not load from API, trying localStorage migration:', err);
+      // API was unreachable (e.g. during redeployment).  Do NOT fall through
+      // to createSampleData — that would overwrite the real schema once the
+      // API comes back.  Instead, try localStorage or return an in-memory
+      // default WITHOUT saving.
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            return JSON.parse(stored);
+          } catch (_) { /* ignore parse errors, continue to fallback */ }
+        }
+      }
+      console.warn('[Schema] Returning in-memory default (NOT saved) because API is unavailable');
+      return this.createSampleData();
     }
 
     // Migration: try reading from localStorage and push to API
