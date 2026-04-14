@@ -747,8 +747,18 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Clone the data and update the opportunity number
     const cloneData = { ...sourceData };
-    // Remove internal tracking fields
+    // Remove internal tracking fields and stale IDs from the source record
     delete cloneData._dropboxFolderId;
+    delete cloneData.id;
+    delete cloneData.Id;
+    delete cloneData.createdAt;
+    delete cloneData.updatedAt;
+    delete cloneData.CreatedDate;
+    delete cloneData.LastModifiedDate;
+    delete cloneData.CreatedById;
+    delete cloneData.LastModifiedById;
+    delete cloneData.createdBy;
+    delete cloneData.modifiedBy;
     // Mark as a requote with metadata for filtering/linking
     cloneData._isRequote = true;
     cloneData._parentOpportunityNumber = baseOppNumber;

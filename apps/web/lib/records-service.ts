@@ -153,8 +153,9 @@ class RecordsService {
       || stripped._pageLayoutId;
 
     return {
-      id: record.id,
       ...stripped,
+      // DB-level fields MUST override anything from the data blob
+      id: record.id,
       // Convenience keys for list/table columns
       createdBy: record.createdBy?.name || record.createdBy?.email || 'Unknown',
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',
