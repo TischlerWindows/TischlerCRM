@@ -94,67 +94,6 @@ function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: st
   );
 }
 
-// ── Requote Version Selector ───────────────────────────────────────────
-
-function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: string; recordId: string }) {
-  const router = useRouter();
-  const [versions, setVersions] = useState<Array<{ id: string; label: string; isCurrent: boolean }>>([]);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (objectApiName !== 'Opportunity' || !recordId) return;
-    let cancelled = false;
-    apiClient.getRequoteVersions(objectApiName, recordId).then((res) => {
-      if (!cancelled && res.versions.length > 1) {
-        setVersions(res.versions);
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [objectApiName, recordId]);
-
-  if (versions.length < 2) return null;
-
-  const current = versions.find((v) => v.isCurrent);
-
-  return (
-    <div className="relative mt-1">
-      <button
-        onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
-      >
-        {current?.label || 'Version'}
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-overlay" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal">
-            {versions.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => {
-                  setOpen(false);
-                  if (!v.isCurrent) {
-                    router.push(`/${objectApiName.toLowerCase()}s/${v.id}`);
-                  }
-                }}
-                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
-                  v.isCurrent
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {v.label}
-                {v.isCurrent && <span className="ml-2 text-xs text-blue-400">(current)</span>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Component ──────────────────────────────────────────────────────────
 
 /**
