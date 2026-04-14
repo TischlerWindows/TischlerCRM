@@ -62,7 +62,10 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
       if (res.linked && res.parentObjectApiName && res.parentRecordId && res.parentFolderName && res.subfolder && res.childFolderName) {
         let subPath = `${res.subfolder}/${res.childFolderName}`
 
-        if (objectApiName === 'Opportunity') {
+        if (objectApiName === 'Opportunity' && res.isRequote && res.parentOpportunityNumber) {
+          // Requote → open requote folder inside parent OPP's 1. Estimation
+          subPath = `${res.subfolder}/${res.parentOpportunityNumber}/1. Estimation/${res.childFolderName}`
+        } else if (objectApiName === 'Opportunity') {
           // Opportunity → open the OPP#### folder inside 1. Estimation
           subPath = `${res.subfolder}/${res.childFolderName}/1. Estimation/${res.childFolderName}`
         } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {

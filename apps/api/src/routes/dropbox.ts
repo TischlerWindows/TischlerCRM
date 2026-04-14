@@ -784,6 +784,42 @@ export async function tryEnsureLinkedFolder(
     }
 
     const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+
+    // ── Special handling: Requote Opportunity ──
+    // Requotes don't get their own top-level Project Books folder.
+    // Instead, create only a subfolder inside the original Opportunity's
+    // 1. Estimation folder (e.g. .../OPP0001/1. Estimation/OPP0001 - Requote 1/)
+    if (childObjectApiName === 'Opportunity' && childData._isRequote && childData._parentOpportunityNumber) {
+      const parentOppNumber = (childData._parentOpportunityNumber as string).replace(/[\\/:*?"<>|]/g, '_').trim();
+
+      // Check if already tracked
+      const existingChildFolder = await resolveStoredFolder(accessToken, childRecordId);
+      if (existingChildFolder?.found) {
+        console.log(`[dropbox] Requote folder already tracked for ${childRecordId} at ${existingChildFolder.fullPath}`);
+        return;
+      }
+
+      const requotePath = `${parentPath}/${subfolder}/${parentOppNumber}/1. Estimation/${safeName}`;
+      console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
+
+      try {
+        const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+          path: requotePath,
+          autorename: false,
+        }) as { metadata: { id: string } };
+        await storeFolderIdOnRecord(childRecordId, result.metadata.id);
+        console.log(`[dropbox] Successfully created requote folder: ${requotePath}`);
+      } catch (err: any) {
+        if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+          console.error('[dropbox] Requote folder creation failed:', err.message);
+        } else {
+          console.log(`[dropbox] Requote folder already exists: ${requotePath}`);
+          await backfillFolderId(accessToken, childRecordId, requotePath);
+        }
+      }
+      return; // Done — no full folder structure for requotes
+    }
+
     const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
     console.log(`[dropbox] Creating linked folder: ${childPath}`);
@@ -1399,6 +1435,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         subfolder,
         childFolderName,
         ...(linkedOpportunityFolderName ? { linkedOpportunityFolderName } : {}),
+        ...(recordData._isRequote ? { isRequote: true, parentOpportunityNumber: recordData._parentOpportunityNumber } : {}),
       });
     } catch (err: any) {
       req.log.error(err, 'resolve-path failed');
