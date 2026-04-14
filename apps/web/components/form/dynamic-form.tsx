@@ -1037,10 +1037,11 @@ export default function DynamicForm({
               }
               const filtered = canvasItems.filter((item) => {
                 if (item.kind === 'widget') {
-                  // Hide external widgets inside the form dialog — they only
-                  // belong on the record detail page (rendered post-creation).
+                  // Hide external widgets and Summary inside the form dialog —
+                  // they only belong on the record detail page (rendered post-creation).
                   const cfg = (item.widget as any).config;
                   if (cfg?.type === 'ExternalWidget') return false;
+                  if (cfg?.type === 'Summary') return false;
                   if (isHiddenByLifecycle(item.widget as any, layoutType)) return false;
                   return true;
                 }
