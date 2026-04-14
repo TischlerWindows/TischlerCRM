@@ -1103,8 +1103,8 @@ export default function SummaryPage() {
     const v = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
     const addOnRow = (label: string, key: string, hasQty: boolean, details: string) => `
       <tr><td class="b">${label}</td><td class="r">${hasQty ? v(key, 'qty') : '—'}</td><td colspan="2">${details}</td>
-      <td class="r">${v(key, 'netEuro')}</td><td class="r">${v(key, 'full')}</td><td class="r">${v(key, 'pct')}</td><td class="r">${v(key, 'final')}</td><td class="r">${v(key, 'finalAdj') || '—'}</td>
-      <td class="r cb">${v(key, 'calcFull')}</td><td class="r cb">${v(key, 'calcDisc')}</td><td class="r cg">${v(key, 'calcFinal')}</td><td class="r cp">${v(key, 'calcFinalAdj') || '—'}</td></tr>`;
+      <td class="r">${v(key, 'netEuro')}</td><td class="r">${v(key, 'full')}</td><td class="r">${v(key, 'pct')}</td><td class="r">${v(key, 'final')}</td><td></td>
+      <td class="r cb">${v(key, 'calcFull')}</td><td class="r cb">${v(key, 'calcDisc')}</td><td class="r cg">${v(key, 'calcFinal')}</td><td></td></tr>`;
     return `
   <div class="section-card">
     <div class="heading">Add-On Items</div>
@@ -1113,8 +1113,8 @@ export default function SummaryPage() {
         <colgroup><col style="width:12%"/><col style="width:5%"/><col style="width:6%"/><col style="width:7%"/><col style="width:8%"/><col style="width:7%"/><col style="width:4%"/><col style="width:7%"/><col style="width:9%"/><col style="width:7%"/><col style="width:7%"/><col style="width:7%"/><col style="width:9%"/></colgroup>
         <thead><tr>
           <th>Item</th><th class="r">Qty</th><th colspan="2">Details</th><th class="r">NET €</th>
-          <th class="r">Full</th><th class="r">%</th><th class="r">Final</th><th class="r">FINAL W/ ADJ</th>
-          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th class="r cp">Final W/ Adj</th>
+          <th class="r">Full</th><th class="r">%</th><th class="r">Final</th><th></th>
+          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th></th>
         </tr></thead>
         <tbody>
           ${addOnRow('Window Screens', 'windowScreens', true, `Frame: ${v('windowScreens', 'frameType')} | Mesh: ${v('windowScreens', 'meshType')}`)}
