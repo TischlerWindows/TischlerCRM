@@ -236,7 +236,9 @@ export default function RecordDetailPage({
 
     // Opportunity records: show as "OPP#### (Opp Name)"
     if (objectApiName === 'Opportunity') {
-      const oppNum = record.Opportunity__opportunityNumber || record.opportunityNumber || '';
+      const rawOppNum = record.Opportunity__opportunityNumber || record.opportunityNumber || '';
+      // Strip "- Requote N" suffix from the number — the name already carries that info
+      const oppNum = rawOppNum.replace(/\s*-\s*Requote\s+\d+$/i, '');
       const oppName = record.Opportunity__opportunityName || record.opportunityName || '';
       if (oppNum && oppName) return `${oppNum} (${oppName})`;
       if (oppNum) return oppNum;
