@@ -387,9 +387,9 @@ export default function RecordDetailPage({
           </Link>
 
           {showHeaderCard && (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
               {/* Identity + Actions row */}
-              <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center justify-between px-5 py-4 relative z-10">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 shrink-0 bg-brand-navy/10 rounded-lg flex items-center justify-center">
                     <IconComponent className="w-5 h-5 text-brand-navy" />
