@@ -233,6 +233,15 @@ export default function RecordDetailPage({
   // ── Build a display title from the record ────────────────────────────
   const getRecordTitle = (): string => {
     if (!record) return '';
+
+    // Opportunity records: show as "OPP#### (Opp Name)"
+    if (objectApiName === 'Opportunity') {
+      const oppNum = record.Opportunity__opportunityNumber || record.opportunityNumber || '';
+      const oppName = record.Opportunity__opportunityName || record.opportunityName || '';
+      if (oppNum && oppName) return `${oppNum} (${oppName})`;
+      if (oppNum) return oppNum;
+    }
+
     const numberKey = Object.keys(record).find(
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k],
     );
