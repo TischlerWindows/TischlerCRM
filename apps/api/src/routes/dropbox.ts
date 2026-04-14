@@ -800,14 +800,17 @@ export async function tryEnsureLinkedFolder(
       }
 
       const requotePath = `${parentPath}/${subfolder}/${parentOppNumber}/1. Estimation/${safeName}`;
+      const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppNumber}/1. Estimation/${parentOppNumber}`;
       console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
 
+      let requoteCreated = false;
       try {
         const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
           path: requotePath,
           autorename: false,
         }) as { metadata: { id: string } };
         await storeFolderIdOnRecord(childRecordId, result.metadata.id);
+        requoteCreated = true;
         console.log(`[dropbox] Successfully created requote folder: ${requotePath}`);
       } catch (err: any) {
         if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
@@ -817,6 +820,41 @@ export async function tryEnsureLinkedFolder(
           await backfillFolderId(accessToken, childRecordId, requotePath);
         }
       }
+
+      // Copy contents from the parent OPP folder in Estimation to the requote folder
+      if (requoteCreated) {
+        try {
+          const listResult = await dropboxApi(accessToken, '/files/list_folder', {
+            path: parentOppEstimationFolder,
+            limit: 2000,
+          }) as { entries: Array<{ '.tag': string; path_display: string; name: string }> };
+
+          if (listResult.entries && listResult.entries.length > 0) {
+            console.log(`[dropbox] Copying ${listResult.entries.length} items from ${parentOppEstimationFolder} → ${requotePath}`);
+            for (const entry of listResult.entries) {
+              try {
+                await dropboxApi(accessToken, '/files/copy_v2', {
+                  from_path: entry.path_display,
+                  to_path: `${requotePath}/${entry.name}`,
+                  autorename: true,
+                });
+              } catch (cpErr: any) {
+                console.error(`[dropbox] Failed to copy ${entry.name} to requote: ${cpErr.message}`);
+              }
+            }
+            console.log(`[dropbox] Finished copying files to requote folder`);
+          } else {
+            console.log(`[dropbox] Parent OPP estimation folder empty: ${parentOppEstimationFolder}`);
+          }
+        } catch (err: any) {
+          if (err.message?.includes('409') || err.message?.includes('not_found')) {
+            console.log(`[dropbox] Parent OPP estimation folder not found: ${parentOppEstimationFolder}`);
+          } else {
+            console.error('[dropbox] Copy to requote failed (non-fatal):', err.message);
+          }
+        }
+      }
+
       return; // Done — no full folder structure for requotes
     }
 
