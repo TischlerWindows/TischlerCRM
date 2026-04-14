@@ -530,8 +530,22 @@ export async function tryRenameDropboxFolder(
       });
       if (!propRecord) return null;
       const propData = propRecord.data as Record<string, any>;
-      const propFolderName = deriveDropboxFolderName(propData, propId);
-      const parentPath = buildFolderPath('Property', propId, propFolderName);
+
+      // Resolve actual Property folder — prefer stored folder ID to handle renames
+      let parentPath: string;
+      const parentFolder = await resolveStoredFolder(accessToken!, propId);
+      if (parentFolder?.found) {
+        parentPath = parentFolder.fullPath;
+      } else {
+        const renamedParent = await findExistingFolderInDropbox(accessToken!, 'Property', propId, propData);
+        if (renamedParent) {
+          parentPath = renamedParent.fullPath;
+        } else {
+          const propFolderName = deriveDropboxFolderName(propData, propId);
+          parentPath = buildFolderPath('Property', propId, propFolderName);
+        }
+      }
+
       const safeChild = childName.replace(/[\\/:*?"<>|]/g, '_').trim();
       return `${parentPath}/${subfolder}/${safeChild}`;
     };
@@ -653,9 +667,24 @@ export async function tryEnsureLinkedFolder(
       return;
     }
     const propertyData = propertyRecord.data as Record<string, any>;
-    const parentFolderName = deriveDropboxFolderName(propertyData, propertyId);
+    const derivedParentFolderName = deriveDropboxFolderName(propertyData, propertyId);
 
-    const parentPath = buildFolderPath('Property', propertyId, parentFolderName);
+    // Resolve actual Property parent folder — prefer stored folder ID to handle renames
+    let parentPath: string;
+    const parentFolder = await resolveStoredFolder(accessToken, propertyId);
+    if (parentFolder?.found) {
+      parentPath = parentFolder.fullPath;
+      console.log(`[dropbox] Resolved Property parent via stored folder ID: ${parentPath}`);
+    } else {
+      // Search for a renamed Property folder by auto-number
+      const renamedParent = await findExistingFolderInDropbox(accessToken, 'Property', propertyId, propertyData);
+      if (renamedParent) {
+        parentPath = renamedParent.fullPath;
+        console.log(`[dropbox] Resolved Property parent via auto-number search: ${parentPath}`);
+      } else {
+        parentPath = buildFolderPath('Property', propertyId, derivedParentFolderName);
+      }
+    }
 
     // ── Special handling: Project linked to an Opportunity ──
     // Don't create a separate Project folder — use the linked Opportunity's
@@ -685,7 +714,14 @@ export async function tryEnsureLinkedFolder(
           });
           if (oppRecord) {
             const oppData = oppRecord.data as Record<string, any>;
-            const oppFolderName = deriveDropboxFolderName(oppData, oppId);
+            // Resolve Opportunity folder via stored ID to handle renames
+            let oppFolderName: string;
+            const oppFolder = await resolveStoredFolder(accessToken, oppId);
+            if (oppFolder?.found) {
+              oppFolderName = oppFolder.folderName;
+            } else {
+              oppFolderName = deriveDropboxFolderName(oppData, oppId);
+            }
             const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
             const oppPath = `${parentPath}/Project Books/${safeOpp}`;
             const estimationPath = `${oppPath}/1. Estimation`;
