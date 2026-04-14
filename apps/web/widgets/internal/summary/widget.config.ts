@@ -9,4 +9,5 @@ export const config: WidgetManifest = {
   integration: null,
   defaultDisplayMode: 'full',
   configSchema: [],
+  hideFromPalette: true,
 }
