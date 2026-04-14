@@ -132,6 +132,8 @@ function getWidgetLabel(config: WidgetConfig): string {
       return 'Path'
     case 'InstallationCostGrid':
       return 'Installation Cost Grid'
+    case 'Summary':
+      return 'Summary'
     default:
       return 'Widget'
   }

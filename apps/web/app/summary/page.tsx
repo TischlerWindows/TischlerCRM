@@ -638,12 +638,24 @@ export default function SummaryPage() {
   useEffect(() => {
     if (loading) return;
     const opportunityId = searchParams.get('fromOpportunity');
-    if (!opportunityId) return;
-    const opportunityName = searchParams.get('opportunityName') || '';
-    const opportunityNumber = searchParams.get('opportunityNumber') || '';
-    // Clear query params so refreshing doesn't re-create
-    router.replace('/summary');
-    createNewSummary({ opportunityId, opportunityName, opportunityNumber });
+    if (opportunityId) {
+      const opportunityName = searchParams.get('opportunityName') || '';
+      const opportunityNumber = searchParams.get('opportunityNumber') || '';
+      // Clear query params so refreshing doesn't re-create
+      router.replace('/summary');
+      createNewSummary({ opportunityId, opportunityName, opportunityNumber });
+      return;
+    }
+    // Auto-open existing summary for editing (from Summary widget on record page)
+    const editId = searchParams.get('editSummary');
+    if (editId) {
+      const found = summaries.find(s => s.id === editId);
+      if (found) {
+        router.replace('/summary');
+        setEditingSummary(found);
+        setShowNewSummary(true);
+      }
+    }
   }, [loading, searchParams]);
 
   const handleSort = (columnId: string) => {

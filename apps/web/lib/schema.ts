@@ -220,7 +220,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -338,6 +338,10 @@ export interface InstallationCostGridConfig {
   type: 'InstallationCostGrid';
 }
 
+export interface SummaryConfig {
+  type: 'Summary';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -349,7 +353,8 @@ export type WidgetConfig =
   | TeamMembersRollupConfig
   | TeamMemberAssociationsConfig
   | PathConfig
-  | InstallationCostGridConfig;
+  | InstallationCostGridConfig
+  | SummaryConfig;
 
 export interface PageWidget {
   id: string;
