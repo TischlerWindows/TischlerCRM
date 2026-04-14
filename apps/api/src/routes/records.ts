@@ -773,13 +773,20 @@ export async function recordRoutes(app: FastifyInstance) {
       cloneData.opportunityNumber = newOppNumber;
     }
 
-    // Also update name to include requote
+    // Set the opportunity name — use the user-supplied name if provided,
+    // otherwise fall back to auto-generated "<base> - Requote N"
+    const body = req.body as { name?: string } | null;
+    const userSuppliedName = body?.name?.trim();
     for (const key of Object.keys(cloneData)) {
       const stripped = key.replace(/^[A-Za-z]+__/, '');
       if (stripped === 'opportunityName' || stripped === 'name') {
-        const origName = String(cloneData[key] || '');
-        const baseName = origName.replace(/\s*-\s*Requote\s*\d+$/i, '');
-        cloneData[key] = `${baseName} - Requote ${requoteNum}`;
+        if (userSuppliedName) {
+          cloneData[key] = userSuppliedName;
+        } else {
+          const origName = String(cloneData[key] || '');
+          const baseName = origName.replace(/\s*-\s*Requote\s*\d+$/i, '');
+          cloneData[key] = `${baseName} - Requote ${requoteNum}`;
+        }
       }
     }
 

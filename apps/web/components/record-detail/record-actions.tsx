@@ -59,6 +59,8 @@ export function RecordActions({
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isRequoting, setIsRequoting] = useState(false);
+  const [showRequotePrompt, setShowRequotePrompt] = useState(false);
+  const [requoteName, setRequoteName] = useState('');
 
   // Auto-open edit form when navigated with ?edit=true (e.g. after requote)
   useEffect(() => {
@@ -149,11 +151,19 @@ export function RecordActions({
     }
   };
 
-  const handleRequote = async () => {
-    if (!record || !rawRecord) return;
+  const handleRequoteClick = () => {
+    // Pre-fill with existing opportunity name
+    const existing = record?.Opportunity__opportunityName || record?.opportunityName || record?.name || '';
+    setRequoteName(existing);
+    setShowRequotePrompt(true);
+  };
+
+  const handleRequoteConfirm = async () => {
+    if (!record || !rawRecord || !requoteName.trim()) return;
+    setShowRequotePrompt(false);
     setIsRequoting(true);
     try {
-      const requoted = await apiClient.createRequote(objectApiName, record.id);
+      const requoted = await apiClient.createRequote(objectApiName, record.id, requoteName.trim());
       if (requoted) {
         showToast('Requote created — opening in edit mode', 'success');
         router.push(`/${backRoute.replace(/^\//, '').split('/')[0]}/${requoted.id}?edit=true`);
@@ -196,7 +206,7 @@ export function RecordActions({
         )}
         {showRequote && objectApiName === 'Opportunity' && canEdit && (
           <button
-            onClick={handleRequote}
+            onClick={handleRequoteClick}
             disabled={isRequoting}
             className="inline-flex items-center px-4 py-2 border border-blue-300 rounded-lg text-sm font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -288,6 +298,43 @@ export function RecordActions({
         variant="destructive"
         onConfirm={() => { void confirmDelete(); }}
       />
+
+      {/* Requote name prompt */}
+      {showRequotePrompt && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/40" onClick={() => setShowRequotePrompt(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Create Requote</h3>
+              <p className="text-sm text-gray-500 mb-4">Enter the name for this requote. This will appear as the Opportunity Name.</p>
+              <input
+                autoFocus
+                type="text"
+                value={requoteName}
+                onChange={(e) => setRequoteName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && requoteName.trim()) void handleRequoteConfirm(); }}
+                placeholder="e.g. Project Name - Requote 2"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => setShowRequotePrompt(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleRequoteConfirm()}
+                  disabled={!requoteName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create Requote
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }

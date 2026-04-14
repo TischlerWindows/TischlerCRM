@@ -462,10 +462,10 @@ class ApiClient {
     });
   }
 
-  async createRequote(objectApiName: string, recordId: string) {
+  async createRequote(objectApiName: string, recordId: string, name?: string) {
     return this.request<any>(`/objects/${objectApiName}/records/${recordId}/requote`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ name }),
     });
   }
 
