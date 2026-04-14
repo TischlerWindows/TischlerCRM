@@ -34,7 +34,7 @@ interface RecordDetailPageProps {
 }
 
 // ── Requote Version Selector ───────────────────────────────────────────
-
+/** Dropdown that lets users switch between an opportunity and its requotes */
 function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: string; recordId: string }) {
   const router = useRouter();
   const [versions, setVersions] = useState<Array<{ id: string; label: string; isCurrent: boolean }>>([]);
