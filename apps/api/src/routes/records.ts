@@ -773,13 +773,19 @@ export async function recordRoutes(app: FastifyInstance) {
     // Generate a new record ID
     const newId = generateRecordId(apiName);
 
+    // Validate pageLayoutId format
+    const srcLayoutId = sourceRecord.pageLayoutId;
+    const isValidLayout = srcLayoutId && /^[0-9]{3}[A-Za-z0-9]{12}$/.test(srcLayoutId);
+
     // Create the requote record
     const record = await prisma.record.create({
       data: {
         id: newId,
         objectId: object.id,
         data: cloneData,
-        pageLayoutId: sourceRecord.pageLayoutId,
+        ...(isValidLayout ? { pageLayoutId: srcLayoutId } : {}),
+        createdById: userId,
+        modifiedById: userId,
       },
     });
 

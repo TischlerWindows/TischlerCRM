@@ -292,7 +292,7 @@ export interface HeaderHighlightsConfig {
   /** Up to 6 field API names to display as highlight badges */
   fieldApiNames: string[];
   /** Which action buttons to show in the highlights bar. Defaults to edit + delete when absent. */
-  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print'>;
+  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'>;
 }
 
 export interface ExternalWidgetLayoutConfig {

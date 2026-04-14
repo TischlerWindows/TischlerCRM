@@ -25,7 +25,7 @@ export interface RecordActionsProps {
   canDelete: boolean;
   canCustomize: boolean;
   /** Visible action buttons (from HeaderHighlights widget config) */
-  visibleActions: Array<'edit' | 'delete' | 'clone' | 'print'>;
+  visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'>;
   /** Called after a successful edit to update parent state */
   onRecordUpdated: (raw: RecordData, flat: Record<string, any>) => void;
 }
@@ -71,6 +71,7 @@ export function RecordActions({
   const showDelete = visibleActions.includes('delete');
   const showClone = visibleActions.includes('clone');
   const showPrint = visibleActions.includes('print');
+  const showRequote = visibleActions.includes('requote');
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleEdit = () => {
@@ -184,7 +185,7 @@ export function RecordActions({
             {isCloning ? 'Cloning\u2026' : 'Clone'}
           </button>
         )}
-        {objectApiName === 'Opportunity' && canEdit && (
+        {showRequote && objectApiName === 'Opportunity' && canEdit && (
           <button
             onClick={handleRequote}
             disabled={isRequoting}

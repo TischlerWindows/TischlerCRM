@@ -280,7 +280,7 @@ export default function RecordDetailPage({
 
   // ── Resolve HeaderHighlights widget config ───────────────────────────
   let highlightApiNames: string[] = [];
-  let visibleActions: Array<'edit' | 'delete' | 'clone' | 'print'> = ['edit', 'delete'];
+  let visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'> = ['edit', 'delete'];
   let hasHighlightsWidget = false;
   let isNewStyleLayout = false;
   if (pageLayout?.tabs) {

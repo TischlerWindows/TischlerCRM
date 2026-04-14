@@ -2,13 +2,14 @@
 import { useState } from 'react'
 import type { ConfigPanelProps } from '@/lib/widgets/types'
 
-type ActionKey = 'edit' | 'delete' | 'clone' | 'print'
+type ActionKey = 'edit' | 'delete' | 'clone' | 'print' | 'requote'
 
 const ACTION_OPTIONS: Array<{ key: ActionKey; label: string; description: string }> = [
   { key: 'edit', label: 'Edit', description: 'Open edit form for this record' },
   { key: 'delete', label: 'Delete', description: 'Permanently delete this record' },
   { key: 'clone', label: 'Clone Record', description: 'Duplicate this record' },
   { key: 'print', label: 'Print Page', description: 'Print the current record page' },
+  { key: 'requote', label: 'Create Requote', description: 'Create a requote copy (Opportunity only)' },
 ]
 
 export default function HeaderHighlightsConfigPanel({ config, onChange, object }: ConfigPanelProps) {
