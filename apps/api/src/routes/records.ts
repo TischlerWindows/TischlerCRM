@@ -803,12 +803,13 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    // Ensure linked Dropbox folder
-    try {
-      await tryEnsureLinkedFolder(userId, apiName, record.id, cloneData);
-    } catch { /* non-fatal */ }
-
+    // Send response immediately so the frontend can redirect
     reply.code(201).send(record);
+
+    // Ensure linked Dropbox folder (fire-and-forget so file copies don't block the response)
+    tryEnsureLinkedFolder(userId, apiName, record.id, cloneData).catch((err) => {
+      console.error('[dropbox] Requote folder creation failed (non-fatal):', err);
+    });
   });
 
   // ── Get requote versions for an Opportunity ──────────────────────────────
