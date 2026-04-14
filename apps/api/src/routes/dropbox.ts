@@ -824,6 +824,14 @@ export async function tryEnsureLinkedFolder(
           });
         } catch { /* folder already exists — ignore */ }
       }
+      // Create an OPP#### folder inside 1. Estimation for working files
+      try {
+        await dropboxApi(accessToken, '/files/create_folder_v2', {
+          path: `${childPath}/1. Estimation/${safeName}`,
+          autorename: false,
+        });
+        console.log(`[dropbox] Created estimation sub-folder: ${childPath}/1. Estimation/${safeName}`);
+      } catch { /* folder already exists — ignore */ }
     }
 
     // ── Copy files from related record folder ──
