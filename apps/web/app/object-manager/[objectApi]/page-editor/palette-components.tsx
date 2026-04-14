@@ -179,7 +179,7 @@ export function PaletteComponents({
           <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
             Components
           </div>
-          {internalWidgets.filter((m) => !m.hideFromPalette).map((manifest) => (
+          {internalWidgets.map((manifest) => (
             <InternalDraggableCard key={manifest.id} manifest={manifest} />
           ))}
         </div>
