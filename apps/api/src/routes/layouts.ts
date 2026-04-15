@@ -134,7 +134,12 @@ function buildExtensionsJson(
 }
 
 export async function layoutRoutes(app: FastifyInstance) {
-  // Get all layouts for an object
+  // Get all layouts for an object.
+  // Note: the runtime page-layout resolver lives on the web side
+  // (apps/web/lib/layout-resolver.ts) and treats only `active === true` as
+  // live — undefined / false both count as Draft. The Prisma `isActive`
+  // column here uses the same semantics; the schema-blob path goes through
+  // the JSON-stored `active` field on each layout.
   app.get('/objects/:apiName/layouts', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
 

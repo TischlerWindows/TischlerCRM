@@ -39,8 +39,12 @@ export interface ResolveOptions {
 }
 
 function isActive(layout: PageLayout): boolean {
-  // Default to active when the flag is undefined (legacy layouts had no flag).
-  return layout.active !== false;
+  // Require an explicit `true`. The editor's getStatus() shows undefined/false
+  // as "Draft" — matching that here keeps the resolver and the admin UI in
+  // sync. Template-built layouts (e.g. seeded "Property - Wood Template")
+  // leave `active` undefined and would otherwise be wrongly treated as live,
+  // making activeLayouts.length > 1 and bypassing the single-active shortcut.
+  return layout.active === true;
 }
 
 export function resolveLayoutForUser(
