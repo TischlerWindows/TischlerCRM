@@ -89,7 +89,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       const appPerm = hrefToAppPermMap[tab.href];
       if (appPerm) return hasAppPermission(appPerm as any);
 
-      // Non-object, non-restricted tabs (Summary, Settings, etc.) are always shown
+      // Non-object, non-restricted tabs (Settings, etc.) are always shown
       return true;
     });
   }, [tabs, canAccess, hasAppPermission, schema]);
@@ -134,7 +134,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     (async () => {
       const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
       if (savedTabs && Array.isArray(savedTabs)) {
-        setTabs(savedTabs);
+        setTabs(savedTabs.filter((t) => t.href !== '/summary'));
       } else {
         setTabs(defaultTabs);
       }
