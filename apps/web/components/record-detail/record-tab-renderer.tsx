@@ -181,9 +181,13 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
   // Render a single region's inner content (panels + widgets)
   const renderRegion = (region: LayoutSection) => {
     const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
+    // HeaderHighlights are consumed by the header card — don't render them inline
     const sortedWidgets = [...(region.widgets ?? [])]
-      .filter((w: any) => !w.hideOnView && !w.hideOnExisting)
+      .filter((w: any) => !w.hideOnView && !w.hideOnExisting && w.widgetType !== 'HeaderHighlights')
       .sort((a: any, b: any) => a.order - b.order);
+
+    // Skip entirely-empty regions (e.g. a HeaderHighlights-only "Header" region)
+    if (sortedPanels.length === 0 && sortedWidgets.length === 0) return null;
 
     const regionStyle: React.CSSProperties = {
       ...(region.style?.background ? { backgroundColor: region.style.background } : {}),
