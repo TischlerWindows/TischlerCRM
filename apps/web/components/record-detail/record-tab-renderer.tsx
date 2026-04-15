@@ -162,7 +162,8 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
   const visibleRegions = regions.filter((region) => {
     if (region.hidden) return false;
-    if ((region as any).hideOnExisting) return false;
+    // Detail page is "view" mode — check hideOnView with legacy hideOnExisting fallback
+    if ((region as any).hideOnView || (region as any).hideOnExisting) return false;
     if ((region as any).visibleIf?.length > 0 && !evaluateVisibility((region as any).visibleIf, layoutVisibilityData)) return false;
     const regionFx = getFormattingEffectsForRegion(pageLayout, region.id, layoutVisibilityData);
     return !regionFx?.hidden;
@@ -181,7 +182,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
   const renderRegion = (region: LayoutSection) => {
     const sortedPanels = [...(region.panels ?? [])].sort((a: any, b: any) => a.order - b.order);
     const sortedWidgets = [...(region.widgets ?? [])]
-      .filter((w: any) => !w.hideOnExisting)
+      .filter((w: any) => !w.hideOnView && !w.hideOnExisting)
       .sort((a: any, b: any) => a.order - b.order);
 
     const regionStyle: React.CSSProperties = {
@@ -201,7 +202,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
         {/* Panels */}
           {sortedPanels.map((panel: any) => {
             if (panel.hidden) return null;
-            if (panel.hideOnExisting) return null;
+            if (panel.hideOnView || panel.hideOnExisting) return null;
             if (panel.visibleIf?.length > 0 && !evaluateVisibility(panel.visibleIf, layoutVisibilityData)) return null;
             const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
@@ -209,7 +210,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
-            if (f.hideOnExisting) return false;
+            if (f.hideOnView || f.hideOnExisting) return false;
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;

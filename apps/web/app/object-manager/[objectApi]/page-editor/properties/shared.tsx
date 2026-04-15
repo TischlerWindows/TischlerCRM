@@ -166,35 +166,73 @@ export function TabBar({
 
 /* ---------- Hide on New/Existing checkboxes ---------- */
 
+/** Resolves legacy hideOnExisting into hideOnView + hideOnEdit for reading. */
+export function resolveHideFlags(el: {
+  hideOnNew?: boolean;
+  hideOnView?: boolean;
+  hideOnEdit?: boolean;
+  hideOnExisting?: boolean;
+}): { hideOnNew: boolean; hideOnView: boolean; hideOnEdit: boolean } {
+  return {
+    hideOnNew: !!el.hideOnNew,
+    hideOnView: !!el.hideOnView || !!el.hideOnExisting,
+    hideOnEdit: !!el.hideOnEdit || !!el.hideOnExisting,
+  };
+}
+
 function getHideOnHelperText(
-  hideOnNew: boolean | undefined,
-  hideOnExisting: boolean | undefined,
+  hideOnNew: boolean,
+  hideOnView: boolean,
+  hideOnEdit: boolean,
   elementLabel: string,
 ): string | null {
-  if (hideOnNew && hideOnExisting) {
+  if (hideOnNew && hideOnView && hideOnEdit) {
     return `This ${elementLabel} is hidden everywhere. Consider using formatting rules instead.`;
   }
-  if (hideOnNew) {
-    return `This ${elementLabel} will only appear after the record is saved.`;
-  }
-  if (hideOnExisting) {
-    return `This ${elementLabel} will only appear on the New Record form.`;
-  }
-  return null;
+  const visible: string[] = [];
+  if (!hideOnNew) visible.push('New Record');
+  if (!hideOnView) visible.push('View');
+  if (!hideOnEdit) visible.push('Edit');
+  if (visible.length === 3) return null;
+  if (visible.length === 0) return `This ${elementLabel} is hidden everywhere.`;
+  return `This ${elementLabel} will only appear on: ${visible.join(', ')}.`;
 }
 
 export function HideOnCheckboxes({
   hideOnNew,
+  hideOnView,
+  hideOnEdit,
   hideOnExisting,
   onChange,
   elementLabel,
 }: {
   hideOnNew?: boolean;
+  hideOnView?: boolean;
+  hideOnEdit?: boolean;
+  /** @deprecated legacy flag — auto-migrated to hideOnView + hideOnEdit on first edit */
   hideOnExisting?: boolean;
-  onChange: (patch: { hideOnNew?: boolean; hideOnExisting?: boolean }) => void;
+  onChange: (patch: { hideOnNew?: boolean; hideOnView?: boolean; hideOnEdit?: boolean; hideOnExisting?: boolean }) => void;
   elementLabel: string;
 }) {
-  const helperText = getHideOnHelperText(hideOnNew, hideOnExisting, elementLabel);
+  // Resolve legacy hideOnExisting into the new flags for display
+  const resolved = resolveHideFlags({ hideOnNew, hideOnView, hideOnEdit, hideOnExisting });
+  const helperText = getHideOnHelperText(resolved.hideOnNew, resolved.hideOnView, resolved.hideOnEdit, elementLabel);
+
+  // When the user toggles any checkbox, migrate legacy hideOnExisting and clear it
+  const handleToggle = (field: 'hideOnNew' | 'hideOnView' | 'hideOnEdit', checked: boolean) => {
+    const next: { hideOnNew?: boolean; hideOnView?: boolean; hideOnEdit?: boolean; hideOnExisting?: boolean } = {
+      hideOnNew: resolved.hideOnNew,
+      hideOnView: resolved.hideOnView,
+      hideOnEdit: resolved.hideOnEdit,
+      hideOnExisting: undefined, // clear legacy flag after first edit
+    };
+    next[field] = checked;
+    // Normalize false → undefined to keep JSON clean
+    for (const key of ['hideOnNew', 'hideOnView', 'hideOnEdit'] as const) {
+      if (!next[key]) next[key] = undefined;
+    }
+    onChange(next);
+  };
 
   return (
     <div>
@@ -205,8 +243,8 @@ export function HideOnCheckboxes({
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
-            checked={!!hideOnNew}
-            onChange={(e) => onChange({ hideOnNew: e.target.checked || undefined })}
+            checked={resolved.hideOnNew}
+            onChange={(e) => handleToggle('hideOnNew', e.target.checked)}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
           Hide on New Record
@@ -214,11 +252,20 @@ export function HideOnCheckboxes({
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
-            checked={!!hideOnExisting}
-            onChange={(e) => onChange({ hideOnExisting: e.target.checked || undefined })}
+            checked={resolved.hideOnView}
+            onChange={(e) => handleToggle('hideOnView', e.target.checked)}
             className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
           />
-          Hide on Existing Record
+          Hide on View
+        </label>
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={resolved.hideOnEdit}
+            onChange={(e) => handleToggle('hideOnEdit', e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          Hide on Edit
         </label>
       </div>
       {helperText && (
@@ -234,6 +281,27 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
   const updateField = useEditorStore((s) => s.updateField);
   const updateTab = useEditorStore((s) => s.updateTab);
 
+  // All hooks MUST be called before any conditional returns (Rules of Hooks)
+  const [saved, setSaved] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => { if (savedTimer.current) clearTimeout(savedTimer.current); };
+  }, []);
+
+  const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[]) => {
+    if (!selection) return;
+    if (selection.kind === 'region') {
+      updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+    } else if (selection.kind === 'panel') {
+      updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
+    }
+    setSaved(true);
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSaved(false), 3000);
+  }, [selection, updateSection, updatePanel]);
+
+  // Conditional returns come AFTER all hooks
   if (!selection) return null;
   if (selection.kind === 'widget') return null;
 
@@ -243,6 +311,8 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       <div className="overflow-y-auto flex-1 p-3 space-y-4">
         <HideOnCheckboxes
           hideOnNew={selection.tab.hideOnNew}
+          hideOnView={selection.tab.hideOnView}
+          hideOnEdit={selection.tab.hideOnEdit}
           hideOnExisting={selection.tab.hideOnExisting}
           onChange={(patch) => updateTab(selection.tab.id, patch)}
           elementLabel="tab"
@@ -277,24 +347,6 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       : selection.kind === 'panel'
       ? (selection.panel as any).visibleIf ?? []
       : [];
-
-  const [saved, setSaved] = useState(false);
-  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    return () => { if (savedTimer.current) clearTimeout(savedTimer.current); };
-  }, []);
-
-  const handleSaveConditions = useCallback((conditions: import('@/lib/schema').ConditionExpr[]) => {
-    if (selection.kind === 'region') {
-      updateSection(selection.region.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
-    } else if (selection.kind === 'panel') {
-      updatePanel(selection.panel.id, { visibleIf: conditions.length > 0 ? conditions : undefined } as any);
-    }
-    setSaved(true);
-    if (savedTimer.current) clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setSaved(false), 3000);
-  }, [selection, updateSection, updatePanel]);
 
   // Build a fake FieldDef so we can reuse FieldVisibilityRuleEditor
   const fakeField: import('@/lib/schema').FieldDef = {
@@ -334,42 +386,33 @@ export function VisibilityTab({ selection, availableFields = [] }: { selection: 
       </div>
 
       <div className="border-t border-gray-100 pt-3">
-        <HideOnCheckboxes
-          hideOnNew={
-            selection.kind === 'field'
-              ? selection.field.hideOnNew
-              : selection.kind === 'panel'
-              ? selection.panel.hideOnNew
-              : selection.kind === 'region'
-              ? selection.region.hideOnNew
-              : undefined
-          }
-          hideOnExisting={
-            selection.kind === 'field'
-              ? selection.field.hideOnExisting
-              : selection.kind === 'panel'
-              ? selection.panel.hideOnExisting
-              : selection.kind === 'region'
-              ? selection.region.hideOnExisting
-              : undefined
-          }
-          onChange={(patch) => {
-            if (selection.kind === 'field') {
-              updateField(selection.field.fieldApiName, selection.panel.id, patch);
-            } else if (selection.kind === 'panel') {
-              updatePanel(selection.panel.id, patch);
-            } else if (selection.kind === 'region') {
-              updateSection(selection.region.id, patch);
-            }
-          }}
-          elementLabel={
-            selection.kind === 'field'
-              ? 'field'
-              : selection.kind === 'panel'
-              ? 'panel'
-              : 'section'
-          }
-        />
+        {(() => {
+          const source: any =
+            selection.kind === 'field' ? selection.field :
+            selection.kind === 'panel' ? selection.panel :
+            selection.region;
+          const label =
+            selection.kind === 'field' ? 'field' :
+            selection.kind === 'panel' ? 'panel' : 'section';
+          return (
+            <HideOnCheckboxes
+              hideOnNew={source.hideOnNew}
+              hideOnView={source.hideOnView}
+              hideOnEdit={source.hideOnEdit}
+              hideOnExisting={source.hideOnExisting}
+              onChange={(patch) => {
+                if (selection.kind === 'field') {
+                  updateField(selection.field.fieldApiName, selection.panel.id, patch);
+                } else if (selection.kind === 'panel') {
+                  updatePanel(selection.panel.id, patch);
+                } else if (selection.kind === 'region') {
+                  updateSection(selection.region.id, patch);
+                }
+              }}
+              elementLabel={label}
+            />
+          );
+        })()}
       </div>
 
       {(selection.kind === 'region' || selection.kind === 'panel') && (

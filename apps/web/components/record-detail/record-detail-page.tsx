@@ -389,8 +389,8 @@ export default function RecordDetailPage({
             {pageLayout.tabs.length > 1 && (() => {
               const sortedTabsForNav = [...pageLayout.tabs]
                 .filter((tab: any) => {
-                  // Hide tabs with hideOnExisting flag (detail page = existing record)
-                  if (tab.hideOnExisting) return false;
+                  // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
+                  if (tab.hideOnView || tab.hideOnExisting) return false;
                   // Hide tabs via formatting rules
                   const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                   if (tabFx?.hidden) return false;
@@ -423,7 +423,7 @@ export default function RecordDetailPage({
               ? (() => {
                   const sortedTabsForRender = [...pageLayout.tabs]
                     .filter((tab: any) => {
-                      if (tab.hideOnExisting) return false;
+                      if (tab.hideOnView || tab.hideOnExisting) return false;
                       const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                       if (tabFx?.hidden) return false;
                       return true;
@@ -452,7 +452,7 @@ export default function RecordDetailPage({
                 })()
               : pageLayout.tabs
                   .filter((tab: any) => {
-                    if (tab.hideOnExisting) return false;
+                    if (tab.hideOnView || tab.hideOnExisting) return false;
                     const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
                     if (tabFx?.hidden) return false;
                     return true;
