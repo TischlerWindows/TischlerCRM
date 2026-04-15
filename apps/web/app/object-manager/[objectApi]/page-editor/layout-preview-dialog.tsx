@@ -1,43 +1,113 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Eye, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { FieldDef, PageLayout } from '@/lib/schema';
+import DynamicForm from '@/components/dynamic-form';
+import { PreviewDetailView } from '@/components/record-detail/preview-detail-view';
+import { recordsService } from '@/lib/records-service';
+import type { FieldDef, ObjectDef, PageLayout } from '@/lib/schema';
+import { useEditorStore } from './editor-store';
+import type { PreviewMode } from './store/selection-slice';
 
-function sampleValue(fieldType: string | undefined, label: string): string {
-  switch (fieldType) {
-    case 'Email': return 'john@example.com';
-    case 'Phone': return '(555) 123-4567';
-    case 'Currency': return '$12,500';
-    case 'Number': return '42';
-    case 'Percent': return '85%';
-    case 'Date': return '03-15-2026';
-    case 'DateTime': return '03-15-2026 09:30';
-    case 'Checkbox': return 'Yes';
-    case 'URL': return 'https://example.com';
-    default: return label;
+type LoadStatus = 'idle' | 'loading' | 'loaded' | 'empty' | 'error';
+
+export interface LayoutPreviewDialogProps {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  /** The current in-memory layout from the editor store (may be unsaved). */
+  layout: PageLayout | null;
+  /** The object being edited — used to fetch a sample record and render view-mode widgets. */
+  objectApiName: string;
+  objectDef: ObjectDef | undefined;
+  objectLabel: string;
+  /** Preserved for backwards-compat callers; not used directly by the new renderer. */
+  allFields?: FieldDef[];
+}
+
+function formatRecordLabel(record: Record<string, any> | null, objectDef: ObjectDef | undefined): string {
+  if (!record) return '';
+  // Try common name-like fields; fall back to ID.
+  const candidates = ['name', 'Name', 'label'];
+  for (const key of candidates) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) return value;
   }
+  // Walk object fields to find the first Text-like populated field.
+  const nameField = objectDef?.fields.find(
+    (f) => /name/i.test(f.apiName) || /name/i.test(f.label),
+  );
+  if (nameField) {
+    const unprefixed = nameField.apiName.replace(/^[A-Za-z]+__/, '');
+    const value = record[nameField.apiName] ?? record[unprefixed];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return (record.id as string) || '(unnamed record)';
 }
 
 export function LayoutPreviewDialog({
   open,
   onOpenChange,
-  pageLayout,
-  allFields,
+  layout,
+  objectApiName,
+  objectDef,
   objectLabel,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  pageLayout: PageLayout | null;
-  allFields: FieldDef[];
-  objectLabel: string;
-}) {
-  if (!pageLayout) {
+}: LayoutPreviewDialogProps) {
+  const previewMode = useEditorStore((s) => s.previewMode);
+  const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
+
+  const [sampleRecord, setSampleRecord] = useState<Record<string, any> | null>(null);
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('idle');
+  const [toast, setToast] = useState<string | null>(null);
+
+  // Fetch the most recent record when the dialog first opens.
+  useEffect(() => {
+    if (!open || !objectApiName) return;
+    let cancelled = false;
+    setLoadStatus('loading');
+    recordsService
+      .getRecords(objectApiName, { limit: 1 })
+      .then((records) => {
+        if (cancelled) return;
+        if (!records || records.length === 0) {
+          setSampleRecord(null);
+          setLoadStatus('empty');
+        } else {
+          // Flatten the nested `{ id, data: {...} }` shape to the flat form that
+          // DynamicForm / RecordTabRenderer expect.
+          setSampleRecord(recordsService.flattenRecord(records[0]));
+          setLoadStatus('loaded');
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSampleRecord(null);
+        setLoadStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, objectApiName]);
+
+  // Dismiss the toast after a couple of seconds.
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2200);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const previewNoop = async () => {
+    setToast("Preview mode — changes aren't saved");
+  };
+
+  const close = () => onOpenChange(false);
+
+  if (!layout) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
@@ -50,156 +120,117 @@ export function LayoutPreviewDialog({
     );
   }
 
+  const modes: PreviewMode[] = ['new', 'view', 'edit'];
+
+  const needsRecord = previewMode === 'view' || previewMode === 'edit';
+  const isLoading = loadStatus === 'loading' || (needsRecord && loadStatus === 'idle');
+  const isEmpty = needsRecord && loadStatus === 'empty';
+  const isError = loadStatus === 'error';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Layout preview — {objectLabel}</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-gray-500 mb-4">
-          Sample data is shown for illustration. Actual values will vary.
-        </p>
-
-        <div className="space-y-8">
-          {pageLayout.tabs.map((tab, ti) => {
-            if (!('regions' in tab) || !Array.isArray((tab as any).regions)) {
-              return (
-                <div key={ti} className="p-4 text-sm text-gray-500 italic">
-                  Legacy layout format — save the layout in the editor to update.
-                </div>
-              );
-            }
-            const regions = (tab as any).regions as any[];
-            return (
-              <div key={ti}>
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-                  {tab.label}
-                </h3>
-                <div
-                  className="grid gap-4"
-                  style={{ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' }}
+          <div className="flex items-center justify-between gap-4">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-4 w-4 text-gray-500" />
+              Preview — {objectLabel}
+            </DialogTitle>
+            <div
+              className="flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5"
+              role="radiogroup"
+              aria-label="Preview mode"
+            >
+              {modes.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={previewMode === mode}
+                  onClick={() => setPreviewMode(mode)}
+                  className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                    previewMode === mode
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  {regions
-                    .sort(
-                      (a: any, b: any) =>
-                        (a.gridRow ?? 0) - (b.gridRow ?? 0) ||
-                        (a.gridColumn ?? 0) - (b.gridColumn ?? 0)
-                    )
-                    .map((region: any) => {
-                      if (region.hidden) return null;
-                      return (
-                        <div
-                          key={region.id}
-                          style={{
-                            gridColumn: `${region.gridColumn ?? 1} / span ${region.gridColumnSpan ?? 12}`,
-                            ...(region.style?.background
-                              ? { backgroundColor: region.style.background }
-                              : {}),
-                          }}
-                          className="space-y-3 p-1"
-                        >
-                          {[...region.panels]
-                            .sort((a: any, b: any) => a.order - b.order)
-                            .map((panel: any) => {
-                              if (panel.hidden) return null;
-                              const headerStyle: React.CSSProperties = {
-                                ...(panel.style?.headerBackground
-                                  ? { backgroundColor: panel.style.headerBackground }
-                                  : {}),
-                                ...(panel.style?.headerTextColor
-                                  ? { color: panel.style.headerTextColor }
-                                  : {}),
-                                fontWeight: panel.style?.headerBold ? 700 : undefined,
-                              };
-                              const bodyStyle: React.CSSProperties = {
-                                ...(panel.style?.bodyBackground
-                                  ? { backgroundColor: panel.style.bodyBackground }
-                                  : {}),
-                              };
-                              return (
-                                <div
-                                  key={panel.id}
-                                  className="rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm"
-                                >
-                                  <div
-                                    className="px-3 py-2 border-b border-gray-100 bg-gray-50 text-xs font-semibold text-gray-700"
-                                    style={headerStyle}
-                                  >
-                                    {panel.label}
-                                  </div>
-                                  <div
-                                    className="grid gap-x-4 gap-y-3 p-3"
-                                    style={{
-                                      ...bodyStyle,
-                                      gridTemplateColumns: `repeat(${panel.columns ?? 2}, minmax(0, 1fr))`,
-                                    }}
-                                  >
-                                    {[...panel.fields]
-                                      .sort((a: any, b: any) => a.order - b.order)
-                                      .filter((f: any) => f.behavior !== 'hidden')
-                                      .map((f: any) => {
-                                        const fd = allFields.find(
-                                          (def) => def.apiName === f.fieldApiName
-                                        );
-                                        const displayLabel =
-                                          f.labelOverride || fd?.label || f.fieldApiName;
-                                        const sample = sampleValue(fd?.type, displayLabel);
-                                        const labelStyle: React.CSSProperties = {
-                                          ...(f.labelStyle?.color
-                                            ? { color: f.labelStyle.color }
-                                            : {}),
-                                          fontWeight: f.labelStyle?.bold ? 700 : undefined,
-                                        };
-                                        const valueStyle: React.CSSProperties = {
-                                          ...(f.valueStyle?.color
-                                            ? { color: f.valueStyle.color }
-                                            : {}),
-                                          ...(f.valueStyle?.background
-                                            ? {
-                                                backgroundColor: f.valueStyle.background,
-                                                padding: '1px 4px',
-                                                borderRadius: 3,
-                                              }
-                                            : {}),
-                                          fontWeight: f.valueStyle?.bold ? 700 : undefined,
-                                        };
-                                        return (
-                                          <div
-                                            key={f.fieldApiName}
-                                            style={{
-                                              gridColumn: `span ${Math.min(
-                                                f.colSpan ?? 1,
-                                                panel.columns ?? 2
-                                              )}`,
-                                            }}
-                                          >
-                                            <div
-                                              className="text-[10px] font-medium text-gray-400 mb-0.5"
-                                              style={labelStyle}
-                                            >
-                                              {displayLabel}
-                                            </div>
-                                            <div
-                                              className="text-xs text-gray-700"
-                                              style={valueStyle}
-                                            >
-                                              {sample}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-            );
-          })}
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto pr-1">
+          {isError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+              Failed to load a record to preview against. Try closing and reopening the preview.
+            </div>
+          ) : isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading a sample record…
+            </div>
+          ) : isEmpty ? (
+            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-600">
+              <p className="font-medium text-gray-800">No records yet for {objectLabel}.</p>
+              <p className="mt-2">
+                Create a record first, then reopen this preview to see the{' '}
+                <span className="font-semibold capitalize">{previewMode}</span> layout in action.
+              </p>
+              <p className="mt-2 text-xs text-gray-500">
+                Tip: switch to <span className="font-semibold">New</span> mode to preview the create
+                form — it doesn&apos;t need an existing record.
+              </p>
+            </div>
+          ) : previewMode === 'view' ? (
+            <PreviewDetailView
+              layout={layout}
+              record={sampleRecord}
+              objectDef={objectDef}
+            />
+          ) : previewMode === 'new' ? (
+            <DynamicForm
+              objectApiName={objectApiName}
+              layoutType="create"
+              layoutOverride={layout}
+              recordData={{}}
+              onSubmit={previewNoop}
+              onCancel={close}
+            />
+          ) : (
+            <DynamicForm
+              objectApiName={objectApiName}
+              layoutType="edit"
+              layoutOverride={layout}
+              recordData={sampleRecord ?? {}}
+              onSubmit={previewNoop}
+              onCancel={close}
+            />
+          )}
         </div>
+
+        <div className="border-t border-gray-200 pt-3 text-xs text-gray-500 flex items-center justify-between gap-3">
+          <div>
+            {needsRecord && sampleRecord ? (
+              <>
+                Previewing record:{' '}
+                <span className="font-medium text-gray-700">
+                  {formatRecordLabel(sampleRecord, objectDef)}
+                </span>
+              </>
+            ) : previewMode === 'new' ? (
+              <>New Record form — no sample data used.</>
+            ) : null}
+          </div>
+          <div className="italic">Interactions don&apos;t save in preview.</div>
+        </div>
+
+        {toast && (
+          <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white shadow-lg">
+            {toast}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

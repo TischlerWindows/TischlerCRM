@@ -48,6 +48,8 @@ export interface DynamicFormProps {
   objectApiName: string;
   layoutType: 'create' | 'edit';
   layoutId?: string;
+  /** If provided, this layout is rendered directly instead of looking up one via layoutId. */
+  layoutOverride?: PageLayout;
   recordData?: Record<string, any>;
   onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
   onCancel?: () => void;
@@ -70,6 +72,7 @@ export default function DynamicForm({
   objectApiName,
   layoutType,
   layoutId,
+  layoutOverride,
   recordData = {},
   onSubmit,
   onCancel,
@@ -164,6 +167,14 @@ export default function DynamicForm({
 
   // ── Layout resolution ─────────────────────────────────────────
   const layout = useMemo(() => {
+    // Caller-supplied layout takes precedence (used by the page-editor preview
+    // to render an unsaved, in-memory draft).
+    if (layoutOverride) {
+      return isLegacyLayout(layoutOverride)
+        ? migrateLegacyLayout(layoutOverride as any)
+        : layoutOverride;
+    }
+
     if (!object?.pageLayouts?.length) return undefined;
 
     let resolved: PageLayout | undefined;
@@ -191,7 +202,7 @@ export default function DynamicForm({
       return migrateLegacyLayout(resolved as any);
     }
     return resolved;
-  }, [object, layoutId, layoutType]);
+  }, [object, layoutId, layoutType, layoutOverride]);
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab) {

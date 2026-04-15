@@ -60,9 +60,11 @@ export default function EditorPage() {
       <LayoutPreviewDialog
         open={lifecycle.showPreview}
         onOpenChange={lifecycle.setShowPreview}
-        pageLayout={layout as unknown as PageLayout}
-        allFields={lifecycle.allFields}
+        layout={layout as unknown as PageLayout}
+        objectApiName={lifecycle.objectApiName}
+        objectDef={lifecycle.object}
         objectLabel={lifecycle.object.label}
+        allFields={lifecycle.allFields}
       />
 
       {lifecycle.showFormattingRulesDialog && (
