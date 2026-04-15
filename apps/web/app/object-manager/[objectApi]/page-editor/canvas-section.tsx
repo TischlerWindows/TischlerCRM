@@ -45,7 +45,8 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
 
   const isHiddenInPreviewMode =
     (previewMode === 'new' && region.hideOnNew) ||
-    (previewMode === 'existing' && region.hideOnExisting);
+    (previewMode === 'view' && ((region as any).hideOnView || region.hideOnExisting)) ||
+    (previewMode === 'edit' && ((region as any).hideOnEdit || region.hideOnExisting));
 
   const hasVisibilityRule = useMemo(
     () =>
@@ -264,7 +265,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
           {region.hidden || isHiddenInPreviewMode ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
               <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
-                {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : 'Existing'} Record` : 'Hidden'}
+                {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : previewMode === 'view' ? 'View' : 'Edit'}` : 'Hidden'}
               </span>
             </div>
           ) : null}
@@ -385,7 +386,7 @@ export function CanvasRegion({ region, tabId }: CanvasRegionProps) {
       {region.hidden || isHiddenInPreviewMode ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 pointer-events-none">
           <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600">
-            {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : 'Existing'} Record` : 'Hidden'}
+            {isHiddenInPreviewMode ? `Hidden on ${previewMode === 'new' ? 'New' : previewMode === 'view' ? 'View' : 'Edit'}` : 'Hidden'}
           </span>
         </div>
       ) : null}

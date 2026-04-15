@@ -271,6 +271,8 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
       <div className="border-t border-gray-200 pt-3">
         <HideOnCheckboxes
           hideOnNew={selection.widget.hideOnNew}
+          hideOnView={(selection.widget as any).hideOnView}
+          hideOnEdit={(selection.widget as any).hideOnEdit}
           hideOnExisting={selection.widget.hideOnExisting}
           onChange={(patch) => updateWidget(selection.widget.id, patch)}
           elementLabel="widget"

@@ -106,7 +106,8 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
 
   const isHiddenInPreviewMode =
     (previewMode === 'new' && (widget as any).hideOnNew) ||
-    (previewMode === 'existing' && (widget as any).hideOnExisting);
+    (previewMode === 'view' && ((widget as any).hideOnView || (widget as any).hideOnExisting)) ||
+    (previewMode === 'edit' && ((widget as any).hideOnEdit || (widget as any).hideOnExisting));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: widget.id,
     data: { type: 'widget', widgetId: widget.id },

@@ -3,7 +3,7 @@ import type { SelectedElement } from '../types';
 
 // ── Selection slice interface ────────────────────────────────────────────────
 
-export type PreviewMode = 'existing' | 'new';
+export type PreviewMode = 'new' | 'view' | 'edit';
 
 export interface SelectionSlice {
   selectedElement: SelectedElement;
@@ -22,7 +22,7 @@ export const createSelectionSlice: StateCreator<
   SelectionSlice
 > = (set) => ({
   selectedElement: null,
-  previewMode: 'existing',
+  previewMode: 'view',
 
   setSelectedElement: (el) => set({ selectedElement: el }),
   setPreviewMode: (mode) => set({ previewMode: mode }),

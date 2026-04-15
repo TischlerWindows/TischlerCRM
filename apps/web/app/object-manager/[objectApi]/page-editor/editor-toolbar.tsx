@@ -480,32 +480,22 @@ export function EditorToolbar({
             )}
           </Button>
           <div className="flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5" role="radiogroup" aria-label="Preview mode">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={previewMode === 'existing'}
-              onClick={() => setPreviewMode('existing')}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                previewMode === 'existing'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Existing Record
-            </button>
-            <button
-              type="button"
-              role="radio"
-              aria-checked={previewMode === 'new'}
-              onClick={() => setPreviewMode('new')}
-              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                previewMode === 'new'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              New Record
-            </button>
+            {(['new', 'view', 'edit'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={previewMode === mode}
+                onClick={() => setPreviewMode(mode)}
+                className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                  previewMode === mode
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
 
           <Button variant="outline" size="sm" type="button" onClick={onPreview}>
