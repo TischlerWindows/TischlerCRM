@@ -1026,7 +1026,9 @@ async function tryCopyLinkedRecordFiles(
           const safeLead = leadFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
           // Lead folder lives under: /TischlerCRM/Property/{prop}/Leads/{leadFolder}
           sourcePath = `${parentPropertyPath}/Leads/${safeLead}`;
-          destPath = `${childPath}/1. Estimation`;
+          // Copy into the OPP sub-folder inside 1. Estimation (e.g. .../1. Estimation/OPP0013 (name))
+          const oppSubfolder = childPath.split('/').pop()!;
+          destPath = `${childPath}/1. Estimation/${oppSubfolder}`;
           console.log(`[dropbox] Will copy Lead files: ${sourcePath} → ${destPath}`);
         }
       }
