@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
 import { GripVertical, LayoutGrid, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -61,40 +61,27 @@ function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4;
 // ── Field chips ──────────────────────────────────────────────────────────────
 
 function ComponentSectionTile() {
-  const addSection = useEditorStore((s) => s.addSection);
-  const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: 'palette-panel-components',
+    data: { type: 'palette-panel', columns: 1, label: 'Component Section', panelType: 'components' },
+  });
 
-  const handleClick = useCallback(() => {
-    const { layout, activeTabId } = useEditorStore.getState();
-    const activeTab = layout.tabs.find((t) => t.id === activeTabId) ?? layout.tabs[0];
-    if (!activeTab) return;
-
-    const regions = activeTab.regions;
-    const maxRow = regions.reduce((max, r) => Math.max(max, r.gridRow + r.gridRowSpan - 1), 0);
-    const region = {
-      id: `region-${Date.now()}`,
-      label: `Component Section ${regions.length + 1}`,
-      gridColumn: 1,
-      gridColumnSpan: 12,
-      gridRow: maxRow + 1,
-      gridRowSpan: 1,
-      style: {},
-      panels: [],
-      widgets: [],
-    };
-
-    addSection(region, activeTab.id);
-    setSelectedElement({ type: 'region', id: region.id });
-  }, [addSection, setSelectedElement]);
+  const style: CSSProperties = {
+    opacity: isDragging ? 0 : 1,
+  };
 
   return (
     <button
+      ref={setNodeRef}
       type="button"
-      onClick={handleClick}
-      className="flex w-full items-center gap-2 rounded-md border border-dashed border-gray-300 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:border-gray-400 hover:bg-gray-50"
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="flex w-full items-center gap-2 rounded-md border border-dashed border-gray-300 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:border-gray-400 hover:bg-gray-50 active:cursor-grabbing"
     >
-      <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-gray-700">Component Section</span>
+      <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
     </button>
   );
 }

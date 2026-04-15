@@ -107,6 +107,7 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
       kind: 'palette-panel',
       columns: cols,
       label: typeof data.label === 'string' ? data.label : 'New Section',
+      ...(data.panelType === 'components' ? { panelType: 'components' as const } : {}),
     };
   }
 

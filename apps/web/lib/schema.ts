@@ -495,6 +495,8 @@ export interface LayoutPanel {
   columns: 1 | 2 | 3 | 4;
   style: PanelStyle;
   fields: PanelField[];
+  panelType?: 'fields' | 'components';
+  widgets?: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
   visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
   hideOnNew?: boolean;       // Hide on New Record form (creation)
