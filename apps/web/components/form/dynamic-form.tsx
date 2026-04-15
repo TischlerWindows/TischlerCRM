@@ -53,14 +53,15 @@ export interface DynamicFormProps {
   onCancel?: () => void;
 }
 
-/** Returns true if an element should be hidden based on record lifecycle state. */
+/** Returns true if an element should be hidden based on record lifecycle state.
+ *  Legacy `hideOnExisting` is treated as both `hideOnView` and `hideOnEdit`. */
 function isHiddenByLifecycle(
-  element: { hideOnNew?: boolean; hideOnExisting?: boolean },
+  element: { hideOnNew?: boolean; hideOnView?: boolean; hideOnEdit?: boolean; hideOnExisting?: boolean },
   mode: 'create' | 'edit',
 ): boolean {
-  if (mode === 'create' && element.hideOnNew) return true;
-  if (mode === 'edit' && element.hideOnExisting) return true;
-  return false;
+  if (mode === 'create') return !!element.hideOnNew;
+  // mode === 'edit'
+  return !!element.hideOnEdit || !!element.hideOnExisting;
 }
 
 // ── DynamicForm ─────────────────────────────────────────────────────

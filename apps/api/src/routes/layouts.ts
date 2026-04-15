@@ -64,6 +64,9 @@ const layoutFieldSchema = z.object({
   rowSpan: z.number().min(1).max(6).optional(),
   presentation: fieldPresentationSchema.optional(),
   hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
   hideOnExisting: z.boolean().optional(),
 });
 
@@ -78,6 +81,9 @@ const layoutSectionSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   fields: z.array(layoutFieldSchema),
   hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
   hideOnExisting: z.boolean().optional(),
 });
 
@@ -87,6 +93,9 @@ const layoutTabSchema = z.object({
   order: z.number(),
   sections: z.array(layoutSectionSchema),
   hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
   hideOnExisting: z.boolean().optional(),
 });
 

@@ -44,7 +44,8 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
 
   const isHiddenInPreviewMode =
     (previewMode === 'new' && field.hideOnNew) ||
-    (previewMode === 'existing' && field.hideOnExisting);
+    (previewMode === 'view' && ((field as any).hideOnView || field.hideOnExisting)) ||
+    (previewMode === 'edit' && ((field as any).hideOnEdit || field.hideOnExisting));
 
   const hasVisibilityRule = useMemo(
     () =>
@@ -230,7 +231,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
             )}
             {isHiddenInPreviewMode && (
               <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-blue-600">
-                {previewMode === 'new' ? 'Hide on New' : 'Hide on Edit'}
+                Hide on {previewMode === 'new' ? 'New' : previewMode === 'view' ? 'View' : 'Edit'}
               </span>
             )}
             {hasVisibilityRule && (
