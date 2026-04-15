@@ -458,14 +458,25 @@ export default function DynamicForm({
   // ── Wizard sections ───────────────────────────────────────────
   const wizardSections = (() => {
     if (layoutType !== 'create') return [];
-    const allSections: { section: LayoutPanel; tabLabel: string; regionLabel: string }[] = [];
+    type WizardSection = {
+      section: LayoutPanel;
+      tabLabel: string;
+      regionLabel: string;
+      /** Parent region — used so the wizard step can render region-level widgets. */
+      region: LayoutSection;
+      /** True only for the last visible panel in this region — widgets render here. */
+      isLastPanelInRegion: boolean;
+    };
+    const allSections: WizardSection[] = [];
     layout.tabs.forEach((tab) => {
       if (isHiddenByLifecycle(tab as any, layoutType)) return;
       tab.regions.forEach((region) => {
         if (isHiddenByLifecycle(region as any, layoutType)) return;
-        region.panels
+        // Filter panels first so we can correctly mark the LAST visible panel.
+        const visiblePanels = region.panels
+          .slice()
           .sort((a, b) => a.order - b.order)
-          .forEach((panel) => {
+          .filter((panel) => {
             const isVisible = evaluateVisibility(
               (region as any).visibleIf,
               formData,
@@ -483,7 +494,7 @@ export default function DynamicForm({
               formData,
               visibilityCtx,
             );
-            if (
+            return (
               isVisible &&
               (region as any).showInTemplate !== false &&
               !regionFx?.hidden &&
@@ -491,10 +502,17 @@ export default function DynamicForm({
               !panel.hidden &&
               !isHiddenByLifecycle(panel as any, layoutType) &&
               evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx)
-            ) {
-              allSections.push({ section: panel, tabLabel: tab.label, regionLabel: region.label });
-            }
+            );
           });
+        visiblePanels.forEach((panel, idx) => {
+          allSections.push({
+            section: panel,
+            tabLabel: tab.label,
+            regionLabel: region.label,
+            region,
+            isLastPanelInRegion: idx === visiblePanels.length - 1,
+          });
+        });
       });
     });
     return allSections;
@@ -1015,23 +1033,41 @@ export default function DynamicForm({
         )}
 
         {/* Wizard mode sections */}
-        {!showReview && isWizardMode && wizardSections[currentStep] && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="p-4 bg-gray-100 rounded-t-lg">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {wizardSections[currentStep]!.regionLabel || wizardSections[currentStep]!.section.label}
-                </h3>
-                {(wizardSections[currentStep]!.section as any).description ? (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {(wizardSections[currentStep]!.section as any).description}
-                  </p>
-                ) : null}
+        {!showReview && isWizardMode && wizardSections[currentStep] && (() => {
+          const step = wizardSections[currentStep]!;
+          // Render region widgets in the step for the LAST panel of the region,
+          // matching the detail page's visual order (widgets below panels).
+          const stepWidgets = step.isLastPanelInRegion
+            ? (step.region.widgets ?? []).filter((w: any) => {
+                const cfg = (w as any).config;
+                // External widgets and Summary only belong on the record detail page.
+                if (cfg?.type === 'ExternalWidget') return false;
+                if (cfg?.type === 'Summary') return false;
+                if (isHiddenByLifecycle(w as any, layoutType)) return false;
+                return true;
+              })
+            : [];
+          return (
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="bg-white rounded-lg border border-gray-200">
+                <div className="p-4 bg-gray-100 rounded-t-lg">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {step.regionLabel || step.section.label}
+                  </h3>
+                  {(step.section as any).description ? (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(step.section as any).description}
+                    </p>
+                  ) : null}
+                </div>
+                {renderSectionContent(step.section)}
               </div>
-              {renderSectionContent(wizardSections[currentStep]!.section)}
+              {stepWidgets.length > 0 && (
+                <LayoutWidgetsInline widgets={stepWidgets as any} />
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Regions + tab widgets -- 12-column tab canvas */}
         {!showReview && !isWizardMode && (

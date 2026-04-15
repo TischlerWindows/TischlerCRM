@@ -42,8 +42,6 @@ export function EditorToolbar({
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
-  const previewMode = useEditorStore((s) => s.previewMode);
-  const setPreviewMode = useEditorStore((s) => s.setPreviewMode);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
@@ -479,32 +477,6 @@ export function EditorToolbar({
               <span className="ml-1 text-xs text-gray-500">({redoCount})</span>
             )}
           </Button>
-          <div
-            className="flex items-center gap-1.5"
-            title="See what this mode looks like. Fields appear in all modes unless you check 'Hide on New/View/Edit'."
-          >
-            <Eye className="h-3.5 w-3.5 text-gray-500" />
-            <span className="text-xs font-medium text-gray-500">Preview:</span>
-            <div className="flex items-center rounded-md border border-gray-200 bg-gray-100 p-0.5" role="radiogroup" aria-label="Preview mode">
-              {(['new', 'view', 'edit'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={previewMode === mode}
-                  onClick={() => setPreviewMode(mode)}
-                  className={`rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
-                    previewMode === mode
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <Button variant="outline" size="sm" type="button" onClick={onPreview}>
             <Eye className="mr-1.5 h-4 w-4" />
             Preview
