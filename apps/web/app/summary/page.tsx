@@ -894,7 +894,7 @@ export default function SummaryPage() {
   };
 
   // ── Generate Quote Summary PDF using jsPDF ──
-  const handlePrintPDF = async () => {
+  const handlePrintPDF = async (mode: 'download' | 'preview' = 'download') => {
     if (!editingSummary) return;
     const s = editingSummary;
     const { jsPDF } = await import('jspdf');
@@ -1194,7 +1194,13 @@ export default function SummaryPage() {
       drawFooter(doc);
     }
 
-    doc.save(`Quote_Summary_${(s.name || 'Untitled').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    if (mode === 'preview') {
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } else {
+      doc.save(`Quote_Summary_${(s.name || 'Untitled').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    }
   };
 
   const handleSaveSummary = () => {
@@ -2421,7 +2427,14 @@ export default function SummaryPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handlePrintPDF}
+                  onClick={() => handlePrintPDF('preview')}
+                  className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview PDF
+                </button>
+                <button
+                  onClick={() => handlePrintPDF('download')}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Printer className="w-4 h-4 mr-2" />
