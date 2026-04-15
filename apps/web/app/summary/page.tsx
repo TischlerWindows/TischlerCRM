@@ -893,263 +893,308 @@ export default function SummaryPage() {
     setOpenDropdown(null);
   };
 
-  // ── Print PDF — renders both pages into a new window and triggers print ──
-  const handlePrintPDF = () => {
+  // ── Generate Quote Summary PDF using jsPDF ──
+  const handlePrintPDF = async () => {
     if (!editingSummary) return;
     const s = editingSummary;
-    const esc = (v: string | undefined | null) => (v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const { jsPDF } = await import('jspdf');
+
     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
     const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
-    const p = (x: string | undefined) => parseFloat(x || '0') || 0;
+    const pv = (x: string | undefined) => parseFloat(x || '0') || 0;
     const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
+    const val = (v: string | undefined | null) => v || '—';
+    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
-    // Build row HTML for windows/doors tables
-    const buildDataRows = (rows: any[]) => rows.filter((r: any) =>
+    // ── Brand colors ──
+    const navy = [30, 58, 95] as const;     // #1e3a5f
+    const red = [218, 41, 28] as const;      // Tischler red
+    const gray50 = [80, 80, 80] as const;
+    const gray80 = [128, 128, 128] as const;
+    const grayLine = [200, 200, 200] as const;
+    const headerBg = [44, 62, 80] as const;
+    const altRow = [248, 249, 250] as const;
+
+    // ── Helpers ──
+    const drawHeader = (doc: any, title: string) => {
+      const w = doc.internal.pageSize.getWidth();
+      doc.setFontSize(16);
+      doc.setTextColor(...navy);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TISCHLER UND SOHN', 15, 14);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...gray80);
+      doc.text(title, 15, 20);
+      doc.text(`${val(s.name)}  |  ${dateStr}`, w - 15, 14, { align: 'right' });
+      doc.text(`${val(s.opportunityNumber)}`, w - 15, 20, { align: 'right' });
+      doc.setDrawColor(...red);
+      doc.setLineWidth(0.6);
+      doc.line(15, 23, w - 15, 23);
+    };
+
+    const drawFooter = (doc: any) => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...gray80);
+      doc.text('Tischler und Sohn  |  Confidential', w / 2, h - 6, { align: 'center' });
+      const pageCount = doc.getNumberOfPages();
+      doc.text(`Page ${doc.getCurrentPageInfo().pageNumber} of ${pageCount}`, w - 15, h - 6, { align: 'right' });
+    };
+
+    // Draws a labeled field pair
+    const drawField = (doc: any, x: number, y: number, label: string, value: string, maxW = 55) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...gray80);
+      doc.text(label.toUpperCase(), x, y);
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      doc.text(val(value).substring(0, Math.floor(maxW / 1.8)), x, y + 4);
+    };
+
+    // Draws a table with auto column widths, header row, and data rows
+    const drawTable = (
+      doc: any, startY: number, headers: string[],
+      colWidths: number[], rows: string[][],
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean }
+    ) => {
+      const x0 = 15;
+      let y = startY;
+      const rh = 4.2; // row height
+      const w = doc.internal.pageSize.getWidth();
+      const maxY = doc.internal.pageSize.getHeight() - 14;
+
+      // Header row
+      doc.setFillColor(...headerBg);
+      const totalW = colWidths.reduce((a, b) => a + b, 0);
+      doc.rect(x0, y, totalW, 5.5, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      let cx = x0;
+      for (let i = 0; i < headers.length; i++) {
+        const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
+        const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
+        doc.text(headers[i], tx, y + 3.8, { align });
+        cx += colWidths[i];
+      }
+      y += 6.5;
+
+      // Data rows
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      for (let ri = 0; ri < rows.length; ri++) {
+        if (y + rh > maxY) {
+          doc.addPage();
+          drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+          y = 28;
+        }
+
+        // Alternating row background
+        if (ri % 2 === 1) {
+          doc.setFillColor(...altRow);
+          doc.rect(x0, y - 2.8, totalW, rh, 'F');
+        }
+
+        // Bold last row (grand total)
+        const isLast = opts?.highlightLast && ri === rows.length - 1;
+        if (isLast) {
+          doc.setFillColor(235, 237, 240);
+          doc.rect(x0, y - 2.8, totalW, rh + 0.5, 'F');
+          doc.setFont('helvetica', 'bold');
+        }
+
+        doc.setTextColor(50, 50, 50);
+        cx = x0;
+        for (let i = 0; i < rows[ri].length; i++) {
+          const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
+          if (isBoldCol) doc.setFont('helvetica', 'bold');
+          const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
+          const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
+          const cellText = (rows[ri][i] || '').substring(0, Math.floor(colWidths[i] / 1.5));
+          doc.text(cellText, tx, y, { align });
+          if (isBoldCol) doc.setFont('helvetica', 'normal');
+          cx += colWidths[i];
+        }
+        if (isLast) doc.setFont('helvetica', 'normal');
+        y += rh;
+      }
+      return y;
+    };
+
+    // Section heading
+    const drawSectionTitle = (doc: any, y: number, title: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...navy);
+      doc.text(title, 15, y);
+      doc.setDrawColor(...grayLine);
+      doc.setLineWidth(0.3);
+      const w = doc.internal.pageSize.getWidth();
+      doc.line(15, y + 1.5, w - 15, y + 1.5);
+      return y + 6;
+    };
+
+    // ════════════════════════════════════════════════
+    // PAGE 1: Data Entry (landscape)
+    // ════════════════════════════════════════════════
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+
+    drawHeader(doc, 'Quote Summary — Data Entry');
+
+    // Info bar
+    let y = 28;
+    const infoFields = [
+      ['Job Name', s.name], ['Salesman', s.salesman], ['Opportunity #', s.opportunityNumber],
+      ['Job Type', s.jobType], ['Estimator', s.estimator], ['Date', dateStr],
+    ];
+    const infoColW = (pw - 30) / 6;
+    for (let i = 0; i < infoFields.length; i++) {
+      drawField(doc, 15 + i * infoColW, y, infoFields[i][0], infoFields[i][1], infoColW);
+    }
+    y += 11;
+
+    // Filter non-empty rows
+    const filterRows = (rows: any[]) => rows.filter((r: any) =>
       r.tusPosition || r.archPosition || r.qty || r.widthMM || r.heightMM || r.type || r.type2
-    ).map((r: any) => `<tr>
-      <td>${esc(r.tusPosition)}</td><td>${esc(r.archPosition)}</td><td class="r">${esc(r.qty)}</td>
-      <td class="r">${esc(r.widthMM)}</td><td class="r">${esc(r.heightMM)}</td>
-      <td class="r">${esc(r.widthFtIn)}</td><td class="r">${esc(r.heightFtIn)}</td>
-      <td class="r">${esc(r.sqFeetEach)}</td><td class="r">${esc(r.sqFeetTotal)}</td>
-      <td class="r">${esc(r.operableSashesEach)}</td><td class="r">${esc(r.operableSashesTotal)}</td>
-      <td class="r">${esc(r.qty2)}</td><td>${esc(r.type)}</td>
-      <td class="r">${esc(r.qty3)}</td><td>${esc(r.type2)}</td>
-      <td>${esc(r.specialRemarks)}</td>
-      <td class="r">${esc(r.fieldsEach)}</td><td class="r">${esc(r.fieldsTotal)}</td>
-      <td class="r">${esc(r.siteMullionsEach)}</td><td class="r">${esc(r.siteMullionsTotal)}</td>
-      <td class="r">${esc(r.netEuroEach)}</td><td class="r">${esc(r.netEuroTotal)}</td>
-      <td class="r mc">${esc(r.magneticContactUnit)}</td><td class="r mc">${esc(r.magneticContactPosition)}</td>
-      <td class="r snt">${esc(r.shadeBoxesNoSideTrimUnit)}</td><td class="r snt">${esc(r.shadeBoxesNoSideTrimPosition)}</td>
-      <td class="r swt">${esc(r.shadeBoxesWithSideTrimUnit)}</td><td class="r swt">${esc(r.shadeBoxesWithSideTrimPosition)}</td>
-      <td class="r ff">${esc(r.finalFinishUnit)}</td><td class="r ff">${esc(r.finalFinishPosition)}</td>
-    </tr>`).join('');
+    );
 
-    const dataTableHeaders = `<tr>
-      <th style="width:4%">TuS Pos.</th><th style="width:4%">Arch Pos.</th><th style="width:2.5%">Qty</th>
-      <th style="width:3.5%">W (MM)</th><th style="width:3.5%">H (MM)</th><th style="width:4%">W (Ft&In)</th><th style="width:4%">H (Ft&In)</th>
-      <th style="width:3.5%">Sq Ft (Ea)</th><th style="width:3.5%">Sq Ft (Tot)</th>
-      <th style="width:3.5%">Op. Sash (Ea)</th><th style="width:3.5%">Op. Sash (Tot)</th>
-      <th style="width:2.5%">Qty</th><th style="width:3%">Type</th><th style="width:2.5%">Qty</th><th style="width:3%">Type 2</th>
-      <th style="width:6%">Special Remarks</th>
-      <th style="width:3%">Fields (Ea)</th><th style="width:3%">Fields (Tot)</th>
-      <th style="width:3%"># Site Mull. (Ea)</th><th style="width:3%"># Site Mull. (Tot)</th>
-      <th style="width:4%">NET € (Ea)</th><th style="width:4%">NET € (Tot)</th>
-      <th style="width:3.5%" class="mc">Mag. Ct. /Unit</th><th style="width:3.5%" class="mc">Mag. Ct. /Pos</th>
-      <th style="width:3.5%" class="snt">Shade No Trim /Unit</th><th style="width:3.5%" class="snt">Shade No Trim /Pos</th>
-      <th style="width:3.5%" class="swt">Shade W/ Trim /Unit</th><th style="width:3.5%" class="swt">Shade W/ Trim /Pos</th>
-      <th style="width:3.5%" class="ff">Final Fin. /Unit</th><th style="width:3.5%" class="ff">Final Fin. /Pos</th>
-    </tr>`;
+    // Data table columns (streamlined — 16 core columns)
+    const dtHeaders = [
+      'TuS Pos', 'Arch Pos', 'Qty', 'W (MM)', 'H (MM)', 'W (Ft/In)', 'H (Ft/In)',
+      'Sq Ft Ea', 'Sq Ft Tot', 'Op.Sash Ea', 'Op.Sash Tot',
+      'Type', 'Remarks',
+      'Fields Tot', 'Site Mull', 'NET \u20AC Tot',
+    ];
+    const dtColW = [14, 14, 9, 13, 13, 16, 16, 14, 14, 14, 14, 30, 28, 14, 14, 14];
+    const buildDtRow = (r: any): string[] => [
+      r.tusPosition, r.archPosition, r.qty, r.widthMM, r.heightMM,
+      r.widthFtIn, r.heightFtIn, r.sqFeetEach, r.sqFeetTotal,
+      r.operableSashesEach, r.operableSashesTotal,
+      r.type, r.specialRemarks,
+      r.fieldsTotal, r.siteMullionsTotal, r.netEuroTotal,
+    ].map(v => v || '');
 
-    // Quote totals calculation
+    // Windows
+    const winRows = filterRows(s.rows);
+    if (winRows.length > 0) {
+      y = drawSectionTitle(doc, y, 'Windows');
+      y = drawTable(doc, y, dtHeaders, dtColW, winRows.map(buildDtRow), { rightAlignFrom: 2 });
+      y += 4;
+    }
+
+    // Doors
+    const doorRows = filterRows(s.doorRows);
+    if (doorRows.length > 0) {
+      const maxY = doc.internal.pageSize.getHeight() - 20;
+      if (y + 20 > maxY) { doc.addPage(); drawHeader(doc, 'Quote Summary — Data Entry (cont.)'); y = 28; }
+      y = drawSectionTitle(doc, y, 'Doors');
+      y = drawTable(doc, y, dtHeaders, dtColW, doorRows.map(buildDtRow), { rightAlignFrom: 2 });
+    }
+
+    // ════════════════════════════════════════════════
+    // PAGE 2: Project Summary (portrait)
+    // ════════════════════════════════════════════════
+    doc.addPage('a4', 'portrait');
+    const pw2 = doc.internal.pageSize.getWidth();
+
+    drawHeader(doc, 'Quote Summary — Project Summary');
+    y = 28;
+
+    // ── Project Overview ──
+    y = drawSectionTitle(doc, y, 'Project Overview');
+    const col3W = (pw2 - 30) / 3;
+    drawField(doc, 15, y, 'Date', dateStr, col3W);
+    drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Address', val(s.address), col3W);
+    drawField(doc, 15 + col3W, y, 'Salesman', val(s.salesman), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
+    if (s.quoteType === 'requote') {
+      drawField(doc, 15 + col3W, y, 'Description of Changes', val(s.requoteDescription), col3W * 2);
+    }
+    y += 12;
+
+    // ── Product Specifications ──
+    y = drawSectionTitle(doc, y, 'Product Specifications');
+    drawField(doc, 15, y, 'Product', val(s.product || s.jobType), col3W);
+    drawField(doc, 15 + col3W, y, 'Product Type', val(s.productType), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Options', (s.productTypeOptions || []).join(', ') || '—', col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Wood Type', val(s.woodType), col3W);
+    drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Muntin Type', val(s.muntinType), col3W);
+    drawField(doc, 15 + col3W, y, 'Spacer Bars', val(s.spacerBars), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Project Contains', (s.projectContains || []).join(', ') || '—', pw2 - 30);
+    y += 12;
+
+    // ── Quote Totals ──
+    y = drawSectionTitle(doc, y, 'Quote Totals');
     const ewQty = sumField(s.rows, 'qty'), ewFields = sumField(s.rows, 'fieldsTotal');
     const ewSqFt = sumField(s.rows, 'sqFeetTotal'), ewNet = sumField(s.rows, 'netEuroTotal');
     const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
     const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
     const tQty = ewQty + dQty, tFields = ewFields + dFields, tSqFt = ewSqFt + dSqFt, tNet = ewNet + dNet;
     const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
-    const calcRow = (net: number, cat: any) => {
-      const full = net ? p(cat?.full) / net : 0;
-      const disc = net ? p(cat?.pct) / net : 0;
-      const fn = net ? p(cat?.final) / net : 0;
-      const fa = net ? p(cat?.finalAdj) / net : 0;
-      return { full, disc, final: fn, finalAdj: fa };
-    };
-    const ewC = calcRow(ewNet, qt.euroWindows), dhC = calcRow(0, qt.doubleHung), edC = calcRow(dNet, qt.euroDoors);
-    const gtC = { full: ewC.full + dhC.full + edC.full, disc: ewC.disc + dhC.disc + edC.disc, final: ewC.final + dhC.final + edC.final, finalAdj: ewC.finalAdj + dhC.finalAdj + edC.finalAdj };
-    const qtSum = (f: string) => p((qt.euroWindows as any)?.[f]) + p((qt.doubleHung as any)?.[f]) + p((qt.euroDoors as any)?.[f]);
+    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
+    const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
+    const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
+      label, fmtInt(qty), fmtInt(fields), fmt(sqFt),
+      net ? '\u20AC' + fmt(net) : '—',
+      cat?.full || '—', cat?.pct || '—', cat?.final || '—', cat?.finalAdj || '—',
+    ];
+    const qtRows = [
+      qtRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows),
+      qtRow('Double Hung', 0, 0, 0, 0, qt.doubleHung),
+      qtRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors),
+      qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+        full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
+        final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
+      }),
+    ];
+    // Local qtSum for this scope
+    function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
+    y = drawTable(doc, y, qtHeaders, qtColW, qtRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+    y += 6;
 
-    const quoteTotalRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any, calc: any) => `
-      <tr><td class="b">${label}</td><td class="r">${fmtInt(qty)}</td><td class="r">${fmtInt(fields)}</td>
-      <td class="r">${fmt(sqFt)}</td><td class="r">${net ? '€' + fmt(net) : '—'}</td>
-      <td class="r">${cat?.full || '—'}</td><td class="r">${cat?.pct || '—'}</td>
-      <td class="r">${cat?.final || '—'}</td><td class="r">${cat?.finalAdj || '—'}</td>
-      <td class="r cb">${calc.full ? '€' + fmt(calc.full) : '—'}</td><td class="r cb">${calc.disc ? '€' + fmt(calc.disc) : '—'}</td>
-      <td class="r cg">${calc.final ? fmt(calc.final) : '—'}</td><td class="r cp">${calc.finalAdj ? fmt(calc.finalAdj) : '—'}</td></tr>`;
+    // ── Add-On Items ──
+    const ao = (s.addOns || {}) as any;
+    const aoV = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
+    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%', 'Final'];
+    const aoColW = [30, 12, 45, 22, 20, 12, 22];
+    const aoRows = [
+      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final')],
+      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoV('entryDoor', 'full'), aoV('entryDoor', 'pct'), aoV('entryDoor', 'final')],
+      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoV('jambExtensions', 'full'), aoV('jambExtensions', 'pct'), aoV('jambExtensions', 'final')],
+      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoV('magneticContact', 'full'), aoV('magneticContact', 'pct'), aoV('magneticContact', 'final')],
+      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoV('finalFinish', 'full'), aoV('finalFinish', 'pct'), aoV('finalFinish', 'final')],
+      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoV('installation', 'full'), aoV('installation', 'pct'), aoV('installation', 'final')],
+    ];
 
-    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
+    y = drawSectionTitle(doc, y, 'Add-On Items');
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0 });
 
-    const html = `<!DOCTYPE html><html><head><title>${esc(s.name)} — Summary</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 8pt; color: #111; }
-  h1 { font-size: 14pt; margin-bottom: 2px; }
-  h2 { font-size: 11pt; margin: 10px 0 4px; border-bottom: 2px solid #1e3a5f; padding-bottom: 2px; color: #1e3a5f; }
-  h3 { font-size: 9pt; margin: 8px 0 3px; color: #333; }
-  .header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #ccc; }
-  .header .subtitle { font-size: 8pt; color: #666; }
-  .info-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 8px; }
-  .info-grid .item { }
-  .info-grid .item .label { font-size: 7pt; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.3px; }
-  .info-grid .item .value { font-size: 9pt; padding: 2px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
-  th, td { border: 1px solid #ccc; padding: 2px 3px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  th { background: #f0f0f0; font-weight: 600; font-size: 6.5pt; text-transform: uppercase; white-space: normal; word-wrap: break-word; line-height: 1.15; }
-  .r { text-align: right; }
-  .b { font-weight: 600; }
-  .mc { background: #e8f5e9; }
-  .snt { background: #fff3e0; }
-  .swt { background: #e3f2fd; }
-  .ff { background: #fce4ec; }
-  .cb { background: #e3f2fd; }
-  .cg { background: #e8f5e9; }
-  .cp { background: #f3e5f5; }
-  .gt { font-weight: 700; background: #f5f5f5; }
-  .section-card { border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; }
-  .section-card .heading { background: #f8f8f8; padding: 4px 8px; font-size: 9pt; font-weight: 600; border-bottom: 1px solid #ddd; }
-  .section-card .body { padding: 6px 8px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
-  .field .fl { font-size: 7pt; font-weight: 600; color: #555; }
-  .field .fv { font-size: 8.5pt; padding: 1px 0; min-height: 14px; }
-  @media print {
-    @page { margin: 0.3in; }
-    .page1 { page: landscape; }
-    .page2 { page-break-before: always; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page1 table { font-size: 5.5pt; }
-    .page1 th { font-size: 5pt; }
-    .page1 th, .page1 td { padding: 1px 2px; }
-  }
-  @page { size: landscape; margin: 0.3in; }
-</style></head><body>
+    // ── Add footers to all pages ──
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      drawFooter(doc);
+    }
 
-<!-- PAGE 1: Data Entry -->
-<div class="page1">
-  <div class="header">
-    <h1>Quote Summary — Data Entry</h1>
-    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
-  </div>
-
-  <div class="info-grid">
-    <div class="item"><div class="label">Job Name</div><div class="value">${esc(s.name)}</div></div>
-    <div class="item"><div class="label">Salesman</div><div class="value">${esc(s.salesman)}</div></div>
-    <div class="item"><div class="label">Opportunity #</div><div class="value">${esc(s.opportunityNumber)}</div></div>
-    <div class="item"><div class="label">Job Type</div><div class="value">${esc(s.jobType)}</div></div>
-    <div class="item"><div class="label">Estimator</div><div class="value">${esc(s.estimator)}</div></div>
-    <div class="item"><div class="label">Date</div><div class="value">${dateStr}</div></div>
-  </div>
-
-  <h2>Windows</h2>
-  <table>${dataTableHeaders}${buildDataRows(s.rows)}</table>
-
-  <h2 style="margin-top:12px">Doors</h2>
-  <table>${dataTableHeaders}${buildDataRows(s.doorRows)}</table>
-</div>
-
-<!-- PAGE 2: Project Summary -->
-<div class="page2">
-  <div class="header">
-    <h1>Quote Summary — Project Summary</h1>
-    <span class="subtitle">${esc(s.name)} | ${dateStr}</span>
-  </div>
-
-  <div class="section-card">
-    <div class="heading">Project Overview</div>
-    <div class="body">
-      <div class="three-col">
-        <div class="field"><div class="fl">Date</div><div class="fv">${dateStr}</div></div>
-        <div class="field"><div class="fl">Opportunity #</div><div class="fv">${esc(s.opportunityNumber)}</div></div>
-        <div class="field"><div class="fl">Project Name</div><div class="fv">${esc(s.name)}</div></div>
-      </div>
-      <div class="three-col" style="margin-top:4px">
-        <div class="field"><div class="fl">Address</div><div class="fv">${esc(s.address)}</div></div>
-        <div class="field"><div class="fl">Salesman</div><div class="fv">${esc(s.salesman)}</div></div>
-        <div class="field"><div class="fl">Estimator</div><div class="fv">${esc(s.estimator)}</div></div>
-      </div>
-      <div class="two-col" style="margin-top:4px">
-        <div class="field"><div class="fl">Quote Type</div><div class="fv">${s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—'}</div></div>
-        ${s.quoteType === 'requote' ? `<div class="field"><div class="fl">Description of Changes</div><div class="fv">${esc(s.requoteDescription)}</div></div>` : ''}
-      </div>
-    </div>
-  </div>
-
-  <div class="section-card">
-    <div class="heading">Product Specifications</div>
-    <div class="body">
-      <div class="three-col">
-        <div class="field"><div class="fl">Product</div><div class="fv">${esc(s.product || s.jobType)}</div></div>
-        <div class="field"><div class="fl">Product Type</div><div class="fv">${esc(s.productType)}</div></div>
-        <div class="field"><div class="fl">Options</div><div class="fv">${(s.productTypeOptions || []).map(esc).join(', ') || '—'}</div></div>
-      </div>
-      <div class="three-col" style="margin-top:4px">
-        <div class="field"><div class="fl">Wood Type</div><div class="fv">${esc(s.woodType)}</div></div>
-        <div class="field"><div class="fl">Finish</div><div class="fv">${esc(s.finish)}</div></div>
-        <div class="field"><div class="fl">Glass Type</div><div class="fv">${esc(s.glassType)}</div></div>
-      </div>
-      <div class="three-col" style="margin-top:4px">
-        <div class="field"><div class="fl">Muntin Type</div><div class="fv">${esc(s.muntinType)}</div></div>
-        <div class="field"><div class="fl">Spacer Bars</div><div class="fv">${esc(s.spacerBars)}</div></div>
-        <div class="field"><div class="fl">Spacer Bar Colors</div><div class="fv">${esc(s.spacerBarColors)}</div></div>
-      </div>
-      <div class="field" style="margin-top:4px"><div class="fl">Project Contains</div><div class="fv">${(s.projectContains || []).map(esc).join(', ') || '—'}</div></div>
-    </div>
-  </div>
-
-  <div class="section-card">
-    <div class="heading">Quote Totals</div>
-    <div class="body" style="padding:0">
-      <table>
-        <colgroup><col style="width:12%"/><col style="width:5%"/><col style="width:6%"/><col style="width:7%"/><col style="width:8%"/><col style="width:7%"/><col style="width:4%"/><col style="width:7%"/><col style="width:9%"/><col style="width:7%"/><col style="width:7%"/><col style="width:7%"/><col style="width:9%"/></colgroup>
-        <thead><tr>
-          <th></th><th class="r">Qty</th><th class="r">Fields</th><th class="r">Sq Feet</th><th class="r">NET €</th>
-          <th class="r">Full</th><th class="r">%</th><th class="r">FINAL</th><th class="r">FINAL W/ ADJ</th>
-          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th class="r cp">Final W/ Adj</th>
-        </tr></thead>
-        <tbody>
-          ${quoteTotalRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows, ewC)}
-          ${quoteTotalRow('Double Hung', 0, 0, 0, 0, qt.doubleHung, dhC)}
-          ${quoteTotalRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors, edC)}
-          <tr class="gt"><td class="b">Grand Total</td><td class="r">${fmtInt(tQty)}</td><td class="r">${fmtInt(tFields)}</td>
-          <td class="r">${fmt(tSqFt)}</td><td class="r">${tNet ? '€' + fmt(tNet) : '—'}</td>
-          <td class="r">${qtSum('full') ? fmt(qtSum('full')) : '—'}</td><td class="r">${qtSum('pct') ? fmt(qtSum('pct')) : '—'}</td>
-          <td class="r">${qtSum('final') ? fmt(qtSum('final')) : '—'}</td><td class="r">${qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—'}</td>
-          <td class="r cb">${gtC.full ? '€' + fmt(gtC.full) : '—'}</td><td class="r cb">${gtC.disc ? '€' + fmt(gtC.disc) : '—'}</td>
-          <td class="r cg">${gtC.final ? fmt(gtC.final) : '—'}</td><td class="r cp">${gtC.finalAdj ? fmt(gtC.finalAdj) : '—'}</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  ${(() => {
-    const ao = s.addOns || {} as any;
-    const v = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
-    const addOnRow = (label: string, key: string, hasQty: boolean, details: string) => `
-      <tr><td class="b">${label}</td><td class="r">${hasQty ? v(key, 'qty') : '—'}</td><td colspan="2">${details}</td>
-      <td class="r">${v(key, 'netEuro')}</td><td class="r">${v(key, 'full')}</td><td class="r">${v(key, 'pct')}</td><td class="r">${v(key, 'final')}</td><td></td>
-      <td class="r cb">${v(key, 'calcFull')}</td><td class="r cb">${v(key, 'calcDisc')}</td><td class="r cg">${v(key, 'calcFinal')}</td><td></td></tr>`;
-    return `
-  <div class="section-card">
-    <div class="heading">Add-On Items</div>
-    <div class="body" style="padding:0">
-      <table>
-        <colgroup><col style="width:12%"/><col style="width:5%"/><col style="width:6%"/><col style="width:7%"/><col style="width:8%"/><col style="width:7%"/><col style="width:4%"/><col style="width:7%"/><col style="width:9%"/><col style="width:7%"/><col style="width:7%"/><col style="width:7%"/><col style="width:9%"/></colgroup>
-        <thead><tr>
-          <th>Item</th><th class="r">Qty</th><th colspan="2">Details</th><th class="r">NET €</th>
-          <th class="r">Full</th><th class="r">%</th><th class="r">Final</th><th></th>
-          <th class="r cb">Full</th><th class="r cb">Disc</th><th class="r cg">Final</th><th></th>
-        </tr></thead>
-        <tbody>
-          ${addOnRow('Window Screens', 'windowScreens', true, `Frame: ${v('windowScreens', 'frameType')} | Mesh: ${v('windowScreens', 'meshType')}`)}
-          ${addOnRow('Door Screen Sash', 'doorScreenSash', true, `Wood Frame: ${v('doorScreenSash', 'woodFrame')} | Mesh: ${v('doorScreenSash', 'meshType')}`)}
-          ${addOnRow('Entry Door', 'entryDoor', true, '—')}
-          ${addOnRow('Jamb Extensions', 'jambExtensions', false, '—')}
-          ${addOnRow('Magnetic Contact', 'magneticContact', false, '—')}
-          ${addOnRow('Final Finish', 'finalFinish', false, '—')}
-          ${addOnRow('Installation', 'installation', false, '—')}
-        </tbody>
-      </table>
-    </div>
-  </div>`;
-  })()}
-</div>
-
-</body></html>`;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.onload = () => { printWindow.print(); };
+    doc.save(`Quote_Summary_${(s.name || 'Untitled').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
   };
 
   const handleSaveSummary = () => {
@@ -2380,7 +2425,7 @@ export default function SummaryPage() {
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Printer className="w-4 h-4 mr-2" />
-                  Print PDF
+                  Download PDF
                 </button>
                 <button
                   onClick={() => {
