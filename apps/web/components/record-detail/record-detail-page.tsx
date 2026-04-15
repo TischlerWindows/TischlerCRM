@@ -365,7 +365,8 @@ export default function RecordDetailPage({
       const regions = (tab as any).regions ?? [];
       if (regions.length > 0) isNewStyleLayout = true;
       for (const region of regions) {
-        const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights');
+        const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights')
+          ?? region.panels?.flatMap((p: any) => p.widgets ?? []).find((w: any) => w.widgetType === 'HeaderHighlights');
         if (hw && hw.config.type === 'HeaderHighlights') {
           hasHighlightsWidget = true;
           highlightApiNames = hw.config.fieldApiNames ?? [];
