@@ -1185,8 +1185,12 @@ export default function SummaryPage() {
     
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
+    const oppId = editingSummary.linkedOpportunityId;
     setShowNewSummary(false);
     setEditingSummary(null);
+    if (oppId) {
+      router.push(`/opportunities/${oppId}`);
+    }
   };
 
   const handleAddRow = () => {
@@ -2383,6 +2387,9 @@ export default function SummaryPage() {
                     setShowNewSummary(false);
                     setEditingSummary(null);
                     setActivePage(1);
+                    if (editingSummary?.linkedOpportunityId) {
+                      router.push(`/opportunities/${editingSummary.linkedOpportunityId}`);
+                    }
                   }}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
                 >
@@ -3631,9 +3638,13 @@ export default function SummaryPage() {
             <div className="p-6 border-t border-gray-200 flex justify-between items-center print:hidden">
               <button
                 onClick={() => {
+                  const oppId = editingSummary?.linkedOpportunityId;
                   setShowNewSummary(false);
                   setEditingSummary(null);
                   setActivePage(1);
+                  if (oppId) {
+                    router.push(`/opportunities/${oppId}`);
+                  }
                 }}
                 className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
