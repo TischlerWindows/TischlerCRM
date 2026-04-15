@@ -109,8 +109,41 @@ export async function recordRoutes(app: FastifyInstance) {
 
       const config = objDef.searchConfig;
       const searchFields: string[] = config.searchableFields ?? [];
-      const titleField: string = config.titleField || searchFields[0] || '';
-      const subtitleFields: string[] = config.subtitleFields || [];
+      const apiName: string = objDef.apiName;
+
+      // ── Smart field resolution for title / subtitle ──────────────
+      // Auto-detect number, name, and address fields from object field definitions
+      const fields: any[] = objDef.fields ?? [];
+      const fieldApis = fields.map((f: any) => f.apiName as string);
+
+      // Find the object number field (e.g. Property__propertyNumber or propertyNumber)
+      const numberField = fieldApis.find((f: string) =>
+        f.toLowerCase().endsWith('number') &&
+        (f.toLowerCase().includes(apiName.toLowerCase()) || f.toLowerCase().startsWith(apiName.toLowerCase()))
+      ) || '';
+
+      // For Property: use address as subtitle; for others: use the name field
+      const isProperty = apiName === 'Property';
+      let nameField = '';
+      let addressField = '';
+
+      if (isProperty) {
+        addressField = fieldApis.find((f: string) => f.toLowerCase().endsWith('__address') || f.toLowerCase() === 'address') || '';
+      } else {
+        // Find a name field: opportunityName, projectName, accountName, contactName, subject, name, etc.
+        nameField = fieldApis.find((f: string) => {
+          const lower = f.toLowerCase();
+          return (lower.endsWith('name') || lower.endsWith('subject')) &&
+            !lower.includes('number') &&
+            (lower.includes(apiName.toLowerCase()) || lower === 'name' || lower === 'subject');
+        }) || '';
+      }
+
+      // Fall back to explicit searchConfig fields if set
+      const titleField: string = config.titleField || numberField || searchFields[0] || '';
+      const subtitleFields: string[] = config.subtitleFields?.length
+        ? config.subtitleFields
+        : (isProperty ? [addressField].filter(Boolean) : [nameField].filter(Boolean));
 
       const matched: any[] = [];
       for (const record of records) {
@@ -137,13 +170,28 @@ export async function recordRoutes(app: FastifyInstance) {
         }
 
         if (hitFields.length > 0) {
-          const titleVal = resolveDataValue(data, titleField);
+          // Build display title: prefer "NUMBER (Name)" format
+          const numVal = numberField ? displayValue(resolveDataValue(data, numberField)) : '';
+          const titleVal = displayValue(resolveDataValue(data, titleField));
+          let title = '';
+
+          if (numVal && titleField !== numberField && titleVal && titleVal !== numVal) {
+            // Both number and a separate title field — combine them
+            title = `${numVal} (${titleVal})`;
+          } else if (numVal) {
+            title = numVal;
+          } else if (titleVal) {
+            title = titleVal;
+          } else {
+            title = record.id;
+          }
+
           matched.push({
             id: record.id,
             objectApiName: objDef.apiName,
             objectLabel: objDef.label,
             objectPluralLabel: objDef.pluralLabel || objDef.label,
-            title: displayValue(titleVal) || record.id,
+            title,
             subtitle: subtitleFields
               .map(f => displayValue(resolveDataValue(data, f)))
               .filter(Boolean)

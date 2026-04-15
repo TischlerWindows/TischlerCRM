@@ -216,11 +216,6 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
                                 {result.subtitle}
                               </p>
                             )}
-                            {result.matchedFields.length > 0 && (
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                Matched: {result.matchedFields.join(', ')}
-                              </p>
-                            )}
                           </div>
                         </button>
                       );
