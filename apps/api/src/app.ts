@@ -165,6 +165,10 @@ export function buildApp() {
       },
     });
 
+    // `profileId` is required by the client-side page-layout resolver
+    // (apps/web/lib/layout-resolver.ts) to match the current user against
+    // `layout.roles`. Keep it in sync across accept-invite / reset / impersonate
+    // response shapes so the resolver has a consistent profile to match on.
     const response: Record<string, unknown> = {
       token,
       user: {
