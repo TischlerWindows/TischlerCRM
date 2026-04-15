@@ -963,14 +963,15 @@ export default function SummaryPage() {
     ) => {
       const x0 = 15;
       let y = startY;
-      const rh = 4.2; // row height
+      const rh = 4.5; // row height
       const w = doc.internal.pageSize.getWidth();
       const maxY = doc.internal.pageSize.getHeight() - 14;
-
-      // Header row
-      doc.setFillColor(...headerBg);
       const totalW = colWidths.reduce((a, b) => a + b, 0);
-      doc.rect(x0, y, totalW, 5.5, 'F');
+
+      // Header row background
+      const headerH = 6;
+      doc.setFillColor(...headerBg);
+      doc.rect(x0, y, totalW, headerH, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(5.5);
       doc.setTextColor(255, 255, 255);
@@ -978,10 +979,10 @@ export default function SummaryPage() {
       for (let i = 0; i < headers.length; i++) {
         const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
         const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
-        doc.text(headers[i], tx, y + 3.8, { align });
+        doc.text(headers[i], tx, y + 4, { align });
         cx += colWidths[i];
       }
-      y += 6.5;
+      y += headerH;
 
       // Data rows
       doc.setFont('helvetica', 'normal');
@@ -996,14 +997,14 @@ export default function SummaryPage() {
         // Alternating row background
         if (ri % 2 === 1) {
           doc.setFillColor(...altRow);
-          doc.rect(x0, y - 2.8, totalW, rh, 'F');
+          doc.rect(x0, y, totalW, rh, 'F');
         }
 
         // Bold last row (grand total)
         const isLast = opts?.highlightLast && ri === rows.length - 1;
         if (isLast) {
           doc.setFillColor(235, 237, 240);
-          doc.rect(x0, y - 2.8, totalW, rh + 0.5, 'F');
+          doc.rect(x0, y, totalW, rh, 'F');
           doc.setFont('helvetica', 'bold');
         }
 
@@ -1015,7 +1016,7 @@ export default function SummaryPage() {
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
           const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
           const cellText = (rows[ri][i] || '').substring(0, Math.floor(colWidths[i] / 1.5));
-          doc.text(cellText, tx, y, { align });
+          doc.text(cellText, tx, y + 3, { align });
           if (isBoldCol) doc.setFont('helvetica', 'normal');
           cx += colWidths[i];
         }
