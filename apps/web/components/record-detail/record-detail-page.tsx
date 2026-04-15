@@ -10,6 +10,8 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
+import { resolveLayoutForUser } from '@/lib/layout-resolver';
+import { useAuth } from '@/lib/auth-context';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import { getFormattingEffectsForField, getFormattingEffectsForTab } from '@/lib/layout-formatting';
@@ -118,6 +120,7 @@ export default function RecordDetailPage({
   const params = useParams();
   const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
+  const { user: authUser } = useAuth();
 
   // If navigated from a related list, use the `from` param for back navigation
   const fromPath = searchParams.get('from');
@@ -186,17 +189,16 @@ export default function RecordDetailPage({
   // ── Resolve layout ───────────────────────────────────────────────────
   const pageLayout = useMemo(() => {
     if (!record || !objectDef) return null;
-    const findLayout = (id: string) => objectDef.pageLayouts?.find((l) => l.id === id) ?? null;
-    let raw: PageLayout | null = null;
-    if (record.pageLayoutId) raw = findLayout(record.pageLayoutId);
-    if (!raw) {
-      const rt = record.recordTypeId
-        ? objectDef.recordTypes?.find((r) => r.id === record.recordTypeId)
-        : objectDef.recordTypes?.[0];
-      if (rt?.pageLayoutId) raw = findLayout(rt.pageLayoutId);
-    }
-    if (!raw) raw = objectDef.pageLayouts?.[0] ?? null;
-    if (!raw) return null;
+    const result = resolveLayoutForUser(
+      objectDef,
+      { profileId: authUser?.profileId ?? null },
+      {
+        record: { pageLayoutId: record.pageLayoutId as string | null | undefined },
+        layoutType: 'edit',
+      },
+    );
+    if (result.kind !== 'resolved') return null;
+    let raw: PageLayout = result.layout;
     // Migrate legacy layouts (sections → regions/panels/fields)
     if (isLegacyLayout(raw)) {
       raw = migrateLegacyLayout(raw as any);
@@ -206,7 +208,7 @@ export default function RecordDetailPage({
       return { ...raw, tabs: editorTabs as any } as PageLayout;
     }
     return raw;
-  }, [record, objectDef]);
+  }, [record, objectDef, authUser?.profileId]);
 
   useEffect(() => {
     setActiveTabIdx(0);

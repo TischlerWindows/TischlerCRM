@@ -265,6 +265,16 @@ export function useEditorLifecycle(): EditorLifecycle {
   }, [activeTab, activeTabId, setActiveTab]);
 
   const layoutAssignmentNote = useMemo(() => {
+    // First, warn about the object-level "no default" config error. This is
+    // the most actionable thing for the admin to fix — without a default,
+    // users whose profile doesn't match any role-assigned layout see an error.
+    if (object?.pageLayouts && object.pageLayouts.length > 0) {
+      const activeLayouts = object.pageLayouts.filter((l) => l.active !== false);
+      if (activeLayouts.length > 1 && !activeLayouts.some((l) => l.isDefault === true)) {
+        return "No default layout is set. Users without a role-assigned layout won't be able to open this object — mark one layout as Default (star icon on the Page Layouts list).";
+      }
+    }
+
     if (!object?.recordTypes?.length) return null;
     if (layoutId === 'new') {
       return 'After you save, go back to Page Layouts and use "Assign to record type" so records use this layout.';

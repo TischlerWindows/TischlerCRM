@@ -167,7 +167,13 @@ export function buildApp() {
 
     const response: Record<string, unknown> = {
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        profileId: user.profileId ?? null,
+      },
     };
     if (user.mustChangePassword) {
       response.mustChangePassword = true;
@@ -212,7 +218,7 @@ export function buildApp() {
 
     const env = loadEnv();
     const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
   // ── Auth: forgot password ─────────────────────────────────────────────────
@@ -279,7 +285,7 @@ export function buildApp() {
 
     const env = loadEnv();
     const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
   // ── Auth: change password (requires valid JWT) ────────────────────────────
