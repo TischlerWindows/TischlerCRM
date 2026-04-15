@@ -43,6 +43,10 @@ export function findWidgetEntry(
     for (const region of tab.regions) {
       const widget = region.widgets.find((w) => w.id === widgetId);
       if (widget) return { tab, region, widget };
+      for (const panel of region.panels) {
+        const pw = (panel.widgets ?? []).find((w) => w.id === widgetId);
+        if (pw) return { tab, region, widget: pw };
+      }
     }
   }
 }
@@ -522,6 +526,11 @@ export const createLayoutSlice: StateCreator<
             ...region,
             widgets: region.widgets.map((w) =>
               w.id === widgetId ? { ...w, ...patch } : w,
+            ),
+            panels: region.panels.map((panel) =>
+              panel.widgets?.some((w) => w.id === widgetId)
+                ? { ...panel, widgets: panel.widgets.map((w) => w.id === widgetId ? { ...w, ...patch } : w) }
+                : panel,
             ),
           })),
         })),

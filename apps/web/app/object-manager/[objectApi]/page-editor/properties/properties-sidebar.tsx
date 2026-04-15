@@ -60,6 +60,13 @@ export function FloatingProperties({ onClose, availableFields = [] }: FloatingPr
           if (widget) {
             return { kind: 'widget', tab, region, widget };
           }
+          // Also search inside component panels
+          for (const panel of region.panels) {
+            const panelWidget = (panel.widgets ?? []).find((candidate) => candidate.id === selectedElement.id);
+            if (panelWidget) {
+              return { kind: 'widget', tab, region, widget: panelWidget };
+            }
+          }
         }
       }
     }

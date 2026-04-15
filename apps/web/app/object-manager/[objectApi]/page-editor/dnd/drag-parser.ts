@@ -29,6 +29,10 @@ export function findWidget(layout: EditorState['layout'], widgetId: string) {
     for (const region of tab.regions) {
       const widget = region.widgets.find((candidate) => candidate.id === widgetId);
       if (widget) return { widget, region };
+      for (const panel of region.panels) {
+        const pw = (panel.widgets ?? []).find((candidate) => candidate.id === widgetId);
+        if (pw) return { widget: pw, region };
+      }
     }
   }
   return undefined;
