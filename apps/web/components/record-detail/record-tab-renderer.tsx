@@ -207,6 +207,56 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
             const panelFx = getFormattingEffectsForPanel(pageLayout, panel.id, layoutVisibilityData);
           if (panelFx?.hidden) return null;
 
+          // Component panels — render their widgets via LayoutWidgetsInline
+          if (panel.panelType === 'components') {
+            const panelWidgets = [...(panel.widgets ?? [])]
+              .filter((w: any) => !w.hideOnView && !w.hideOnExisting)
+              .sort((a: any, b: any) => a.order - b.order);
+
+            const isPanelCollapsed = collapsedPanelIds.has(panel.id);
+            const headerStyle: React.CSSProperties = {
+              ...(panel.style?.headerBackground ? { backgroundColor: panel.style.headerBackground } : {}),
+              ...(panel.style?.headerTextColor ? { color: panel.style.headerTextColor } : {}),
+              fontWeight: panel.style?.headerBold ? 700 : undefined,
+              fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
+              textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+            };
+
+            return (
+              <div key={panel.id} className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => togglePanelCollapse(panel.id)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+                  style={headerStyle}
+                  aria-label={isPanelCollapsed ? `Expand ${panel.label} panel` : `Collapse ${panel.label} panel`}
+                  aria-expanded={!isPanelCollapsed}
+                >
+                  <span className="text-sm font-semibold text-gray-700" style={headerStyle}>{panel.label}</span>
+                  {isPanelCollapsed
+                    ? <ChevronRight className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                    : <ChevronDown className="h-4 w-4 text-gray-500 shrink-0" aria-hidden="true" />
+                  }
+                </button>
+                {!isPanelCollapsed && (
+                  <div className="p-2">
+                    {panelWidgets.length > 0 ? (
+                      <LayoutWidgetsInline
+                        widgets={panelWidgets as any}
+                        record={record ?? undefined}
+                        objectDef={buildObjectDefPayload(objectDef)}
+                        collapsedWidgetIds={collapsedWidgetIds}
+                        toggleWidgetCollapse={toggleWidgetCollapse}
+                      />
+                    ) : (
+                      <div className="py-4 text-center text-sm text-gray-400">No components configured</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
           const sortedFields = [...(panel.fields ?? [])].sort((a: any, b: any) => a.order - b.order);
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
