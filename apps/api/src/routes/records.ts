@@ -61,13 +61,16 @@ export async function recordRoutes(app: FastifyInstance) {
     return String(val);
   }
 
+  // Keys to exclude from composite display values (e.g. address lat/lng)
+  const HIDDEN_COMPOSITE_KEYS = new Set(['lat', 'lng', 'latitude', 'longitude']);
+
   // Build a display-friendly string from a data value
   function displayValue(val: unknown): string {
     if (val == null) return '';
     if (typeof val === 'object') {
-      return Object.values(val as Record<string, unknown>)
-        .filter(v => v != null && v !== '')
-        .map(v => String(v))
+      return Object.entries(val as Record<string, unknown>)
+        .filter(([k, v]) => v != null && v !== '' && !HIDDEN_COMPOSITE_KEYS.has(k.toLowerCase()))
+        .map(([, v]) => String(v))
         .join(', ');
     }
     return String(val);
