@@ -1,9 +1,9 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
-import { GripVertical, Search, Trash2 } from 'lucide-react';
+import { GripVertical, LayoutGrid, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
@@ -59,6 +59,45 @@ function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4;
 }
 
 // ── Field chips ──────────────────────────────────────────────────────────────
+
+function ComponentSectionTile() {
+  const addSection = useEditorStore((s) => s.addSection);
+  const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
+
+  const handleClick = useCallback(() => {
+    const { layout, activeTabId } = useEditorStore.getState();
+    const activeTab = layout.tabs.find((t) => t.id === activeTabId) ?? layout.tabs[0];
+    if (!activeTab) return;
+
+    const regions = activeTab.regions;
+    const maxRow = regions.reduce((max, r) => Math.max(max, r.gridRow + r.gridRowSpan - 1), 0);
+    const region = {
+      id: `region-${Date.now()}`,
+      label: `Component Section ${regions.length + 1}`,
+      gridColumn: 1,
+      gridColumnSpan: 12,
+      gridRow: maxRow + 1,
+      gridRowSpan: 1,
+      style: {},
+      panels: [],
+      widgets: [],
+    };
+
+    addSection(region, activeTab.id);
+    setSelectedElement({ type: 'region', id: region.id });
+  }, [addSection, setSelectedElement]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="flex w-full items-center gap-2 rounded-md border border-dashed border-gray-300 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:border-gray-400 hover:bg-gray-50"
+    >
+      <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+      <span className="min-w-0 flex-1 truncate font-medium text-gray-700">Component Section</span>
+    </button>
+  );
+}
 
 function DraggableFieldChip({
   field,
@@ -195,6 +234,16 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
             {FIELD_SECTION_TILES.map((tile) => (
               <DraggableFieldSectionTile key={tile.columns} columns={tile.columns} label={tile.label} />
             ))}
+          </div>
+        </section>
+
+        {/* Component Section tile */}
+        <section className="space-y-1.5">
+          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            Component Sections
+          </div>
+          <div className="space-y-1">
+            <ComponentSectionTile />
           </div>
         </section>
 
