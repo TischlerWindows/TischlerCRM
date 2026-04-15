@@ -11,7 +11,6 @@ export const DEFAULT_TAB_ORDER = [
   { name: 'Quotes', href: '/quotes' },
   { name: 'Installations', href: '/installations' },
   { name: 'Tasks', href: '/tasks' },
-  { name: 'Summary', href: '/summary' },
   { name: 'Reports', href: '/reports' },
   { name: 'Dashboards', href: '/dashboard' },
 ];

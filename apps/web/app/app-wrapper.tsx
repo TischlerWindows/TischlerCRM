@@ -76,7 +76,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const hrefToAppPermMap: Record<string, string> = {
     '/reports': 'manageReports',
     '/dashboard': 'manageDashboards',
-    '/summary': 'viewSummary',
   };
 
   // Filter tabs so users only see objects they have read access to
