@@ -64,7 +64,6 @@ interface Installation {
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function InstallationsPage() {
-  const { user } = useAuth();
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
