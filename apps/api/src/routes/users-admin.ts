@@ -490,6 +490,7 @@ export async function usersAdminRoutes(app: FastifyInstance) {
         email: target.email,
         name: target.name,
         role,
+        profileId: target.profileId ?? null,
       },
     });
   });

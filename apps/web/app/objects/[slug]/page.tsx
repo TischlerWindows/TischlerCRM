@@ -24,9 +24,11 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import CsvImportDialog from '@/components/csv-import-dialog';
+import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -57,8 +59,10 @@ export default function CustomObjectRecordsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
-  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [layoutError, setLayoutError] = useState<
+    Extract<LayoutResolveResult, { kind: 'error' }> | null
+  >(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
@@ -124,37 +128,6 @@ export default function CustomObjectRecordsPage() {
     }
   }, [schema, loadSchema]);
 
-  // Load saved layout selection
-  useEffect(() => {
-    if (hasPageLayout && !selectedLayoutId) {
-      (async () => {
-        const savedLayoutId = await getPreference<string>(`${slug}SelectedLayoutId`);
-        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-          setSelectedLayoutId(savedLayoutId);
-        } else {
-          // 1. Use the layout assigned to the default record type (set by Page Editor)
-          const defaultRt = objectDef?.defaultRecordTypeId
-            ? objectDef.recordTypes?.find(r => r.id === objectDef.defaultRecordTypeId)
-            : objectDef?.recordTypes?.[0];
-          if (defaultRt?.pageLayoutId) {
-            const rtLayout = pageLayouts.find(l => l.id === defaultRt.pageLayoutId);
-            if (rtLayout) {
-              setSelectedLayoutId(rtLayout.id);
-              return;
-            }
-          }
-          // 2. Fallback: prefer a layout that has fields over an empty default
-          const withFields = pageLayouts.find(l =>
-            l.tabs?.some(t => t.regions?.some(r => r.panels?.some(p => (p.fields?.length || 0) > 0)))
-          );
-          const best = withFields || pageLayouts[0];
-          if (best) {
-            setSelectedLayoutId(best.id);
-          }
-        }
-      })();
-    }
-  }, [hasPageLayout, pageLayouts, selectedLayoutId, slug, objectDef]);
 
   // Load records from API
   useEffect(() => {
@@ -195,45 +168,22 @@ export default function CustomObjectRecordsPage() {
   }, [visibleColumns, slug]);
 
   const handleNewRecord = () => {
-    if (!hasPageLayout) {
+    if (!objectDef) {
       setShowNoLayoutsDialog(true);
       return;
     }
-
-    // Prefer the layout assigned to the default record type (set by Page Editor)
-    const defaultRt = objectDef?.defaultRecordTypeId
-      ? objectDef.recordTypes?.find(r => r.id === objectDef.defaultRecordTypeId)
-      : objectDef?.recordTypes?.[0];
-    const rtLayout = defaultRt?.pageLayoutId
-      ? pageLayouts.find(l => l.id === defaultRt.pageLayoutId)
-      : null;
-
-    // Filter to layouts that actually have fields
-    const layoutsWithFields = pageLayouts.filter(l =>
-      l.tabs?.some(t => t.regions?.some(r => r.panels?.some(p => (p.fields?.length || 0) > 0)))
+    const result = resolveLayoutForUser(
+      objectDef,
+      { profileId: user?.profileId ?? null },
     );
-    const effectiveLayouts = layoutsWithFields.length > 0 ? layoutsWithFields : pageLayouts;
-    
-    if (effectiveLayouts.length > 1) {
-      // Pre-select the recordType-assigned layout if it has fields
-      if (rtLayout && layoutsWithFields.some(l => l.id === rtLayout.id)) {
-        setSelectedLayoutId(rtLayout.id);
-      }
-      setShowLayoutSelector(true);
-    } else if (rtLayout) {
-      setSelectedLayoutId(rtLayout.id);
+    if (result.kind === 'resolved') {
+      setSelectedLayoutId(result.layout.id);
       setShowDynamicForm(true);
-    } else if (effectiveLayouts[0]) {
-      setSelectedLayoutId(effectiveLayouts[0].id);
-      setShowDynamicForm(true);
+    } else if (result.reason === 'no-layouts') {
+      setShowNoLayoutsDialog(true);
+    } else {
+      setLayoutError(result);
     }
-  };
-
-  const handleLayoutSelect = (layoutId: string) => {
-    setSelectedLayoutId(layoutId);
-    setPreference(`${slug}SelectedLayoutId`, layoutId);
-    setShowLayoutSelector(false);
-    setShowDynamicForm(true);
   };
 
   const getFieldValue = (record: CustomRecord, columnId: string): string => {
@@ -813,40 +763,12 @@ export default function CustomObjectRecordsPage() {
         </div>
       )}
 
-      {/* Layout Selector Dialog */}
-      {showLayoutSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select Page Layout</h2>
-            </div>
-            <div className="p-6">
-              <p className="text-gray-600 mb-4">
-                Choose a layout for the new {objectDef.label.toLowerCase()} record:
-              </p>
-              <div className="space-y-2">
-                {pageLayouts.map(layout => (
-                  <button
-                    key={layout.id}
-                    onClick={() => handleLayoutSelect(layout.id)}
-                    className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-[#b8bfe8] transition-colors"
-                  >
-                    <div className="font-medium text-gray-900">{layout.name}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="p-6 border-t border-gray-200">
-              <button
-                onClick={() => setShowLayoutSelector(false)}
-                className="w-full px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LayoutErrorDialog
+        open={layoutError !== null}
+        onOpenChange={(v) => { if (!v) setLayoutError(null); }}
+        result={layoutError}
+        objectLabel={objectDef?.label || slug}
+      />
 
       {/* Column Configuration Dialog */}
       {showFilterSettings && (

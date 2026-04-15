@@ -28,9 +28,11 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import CsvImportDialog from '@/components/csv-import-dialog';
+import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
+import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -94,8 +96,10 @@ export default function OpportunitiesPage() {
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [prefillData, setPrefillData] = useState<Record<string, any>>({});
-  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [layoutError, setLayoutError] = useState<
+    Extract<LayoutResolveResult, { kind: 'error' }> | null
+  >(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
@@ -162,33 +166,25 @@ export default function OpportunitiesPage() {
     });
   }, [oppObject]);
 
-  // Load and persist layout selection
-  useEffect(() => {
-    if (hasPageLayout && !selectedLayoutId) {
-      (async () => {
-        const savedLayoutId = await getPreference<string>('opportunitySelectedLayoutId');
-        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-          setSelectedLayoutId(savedLayoutId);
-        } else if (pageLayouts.length > 0) {
-          setSelectedLayoutId(pageLayouts[0].id);
-        }
-      })();
-    }
-  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
   // Auto-open new record form when navigated from a related list with ?new=true
   useEffect(() => {
-    if (searchParams.get('new') === 'true' && hasPageLayout && selectedLayoutId) {
-      // Extract prefill fields from URL (e.g., PropertyId=001EcZ28vn7mm0E)
-      const prefill: Record<string, any> = {}
-      searchParams.forEach((value, key) => {
-        if (key !== 'new') prefill[key] = value
-      })
-      setPrefillData(prefill)
-      setShowDynamicForm(true)
-      router.replace(pathname, { scroll: false })
-    }
-  }, [searchParams, hasPageLayout, selectedLayoutId, pathname, router])
+    if (searchParams.get('new') !== 'true' || !oppObject) return;
+    const result = resolveLayoutForUser(
+      oppObject,
+      { profileId: user?.profileId ?? null },
+    );
+    if (result.kind !== 'resolved') return;
+    // Extract prefill fields from URL (e.g., PropertyId=001EcZ28vn7mm0E)
+    const prefill: Record<string, any> = {}
+    searchParams.forEach((value, key) => {
+      if (key !== 'new') prefill[key] = value
+    })
+    setPrefillData(prefill)
+    setSelectedLayoutId(result.layout.id);
+    setShowDynamicForm(true)
+    router.replace(pathname, { scroll: false })
+  }, [searchParams, oppObject, user?.profileId, pathname, router])
 
   useEffect(() => {
     (async () => {
@@ -664,13 +660,21 @@ export default function OpportunitiesPage() {
             {canCreate && (
             <button
               onClick={() => {
-                if (!hasPageLayout) {
+                if (!oppObject) {
                   setShowNoLayoutsDialog(true);
-                } else if (pageLayouts.length === 1 && pageLayouts[0]) {
-                  setSelectedLayoutId(pageLayouts[0].id);
+                  return;
+                }
+                const result = resolveLayoutForUser(
+                  oppObject,
+                  { profileId: user?.profileId ?? null },
+                );
+                if (result.kind === 'resolved') {
+                  setSelectedLayoutId(result.layout.id);
                   setShowDynamicForm(true);
+                } else if (result.reason === 'no-layouts') {
+                  setShowNoLayoutsDialog(true);
                 } else {
-                  setShowLayoutSelector(true);
+                  setLayoutError(result);
                 }
               }}
               className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
@@ -877,52 +881,12 @@ export default function OpportunitiesPage() {
         </div>
       )}
 
-      {/* Layout Selector Dialog */}
-      {showLayoutSelector && pageLayouts.length > 1 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select a Layout</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Choose which form layout to use for creating a New Opportunity
-              </p>
-            </div>
-            <div className="p-6 space-y-3">
-              {pageLayouts.map((layout) => (
-                <button
-                  key={layout.id}
-                  onClick={() => {
-                    setSelectedLayoutId(layout.id);
-                    setPreference('opportunitySelectedLayoutId', layout.id);
-                    setShowLayoutSelector(false);
-                    setShowDynamicForm(true);
-                  }}
-                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left"
-                >
-                  <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Target className="w-5 h-5 text-brand-navy" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900">{layout.name}</div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {layout.tabs.length} {layout.tabs.length === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs.reduce((acc, tab) => acc + tab.regions.length, 0)} sections
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => setShowLayoutSelector(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <LayoutErrorDialog
+        open={layoutError !== null}
+        onOpenChange={(v) => { if (!v) setLayoutError(null); }}
+        result={layoutError}
+        objectLabel="Opportunity"
+      />
 
       {/* Dynamic Form Dialog */}
       {hasPageLayout && selectedLayoutId && (

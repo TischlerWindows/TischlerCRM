@@ -13,6 +13,7 @@ import {
   normalizeFieldType,
 } from '@/lib/schema';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
+import { resolveLayoutForUser } from '@/lib/layout-resolver';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
@@ -178,23 +179,30 @@ export default function DynamicForm({
     if (!object?.pageLayouts?.length) return undefined;
 
     let resolved: PageLayout | undefined;
+
+    // Explicit layoutId wins — but only if that layout is still active.
+    // If inactive, drop through to the profile-aware resolver so users
+    // don't see a deactivated layout on an existing record.
     if (layoutId) {
-      resolved = object.pageLayouts.find((l) => l.id === layoutId);
-    } else {
-      const defaultRt = object.defaultRecordTypeId
-        ? object.recordTypes?.find((r) => r.id === object.defaultRecordTypeId)
-        : object.recordTypes?.[0];
-      if (defaultRt?.pageLayoutId) {
-        resolved = object.pageLayouts.find((l) => l.id === defaultRt.pageLayoutId);
+      const match = object.pageLayouts.find((l) => l.id === layoutId);
+      if (match && match.active !== false) {
+        resolved = match;
       }
-      if (!resolved) {
-        const hasFields = (l: any) =>
-          l.tabs?.some((t: any) =>
-            t.regions?.some((r: any) => r.panels?.some((p: any) => (p.fields?.length || 0) > 0)) ||
-            t.sections?.some((s: any) => (s.fields?.length || 0) > 0),
-          );
-        const byType = object.pageLayouts.filter((l) => l.layoutType === layoutType);
-        resolved = byType.find(hasFields) || object.pageLayouts.find(hasFields) || byType[0] || object.pageLayouts[0];
+    }
+
+    if (!resolved) {
+      const result = resolveLayoutForUser(
+        object,
+        { profileId: authUser?.profileId ?? null },
+        {
+          record: recordData?.pageLayoutId
+            ? { pageLayoutId: recordData.pageLayoutId as string }
+            : null,
+          layoutType,
+        },
+      );
+      if (result.kind === 'resolved') {
+        resolved = result.layout;
       }
     }
 
@@ -202,7 +210,7 @@ export default function DynamicForm({
       return migrateLegacyLayout(resolved as any);
     }
     return resolved;
-  }, [object, layoutId, layoutType, layoutOverride]);
+  }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId, recordData]);
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab) {

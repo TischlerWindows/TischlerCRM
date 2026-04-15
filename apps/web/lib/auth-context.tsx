@@ -8,6 +8,8 @@ interface User {
   email: string;
   name: string | null;
   role: string;
+  /** Profile id — used to match the user against layout.roles for page-layout assignment. */
+  profileId?: string | null;
 }
 
 interface AuthContextType {

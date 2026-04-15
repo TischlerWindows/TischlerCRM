@@ -29,8 +29,10 @@ import {
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import CsvImportDialog from '@/components/csv-import-dialog';
+import { LayoutErrorDialog } from '@/components/layout-error-dialog';
 import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
+import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import { usePermissions } from '@/lib/permissions-context';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
@@ -120,8 +122,10 @@ export default function AccountsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
-  const [showLayoutSelector, setShowLayoutSelector] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [layoutError, setLayoutError] = useState<
+    Extract<LayoutResolveResult, { kind: 'error' }> | null
+  >(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showAddColumn, setShowAddColumn] = useState(false);
@@ -178,19 +182,6 @@ export default function AccountsPage() {
     });
   }, [accountObject]);
 
-  // Load and persist layout selection
-  useEffect(() => {
-    if (hasPageLayout && !selectedLayoutId) {
-      (async () => {
-        const savedLayoutId = await getPreference<string>('accountSelectedLayoutId');
-        if (savedLayoutId && pageLayouts.find(l => l.id === savedLayoutId)) {
-          setSelectedLayoutId(savedLayoutId);
-        } else if (pageLayouts.length > 0) {
-          setSelectedLayoutId(pageLayouts[0].id);
-        }
-      })();
-    }
-  }, [hasPageLayout, pageLayouts, selectedLayoutId]);
 
 
   // Load saved tab configuration and custom objects from API
@@ -666,13 +657,21 @@ export default function AccountsPage() {
             {canCreateAccount && (
             <button
                 onClick={() => {
-                  if (!hasPageLayout) {
+                  if (!accountObject) {
                     setShowNoLayoutsDialog(true);
-                  } else if (pageLayouts.length === 1 && pageLayouts[0]) {
-                    setSelectedLayoutId(pageLayouts[0].id);
+                    return;
+                  }
+                  const result = resolveLayoutForUser(
+                    accountObject,
+                    { profileId: user?.profileId ?? null },
+                  );
+                  if (result.kind === 'resolved') {
+                    setSelectedLayoutId(result.layout.id);
                     setShowDynamicForm(true);
+                  } else if (result.reason === 'no-layouts') {
+                    setShowNoLayoutsDialog(true);
                   } else {
-                    setShowLayoutSelector(true);
+                    setLayoutError(result);
                   }
                 }}
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
@@ -877,52 +876,13 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* Layout Selector Dialog */}
-      {showLayoutSelector && pageLayouts.length > 1 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Select a Page Layout</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Choose which form layout to use for creating a new account
-              </p>
-            </div>
-            <div className="p-6 space-y-3">
-              {pageLayouts.map((layout) => (
-                <button
-                  key={layout.id}
-                  onClick={() => {
-                    setSelectedLayoutId(layout.id);
-                    setPreference('accountSelectedLayoutId', layout.id);
-                    setShowLayoutSelector(false);
-                    setShowDynamicForm(true);
-                  }}
-                  className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors text-left"
-                >
-                  <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Building2 className="w-5 h-5 text-brand-navy" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900">{layout.name}</div>
-                    <div className="text-sm text-gray-500 mt-1">
-                      {layout.tabs?.length || 0} {(layout.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} • {' '}
-                      {layout.tabs?.reduce((acc: number, tab: any) => acc + (tab.regions?.length || tab.sections?.length || 0), 0) || 0} sections
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="p-6 border-t border-gray-200 flex justify-end">
-              <button
-                onClick={() => setShowLayoutSelector(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Layout resolution error (multi-layout, no default, no role match) */}
+      <LayoutErrorDialog
+        open={layoutError !== null}
+        onOpenChange={(v) => { if (!v) setLayoutError(null); }}
+        result={layoutError}
+        objectLabel="Account"
+      />
 
       {/* Dynamic Form Dialog */}
       {hasPageLayout && selectedLayoutId && (
