@@ -64,7 +64,9 @@ interface Installation {
 const defaultTabs = DEFAULT_TAB_ORDER;
 
 export default function InstallationsPage() {
-  const { user } = useAuth();
+  // Note: `user` is declared below at the start of the main hook block
+  // (line ~88). A second declaration here was removed — Next.js build fails
+  // on duplicate const destructures in the same scope.
   const [installations, setInstallations] = useState<Installation[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
