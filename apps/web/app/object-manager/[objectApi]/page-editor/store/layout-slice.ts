@@ -386,15 +386,6 @@ export const createLayoutSlice: StateCreator<
   },
 
   addField: (field, panelId, atIndex) => {
-    const alreadyPlaced = get().layout.tabs.some((tab) =>
-      tab.regions.some((region) =>
-        region.panels.some((panel) =>
-          panel.fields.some((f) => f.fieldApiName === field.fieldApiName),
-        ),
-      ),
-    );
-    if (alreadyPlaced) return;
-
     get().pushUndo();
     set((s) => ({
       layout: {
