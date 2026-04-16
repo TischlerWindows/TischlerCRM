@@ -16,8 +16,14 @@ interface DynamicFormDialogProps {
   layoutType: 'create' | 'edit';
   layoutId?: string;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
+  onSubmit: (data: Record<string, any>, layoutId?: string) => string | void | Promise<string | void>;
   title?: string;
+  /**
+   * Called after the record is created AND all pending widget data has
+   * been saved. Use this for navigation (router.push) instead of
+   * navigating inside onSubmit, so pending data is saved first.
+   */
+  onCreated?: (recordId: string) => void;
 }
 
 export default function DynamicFormDialog({
@@ -29,13 +35,15 @@ export default function DynamicFormDialog({
   recordData,
   onSubmit,
   title,
+  onCreated,
 }: DynamicFormDialogProps) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const formTouchedRef = useRef(false);
 
   const handleSubmit = async (data: Record<string, any>, layoutId?: string) => {
     formTouchedRef.current = false;
-    await onSubmit(data, layoutId);
+    const result = await onSubmit(data, layoutId);
+    return result;
   };
 
   const requestClose = useCallback(() => {
@@ -109,6 +117,7 @@ export default function DynamicFormDialog({
               recordData={recordData}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
+              onCreated={onCreated}
             />
           </div>
         </DialogContent>

@@ -449,22 +449,22 @@ export default function OpportunitiesPage() {
         .filter(num => num && num.startsWith('OPP'))
         .map(num => parseInt(num.replace(/^OPP-?/, ''), 10))
         .filter(num => !isNaN(num));
-      
+
       const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
       const nextNumber = maxNumber + 1;
       const opportunityNumber = `OPP${String(nextNumber).padStart(4, '0')}`;
 
-      
+
       const today = new Date().toISOString().split('T')[0];
       const currentUserName = user?.name || user?.email || 'Development User';
-      
+
       const recordData = {
         ...normalizedData,
         opportunityNumber,
       };
 
       const result = await recordsService.createRecord('Opportunity', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
-      
+
       const newOpp: Opportunity = {
         id: result.id,
         opportunityNumber,
@@ -477,14 +477,21 @@ export default function OpportunitiesPage() {
 
       const updatedOpps = [newOpp, ...opportunities];
       setOpportunities(updatedOpps);
-      
-      setShowDynamicForm(false);
-      setSelectedLayoutId(null);
-      router.push(`/opportunities/${result.id}`);
+
+      // Return the new record ID so DynamicForm can save pending widget
+      // data (e.g. team members) before navigating away.
+      return result.id;
     } catch (error) {
       console.error('Failed to create opportunity:', error);
       throw error;
     }
+  };
+
+  /** Called by DynamicForm after record + pending widgets are saved */
+  const handleOpportunityCreated = (recordId: string) => {
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    router.push(`/opportunities/${recordId}`);
   };
 
   const handleDelete = async (id: string) => {
@@ -904,6 +911,7 @@ export default function OpportunitiesPage() {
           layoutId={selectedLayoutId}
           recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
+          onCreated={handleOpportunityCreated}
           title="New Opportunity"
         />
       )}

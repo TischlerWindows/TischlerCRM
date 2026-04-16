@@ -30,6 +30,8 @@ import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { PendingWidgetProvider, usePendingWidgetManager } from './pending-widget-context';
+import { getWidgetSupportsCreate } from '@/lib/widgets/registry-loader';
 import {
   ChevronDown,
   ChevronRight,
@@ -52,8 +54,21 @@ export interface DynamicFormProps {
   /** If provided, this layout is rendered directly instead of looking up one via layoutId. */
   layoutOverride?: PageLayout;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
+  /**
+   * Called when the form is submitted. For create forms, return the new
+   * record's ID so pending widget data (e.g. team members) can be saved
+   * after the parent record is created. If not returned, pending widget
+   * data is skipped.
+   */
+  onSubmit: (data: Record<string, any>, layoutId?: string) => string | void | Promise<string | void>;
   onCancel?: () => void;
+  /**
+   * Called after the record is created AND all pending widget data has
+   * been saved. Use this for navigation (router.push) instead of
+   * navigating inside onSubmit, so pending data is saved first.
+   * Only relevant for create forms that use widgets.
+   */
+  onCreated?: (recordId: string) => void;
 }
 
 /** Returns true if an element should be hidden based on record lifecycle state.
@@ -77,6 +92,7 @@ export default function DynamicForm({
   recordData = {},
   onSubmit,
   onCancel,
+  onCreated,
 }: DynamicFormProps) {
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
@@ -160,7 +176,25 @@ export default function DynamicForm({
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
 
+  // Pending widget manager — manages widget registrations for create mode
+  const isCreateMode = layoutType === 'create';
+  const pendingCtx = usePendingWidgetManager(isCreateMode, objectApiName);
+
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
+
+  // Object definition for widgets (simplified shape expected by LayoutWidgetsInline)
+  const widgetObjectDef = useMemo(() => {
+    if (!object) return undefined;
+    return {
+      apiName: object.apiName,
+      label: object.label,
+      fields: object.fields.map((f) => ({
+        apiName: f.apiName,
+        label: f.label,
+        type: f.type,
+      })),
+    };
+  }, [object]);
 
   // Current user
   const { user: authUser } = useAuth();
@@ -605,7 +639,21 @@ export default function DynamicForm({
       setSubmitError(null);
       setIsSubmitting(true);
       try {
-        await onSubmit(completeData, layoutId);
+        const result = await onSubmit(completeData, layoutId);
+        // If onSubmit returned a record ID (create mode) and there are
+        // pending widget saves (e.g. team members), save them now.
+        const recordId = typeof result === 'string' ? result : undefined;
+        if (recordId && pendingCtx?.hasPendingData()) {
+          const { errors: pendingErrors } = await pendingCtx.saveAllPending(recordId);
+          if (pendingErrors.length > 0) {
+            console.warn('[DynamicForm] Some pending widget data failed to save:', pendingErrors);
+            // Don't block the flow — record is created; user can add related data later
+          }
+        }
+        // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
+        if (recordId && onCreated) {
+          onCreated(recordId);
+        }
       } catch (error) {
         const msg =
           error instanceof Error ? error.message : 'Failed to save record';
@@ -929,6 +977,7 @@ export default function DynamicForm({
   // ══════════════════════════════════════════════════════════════
 
   return (
+    <PendingWidgetProvider value={pendingCtx.contextValue}>
     <>
       <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
         {/* Wizard Step Indicator */}
@@ -1051,6 +1100,8 @@ export default function DynamicForm({
                 // External widgets and Summary only belong on the record detail page.
                 if (cfg?.type === 'ExternalWidget') return false;
                 if (cfg?.type === 'Summary') return false;
+                // On create forms, hide widgets that don't support create mode
+                if (isCreateMode && !getWidgetSupportsCreate(cfg?.type)) return false;
                 if (isHiddenByLifecycle(w as any, layoutType)) return false;
                 return true;
               })
@@ -1071,7 +1122,11 @@ export default function DynamicForm({
                 {renderSectionContent(step.section)}
               </div>
               {stepWidgets.length > 0 && (
-                <LayoutWidgetsInline widgets={stepWidgets as any} />
+                <LayoutWidgetsInline
+                  widgets={stepWidgets as any}
+                  record={formData}
+                  objectDef={widgetObjectDef}
+                />
               )}
             </div>
           );
@@ -1098,6 +1153,8 @@ export default function DynamicForm({
                   const cfg = (item.widget as any).config;
                   if (cfg?.type === 'ExternalWidget') return false;
                   if (cfg?.type === 'Summary') return false;
+                  // On create forms, hide widgets that don't support create mode
+                  if (isCreateMode && !getWidgetSupportsCreate(cfg?.type)) return false;
                   if (isHiddenByLifecycle(item.widget as any, layoutType)) return false;
                   return true;
                 }
@@ -1142,7 +1199,11 @@ export default function DynamicForm({
                             gridRowSpan: (g as any).gridRowSpan ?? 1,
                           })}
                         >
-                          <LayoutWidgetsInline widgets={[g] as any} />
+                          <LayoutWidgetsInline
+                            widgets={[g] as any}
+                            record={formData}
+                            objectDef={widgetObjectDef}
+                          />
                         </div>
                       );
                     }
@@ -1660,5 +1721,6 @@ export default function DynamicForm({
         </Dialog>
       )}
     </>
+    </PendingWidgetProvider>
   );
 }
