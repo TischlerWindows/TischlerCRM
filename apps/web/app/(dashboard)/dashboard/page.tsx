@@ -692,6 +692,102 @@ export default function DashboardPage() {
     })();
   }, [newFilterBtn.objectType]);
 
+  // Auto-refresh all object-mode widgets when the selected dashboard changes
+  useEffect(() => {
+    if (!selectedDashboard || selectedDashboard.widgets.length === 0) return;
+    const objectWidgets = selectedDashboard.widgets.filter(
+      w => w.config?.dataSourceMode === 'object' && w.dataSource
+    );
+    if (objectWidgets.length === 0) return;
+
+    // Collect unique object types needed
+    const objectTypes = Array.from(new Set(objectWidgets.map(w => w.dataSource).filter(Boolean)));
+
+    (async () => {
+      // Fetch records for all needed object types
+      for (const objType of objectTypes) {
+        const apiName = PLURAL_TO_API_NAME[objType] || objType;
+        try {
+          const records = await recordsService.getRecords(apiName);
+          const flat = recordsService.flattenRecords(records);
+          setCachedRecords(objType, flat);
+        } catch (e) {
+          console.error(`Failed to load records for ${objType}:`, e);
+        }
+      }
+
+      // Now re-aggregate each widget's data
+      let updatedWidgets = [...selectedDashboard.widgets];
+      let changed = false;
+
+      for (const widget of objectWidgets) {
+        const objType = widget.dataSource;
+        const records = getCachedRecords(objType);
+        const isMetricWidget = widget.type === 'metric' || widget.type === 'card';
+        const xField = widget.config?.xAxis;
+        const yField = widget.config?.yAxis;
+
+        if (isMetricWidget) {
+          // Metric: record count or field sum
+          let value = records.length;
+          if (yField) {
+            const field = stripFieldPrefix(yField);
+            value = records.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
+          }
+          updatedWidgets = updatedWidgets.map(w =>
+            w.id === widget.id ? { ...w, config: { ...w.config, value } } : w
+          );
+          changed = true;
+        } else if (xField && yField) {
+          // Chart widgets with proper config
+          const stackByField = widget.config?.stackBy;
+          if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
+            try {
+              const { data, stackKeys } = aggregateStackedChartData({
+                objectType: objType,
+                xAxisField: xField,
+                yAxisField: yField,
+                stackByField,
+                aggregationType: widget.config?.aggregationType || 'sum'
+              });
+              if (data && data.length > 0) {
+                updatedWidgets = updatedWidgets.map(w =>
+                  w.id === widget.id ? { ...w, config: { ...w.config, data, stackKeys } } : w
+                );
+                changed = true;
+              }
+            } catch { /* skip */ }
+          } else {
+            try {
+              const aggregatedData = aggregateChartData({
+                objectType: objType,
+                xAxisField: xField,
+                yAxisField: yField,
+                aggregationType: widget.config?.aggregationType || 'sum'
+              });
+              if (aggregatedData && aggregatedData.length > 0) {
+                updatedWidgets = updatedWidgets.map(w =>
+                  w.id === widget.id ? { ...w, config: { ...w.config, data: aggregatedData } } : w
+                );
+                changed = true;
+              }
+            } catch { /* skip */ }
+          }
+        }
+      }
+
+      if (changed) {
+        const updatedDashboard = {
+          ...selectedDashboard,
+          widgets: updatedWidgets
+        };
+        setSelectedDashboard(updatedDashboard);
+        setDashboards(prev => prev.map(d => d.id === updatedDashboard.id ? updatedDashboard : d));
+        persistDashboard(updatedDashboard);
+      }
+    })();
+  }, [selectedDashboard?.id]); // Only re-run when switching dashboards
+
   const handleCreateDashboard = async (name: string, description: string) => {
     try {
       const created = await apiClient.createDashboard({ name, description, widgets: [] });
@@ -965,8 +1061,11 @@ export default function DashboardPage() {
     const xField = widget.config?.xAxis;
     const yField = widget.config?.yAxis;
     const stackByField = widget.config?.stackBy;
+    const isMetric = widget.type === 'metric' || widget.type === 'card';
+    const isCount = widget.config?.aggregationType === 'count';
 
-    if (!objectType || !xField || !yField) {
+    // Metrics/counts just need objectType; charts need xAxis + yAxis
+    if (!isMetric && !isCount && (!xField || !yField)) {
       console.warn('Widget missing configuration for refresh');
       setRefreshingWidgetId(null);
       return;
@@ -978,6 +1077,31 @@ export default function DashboardPage() {
       const records = await recordsService.getRecords(apiName);
       const flatRecords = recordsService.flattenRecords(records);
       setCachedRecords(objectType, flatRecords);
+
+      // Metric/card widgets: compute value from record count or field sum
+      if (isMetric) {
+        let value = flatRecords.length;
+        if (yField) {
+          const field = stripFieldPrefix(yField);
+          value = flatRecords.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
+        }
+        const updatedWidgets = selectedDashboard.widgets.map(w =>
+          w.id === widget.id
+            ? { ...w, config: { ...w.config, value, data: flatRecords.slice(0, 50).map((r: any) => ({ label: r.name || r.id || '', value: 1 })) } }
+            : w
+        );
+        const updatedDashboard = {
+          ...selectedDashboard,
+          widgets: updatedWidgets,
+          lastModifiedAt: new Date().toISOString().split('T')[0] || ''
+        };
+        const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
+        setDashboards(updated);
+        setSelectedDashboard(updatedDashboard);
+        persistDashboard(updatedDashboard);
+        setTimeout(() => setRefreshingWidgetId(null), 400);
+        return;
+      }
 
       // Check if this is a stacked chart
       if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
