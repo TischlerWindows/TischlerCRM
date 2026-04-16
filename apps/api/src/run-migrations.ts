@@ -44,6 +44,10 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_widget_settings_org_idx',
     sql: `CREATE INDEX IF NOT EXISTS "WidgetSetting_orgId_idx" ON "WidgetSetting"("orgId")`,
   },
+  {
+    name: 'add_page_layout_extensions',
+    sql: `ALTER TABLE "PageLayout" ADD COLUMN IF NOT EXISTS "extensions" JSONB`,
+  },
   // Integration and UserIntegration tables are created by prisma db push.
   // These are kept as no-op safety nets (IF NOT EXISTS) and must use single
   // statements per entry because $executeRawUnsafe does not support batches.
