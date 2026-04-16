@@ -603,6 +603,66 @@ export async function ensureCoreObjects(): Promise<void> {
   // objects that were created in the UI but whose apiClient.createObject call
   // failed (e.g., first letter not capitalised, transient network error, etc.).
   await syncSchemaObjectsToDb(systemUser.id);
+
+  // ── Service Department & Profiles ──────────────────────────────────
+  // Ensure Service department exists
+  const existingDept = await prisma.department.findFirst({
+    where: { name: { equals: 'Service', mode: 'insensitive' } },
+  })
+  if (!existingDept) {
+    await prisma.department.create({
+      data: {
+        id: generateId('Department'),
+        name: 'Service',
+        description: 'Service Department — technicians and managers',
+        createdById: systemUser.id,
+        modifiedById: systemUser.id,
+      },
+    })
+    console.log('[ensure-core-objects] Created Service department')
+  }
+
+  // Ensure Service Manager profile exists
+  const existingMgrProfile = await prisma.profile.findFirst({
+    where: { name: { equals: 'Service Manager', mode: 'insensitive' } },
+  })
+  if (!existingMgrProfile) {
+    await prisma.profile.create({
+      data: {
+        id: generateId('Profile'),
+        name: 'Service Manager',
+        description: 'Full access to service module objects and features',
+        permissions: JSON.stringify({
+          objectPermissions: {},
+          appPermissions: {},
+        }),
+        createdById: systemUser.id,
+        modifiedById: systemUser.id,
+      },
+    })
+    console.log('[ensure-core-objects] Created Service Manager profile')
+  }
+
+  // Ensure Service Technician profile exists
+  const existingTechProfile = await prisma.profile.findFirst({
+    where: { name: { equals: 'Service Technician', mode: 'insensitive' } },
+  })
+  if (!existingTechProfile) {
+    await prisma.profile.create({
+      data: {
+        id: generateId('Profile'),
+        name: 'Service Technician',
+        description: 'Graduated access for service technicians — starts restricted',
+        permissions: JSON.stringify({
+          objectPermissions: {},
+          appPermissions: {},
+        }),
+        createdById: systemUser.id,
+        modifiedById: systemUser.id,
+      },
+    })
+    console.log('[ensure-core-objects] Created Service Technician profile')
+  }
 }
 
 /**
