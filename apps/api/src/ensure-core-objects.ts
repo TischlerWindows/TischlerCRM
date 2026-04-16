@@ -615,8 +615,6 @@ export async function ensureCoreObjects(): Promise<void> {
         id: generateId('Department'),
         name: 'Service',
         description: 'Service Department — technicians and managers',
-        createdById: systemUser.id,
-        modifiedById: systemUser.id,
       },
     })
     console.log('[ensure-core-objects] Created Service department')
@@ -631,13 +629,12 @@ export async function ensureCoreObjects(): Promise<void> {
       data: {
         id: generateId('Profile'),
         name: 'Service Manager',
+        label: 'Service Manager',
         description: 'Full access to service module objects and features',
         permissions: JSON.stringify({
           objectPermissions: {},
           appPermissions: {},
         }),
-        createdById: systemUser.id,
-        modifiedById: systemUser.id,
       },
     })
     console.log('[ensure-core-objects] Created Service Manager profile')
@@ -652,13 +649,12 @@ export async function ensureCoreObjects(): Promise<void> {
       data: {
         id: generateId('Profile'),
         name: 'Service Technician',
+        label: 'Service Technician',
         description: 'Graduated access for service technicians — starts restricted',
         permissions: JSON.stringify({
           objectPermissions: {},
           appPermissions: {},
         }),
-        createdById: systemUser.id,
-        modifiedById: systemUser.id,
       },
     })
     console.log('[ensure-core-objects] Created Service Technician profile')
