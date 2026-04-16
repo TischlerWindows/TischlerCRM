@@ -51,6 +51,14 @@ export function sortedWidgets(region: LayoutSection): LayoutWidget[] {
 // IMPORTANT: Add every WidgetType value here when registering a new widget.
 // This set validates drag ids at runtime. A missing entry causes the widget
 // to silently fail to drop from the palette.
+//
+// FOUR-PLACE WIDGET REGISTRATION CHECKLIST (when adding a new widget):
+//   1. apps/web/lib/schema.ts → add to WidgetType union
+//   2. apps/web/widgets/internal/registry.ts → register with widgetConfigType
+//   3. apps/web/app/object-manager/[objectApi]/page-editor/palette-components.tsx
+//      → add kebab-id → PascalCase entry to MANIFEST_ID_TO_WIDGET_TYPE
+//   4. THIS FILE (drag-parser.ts) → add PascalCase entry to WIDGET_TYPES set
+// Missing ANY = widget silently fails to drag from the palette.
 const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'RelatedList',
   'CustomComponent',
@@ -64,6 +72,10 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'Path',
   'InstallationCostGrid',
   'Summary',
+  'WorkOrderAssignments',
+  'PunchList',
+  'TimeEntries',
+  'WorkOrderExpenses',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {

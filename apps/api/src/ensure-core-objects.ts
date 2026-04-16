@@ -604,6 +604,13 @@ export async function ensureCoreObjects(): Promise<void> {
   // failed (e.g., first letter not capitalised, transient network error, etc.).
   await syncSchemaObjectsToDb(systemUser.id);
 
+  // IMPORTANT: The frontend reads its schema from a SEPARATE Setting row with
+  // key 'tces-object-manager-schema'. CustomObject/CustomField records in the
+  // DB are NOT auto-synced to this blob, so without this step new core objects
+  // defined in CORE_OBJECTS above will not appear in the Object Manager UI
+  // even though they exist in the database. This function reconciles the two.
+  await syncCoreObjectsToSchemaSetting();
+
   // ── Service Department & Profiles ──────────────────────────────────
   // Ensure Service department exists
   const existingDept = await prisma.department.findFirst({
@@ -746,6 +753,119 @@ async function syncSchemaObjectsToDb(userId: string): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not sync schema objects:', err);
+  }
+}
+
+/**
+ * Sync CORE_OBJECTS to the frontend schema Setting blob
+ * (key: 'tces-object-manager-schema').
+ *
+ * The frontend loads its schema from this Setting, NOT directly from the
+ * CustomObject / CustomField tables. Without this sync, new core objects
+ * defined in this file do not appear in the Object Manager UI even though
+ * they exist in the database.
+ *
+ * This function is additive and idempotent:
+ * - If the Setting does not exist, creates it with all CORE_OBJECTS.
+ * - If an object is missing from the Setting, adds it with all its fields.
+ * - If an object exists but is missing fields, adds the missing fields.
+ * - Never removes or modifies existing objects/fields (UI edits win).
+ */
+async function syncCoreObjectsToSchemaSetting(): Promise<void> {
+  const SETTING_KEY = 'tces-object-manager-schema';
+  try {
+    const existing = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
+    const now = new Date().toISOString();
+
+    // Build a core-object representation in the shape the frontend expects.
+    const buildCoreObject = (def: typeof CORE_OBJECTS[number]) => ({
+      id: `core-${def.apiName}`,
+      apiName: def.apiName,
+      label: def.label,
+      pluralLabel: def.pluralLabel,
+      description: def.description,
+      fields: def.fields.map((f) => ({
+        id: `core-${def.apiName}-${f.apiName}`,
+        apiName: f.apiName,
+        label: f.label,
+        type: f.type,
+        required: (f as any).required ?? false,
+        unique: (f as any).unique ?? false,
+        picklistValues: (f as any).picklistValues,
+        defaultValue: (f as any).defaultValue,
+        custom: false,
+      })),
+      recordTypes: [],
+      pageLayouts: [],
+      validationRules: [],
+    });
+
+    if (!existing || !existing.value) {
+      // No schema yet — seed it with all core objects.
+      const schema = {
+        version: 1,
+        objects: CORE_OBJECTS.map(buildCoreObject),
+        updatedAt: now,
+      };
+      await prisma.setting.create({
+        data: { key: SETTING_KEY, value: schema as any },
+      });
+      console.log(`[ensure-core-objects] Seeded '${SETTING_KEY}' with ${CORE_OBJECTS.length} core objects`);
+      return;
+    }
+
+    const schema = existing.value as any;
+    const objects: any[] = Array.isArray(schema.objects) ? schema.objects : [];
+    let addedObjects = 0;
+    let addedFields = 0;
+
+    for (const def of CORE_OBJECTS) {
+      const idx = objects.findIndex(
+        (o) => o && typeof o.apiName === 'string' && o.apiName.toLowerCase() === def.apiName.toLowerCase()
+      );
+      if (idx === -1) {
+        objects.push(buildCoreObject(def));
+        addedObjects++;
+        continue;
+      }
+      // Object exists — merge any new fields without touching existing ones.
+      const obj = objects[idx];
+      if (!Array.isArray(obj.fields)) obj.fields = [];
+      for (const f of def.fields) {
+        const hasField = obj.fields.some(
+          (ef: any) => ef && typeof ef.apiName === 'string' && ef.apiName === f.apiName
+        );
+        if (!hasField) {
+          obj.fields.push({
+            id: `core-${def.apiName}-${f.apiName}`,
+            apiName: f.apiName,
+            label: f.label,
+            type: f.type,
+            required: (f as any).required ?? false,
+            unique: (f as any).unique ?? false,
+            picklistValues: (f as any).picklistValues,
+            defaultValue: (f as any).defaultValue,
+            custom: false,
+          });
+          addedFields++;
+        }
+      }
+    }
+
+    if (addedObjects > 0 || addedFields > 0) {
+      schema.objects = objects;
+      schema.version = (Number(schema.version) || 0) + 1;
+      schema.updatedAt = now;
+      await prisma.setting.update({
+        where: { key: SETTING_KEY },
+        data: { value: schema as any },
+      });
+      console.log(
+        `[ensure-core-objects] Updated '${SETTING_KEY}': +${addedObjects} objects, +${addedFields} fields`
+      );
+    }
+  } catch (err) {
+    console.warn(`[ensure-core-objects] Could not sync core objects to schema setting:`, err);
   }
 }
 

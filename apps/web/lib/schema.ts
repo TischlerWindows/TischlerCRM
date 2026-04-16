@@ -220,7 +220,15 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary';
+// IMPORTANT: When adding a new internal widget, you must update FOUR places:
+//   1. Add the PascalCase type here in WidgetType union
+//   2. Register it in apps/web/widgets/internal/registry.ts with widgetConfigType: 'YourType'
+//   3. Add kebab-id → PascalCase entry to MANIFEST_ID_TO_WIDGET_TYPE in
+//      apps/web/app/object-manager/[objectApi]/page-editor/palette-components.tsx
+//   4. Add PascalCase entry to WIDGET_TYPES set in
+//      apps/web/app/object-manager/[objectApi]/page-editor/dnd/drag-parser.ts
+// Missing ANY of these = widget silently fails to drag from the palette.
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'WorkOrderAssignments' | 'PunchList' | 'TimeEntries' | 'WorkOrderExpenses';
 
 export type RelatedListFilterOperator =
   | 'equals'

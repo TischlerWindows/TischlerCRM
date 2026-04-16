@@ -39,6 +39,14 @@ function getLucideIcon(name: string): ElementType {
 // Without an entry the drag id defaults to the kebab-case manifest id, which
 // fails the WidgetType allowlist check in drag-parser.ts and silently drops
 // the drag. Add a row here whenever you register a new internal widget.
+//
+// FOUR-PLACE WIDGET REGISTRATION CHECKLIST (when adding a new widget):
+//   1. apps/web/lib/schema.ts → add to WidgetType union
+//   2. apps/web/widgets/internal/registry.ts → register with widgetConfigType
+//   3. THIS FILE (palette-components.tsx) → add kebab-id → PascalCase entry
+//   4. apps/web/app/object-manager/[objectApi]/page-editor/dnd/drag-parser.ts
+//      → add PascalCase entry to WIDGET_TYPES set
+// Missing ANY = widget silently fails to drag from the palette.
 const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'related-list': 'RelatedList',
   'activity-feed': 'ActivityFeed',
@@ -51,6 +59,10 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'path': 'Path',
   'installation-cost-grid': 'InstallationCostGrid',
   'summary': 'Summary',
+  'work-order-assignments': 'WorkOrderAssignments',
+  'punch-list': 'PunchList',
+  'time-entries': 'TimeEntries',
+  'work-order-expenses': 'WorkOrderExpenses',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
