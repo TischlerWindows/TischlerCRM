@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import {
   Plus, Search, Users, X, Edit2, Trash2, Copy,
@@ -10,6 +10,7 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
+import { usePendingWidget } from '@/components/form/pending-widget-context'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -59,7 +60,7 @@ interface MergedAccount {
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const SUPPORTED_OBJECTS = ['Property', 'Opportunity', 'Project', 'WorkOrder', 'Installation']
+const SUPPORTED_OBJECTS = ['Property', 'Opportunity', 'Project', 'WorkOrder', 'Installation', 'Lead']
 
 /** Plain field name used in TeamMember data to reference the parent */
 const OBJECT_TO_FIELD: Record<string, string> = {
@@ -68,6 +69,7 @@ const OBJECT_TO_FIELD: Record<string, string> = {
   Project: 'project',
   WorkOrder: 'workOrder',
   Installation: 'installation',
+  Lead: 'lead',
 }
 
 /** Auto-generated lookup field name used by ensureRelationshipFields
@@ -79,6 +81,7 @@ const OBJECT_TO_LOOKUP_FIELD: Record<string, string> = {
   Project: 'ProjectId',
   WorkOrder: 'WorkOrderId',
   Installation: 'InstallationId',
+  Lead: 'LeadId',
 }
 
 /** Reverse mapping: plain field name → auto-generated lookup field name */
@@ -88,6 +91,7 @@ const FIELD_TO_LOOKUP: Record<string, string> = {
   project: 'ProjectId',
   workOrder: 'WorkOrderId',
   installation: 'InstallationId',
+  lead: 'LeadId',
 }
 
 const CHILD_OBJECT_TYPES = ['Opportunity', 'Project', 'WorkOrder', 'Installation']
@@ -355,6 +359,61 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [editContractHolder, setEditContractHolder] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // ── Pending widget support (create mode) ──
+  const pendingCtx = usePendingWidget()
+  const isCreateMode = pendingCtx?.isCreateMode === true && !recordId
+  const [pendingMembers, setPendingMembers] = useState<TeamMemberRecord[]>([])
+  const pendingMembersRef = useRef(pendingMembers)
+  pendingMembersRef.current = pendingMembers
+
+  // Register with pending widget context so saves happen after parent creation
+  useEffect(() => {
+    if (!isCreateMode || !pendingCtx || !isSupported) return
+
+    const widgetId = `team-members-${objectApiName}`
+
+    pendingCtx.registerWidget({
+      widgetId,
+      hasPendingData: () => pendingMembersRef.current.length > 0,
+      savePendingData: async (parentRecordId: string) => {
+        const parentField = OBJECT_TO_FIELD[objectApiName]
+        if (!parentField) throw new Error(`No FK field for ${objectApiName}`)
+
+        for (const member of pendingMembersRef.current) {
+          await apiClient.post('/objects/TeamMember/records', {
+            data: {
+              ...member.data,
+              [parentField]: parentRecordId,
+            },
+          })
+        }
+      },
+      getPendingSummary: () =>
+        `${pendingMembersRef.current.length} team member(s)`,
+    })
+
+    return () => {
+      pendingCtx.unregisterWidget(widgetId)
+    }
+  }, [isCreateMode, pendingCtx, objectApiName, isSupported])
+
+  /** Add a pending team member (create mode only) */
+  const addPendingMember = useCallback(
+    (data: Record<string, unknown>) => {
+      const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      setPendingMembers((prev) => [
+        ...prev,
+        { id: tempId, data, createdAt: new Date().toISOString() },
+      ])
+    },
+    [],
+  )
+
+  /** Remove a pending team member by temp ID */
+  const removePendingMember = useCallback((id: string) => {
+    setPendingMembers((prev) => prev.filter((m) => m.id !== id))
+  }, [])
+
   // ── 5b: Data Fetching ──
   const fetchTeamMembers = useCallback(async () => {
     if (!recordId || !isSupported) return
@@ -510,12 +569,18 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   // ── 5c: De-duplication & merge ──
   const currentField = OBJECT_TO_FIELD[objectApiName] ?? ''
 
+  // Combine real and pending members for the merge logic
+  const allMembers = useMemo(
+    () => [...rawMembers, ...pendingMembers],
+    [rawMembers, pendingMembers],
+  )
+
   const { mergedContacts, mergedAccounts, allRoles } = useMemo(() => {
     const contactMap = new Map<string, MergedContact>()
     const accountMap = new Map<string, MergedAccount>()
     const roleSet = new Set<string>()
 
-    for (const member of rawMembers) {
+    for (const member of allMembers) {
       const contactId = getLookupId(member, 'contact')
       const contactName =
         (contactId && contactNames.get(contactId)) ||  // resolved via API
@@ -627,7 +692,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [rawMembers, currentField, recordId, contactNames, accountNames, parentNames, contactRecords, accountRecords])
+  }, [allMembers, currentField, recordId, contactNames, accountNames, parentNames, contactRecords, accountRecords])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
@@ -696,6 +761,13 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
   // ── 5i: Delete handler ──
   const handleDelete = async (memberId: string) => {
+    // In create mode, remove from pending list instead of API
+    if (isCreateMode && memberId.startsWith('pending-')) {
+      removePendingMember(memberId)
+      setDeleteTarget(null)
+      return
+    }
+
     setDeletingId(memberId)
     if (_cacheKey) teamMembersCache.delete(_cacheKey) // invalidate before refetch
     try {
@@ -741,15 +813,17 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           <span className="text-[11px] text-brand-gray tabular-nums">
             {totalCount} member{totalCount !== 1 ? 's' : ''}
           </span>
-          <button
-            type="button"
-            onClick={() => setShowCopyModal(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-brand-gray hover:text-brand-dark hover:bg-gray-50 transition-colors"
-            title="Copy team from another record"
-          >
-            <Copy className="w-3 h-3" />
-            Copy
-          </button>
+          {!isCreateMode && (
+            <button
+              type="button"
+              onClick={() => setShowCopyModal(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-brand-gray hover:text-brand-dark hover:bg-gray-50 transition-colors"
+              title="Copy team from another record"
+            >
+              <Copy className="w-3 h-3" />
+              Copy
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
@@ -903,14 +977,16 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       {showAddModal && (
         <AddTeamMemberModal
           objectApiName={objectApiName}
-          recordId={recordId!}
+          recordId={recordId ?? ''}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); fetchTeamMembers() }}
+          pendingMode={isCreateMode}
+          onAddPending={isCreateMode ? (data) => { addPendingMember(data); setShowAddModal(false) } : undefined}
         />
       )}
 
       {/* ── Copy Team Modal ── */}
-      {showCopyModal && (
+      {!isCreateMode && showCopyModal && (
         <CopyTeamModal
           objectApiName={objectApiName}
           recordId={recordId!}
@@ -1271,11 +1347,17 @@ function AddTeamMemberModal({
   recordId,
   onClose,
   onSaved,
+  pendingMode = false,
+  onAddPending,
 }: {
   objectApiName: string
   recordId: string
   onClose: () => void
   onSaved: () => void
+  /** When true, don't POST to API — call onAddPending instead */
+  pendingMode?: boolean
+  /** Callback to add pending member data (create mode) */
+  onAddPending?: (data: Record<string, unknown>) => void
 }) {
   const [step, setStep] = useState<AddStep>('choose')
 
@@ -1414,6 +1496,21 @@ function AddTeamMemberModal({
       setError('Role is required')
       return
     }
+
+    const memberData = {
+      contact: String(selectedContact.id),
+      contactName: getRecordName(selectedContact),
+      role,
+      primaryContact,
+      contractHolder,
+    }
+
+    // In pending mode, don't POST — just queue the data
+    if (pendingMode && onAddPending) {
+      onAddPending(memberData)
+      return
+    }
+
     setSaving(true)
     setError(null)
     try {
@@ -1421,11 +1518,7 @@ function AddTeamMemberModal({
       await apiClient.post('/objects/TeamMember/records', {
         data: {
           [parentField]: recordId,
-          contact: String(selectedContact.id),
-          contactName: getRecordName(selectedContact),
-          role,
-          primaryContact,
-          contractHolder,
+          ...memberData,
         },
       })
       onSaved()
@@ -1449,13 +1542,43 @@ function AddTeamMemberModal({
         return
       }
     }
+
+    const accountId = String(selectedAccount.id)
+    const acctName = getRecordName(selectedAccount)
+
+    // In pending mode, queue all members locally
+    if (pendingMode && onAddPending) {
+      if (accountRole) {
+        onAddPending({
+          account: accountId,
+          accountName: acctName,
+          role: accountRole,
+          primaryContact: accountPrimary,
+          contractHolder: accountContractHolder,
+        })
+      }
+      const contactNameMap = new Map<string, string>()
+      for (const c of accountContacts) {
+        contactNameMap.set(String(c.id), getRecordName(c))
+      }
+      for (const contactId of selectedContactIds) {
+        onAddPending({
+          contact: contactId,
+          contactName: contactNameMap.get(contactId) || '',
+          account: accountId,
+          accountName: acctName,
+          role: contactRoles[contactId] || 'Other',
+          primaryContact: false,
+          contractHolder: false,
+        })
+      }
+      return
+    }
+
     setSaving(true)
     setError(null)
     try {
       const parentField = OBJECT_TO_FIELD[objectApiName]
-      const accountId = String(selectedAccount.id)
-
-      const acctName = getRecordName(selectedAccount)
 
       // Add account as team member if a role is set
       if (accountRole) {

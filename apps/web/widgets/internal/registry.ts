@@ -55,6 +55,7 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'TeamMembersRollup',
     Component: dynamic(() => import('./team-members-rollup/index')),
     ConfigPanel: TeamMembersRollupConfigPanel,
+    supportsCreate: true,
   },
   {
     manifest: teamMemberAssociationsManifest,
