@@ -604,21 +604,19 @@ export async function ensureCoreObjects(): Promise<void> {
   // failed (e.g., first letter not capitalised, transient network error, etc.).
   await syncSchemaObjectsToDb(systemUser.id);
 
-  // NOTE: Temporarily disabled — the existing frontend Setting blob stores
-  // field apiNames with the "ObjectName__" prefix (e.g. "Technician__techCode"),
-  // but CORE_OBJECTS uses bare names (e.g. "techCode"). The old function's
-  // simple equality check did not match across the two formats, causing
-  // duplicate fields to be appended to every existing object. New objects
-  // are still created in the DB by the ensureFields() path above, and are
-  // exposed to the UI via the object manager's own CustomObject/CustomField
-  // queries. Fixing the sync properly requires name-matching logic that
-  // understands the prefix convention.
-  // await syncCoreObjectsToSchemaSetting();
-
   // One-time cleanup: remove any fields that the previous broken version of
   // syncCoreObjectsToSchemaSetting() appended to the schema Setting blob.
   // Those fields have ids starting with "core-". Safe to call every startup.
   await removeCoreSyncPollution();
+
+  // Sync CORE_OBJECTS to the frontend schema Setting blob.
+  // This version handles both bare ("techCode") and prefixed
+  // ("Technician__techCode") field apiNames, so it no longer duplicates
+  // fields. Critical: without this, the page-editor renders fields (by
+  // apiName reference) that it can't find in the schema blob, causing the
+  // FieldInput TypeError on WorkOrder and any other object with fields that
+  // ensureFields added to the DB but the schema blob doesn't know about.
+  await syncCoreObjectsToSchemaSetting();
 
   // ── Service Department & Profiles ──────────────────────────────────
   // Ensure Service department exists
@@ -852,7 +850,18 @@ async function syncCoreObjectsToSchemaSetting(): Promise<void> {
     const existing = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
     const now = new Date().toISOString();
 
+    // Normalize a field apiName to its bare form for matching:
+    //   "Technician__techCode" → "techcode"
+    //   "techCode"             → "techcode"
+    // The schema blob uses prefixed names for UI-created fields; our
+    // CORE_OBJECTS uses bare names. Matching on the normalized bare form
+    // prevents duplicate insertion.
+    const normalizeFieldKey = (apiName: string): string =>
+      apiName.replace(/^[A-Za-z]+__/, '').toLowerCase();
+
     // Build a core-object representation in the shape the frontend expects.
+    // Fields are written with the PREFIXED apiName (e.g. "WorkOrder__techCode")
+    // so that layouts referencing fields in that format resolve correctly.
     const buildCoreObject = (def: typeof CORE_OBJECTS[number]) => ({
       id: `core-${def.apiName}`,
       apiName: def.apiName,
@@ -861,7 +870,7 @@ async function syncCoreObjectsToSchemaSetting(): Promise<void> {
       description: def.description,
       fields: def.fields.map((f) => ({
         id: `core-${def.apiName}-${f.apiName}`,
-        apiName: f.apiName,
+        apiName: `${def.apiName}__${f.apiName}`,
         label: f.label,
         type: f.type,
         required: (f as any).required ?? false,
@@ -904,26 +913,31 @@ async function syncCoreObjectsToSchemaSetting(): Promise<void> {
         continue;
       }
       // Object exists — merge any new fields without touching existing ones.
+      // Match by the normalized (bare, lowercase) apiName so we don't create
+      // duplicates across prefixed/bare naming conventions.
       const obj = objects[idx];
       if (!Array.isArray(obj.fields)) obj.fields = [];
+      const existingKeys = new Set(
+        obj.fields
+          .filter((ef: any) => ef && typeof ef.apiName === 'string')
+          .map((ef: any) => normalizeFieldKey(ef.apiName))
+      );
       for (const f of def.fields) {
-        const hasField = obj.fields.some(
-          (ef: any) => ef && typeof ef.apiName === 'string' && ef.apiName === f.apiName
-        );
-        if (!hasField) {
-          obj.fields.push({
-            id: `core-${def.apiName}-${f.apiName}`,
-            apiName: f.apiName,
-            label: f.label,
-            type: f.type,
-            required: (f as any).required ?? false,
-            unique: (f as any).unique ?? false,
-            picklistValues: (f as any).picklistValues,
-            defaultValue: (f as any).defaultValue,
-            custom: false,
-          });
-          addedFields++;
-        }
+        const key = normalizeFieldKey(f.apiName);
+        if (existingKeys.has(key)) continue;
+        obj.fields.push({
+          id: `core-${def.apiName}-${f.apiName}`,
+          apiName: `${def.apiName}__${f.apiName}`,
+          label: f.label,
+          type: f.type,
+          required: (f as any).required ?? false,
+          unique: (f as any).unique ?? false,
+          picklistValues: (f as any).picklistValues,
+          defaultValue: (f as any).defaultValue,
+          custom: false,
+        });
+        existingKeys.add(key);
+        addedFields++;
       }
     }
 

@@ -146,6 +146,20 @@ export function FieldInput({
   onLookupBlur,
   onInlineCreate,
 }: FieldInputProps) {
+  // Defensive: if the caller passed no fieldDef, skip rendering instead of
+  // crashing. This happens when a layout references a field that exists in
+  // the DB (CustomField row) but not in the schema blob — typically during
+  // schema drift between ensure-core-objects field additions and the frontend
+  // `tces-object-manager-schema` Setting. The TypeError "Cannot read properties
+  // of undefined (reading 'type')" was happening here on page load for
+  // WorkOrder and any other object whose layout references fresh fields.
+  if (!fieldDef) {
+    if (typeof window !== 'undefined' && (window as any).__loggedMissingFieldDef !== true) {
+      console.warn('[FieldInput] Skipping render — fieldDef is undefined (schema drift?)');
+      (window as any).__loggedMissingFieldDef = true;
+    }
+    return null;
+  }
   // Check if field should be visible based on visibility rules
   const isVisible = evaluateVisibility(
     fieldDef.visibleIf,
