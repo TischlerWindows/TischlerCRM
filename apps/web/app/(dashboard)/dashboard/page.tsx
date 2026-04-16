@@ -53,6 +53,7 @@ import {
 } from 'recharts';
 import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords, getCachedRecords, stripFieldPrefix } from '@/lib/chart-data-utils';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,58 @@ import { getPreference, setPreference, getSetting, setSetting } from '@/lib/pref
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
+
+// ── API shape mappers ────────────────────────────────────────────────────────
+function mapDashboardFromApi(d: any): Dashboard {
+  const sw = d.sharedWith || {};
+  return {
+    id: d.id,
+    name: d.name,
+    description: d.description || '',
+    widgets: (d.widgets || []).map((w: any) => ({
+      id: w.id,
+      type: w.type,
+      title: w.title,
+      reportId: w.reportId || undefined,
+      dataSource: w.dataSource,
+      config: w.config || {},
+      position: { x: w.positionX ?? 0, y: w.positionY ?? 0, w: w.width ?? 4, h: w.height ?? 2 },
+      sectionId: (w.config as any)?.sectionId || undefined,
+    })),
+    sections: sw.sections || [],
+    createdBy: d.createdBy?.name || '',
+    createdAt: (d.createdAt || '').split('T')[0],
+    lastModifiedAt: (d.updatedAt || '').split('T')[0],
+    isFavorite: d.isFavorite,
+    backgroundColor: sw.backgroundColor || undefined,
+  };
+}
+
+function mapDashboardToApi(d: Dashboard) {
+  return {
+    name: d.name,
+    description: d.description || '',
+    isFavorite: d.isFavorite || false,
+    sections: d.sections || [],
+    backgroundColor: d.backgroundColor || '',
+    widgets: d.widgets.map(w => ({
+      type: w.type,
+      title: w.title,
+      dataSource: w.dataSource || '',
+      reportId: w.reportId || null,
+      config: { ...w.config, sectionId: w.sectionId || undefined },
+      position: w.position,
+    })),
+  };
+}
+
+async function persistDashboard(dashboard: Dashboard) {
+  try {
+    await apiClient.updateDashboard(dashboard.id, mapDashboardToApi(dashboard));
+  } catch (err) {
+    console.error('Failed to persist dashboard:', err);
+  }
+}
 
 interface DashboardSection {
   id: string;
@@ -522,7 +575,7 @@ export default function DashboardPage() {
       lastResizePos.current = null;
       setResizingWidget(null);
       if (selectedDashboard) {
-        setSetting('dashboards', dashboards);
+        persistDashboard(selectedDashboard);
       }
     };
 
@@ -547,111 +600,46 @@ export default function DashboardPage() {
         setAvailableReports([]);
       }
 
-      // Load dashboards from settings
-      const savedDashboards = await getSetting<any[]>('dashboards');
-      if (savedDashboards && savedDashboards.length > 0) {
-        setDashboards(savedDashboards);
-        setSelectedDashboard(savedDashboards[0]);
-      } else {
-      // Create default dashboard
-      const defaultDashboard: Dashboard = {
-        id: '1',
-        name: 'Sales Overview',
-        description: 'Key sales metrics and performance indicators',
-        sections: [
-          { id: 's1', title: 'Key Metrics' },
-          { id: 's2', title: 'Sales Pipeline' },
-          { id: 's3', title: 'Trends' }
-        ],
-        widgets: [
-          {
-            id: 'w1',
-            type: 'metric',
-            title: 'Total Revenue',
-            dataSource: 'opportunities',
-            config: { value: 2450000, prefix: '$', trend: 12.5 },
-            position: { x: 0, y: 0, w: 3, h: 1 },
-            sectionId: 's1'
-          },
-          {
-            id: 'w2',
-            type: 'metric',
-            title: 'Active Opportunities',
-            dataSource: 'opportunities',
-            config: { value: 47, trend: -5.2 },
-            position: { x: 3, y: 0, w: 3, h: 1 },
-            sectionId: 's1'
-          },
-          {
-            id: 'w3',
-            type: 'metric',
-            title: 'Win Rate',
-            dataSource: 'opportunities',
-            config: { value: 68, suffix: '%', trend: 3.1 },
-            position: { x: 6, y: 0, w: 3, h: 1 },
-            sectionId: 's1'
-          },
-          {
-            id: 'w4',
-            type: 'vertical-bar',
-            title: 'Opportunities by Stage',
-            dataSource: 'opportunities',
-            config: {
-              data: [
-                { label: 'Prospecting', value: 15 },
-                { label: 'Qualification', value: 12 },
-                { label: 'Proposal', value: 8 },
-                { label: 'Negotiation', value: 7 },
-                { label: 'Closed Won', value: 5 }
-              ]
-            },
-            position: { x: 0, y: 1, w: 6, h: 2 },
-            sectionId: 's2'
-          },
-          {
-            id: 'w5',
-            type: 'donut',
-            title: 'Revenue by Product',
-            dataSource: 'products',
-            config: {
-              data: [
-                { label: 'Solar Panels', value: 45 },
-                { label: 'Inverters', value: 25 },
-                { label: 'Batteries', value: 20 },
-                { label: 'Installation', value: 10 }
-              ]
-            },
-            position: { x: 6, y: 1, w: 3, h: 2 },
-            sectionId: 's2'
-          },
-          {
-            id: 'w6',
-            type: 'line',
-            title: 'Monthly Revenue Trend',
-            dataSource: 'opportunities',
-            config: {
-              data: [
-                { label: 'Jan', value: 180000 },
-                { label: 'Feb', value: 195000 },
-                { label: 'Mar', value: 210000 },
-                { label: 'Apr', value: 205000 },
-                { label: 'May', value: 225000 },
-                { label: 'Jun', value: 240000 }
-              ]
-            },
-            position: { x: 0, y: 3, w: 9, h: 2 },
-            sectionId: 's3'
+      // Load dashboards from API
+      try {
+        const apiDashboards = await apiClient.getDashboards();
+        if (apiDashboards && apiDashboards.length > 0) {
+          const mapped = apiDashboards.map(mapDashboardFromApi);
+          setDashboards(mapped);
+          setSelectedDashboard(mapped[0]);
+        } else {
+          // Create a default dashboard via API
+          const defaultPayload = {
+            name: 'Sales Overview',
+            description: 'Key sales metrics and performance indicators',
+            sections: [
+              { id: 's1', title: 'Key Metrics' },
+              { id: 's2', title: 'Sales Pipeline' },
+              { id: 's3', title: 'Trends' }
+            ],
+            widgets: [
+              { type: 'metric', title: 'Total Opportunities', dataSource: 'opportunities', config: { dataSourceMode: 'object', yAxis: '', aggregationType: 'count', value: 0, prefix: '', suffix: '', trend: 0, sectionId: 's1' }, position: { x: 0, y: 0, w: 3, h: 1 } },
+              { type: 'metric', title: 'Total Leads', dataSource: 'leads', config: { dataSourceMode: 'object', yAxis: '', aggregationType: 'count', value: 0, prefix: '', suffix: '', trend: 0, sectionId: 's1' }, position: { x: 3, y: 0, w: 3, h: 1 } },
+              { type: 'metric', title: 'Total Properties', dataSource: 'properties', config: { dataSourceMode: 'object', yAxis: '', aggregationType: 'count', value: 0, prefix: '', suffix: '', trend: 0, sectionId: 's1' }, position: { x: 6, y: 0, w: 3, h: 1 } },
+            ],
+          };
+          const created = await apiClient.createDashboard(defaultPayload);
+          const mapped = mapDashboardFromApi(created);
+          setDashboards([mapped]);
+          setSelectedDashboard(mapped);
+        }
+      } catch (err) {
+        console.error('Error loading dashboards from API:', err);
+        // Fallback: try legacy settings
+        try {
+          const savedDashboards = await getSetting<any[]>('dashboards');
+          if (savedDashboards && savedDashboards.length > 0) {
+            setDashboards(savedDashboards);
+            setSelectedDashboard(savedDashboards[0]);
           }
-        ],
-        createdBy: 'Development User',
-        createdAt: '2024-01-15',
-        lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-      };
-      setDashboards([defaultDashboard]);
-      setSelectedDashboard(defaultDashboard);
-      setSetting('dashboards', [defaultDashboard]);
-    }
-    setLoading(false);
+        } catch { /* ignore */ }
+      }
+      setLoading(false);
     })();
   }, []);
 
@@ -704,31 +692,30 @@ export default function DashboardPage() {
     })();
   }, [newFilterBtn.objectType]);
 
-  const handleCreateDashboard = (name: string, description: string) => {
-    const newDashboard: Dashboard = {
-      id: Date.now().toString(),
-      name,
-      description,
-      widgets: [],
-      createdBy: 'Development User',
-      createdAt: new Date().toISOString().split('T')[0] || '',
-      lastModifiedAt: new Date().toISOString().split('T')[0] || ''
-    };
-    const updated = [...dashboards, newDashboard];
-    setDashboards(updated);
-    setSelectedDashboard(newDashboard);
-    setSetting('dashboards', updated);
+  const handleCreateDashboard = async (name: string, description: string) => {
+    try {
+      const created = await apiClient.createDashboard({ name, description, widgets: [] });
+      const mapped = mapDashboardFromApi(created);
+      setDashboards(prev => [...prev, mapped]);
+      setSelectedDashboard(mapped);
+    } catch (err) {
+      console.error('Failed to create dashboard:', err);
+    }
     setShowNewDashboard(false);
   };
 
-  const handleDeleteDashboard = (id: string) => {
+  const handleDeleteDashboard = async (id: string) => {
     if (confirm('Are you sure you want to delete this dashboard?')) {
+      try {
+        await apiClient.deleteDashboard(id);
+      } catch (err) {
+        console.error('Failed to delete dashboard:', err);
+      }
       const updated = dashboards.filter(d => d.id !== id);
       setDashboards(updated);
       if (selectedDashboard?.id === id) {
         setSelectedDashboard(updated[0] || null);
       }
-      setSetting('dashboards', updated);
     }
   };
 
@@ -849,7 +836,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
     setShowWidgetConfig(false);
     setSelectedWidgetType(null);
   };
@@ -866,7 +853,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
   };
 
   // ── Section CRUD ─────────────────────────────────────────────────────
@@ -881,7 +868,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
     setShowAddSection(false);
   };
 
@@ -899,7 +886,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
   };
 
   const handleRenameSection = (sectionId: string, newTitle: string) => {
@@ -914,7 +901,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
     setEditingSectionId(null);
   };
 
@@ -934,7 +921,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
   };
 
   const handleMoveWidgetToSection = (widgetId: string, sectionId: string | undefined) => {
@@ -949,7 +936,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
   };
 
   const handleRefreshWidget = async (widget: DashboardWidget) => {
@@ -1025,7 +1012,7 @@ export default function DashboardPage() {
         const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
         setDashboards(updated);
         setSelectedDashboard(updatedDashboard);
-        setSetting('dashboards', updated);
+        persistDashboard(updatedDashboard);
 
       } else {
         // Use regular aggregation for non-stacked charts
@@ -1058,7 +1045,7 @@ export default function DashboardPage() {
         const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
         setDashboards(updated);
         setSelectedDashboard(updatedDashboard);
-        setSetting('dashboards', updated);
+        persistDashboard(updatedDashboard);
 
       }
       
@@ -1183,7 +1170,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
     setShowWidgetConfig(false);
     setSelectedWidgetType(null);
     setEditingWidget(null);
@@ -1297,7 +1284,7 @@ export default function DashboardPage() {
     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
     setDashboards(updated);
     setSelectedDashboard(updatedDashboard);
-    setSetting('dashboards', updated);
+    persistDashboard(updatedDashboard);
     setDraggingWidgetId(null);
     setDropTarget(null);
   };
@@ -2278,26 +2265,24 @@ export default function DashboardPage() {
   };
 
   const handleToggleFavorite = (id: string) => {
+    const target = dashboards.find(d => d.id === id);
+    const toggled = target ? { ...target, isFavorite: !target.isFavorite } : null;
     const updated = dashboards.map(d => 
       d.id === id ? { ...d, isFavorite: !d.isFavorite } : d
     );
     setDashboards(updated);
-    setSetting('dashboards', updated);
+    if (toggled) persistDashboard(toggled);
   };
 
-  const handleDuplicateDashboard = (dashboard: Dashboard) => {
-    const today = new Date().toISOString().split('T')[0] || '';
-    const newDashboard: Dashboard = {
-      ...dashboard,
-      id: Date.now().toString(),
-      name: `${dashboard.name} (Copy)`,
-      createdAt: today,
-      lastModifiedAt: today
-    };
-    
-    const updated = [...dashboards, newDashboard];
-    setDashboards(updated);
-    setSetting('dashboards', updated);
+  const handleDuplicateDashboard = async (dashboard: Dashboard) => {
+    try {
+      const payload = mapDashboardToApi({ ...dashboard, name: `${dashboard.name} (Copy)` });
+      const created = await apiClient.createDashboard(payload);
+      const mapped = mapDashboardFromApi(created);
+      setDashboards(prev => [...prev, mapped]);
+    } catch (err) {
+      console.error('Failed to duplicate dashboard:', err);
+    }
   };
 
   const filteredDashboards = dashboards
@@ -2669,7 +2654,7 @@ export default function DashboardPage() {
                           setSelectedDashboard(updated);
                           const all = dashboards.map(d => d.id === updated.id ? updated : d);
                           setDashboards(all);
-                          setSetting('dashboards', all);
+                          persistDashboard(updated);
                         }}
                         className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                       />
@@ -2680,7 +2665,7 @@ export default function DashboardPage() {
                             setSelectedDashboard(updated);
                             const all = dashboards.map(d => d.id === updated.id ? updated : d);
                             setDashboards(all);
-                            setSetting('dashboards', all);
+                            persistDashboard(updated);
                           }}
                           className="text-xs text-gray-500 hover:text-gray-700"
                         >Reset</button>
@@ -2706,7 +2691,7 @@ export default function DashboardPage() {
                         setTimeout(() => {
                           setSelectedDashboard(updated);
                           setDashboards(all);
-                          setSetting('dashboards', all);
+                          persistDashboard(updated);
                         }, 0);
                       }
                       return null;
@@ -2875,7 +2860,7 @@ export default function DashboardPage() {
                                     const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
                                     setDashboards(updated);
                                     setSelectedDashboard(updatedDashboard);
-                                    setSetting('dashboards', updated);
+                                    persistDashboard(updatedDashboard);
                                     setNewFilterBtn({ label: '', field: '', value: '', objectType: '' });
                                   }}
                                   className="px-3 py-1.5 bg-brand-navy text-white text-xs rounded font-medium hover:bg-brand-navy-dark transition-colors"
@@ -2941,7 +2926,7 @@ export default function DashboardPage() {
                                           const updated = dashboards.map(d => d.id === updatedDashboard.id ? updatedDashboard : d);
                                           setDashboards(updated);
                                           setSelectedDashboard(updatedDashboard);
-                                          setSetting('dashboards', updated);
+                                          persistDashboard(updatedDashboard);
                                           if (activeFilterButtons[section.id] === btn.label) {
                                             setActiveFilterButtons(prev => ({ ...prev, [section.id]: null }));
                                           }

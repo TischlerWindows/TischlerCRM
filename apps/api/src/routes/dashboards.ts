@@ -7,6 +7,17 @@ const dashboardSchema = z.object({
   name: z.string().min(1, 'Dashboard name is required'),
   description: z.string().optional(),
   isFavorite: z.boolean().optional(),
+  sections: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    subtitle: z.string().optional(),
+    filterButtons: z.array(z.object({
+      label: z.string(),
+      field: z.string(),
+      value: z.string(),
+    })).optional(),
+  })).optional(),
+  backgroundColor: z.string().optional(),
   widgets: z.array(z.object({
     type: z.string(),
     title: z.string(),
@@ -66,13 +77,14 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
       const parsed = dashboardSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-      const { name, description, widgets } = parsed.data;
+      const { name, description, widgets, sections, backgroundColor } = parsed.data;
 
       const dashboard = await prisma.dashboard.create({
         data: {
           id: generateId('Dashboard'),
           name,
           description,
+          sharedWith: { sections: sections || [], backgroundColor: backgroundColor || '' },
           createdById: userId,
           modifiedById: userId,
           widgets: {
@@ -150,7 +162,7 @@ export async function dashboardRoutes(app: FastifyInstance) {
       const { id } = request.params as any;
       const parsed = dashboardSchema.partial().safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-      const { name, description, isFavorite, widgets = [] } = parsed.data;
+      const { name, description, isFavorite, widgets = [], sections, backgroundColor } = parsed.data;
 
       // Check ownership
       const dashboard = await prisma.dashboard.findUnique({
@@ -169,6 +181,9 @@ export async function dashboardRoutes(app: FastifyInstance) {
           name,
           description,
           isFavorite,
+          sharedWith: sections !== undefined || backgroundColor !== undefined
+            ? { sections: sections || [], backgroundColor: backgroundColor || '' }
+            : undefined,
           modifiedById: userId,
           widgets: {
             deleteMany: {}, // Delete all existing widgets
