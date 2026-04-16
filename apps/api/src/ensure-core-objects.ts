@@ -766,14 +766,16 @@ async function syncSchemaObjectsToDb(userId: string): Promise<void> {
 }
 
 /**
- * Remove any schema-Setting entries that the previous broken version of
- * syncCoreObjectsToSchemaSetting() appended. Those entries are identifiable
- * because their ids start with "core-" (field ids were "core-<ObjectName>-<field>"
- * and the object ids were "core-<ObjectName>"). Legitimate UI-created entries
- * use randomly generated ids, so the "core-" prefix is a safe discriminator.
+ * Clean up schema-Setting corruption. Removes:
+ *   1. Fields/objects with id starting with "core-" (added by the previous
+ *      broken version of syncCoreObjectsToSchemaSetting).
+ *   2. Any null/undefined entries in the objects array or in any object's
+ *      fields array — these cause `field.type` TypeErrors in the frontend
+ *      when it maps over fields.
+ *   3. Any fields missing a `type` or `apiName` — invalid by definition;
+ *      the frontend's field renderer switch on `field.type` chokes on them.
  *
- * Idempotent and safe to call every startup. Removes fields first, then any
- * whole objects that were added by the broken sync.
+ * Idempotent and safe to call every startup.
  */
 async function removeCoreSyncPollution(): Promise<void> {
   const SETTING_KEY = 'tces-object-manager-schema';
@@ -787,21 +789,30 @@ async function removeCoreSyncPollution(): Promise<void> {
     let removedFields = 0;
     let removedObjects = 0;
 
-    // Remove fields with id starting with "core-" from every object
+    // Sanitize each object's fields array
     for (const obj of schema.objects) {
       if (!obj || !Array.isArray(obj.fields)) continue;
       const before = obj.fields.length;
-      obj.fields = obj.fields.filter(
-        (f: any) => !(f && typeof f.id === 'string' && f.id.startsWith('core-'))
-      );
+      obj.fields = obj.fields.filter((f: any) => {
+        if (!f || typeof f !== 'object') return false;
+        // Drop fields added by the broken sync
+        if (typeof f.id === 'string' && f.id.startsWith('core-')) return false;
+        // Drop fields without required shape — these cause frontend TypeErrors
+        if (typeof f.apiName !== 'string' || !f.apiName) return false;
+        if (typeof f.type !== 'string' || !f.type) return false;
+        return true;
+      });
       removedFields += before - obj.fields.length;
     }
 
-    // Remove whole objects that were added by the broken sync (id starts with "core-")
+    // Sanitize the objects array itself
     const beforeCount = schema.objects.length;
-    schema.objects = schema.objects.filter(
-      (o: any) => !(o && typeof o.id === 'string' && o.id.startsWith('core-'))
-    );
+    schema.objects = schema.objects.filter((o: any) => {
+      if (!o || typeof o !== 'object') return false;
+      if (typeof o.id === 'string' && o.id.startsWith('core-')) return false;
+      if (typeof o.apiName !== 'string' || !o.apiName) return false;
+      return true;
+    });
     removedObjects = beforeCount - schema.objects.length;
 
     if (removedFields > 0 || removedObjects > 0) {
