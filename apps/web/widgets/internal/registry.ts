@@ -16,6 +16,8 @@ import { config as installationCostGridManifest } from './installation-cost-grid
 import { config as summaryManifest } from './summary/widget.config'
 import { config as woAssignmentsManifest } from './work-order-assignments/widget.config'
 import { config as punchListManifest } from './punch-list/widget.config'
+import { config as timeEntriesManifest } from './time-entries/widget.config'
+import { config as woExpensesManifest } from './work-order-expenses/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -89,6 +91,16 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: punchListManifest,
     widgetConfigType: 'PunchList',
     Component: dynamic(() => import('./punch-list/index')),
+  },
+  {
+    manifest: timeEntriesManifest,
+    widgetConfigType: 'TimeEntries',
+    Component: dynamic(() => import('./time-entries/index')),
+  },
+  {
+    manifest: woExpensesManifest,
+    widgetConfigType: 'WorkOrderExpenses',
+    Component: dynamic(() => import('./work-order-expenses/index')),
   },
 ]
 
