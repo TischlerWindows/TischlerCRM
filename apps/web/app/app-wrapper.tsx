@@ -60,6 +60,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/quotes': 'Quote',
     '/installations': 'Installation',
     '/tasks': 'Task',
+    '/tech-dashboard': 'WorkOrder',
   };
 
   // Also map custom object tabs (href like /objects/myobject) dynamically
@@ -111,6 +112,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
+    pathname?.startsWith('/tech-dashboard') ||
     pathname?.includes('demo');
 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
