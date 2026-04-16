@@ -111,6 +111,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 }
 
 function getWidgetLabel(config: WidgetConfig): string {
+  // Defensive: a malformed layout can carry a widget with no config or no
+  // config.type. Don't crash the whole page — fall back to a generic label.
+  if (!config || typeof (config as any).type !== 'string') return 'Widget'
   switch (config.type) {
     case 'RelatedList':
       return config.label || config.relatedObjectApiName || 'Related List'
@@ -213,7 +216,13 @@ export function LayoutWidgetsInline({
   if (!widgets?.length) return null
 
   const effectiveEnabledIds = enabledIds ?? externalWidgets.map((w) => w.id)
-  const sorted = [...widgets].sort((a, b) => a.order - b.order)
+  // Defensive: filter out malformed widgets (no config / undefined entries).
+  // The saved PageLayout can contain widget rows whose config.type was lost
+  // during schema drift — rendering them crashes the entire page because
+  // getWidgetLabel() and other downstream code call config.type directly.
+  const sorted = [...widgets]
+    .filter((w): w is NonNullable<typeof w> => !!w && !!(w as any).config && typeof (w as any).config.type === 'string')
+    .sort((a, b) => a.order - b.order)
   const liveRecord = record ?? STUB_RECORD
   const liveObject = objectDef ?? STUB_OBJECT
   const canCollapse = collapsedWidgetIds != null && toggleWidgetCollapse != null
