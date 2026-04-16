@@ -7,10 +7,9 @@ export function middleware(request: NextRequest) {
     return new NextResponse(null, { status: 405 });
   }
 
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'unsafe-inline' 'nonce-${nonce}' 'strict-dynamic'`,
+    `script-src 'self' 'unsafe-eval' 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' data:`,
@@ -21,10 +20,7 @@ export function middleware(request: NextRequest) {
     `form-action 'self'`,
   ].join('; ');
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
-
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next();
   response.headers.set('Content-Security-Policy', csp);
 
   return response;
