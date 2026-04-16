@@ -604,12 +604,21 @@ export async function ensureCoreObjects(): Promise<void> {
   // failed (e.g., first letter not capitalised, transient network error, etc.).
   await syncSchemaObjectsToDb(systemUser.id);
 
-  // IMPORTANT: The frontend reads its schema from a SEPARATE Setting row with
-  // key 'tces-object-manager-schema'. CustomObject/CustomField records in the
-  // DB are NOT auto-synced to this blob, so without this step new core objects
-  // defined in CORE_OBJECTS above will not appear in the Object Manager UI
-  // even though they exist in the database. This function reconciles the two.
-  await syncCoreObjectsToSchemaSetting();
+  // NOTE: Temporarily disabled — the existing frontend Setting blob stores
+  // field apiNames with the "ObjectName__" prefix (e.g. "Technician__techCode"),
+  // but CORE_OBJECTS uses bare names (e.g. "techCode"). The old function's
+  // simple equality check did not match across the two formats, causing
+  // duplicate fields to be appended to every existing object. New objects
+  // are still created in the DB by the ensureFields() path above, and are
+  // exposed to the UI via the object manager's own CustomObject/CustomField
+  // queries. Fixing the sync properly requires name-matching logic that
+  // understands the prefix convention.
+  // await syncCoreObjectsToSchemaSetting();
+
+  // One-time cleanup: remove any fields that the previous broken version of
+  // syncCoreObjectsToSchemaSetting() appended to the schema Setting blob.
+  // Those fields have ids starting with "core-". Safe to call every startup.
+  await removeCoreSyncPollution();
 
   // ── Service Department & Profiles ──────────────────────────────────
   // Ensure Service department exists
@@ -753,6 +762,61 @@ async function syncSchemaObjectsToDb(userId: string): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not sync schema objects:', err);
+  }
+}
+
+/**
+ * Remove any schema-Setting entries that the previous broken version of
+ * syncCoreObjectsToSchemaSetting() appended. Those entries are identifiable
+ * because their ids start with "core-" (field ids were "core-<ObjectName>-<field>"
+ * and the object ids were "core-<ObjectName>"). Legitimate UI-created entries
+ * use randomly generated ids, so the "core-" prefix is a safe discriminator.
+ *
+ * Idempotent and safe to call every startup. Removes fields first, then any
+ * whole objects that were added by the broken sync.
+ */
+async function removeCoreSyncPollution(): Promise<void> {
+  const SETTING_KEY = 'tces-object-manager-schema';
+  try {
+    const existing = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
+    if (!existing || !existing.value) return;
+
+    const schema = existing.value as any;
+    if (!Array.isArray(schema.objects)) return;
+
+    let removedFields = 0;
+    let removedObjects = 0;
+
+    // Remove fields with id starting with "core-" from every object
+    for (const obj of schema.objects) {
+      if (!obj || !Array.isArray(obj.fields)) continue;
+      const before = obj.fields.length;
+      obj.fields = obj.fields.filter(
+        (f: any) => !(f && typeof f.id === 'string' && f.id.startsWith('core-'))
+      );
+      removedFields += before - obj.fields.length;
+    }
+
+    // Remove whole objects that were added by the broken sync (id starts with "core-")
+    const beforeCount = schema.objects.length;
+    schema.objects = schema.objects.filter(
+      (o: any) => !(o && typeof o.id === 'string' && o.id.startsWith('core-'))
+    );
+    removedObjects = beforeCount - schema.objects.length;
+
+    if (removedFields > 0 || removedObjects > 0) {
+      schema.version = (Number(schema.version) || 0) + 1;
+      schema.updatedAt = new Date().toISOString();
+      await prisma.setting.update({
+        where: { key: SETTING_KEY },
+        data: { value: schema as any },
+      });
+      console.log(
+        `[ensure-core-objects] Cleaned up schema pollution: -${removedObjects} objects, -${removedFields} fields`
+      );
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not clean up schema pollution:', err);
   }
 }
 

@@ -48,6 +48,60 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_page_layout_extensions',
     sql: `ALTER TABLE "PageLayout" ADD COLUMN IF NOT EXISTS "extensions" JSONB`,
   },
+  // ── Soft delete columns — added to multiple models over time
+  //    without matching migrations. Without these, Prisma queries that
+  //    filter `deletedAt: null` throw "column does not exist" and the
+  //    endpoint returns 500. These are the root cause of many record 500s.
+  {
+    name: 'add_record_deleted_at',
+    sql: `ALTER TABLE "Record" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)`,
+  },
+  {
+    name: 'add_record_deleted_by_id',
+    sql: `ALTER TABLE "Record" ADD COLUMN IF NOT EXISTS "deletedById" TEXT`,
+  },
+  {
+    name: 'add_record_deleted_at_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "Record_deletedAt_idx" ON "Record"("deletedAt")`,
+  },
+  {
+    name: 'add_user_deleted_at',
+    sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)`,
+  },
+  {
+    name: 'add_user_deleted_by_id',
+    sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "deletedById" TEXT`,
+  },
+  {
+    name: 'add_user_is_active',
+    sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true`,
+  },
+  {
+    name: 'add_department_deleted_at',
+    sql: `ALTER TABLE "Department" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3)`,
+  },
+  {
+    name: 'add_department_deleted_by_id',
+    sql: `ALTER TABLE "Department" ADD COLUMN IF NOT EXISTS "deletedById" TEXT`,
+  },
+  {
+    name: 'add_department_is_active',
+    sql: `ALTER TABLE "Department" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true`,
+  },
+  // ── CustomField.isActive — used by POST /records `include` filter.
+  //    Missing this column makes record creation 500.
+  {
+    name: 'add_custom_field_is_active',
+    sql: `ALTER TABLE "CustomField" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true`,
+  },
+  {
+    name: 'add_custom_field_is_custom',
+    sql: `ALTER TABLE "CustomField" ADD COLUMN IF NOT EXISTS "isCustom" BOOLEAN NOT NULL DEFAULT true`,
+  },
+  {
+    name: 'add_page_layout_is_active',
+    sql: `ALTER TABLE "PageLayout" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN NOT NULL DEFAULT true`,
+  },
   // Integration and UserIntegration tables are created by prisma db push.
   // These are kept as no-op safety nets (IF NOT EXISTS) and must use single
   // statements per entry because $executeRawUnsafe does not support batches.
