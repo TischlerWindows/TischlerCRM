@@ -152,7 +152,7 @@ export function buildApp() {
     }
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
 
     await prisma.loginEvent.create({
       data: {
@@ -221,7 +221,7 @@ export function buildApp() {
     });
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
     return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
@@ -288,7 +288,7 @@ export function buildApp() {
     });
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
     return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 

@@ -34,8 +34,11 @@ export async function settingRoutes(app: FastifyInstance) {
     }
   });
 
-  // Set (upsert) a setting
+  // Set (upsert) a setting (admin only)
   app.put('/settings/:key', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     try {
       const { key } = req.params as { key: string };
       const schema = z.object({ value: z.unknown() });
@@ -55,8 +58,11 @@ export async function settingRoutes(app: FastifyInstance) {
     }
   });
 
-  // Delete a setting
+  // Delete a setting (admin only)
   app.delete('/settings/:key', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const { key } = req.params as { key: string };
     try {
       await prisma.setting.delete({ where: { key } });

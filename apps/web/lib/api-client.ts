@@ -126,7 +126,7 @@ class ApiClient {
     this.baseUrl = baseUrl;
     // Try to load token from localStorage on init
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
     }
   }
 
@@ -134,8 +134,10 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       if (token) {
-        localStorage.setItem('auth_token', token);
+        sessionStorage.setItem('auth_token', token);
+        localStorage.removeItem('auth_token');
       } else {
+        sessionStorage.removeItem('auth_token');
         localStorage.removeItem('auth_token');
       }
     }
@@ -189,7 +191,7 @@ class ApiClient {
       if (response.status === 401 && typeof window !== 'undefined') {
         this.setToken(null);
         localStorage.removeItem('user');
-        document.cookie = 'auth-token=; Max-Age=0; path=/;';
+        document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
         }

@@ -52,7 +52,7 @@ export default function SignupPage() {
       setSuccess(true);
 
       if (data.token) {
-        document.cookie = `auth-token=${data.token}; path=/; max-age=28800`;
+        document.cookie = `auth-token=${data.token}; path=/; max-age=28800; Secure; SameSite=Strict`;
         localStorage.setItem('user', JSON.stringify(data.user));
         setTimeout(() => router.push('/'), 1500);
       } else {

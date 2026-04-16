@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('user');
     // Clear auth cookie
-    document.cookie = 'auth-token=; Max-Age=0; path=/;';
+    document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
     // Clear API client token
     apiClient.setToken(null);
     setToken(null);
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Sync token to API client
     apiClient.setToken(newToken);
     // Also set cookie as backup
-    document.cookie = `auth-token=${encodeURIComponent(newToken)}; path=/`;
+    document.cookie = `auth-token=${encodeURIComponent(newToken)}; path=/; Secure; SameSite=Strict`;
     localStorage.setItem('user', JSON.stringify(newUser));
   };
 
