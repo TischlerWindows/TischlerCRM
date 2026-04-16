@@ -32,6 +32,18 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
     [schema?.objects]
   );
 
+  // Defensive: a malformed layout may have a widget without a config,
+  // or with a config missing its .type discriminant. Render a
+  // fallback message instead of crashing the entire page.
+  if (!selection.widget.config || typeof (selection.widget.config as any).type !== 'string') {
+    return (
+      <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+        This widget has no configuration yet. Remove it and re-add it from
+        the palette to fix.
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="rounded-md bg-gray-50 px-2 py-1.5 text-xs text-gray-700">

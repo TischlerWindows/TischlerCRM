@@ -115,7 +115,7 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
 
   const isExternal = widget.widgetType === 'ExternalWidget';
   const externalManifest =
-    isExternal && widget.config.type === 'ExternalWidget'
+    isExternal && widget.config && widget.config.type === 'ExternalWidget'
       ? getWidgetById(widget.config.externalWidgetId)
       : undefined;
 

@@ -369,7 +369,11 @@ export default function RecordDetailPage({
       for (const region of regions) {
         const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights')
           ?? region.panels?.flatMap((p: any) => p.widgets ?? []).find((w: any) => w.widgetType === 'HeaderHighlights');
-        if (hw && hw.config.type === 'HeaderHighlights') {
+        // Defensive: a stored PageLayout can have widget rows with no config
+        // (schema drift, partial saves). Never access .config.xxx without
+        // verifying .config exists — this used to crash the entire detail
+        // page with "Cannot read properties of undefined (reading 'type')".
+        if (hw && hw.config && hw.config.type === 'HeaderHighlights') {
           hasHighlightsWidget = true;
           highlightApiNames = hw.config.fieldApiNames ?? [];
           if (Array.isArray(hw.config.visibleActions)) {
