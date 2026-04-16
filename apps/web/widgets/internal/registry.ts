@@ -14,6 +14,7 @@ import { config as teamMemberAssociationsManifest } from './team-member-associat
 import { config as pathManifest } from './path/widget.config'
 import { config as installationCostGridManifest } from './installation-cost-grid/widget.config'
 import { config as summaryManifest } from './summary/widget.config'
+import { config as woAssignmentsManifest } from './work-order-assignments/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -77,6 +78,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: summaryManifest,
     widgetConfigType: 'Summary',
     Component: dynamic(() => import('./summary/index')),
+  },
+  {
+    manifest: woAssignmentsManifest,
+    widgetConfigType: 'WorkOrderAssignments',
+    Component: dynamic(() => import('./work-order-assignments/index')),
   },
 ]
 
