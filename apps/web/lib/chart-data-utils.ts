@@ -69,9 +69,14 @@ export function getPluralObjectKey(objectType: string): string {
     quote: 'quotes',
     installation: 'installations',
     service: 'services',
+    workorder: 'workorders',
+    task: 'tasks',
   };
 
+  // Reverse map: if input is already plural, return as-is
+  const knownPlurals = new Set(Object.values(pluralMap));
   const key = objectType.toLowerCase();
+  if (knownPlurals.has(key)) return key;
   return pluralMap[key] || key + 's';
 }
 

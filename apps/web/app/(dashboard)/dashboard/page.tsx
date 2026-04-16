@@ -738,15 +738,16 @@ export default function DashboardPage() {
             w.id === widget.id ? { ...w, config: { ...w.config, value } } : w
           );
           changed = true;
-        } else if (xField && yField) {
-          // Chart widgets with proper config
+        } else if (xField) {
+          // Chart widgets — yField can be empty for count aggregation
+          const effectiveYField = yField || xField;
           const stackByField = widget.config?.stackBy;
           if (stackByField && (widget.type === 'stacked-horizontal-bar' || widget.type === 'stacked-vertical-bar')) {
             try {
               const { data, stackKeys } = aggregateStackedChartData({
                 objectType: objType,
                 xAxisField: xField,
-                yAxisField: yField,
+                yAxisField: effectiveYField,
                 stackByField,
                 aggregationType: widget.config?.aggregationType || 'sum'
               });
@@ -762,7 +763,7 @@ export default function DashboardPage() {
               const aggregatedData = aggregateChartData({
                 objectType: objType,
                 xAxisField: xField,
-                yAxisField: yField,
+                yAxisField: effectiveYField,
                 aggregationType: widget.config?.aggregationType || 'sum'
               });
               if (aggregatedData && aggregatedData.length > 0) {

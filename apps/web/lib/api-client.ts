@@ -554,7 +554,7 @@ class ApiClient {
 
   async updateDashboard(dashboardId: string, data: Partial<any>) {
     return this.request<any>(`/dashboards/${dashboardId}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
