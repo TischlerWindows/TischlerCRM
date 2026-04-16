@@ -39,6 +39,11 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   TeamMember: '033',
   Task: '034',
   Technician: '035',
+  WorkOrderAssignment: '036',
+  PunchListItem: '037',
+  TimeEntry: '038',
+  WorkOrderExpense: '039',
+  TechnicianRateHistory: '040',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
