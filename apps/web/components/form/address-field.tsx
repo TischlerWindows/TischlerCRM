@@ -213,9 +213,12 @@ export function LocationSearchInput({
     buildLocationBlob(value, fieldDef.apiName, formData, tf),
   );
 
-  // Sync from parent when the parent value changes meaningfully
+  // Sync from parent when the parent value changes meaningfully.
+  // Use toAddressObject (NOT buildLocationBlob) — after mount, the parent
+  // value IS the authoritative blob we pushed.  Re-merging scattered
+  // dotted keys would overwrite intentional deletions.
   useEffect(() => {
-    const incoming = buildLocationBlob(value, fieldDef.apiName, formData, tf);
+    const incoming = toAddressObject(value);
     if (addrKey(incoming) !== addrKey(local)) {
       setLocal(incoming);
     }
