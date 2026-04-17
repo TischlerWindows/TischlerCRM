@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  LifeBuoy,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -68,6 +69,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
       { name: 'Automations', href: '/settings/automations', icon: Zap },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell },
+      { name: 'Support Tickets', href: '/settings/support-tickets', icon: LifeBuoy },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
     ],
   },
