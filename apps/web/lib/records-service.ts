@@ -132,17 +132,29 @@ class RecordsService {
     const prefixedCleanKeys = new Set<string>(); // track clean keys that came from a prefixed source
     if (record.data && typeof record.data === 'object') {
       for (const [key, value] of Object.entries(record.data)) {
+        // Flatten address-like nested objects into a readable string
+        const resolved = this.resolveNestedValue(key, value);
+
         // Keep original prefixed key so edit forms can match by apiName
-        stripped[key] = value;
+        stripped[key] = resolved;
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
         const hadPrefix = cleanKey !== key;
         if (hadPrefix) {
           // Prefixed keys always overwrite the stripped alias
-          stripped[cleanKey] = value;
+          stripped[cleanKey] = resolved;
           prefixedCleanKeys.add(cleanKey);
         } else if (!prefixedCleanKeys.has(cleanKey)) {
           // Unprefixed key only sets the alias when no prefixed source claimed it
-          stripped[cleanKey] = value;
+          stripped[cleanKey] = resolved;
+        }
+
+        // Also expand sub-fields for address-like objects (e.g. address.city → "address.city")
+        if (value && typeof value === 'object' && !Array.isArray(value) && this.isAddressLike(value)) {
+          for (const [subKey, subVal] of Object.entries(value)) {
+            if (subKey === 'lat' || subKey === 'lng') continue; // skip coordinates
+            const dotKey = `${cleanKey}.${subKey}`;
+            if (!stripped[dotKey]) stripped[dotKey] = subVal;
+          }
         }
       }
     }
@@ -170,6 +182,26 @@ class RecordsService {
       CreatedById: record.createdBy?.id ?? '',
       LastModifiedById: record.modifiedBy?.id ?? '',
     };
+  }
+
+  /**
+   * Check if a value looks like an address object
+   */
+  private isAddressLike(value: any): boolean {
+    if (!value || typeof value !== 'object') return false;
+    return ('street' in value || 'city' in value || 'state' in value || 'postalCode' in value);
+  }
+
+  /**
+   * Resolve a nested object value to a display string
+   * Address objects → "Street, City, State Zip"
+   * Other objects → kept as-is (for non-chart uses like edit forms)
+   */
+  private resolveNestedValue(key: string, value: any): any {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+    if (!this.isAddressLike(value)) return value;
+    const parts = [value.street, value.city, value.state, value.postalCode].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : value;
   }
 
   /**

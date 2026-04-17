@@ -114,6 +114,21 @@ function formatDisplayValue(value: any): string {
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
   }
+  // Handle nested objects (e.g. address objects)
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    // Address-like object: format as readable string
+    if (value.street || value.city || value.state) {
+      const parts = [value.street, value.city, value.state, value.postalCode].filter(Boolean);
+      return parts.join(', ').substring(0, 80) || 'Unspecified';
+    }
+    // Generic object: try name or id
+    if (value.name) return String(value.name).substring(0, 50);
+    if (value.label) return String(value.label).substring(0, 50);
+    return 'Unspecified';
+  }
+  if (Array.isArray(value)) {
+    return value.map(v => String(v)).join(', ').substring(0, 50) || 'Unspecified';
+  }
   return String(value).substring(0, 50); // Limit display length
 }
 
