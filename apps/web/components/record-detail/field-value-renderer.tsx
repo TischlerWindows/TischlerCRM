@@ -108,14 +108,13 @@ export function renderValue(
   }
   const fieldType = fieldDef?.type;
 
-  // LocationSearch — virtual widget, reads mapped target fields
-  if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
-    const tf = fieldDef.targetFields;
-    const fieldBase = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
-
-    // Build a merged address object from all available data sources
-    // (same approach as the form input — see address-field.tsx).
+  // LocationSearch — works like Address but merges scattered data first
+  if (fieldType === 'LocationSearch' && record) {
+    // Build a merged address object from all data sources (mirrors
+    // buildLocationBlob in address-field.tsx).
     const valObj: Record<string, any> = (typeof value === 'object' && value) ? { ...value } : {};
+    const tf = fieldDef?.targetFields || {};
+    const fieldBase = (fieldDef?.apiName || '').replace(/^[A-Za-z]+__/, '');
 
     // 1. Dotted flat keys (e.g. address_search.city)
     for (const key of Object.keys(record)) {
@@ -127,46 +126,38 @@ export function renderValue(
       }
     }
 
-    // 2. Compound address object at the street target (legacy records
-    //    store {lat, lng, street, city, …} in the 'address' key)
-    const streetRaw = tf.street ? (record[tf.street] ?? record[tf.street.replace(/^[A-Za-z]+__/, '')]) : undefined;
-    if (typeof streetRaw === 'object' && streetRaw) {
-      for (const [k, v] of Object.entries(streetRaw as Record<string, any>)) {
-        if (!valObj[k] && v != null && v !== '') valObj[k] = v;
-      }
-    }
-
-    // 3. Individual target-field columns (skip street target — collides
-    //    with formatted address string)
-    for (const jsonKey of ['city', 'state', 'postalCode', 'country', 'lat', 'lng'] as const) {
-      if (!valObj[jsonKey]) {
-        const tfKey = tf[jsonKey];
-        if (tfKey) {
-          const raw = record[tfKey] ?? record[tfKey.replace(/^[A-Za-z]+__/, '')];
-          if (raw != null && raw !== '' && typeof raw !== 'object') valObj[jsonKey] = raw;
+    // 2. Compound address object at the street target
+    if (tf.street) {
+      const raw = record[tf.street] ?? record[tf.street.replace(/^[A-Za-z]+__/, '')];
+      if (typeof raw === 'object' && raw) {
+        for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+          if (!valObj[k] && v != null && v !== '') valObj[k] = v;
         }
       }
     }
 
+    // 3. Safe individual target-field columns (skip street)
+    for (const jsonKey of ['city', 'state', 'postalCode', 'country', 'lat', 'lng'] as const) {
+      if (!valObj[jsonKey] && tf[jsonKey]) {
+        const raw = record[tf[jsonKey]] ?? record[tf[jsonKey].replace(/^[A-Za-z]+__/, '')];
+        if (raw != null && raw !== '' && typeof raw !== 'object') valObj[jsonKey] = raw;
+      }
+    }
+
+    // Render exactly like Address
+    const parts = [valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country].filter(Boolean);
+    const addressText = parts.length > 0 ? parts.join(', ') : '-';
     const lat = Number(valObj.lat);
     const lng = Number(valObj.lng);
-    const addressParts = [
-      valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country,
-    ].filter(Boolean).join(', ');
-
     if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
         <div className="space-y-2">
-          <span>{addressParts || '-'}</span>
-          <LocationMapPreview
-            lat={lat}
-            lng={lng}
-            address={addressParts || undefined}
-          />
+          <span>{addressText}</span>
+          <LocationMapPreview lat={lat} lng={lng} address={addressText !== '-' ? addressText : undefined} />
         </div>
       );
     }
-    return addressParts || '-';
+    return addressText;
   }
 
   if (value === null || value === undefined || value === '') return '-';

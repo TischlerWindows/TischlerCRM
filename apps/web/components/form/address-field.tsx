@@ -136,6 +136,60 @@ export function AddressInput({
 }
 
 // ── LocationSearch field input ───────────────────────────────────────
+// Works identically to AddressInput (local state, single JSON blob) but
+// ALSO writes each sub-field to its mapped target field so downstream
+// consumers (Dropbox folder naming, etc.) stay in sync.
+
+/** Merge all scattered data sources into one address object. */
+function buildLocationBlob(
+  value: any,
+  fieldApiName: string,
+  formData: Record<string, any>,
+  targetFields: Record<string, string>,
+): Record<string, any> {
+  const blob = toAddressObject(value);
+  const fieldBase = fieldApiName.replace(/^[A-Za-z]+__/, '');
+
+  // 1. Dotted flat keys  (e.g. address_search.city → city)
+  for (const key of Object.keys(formData)) {
+    if (key.startsWith(fieldBase + '.')) {
+      const sub = key.slice(fieldBase.length + 1);
+      if (sub && !blob[sub] && formData[key] != null && formData[key] !== '') {
+        blob[sub] = formData[key];
+      }
+    }
+  }
+
+  // 2. Compound address object at the street target (legacy records
+  //    store {lat, lng, street, …} in the 'address' key)
+  const streetKey = targetFields.street;
+  if (streetKey) {
+    const raw = formData[streetKey] ?? formData[streetKey.replace(/^[A-Za-z]+__/, '')];
+    if (typeof raw === 'object' && raw) {
+      for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+        if (!blob[k] && v != null && v !== '') blob[k] = v;
+      }
+    }
+  }
+
+  // 3. Individual target-field columns (skip street – it collides with
+  //    the full formatted address string that lives in 'address')
+  for (const [jsonKey, tfKey] of [
+    ['city', targetFields.city],
+    ['state', targetFields.state],
+    ['postalCode', targetFields.postalCode],
+    ['country', targetFields.country],
+    ['lat', targetFields.lat],
+    ['lng', targetFields.lng],
+  ] as const) {
+    if (!blob[jsonKey] && tfKey) {
+      const v = formData[tfKey] ?? formData[tfKey.replace(/^[A-Za-z]+__/, '')];
+      if (v != null && v !== '' && typeof v !== 'object') blob[jsonKey] = v;
+    }
+  }
+
+  return blob;
+}
 
 export function LocationSearchInput({
   fieldDef,
@@ -148,78 +202,73 @@ export function LocationSearchInput({
   fieldDef: FieldDef;
   value: any;
   onChange: (val: any) => void;
-  /** Called for each target field when an address is selected */
   onFieldChange: (fieldApiName: string, val: any) => void;
   formData: Record<string, any>;
   disabled?: boolean;
 }) {
   const tf = fieldDef.targetFields || {};
 
-  // Build a merged address object from every available data source so
-  // we always show the most complete data regardless of storage format.
-  //
-  // Sources (checked in priority order):
-  //  1. The field's own JSON blob  (address_search = {street, city, …})
-  //  2. Dotted flat keys            (address_search.city = "Stone Ridge")
-  //  3. Compound address object     (address = {lat, lng, street, …})
-  //  4. Individual target-field cols (city, state, zipCode – BUT NOT the
-  //     'address' col because it often stores a full formatted string)
-  const blob = toAddressObject(value);
-  const fieldBase = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
+  // ── LOCAL STATE (mirrors AddressInput pattern exactly) ──
+  const [local, setLocal] = useState<Record<string, any>>(() =>
+    buildLocationBlob(value, fieldDef.apiName, formData, tf),
+  );
 
-  // Merge dotted keys (e.g. address_search.city → city)
-  for (const key of Object.keys(formData)) {
-    if (key.startsWith(fieldBase + '.')) {
-      const sub = key.slice(fieldBase.length + 1);
-      if (sub && !blob[sub] && formData[key] != null && formData[key] !== '') {
-        blob[sub] = formData[key];
-      }
+  // Sync from parent when the parent value changes meaningfully
+  useEffect(() => {
+    const incoming = buildLocationBlob(value, fieldDef.apiName, formData, tf);
+    if (addrKey(incoming) !== addrKey(local)) {
+      setLocal(incoming);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
 
-  // Check if the street target field holds a compound address object
-  const streetTargetRaw = tf.street
-    ? (formData[tf.street] ?? formData[tf.street.replace(/^[A-Za-z]+__/, '')])
-    : undefined;
-  const compoundAddr = (typeof streetTargetRaw === 'object' && streetTargetRaw) ? streetTargetRaw as Record<string, any> : {};
-  for (const [k, v] of Object.entries(compoundAddr)) {
-    if (!blob[k] && v != null && v !== '') blob[k] = v;
-  }
+  // Push a complete blob to parent + individual target fields
+  const pushAll = useCallback(
+    (next: Record<string, any>) => {
+      onChange(next);
+      if (tf.street) onFieldChange(tf.street, next.street ?? '');
+      if (tf.city) onFieldChange(tf.city, next.city ?? '');
+      if (tf.state) onFieldChange(tf.state, next.state ?? '');
+      if (tf.postalCode) onFieldChange(tf.postalCode, next.postalCode ?? '');
+      if (tf.country) onFieldChange(tf.country, next.country ?? '');
+      if (tf.lat) onFieldChange(tf.lat, next.lat != null ? String(next.lat) : '');
+      if (tf.lng) onFieldChange(tf.lng, next.lng != null ? String(next.lng) : '');
+    },
+    [onChange, onFieldChange, tf],
+  );
 
-  // Fill remaining gaps from individual target-field columns (skip the
-  // street target — "address" — because it collides with the formatted string)
-  const safeKeys: Array<[string, string]> = [
-    ['city', tf.city ?? ''],
-    ['state', tf.state ?? ''],
-    ['postalCode', tf.postalCode ?? ''],
-    ['country', tf.country ?? ''],
-    ['lat', tf.lat ?? ''],
-    ['lng', tf.lng ?? ''],
-  ];
-  for (const [jsonKey, tfKey] of safeKeys) {
-    if (!blob[jsonKey] && tfKey) {
-      const v = formData[tfKey] ?? formData[tfKey.replace(/^[A-Za-z]+__/, '')];
-      if (v != null && v !== '' && typeof v !== 'object') blob[jsonKey] = v;
-    }
-  }
+  const handleSubField = useCallback(
+    (field: string, fieldValue: string) => {
+      setLocal((prev) => {
+        const next = { ...prev, [field]: fieldValue };
+        pushAll(next);
+        return next;
+      });
+    },
+    [pushAll],
+  );
 
-  const street = blob.street ? String(blob.street) : '';
-  const city = blob.city ? String(blob.city) : '';
-  const state = blob.state ? String(blob.state) : '';
-  const postalCode = blob.postalCode ? String(blob.postalCode) : '';
-  const country = blob.country ? String(blob.country) : '';
+  const handleAutocomplete = useCallback(
+    (addr: any) => {
+      const next = {
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        postalCode: addr.postalCode,
+        country: addr.country,
+        lat: addr.lat,
+        lng: addr.lng,
+      };
+      setLocal(next);
+      pushAll(next);
+    },
+    [pushAll],
+  );
 
-  // Always build the search-bar display from current sub-field values so
-  // editing or clearing a sub-field immediately updates the search bar.
-  const locationValue = [street, city, state, postalCode].filter(Boolean).join(', ');
-
-  // When a sub-field is edited, update the target field AND the field's
-  // own JSON value so the search bar and saved data stay in sync.
-  const handleSubField = (targetKey: string | undefined, jsonKey: string, val: string) => {
-    if (targetKey) onFieldChange(targetKey, val);
-    const updated = { ...blob, [jsonKey]: val };
-    onChange(updated);
-  };
+  // Build display string from current local state
+  const addressDisplay = [local.street, local.city, local.state, local.postalCode, local.country]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <div className="space-y-2 border border-gray-300 rounded-lg p-3">
@@ -227,59 +276,41 @@ export function LocationSearchInput({
         <AddressAutocomplete
           disabled={disabled}
           placeholder="Search for an address..."
-          value={locationValue}
-          onAddressSelected={(addr) => {
-            if (tf.street) onFieldChange(tf.street, addr.street);
-            if (tf.city) onFieldChange(tf.city, addr.city);
-            if (tf.state) onFieldChange(tf.state, addr.state);
-            if (tf.postalCode) onFieldChange(tf.postalCode, addr.postalCode);
-            if (tf.country) onFieldChange(tf.country, addr.country);
-            if (tf.lat) onFieldChange(tf.lat, String(addr.lat));
-            if (tf.lng) onFieldChange(tf.lng, String(addr.lng));
-            // Keep the JSON blob in sync
-            onChange({
-              street: addr.street,
-              city: addr.city,
-              state: addr.state,
-              postalCode: addr.postalCode,
-              country: addr.country,
-              lat: addr.lat,
-              lng: addr.lng,
-            });
-          }}
+          value={addressDisplay}
+          onAddressSelected={handleAutocomplete}
         />
       )}
       <Input
         placeholder="Street"
-        value={street}
-        onChange={(e) => handleSubField(tf.street, 'street', e.target.value)}
+        value={local.street || ''}
+        onChange={(e) => handleSubField('street', e.target.value)}
         disabled={disabled}
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="City"
-          value={city}
-          onChange={(e) => handleSubField(tf.city, 'city', e.target.value)}
+          value={local.city || ''}
+          onChange={(e) => handleSubField('city', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="State/Province"
-          value={state}
-          onChange={(e) => handleSubField(tf.state, 'state', e.target.value)}
+          value={local.state || ''}
+          onChange={(e) => handleSubField('state', e.target.value)}
           disabled={disabled}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
           placeholder="Postal Code"
-          value={postalCode}
-          onChange={(e) => handleSubField(tf.postalCode, 'postalCode', e.target.value)}
+          value={local.postalCode || ''}
+          onChange={(e) => handleSubField('postalCode', e.target.value)}
           disabled={disabled}
         />
         <Input
           placeholder="Country"
-          value={country}
-          onChange={(e) => handleSubField(tf.country, 'country', e.target.value)}
+          value={local.country || ''}
+          onChange={(e) => handleSubField('country', e.target.value)}
           disabled={disabled}
         />
       </div>
