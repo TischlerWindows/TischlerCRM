@@ -31,25 +31,16 @@ interface Crumb {
 
 function buildCrumbs(pathname: string): Crumb[] {
   const segments = pathname.split('/').filter(Boolean);
-  if (segments.length === 0) return [];
+  if (segments.length === 0 || segments[0] !== 'settings') return [];
 
   const crumbs: Crumb[] = [{ label: 'Tischler CRM', href: '/' }];
-  const root = segments[0];
-  if (root === 'settings') {
-    crumbs.push({ label: 'Setup', href: '/settings' });
-    for (let i = 1; i < segments.length; i++) {
-      const seg = segments[i]!;
-      const label = SEGMENT_LABELS[seg] || decodeURIComponent(seg);
-      const isLast = i === segments.length - 1;
-      crumbs.push(isLast ? { label } : { label, href: '/' + segments.slice(0, i + 1).join('/') });
-    }
-  } else if (root === 'object-manager') {
-    crumbs.push({ label: 'Setup', href: '/settings' });
-    crumbs.push({ label: 'Object Manager', href: '/object-manager' });
-    if (segments.length >= 2) {
-      const objectApi = decodeURIComponent(segments[1]!);
-      crumbs.push({ label: objectApi });
-    }
+  const isSettingsRoot = segments.length === 1;
+  crumbs.push(isSettingsRoot ? { label: 'Setup' } : { label: 'Setup', href: '/settings' });
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const label = SEGMENT_LABELS[seg] || decodeURIComponent(seg);
+    const isLast = i === segments.length - 1;
+    crumbs.push(isLast ? { label } : { label, href: '/' + segments.slice(0, i + 1).join('/') });
   }
 
   return crumbs;

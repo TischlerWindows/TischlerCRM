@@ -224,7 +224,7 @@ export default function ObjectDetailPage() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-[48px] h-[calc(100vh-48px)] bg-white border-r border-gray-200 transition-all duration-300 z-40',
+          'fixed left-0 top-[48px] h-[calc(100vh-48px)] bg-white border-r border-gray-200 transition-all duration-300 z-40 flex flex-col',
           sidebarCollapsed ? 'w-16' : 'w-72'
         )}
       >
@@ -258,7 +258,7 @@ export default function ObjectDetailPage() {
         )}
 
         {/* Navigation */}
-        <nav className="p-2 overflow-y-auto" style={{ height: 'calc(100vh - 180px)' }}>
+        <nav className="flex-1 min-h-0 p-2 overflow-y-auto">
           {!sidebarCollapsed && (
             <>
               {['Data Model', 'Layouts & UI', 'Automation', 'Security & Access'].map((category) => {
