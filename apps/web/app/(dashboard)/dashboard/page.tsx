@@ -2056,8 +2056,8 @@ export default function DashboardPage() {
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241'];
-                    const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
+                    const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+                    const offset = acc.length > 0 ? acc[acc.length - 1].offset + acc[acc.length - 1].percentage : 0;
                     
                     acc.push({
                       percentage,
@@ -2085,12 +2085,15 @@ export default function DashboardPage() {
               </div>
               <div className="mt-4 space-y-2 w-full">
                 {widget.config.data?.map((item: any, idx: number) => {
+                  const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
+                  const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                  const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
                   const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                   return (
                     <div key={idx} className={`flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color || widget.config.barColors?.[item.label] || [widgetAccent, '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color || widget.config.barColors?.[item.label] || defaultColors[idx % defaultColors.length] }} />
                       <span className={valueColorClass}>{item.label}</span>
-                      <span className={`${labelColorClass} ml-auto`}>{item.value}%</span>
+                      <span className={`${labelColorClass} ml-auto`}>{pct}%</span>
                     </div>
                   );
                 })}
