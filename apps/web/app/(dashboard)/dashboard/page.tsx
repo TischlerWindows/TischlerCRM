@@ -1519,32 +1519,33 @@ export default function DashboardPage() {
       gridRow: `span ${widget.position.h}`
     };
 
-    const widgetAccent = widget.config?.accentColor || '#151f6d';
+    const widgetAccent = widget.config?.accentColor || '#3b82f6';
     const widgetBg = widget.config?.widgetBg || '';
     const widgetFontColor = widget.config?.fontColor || '';
     const fc = widgetFontColor; // shorthand for inline usage
-    const bgClass = widgetBg ? 'rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-200' : 'bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow duration-200';
+    const bgClass = widgetBg ? 'rounded-2xl border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300' : 'bg-white rounded-2xl border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-300';
     const isDrillTarget = drillDownWidgetId === widget.id && (drillDownLabel || widget.type === 'card');
-    const drillRing = isDrillTarget ? ' ring-2 ring-red-500' : '';
+    const drillRing = isDrillTarget ? ' ring-2 ring-blue-400 ring-offset-2' : '';
     const bgStyle = { ...widgetStyle, ...(widgetBg ? { backgroundColor: widgetBg } : {}), ...(fc ? { color: fc } : {}) };
-    const tickStyle = fc ? { fontSize: 12, fill: fc } : { fontSize: 12 };
-    const tickStyle11 = fc ? { fontSize: 11, fill: fc } : { fontSize: 11 };
-    const titleColorClass = fc ? '' : 'text-gray-900';
-    const labelColorClass = fc ? '' : 'text-gray-600';
-    const valueColorClass = fc ? '' : 'text-gray-700';
+    const tickStyle = fc ? { fontSize: 11, fill: fc, fontFamily: 'Inter, system-ui, sans-serif' } : { fontSize: 11, fill: '#94a3b8', fontFamily: 'Inter, system-ui, sans-serif' };
+    const tickStyle11 = fc ? { fontSize: 10, fill: fc, fontFamily: 'Inter, system-ui, sans-serif' } : { fontSize: 10, fill: '#94a3b8', fontFamily: 'Inter, system-ui, sans-serif' };
+    const titleColorClass = fc ? '' : 'text-gray-800';
+    const labelColorClass = fc ? '' : 'text-gray-500';
+    const valueColorClass = fc ? '' : 'text-gray-600';
+    const tooltipStyle = { backgroundColor: 'rgba(255,255,255,0.96)', border: 'none', borderRadius: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', padding: '8px 12px', fontSize: '12px' };
     const filterBar = null; // Filter bar is now rendered at section level
 
     switch (widget.type) {
       case 'metric':
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-5 relative group`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1553,14 +1554,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1568,14 +1569,14 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-sm ${labelColorClass} mb-2`}>{widget.title}</div>
+            <div className={`text-[11px] font-medium uppercase tracking-wide ${labelColorClass} mb-1.5`}>{widget.title}</div>
             {filterBar}
             <div className="flex items-baseline gap-2">
-              <div className={`text-3xl font-bold ${titleColorClass}`}>
+              <div className={`text-3xl font-semibold tracking-tight ${titleColorClass}`}>
                 {widget.config.prefix}{widget.config.value?.toLocaleString()}{widget.config.suffix}
               </div>
               {widget.config.trend && (
-                <div className={`text-sm font-medium ${widget.config.trend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                <div className={`text-xs font-medium ${widget.config.trend > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                   {widget.config.trend > 0 ? '+' : ''}{widget.config.trend}%
                 </div>
               )}
@@ -1585,14 +1586,14 @@ export default function DashboardPage() {
 
       case 'vertical-bar': {
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative flex flex-col group`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-5 relative flex flex-col group`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1601,14 +1602,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1619,11 +1620,11 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1633,7 +1634,7 @@ export default function DashboardPage() {
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" strokeOpacity={0.8} />
                     <XAxis
                       dataKey="label"
                       angle={-45}
@@ -1647,13 +1648,13 @@ export default function DashboardPage() {
                     />
                     <Tooltip 
                       cursor={false}
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                      contentStyle={tooltipStyle}
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" activeBar={{ fillOpacity: 0.7 }} onClick={(data: any, idx: number) => handleChartDrillDown(widget, data.label, idx)}>
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]} cursor="pointer" activeBar={{ fillOpacity: 0.8 }} onClick={(data: any, idx: number) => handleChartDrillDown(widget, data.label, idx)} barSize={Math.min(40, Math.max(12, 200 / (widget.config.data?.length || 1)))}>
                       {widget.config.data.map((entry: any, idx: number) => (
-                        <Cell key={idx} fill={entry.color || widget.config.barColors?.[entry.label] || widget.config.barColor || widgetAccent} />
+                        <Cell key={idx} fill={entry.color || widget.config.barColors?.[entry.label] || widget.config.barColor || widgetAccent} fillOpacity={0.85} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -1672,14 +1673,14 @@ export default function DashboardPage() {
         const hLabelPos = widget.config?.hBarLabelPos || 'left';
         const hValuePos = widget.config?.hBarValuePos || 'right';
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-5 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1688,14 +1689,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1706,31 +1707,31 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className={`flex flex-col gap-2 flex-1 min-h-0`}>
               {widget.config.data?.map((item: any, idx: number) => {
                 const maxValue = Math.max(...widget.config.data.map((d: any) => d.value));
                 const widthPercent = (item.value / maxValue) * 100;
-                const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
+                const barHeight = Math.max(20, Math.min(28, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                 return (
-                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
-                    {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
-                    {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
-                    <div className="flex-1 rounded-full flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
+                  <div key={idx} className={`flex items-center gap-2.5 flex-1 min-h-0 cursor-pointer rounded-lg px-1.5 -mx-1.5 transition-all duration-200 ${isActive ? 'bg-blue-50/60 ring-1 ring-blue-200/60' : 'hover:bg-gray-50/50'}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                    {hLabelPos === 'left' && <div className={`text-[11px] ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
+                    {hValuePos === 'left' && <div className={`text-[11px] ${valueColorClass} font-medium w-10 tabular-nums`}>{item.value}</div>}
+                    <div className="flex-1 rounded-md flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}15` : '#f1f5f9' }}>
                       <div
-                        className="rounded-full h-full transition-all hover:brightness-125"
-                        style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widget.config.barColors?.[item.label] || widgetAccent }}
+                        className="rounded-md h-full transition-all duration-300 hover:brightness-110"
+                        style={{ width: `${widthPercent}%`, minWidth: '3px', backgroundColor: item.color || widget.config.barColors?.[item.label] || widgetAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
                     </div>
-                    {hLabelPos === 'right' && <div className={`text-xs ${labelColorClass} w-20 truncate`}>{item.label}</div>}
-                    {hValuePos === 'right' && <div className={`text-xs ${valueColorClass} font-medium w-12 text-right`}>{item.value}</div>}
+                    {hLabelPos === 'right' && <div className={`text-[11px] ${labelColorClass} w-20 truncate`}>{item.label}</div>}
+                    {hValuePos === 'right' && <div className={`text-[11px] ${valueColorClass} font-medium w-10 text-right tabular-nums`}>{item.value}</div>}
                   </div>
                 );
               })}
@@ -1741,17 +1742,17 @@ export default function DashboardPage() {
 
       case 'stacked-vertical-bar': {
         const svStackKeys = widget.config.stackKeys || [];
-        const svColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const svColors = [widgetAccent, '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#f97316', '#14b8a6', '#6366f1', '#84cc16'];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-5 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1760,14 +1761,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1778,11 +1779,11 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && svStackKeys.length > 0 ? (
@@ -1791,7 +1792,7 @@ export default function DashboardPage() {
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" strokeOpacity={0.8} />
                     <XAxis
                       dataKey="label"
                       angle={-45}
@@ -1802,7 +1803,7 @@ export default function DashboardPage() {
                     <YAxis tick={tickStyle11} />
                     <Tooltip
                       cursor={false}
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                      contentStyle={tooltipStyle}
                     />
                     <Legend />
                     {svStackKeys.map((key: string, idx: number) => (
@@ -1811,9 +1812,10 @@ export default function DashboardPage() {
                         dataKey={key}
                         stackId="stack"
                         fill={svColors[idx % svColors.length]}
+                        fillOpacity={0.85}
                         radius={idx === svStackKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                         cursor="pointer"
-                        activeBar={{ fillOpacity: 0.7 }}
+                        activeBar={{ fillOpacity: 1 }}
                         onClick={(data: any, barIdx: number) => handleChartDrillDown(widget, data.label, barIdx)}
                       />
                     ))}
@@ -1831,17 +1833,17 @@ export default function DashboardPage() {
 
       case 'stacked-horizontal-bar': {
         const stackKeys = widget.config.stackKeys || [];
-        const colors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4'];
+        const colors = [widgetAccent, '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#f97316', '#14b8a6', '#6366f1', '#84cc16'];
         
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-5 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1850,14 +1852,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1868,44 +1870,44 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 && stackKeys.length > 0 ? (
-              <div className="flex flex-col gap-3 flex-1 min-h-0">
+              <div className="flex flex-col gap-2.5 flex-1 min-h-0">
                 {/* Legend */}
-                <div className="flex flex-wrap gap-3 justify-center pb-2 border-b">
+                <div className="flex flex-wrap gap-2.5 justify-center pb-2 border-b border-gray-100">
                   {stackKeys.map((key: string, idx: number) => (
-                    <div key={key} className="flex items-center gap-1.5">
+                    <div key={key} className="flex items-center gap-1">
                       <div 
-                        className="w-3 h-3 rounded" 
+                        className="w-2.5 h-2.5 rounded-sm" 
                         style={{ backgroundColor: colors[idx % colors.length] }}
                       />
-                      <span className={`text-xs ${labelColorClass}`}>{key}</span>
+                      <span className={`text-[10px] ${labelColorClass}`}>{key}</span>
                     </div>
                   ))}
                 </div>
 
                 {/* Stacked Bars */}
-                <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto">
+                <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto">
                   {widget.config.data.map((item: any, idx: number) => {
                     const total = stackKeys.reduce((sum: number, key: string) => {
                       return sum + (Number(item[key]) || 0);
                     }, 0);
                     
-                    const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
+                    const barHeight = Math.max(20, Math.min(28, 100 / Math.max(1, (widget.config.data?.length || 1))));
                     const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                     
                     return (
-                      <div key={idx} className={`flex items-center gap-3 cursor-pointer rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
-                        <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
+                      <div key={idx} className={`flex items-center gap-2.5 cursor-pointer rounded-lg px-1.5 -mx-1.5 transition-all duration-200 ${isActive ? 'bg-blue-50/60 ring-1 ring-blue-200/60' : 'hover:bg-gray-50/50'}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                        <div className={`text-[11px] ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
-                        <div className="flex-1 rounded-full flex items-center overflow-hidden" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
+                        <div className="flex-1 rounded-md flex items-center overflow-hidden" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}15` : '#f1f5f9' }}>
                           {stackKeys.map((key: string, stackIdx: number) => {
                             const value = Number(item[key]) || 0;
                             const widthPercent = total > 0 ? (value / total) * 100 : 0;
@@ -1915,16 +1917,16 @@ export default function DashboardPage() {
                             return (
                               <div
                                 key={key}
-                                className="h-full transition-all hover:brightness-125 flex items-center justify-center"
+                                className="h-full transition-all duration-300 hover:brightness-110 flex items-center justify-center"
                                 style={{ 
                                   width: `${widthPercent}%`,
                                   backgroundColor: colors[stackIdx % colors.length],
-                                  minWidth: widthPercent > 5 ? 'auto' : '2px'
+                                  minWidth: widthPercent > 5 ? 'auto' : '3px'
                                 }}
                                 title={`${key}: ${value}`}
                               >
                                 {widthPercent > 8 && (
-                                  <span className="text-xs text-white font-medium px-1">
+                                  <span className="text-[10px] text-white font-medium px-1">
                                     {value}
                                   </span>
                                 )}
@@ -1932,7 +1934,7 @@ export default function DashboardPage() {
                             );
                           })}
                         </div>
-                        <div className={`text-xs ${valueColorClass} font-medium w-12 text-right flex-shrink-0`}>
+                        <div className={`text-[11px] ${valueColorClass} font-medium w-10 text-right flex-shrink-0 tabular-nums`}>
                           {total.toFixed(0)}
                         </div>
                       </div>
@@ -1951,14 +1953,14 @@ export default function DashboardPage() {
 
       case 'line': {
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-5 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -1967,14 +1969,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1985,11 +1987,11 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             
             {widget.config.data && widget.config.data.length > 0 ? (
@@ -1999,7 +2001,7 @@ export default function DashboardPage() {
                     data={widget.config.data}
                     margin={{ top: 20, right: 30, left: 0, bottom: Math.max(40, Math.min(80, (widget.config.data?.length || 1) * 8)) }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" strokeOpacity={0.8} />
                     <XAxis
                       dataKey="label"
                       angle={-45}
@@ -2010,7 +2012,7 @@ export default function DashboardPage() {
                     <YAxis tick={tickStyle11} />
                     <Tooltip
                       cursor={false}
-                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                      contentStyle={tooltipStyle}
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
                     />
                     <Legend />
@@ -2019,8 +2021,8 @@ export default function DashboardPage() {
                       dataKey="value"
                       stroke={widgetAccent}
                       strokeWidth={2}
-                      dot={{ r: 4, fill: widgetAccent, cursor: 'pointer' }}
-                      activeDot={{ r: 6, fill: '#da291c', cursor: 'pointer', onClick: (_e: any, payload: any) => handleChartDrillDown(widget, payload?.payload?.label, payload?.index) }}
+                      dot={{ r: 3, fill: widgetAccent, strokeWidth: 0, cursor: 'pointer' }}
+                      activeDot={{ r: 5, fill: widgetAccent, stroke: '#fff', strokeWidth: 2, cursor: 'pointer', onClick: (_e: any, payload: any) => handleChartDrillDown(widget, payload?.payload?.label, payload?.index) }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -2038,12 +2040,12 @@ export default function DashboardPage() {
         return (
           <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative flex flex-col`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -2052,14 +2054,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -2067,16 +2069,16 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <div className="relative w-32 h-32">
                 <svg viewBox="0 0 100 100" className="transform -rotate-90">
-                  <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#f1f5f9" strokeWidth="16" />
                   {widget.config.data?.reduce((acc: any[], item: any, idx: number) => {
                     const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                     const percentage = (item.value / total) * 100;
-                    const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+                    const defaultColors = [widgetAccent, '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#f97316', '#14b8a6', '#6366f1', '#84cc16'];
                     const offset = acc.length > 0 ? acc[acc.length - 1].offset + acc[acc.length - 1].percentage : 0;
                     
                     acc.push({
@@ -2094,26 +2096,26 @@ export default function DashboardPage() {
                       r="40"
                       fill="none"
                       stroke={segment.color}
-                      strokeWidth="20"
+                      strokeWidth="16"
                       strokeDasharray={`${segment.percentage * 2.513} 251.3`}
                       strokeDashoffset={-segment.offset * 2.513}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
+                      className="cursor-pointer hover:opacity-75 transition-opacity duration-200"
                       onClick={() => handleChartDrillDown(widget, segment.label, idx)}
                     />
                   ))}
                 </svg>
               </div>
-              <div className="mt-4 space-y-2 w-full">
+              <div className="mt-4 space-y-1.5 w-full">
                 {widget.config.data?.map((item: any, idx: number) => {
                   const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
                   const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
-                  const defaultColors = [widgetAccent, '#da291c', '#9f9fa2', '#293241', '#1e2a7a', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+                  const defaultColors = [widgetAccent, '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#f97316', '#14b8a6', '#6366f1', '#84cc16'];
                   const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                   return (
-                    <div key={idx} className={`flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
-                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: item.color || widget.config.barColors?.[item.label] || defaultColors[idx % defaultColors.length] }} />
-                      <span className={valueColorClass}>{item.label}</span>
-                      <span className={`${labelColorClass} ml-auto`}>{pct}%</span>
+                    <div key={idx} className={`flex items-center gap-2 text-[11px] cursor-pointer rounded-md px-1.5 py-0.5 -mx-1.5 transition-all duration-200 ${isActive ? 'bg-blue-50/60 ring-1 ring-blue-200/60' : 'hover:bg-gray-50/50'}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                      <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color || widget.config.barColors?.[item.label] || defaultColors[idx % defaultColors.length] }} />
+                      <span className={`${valueColorClass} truncate`}>{item.label}</span>
+                      <span className={`${labelColorClass} ml-auto tabular-nums`}>{pct}%</span>
                     </div>
                   );
                 })}
@@ -2125,14 +2127,14 @@ export default function DashboardPage() {
 
       case 'gauge':
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-5 relative`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -2141,14 +2143,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -2156,7 +2158,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
               <Gauge className="w-24 h-24 text-brand-navy" />
@@ -2170,12 +2172,12 @@ export default function DashboardPage() {
         return (
           <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative overflow-auto`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -2184,14 +2186,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -2199,7 +2201,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            <div className={`text-[13px] font-semibold tracking-tight ${titleColorClass} mb-3`}>{widget.title}</div>
+            <div className={`text-xs font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <table className="w-full text-sm">
               <thead>
@@ -2247,7 +2249,7 @@ export default function DashboardPage() {
             className={`${bgClass}${drillRing} relative group flex flex-col`}
           >
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
             {/* Toolbar */}
             <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
@@ -2269,14 +2271,14 @@ export default function DashboardPage() {
                 <>
                   <button
                     onClick={() => handleEditWidget(widget)}
-                    className="p-1 text-brand-navy hover:bg-[#f0f1fa] rounded"
+                    className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                     title="Edit widget"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteWidget(widget.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                     title="Delete widget"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -2287,7 +2289,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-4 h-4 bg-brand-navy rounded-tl cursor-se-resize hover:bg-brand-navy-light z-20 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2311,13 +2313,13 @@ export default function DashboardPage() {
                   onClick={() => { setDrillDownWidgetId(isExpanded ? null : widget.id); setDrillDownLabel(null); }}
                 >
                   <div className={`text-center ${isCompact ? 'min-w-0 overflow-hidden' : ''}`}>
-                    <div className={`${titleSizeClass} ${labelColorClass} font-medium ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
+                    <div className={`${titleSizeClass} ${labelColorClass} font-medium uppercase tracking-wide ${isCompact ? 'truncate' : ''}`}>{widget.title}</div>
                     <div className={`flex items-baseline justify-center ${isTiny ? 'gap-1' : 'gap-2'}`}>
-                      <div className={`${valueSizeClass} font-bold ${titleColorClass} ${isCompact ? 'truncate' : ''}`}>
+                      <div className={`${valueSizeClass} font-semibold tracking-tight ${titleColorClass} ${isCompact ? 'truncate' : ''}`}>
                         {cardPrefix}{typeof cardValue === 'number' ? cardValue.toLocaleString() : cardValue}{cardSuffix}
                       </div>
                       {cardTrend != null && cardTrend !== 0 && (
-                        <div className={`${trendSizeClass} font-semibold ${cardTrend > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`${trendSizeClass} font-semibold ${cardTrend > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
                           {cardTrend > 0 ? '+' : ''}{cardTrend}%
                         </div>
                       )}
@@ -2339,12 +2341,12 @@ export default function DashboardPage() {
         return (
           <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 flex items-center justify-center text-gray-400 relative`}>
             {refreshingWidgetId === widget.id && (
-              <div className="absolute inset-0 bg-gray-400 opacity-30 rounded-lg animate-pulse z-20" />
+              <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2 right-2 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 backdrop-blur-sm rounded-lg px-1 py-0.5">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
-                className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
                 title="Refresh widget"
               >
                 <RefreshCw className="w-4 h-4" />
@@ -2352,7 +2354,7 @@ export default function DashboardPage() {
               {dashEditMode && (
                 <button
                   onClick={() => handleDeleteWidget(widget.id)}
-                  className="p-1 text-red-600 hover:bg-red-50 rounded"
+                  className="p-1.5 text-gray-400 hover:text-red-500 rounded-md transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -2771,28 +2773,28 @@ export default function DashboardPage() {
             /* Grid View - Show selected dashboard */
             selectedDashboard ? (
               <div>
-                <div className="mb-6 flex justify-between items-center">
+                <div className="mb-8 flex justify-between items-center">
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900">{selectedDashboard.name}</h2>
-                    <p className="text-sm text-gray-600">{selectedDashboard.description}</p>
+                    <h2 className="text-lg font-semibold text-gray-800 tracking-tight">{selectedDashboard.name}</h2>
+                    <p className="text-xs text-gray-400 mt-0.5">{selectedDashboard.description}</p>
                   </div>
-                  <div className="flex gap-3">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setDashEditMode(!dashEditMode)}
-                      className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
+                      className={`inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
                         dashEditMode 
-                          ? 'bg-brand-navy text-white hover:bg-brand-navy-dark' 
-                          : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
+                          ? 'bg-gray-800 text-white hover:bg-gray-700 shadow-sm' 
+                          : 'border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300'
                       }`}
                     >
-                      <Settings className="w-5 h-5 mr-2" />
+                      <Settings className="w-4 h-4 mr-1.5" />
                       {dashEditMode ? 'Done Editing' : 'Edit Dashboard'}
                     </button>
                     {dashEditMode && (
                       <>
                       <button
                         onClick={() => setShowAddSection(true)}
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                        className="inline-flex items-center px-3.5 py-1.5 border border-gray-200 text-gray-500 text-sm rounded-lg hover:text-gray-700 hover:border-gray-300 transition-all duration-200"
                       >
                         <Layers className="w-5 h-5 mr-2" />
                         Add Section
@@ -2843,7 +2845,7 @@ export default function DashboardPage() {
                 )}
 
                 {selectedDashboard.widgets.length > 0 || (selectedDashboard.sections || []).length > 0 ? (
-                  <div className="pb-[600px] space-y-5 rounded-xl p-5" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
+                  <div className="pb-[600px] space-y-6 rounded-2xl p-6" style={selectedDashboard.backgroundColor ? { backgroundColor: selectedDashboard.backgroundColor } : undefined}>
                     {/* Auto-migrate unsectioned widgets to first section */}
                     {(() => {
                       const sectionIds = new Set((selectedDashboard.sections || []).map(s => s.id));
@@ -2869,7 +2871,7 @@ export default function DashboardPage() {
                       const sectionWidgets = selectedDashboard.widgets.filter(w => w.sectionId === section.id);
                       const isSectionDropTarget = dashEditMode && draggingWidgetId && dropTarget?.sectionId === section.id && dropTarget?.beforeWidgetId === null;
                       return (
-                        <div key={section.id} className="bg-gradient-to-b from-white to-gray-50/80 border border-gray-200/60 rounded-2xl p-5 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
+                        <div key={section.id} className="bg-white/60 backdrop-blur-sm border border-gray-100 rounded-2xl p-6 shadow-sm">
                           <div
                             className={`flex items-center justify-between mb-4 pb-3 border-b border-gray-100 transition-colors ${
                               dashEditMode && draggingWidgetId ? 'border-2 border-dashed border-transparent hover:border-blue-300 rounded px-2 py-1' : ''
@@ -2904,7 +2906,7 @@ export default function DashboardPage() {
                                 <button type="button" onClick={() => setEditingSectionId(null)} className="text-sm text-gray-500 hover:underline">Cancel</button>
                               </form>
                             ) : (
-                              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-[0.08em] flex items-center gap-2"><span className="w-1 h-4 bg-brand-navy rounded-full inline-block"></span>{section.title}</h3>
+                              <h3 className="text-[11px] font-semibold text-gray-400 uppercase tracking-[0.12em] flex items-center gap-2.5"><span className="w-0.5 h-3.5 bg-blue-400 rounded-full inline-block"></span>{section.title}</h3>
                             )}
                             {dashEditMode && editingSectionId !== section.id && (
                               <div className="flex items-center gap-1">
@@ -3122,7 +3124,7 @@ export default function DashboardPage() {
                             return (sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId)) ? (
                             <>
                             <div
-                              className={`grid grid-cols-9 gap-5 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
@@ -3203,7 +3205,7 @@ export default function DashboardPage() {
                             {dashEditMode && (
                               <button
                                 onClick={() => { setPendingAddSectionId(section.id); setShowWidgetSelector(true); }}
-                                className="mt-3 w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-xs font-medium text-gray-400 hover:border-brand-navy/40 hover:text-brand-navy hover:bg-brand-navy/[0.02] transition-all duration-200 flex items-center justify-center gap-2"
+                                className="mt-3 w-full py-2 border border-dashed border-gray-200 rounded-xl text-[11px] font-medium text-gray-300 hover:border-gray-300 hover:text-gray-500 transition-all duration-200 flex items-center justify-center gap-1.5"
                               >
                                 <Plus className="w-4 h-4" /> Add Widget to {section.title}
                               </button>
@@ -3215,7 +3217,7 @@ export default function DashboardPage() {
                                 setPendingAddSectionId(section.id);
                                 setShowWidgetSelector(true);
                               }}
-                              className="w-full py-8 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-brand-navy/40 hover:text-brand-navy hover:bg-brand-navy/[0.02] transition-all duration-200 flex items-center justify-center gap-2"
+                              className="w-full py-6 border border-dashed border-gray-200 rounded-xl text-xs text-gray-300 hover:border-gray-300 hover:text-gray-500 transition-all duration-200 flex items-center justify-center gap-1.5"
                             >
                               <Plus className="w-4 h-4" /> Add Widget
                             </button>
@@ -3257,7 +3259,7 @@ export default function DashboardPage() {
 
       {/* Add Section Dialog */}
       {showAddSection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-900">Add Section</h2>
@@ -3289,7 +3291,7 @@ export default function DashboardPage() {
 
       {/* New Dashboard Dialog */}
       {showNewDashboard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Create New Dashboard</h2>
@@ -3345,21 +3347,21 @@ export default function DashboardPage() {
 
       {/* Widget Selector Dialog */}
       {showWidgetSelector && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Add Widget</h2>
-              <p className="text-sm text-gray-600 mt-1">Choose a visualization type</p>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 border border-gray-100">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">Add Widget</h2>
+              <p className="text-xs text-gray-400 mt-1">Choose a visualization type</p>
             </div>
-            <div className="p-6 grid grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+            <div className="p-6 grid grid-cols-2 gap-3 max-h-96 overflow-y-auto">
               {WIDGET_TYPES.map(type => (
                 <button
                   key={type.id}
                   onClick={() => handleSelectWidgetType(type.id)}
-                  className="flex flex-col items-center gap-3 p-6 border border-gray-200 rounded-lg hover:border-brand-navy hover:bg-[#f0f1fa] transition-colors"
+                  className="flex flex-col items-center gap-2.5 p-5 border border-gray-100 rounded-xl hover:border-gray-300 hover:bg-gray-50/50 transition-all duration-200"
                 >
-                  <type.icon className="w-8 h-8 text-brand-navy" />
-                  <span className="text-sm font-medium text-gray-900">{type.label}</span>
+                  <type.icon className="w-6 h-6 text-gray-400" />
+                  <span className="text-xs font-medium text-gray-600">{type.label}</span>
                 </button>
               ))}
             </div>
@@ -3377,11 +3379,11 @@ export default function DashboardPage() {
 
       {/* Widget Configuration Dialog */}
       {showWidgetConfig && selectedWidgetType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl my-8 flex flex-col max-h-[90vh]">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">{editingWidget ? 'Edit' : 'Configure'} {WIDGET_TYPES.find(t => t.id === selectedWidgetType)?.label}</h2>
-              <p className="text-sm text-gray-600 mt-1">{editingWidget ? 'Update widget' : 'Set up data source and display'} options</p>
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl my-8 flex flex-col max-h-[90vh] border border-gray-100">
+            <div className="p-6 border-b border-gray-100">
+              <h2 className="text-lg font-semibold text-gray-800">{editingWidget ? 'Edit' : 'Configure'} {WIDGET_TYPES.find(t => t.id === selectedWidgetType)?.label}</h2>
+              <p className="text-xs text-gray-400 mt-1">{editingWidget ? 'Update widget' : 'Set up data source and display'} options</p>
             </div>
             
             <div className="flex-1 flex overflow-hidden">
@@ -4149,7 +4151,7 @@ export default function DashboardPage() {
                           <div key={idx} className="flex items-center gap-2 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
                             <div
                               className="w-4 h-4 rounded flex-shrink-0 border border-gray-300"
-                              style={{ backgroundColor: item.color || widgetConfig.accentColor || '#151f6d' }}
+                              style={{ backgroundColor: item.color || widgetConfig.accentColor || '#3b82f6' }}
                             />
                             <input
                               type="text"
@@ -4219,7 +4221,7 @@ export default function DashboardPage() {
                     </label>
                     <input
                       type="color"
-                      value={widgetConfig.accentColor || '#151f6d'}
+                      value={widgetConfig.accentColor || '#3b82f6'}
                       onChange={(e) => setWidgetConfig({ ...widgetConfig, accentColor: e.target.value })}
                       className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                     />
@@ -4495,7 +4497,7 @@ export default function DashboardPage() {
                   const dataArr = isManual ? (widgetConfig.manualData || []) : (previewData?.data || []);
                   const item = dataArr[colorPickerBarIdx];
                   if (!item) return null;
-                  const currentColor = item.color || widgetConfig.barColors?.[item.label] || widgetConfig.accentColor || '#151f6d';
+                  const currentColor = item.color || widgetConfig.barColors?.[item.label] || widgetConfig.accentColor || '#3b82f6';
                   return (
                     <div className="mt-2 p-3 bg-white rounded-lg border border-gray-200 shadow-lg flex items-center gap-3">
                       <span className="text-xs text-gray-600 font-medium truncate max-w-[100px]">{item.label || `Bar ${colorPickerBarIdx + 1}`}</span>
@@ -4517,7 +4519,7 @@ export default function DashboardPage() {
                         className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
                       />
                       <div className="flex gap-1">
-                        {['#151f6d', '#da291c', '#059669', '#7c3aed', '#d97706', '#0891b2'].map((c) => (
+                        {['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'].map((c) => (
                           <button
                             key={c}
                             type="button"
@@ -4579,20 +4581,20 @@ export default function DashboardPage() {
               </div>
             </div>
             
-            <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
+            <div className="p-5 border-t border-gray-100 flex justify-end gap-2.5">
               <button
                 onClick={() => {
                   setShowWidgetConfig(false);
                   setSelectedWidgetType(null);
                   setEditingWidget(null);
                 }}
-                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:text-gray-700 hover:border-gray-300 transition-all duration-200"
               >
                 Cancel
               </button>
               <button
                 onClick={editingWidget ? handleUpdateWidget : handleSaveWidget}
-                className="px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
+                className="px-4 py-2 text-sm bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-all duration-200 shadow-sm"
               >
                 {editingWidget ? 'Update Widget' : 'Add Widget'}
               </button>
