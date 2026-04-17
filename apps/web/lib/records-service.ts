@@ -151,7 +151,6 @@ class RecordsService {
         // Also expand sub-fields for address-like objects (e.g. address.city → "address.city")
         if (value && typeof value === 'object' && !Array.isArray(value) && this.isAddressLike(value)) {
           for (const [subKey, subVal] of Object.entries(value)) {
-            if (subKey === 'lat' || subKey === 'lng') continue; // skip coordinates
             const dotKey = `${cleanKey}.${subKey}`;
             if (!stripped[dotKey]) stripped[dotKey] = subVal;
           }
@@ -193,15 +192,13 @@ class RecordsService {
   }
 
   /**
-   * Resolve a nested object value to a display string
-   * Address objects → "Street, City, State Zip"
-   * Other objects → kept as-is (for non-chart uses like edit forms)
+   * Resolve a nested object value.
+   * Address-like objects are kept as-is so edit forms and detail renderers
+   * can access lat/lng and the full structure.  List views handle
+   * object→string formatting via formatFieldValue at display time.
    */
-  private resolveNestedValue(key: string, value: any): any {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
-    if (!this.isAddressLike(value)) return value;
-    const parts = [value.street, value.city, value.state, value.postalCode].filter(Boolean);
-    return parts.length > 0 ? parts.join(', ') : value;
+  private resolveNestedValue(_key: string, value: any): any {
+    return value;
   }
 
   /**

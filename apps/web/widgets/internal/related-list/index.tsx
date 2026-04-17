@@ -130,6 +130,13 @@ function applyFilters(rows: Record<string, unknown>[], rules: FilterRule[]): Rec
 
 function getCellValue(row: Record<string, unknown>, col: string): string {
   const val = getVal(row, col)
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const v = val as Record<string, unknown>
+    if (v.street || v.city || v.state || v.postalCode || v.country) {
+      return [v.street, v.city, v.state, v.postalCode, v.country].filter(Boolean).join(', ') || '—'
+    }
+    return JSON.stringify(val)
+  }
   return val !== undefined && val !== null ? String(val) : '—'
 }
 
