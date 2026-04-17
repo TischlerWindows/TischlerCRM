@@ -127,11 +127,14 @@ export function renderValue(
 
     if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
-        <LocationMapPreview
-          lat={lat}
-          lng={lng}
-          address={addressParts || undefined}
-        />
+        <div className="space-y-2">
+          <span>{addressParts || '-'}</span>
+          <LocationMapPreview
+            lat={lat}
+            lng={lng}
+            address={addressParts || undefined}
+          />
+        </div>
       );
     }
     return addressParts || '-';

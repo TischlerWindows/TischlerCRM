@@ -153,10 +153,11 @@ export function LocationSearchInput({
   formData: Record<string, any>;
   disabled?: boolean;
 }) {
+  const tf = fieldDef.targetFields || {};
+
   // Build display value from saved target fields if the field's own value is empty
   let locationValue = value as string | undefined;
   if (!locationValue && fieldDef.targetFields) {
-    const tf = fieldDef.targetFields;
     const parts = [
       formData[tf.street ?? ''],
       formData[tf.city ?? ''],
@@ -167,24 +168,81 @@ export function LocationSearchInput({
     if (parts.length > 0) locationValue = parts.join(', ');
   }
 
+  // Resolve a target-field value from formData (handles prefixed & un-prefixed keys)
+  const resolve = (key: string | undefined) => {
+    if (!key) return '';
+    return formData[key] ?? formData[key.replace(/^[A-Za-z]+__/, '')] ?? '';
+  };
+
+  const handleSubField = (targetKey: string | undefined, val: string) => {
+    if (targetKey) onFieldChange(targetKey, val);
+  };
+
   return (
-    <AddressAutocomplete
-      disabled={disabled}
-      value={locationValue || ''}
-      onAddressSelected={(addr) => {
-        const targets = fieldDef.targetFields || {};
-        if (targets.street) onFieldChange(targets.street, addr.street);
-        if (targets.city) onFieldChange(targets.city, addr.city);
-        if (targets.state) onFieldChange(targets.state, addr.state);
-        if (targets.postalCode)
-          onFieldChange(targets.postalCode, addr.postalCode);
-        if (targets.country) onFieldChange(targets.country, addr.country);
-        if (targets.lat) onFieldChange(targets.lat, String(addr.lat));
-        if (targets.lng) onFieldChange(targets.lng, String(addr.lng));
-        // Persist the formatted address in the field's own value
-        onChange(addr.formattedAddress);
-      }}
-    />
+    <div className="space-y-2 border border-gray-300 rounded-lg p-3">
+      {!disabled && (
+        <AddressAutocomplete
+          disabled={disabled}
+          placeholder="Search for an address..."
+          value={locationValue || ''}
+          onAddressSelected={(addr) => {
+            if (tf.street) onFieldChange(tf.street, addr.street);
+            if (tf.city) onFieldChange(tf.city, addr.city);
+            if (tf.state) onFieldChange(tf.state, addr.state);
+            if (tf.postalCode) onFieldChange(tf.postalCode, addr.postalCode);
+            if (tf.country) onFieldChange(tf.country, addr.country);
+            if (tf.lat) onFieldChange(tf.lat, String(addr.lat));
+            if (tf.lng) onFieldChange(tf.lng, String(addr.lng));
+            // Persist the formatted address in the field's own value
+            onChange(addr.formattedAddress);
+          }}
+        />
+      )}
+      {tf.street && (
+        <Input
+          placeholder="Street"
+          value={resolve(tf.street)}
+          onChange={(e) => handleSubField(tf.street, e.target.value)}
+          disabled={disabled}
+        />
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {tf.city && (
+          <Input
+            placeholder="City"
+            value={resolve(tf.city)}
+            onChange={(e) => handleSubField(tf.city, e.target.value)}
+            disabled={disabled}
+          />
+        )}
+        {tf.state && (
+          <Input
+            placeholder="State/Province"
+            value={resolve(tf.state)}
+            onChange={(e) => handleSubField(tf.state, e.target.value)}
+            disabled={disabled}
+          />
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {tf.postalCode && (
+          <Input
+            placeholder="Postal Code"
+            value={resolve(tf.postalCode)}
+            onChange={(e) => handleSubField(tf.postalCode, e.target.value)}
+            disabled={disabled}
+          />
+        )}
+        {tf.country && (
+          <Input
+            placeholder="Country"
+            value={resolve(tf.country)}
+            onChange={(e) => handleSubField(tf.country, e.target.value)}
+            disabled={disabled}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
