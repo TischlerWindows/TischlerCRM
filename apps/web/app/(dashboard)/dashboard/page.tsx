@@ -282,7 +282,7 @@ export default function DashboardPage() {
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingSectionTitle, setEditingSectionTitle] = useState('');
   const [draggingWidgetId, setDraggingWidgetId] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ sectionId: string | undefined; beforeWidgetId: string | null; position?: 'before' | 'after' } | null>(null);
   const [pendingAddSectionId, setPendingAddSectionId] = useState<string | null>(null);
   const [addingFilterBtnSectionId, setAddingFilterBtnSectionId] = useState<string | null>(null);
   const [newFilterBtn, setNewFilterBtn] = useState({ label: '', field: '', value: '', objectType: '' });
@@ -1383,6 +1383,33 @@ export default function DashboardPage() {
     saveTabConfiguration(newTabs);
   };
 
+  // ── Auto-scroll while dragging ───────────────────────────────────────
+  useEffect(() => {
+    if (!draggingWidgetId) return;
+    let scrollRaf: number | null = null;
+    const EDGE_SIZE = 60; // px from viewport edge to trigger scroll
+    const SCROLL_SPEED = 12; // px per frame
+
+    const handleDragOverScroll = (e: DragEvent) => {
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      scrollRaf = requestAnimationFrame(() => {
+        const { clientY } = e;
+        const vh = window.innerHeight;
+        if (clientY < EDGE_SIZE) {
+          window.scrollBy(0, -SCROLL_SPEED);
+        } else if (clientY > vh - EDGE_SIZE) {
+          window.scrollBy(0, SCROLL_SPEED);
+        }
+      });
+    };
+
+    document.addEventListener('dragover', handleDragOverScroll);
+    return () => {
+      document.removeEventListener('dragover', handleDragOverScroll);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+    };
+  }, [draggingWidgetId]);
+
   // ── Widget drag-and-drop ─────────────────────────────────────────────
   const handleWidgetDragStart = (e: React.DragEvent, widgetId: string) => {
     setDraggingWidgetId(widgetId);
@@ -1402,7 +1429,7 @@ export default function DashboardPage() {
     setDropTarget(null);
   };
 
-  const handleWidgetDrop = (targetSectionId: string | undefined, beforeWidgetId: string | null) => {
+  const handleWidgetDrop = (targetSectionId: string | undefined, targetWidgetId: string | null, position: 'before' | 'after' = 'before') => {
     if (!selectedDashboard || !draggingWidgetId) return;
 
     const widgets = [...selectedDashboard.widgets];
@@ -1414,11 +1441,11 @@ export default function DashboardPage() {
     // Update section
     draggedWidget.sectionId = targetSectionId;
 
-    if (beforeWidgetId) {
-      // Insert before the target widget
-      const targetIdx = widgets.findIndex(w => w.id === beforeWidgetId);
+    if (targetWidgetId) {
+      const targetIdx = widgets.findIndex(w => w.id === targetWidgetId);
       if (targetIdx >= 0) {
-        widgets.splice(targetIdx, 0, draggedWidget);
+        const insertAt = position === 'after' ? targetIdx + 1 : targetIdx;
+        widgets.splice(insertAt, 0, draggedWidget);
       } else {
         widgets.push(draggedWidget);
       }
@@ -2407,7 +2434,8 @@ export default function DashboardPage() {
     }
 
     const isDragging = draggingWidgetId === widget.id;
-    const isDropBefore = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
+    const isDropTarget = dropTarget?.beforeWidgetId === widget.id && dropTarget?.sectionId === sectionId;
+    const dropPosition = isDropTarget ? (dropTarget?.position || 'before') : null;
 
     return (
       <div
@@ -2419,12 +2447,17 @@ export default function DashboardPage() {
           e.preventDefault();
           e.stopPropagation();
           e.dataTransfer.dropEffect = 'move';
-          setDropTarget({ sectionId, beforeWidgetId: widget.id });
+          // Determine if cursor is in top or bottom half of widget
+          const rect = e.currentTarget.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          const pos: 'before' | 'after' = e.clientY < midY ? 'before' : 'after';
+          setDropTarget({ sectionId, beforeWidgetId: widget.id, position: pos });
         }}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          handleWidgetDrop(sectionId, widget.id);
+          const pos = dropTarget?.position || 'before';
+          handleWidgetDrop(sectionId, widget.id, pos);
         }}
         style={{
           gridColumn: `span ${widget.position.w}`,
@@ -2432,11 +2465,14 @@ export default function DashboardPage() {
           opacity: isDragging ? 0.4 : 1,
           position: 'relative'
         }}
-        className={`transition-opacity group ${isDragging ? 'ring-2 ring-blue-400 rounded-lg' : ''} ${isDropBefore ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg' : ''}`}
+        className={`transition-opacity group ${isDragging ? 'ring-2 ring-blue-400 rounded-lg' : ''} ${isDropTarget ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg' : ''}`}
       >
-        {/* Drop indicator line */}
-        {isDropBefore && (
+        {/* Drop indicator lines */}
+        {dropPosition === 'before' && (
           <div className="absolute -top-2 left-0 right-0 h-1 bg-blue-500 rounded-full z-30" />
+        )}
+        {dropPosition === 'after' && (
+          <div className="absolute -bottom-2 left-0 right-0 h-1 bg-blue-500 rounded-full z-30" />
         )}
         {/* Drag handle */}
         <div
