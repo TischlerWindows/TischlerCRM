@@ -153,6 +153,7 @@ export const ticketsClient = {
   async create(body: {
     title: string;
     description: string;
+    category: string;
     sessionId?: string;
     errorLogIds?: string[];
   }): Promise<SupportTicket> {
