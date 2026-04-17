@@ -4,11 +4,14 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { SettingsSidebar } from '@/components/settings/settings-sidebar';
 import { SettingsBreadcrumb } from '@/components/settings/settings-breadcrumb';
+import { useSetupHistoryTracking } from '@/lib/use-setup-history-tracking';
 
 const STORAGE_KEY = 'tischler-settings-sidebar-collapsed';
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+
+  useSetupHistoryTracking();
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);

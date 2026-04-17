@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { ExitSetupPill } from '@/components/settings/exit-setup-pill';
 import {
   Users,
   Shield,
@@ -168,7 +169,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 pb-5">
+      <nav className="flex-1 overflow-y-auto px-2 pb-2">
         {filteredGroups.map((group) => (
           <div key={group.title}>
             <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
@@ -215,6 +216,10 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           </div>
         ))}
       </nav>
+
+      <div className="px-3 py-3 border-t border-gray-200 bg-white">
+        <ExitSetupPill className="w-full justify-center" />
+      </div>
     </aside>
   );
 }
