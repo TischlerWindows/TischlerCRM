@@ -36,7 +36,8 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
-  Layers
+  Layers,
+  Check
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -260,6 +261,7 @@ export default function DashboardPage() {
     legendPosition: 'right'
   });
   const [dashEditMode, setDashEditMode] = useState(false);
+  const [dashEditSnapshot, setDashEditSnapshot] = useState<Dashboard | null>(null);
   const [editingWidget, setEditingWidget] = useState<string | null>(null);
   const [recordsCacheVersion, setRecordsCacheVersion] = useState(0);
   const [refreshingWidgetId, setRefreshingWidgetId] = useState<string | null>(null);
@@ -2804,19 +2806,47 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-400 mt-0.5">{selectedDashboard.description}</p>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setDashEditMode(!dashEditMode)}
-                      className={`inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm transition-all duration-200 ${
-                        dashEditMode 
-                          ? 'bg-gray-800 text-white hover:bg-gray-700 shadow-sm' 
-                          : 'border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                    >
-                      <Settings className="w-4 h-4 mr-1.5" />
-                      {dashEditMode ? 'Done Editing' : 'Edit Dashboard'}
-                    </button>
-                    {dashEditMode && (
+                    {!dashEditMode ? (
+                      <button
+                        onClick={() => {
+                          setDashEditSnapshot(JSON.parse(JSON.stringify(selectedDashboard)));
+                          setDashEditMode(true);
+                        }}
+                        className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-all duration-200"
+                      >
+                        <Settings className="w-4 h-4 mr-1.5" />
+                        Edit Dashboard
+                      </button>
+                    ) : (
                       <>
+                      <button
+                        onClick={() => {
+                          if (dashEditSnapshot && confirm('Discard all changes made during this editing session?')) {
+                            const restored = dashEditSnapshot;
+                            const updated = dashboards.map(d => d.id === restored.id ? restored : d);
+                            setDashboards(updated);
+                            setSelectedDashboard(restored);
+                            persistDashboard(restored);
+                            setDashEditSnapshot(null);
+                            setDashEditMode(false);
+                          }
+                        }}
+                        className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 transition-all duration-200"
+                      >
+                        <X className="w-4 h-4 mr-1.5" />
+                        Discard
+                      </button>
+                      <button
+                        onClick={() => {
+                          persistDashboard(selectedDashboard);
+                          setDashEditSnapshot(null);
+                          setDashEditMode(false);
+                        }}
+                        className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm bg-gray-800 text-white hover:bg-gray-700 shadow-sm transition-all duration-200"
+                      >
+                        <Check className="w-4 h-4 mr-1.5" />
+                        Save &amp; Close
+                      </button>
                       <button
                         onClick={() => setShowAddSection(true)}
                         className="inline-flex items-center px-3.5 py-1.5 border border-gray-200 text-gray-500 text-sm rounded-lg hover:text-gray-700 hover:border-gray-300 transition-all duration-200"
