@@ -67,7 +67,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
       { name: 'Automations', href: '/settings/automations', icon: Zap },
-      { name: 'Notifications', href: '/settings/notifications', icon: Bell, disabled: true },
+      { name: 'Notifications', href: '/settings/notifications', icon: Bell },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
     ],
   },

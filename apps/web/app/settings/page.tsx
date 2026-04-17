@@ -15,6 +15,7 @@ import {
   Home,
   Plug,
   Zap,
+  Bell,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 
@@ -67,6 +68,7 @@ export default function SettingsPage() {
     { title: 'Backups', icon: Database, href: '/settings/backups', description: 'Database snapshots and restore', color: '#d97706' },
     { title: 'Integrations', icon: Plug, href: '/settings/integrations', description: 'Connect Google Maps, Dropbox, Outlook & more', color: '#4285F4' },
     { title: 'Automations', icon: Zap, href: '/settings/automations', count: counts.automations, description: 'Manage code-based triggers and controllers', color: '#f59e0b' },
+    { title: 'Notifications', icon: Bell, href: '/settings/notifications', description: 'Turn in-app notification types on or off org-wide', color: '#6366f1' },
   ];
 
   return (

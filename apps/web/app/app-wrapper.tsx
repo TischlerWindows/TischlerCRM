@@ -11,7 +11,6 @@ import {
   GripVertical,
   X,
   LogOut,
-  Bell,
   Settings,
   Database,
   ExternalLink,
@@ -32,6 +31,7 @@ import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
 import { installGlobalErrorHandler } from '@/lib/error-reporter';
 import { SubmitTicketModal } from '@/components/support/submit-ticket-modal';
 import { MyTicketsDrawer } from '@/components/support/my-tickets-drawer';
+import { BellPanel } from '@/components/notifications/bell-panel';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -48,7 +48,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSetupMenu, setShowSetupMenu] = useState(false);
   const [showSubmitTicket, setShowSubmitTicket] = useState(false);
@@ -301,38 +300,13 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
         {/* Right: Utilities */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="relative">
-            <button
-              className="p-2 rounded-md hover:bg-white/10 transition-colors"
-              title="Notifications"
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                setShowHelp(false);
-                setShowSetupMenu(false);
-              }}
-            >
-              <Bell className="w-[18px] h-[18px] text-white/80" />
-            </button>
-            {showNotifications && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                </div>
-                <div className="p-8 text-center">
-                  <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No new notifications</p>
-                  <p className="text-xs text-gray-400 mt-1">You&apos;re all caught up!</p>
-                </div>
-              </div>
-            )}
-          </div>
+          <BellPanel />
           <div className="relative">
             <button
               className="p-2 rounded-md hover:bg-white/10 transition-colors"
               title="Help"
               onClick={() => {
                 setShowHelp(!showHelp);
-                setShowNotifications(false);
                 setShowSetupMenu(false);
               }}
             >
@@ -387,7 +361,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
               aria-expanded={showSetupMenu}
               onClick={() => {
                 setShowSetupMenu(!showSetupMenu);
-                setShowNotifications(false);
                 setShowHelp(false);
               }}
             >

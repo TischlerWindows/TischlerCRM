@@ -94,6 +94,10 @@ model User {
   ticketEvents               TicketEvent[]       @relation("TicketEventActor")
   errorLogs                  ErrorLog[]          @relation("ErrorLogUser")
 
+  // Notifications (Phase 2)
+  notifications              Notification[]      @relation("NotificationRecipient")
+  notificationActs           Notification[]      @relation("NotificationLastActor")
+
   @@index([profileId])
   @@index([departmentId])
   @@index([managerId])
@@ -830,4 +834,56 @@ model ErrorLog {
   @@index([ticketId])
   @@index([dedupeKey, createdAt])
   @@index([userId])
+}
+
+// ============================================
+// Notifications (Phase 2)
+// ============================================
+
+model Notification {
+  id     String @id
+  orgId  String
+
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
+
+  kind        String
+  subjectType String
+  subjectId   String
+
+  title   String
+  body    String?
+  linkUrl String
+
+  lastActor   User?   @relation("NotificationLastActor", fields: [lastActorId], references: [id], onDelete: SetNull)
+  lastActorId String?
+
+  count    Int    @default(1)
+  groupKey String
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Note: partial unique index on (groupKey) WHERE readAt IS NULL is added via
+  // hand-written migration SQL — Prisma's schema DSL cannot express partial
+  // unique indexes. That index is what makes grouping race-free via
+  // INSERT ... ON CONFLICT DO UPDATE.
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([createdAt])
+  @@index([orgId])
+  @@index([subjectType, subjectId])
+}
+
+model NotificationTypeSetting {
+  id               String   @id @default(cuid())
+  orgId            String
+  notificationKind String
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([orgId, notificationKind])
+  @@index([orgId])
 }
