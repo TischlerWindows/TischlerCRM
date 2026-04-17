@@ -18,6 +18,7 @@ import {
   Send,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -86,22 +87,13 @@ export default function IntegrationsPage() {
   }
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#f0f1f9] flex items-center justify-center">
-            <Plug className="w-6 h-6 text-brand-navy" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-brand-dark">Integrations</h1>
-            <p className="text-sm text-brand-gray mt-0.5">
-              Connect external services to extend your CRM
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
+      <SettingsPageHeader
+        icon={Plug}
+        title="Connected Apps"
+        subtitle="Connect external services to extend your CRM"
+      />
+      <div className="p-8">
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -204,6 +196,7 @@ export default function IntegrationsPage() {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );
