@@ -636,6 +636,11 @@ export default function DynamicForm({
           }
         }
       }
+      // Remove derived dotted keys (e.g. "address_search.city") that come
+      // from flattenRecord expansion — the parent blob is authoritative.
+      for (const key of Object.keys(completeData)) {
+        if (key.includes('.') && !key.startsWith('_')) delete completeData[key];
+      }
       setSubmitError(null);
       setIsSubmitting(true);
       try {

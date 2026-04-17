@@ -154,7 +154,7 @@ function buildLocationBlob(
   for (const key of Object.keys(formData)) {
     if (key.startsWith(fieldBase + '.')) {
       const sub = key.slice(fieldBase.length + 1);
-      if (sub && !blob[sub] && formData[key] != null && formData[key] !== '') {
+      if (sub && blob[sub] == null && formData[key] != null && formData[key] !== '') {
         blob[sub] = formData[key];
       }
     }
@@ -167,7 +167,7 @@ function buildLocationBlob(
     const raw = formData[streetKey] ?? formData[streetKey.replace(/^[A-Za-z]+__/, '')];
     if (typeof raw === 'object' && raw) {
       for (const [k, v] of Object.entries(raw as Record<string, any>)) {
-        if (!blob[k] && v != null && v !== '') blob[k] = v;
+        if (blob[k] == null && v != null && v !== '') blob[k] = v;
       }
     }
   }
@@ -182,7 +182,7 @@ function buildLocationBlob(
     ['lat', targetFields.lat],
     ['lng', targetFields.lng],
   ] as const) {
-    if (!blob[jsonKey] && tfKey) {
+    if (blob[jsonKey] == null && tfKey) {
       const v = formData[tfKey] ?? formData[tfKey.replace(/^[A-Za-z]+__/, '')];
       if (v != null && v !== '' && typeof v !== 'object') blob[jsonKey] = v;
     }
@@ -240,13 +240,14 @@ export function LocationSearchInput({
     [onChange, onFieldChange, tf],
   );
 
+  const localRef = React.useRef(local);
+  localRef.current = local;
+
   const handleSubField = useCallback(
     (field: string, fieldValue: string) => {
-      setLocal((prev) => {
-        const next = { ...prev, [field]: fieldValue };
-        pushAll(next);
-        return next;
-      });
+      const next = { ...localRef.current, [field]: fieldValue };
+      setLocal(next);
+      pushAll(next);
     },
     [pushAll],
   );

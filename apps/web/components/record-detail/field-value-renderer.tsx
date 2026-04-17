@@ -120,7 +120,7 @@ export function renderValue(
     for (const key of Object.keys(record)) {
       if (key.startsWith(fieldBase + '.')) {
         const sub = key.slice(fieldBase.length + 1);
-        if (sub && !valObj[sub] && record[key] != null && record[key] !== '') {
+        if (sub && valObj[sub] == null && record[key] != null && record[key] !== '') {
           valObj[sub] = record[key];
         }
       }
@@ -131,14 +131,14 @@ export function renderValue(
       const raw = record[tf.street] ?? record[tf.street.replace(/^[A-Za-z]+__/, '')];
       if (typeof raw === 'object' && raw) {
         for (const [k, v] of Object.entries(raw as Record<string, any>)) {
-          if (!valObj[k] && v != null && v !== '') valObj[k] = v;
+          if (valObj[k] == null && v != null && v !== '') valObj[k] = v;
         }
       }
     }
 
     // 3. Safe individual target-field columns (skip street)
     for (const jsonKey of ['city', 'state', 'postalCode', 'country', 'lat', 'lng'] as const) {
-      if (!valObj[jsonKey] && tf[jsonKey]) {
+      if (valObj[jsonKey] == null && tf[jsonKey]) {
         const raw = record[tf[jsonKey]] ?? record[tf[jsonKey].replace(/^[A-Za-z]+__/, '')];
         if (raw != null && raw !== '' && typeof raw !== 'object') valObj[jsonKey] = raw;
       }

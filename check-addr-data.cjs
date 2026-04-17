@@ -2,28 +2,27 @@ const { PrismaClient } = require('./packages/db/node_modules/@prisma/client');
 const p = new PrismaClient();
 
 (async () => {
-  // Check OrgSchema for Property address_search field
-  const s = await p.setting.findFirst({ where: { key: 'tces-object-manager-schema' } });
-  const schema = s.value;
-  const propObj = schema.objects.find(o => o.apiName === 'Property');
-  const asf = propObj.fields.find(f => f.apiName === 'Property__address_search');
-  console.log('=== OrgSchema Property__address_search ===');
-  console.log(JSON.stringify(asf, null, 2));
-
-  // Check a real Property record
-  const propObjRec = await p.customObject.findFirst({ where: { apiName: 'Property' } });
-  // Get 3 most recently updated
-  const recs = await p.record.findMany({ where: { objectId: propObjRec.id }, orderBy: { updatedAt: 'desc' }, take: 3 });
-  
-  for (const rec of recs) {
-    console.log('\n=== Property record ===');
-    console.log('Record ID:', rec.id);
-    console.log('Updated:', rec.updatedAt);
+  // Remove stale dotted keys from ALL records that have address-like blobs
+  const allRecords = await p.record.findMany({ select: { id: true, data: true } });
+  let fixed = 0;
+  for (const rec of allRecords) {
     const d = rec.data;
-    const keys = Object.keys(d).filter(k => /address|city|state|zip|postal|country|lat|lng|street/i.test(k));
-    console.log('Address-related keys:');
-    for (const k of keys) console.log('  ', k, '=', JSON.stringify(d[k]));
+    if (!d || typeof d !== 'object') continue;
+    const toRemove = [];
+    for (const key of Object.keys(d)) {
+      // Dotted keys like "address_search.city", "address.street" etc.
+      if (/^[\w]+\.[\w]+$/.test(key)) {
+        toRemove.push(key);
+      }
+    }
+    if (toRemove.length > 0) {
+      const cleaned = { ...d };
+      for (const k of toRemove) delete cleaned[k];
+      await p.record.update({ where: { id: rec.id }, data: { data: cleaned } });
+      fixed++;
+      console.log(`Cleaned ${toRemove.length} dotted keys from record ${rec.id}: ${toRemove.join(', ')}`);
+    }
   }
-
+  console.log(`\nDone. Fixed ${fixed} records.`);
   await p['$disconnect']();
 })();

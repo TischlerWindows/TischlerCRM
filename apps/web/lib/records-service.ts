@@ -148,11 +148,13 @@ class RecordsService {
           stripped[cleanKey] = resolved;
         }
 
-        // Also expand sub-fields for address-like objects (e.g. address.city → "address.city")
+        // Expand sub-fields for address-like objects (e.g. address.city → "address.city").
+        // ALWAYS overwrite — the blob is authoritative over stale dotted keys
+        // that may exist as separate keys in the raw DB data.
         if (value && typeof value === 'object' && !Array.isArray(value) && this.isAddressLike(value)) {
           for (const [subKey, subVal] of Object.entries(value)) {
             const dotKey = `${cleanKey}.${subKey}`;
-            if (!stripped[dotKey]) stripped[dotKey] = subVal;
+            stripped[dotKey] = subVal;
           }
         }
       }

@@ -101,6 +101,12 @@ export function RecordActions({
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
         normalizedData[cleanKey] = value;
       }
+      // Remove derived dotted keys (e.g. "address_search.city") — the parent
+      // blob is authoritative. Sending stale dotted keys back would persist
+      // old values that conflict with the blob.
+      for (const key of Object.keys(normalizedData)) {
+        if (key.includes('.') && !key.startsWith('_')) delete normalizedData[key];
+      }
       const updated = await recordsService.updateRecord(objectApiName, record.id, { data: normalizedData });
       if (updated) {
         onRecordUpdated(updated, recordsService.flattenRecord(updated));
