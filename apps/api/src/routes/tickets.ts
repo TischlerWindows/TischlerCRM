@@ -259,7 +259,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     const querySchema = z.object({
       status: z.enum(STATUS_VALUES).optional(),
-      category: z.enum(CATEGORY_VALUES).optional(),
+      category: z.string().min(1).max(64).optional(),
       priority: z.enum(PRIORITY_VALUES).optional(),
       assignedToId: z.string().optional(),
       mine: z.coerce.boolean().optional(),

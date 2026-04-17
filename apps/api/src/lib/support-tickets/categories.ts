@@ -18,13 +18,6 @@ export const CATEGORY_COLORS = [
 
 export type CategoryColor = (typeof CATEGORY_COLORS)[number];
 
-export interface TicketCategory {
-  key: string;
-  label: string;
-  color: CategoryColor;
-  order: number;
-}
-
 export const categorySchema = z.object({
   key: z
     .string()
@@ -35,6 +28,8 @@ export const categorySchema = z.object({
   color: z.enum(CATEGORY_COLORS),
   order: z.number().int().min(0),
 });
+
+export type TicketCategory = z.infer<typeof categorySchema>;
 
 export const categoriesArraySchema = z
   .array(categorySchema)
@@ -107,14 +102,16 @@ export async function writeCategories(
 }
 
 /**
- * Idempotent seeder. Called once on API boot from buildApp(). Only inserts
- * the defaults if the row is missing — never overwrites admin edits.
+ * Idempotent seeder. Called once on API boot from buildApp(). Atomically
+ * inserts the defaults if the row is missing; leaves admin edits untouched
+ * via the empty `update: {}`. Safe under concurrent boots — no find-then-
+ * create race, no duplicate-key errors in logs.
  */
 export async function seedCategoriesIfMissing(): Promise<void> {
-  const existing = await prisma.setting.findUnique({ where: { key: SETTING_KEY } });
-  if (existing) return;
-  await prisma.setting.create({
-    data: {
+  await prisma.setting.upsert({
+    where: { key: SETTING_KEY },
+    update: {},
+    create: {
       id: generateId('Setting'),
       key: SETTING_KEY,
       value: { categories: DEFAULT_CATEGORIES },
