@@ -5,6 +5,11 @@ import { z } from 'zod';
 import { logAudit, extractIp } from '../audit.js';
 import { canManageTickets, requireTicketAdmin } from '../lib/permissions.js';
 import { sendSupportTicketAlertEmail } from '../notifications.js';
+import { notify } from '../lib/notifications/notify.js';
+import {
+  getTicketCreatedRecipients,
+  getTicketParticipantRecipients,
+} from '../lib/notifications/ticket-recipients.js';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -209,6 +214,27 @@ export async function ticketRoutes(app: FastifyInstance) {
       }
     })();
 
+    // In-app notification fan-out — separate from the email path above so
+    // users get both the one-time email and a bell-icon ping. notify()
+    // swallows its own errors so the ticket create succeeds either way.
+    (async () => {
+      const recipients = await getTicketCreatedRecipients();
+      const submitterName = ticket.submittedBy?.name ?? ticket.submittedBy?.email ?? 'Someone';
+      await notify(
+        {
+          recipientIds: recipients,
+          kind: 'ticket.created',
+          subjectType: 'SupportTicket',
+          subjectId: ticket.id,
+          title: `New ticket #T-${String(ticket.ticketNumber).padStart(5, '0')}: ${ticket.title}`,
+          body: `Submitted by ${submitterName}`,
+          linkUrl: `/support/tickets/${ticket.id}`,
+          actorId: userId,
+        },
+        app.log,
+      );
+    })();
+
     const full = await loadTicketForReply(ticket.id);
     return reply.code(201).send(full);
   });
@@ -375,6 +401,75 @@ export async function ticketRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
+    // Fire in-app notifications for the kinds we care about.
+    const ticketNumLabel = `#T-${String(before.ticketNumber).padStart(5, '0')}`;
+    const linkUrl = `/support/tickets/${id}`;
+
+    // ticket.assigned — only when assignedToId moves TO a user (not on clear)
+    if (
+      update.assignedToId !== undefined &&
+      update.assignedToId &&
+      update.assignedToId !== before.assignedToId
+    ) {
+      (async () => {
+        await notify(
+          {
+            recipientIds: [update.assignedToId as string],
+            kind: 'ticket.assigned',
+            subjectType: 'SupportTicket',
+            subjectId: id,
+            title: `You were assigned ticket ${ticketNumLabel}: ${before.title}`,
+            linkUrl,
+            actorId: userId,
+          },
+          app.log,
+        );
+      })();
+    }
+
+    // ticket.resolved — fires when status transitions to RESOLVED
+    // ticket.status_changed — fires on any other status move (skip RESOLVED
+    // since it has its own dedicated kind)
+    if (update.status && update.status !== before.status) {
+      const recipients = [before.submittedById].filter((rid) => rid && rid !== userId);
+      if (recipients.length > 0) {
+        if (update.status === 'RESOLVED') {
+          (async () => {
+            await notify(
+              {
+                recipientIds: recipients,
+                kind: 'ticket.resolved',
+                subjectType: 'SupportTicket',
+                subjectId: id,
+                title: `Your ticket ${ticketNumLabel} was resolved`,
+                body: before.title,
+                linkUrl,
+                actorId: userId,
+              },
+              app.log,
+            );
+          })();
+        } else {
+          const statusLabel = String(update.status).toLowerCase().replace(/_/g, ' ');
+          (async () => {
+            await notify(
+              {
+                recipientIds: recipients,
+                kind: 'ticket.status_changed',
+                subjectType: 'SupportTicket',
+                subjectId: id,
+                title: `Ticket ${ticketNumLabel} is now ${statusLabel}`,
+                body: before.title,
+                linkUrl,
+                actorId: userId,
+              },
+              app.log,
+            );
+          })();
+        }
+      }
+    }
+
     const full = await loadTicketForReply(id);
     return reply.send(full);
   });
@@ -409,7 +504,35 @@ export async function ticketRoutes(app: FastifyInstance) {
     });
 
     // Touch the ticket's updatedAt so list views sort correctly
-    await prisma.supportTicket.update({ where: { id }, data: { updatedAt: new Date() } });
+    const touched = await prisma.supportTicket.update({
+      where: { id },
+      data: { updatedAt: new Date() },
+      select: { title: true, ticketNumber: true },
+    });
+
+    // Fan-out the comment notification to the other participants.
+    (async () => {
+      const recipients = await getTicketParticipantRecipients(id);
+      const actor = await prisma.user.findUnique({
+        where: { id: ctx.userId },
+        select: { name: true, email: true },
+      });
+      const actorName = actor?.name ?? actor?.email ?? 'Someone';
+      const label = `#T-${String(touched.ticketNumber).padStart(5, '0')}`;
+      await notify(
+        {
+          recipientIds: recipients,
+          kind: 'ticket.commented',
+          subjectType: 'SupportTicket',
+          subjectId: id,
+          title: `${actorName} commented on ${label}: ${touched.title}`,
+          body: parsed.data.body.slice(0, 200),
+          linkUrl: `/support/tickets/${id}`,
+          actorId: ctx.userId,
+        },
+        app.log,
+      );
+    })();
 
     const full = await loadTicketForReply(id);
     return reply.code(201).send(full);

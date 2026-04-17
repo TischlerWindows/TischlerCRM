@@ -39,6 +39,8 @@ import { dropboxRoutes } from './routes/dropbox.js';
 import { errorLogRoutes } from './routes/error-log.js';
 import { outlookRoutes } from './routes/outlook.js';
 import { ticketRoutes } from './routes/tickets.js';
+import { notificationRoutes } from './routes/notifications.js';
+import { initNotificationListener } from './lib/notifications/listen-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -381,6 +383,9 @@ export function buildApp() {
     // auth even if routeOptions.url is unset in edge cases.
     const pathOnly = (req.url ?? '').split('?')[0] ?? '';
     if (pathOnly === '/places/static-map' || routeUrl === '/places/static-map') return;
+    // SSE notification stream accepts auth via query-param token (EventSource
+    // cannot set Authorization). The route handler verifies it itself.
+    if (pathOnly === '/me/notifications/stream' || routeUrl === '/me/notifications/stream') return;
 
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
@@ -476,7 +481,14 @@ export function buildApp() {
   app.register(errorLogRoutes);
   app.register(outlookRoutes);
   app.register(ticketRoutes);
+  app.register(notificationRoutes);
   app.register(automationRoutes);
+
+  // Start the Postgres LISTEN connection so notify() events broadcast
+  // from any process reach SSE subscribers on this process.
+  initNotificationListener().catch((err) => {
+    app.log.error({ err }, 'Failed to initialize notification listener');
+  });
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/
   for (const { widgetId, registerRoutes } of externalWidgetRouteModules) {

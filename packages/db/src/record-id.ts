@@ -43,6 +43,8 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   TicketAttachment: '037',
   TicketEvent: '038',
   ErrorLog: '039',
+  Notification: '040',
+  NotificationTypeSetting: '041',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
