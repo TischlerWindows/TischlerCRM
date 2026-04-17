@@ -261,6 +261,7 @@ export default function DashboardPage() {
   });
   const [dashEditMode, setDashEditMode] = useState(false);
   const [editingWidget, setEditingWidget] = useState<string | null>(null);
+  const [recordsCacheVersion, setRecordsCacheVersion] = useState(0);
   const [refreshingWidgetId, setRefreshingWidgetId] = useState<string | null>(null);
   const [drillDownWidgetId, setDrillDownWidgetId] = useState<string | null>(null);
   const [drillDownLabel, setDrillDownLabel] = useState<string | null>(null);
@@ -525,7 +526,7 @@ export default function DashboardPage() {
     }
     
     return null;
-  }, [selectedWidgetType, widgetConfig, availableReports]);
+  }, [selectedWidgetType, widgetConfig, availableReports, recordsCacheVersion]);
 
   const handleResizeStart = (e: React.MouseEvent, widget: DashboardWidget) => {
     if (!dashEditMode) return;
@@ -658,6 +659,7 @@ export default function DashboardPage() {
         const records = await recordsService.getRecords(objectType);
         const flatRecords = recordsService.flattenRecords(records);
         setCachedRecords(objectType, flatRecords);
+        setRecordsCacheVersion(v => v + 1);
       } catch (e) {
         console.error(`Failed to load records for ${objectType}:`, e);
       }
@@ -676,6 +678,7 @@ export default function DashboardPage() {
         const records = await recordsService.getRecords(apiName);
         const flat = recordsService.flattenRecords(records);
         setCachedRecords(objType, flat);
+        setRecordsCacheVersion(v => v + 1);
       } catch (e) {
         console.error(`Failed to load records for ${objType}:`, e);
       }
@@ -692,6 +695,7 @@ export default function DashboardPage() {
         const records = await recordsService.getRecords(apiName);
         const flat = recordsService.flattenRecords(records);
         setCachedRecords(newFilterBtn.objectType, flat);
+        setRecordsCacheVersion(v => v + 1);
       } catch (e) {
         console.error(`Failed to load records for ${apiName}:`, e);
       }
@@ -1088,6 +1092,7 @@ export default function DashboardPage() {
       const records = await recordsService.getRecords(apiName);
       const flatRecords = recordsService.flattenRecords(records);
       setCachedRecords(objectType, flatRecords);
+      setRecordsCacheVersion(v => v + 1);
 
       const wFilters: WhereFilter[] = (widget.config?.whereFilters || []).filter((f: WhereFilter) => f.field && f.operator);
 
