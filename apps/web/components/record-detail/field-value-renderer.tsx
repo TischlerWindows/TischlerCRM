@@ -111,35 +111,48 @@ export function renderValue(
   // LocationSearch — virtual widget, reads mapped target fields
   if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
     const tf = fieldDef.targetFields;
-    const resolve = (key: string | undefined) => {
+    const rawResolve = (key: string | undefined) => {
       if (!key) return undefined;
       return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
     };
 
-    // Parse the field's own value as a JSON blob (legacy records store
-    // all address data inside address_search rather than separate cols).
+    // Parse the field's own value as a JSON blob (address_search).
     const valObj = (typeof value === 'object' && value) ? value : {};
 
-    let lat = Number(resolve(tf.lat));
-    let lng = Number(resolve(tf.lng));
-    // Fall back to the JSON blob for lat/lng
-    if ((isNaN(lat) || lat === 0) && valObj.lat != null) lat = Number(valObj.lat);
-    if ((isNaN(lng) || lng === 0) && valObj.lng != null) lng = Number(valObj.lng);
+    // The street target field (Property__address → "address") may hold a full
+    // formatted address string or even a compound JSON object from legacy data.
+    // Check it for lat/lng if it is a JSON object.
+    const streetRaw = rawResolve(tf.street);
+    const addrObj = (typeof streetRaw === 'object' && streetRaw) ? streetRaw as Record<string, any> : {};
 
-    let addressParts = [
-      resolve(tf.street),
-      resolve(tf.city),
-      resolve(tf.state),
-      resolve(tf.postalCode),
-      resolve(tf.country),
+    // Resolve individual address components — prefer JSON blob, then
+    // compound-address object, then individual target-field columns.
+    const resolveField = (targetKey: string | undefined, jsonKey: string) => {
+      if (valObj[jsonKey] != null && valObj[jsonKey] !== '') return String(valObj[jsonKey]);
+      if (addrObj[jsonKey] != null && addrObj[jsonKey] !== '') return String(addrObj[jsonKey]);
+      const raw = rawResolve(targetKey);
+      if (raw == null || raw === '') return '';
+      if (typeof raw === 'object') return '';
+      const s = String(raw);
+      if (s.includes(',')) return '';  // skip formatted multi-part addresses
+      return s;
+    };
+
+    // Lat / lng — try blob, compound-address object, then individual columns
+    let lat = valObj.lat != null ? Number(valObj.lat)
+      : addrObj.lat != null ? Number(addrObj.lat)
+      : Number(rawResolve(tf.lat));
+    let lng = valObj.lng != null ? Number(valObj.lng)
+      : addrObj.lng != null ? Number(addrObj.lng)
+      : Number(rawResolve(tf.lng));
+
+    const addressParts = [
+      resolveField(tf.street, 'street'),
+      resolveField(tf.city, 'city'),
+      resolveField(tf.state, 'state'),
+      resolveField(tf.postalCode, 'postalCode'),
+      resolveField(tf.country, 'country'),
     ].filter(Boolean).join(', ');
-
-    // Fall back to JSON blob for address text
-    if (!addressParts) {
-      addressParts = [
-        valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country,
-      ].filter(Boolean).join(', ');
-    }
 
     if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (

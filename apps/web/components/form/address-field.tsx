@@ -159,14 +159,20 @@ export function LocationSearchInput({
   // all address data inside one JSON blob rather than separate fields).
   const valueObj = toAddressObject(value);
 
-  // Resolve a sub-field: prefer the dedicated target-field column in
-  // formData, fall back to the JSON blob stored in the field's own value.
+  // Resolve a sub-field.  Prefer the JSON blob stored in the field's own
+  // value — it is per-component and avoids name collisions (e.g. the
+  // target key "Property__address" strips to "address", which may hold a
+  // full formatted address string rather than just the street).
   const resolve = (targetKey: string | undefined, jsonKey: string): string => {
-    if (targetKey) {
-      const v = formData[targetKey] ?? formData[targetKey.replace(/^[A-Za-z]+__/, '')];
-      if (v !== undefined && v !== null && v !== '') return String(v);
-    }
-    return valueObj[jsonKey] != null ? String(valueObj[jsonKey]) : '';
+    if (valueObj[jsonKey] != null && valueObj[jsonKey] !== '') return String(valueObj[jsonKey]);
+    if (!targetKey) return '';
+    const raw = formData[targetKey] ?? formData[targetKey.replace(/^[A-Za-z]+__/, '')];
+    if (raw == null || raw === '') return '';
+    // Skip compound values (JSON objects or formatted multi-part addresses)
+    if (typeof raw === 'object') return '';
+    const s = String(raw);
+    if (s.includes(',')) return '';
+    return s;
   };
 
   const street = resolve(tf.street, 'street');
