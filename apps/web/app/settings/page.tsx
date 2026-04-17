@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Users, Shield, Building2, FileText, Trash2, Lock, Database,
   Settings2, ArrowRight, Home, Plug, Zap, Bell, Puzzle, AlertTriangle,
-  Pin, PinOff, type LucideIcon,
+  LifeBuoy, Pin, PinOff, type LucideIcon,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ObjectManagerHeroCard } from '@/components/settings/object-manager-hero-card';
@@ -63,12 +63,13 @@ export default function SettingsPage() {
     { title: 'Automations', icon: Zap, href: '/settings/automations', count: counts.automations, description: 'Triggers and controllers', color: '#f59e0b', group: 'Automation' },
     { title: 'Notifications', icon: Bell, href: '/settings/notifications', description: 'Org-wide notification preferences', color: '#6366f1', group: 'Automation' },
     { title: 'Widgets', icon: Puzzle, href: '/settings/widgets', description: 'Reusable page widgets', color: '#7c3aed', group: 'Automation' },
+    { title: 'Support Tickets', icon: LifeBuoy, href: '/settings/support-tickets', description: 'Manage the category list used on the submit form', color: '#0ea5e9', group: 'Support' },
     { title: 'Connected Apps', icon: Plug, href: '/settings/integrations', description: 'Google Maps, Dropbox, Outlook, etc.', color: '#4285F4', group: 'Connections' },
     { title: 'Audit Log', icon: FileText, href: '/settings/audit-log', description: 'All system activity', color: '#7c3aed', group: 'Monitoring' },
     { title: 'Error Log', icon: AlertTriangle, href: '/settings/error-log', description: 'Client errors captured across the app', color: '#dc2626', group: 'Monitoring' },
   ];
 
-  const groupOrder = ['Company', 'Users & Access', 'Data Model', 'Automation', 'Connections', 'Monitoring'];
+  const groupOrder = ['Company', 'Users & Access', 'Data Model', 'Automation', 'Support', 'Connections', 'Monitoring'];
   const cardsByGroup: Record<string, Card[]> = {};
   for (const g of groupOrder) cardsByGroup[g] = [];
   for (const c of cards) cardsByGroup[c.group]!.push(c);

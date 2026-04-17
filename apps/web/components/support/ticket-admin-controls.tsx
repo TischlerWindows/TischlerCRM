@@ -5,11 +5,11 @@ import { Loader2 } from 'lucide-react';
 import {
   ticketsClient,
   type SupportTicket,
-  type TicketCategory,
   type TicketPriority,
   type TicketStatus,
   type UserRef,
 } from '@/lib/tickets-client';
+import { categoriesClient } from '@/lib/support-ticket-categories-client';
 
 const STATUS_OPTIONS: TicketStatus[] = [
   'OPEN',
@@ -19,13 +19,6 @@ const STATUS_OPTIONS: TicketStatus[] = [
   'CLOSED',
 ];
 const PRIORITY_OPTIONS: TicketPriority[] = ['LOW', 'NORMAL', 'HIGH', 'URGENT'];
-const CATEGORY_OPTIONS: TicketCategory[] = [
-  'UNTRIAGED',
-  'CRM_ISSUE',
-  'IT_ISSUE',
-  'FEATURE_REQUEST',
-  'QUESTION',
-];
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   OPEN: 'Open',
@@ -34,19 +27,18 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   RESOLVED: 'Resolved',
   CLOSED: 'Closed',
 };
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  UNTRIAGED: 'Untriaged',
-  CRM_ISSUE: 'CRM issue',
-  IT_ISSUE: 'IT issue',
-  FEATURE_REQUEST: 'Feature request',
-  QUESTION: 'Question',
-};
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   LOW: 'Low',
   NORMAL: 'Normal',
   HIGH: 'High',
   URGENT: 'Urgent',
 };
+
+interface CategoryOption {
+  key: string;
+  label: string;
+  isOrphan: boolean;
+}
 
 interface Props {
   ticket: SupportTicket;
@@ -57,6 +49,7 @@ export function TicketAdminControls({ ticket, onUpdated }: Props) {
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<UserRef[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -68,6 +61,38 @@ export function TicketAdminControls({ ticket, onUpdated }: Props) {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { items, orphans } = await categoriesClient.listAdmin();
+        const active: CategoryOption[] = items.map((c) => ({
+          key: c.key,
+          label: c.label,
+          isOrphan: false,
+        }));
+        const orphanOptions: CategoryOption[] = orphans
+          .filter((o) => !items.find((i) => i.key === o.key))
+          .map((o) => ({ key: o.key, label: `${o.key} (deleted)`, isOrphan: true }));
+        // Keep the currently-selected orphan in the list even if the orphans
+        // response didn't surface it (e.g. freshly renamed).
+        if (
+          ticket.category &&
+          !active.find((a) => a.key === ticket.category) &&
+          !orphanOptions.find((o) => o.key === ticket.category)
+        ) {
+          orphanOptions.push({
+            key: ticket.category,
+            label: `${ticket.category} (deleted)`,
+            isOrphan: true,
+          });
+        }
+        setCategoryOptions([...active, ...orphanOptions]);
+      } catch {
+        // Non-fatal; dropdown is empty and admin can reload.
+      }
+    })();
+  }, [ticket.category]);
 
   const apply = async (field: string, body: Record<string, unknown>) => {
     setSaving(field);
@@ -130,9 +155,9 @@ export function TicketAdminControls({ ticket, onUpdated }: Props) {
           disabled={!!saving}
           className="w-full border border-gray-300 rounded-md px-2 py-1.5 bg-white"
         >
-          {CATEGORY_OPTIONS.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABELS[c]}
+          {categoryOptions.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.label}
             </option>
           ))}
         </select>

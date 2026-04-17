@@ -15,6 +15,7 @@ import {
   Puzzle,
   Zap,
   AlertTriangle,
+  LifeBuoy,
   Settings2,
   type LucideIcon,
 } from 'lucide-react';
@@ -36,6 +37,7 @@ const REGISTRY: Record<string, LucideIcon> = {
   puzzle: Puzzle,
   zap: Zap,
   'alert-triangle': AlertTriangle,
+  'life-buoy': LifeBuoy,
   settings: Settings2,
 };
 

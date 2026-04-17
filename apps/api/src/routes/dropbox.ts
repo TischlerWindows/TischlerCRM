@@ -389,17 +389,41 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
   );
   const autoNumber = numberKey ? (recordData[numberKey] as string) : '';
 
-  // Find address field and extract street text
-  const addrKey = Object.keys(recordData).find(
-    (k) => k.toLowerCase() === 'address' || k.toLowerCase().endsWith('__address'),
-  );
+  // Find address — prefer the LocationSearch blob (address_search) which
+  // always has structured {street, city, state} data, then fall back to
+  // the legacy 'address' key which may be a flat formatted string.
   let addrStr = '';
-  if (addrKey) {
-    const raw = recordData[addrKey];
-    if (typeof raw === 'string') {
-      addrStr = raw;
-    } else if (raw && typeof raw === 'object') {
+
+  // 1. Try address_search / *__address_search (LocationSearch blob)
+  const searchKey = Object.keys(recordData).find(
+    (k) => k.toLowerCase() === 'address_search' || k.toLowerCase().endsWith('__address_search'),
+  );
+  if (searchKey) {
+    const raw = recordData[searchKey];
+    if (raw && typeof raw === 'object') {
       addrStr = [raw.street, raw.city, raw.state].filter(Boolean).join(', ');
+    } else if (typeof raw === 'string' && raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          addrStr = [parsed.street, parsed.city, parsed.state].filter(Boolean).join(', ');
+        }
+      } catch { addrStr = raw; }
+    }
+  }
+
+  // 2. Fall back to address / *__address
+  if (!addrStr) {
+    const addrKey = Object.keys(recordData).find(
+      (k) => k.toLowerCase() === 'address' || k.toLowerCase().endsWith('__address'),
+    );
+    if (addrKey) {
+      const raw = recordData[addrKey];
+      if (typeof raw === 'string' && raw) {
+        addrStr = raw;
+      } else if (raw && typeof raw === 'object') {
+        addrStr = [raw.street, raw.city, raw.state].filter(Boolean).join(', ');
+      }
     }
   }
 

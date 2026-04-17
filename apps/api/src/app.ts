@@ -41,6 +41,8 @@ import { outlookRoutes } from './routes/outlook.js';
 import { ticketRoutes } from './routes/tickets.js';
 import { notificationRoutes } from './routes/notifications.js';
 import { initNotificationListener } from './lib/notifications/listen-manager.js';
+import { supportTicketConfigRoutes } from './routes/support-ticket-config.js';
+import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -482,12 +484,19 @@ export function buildApp() {
   app.register(outlookRoutes);
   app.register(ticketRoutes);
   app.register(notificationRoutes);
+  app.register(supportTicketConfigRoutes);
   app.register(automationRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast
   // from any process reach SSE subscribers on this process.
   initNotificationListener().catch((err) => {
     app.log.error({ err }, 'Failed to initialize notification listener');
+  });
+
+  // Seed the default ticket categories if the Setting row is missing.
+  // Idempotent: never overwrites admin edits.
+  seedCategoriesIfMissing().catch((err) => {
+    app.log.error({ err }, 'Failed to seed default ticket categories');
   });
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/

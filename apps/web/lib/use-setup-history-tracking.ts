@@ -25,6 +25,7 @@ const ROUTE_META: Record<string, RouteMeta> = {
   '/settings/notifications': { title: 'Notifications', iconKey: 'bell' },
   '/settings/widgets': { title: 'Widgets', iconKey: 'puzzle' },
   '/settings/integrations': { title: 'Connected Apps', iconKey: 'plug' },
+  '/settings/support-tickets': { title: 'Support Tickets', iconKey: 'life-buoy' },
   '/object-manager': { title: 'Object Manager', iconKey: 'briefcase' },
 };
 

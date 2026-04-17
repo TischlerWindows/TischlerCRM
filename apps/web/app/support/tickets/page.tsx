@@ -15,6 +15,7 @@ import {
 import { TicketStatusPill } from '@/components/support/ticket-status-pill';
 import { TicketPriorityPill } from '@/components/support/ticket-priority-pill';
 import { TicketCategoryPill } from '@/components/support/ticket-category-pill';
+import { useCategoryCatalog } from '@/lib/category-catalog-context';
 
 type StatusFilter = TicketStatus | 'ALL';
 type CategoryFilter = TicketCategory | 'ALL';
@@ -24,6 +25,7 @@ export default function AdminTicketsPage() {
   const router = useRouter();
   const { hasAppPermission, loading: permsLoading } = usePermissions();
   const canManage = hasAppPermission('manageSupportTickets');
+  const { categories: catalogCategories } = useCategoryCatalog();
 
   const [tickets, setTickets] = useState<TicketListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,11 +111,11 @@ export default function AdminTicketsPage() {
           className="border border-gray-300 rounded-md px-2 py-2 text-sm bg-white"
         >
           <option value="ALL">All categories</option>
-          <option value="UNTRIAGED">Untriaged</option>
-          <option value="CRM_ISSUE">CRM issue</option>
-          <option value="IT_ISSUE">IT issue</option>
-          <option value="FEATURE_REQUEST">Feature request</option>
-          <option value="QUESTION">Question</option>
+          {catalogCategories.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.label}
+            </option>
+          ))}
         </select>
 
         <select

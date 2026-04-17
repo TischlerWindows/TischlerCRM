@@ -22,6 +22,7 @@ const SIDEBAR_STATIC: Array<{ title: string; href: string; iconKey: string }> = 
   { title: 'Automations', href: '/settings/automations', iconKey: 'zap' },
   { title: 'Notifications', href: '/settings/notifications', iconKey: 'bell' },
   { title: 'Widgets', href: '/settings/widgets', iconKey: 'puzzle' },
+  { title: 'Support Tickets', href: '/settings/support-tickets', iconKey: 'life-buoy' },
   { title: 'Connected Apps', href: '/settings/integrations', iconKey: 'plug' },
   { title: 'Audit Log', href: '/settings/audit-log', iconKey: 'file-text' },
   { title: 'Error Log', href: '/settings/error-log', iconKey: 'alert-triangle' },
