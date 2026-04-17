@@ -1631,7 +1631,7 @@ export default function DashboardPage() {
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
                     {widget.config.showLegend && <Legend />}
-                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" onClick={(data: any, idx: number) => handleChartDrillDown(widget, data.label, idx)}>
+                    <Bar dataKey="value" radius={[8, 8, 0, 0]} cursor="pointer" activeBar={{ fillOpacity: 0.7 }} onClick={(data: any, idx: number) => handleChartDrillDown(widget, data.label, idx)}>
                       {widget.config.data.map((entry: any, idx: number) => (
                         <Cell key={idx} fill={entry.color || widget.config.barColors?.[entry.label] || widget.config.barColor || widgetAccent} />
                       ))}
@@ -1699,12 +1699,12 @@ export default function DashboardPage() {
                 const barHeight = Math.max(24, Math.min(32, 100 / Math.max(1, (widget.config.data?.length || 1))));
                 const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                 return (
-                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                  <div key={idx} className={`flex items-center gap-3 flex-1 min-h-0 cursor-pointer rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
                     {hLabelPos === 'left' && <div className={`text-xs ${labelColorClass} w-20 text-right truncate`}>{item.label}</div>}
                     {hValuePos === 'left' && <div className={`text-xs ${valueColorClass} font-medium w-12`}>{item.value}</div>}
                     <div className="flex-1 rounded-full flex items-center" style={{ height: `${barHeight}px`, backgroundColor: widgetBg ? `${widgetBg}80` : '#f3f4f6' }}>
                       <div
-                        className="rounded-full h-full transition-all hover:opacity-80"
+                        className="rounded-full h-full transition-all hover:brightness-125"
                         style={{ width: `${widthPercent}%`, minWidth: '2px', backgroundColor: item.color || widget.config.barColors?.[item.label] || widgetAccent }}
                         title={`${item.label}: ${item.value}`}
                       />
@@ -1793,6 +1793,7 @@ export default function DashboardPage() {
                         fill={svColors[idx % svColors.length]}
                         radius={idx === svStackKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                         cursor="pointer"
+                        activeBar={{ fillOpacity: 0.7 }}
                         onClick={(data: any, barIdx: number) => handleChartDrillDown(widget, data.label, barIdx)}
                       />
                     ))}
@@ -1880,7 +1881,7 @@ export default function DashboardPage() {
                     const isActive = drillDownLabel === item.label && drillDownWidgetId === widget.id;
                     
                     return (
-                      <div key={idx} className={`flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
+                      <div key={idx} className={`flex items-center gap-3 cursor-pointer rounded-lg px-1 -mx-1 transition-colors ${isActive ? 'bg-blue-50 ring-1 ring-blue-200' : ''}`} onClick={() => handleChartDrillDown(widget, item.label, idx)}>
                         <div className={`text-xs ${labelColorClass} w-24 text-right truncate flex-shrink-0`} title={item.label}>
                           {item.label}
                         </div>
@@ -1894,7 +1895,7 @@ export default function DashboardPage() {
                             return (
                               <div
                                 key={key}
-                                className="h-full transition-all hover:opacity-80 flex items-center justify-center"
+                                className="h-full transition-all hover:brightness-125 flex items-center justify-center"
                                 style={{ 
                                   width: `${widthPercent}%`,
                                   backgroundColor: colors[stackIdx % colors.length],
