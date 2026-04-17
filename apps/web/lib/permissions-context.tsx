@@ -29,6 +29,7 @@ export interface AppPermissions {
   manageSharing: boolean;
   viewAllData: boolean;
   modifyAllData: boolean;
+  manageSupportTickets: boolean;
 }
 
 interface PermissionsData {

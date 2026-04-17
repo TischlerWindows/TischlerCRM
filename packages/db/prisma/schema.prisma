@@ -83,6 +83,17 @@ model User {
   userIntegrations       UserIntegration[]
   configuredIntegrations Integration[]     @relation("IntegrationConfiguredBy")
 
+  // Support tickets (Phase 1)
+  submittedTickets           SupportTicket[]     @relation("TicketSubmitter")
+  assignedTickets            SupportTicket[]     @relation("TicketAssignee")
+  resolvedTickets            SupportTicket[]     @relation("TicketResolvedBy")
+  deletedTickets             SupportTicket[]     @relation("TicketDeletedBy")
+  ticketComments             TicketComment[]     @relation("TicketCommentAuthor")
+  deletedTicketComments      TicketComment[]     @relation("TicketCommentDeletedBy")
+  uploadedTicketAttachments  TicketAttachment[]  @relation("TicketAttachmentUploader")
+  ticketEvents               TicketEvent[]       @relation("TicketEventActor")
+  errorLogs                  ErrorLog[]          @relation("ErrorLogUser")
+
   @@index([profileId])
   @@index([departmentId])
   @@index([managerId])
@@ -639,4 +650,184 @@ model UserIntegration {
   @@index([userId])
   @@index([integrationId])
   @@index([lastSyncAt])
+}
+
+// ============================================
+// Support Tickets (Phase 1)
+// ============================================
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_USER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TicketCategory {
+  UNTRIAGED
+  CRM_ISSUE
+  IT_ISSUE
+  FEATURE_REQUEST
+  QUESTION
+}
+
+enum TicketEventType {
+  CREATED
+  COMMENT
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  CATEGORY_CHANGED
+  ASSIGNED
+  ATTACHMENT_ADDED
+  ERROR_LOG_ATTACHED
+  RESOLVED
+  REOPENED
+}
+
+model SupportTicket {
+  id            String         @id
+  ticketNumber  Int            @unique @default(autoincrement())
+  title         String
+  description   String
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(NORMAL)
+  category      TicketCategory @default(UNTRIAGED)
+
+  submittedBy   User   @relation("TicketSubmitter", fields: [submittedById], references: [id])
+  submittedById String
+
+  assignedTo   User?   @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String?
+
+  // Opaque reference managed by the attachment storage layer (Dropbox integration).
+  // Semantics are owned by that layer: can be a folder id, path, or JSON blob.
+  attachmentFolderRef String?
+
+  sessionId String?
+
+  resolvedAt   DateTime?
+  resolvedBy   User?     @relation("TicketResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedById String?
+
+  closedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete
+  deletedAt   DateTime?
+  deletedBy   User?     @relation("TicketDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedById String?
+
+  comments    TicketComment[]
+  attachments TicketAttachment[]
+  events      TicketEvent[]
+  errorLogs   ErrorLog[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([submittedById])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model TicketComment {
+  id       String        @id
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+
+  author   User   @relation("TicketCommentAuthor", fields: [authorId], references: [id])
+  authorId String
+
+  body       String
+  isInternal Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Soft delete
+  deletedAt   DateTime?
+  deletedBy   User?     @relation("TicketCommentDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull)
+  deletedById String?
+
+  @@index([ticketId, createdAt])
+}
+
+model TicketAttachment {
+  id       String        @id
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+
+  uploadedBy   User   @relation("TicketAttachmentUploader", fields: [uploadedById], references: [id])
+  uploadedById String
+
+  kind      String // "screenshot" | "file"
+  fileName  String
+  sizeBytes Int?
+  mimeType  String?
+
+  // Storage-agnostic identifiers owned by the storage integration (Dropbox).
+  storagePath String
+  storageId   String?
+  storageRev  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+model TicketEvent {
+  id       String        @id
+  ticket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticketId String
+
+  actor   User?   @relation("TicketEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorId String?
+
+  type    TicketEventType
+  payload Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
+model ErrorLog {
+  id             String  @id
+  message        String
+  stack          String?
+  source         String  @default("client") // "client" | "server"
+  url            String?
+  userAgent      String?
+  componentStack String?
+  metadata       Json?
+
+  user      User?   @relation("ErrorLogUser", fields: [userId], references: [id], onDelete: SetNull)
+  userId    String?
+  userEmail String?
+
+  sessionId  String?
+  dedupeKey  String?
+
+  ticket   SupportTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  ticketId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([source])
+  @@index([sessionId])
+  @@index([ticketId])
+  @@index([dedupeKey, createdAt])
+  @@index([userId])
 }

@@ -16,6 +16,9 @@ import {
   Database,
   ExternalLink,
   Edit,
+  LifeBuoy,
+  Inbox,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
@@ -27,6 +30,8 @@ import { getSetting, setSetting } from '@/lib/preferences';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
 import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
 import { installGlobalErrorHandler } from '@/lib/error-reporter';
+import { SubmitTicketModal } from '@/components/support/submit-ticket-modal';
+import { MyTicketsDrawer } from '@/components/support/my-tickets-drawer';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -46,6 +51,8 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSetupMenu, setShowSetupMenu] = useState(false);
+  const [showSubmitTicket, setShowSubmitTicket] = useState(false);
+  const [showMyTickets, setShowMyTickets] = useState(false);
 
   // Map tab hrefs to CRM object apiNames for permission filtering
   const hrefToObjectMap: Record<string, string> = {
@@ -337,8 +344,37 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                   <h3 className="text-sm font-semibold text-gray-900">Help & Support</h3>
                 </div>
                 <div className="py-1">
-                  <a href="mailto:support@tischlerusa.com" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Contact Support</a>
-                  <button onClick={() => { setShowHelp(false); router.push('/settings'); }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">System Settings</button>
+                  <button
+                    onClick={() => { setShowHelp(false); setShowSubmitTicket(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <LifeBuoy className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">Submit a ticket</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowHelp(false); setShowMyTickets(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <Inbox className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">My tickets</span>
+                  </button>
+                  {hasAppPermission('manageSupportTickets') && (
+                    <button
+                      onClick={() => { setShowHelp(false); router.push('/support/tickets'); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <Users className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                      <span className="flex-1">All tickets</span>
+                    </button>
+                  )}
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    onClick={() => { setShowHelp(false); router.push('/settings'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">System settings</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -532,6 +568,17 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      {/* Support ticket modal + drawer */}
+      <SubmitTicketModal
+        open={showSubmitTicket}
+        onClose={() => setShowSubmitTicket(false)}
+        onCreated={(ticket) => {
+          setShowSubmitTicket(false);
+          router.push(`/support/tickets/${ticket.id}`);
+        }}
+      />
+      <MyTicketsDrawer open={showMyTickets} onClose={() => setShowMyTickets(false)} />
 
       {/* Add Tab Modal */}
       {showAddTab && (

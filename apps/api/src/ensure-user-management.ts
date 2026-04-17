@@ -8,7 +8,7 @@ const READ  = { create:false, read:true, edit:false, delete:false, viewAll:true,
 const NONE  = { create:false, read:false,edit:false, delete:false, viewAll:false, modifyAll:false };
 
 const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies'] as const;
-const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings'] as const;
+const APP_KEYS = ['viewReports','exportData','manageUsers','manageProfiles','viewAuditLog','manageIntegrations','manageDepartments','manageCompanySettings','manageSupportTickets'] as const;
 
 function makePerms(
   obj: Record<string, typeof FULL>,
