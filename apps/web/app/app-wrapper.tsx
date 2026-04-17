@@ -117,6 +117,8 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
+    pathname?.startsWith('/support') ||
+    pathname?.startsWith('/notifications') ||
     pathname?.includes('demo');
 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');

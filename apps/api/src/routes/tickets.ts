@@ -10,6 +10,7 @@ import {
   getTicketCreatedRecipients,
   getTicketParticipantRecipients,
 } from '../lib/notifications/ticket-recipients.js';
+import { getCategoriesOrDefault } from '../lib/support-tickets/categories.js';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -24,7 +25,6 @@ function getFrontendUrl(): string {
 
 const STATUS_VALUES = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_USER', 'RESOLVED', 'CLOSED'] as const;
 const PRIORITY_VALUES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'] as const;
-const CATEGORY_VALUES = ['UNTRIAGED', 'CRM_ISSUE', 'IT_ISSUE', 'FEATURE_REQUEST', 'QUESTION'] as const;
 
 type Status = (typeof STATUS_VALUES)[number];
 
@@ -112,6 +112,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     const schema = z.object({
       title: z.string().min(1).max(200),
       description: z.string().min(1).max(20000),
+      category: z.string().min(1).max(64),
       sessionId: z.string().max(128).optional(),
       errorLogIds: z.array(z.string().max(64)).max(50).optional(),
     });
@@ -120,11 +121,21 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     const { title, description, sessionId, errorLogIds } = parsed.data;
 
+    // Validate the category against the admin-managed active list.
+    const activeCategories = await getCategoriesOrDefault();
+    const validKey = activeCategories.some((c) => c.key === parsed.data.category);
+    if (!validKey) {
+      return reply.code(400).send({
+        error: `Unknown category "${parsed.data.category}"`,
+      });
+    }
+
     const ticket = await prisma.supportTicket.create({
       data: {
         id: generateId('SupportTicket'),
         title,
         description,
+        category: parsed.data.category,
         submittedById: userId,
         sessionId,
       },
@@ -248,7 +259,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     const querySchema = z.object({
       status: z.enum(STATUS_VALUES).optional(),
-      category: z.enum(CATEGORY_VALUES).optional(),
+      category: z.string().min(1).max(64).optional(),
       priority: z.enum(PRIORITY_VALUES).optional(),
       assignedToId: z.string().optional(),
       mine: z.coerce.boolean().optional(),
@@ -321,7 +332,7 @@ export async function ticketRoutes(app: FastifyInstance) {
       .object({
         status: z.enum(STATUS_VALUES).optional(),
         priority: z.enum(PRIORITY_VALUES).optional(),
-        category: z.enum(CATEGORY_VALUES).optional(),
+        category: z.string().min(1).max(64).optional(),
         assignedToId: z.string().nullable().optional(),
       })
       .refine((v) => Object.keys(v).length > 0, { message: 'No fields to update' });
@@ -332,6 +343,19 @@ export async function ticketRoutes(app: FastifyInstance) {
       where: { id, deletedAt: null },
     });
     if (!before) return reply.code(404).send({ error: 'Ticket not found' });
+
+    // Validate the category against the active list plus the ticket's
+    // current value so admins can keep orphan values untouched.
+    if (parsed.data.category !== undefined) {
+      const active = await getCategoriesOrDefault();
+      const allowed = new Set(active.map((c) => c.key));
+      allowed.add(before.category);
+      if (!allowed.has(parsed.data.category)) {
+        return reply
+          .code(400)
+          .send({ error: `Unknown category "${parsed.data.category}"` });
+      }
+    }
 
     const update: any = {};
     const events: Array<{ type: string; payload: any }> = [];

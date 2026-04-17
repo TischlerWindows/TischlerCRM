@@ -5,6 +5,7 @@ import { X, AlertTriangle, Loader2 } from 'lucide-react';
 import { ticketsClient, type SupportTicket } from '@/lib/tickets-client';
 import { getSessionId } from '@/lib/session-id';
 import { getRecentClientErrors, type RecentClientError } from '@/lib/error-reporter';
+import { categoriesClient, type TicketCategory } from '@/lib/support-ticket-categories-client';
 import { AttachmentsSlot } from './attachments-slot';
 
 interface SubmitTicketModalProps {
@@ -16,6 +17,8 @@ interface SubmitTicketModalProps {
 export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [categories, setCategories] = useState<TicketCategory[]>([]);
+  const [category, setCategory] = useState<string>('');
   const [recentErrors, setRecentErrors] = useState<RecentClientError[]>([]);
   const [checkedErrorIds, setCheckedErrorIds] = useState<Set<string>>(new Set());
   const [showErrorsSection, setShowErrorsSection] = useState(true);
@@ -26,6 +29,16 @@ export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModa
 
   useEffect(() => {
     if (!open) return;
+    // Fetch active categories for the picklist.
+    (async () => {
+      try {
+        const list = await categoriesClient.listActive();
+        setCategories(list);
+        setCategory((prev) => prev || list[0]?.key || '');
+      } catch {
+        // Best-effort. Submit will surface a validation error if empty.
+      }
+    })();
     const ringErrors = getRecentClientErrors().filter((e) => e.id);
     if (ringErrors.length > 0) {
       setRecentErrors(ringErrors);
@@ -57,6 +70,7 @@ export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModa
       // Reset on close
       setTitle('');
       setDescription('');
+      setCategory('');
       setRecentErrors([]);
       setCheckedErrorIds(new Set());
       setShowErrorsSection(true);
@@ -78,13 +92,14 @@ export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !description.trim() || submitting) return;
+    if (!title.trim() || !description.trim() || !category || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
       const ticket = await ticketsClient.create({
         title: title.trim(),
         description: description.trim(),
+        category,
         sessionId,
         errorLogIds: Array.from(checkedErrorIds),
       });
@@ -136,6 +151,26 @@ export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModa
               placeholder="Short summary of the issue"
               className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-brand-dark mb-1" htmlFor="ticket-category">
+              Type of issue
+            </label>
+            <select
+              id="ticket-category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              required
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy bg-white"
+            >
+              {categories.length === 0 && <option value="">Loading…</option>}
+              {categories.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -217,7 +252,7 @@ export function SubmitTicketModal({ open, onClose, onCreated }: SubmitTicketModa
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || !title.trim() || !description.trim()}
+            disabled={submitting || !title.trim() || !description.trim() || !category}
             className="px-4 py-2 text-sm font-medium bg-brand-navy text-white rounded-md hover:bg-brand-navy-light transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}

@@ -675,14 +675,6 @@ enum TicketPriority {
   URGENT
 }
 
-enum TicketCategory {
-  UNTRIAGED
-  CRM_ISSUE
-  IT_ISSUE
-  FEATURE_REQUEST
-  QUESTION
-}
-
 enum TicketEventType {
   CREATED
   COMMENT
@@ -703,7 +695,7 @@ model SupportTicket {
   description   String
   status        TicketStatus   @default(OPEN)
   priority      TicketPriority @default(NORMAL)
-  category      TicketCategory @default(UNTRIAGED)
+  category      String         @default("UNTRIAGED")
 
   submittedBy   User   @relation("TicketSubmitter", fields: [submittedById], references: [id])
   submittedById String
