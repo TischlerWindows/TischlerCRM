@@ -2038,7 +2038,7 @@ export default function DashboardPage() {
 
       case 'donut': {
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative flex flex-col`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass}${drillRing} p-6 relative group flex flex-col`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
@@ -2069,6 +2069,13 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                title="Drag to resize"
+              />
+            )}
             <div className={`text-[13px] font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
@@ -2127,7 +2134,7 @@ export default function DashboardPage() {
 
       case 'gauge':
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-5 relative`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-5 relative group`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
@@ -2158,6 +2165,13 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                title="Drag to resize"
+              />
+            )}
             <div className={`text-[13px] font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
             <div className="flex flex-col items-center justify-center h-[calc(100%-2rem)]">
@@ -2170,7 +2184,7 @@ export default function DashboardPage() {
 
       case 'table':
         return (
-          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative overflow-auto`}>
+          <div key={widget.id} style={bgStyle} className={`${bgClass} p-6 relative group overflow-auto`}>
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
@@ -2201,34 +2215,43 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            {dashEditMode && (
+              <div
+                onMouseDown={(e) => handleResizeStart(e, widget)}
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                title="Drag to resize"
+              />
+            )}
             <div className={`text-[13px] font-medium tracking-wide uppercase ${titleColorClass} mb-3`}>{widget.title}</div>
             {filterBar}
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 text-gray-600">Name</th>
-                  <th className="text-left py-2 text-gray-600">Status</th>
-                  <th className="text-right py-2 text-gray-600">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">Acme Corp</td>
-                  <td className="py-2"><span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Active</span></td>
-                  <td className="py-2 text-right">$125,000</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">TechStart Inc</td>
-                  <td className="py-2"><span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">Pending</span></td>
-                  <td className="py-2 text-right">$89,500</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-2">Global Systems</td>
-                  <td className="py-2"><span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Active</span></td>
-                  <td className="py-2 text-right">$210,000</td>
-                </tr>
-              </tbody>
-            </table>
+            {(() => {
+              const tableData = widget.config?.data || widget.config?.manualData || [];
+              const xLabel = widget.config?.xAxis ? stripFieldPrefix(widget.config.xAxis) : 'Name';
+              const yLabel = widget.config?.yAxis ? `Count of ${stripFieldPrefix(widget.config.yAxis)}` : 'Value';
+              if (tableData.length > 0) {
+                return (
+                  <div className="flex-1 overflow-auto min-h-0">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">{xLabel}</th>
+                          <th className="text-right py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">{yLabel}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {tableData.map((row: any, rIdx: number) => (
+                          <tr key={rIdx} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => handleChartDrillDown(widget, row.label, rIdx)}>
+                            <td className={`py-2 ${valueColorClass}`}>{row.label}</td>
+                            <td className={`py-2 text-right tabular-nums font-medium ${titleColorClass}`}>{typeof row.value === 'number' ? row.value.toLocaleString() : row.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              }
+              return <div className="flex-1 flex items-center justify-center text-sm text-gray-400">No data configured</div>;
+            })()}
           </div>
         );
 
@@ -2392,11 +2415,13 @@ export default function DashboardPage() {
         onDragEnd={handleWidgetDragEnd}
         onDragOver={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           e.dataTransfer.dropEffect = 'move';
           setDropTarget({ sectionId, beforeWidgetId: widget.id });
         }}
         onDrop={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           handleWidgetDrop(sectionId, widget.id);
         }}
         style={{
@@ -3124,15 +3149,13 @@ export default function DashboardPage() {
                             return (sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId)) ? (
                             <>
                             <div
-                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId && sectionWidgets.length === 0 ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
                                 e.dataTransfer.dropEffect = 'move';
-                                const target = e.target as HTMLElement;
-                                if (target === e.currentTarget) {
-                                  setDropTarget({ sectionId: section.id, beforeWidgetId: null });
-                                }
+                                // Accept drops anywhere on the grid container
+                                setDropTarget({ sectionId: section.id, beforeWidgetId: null });
                               }}
                               onDrop={(e) => {
                                 if (!dashEditMode) return;
@@ -3141,8 +3164,19 @@ export default function DashboardPage() {
                               }}
                             >
                               {sectionWidgets.map(widget => renderWidgetWithDrag(widget, section.id, sectionFilter))}
+                              {/* Drop zone placeholder when dragging */}
+                              {dashEditMode && draggingWidgetId && !sectionWidgets.find(w => w.id === draggingWidgetId) && (
+                                <div
+                                  style={{ gridColumn: 'span 4', gridRow: 'span 2' }}
+                                  className={`border-2 border-dashed rounded-2xl flex items-center justify-center transition-all duration-200 ${
+                                    isSectionDropTarget ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200 bg-gray-50/30'
+                                  }`}
+                                >
+                                  <span className={`text-sm ${isSectionDropTarget ? 'text-blue-500' : 'text-gray-300'}`}>Drop here</span>
+                                </div>
+                              )}
                               {/* End-of-section drop indicator */}
-                              {isSectionDropTarget && (
+                              {isSectionDropTarget && !dashEditMode && (
                                 <div style={{ gridColumn: 'span 9', height: '4px', gridRow: 'span 1' }} className="flex items-center self-start">
                                   <div className="w-full h-1 bg-blue-500 rounded-full" />
                                 </div>
