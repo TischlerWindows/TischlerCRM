@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { ExitSetupPill } from '@/components/settings/exit-setup-pill';
+import { SetupSearchTypeahead } from '@/components/settings/setup-search-typeahead';
 import {
   Users,
   Shield,
@@ -21,7 +21,6 @@ import {
   Plug,
   Puzzle,
   Zap,
-  Search,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
@@ -96,19 +95,11 @@ interface SettingsSidebarProps {
 
 export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebarProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState('');
 
   const isActive = (href: string) => {
     if (href === '/object-manager') return pathname?.startsWith('/object-manager');
     return pathname === href || pathname?.startsWith(href + '/');
   };
-
-  const filteredGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-  })).filter((group) => group.items.length > 0);
 
   // When collapsed, render only a thin expand strip
   if (collapsed) {
@@ -162,30 +153,12 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
 
       {/* Search */}
       <div className="px-3 py-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input
-            type="search"
-            placeholder="Search settings..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            autoComplete="off"
-            className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-gray-300 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          )}
-        </div>
+        <SetupSearchTypeahead />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-2 pb-2">
-        {filteredGroups.map((group) => (
+        {NAV_GROUPS.map((group) => (
           <div key={group.title}>
             <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
               {group.title}
