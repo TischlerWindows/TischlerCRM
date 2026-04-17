@@ -57,6 +57,34 @@ export async function sendInviteEmail(
   }
 }
 
+export async function sendSupportTicketAlertEmail(
+  admin: NotifyUser,
+  ticket: { ticketNumber: number; title: string; descriptionPreview: string; submitterName: string; url: string },
+): Promise<{ sent: boolean }> {
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false };
+  const displayName = escapeHtml(admin.name ?? admin.email);
+  const title = escapeHtml(ticket.title);
+  const preview = escapeHtml(ticket.descriptionPreview);
+  const submitter = escapeHtml(ticket.submitterName);
+  try {
+    await sendViaMsGraph(
+      result.token,
+      result.senderEmail,
+      admin.email,
+      `New support ticket: #T-${ticket.ticketNumber} — ${ticket.title}`,
+      `<p>Hello ${displayName},</p>
+       <p><strong>${submitter}</strong> submitted a new support ticket.</p>
+       <p><strong>${title}</strong></p>
+       <blockquote style="border-left:3px solid #ccc;padding-left:10px;margin:8px 0;color:#444;">${preview}</blockquote>
+       <p><a href="${ticket.url}">Open ticket #T-${ticket.ticketNumber}</a></p>`
+    );
+    return { sent: true };
+  } catch {
+    return { sent: false };
+  }
+}
+
 export async function sendPasswordResetEmail(
   user: NotifyUser,
   resetUrl: string
