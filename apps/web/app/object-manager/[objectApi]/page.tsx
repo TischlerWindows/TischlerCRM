@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { ObjectManagerTopBar } from '@/components/object-manager/object-manager-top-bar';
+import { useSetupHistoryTracking } from '@/lib/use-setup-history-tracking';
 import { 
   Database, 
   ChevronLeft, 
@@ -158,7 +160,8 @@ export default function ObjectDetailPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const initialLayoutId = searchParams.get('layoutId');
   const sectionParam = searchParams.get('section');
-  const returnTo = searchParams.get('returnTo');
+
+  useSetupHistoryTracking();
 
   useEffect(() => {
     setSelectedObject(objectApi);
@@ -210,28 +213,29 @@ export default function ObjectDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <>
+      <ObjectManagerTopBar
+        crumbs={[
+          { label: 'Object Manager', href: '/object-manager' },
+          { label: object.label },
+        ]}
+      />
+      <div className="min-h-[calc(100vh-48px)] bg-gray-50 flex">
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-full bg-white border-r border-gray-200 transition-all duration-300 z-50',
+          'fixed left-0 top-[48px] h-[calc(100vh-48px)] bg-white border-r border-gray-200 transition-all duration-300 z-40 flex flex-col',
           sidebarCollapsed ? 'w-16' : 'w-72'
         )}
       >
-        {/* Header */}
-        <div className="h-[48px] bg-brand-navy flex items-center justify-between px-3 flex-shrink-0">
-          {!sidebarCollapsed && (
-            <Link href={returnTo || '/object-manager'} className="flex items-center gap-1.5 text-white/80 hover:text-white transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-              <span className="text-xs font-semibold">{returnTo ? 'Back' : 'Object Manager'}</span>
-            </Link>
-          )}
+        {/* Header — collapse only */}
+        <div className="h-[44px] bg-white border-b border-gray-200 flex items-center justify-end px-3 flex-shrink-0">
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-1.5 hover:bg-white/10 rounded transition-colors ml-auto"
+            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <Settings className="w-4 h-4 text-white/80" />
+            <Settings className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
@@ -254,7 +258,7 @@ export default function ObjectDetailPage() {
         )}
 
         {/* Navigation */}
-        <nav className="p-2 overflow-y-auto" style={{ height: 'calc(100vh - 180px)' }}>
+        <nav className="flex-1 min-h-0 p-2 overflow-y-auto">
           {!sidebarCollapsed && (
             <>
               {['Data Model', 'Layouts & UI', 'Automation', 'Security & Access'].map((category) => {
@@ -467,6 +471,7 @@ export default function ObjectDetailPage() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </>
   );
 }

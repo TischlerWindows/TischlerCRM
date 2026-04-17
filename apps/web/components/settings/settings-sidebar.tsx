@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { ExitSetupPill } from '@/components/settings/exit-setup-pill';
+import { SetupSearchTypeahead } from '@/components/settings/setup-search-typeahead';
 import {
   Users,
   Shield,
@@ -20,7 +21,6 @@ import {
   Plug,
   Puzzle,
   Zap,
-  Search,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
@@ -42,35 +42,55 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: 'Administration',
-    items: [
-      { name: 'Users', href: '/settings/users', icon: Users },
-      { name: 'Profiles', href: '/settings/profiles', icon: Shield },
-      { name: 'Departments', href: '/settings/departments', icon: Building2 },
-      { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
-      { name: 'Error Log', href: '/settings/error-log', icon: AlertTriangle },
-      { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
-      { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
-      { name: 'Backups', href: '/settings/backups', icon: Database },
-    ],
-  },
-  {
-    title: 'Settings',
+    title: 'Company',
     items: [
       { name: 'Company Settings', href: '/settings/company', icon: Home },
+      { name: 'Departments', href: '/settings/departments', icon: Building2 },
       { name: 'Security', href: '/settings/security', icon: Lock },
       { name: 'Privacy Center', href: '/settings/privacy', icon: ShieldAlert, disabled: true },
     ],
   },
   {
-    title: 'Integrations',
+    title: 'Users & Access',
     items: [
-      { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
-      { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
+      { name: 'Users', href: '/settings/users', icon: Users },
+      { name: 'Profiles', href: '/settings/profiles', icon: Shield },
+    ],
+  },
+  {
+    title: 'Data Model',
+    items: [
+      { name: 'Backups', href: '/settings/backups', icon: Database },
+      { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
+      { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
+    ],
+  },
+  {
+    title: 'Automation',
+    items: [
       { name: 'Automations', href: '/settings/automations', icon: Zap },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell },
+      { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
+    ],
+  },
+  {
+    title: 'Support',
+    items: [
       { name: 'Support Tickets', href: '/settings/support-tickets', icon: LifeBuoy },
+    ],
+  },
+  {
+    title: 'Connections',
+    items: [
+      { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
+    ],
+  },
+  {
+    title: 'Monitoring',
+    items: [
+      { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
+      { name: 'Error Log', href: '/settings/error-log', icon: AlertTriangle },
     ],
   },
 ];
@@ -82,19 +102,11 @@ interface SettingsSidebarProps {
 
 export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebarProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState('');
 
   const isActive = (href: string) => {
     if (href === '/object-manager') return pathname?.startsWith('/object-manager');
     return pathname === href || pathname?.startsWith(href + '/');
   };
-
-  const filteredGroups = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    ),
-  })).filter((group) => group.items.length > 0);
 
   // When collapsed, render only a thin expand strip
   if (collapsed) {
@@ -137,7 +149,7 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           className={cn(
             'flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 transition-all duration-150',
             isActive('/object-manager')
-              ? 'bg-[#ede9f5] text-[#151f6d] font-semibold shadow-[inset_3px_0_0_#da291c]'
+              ? 'bg-[#ede9f5] text-brand-navy font-semibold shadow-[inset_3px_0_0_theme(colors.brand.red)]'
               : 'bg-gray-50 text-gray-800 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
@@ -148,30 +160,12 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
 
       {/* Search */}
       <div className="px-3 py-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-          <input
-            type="search"
-            placeholder="Search settings..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            autoComplete="off"
-            className="w-full bg-gray-100 border border-gray-200 rounded-lg py-2 pl-9 pr-3 text-[13px] text-gray-700 placeholder:text-gray-400 outline-none focus:bg-white focus:border-gray-300 focus:ring-1 focus:ring-gray-300 transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          )}
-        </div>
+        <SetupSearchTypeahead />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-2 pb-5">
-        {filteredGroups.map((group) => (
+      <nav className="flex-1 overflow-y-auto px-2 pb-2">
+        {NAV_GROUPS.map((group) => (
           <div key={group.title}>
             <div className="px-3 pt-3 pb-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-gray-400">
               {group.title}
@@ -200,14 +194,14 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
                   className={cn(
                     'flex items-center gap-2.5 rounded-lg transition-all duration-150 my-0.5 px-3 py-2',
                     active
-                      ? 'bg-[#ede9f5] text-[#151f6d] font-semibold shadow-[inset_3px_0_0_#da291c]'
+                      ? 'bg-[#ede9f5] text-brand-navy font-semibold shadow-[inset_3px_0_0_theme(colors.brand.red)]'
                       : 'text-gray-800 font-medium hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
                   <item.icon
                     className={cn(
                       'flex-shrink-0 w-[18px] h-[18px]',
-                      active ? 'text-[#151f6d]' : 'text-gray-500'
+                      active ? 'text-brand-navy' : 'text-gray-500'
                     )}
                   />
                   <span className="text-sm">{item.name}</span>
@@ -217,6 +211,10 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           </div>
         ))}
       </nav>
+
+      <div className="px-3 py-3 border-t border-gray-200 bg-white">
+        <ExitSetupPill className="w-full justify-center" />
+      </div>
     </aside>
   );
 }
