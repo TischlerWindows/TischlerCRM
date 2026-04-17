@@ -9,12 +9,8 @@ export type TicketStatus =
 
 export type TicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 
-export type TicketCategory =
-  | 'UNTRIAGED'
-  | 'CRM_ISSUE'
-  | 'IT_ISSUE'
-  | 'FEATURE_REQUEST'
-  | 'QUESTION';
+/** Category is an admin-managed string key. Use CategoryCatalog to resolve label/color. */
+export type TicketCategory = string;
 
 export type TicketEventType =
   | 'CREATED'
