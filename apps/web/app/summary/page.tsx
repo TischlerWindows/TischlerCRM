@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   FileSpreadsheet,
@@ -25,6 +25,8 @@ import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
+import { recordsService } from '@/lib/records-service';
+import { DateInput } from '@/components/date-input';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -537,6 +539,7 @@ interface Summary {
   name: string;
   salesman: string;
   opportunityNumber: string;
+  linkedOpportunityId?: string;
   jobType: string;
   estimator: string;
   date: string;
@@ -562,6 +565,25 @@ interface Summary {
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
+  addOns: {
+    windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    entryDoor: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    magneticContact: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+  };
+  product: string;
+  productType: string;
+  productTypeOptions: string[];
+  woodType: string;
+  finish: string;
+  glassType: string;
+  muntinType: string;
+  spacerBars: string;
+  spacerBarColors: string;
+  projectContains: string[];
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -593,7 +615,13 @@ export default function SummaryPage() {
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  // Opportunity picker state
+  const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
+  const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
+  const [opportunitySearch, setOpportunitySearch] = useState('');
+  const [loadingOpportunities, setLoadingOpportunities] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     (async () => {
@@ -605,6 +633,30 @@ export default function SummaryPage() {
       setLoading(false);
     })();
   }, []);
+
+  // Auto-create summary from opportunity query params
+  useEffect(() => {
+    if (loading) return;
+    const opportunityId = searchParams.get('fromOpportunity');
+    if (opportunityId) {
+      const opportunityName = searchParams.get('opportunityName') || '';
+      const opportunityNumber = searchParams.get('opportunityNumber') || '';
+      // Clear query params so refreshing doesn't re-create
+      router.replace('/summary');
+      createNewSummary({ opportunityId, opportunityName, opportunityNumber });
+      return;
+    }
+    // Auto-open existing summary for editing (from Summary widget on record page)
+    const editId = searchParams.get('editSummary');
+    if (editId) {
+      const found = summaries.find(s => s.id === editId);
+      if (found) {
+        router.replace('/summary');
+        setEditingSummary(found);
+        setShowNewSummary(true);
+      }
+    }
+  }, [loading, searchParams]);
 
   const handleSort = (columnId: string) => {
     if (sortColumn === columnId) {
@@ -668,12 +720,37 @@ export default function SummaryPage() {
       : bStr.localeCompare(aStr, undefined, { numeric: true });
   });
 
-  const createNewSummary = () => {
+  const openOpportunityPicker = async () => {
+    setShowOpportunityPicker(true);
+    setOpportunitySearch('');
+    setLoadingOpportunities(true);
+    try {
+      const records = await recordsService.getRecords('Opportunity');
+      setOpportunityRecords(records.map(r => ({ id: r.id, ...r.data })));
+    } catch (err) {
+      console.error('Failed to load opportunities:', err);
+      setOpportunityRecords([]);
+    } finally {
+      setLoadingOpportunities(false);
+    }
+  };
+
+  const handleOpportunitySelected = (record: any) => {
+    setShowOpportunityPicker(false);
+    createNewSummary({
+      opportunityId: record.id,
+      opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
+      opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+    });
+  };
+
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
-      name: '',
+      name: opts?.opportunityName || '',
       salesman: '',
-      opportunityNumber: '',
+      opportunityNumber: opts?.opportunityNumber || '',
+      linkedOpportunityId: opts?.opportunityId || undefined,
       jobType: '',
       estimator: '',
       date: '',
@@ -771,6 +848,25 @@ export default function SummaryPage() {
         doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
         euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
       },
+      addOns: {
+        windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        entryDoor: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        magneticContact: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+      },
+      product: '',
+      productType: '',
+      productTypeOptions: [],
+      woodType: '',
+      finish: '',
+      glassType: '',
+      muntinType: '',
+      spacerBars: '',
+      spacerBarColors: '',
+      projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -795,6 +891,317 @@ export default function SummaryPage() {
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
     setOpenDropdown(null);
+  };
+
+  // ── Generate Quote Summary PDF using jsPDF ──
+  const handlePrintPDF = async (mode: 'download' | 'preview' = 'download') => {
+    if (!editingSummary) return;
+    const s = editingSummary;
+    const { jsPDF } = await import('jspdf');
+
+    const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+    const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+    const pv = (x: string | undefined) => parseFloat(x || '0') || 0;
+    const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
+    const val = (v: string | undefined | null) => v || '—';
+    const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+
+    // ── Brand colors ──
+    const navy = [30, 58, 95] as const;     // #1e3a5f
+    const red = [218, 41, 28] as const;      // Tischler red
+    const gray50 = [80, 80, 80] as const;
+    const gray80 = [128, 128, 128] as const;
+    const grayLine = [200, 200, 200] as const;
+    const headerBg = [44, 62, 80] as const;
+    const altRow = [248, 249, 250] as const;
+
+    // ── Helpers ──
+    const drawHeader = (doc: any, title: string) => {
+      const w = doc.internal.pageSize.getWidth();
+      doc.setFontSize(16);
+      doc.setTextColor(...navy);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TISCHLER UND SOHN', 15, 14);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...gray80);
+      doc.text(title, 15, 20);
+      doc.text(`${val(s.name)}  |  ${dateStr}`, w - 15, 14, { align: 'right' });
+      doc.text(`${val(s.opportunityNumber)}`, w - 15, 20, { align: 'right' });
+      doc.setDrawColor(...red);
+      doc.setLineWidth(0.6);
+      doc.line(15, 23, w - 15, 23);
+    };
+
+    const drawFooter = (doc: any) => {
+      const w = doc.internal.pageSize.getWidth();
+      const h = doc.internal.pageSize.getHeight();
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(...gray80);
+      doc.text('Tischler und Sohn  |  Confidential', w / 2, h - 6, { align: 'center' });
+      const pageCount = doc.getNumberOfPages();
+      doc.text(`Page ${doc.getCurrentPageInfo().pageNumber} of ${pageCount}`, w - 15, h - 6, { align: 'right' });
+    };
+
+    // Draws a labeled field pair
+    const drawField = (doc: any, x: number, y: number, label: string, value: string, maxW = 55) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...gray80);
+      doc.text(label.toUpperCase(), x, y);
+      doc.setFontSize(8.5);
+      doc.setTextColor(30, 30, 30);
+      doc.text(val(value).substring(0, Math.floor(maxW / 1.8)), x, y + 4);
+    };
+
+    // Draws a table with auto column widths, header row, and data rows
+    const drawTable = (
+      doc: any, startY: number, headers: string[],
+      colWidths: number[], rows: string[][],
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean }
+    ) => {
+      const x0 = 15;
+      let y = startY;
+      const rh = 4.5; // row height
+      const w = doc.internal.pageSize.getWidth();
+      const maxY = doc.internal.pageSize.getHeight() - 14;
+      const totalW = colWidths.reduce((a, b) => a + b, 0);
+
+      // Header row background
+      const headerH = 6;
+      doc.setFillColor(...headerBg);
+      doc.rect(x0, y, totalW, headerH, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(5.5);
+      doc.setTextColor(255, 255, 255);
+      let cx = x0;
+      for (let i = 0; i < headers.length; i++) {
+        const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
+        const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
+        doc.text(headers[i], tx, y + 4, { align });
+        cx += colWidths[i];
+      }
+      y += headerH;
+
+      // Data rows
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      for (let ri = 0; ri < rows.length; ri++) {
+        if (y + rh > maxY) {
+          doc.addPage();
+          drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+          y = 28;
+        }
+
+        // Alternating row background
+        if (ri % 2 === 1) {
+          doc.setFillColor(...altRow);
+          doc.rect(x0, y, totalW, rh, 'F');
+        }
+
+        // Bold last row (grand total)
+        const isLast = opts?.highlightLast && ri === rows.length - 1;
+        if (isLast) {
+          doc.setFillColor(235, 237, 240);
+          doc.rect(x0, y, totalW, rh, 'F');
+          doc.setFont('helvetica', 'bold');
+        }
+
+        doc.setTextColor(50, 50, 50);
+        cx = x0;
+        for (let i = 0; i < rows[ri].length; i++) {
+          const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
+          if (isBoldCol) doc.setFont('helvetica', 'bold');
+          const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
+          const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
+          const cellText = (rows[ri][i] || '').substring(0, Math.floor(colWidths[i] / 1.5));
+          doc.text(cellText, tx, y + 3, { align });
+          if (isBoldCol) doc.setFont('helvetica', 'normal');
+          cx += colWidths[i];
+        }
+        if (isLast) doc.setFont('helvetica', 'normal');
+        y += rh;
+      }
+      return y;
+    };
+
+    // Section heading
+    const drawSectionTitle = (doc: any, y: number, title: string) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...navy);
+      doc.text(title, 15, y);
+      doc.setDrawColor(...grayLine);
+      doc.setLineWidth(0.3);
+      const w = doc.internal.pageSize.getWidth();
+      doc.line(15, y + 1.5, w - 15, y + 1.5);
+      return y + 6;
+    };
+
+    // ════════════════════════════════════════════════
+    // PAGE 1: Data Entry (landscape)
+    // ════════════════════════════════════════════════
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pw = doc.internal.pageSize.getWidth();
+
+    drawHeader(doc, 'Quote Summary — Data Entry');
+
+    // Info bar
+    let y = 28;
+    const infoFields = [
+      ['Job Name', s.name], ['Salesman', s.salesman], ['Opportunity #', s.opportunityNumber],
+      ['Job Type', s.jobType], ['Estimator', s.estimator], ['Date', dateStr],
+    ];
+    const infoColW = (pw - 30) / 6;
+    for (let i = 0; i < infoFields.length; i++) {
+      drawField(doc, 15 + i * infoColW, y, infoFields[i][0], infoFields[i][1], infoColW);
+    }
+    y += 11;
+
+    // Filter non-empty rows
+    const filterRows = (rows: any[]) => rows.filter((r: any) =>
+      r.tusPosition || r.archPosition || r.qty || r.widthMM || r.heightMM || r.type || r.type2
+    );
+
+    // Data table columns (streamlined — 16 core columns)
+    const dtHeaders = [
+      'TuS Pos', 'Arch Pos', 'Qty', 'W (MM)', 'H (MM)', 'W (Ft/In)', 'H (Ft/In)',
+      'Sq Ft Ea', 'Sq Ft Tot', 'Op.Sash Ea', 'Op.Sash Tot',
+      'Type', 'Remarks',
+      'Fields Tot', 'Site Mull', 'NET \u20AC Tot',
+    ];
+    const dtColW = [14, 14, 9, 13, 13, 16, 16, 14, 14, 14, 14, 30, 28, 14, 14, 14];
+    const buildDtRow = (r: any): string[] => [
+      r.tusPosition, r.archPosition, r.qty, r.widthMM, r.heightMM,
+      r.widthFtIn, r.heightFtIn, r.sqFeetEach, r.sqFeetTotal,
+      r.operableSashesEach, r.operableSashesTotal,
+      r.type, r.specialRemarks,
+      r.fieldsTotal, r.siteMullionsTotal, r.netEuroTotal,
+    ].map(v => v || '');
+
+    // Windows
+    const winRows = filterRows(s.rows);
+    if (winRows.length > 0) {
+      y = drawSectionTitle(doc, y, 'Windows');
+      y = drawTable(doc, y, dtHeaders, dtColW, winRows.map(buildDtRow), { rightAlignFrom: 2 });
+      y += 4;
+    }
+
+    // Doors
+    const doorRows = filterRows(s.doorRows);
+    if (doorRows.length > 0) {
+      const maxY = doc.internal.pageSize.getHeight() - 20;
+      if (y + 20 > maxY) { doc.addPage(); drawHeader(doc, 'Quote Summary — Data Entry (cont.)'); y = 28; }
+      y = drawSectionTitle(doc, y, 'Doors');
+      y = drawTable(doc, y, dtHeaders, dtColW, doorRows.map(buildDtRow), { rightAlignFrom: 2 });
+    }
+
+    // ════════════════════════════════════════════════
+    // PAGE 2: Project Summary (portrait)
+    // ════════════════════════════════════════════════
+    doc.addPage('a4', 'portrait');
+    const pw2 = doc.internal.pageSize.getWidth();
+
+    drawHeader(doc, 'Quote Summary — Project Summary');
+    y = 28;
+
+    // ── Project Overview ──
+    y = drawSectionTitle(doc, y, 'Project Overview');
+    const col3W = (pw2 - 30) / 3;
+    drawField(doc, 15, y, 'Date', dateStr, col3W);
+    drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Address', val(s.address), col3W);
+    drawField(doc, 15 + col3W, y, 'Salesman', val(s.salesman), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
+    if (s.quoteType === 'requote') {
+      drawField(doc, 15 + col3W, y, 'Description of Changes', val(s.requoteDescription), col3W * 2);
+    }
+    y += 12;
+
+    // ── Product Specifications ──
+    y = drawSectionTitle(doc, y, 'Product Specifications');
+    drawField(doc, 15, y, 'Product', val(s.product || s.jobType), col3W);
+    drawField(doc, 15 + col3W, y, 'Product Type', val(s.productType), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Options', (s.productTypeOptions || []).join(', ') || '—', col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Wood Type', val(s.woodType), col3W);
+    drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Muntin Type', val(s.muntinType), col3W);
+    drawField(doc, 15 + col3W, y, 'Spacer Bars', val(s.spacerBars), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Project Contains', (s.projectContains || []).join(', ') || '—', pw2 - 30);
+    y += 12;
+
+    // ── Quote Totals ──
+    y = drawSectionTitle(doc, y, 'Quote Totals');
+    const ewQty = sumField(s.rows, 'qty'), ewFields = sumField(s.rows, 'fieldsTotal');
+    const ewSqFt = sumField(s.rows, 'sqFeetTotal'), ewNet = sumField(s.rows, 'netEuroTotal');
+    const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
+    const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
+    const tQty = ewQty + dQty, tFields = ewFields + dFields, tSqFt = ewSqFt + dSqFt, tNet = ewNet + dNet;
+    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
+    const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
+    const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
+      label, fmtInt(qty), fmtInt(fields), fmt(sqFt),
+      net ? '\u20AC' + fmt(net) : '—',
+      cat?.full || '—', cat?.pct || '—', cat?.final || '—', cat?.finalAdj || '—',
+    ];
+    const qtRows = [
+      qtRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows),
+      qtRow('Double Hung', 0, 0, 0, 0, qt.doubleHung),
+      qtRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors),
+      qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+        full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
+        final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
+      }),
+    ];
+    // Local qtSum for this scope
+    function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
+    y = drawTable(doc, y, qtHeaders, qtColW, qtRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+    y += 6;
+
+    // ── Add-On Items ──
+    const ao = (s.addOns || {}) as any;
+    const aoV = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
+    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%', 'Final'];
+    const aoColW = [30, 12, 45, 22, 20, 12, 22];
+    const aoRows = [
+      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final')],
+      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoV('entryDoor', 'full'), aoV('entryDoor', 'pct'), aoV('entryDoor', 'final')],
+      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoV('jambExtensions', 'full'), aoV('jambExtensions', 'pct'), aoV('jambExtensions', 'final')],
+      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoV('magneticContact', 'full'), aoV('magneticContact', 'pct'), aoV('magneticContact', 'final')],
+      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoV('finalFinish', 'full'), aoV('finalFinish', 'pct'), aoV('finalFinish', 'final')],
+      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoV('installation', 'full'), aoV('installation', 'pct'), aoV('installation', 'final')],
+    ];
+
+    if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
+    y = drawSectionTitle(doc, y, 'Add-On Items');
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0 });
+
+    // ── Add footers to all pages ──
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i);
+      drawFooter(doc);
+    }
+
+    if (mode === 'preview') {
+      const blob = doc.output('blob');
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } else {
+      doc.save(`Quote_Summary_${(s.name || 'Untitled').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+    }
   };
 
   const handleSaveSummary = () => {
@@ -830,8 +1237,12 @@ export default function SummaryPage() {
     
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
+    const oppId = editingSummary.linkedOpportunityId;
     setShowNewSummary(false);
     setEditingSummary(null);
+    if (oppId) {
+      router.push(`/opportunities/${oppId}`);
+    }
   };
 
   const handleAddRow = () => {
@@ -1608,8 +2019,9 @@ export default function SummaryPage() {
           table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8px;
+            font-size: 6.5px;
             page-break-inside: auto;
+            table-layout: fixed;
           }
           
           thead {
@@ -1623,15 +2035,19 @@ export default function SummaryPage() {
           
           th, td {
             border: 1px solid #d1d5db;
-            padding: 4px 2px;
+            padding: 2px 1px;
             text-align: left;
+            white-space: nowrap;
           }
           
           th {
             background-color: #f3f4f6 !important;
             font-weight: 600;
-            position: sticky;
-            top: 0;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.15;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
           
           /* Section breaks */
@@ -1748,7 +2164,7 @@ export default function SummaryPage() {
             <h3 className="text-lg font-medium text-gray-900">Summary Records</h3>
             <div className="flex gap-3">
               <button
-                onClick={createNewSummary}
+                onClick={openOpportunityPicker}
                 className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark transition-colors"
               >
                 <Plus className="w-5 h-5 mr-2" />
@@ -1929,6 +2345,78 @@ export default function SummaryPage() {
       </div>
     </div>
 
+    {/* Opportunity Picker Modal */}
+    {showOpportunityPicker && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Select Opportunity</h2>
+              <p className="text-sm text-gray-600 mt-1">Choose an Opportunity to link to this Summary</p>
+            </div>
+            <button
+              onClick={() => setShowOpportunityPicker(false)}
+              className="p-2 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4">
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Search opportunities..."
+                value={opportunitySearch}
+                onChange={(e) => setOpportunitySearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg">
+              {loadingOpportunities ? (
+                <div className="p-6 text-center text-gray-500">
+                  <div className="animate-spin w-6 h-6 border-2 border-brand-navy border-t-transparent rounded-full mx-auto mb-2" />
+                  Loading opportunities...
+                </div>
+              ) : opportunityRecords.filter(r => {
+                if (!opportunitySearch) return true;
+                const q = opportunitySearch.toLowerCase();
+                const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                return name.includes(q) || num.includes(q);
+              }).length === 0 ? (
+                <div className="p-6 text-center text-gray-500">
+                  <p className="text-sm">No opportunities found</p>
+                </div>
+              ) : (
+                opportunityRecords.filter(r => {
+                  if (!opportunitySearch) return true;
+                  const q = opportunitySearch.toLowerCase();
+                  const name = (r.opportunityName || r.Opportunity__opportunityName || '').toLowerCase();
+                  const num = (r.opportunityNumber || r.Opportunity__opportunityNumber || '').toLowerCase();
+                  return name.includes(q) || num.includes(q);
+                }).map(r => (
+                  <button
+                    key={r.id}
+                    onClick={() => handleOpportunitySelected(r)}
+                    className="w-full text-left px-4 py-3 hover:bg-blue-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900">
+                      {r.opportunityNumber || r.Opportunity__opportunityNumber || 'No Number'}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {r.opportunityName || r.Opportunity__opportunityName || 'Unnamed'}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -1940,17 +2428,27 @@ export default function SummaryPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => handlePrintPDF('preview')}
+                  className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  Preview PDF
+                </button>
+                <button
+                  onClick={() => handlePrintPDF('download')}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   <Printer className="w-4 h-4 mr-2" />
-                  Print PDF
+                  Download PDF
                 </button>
                 <button
                   onClick={() => {
                     setShowNewSummary(false);
                     setEditingSummary(null);
                     setActivePage(1);
+                    if (editingSummary?.linkedOpportunityId) {
+                      router.push(`/opportunities/${editingSummary.linkedOpportunityId}`);
+                    }
                   }}
                   className="p-2 hover:bg-gray-100 rounded transition-colors"
                 >
@@ -2106,6 +2604,220 @@ export default function SummaryPage() {
                     </div>
                   </div>
 
+                  {/* Product Specifications */}
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Product Specifications</h3>
+                      <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
+                    </div>
+                    <div className="p-6 space-y-5">
+                      {/* Row 1: Product (auto-filled) */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
+                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                          {editingSummary.jobType || '—'}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Type on Page 1</p>
+                      </div>
+
+                      {/* Row 2: Product Type + Dependent Options */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
+                        <select
+                          value={editingSummary.productType || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, productType: e.target.value, productTypeOptions: [] })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                        >
+                          <option value="">Select product type...</option>
+                          <option value="Double Hung Windows">Double Hung Windows</option>
+                          <option value="Inswing Windows">Inswing Windows</option>
+                          <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                          <option value="Swing Doors">Swing Doors</option>
+                          <option value="Lift Rolling Door">Lift Rolling Door</option>
+                        </select>
+                      </div>
+
+                      {editingSummary.productType && (() => {
+                        const optionsMap: Record<string, string[]> = {
+                          'Double Hung Windows': [
+                            '59 mm Sash',
+                            '66 mm Sash',
+                            '72 mm Sash',
+                            'Concealed Balance',
+                            'Weight and Chain Balance',
+                          ],
+                          'Inswing Windows': [
+                            'Concealed Corrosion Resistant',
+                          ],
+                          'Flush Outswing Windows': [
+                            'Corrosion Resistant Rough Hardware',
+                            'Hinge Finials',
+                          ],
+                          'Swing Doors': [
+                            'Siegenia Rough Hardware',
+                            'KFV Rough Hardware',
+                            'Hinge Finials',
+                            'Bronze Threshold',
+                          ],
+                          'Lift Rolling Door': [
+                            'Standard Hardware',
+                            'Stainless Steel Hardware',
+                          ],
+                        };
+                        const options = optionsMap[editingSummary.productType] || [];
+                        const selected = editingSummary.productTypeOptions || [];
+
+                        const toggle = (opt: string) => {
+                          const next = selected.includes(opt)
+                            ? selected.filter(o => o !== opt)
+                            : [...selected, opt];
+                          setEditingSummary({ ...editingSummary, productTypeOptions: next });
+                        };
+
+                        return (
+                          <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              {editingSummary.productType} Options
+                            </label>
+                            <div className="space-y-2">
+                              {options.map(opt => (
+                                <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selected.includes(opt)}
+                                    onChange={() => toggle(opt)}
+                                    className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                  />
+                                  <span className="text-sm text-gray-700">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Row 3: Wood Type + Finish */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
+                          <select
+                            value={editingSummary.woodType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select wood type...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
+                          <select
+                            value={editingSummary.finish || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, finish: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select finish...</option>
+                            <option value="200">Same finish inside and outside (paint/paint or stain/stain) 200</option>
+                            <option value="510">Partial Split Finish (stain or painted exterior/clear or white dip interior) 510</option>
+                            <option value="610">Stain Exterior/Clear dip interior (Clear dip is considered &quot;no finish&quot;) 610</option>
+                            <option value="500">Split paint finish &amp; paint exterior Stain Interior 500</option>
+                            <option value="600">Split stain finish (Different stain colors inside and outside) 600</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 3: Glass Type + Muntin Type */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                          <select
+                            value={editingSummary.glassType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select glass type...</option>
+                            {['1','2','2.1','3','4','5','6','7','7.1','7.2','8','9','10','11','12','13','14','15','17','18','22','22.1','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40'].map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Muntin Type</label>
+                          <select
+                            value={editingSummary.muntinType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, muntinType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select muntin type...</option>
+                            <option value="SDL">SDL</option>
+                            <option value="TDL">TDL</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row 4: Spacer Bars + Spacer Bar Colors */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
+                          <select
+                            value={editingSummary.spacerBars || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bars...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
+                          <select
+                            value={editingSummary.spacerBarColors || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar colors...</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row: Project Contains */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Project Contains</label>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {['Sliding Doors', 'Big Units', 'Requires Site Measurements'].map(opt => {
+                            const selected = editingSummary.projectContains || [];
+                            return (
+                              <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={selected.includes(opt)}
+                                  onChange={() => {
+                                    const next = selected.includes(opt)
+                                      ? selected.filter((o: string) => o !== opt)
+                                      : [...selected, opt];
+                                    setEditingSummary({ ...editingSummary, projectContains: next });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Aggregate Summary Tables — side by side */}
                   {(() => {
                     const sumField = (rows: (SummaryRow | DoorRow)[], field: string) =>
@@ -2152,13 +2864,29 @@ export default function SummaryPage() {
                     };
 
                     return (
+                      <>
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
                           <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: '11%' }} />
+                              <col style={{ width: '5%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '9%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '7%' }} />
+                              <col style={{ width: '8%' }} />
+                              <col style={{ width: '7%' }} />
+                            </colgroup>
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
@@ -2251,7 +2979,191 @@ export default function SummaryPage() {
                           </table>
                         </div>
                       </div>
-                    );
+
+                      {/* ── Add-On Items ── */}
+                      {(() => {
+                        const ao = editingSummary.addOns || {} as any;
+                        const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
+                        const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
+                        const setAo = (key: string, field: string, value: string) => {
+                          setEditingSummary({
+                            ...editingSummary,
+                            addOns: {
+                              ...ao,
+                              windowScreens: ao.windowScreens || defaultAo,
+                              doorScreenSash: ao.doorScreenSash || defaultAo,
+                              entryDoor: ao.entryDoor || defaultAo,
+                              jambExtensions: ao.jambExtensions || defaultAo,
+                              magneticContact: ao.magneticContact || defaultAo,
+                              finalFinish: ao.finalFinish || defaultAo,
+                              installation: ao.installation || defaultAo,
+                              [key]: { ...getAo(key), [field]: value },
+                            },
+                          });
+                        };
+
+                        const inp = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        const inpLeft = (key: string, field: string, placeholder?: string) => (
+                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                        );
+
+                        return (
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
+                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                              <h3 className="text-lg font-semibold text-gray-900">Add-On Items</h3>
+                              <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
+                            </div>
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                                <colgroup>
+                                  <col style={{ width: '11%' }} />
+                                  <col style={{ width: '5%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '8%' }} />
+                                  <col style={{ width: '7%' }} />
+                                </colgroup>
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                  {/* Window Screens */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
+                                    <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('windowScreens', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Door Screen Sash */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
+                                    <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('doorScreenSash', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Entry Door */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('entryDoor', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Jamb Extensions */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('jambExtensions', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Magnetic Contact */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('magneticContact', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Final Finish */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('finalFinish', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Installation */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'full')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'pct')}</td>
+                                    <td className="px-1 py-1">{inp('installation', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('installation', 'calcFull')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>);
                   })()}
                 </div>
               )}
@@ -2327,10 +3239,9 @@ export default function SummaryPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Date <span className="text-red-500">*</span></label>
-                  <input
-                    type="date"
+                  <DateInput
                     value={editingSummary.date}
-                    onChange={(e) => setEditingSummary({ ...editingSummary, date: e.target.value })}
+                    onChange={(iso) => setEditingSummary({ ...editingSummary, date: iso })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40"
                   />
                 </div>
@@ -2786,9 +3697,13 @@ export default function SummaryPage() {
             <div className="p-6 border-t border-gray-200 flex justify-between items-center print:hidden">
               <button
                 onClick={() => {
+                  const oppId = editingSummary?.linkedOpportunityId;
                   setShowNewSummary(false);
                   setEditingSummary(null);
                   setActivePage(1);
+                  if (oppId) {
+                    router.push(`/opportunities/${oppId}`);
+                  }
                 }}
                 className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >

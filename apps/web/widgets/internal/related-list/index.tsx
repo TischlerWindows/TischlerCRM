@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Plus, Search, ChevronUp, ChevronDown, MoreHorizontal, Trash2, ExternalLink, LayoutGrid, List } from 'lucide-react'
+import { Plus, Search, ChevronUp, ChevronDown, MoreHorizontal, Trash2, ExternalLink } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
@@ -24,7 +24,7 @@ const DEDICATED_ROUTES: Record<string, string> = {
   Account: '/accounts',
   Contact: '/contacts',
   Lead: '/leads',
-  Deal: '/deals',
+  Opportunity: '/opportunities',
   Project: '/projects',
   Product: '/products',
   Installation: '/installations',
@@ -130,6 +130,13 @@ function applyFilters(rows: Record<string, unknown>[], rules: FilterRule[]): Rec
 
 function getCellValue(row: Record<string, unknown>, col: string): string {
   const val = getVal(row, col)
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    const v = val as Record<string, unknown>
+    if (v.street || v.city || v.state || v.postalCode || v.country) {
+      return [v.street, v.city, v.state, v.postalCode, v.country].filter(Boolean).join(', ') || '—'
+    }
+    return JSON.stringify(val)
+  }
   return val !== undefined && val !== null ? String(val) : '—'
 }
 
@@ -160,7 +167,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
   const schema = useSchemaStore((s) => s.schema)
   const {
     objectApiName,
-    label,
     columns = [],
     linkField,
     sortField,
@@ -173,7 +179,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     filters: adminFilters = [],
   } = config as {
     objectApiName?: string
-    label?: string
     columns?: string[]
     linkField?: string
     sortField?: string
@@ -299,7 +304,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     return <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-xs text-red-600">{error}</div>
   }
 
-  const title = label || objectApiName
   const canShowNew = showActionBar && showNewButton && recordId
 
   // ── Tile view ──
@@ -307,7 +311,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     return (
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <Header
-          title={title}
           totalMatched={totalMatched}
           rowLimit={rowLimit}
           objectApiName={objectApiName}
@@ -317,7 +320,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
           showSearch={showSearch}
           search={search}
           onSearch={setSearch}
-          viewIcon={<LayoutGrid className="w-3.5 h-3.5" />}
           allCount={allRows.length}
         />
         {displayRows.length === 0 ? (
@@ -364,7 +366,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     <>
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
         <Header
-          title={title}
           totalMatched={totalMatched}
           rowLimit={rowLimit}
           objectApiName={objectApiName}
@@ -374,7 +375,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
           showSearch={showSearch}
           search={search}
           onSearch={setSearch}
-          viewIcon={<List className="w-3.5 h-3.5" />}
           allCount={allRows.length}
         />
 
@@ -518,7 +518,6 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
 // ── Sub-components ────────────────────────────────────────────────────
 
 interface HeaderProps {
-  title: string
   totalMatched: number
   rowLimit: number
   objectApiName: string
@@ -528,53 +527,44 @@ interface HeaderProps {
   showSearch: boolean
   search: string
   onSearch: (v: string) => void
-  viewIcon: React.ReactNode
   allCount: number
 }
 
 function Header({
-  title, totalMatched, rowLimit, objectApiName, linkField, recordId,
+  totalMatched, rowLimit, objectApiName, linkField, recordId,
   canShowNew, showSearch, search, onSearch, allCount,
 }: HeaderProps) {
   return (
-    <div className="border-b border-gray-100">
-      <div className="px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="text-sm font-semibold text-brand-dark truncate">{title}</h3>
-          <span className="text-[11px] text-brand-gray tabular-nums shrink-0">
-            {totalMatched > rowLimit
-              ? `${rowLimit} of ${totalMatched}`
-              : `${totalMatched}`}
-            {allCount !== totalMatched && (
-              <span className="text-gray-400"> / {allCount} total</span>
-            )}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {canShowNew && recordId && (
-            <Link
-              href={newRecordUrl(objectApiName, linkField, recordId)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              New
-            </Link>
-          )}
-        </div>
-      </div>
+    <div className="px-4 py-2 flex items-center gap-2 border-b border-gray-100">
       {showSearch && (
-        <div className="px-4 pb-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => onSearch(e.target.value)}
-              placeholder="Search records…"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 py-1.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition"
-            />
-          </div>
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => onSearch(e.target.value)}
+            placeholder="Search records…"
+            className="w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 py-1.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition"
+          />
         </div>
+      )}
+      {!showSearch && <div className="flex-1" />}
+      <span className="text-[11px] text-brand-gray tabular-nums shrink-0">
+        {totalMatched > rowLimit
+          ? `${rowLimit} of ${totalMatched}`
+          : `${totalMatched}`}
+        {allCount !== totalMatched && (
+          <span className="text-gray-400"> / {allCount} total</span>
+        )}
+      </span>
+      {canShowNew && recordId && (
+        <Link
+          href={newRecordUrl(objectApiName, linkField, recordId)}
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 transition-colors shrink-0"
+        >
+          <Plus className="w-3 h-3" />
+          New
+        </Link>
       )}
     </div>
   )

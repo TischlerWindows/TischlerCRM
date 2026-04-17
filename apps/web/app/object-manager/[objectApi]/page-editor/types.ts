@@ -45,4 +45,5 @@ export type SelectedElement =
   | { type: 'panel'; id: string }
   | { type: 'field'; id: string; panelId: string }
   | { type: 'widget'; id: string }
+  | { type: 'tab'; id: string }
   | null;

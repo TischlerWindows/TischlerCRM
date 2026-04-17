@@ -132,17 +132,30 @@ class RecordsService {
     const prefixedCleanKeys = new Set<string>(); // track clean keys that came from a prefixed source
     if (record.data && typeof record.data === 'object') {
       for (const [key, value] of Object.entries(record.data)) {
+        // Flatten address-like nested objects into a readable string
+        const resolved = this.resolveNestedValue(key, value);
+
         // Keep original prefixed key so edit forms can match by apiName
-        stripped[key] = value;
+        stripped[key] = resolved;
         const cleanKey = key.replace(/^[A-Za-z]+__/, '');
         const hadPrefix = cleanKey !== key;
         if (hadPrefix) {
           // Prefixed keys always overwrite the stripped alias
-          stripped[cleanKey] = value;
+          stripped[cleanKey] = resolved;
           prefixedCleanKeys.add(cleanKey);
         } else if (!prefixedCleanKeys.has(cleanKey)) {
           // Unprefixed key only sets the alias when no prefixed source claimed it
-          stripped[cleanKey] = value;
+          stripped[cleanKey] = resolved;
+        }
+
+        // Expand sub-fields for address-like objects (e.g. address.city → "address.city").
+        // ALWAYS overwrite — the blob is authoritative over stale dotted keys
+        // that may exist as separate keys in the raw DB data.
+        if (value && typeof value === 'object' && !Array.isArray(value) && this.isAddressLike(value)) {
+          for (const [subKey, subVal] of Object.entries(value)) {
+            const dotKey = `${cleanKey}.${subKey}`;
+            stripped[dotKey] = subVal;
+          }
         }
       }
     }
@@ -153,14 +166,41 @@ class RecordsService {
       || stripped._pageLayoutId;
 
     return {
-      id: record.id,
       ...stripped,
+      // DB-level fields MUST override anything from the data blob
+      id: record.id,
+      // Convenience keys for list/table columns
       createdBy: record.createdBy?.name || record.createdBy?.email || 'Unknown',
       modifiedBy: record.modifiedBy?.name || record.modifiedBy?.email || 'Unknown',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       pageLayoutId: resolvedPageLayoutId,
+      // System-field aliases so layout fields (CreatedDate, CreatedById, etc.)
+      // resolve to the correct DB-level values in forms and detail views.
+      Id: record.id,
+      CreatedDate: record.createdAt,
+      LastModifiedDate: record.updatedAt,
+      CreatedById: record.createdBy?.id ?? '',
+      LastModifiedById: record.modifiedBy?.id ?? '',
     };
+  }
+
+  /**
+   * Check if a value looks like an address object
+   */
+  private isAddressLike(value: any): boolean {
+    if (!value || typeof value !== 'object') return false;
+    return ('street' in value || 'city' in value || 'state' in value || 'postalCode' in value);
+  }
+
+  /**
+   * Resolve a nested object value.
+   * Address-like objects are kept as-is so edit forms and detail renderers
+   * can access lat/lng and the full structure.  List views handle
+   * object→string formatting via formatFieldValue at display time.
+   */
+  private resolveNestedValue(_key: string, value: any): any {
+    return value;
   }
 
   /**

@@ -8,7 +8,8 @@ export type FieldType =
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser"
-  | "LocationSearch";
+  | "LocationSearch"
+  | "DropboxFiles";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -48,6 +49,7 @@ export function normalizeFieldType(raw: string): FieldType {
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
     locationsearch: 'LocationSearch',
+    dropboxfiles: 'DropboxFiles',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }
@@ -68,6 +70,7 @@ export interface FieldDef {
   min?: number;
   max?: number;
   picklistValues?: string[];
+  picklistColors?: Record<string, string>; // option value → hex color (e.g. "#ef4444")
   picklistPosition?: 'left' | 'right';  // for PicklistText: which side gets the dropdown
   defaultValue?: any;
   helpText?: string;
@@ -126,59 +129,43 @@ export interface ValidationRule {
   condition: string; // boolean expression using field apiNames
 }
 
-// ── Workflow automation types (Salesforce-style) ────────────────────
+// ── Workflow Automation ────────────────────────────────────────────
 
-/** When the workflow rule should be evaluated */
-export type WorkflowTriggerType =
-  | 'onCreate'                       // only when a record is created
-  | 'onCreateOrEdit'                 // when created OR any time it's edited
-  | 'onCreateOrEditToMeetCriteria';  // created / edited AND criteria newly met
+export type WorkflowTriggerType = 'onCreate' | 'onCreateOrEdit' | 'onCreateOrEditToMeetCriteria';
 
-/** The kind of action to execute when a workflow rule fires */
-export type WorkflowActionType = 'FieldUpdate' | 'EmailAlert' | 'Task';
-
-/** Update a field on the triggering record */
 export interface FieldUpdateAction {
   type: 'FieldUpdate';
-  fieldApiName: string;      // field to update
-  value: any;                // literal value OR formula expression
-  useFormula?: boolean;      // when true, `value` is a formula expression string
+  fieldApiName: string;
+  value: any;
 }
 
-/** Send an email alert */
 export interface EmailAlertAction {
   type: 'EmailAlert';
-  toField?: string;          // field apiName containing the recipient email
-  toAddress?: string;        // static email address (fallback)
-  subject: string;           // email subject (supports {{fieldApiName}} merge tokens)
-  body: string;              // email HTML body (supports {{fieldApiName}} merge tokens)
+  toField?: string;
+  toAddress?: string;
+  subject: string;
+  body: string;
 }
 
-/** Create a follow-up task */
 export interface TaskAction {
   type: 'Task';
-  subject: string;           // task subject (supports {{fieldApiName}} merge tokens)
-  assignToField?: string;    // field apiName whose value is assigned the task
-  assignToUserId?: string;   // static user ID (fallback)
-  dueInDays?: number;        // due date = trigger date + N days
+  subject: string;
   priority?: 'High' | 'Normal' | 'Low';
+  dueInDays?: number;
+  assignToUserId?: string;
   description?: string;
 }
 
 export type WorkflowAction = FieldUpdateAction | EmailAlertAction | TaskAction;
 
-/** A single workflow rule attached to an object */
 export interface WorkflowRule {
   id: string;
   name: string;
   description?: string;
   active: boolean;
   triggerType: WorkflowTriggerType;
-  conditions: ConditionExpr[];   // all must be true (AND logic)
+  conditions: ConditionExpr[];
   actions: WorkflowAction[];
-  order?: number;                // execution order (lower = first)
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface RecordType {
@@ -202,7 +189,8 @@ export interface PageFieldPresentation {
 export type FormattingRuleTarget =
   | { kind: 'field'; fieldApiName: string; panelId: string }
   | { kind: 'panel'; panelId: string }
-  | { kind: 'region'; regionId: string };
+  | { kind: 'region'; regionId: string }
+  | { kind: 'tab'; tabId: string };
 
 export type FieldHighlightToken = 'none' | 'subtle' | 'attention' | 'positive' | 'critical';
 
@@ -232,7 +220,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -304,7 +292,7 @@ export interface HeaderHighlightsConfig {
   /** Up to 6 field API names to display as highlight badges */
   fieldApiNames: string[];
   /** Which action buttons to show in the highlights bar. Defaults to edit + delete when absent. */
-  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print'>;
+  visibleActions?: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'>;
 }
 
 export interface ExternalWidgetLayoutConfig {
@@ -314,6 +302,46 @@ export interface ExternalWidgetLayoutConfig {
   config: Record<string, unknown>;
 }
 
+export interface TeamMembersRollupConfig {
+  type: 'TeamMembersRollup';
+  rollupFromProperty?: boolean;
+  label?: string;
+  supportedObjects?: string[];
+  displayFields?: {
+    Contact?: string[];
+    Account?: string[];
+  };
+}
+
+export interface TeamMemberAssociationsConfig {
+  type: 'TeamMemberAssociations';
+  label?: string;
+  displayFields?: {
+    Property?: string[];
+    Opportunity?: string[];
+    Project?: string[];
+    WorkOrder?: string[];
+    Installation?: string[];
+  };
+}
+
+export interface PathConfig {
+  type: 'Path';
+  pathId: string;
+  showLabel: boolean;
+  showGuidance: boolean;
+  showKeyFields: boolean;
+  compact: boolean;
+}
+
+export interface InstallationCostGridConfig {
+  type: 'InstallationCostGrid';
+}
+
+export interface SummaryConfig {
+  type: 'Summary';
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -321,7 +349,12 @@ export type WidgetConfig =
   | FileFolderConfig
   | SpacerConfig
   | HeaderHighlightsConfig
-  | ExternalWidgetLayoutConfig;
+  | ExternalWidgetLayoutConfig
+  | TeamMembersRollupConfig
+  | TeamMemberAssociationsConfig
+  | PathConfig
+  | InstallationCostGridConfig
+  | SummaryConfig;
 
 export interface PageWidget {
   id: string;
@@ -331,6 +364,8 @@ export interface PageWidget {
   colSpan?: number;
   rowSpan?: number;
   config: WidgetConfig;
+  /** When false the collapsible header bar is hidden and content renders directly. */
+  collapsible?: boolean;
   /** Tab canvas placement (12-column grid); omit when widget is inside a section only */
   gridColumn?: number;
   gridColumnSpan?: number;
@@ -446,6 +481,11 @@ export interface PanelField {
   labelStyle: LabelStyle;
   valueStyle: ValueStyle;
   behavior: 'none' | 'required' | 'readOnly' | 'hidden';
+  hideOnNew?: boolean;       // Hide on New Record form (creation)
+  hideOnView?: boolean;      // Hide on View (read-only detail page)
+  hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
+  /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
+  hideOnExisting?: boolean;
 }
 
 export interface LayoutPanel {
@@ -455,7 +495,15 @@ export interface LayoutPanel {
   columns: 1 | 2 | 3 | 4;
   style: PanelStyle;
   fields: PanelField[];
+  panelType?: 'fields' | 'components';
+  widgets?: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  hideOnNew?: boolean;       // Hide on New Record form (creation)
+  hideOnView?: boolean;      // Hide on View (read-only detail page)
+  hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
+  /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
+  hideOnExisting?: boolean;
 }
 
 export interface LayoutWidget {
@@ -463,6 +511,13 @@ export interface LayoutWidget {
   widgetType: WidgetType;
   order: number;
   config: WidgetConfig;
+  /** When false the collapsible header bar is hidden and content renders directly. */
+  collapsible?: boolean;
+  hideOnNew?: boolean;       // Hide on New Record form (creation)
+  hideOnView?: boolean;      // Hide on View (read-only detail page)
+  hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
+  /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
+  hideOnExisting?: boolean;
 }
 
 export interface LayoutSection {
@@ -476,6 +531,12 @@ export interface LayoutSection {
   panels: LayoutPanel[];
   widgets: LayoutWidget[];
   hidden?: boolean;   // true = dim in editor canvas; excluded from record renderer
+  visibleIf?: ConditionExpr[]; // show only when ALL conditions are met
+  hideOnNew?: boolean;       // Hide on New Record form (creation)
+  hideOnView?: boolean;      // Hide on View (read-only detail page)
+  hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
+  /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
+  hideOnExisting?: boolean;
 }
 
 export interface LayoutTab {
@@ -483,6 +544,11 @@ export interface LayoutTab {
   label: string;
   order: number;
   regions: LayoutSection[];
+  hideOnNew?: boolean;       // Hide on New Record form (creation)
+  hideOnView?: boolean;      // Hide on View (read-only detail page)
+  hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
+  /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
+  hideOnExisting?: boolean;
 }
 
 export interface PageLayout {
@@ -520,6 +586,35 @@ export interface LegacyPageLayout {
   extensions?: PageLayoutExtensions;
 }
 
+// ── Path definitions ────────────────────────────────────────────────────────
+
+export interface PathTransitionField {
+  fieldApiName: string;
+  required?: boolean;
+}
+
+export interface PathStage {
+  id: string;
+  name: string;
+  order: number;
+  category: 'active' | 'closed-won' | 'closed-lost';
+  guidance?: string;
+  keyFields?: string[];
+  transitionFields?: PathTransitionField[];
+}
+
+export interface PathDef {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  trackingFieldApiName: string;
+  stageEnteredAtFieldApiName: string;
+  stages: PathStage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ObjectDef {
   id: string;
   apiName: string;
@@ -531,6 +626,7 @@ export interface ObjectDef {
   pageLayouts: PageLayout[];
   validationRules: ValidationRule[];
   workflowRules?: WorkflowRule[];
+  paths?: PathDef[];
   /** Global search configuration — which fields are searched and how results display */
   searchConfig?: {
     /** Whether this object appears in the universal search bar */
@@ -578,6 +674,14 @@ export interface CustomLayoutTemplate {
   createdAt: string;
 }
 
+/** Placeholder for future visual-flow builder (not yet implemented) */
+export interface FlowDefinition {
+  id: string;
+  name: string;
+  objectApi: string;
+  active: boolean;
+}
+
 export interface OrgSchema {
   version: number; // increment on save
   objects: ObjectDef[];
@@ -585,80 +689,6 @@ export interface OrgSchema {
   customLayoutTemplates?: CustomLayoutTemplate[];
   updatedAt: string;
   createdBy?: string;
-}
-
-// ── Flow Builder types (Salesforce-style visual automations) ────────
-
-export type FlowType =
-  | 'record-triggered'   // Launches when a record is created/updated/deleted
-  | 'schedule-triggered' // Launches at a specified time/frequency
-  | 'screen'             // Interactive — guides users through screens
-  | 'autolaunched';      // Invoked by API, other flows, or processes
-
-export type FlowStatus = 'draft' | 'active' | 'inactive';
-
-export type FlowTriggerEvent = 'create' | 'update' | 'create_or_update' | 'delete';
-
-export interface FlowSchedule {
-  frequency: 'once' | 'daily' | 'weekly' | 'monthly';
-  startDate?: string;
-  time?: string;          // HH:mm
-  dayOfWeek?: number;     // 0-6 (Sun-Sat)
-  dayOfMonth?: number;    // 1-31
-}
-
-/** A node in the flow canvas */
-export type FlowElementType =
-  | 'start'
-  | 'assignment'        // Set variable / field values
-  | 'decision'          // If/else branching
-  | 'loop'              // Iterate over a collection
-  | 'get-records'       // Query records from an object
-  | 'create-record'     // Create a new record
-  | 'update-records'    // Update existing records
-  | 'delete-records'    // Delete records
-  | 'send-email'        // Send an email alert
-  | 'screen'            // Display a screen to the user
-  | 'subflow'           // Call another flow
-  | 'action';           // Apex/custom action placeholder
-
-export interface FlowElement {
-  id: string;
-  type: FlowElementType;
-  label: string;
-  description?: string;
-  position: { x: number; y: number };
-  config: Record<string, any>;         // Type-specific configuration
-  connectors: FlowConnector[];          // Outgoing edges
-}
-
-export interface FlowConnector {
-  id: string;
-  label?: string;
-  targetElementId: string;
-  isDefault?: boolean;                   // For decision: the "else" branch
-  condition?: ConditionExpr[];           // For decision branches
-}
-
-/** Top-level flow definition */
-export interface FlowDefinition {
-  id: string;
-  name: string;
-  description?: string;
-  type: FlowType;
-  status: FlowStatus;
-  version: number;
-  // Record-triggered config
-  objectApiName?: string;
-  triggerEvent?: FlowTriggerEvent;
-  triggerConditions?: ConditionExpr[];
-  // Schedule-triggered config
-  schedule?: FlowSchedule;
-  // Canvas
-  elements: FlowElement[];
-  // Metadata
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type ConditionExpr = { 
@@ -695,7 +725,8 @@ const _SYSTEM_FIELDS: FieldDef[] = [
     id: 'id',
     apiName: 'Id',
     label: 'Record ID',
-    type: 'text',
+    type: 'Text',
+    readOnly: true,
     required: true,
     unique: true,
     helpText: 'System-generated unique identifier'
@@ -704,30 +735,32 @@ const _SYSTEM_FIELDS: FieldDef[] = [
     id: 'createdDate',
     apiName: 'CreatedDate',
     label: 'Created Date',
-    type: 'datetime',
+    type: 'DateTime',
+    readOnly: true,
     helpText: 'Date and time when record was created'
   },
   {
     id: 'lastModifiedDate',
     apiName: 'LastModifiedDate', 
     label: 'Last Modified Date',
-    type: 'datetime',
+    type: 'DateTime',
+    readOnly: true,
     helpText: 'Date and time when record was last modified'
   },
   {
     id: 'createdBy',
     apiName: 'CreatedById',
     label: 'Created By',
-    type: 'lookup',
-    lookupObject: 'User',
+    type: 'LookupUser',
+    readOnly: true,
     helpText: 'User who created this record'
   },
   {
     id: 'lastModifiedBy',
     apiName: 'LastModifiedById',
     label: 'Last Modified By', 
-    type: 'lookup',
-    lookupObject: 'User',
+    type: 'LookupUser',
+    readOnly: true,
     helpText: 'User who last modified this record'
   }
 ];
@@ -770,7 +803,8 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Time', value: 'Time', type: 'Time' },
   { label: 'URL', value: 'URL', type: 'URL' },
   { label: 'Address', value: 'Address', type: 'Address' },
-  { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' }
+  { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' },
+  { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' }
 ];
 
 // Helper to get field type categories
@@ -781,6 +815,7 @@ export const getFieldTypeCategory = (type: FieldType): string => {
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
   if (["Picklist", "MultiPicklist", "PicklistText"].includes(type)) return "Selection";
+  if (["DropboxFiles"].includes(type)) return "Integration";
   return "Other";
 };
 
@@ -814,6 +849,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     Time: "clock",
     URL: "link",
     Address: "map",
+    DropboxFiles: "cloud",
   };
   return icons[type] || "circle";
 };

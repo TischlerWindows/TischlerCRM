@@ -3,14 +3,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Database } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, ChevronDown, Database } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 import { useSchemaStore } from '@/lib/schema-store';
 import { usePermissions } from '@/lib/permissions-context';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
+import { resolveLayoutForUser } from '@/lib/layout-resolver';
+import { useAuth } from '@/lib/auth-context';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
-import { getFormattingEffectsForField } from '@/lib/layout-formatting';
+import { getFormattingEffectsForField, getFormattingEffectsForTab } from '@/lib/layout-formatting';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import { useRecordSetupContext } from '@/lib/record-setup-context';
@@ -29,6 +33,70 @@ interface RecordDetailPageProps {
   backLabel: string;
   /** Optional icon component shown in the header */
   icon?: React.ComponentType<{ className?: string }>;
+}
+
+// ── Requote Version Selector ───────────────────────────────────────────
+/** Dropdown that lets users switch between an opportunity and its requotes */
+function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: string; recordId: string }) {
+  const router = useRouter();
+  const [versions, setVersions] = useState<Array<{ id: string; label: string; isCurrent: boolean }>>([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (objectApiName !== 'Opportunity' || !recordId) return;
+    let cancelled = false;
+    apiClient.getRequoteVersions(objectApiName, recordId).then((res) => {
+      if (!cancelled && res.versions.length > 1) {
+        setVersions(res.versions);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [objectApiName, recordId]);
+
+  if (versions.length < 2) return null;
+
+  const current = versions.find((v) => v.isCurrent);
+
+  return (
+    <div className="relative mt-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+      >
+        {current?.label || 'Version'}
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-overlay" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal">
+            {versions.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => {
+                  setOpen(false);
+                  if (!v.isCurrent) {
+                    const slug = objectApiName.toLowerCase().endsWith('y')
+                      ? objectApiName.toLowerCase().slice(0, -1) + 'ies'
+                      : objectApiName.toLowerCase() + 's';
+                    router.push(`/${slug}/${v.id}`);
+                  }
+                }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  v.isCurrent
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {v.label}
+                {v.isCurrent && <span className="ml-2 text-xs text-blue-400">(current)</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ── Component ──────────────────────────────────────────────────────────
@@ -52,6 +120,7 @@ export default function RecordDetailPage({
   const params = useParams();
   const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
+  const { user: authUser } = useAuth();
 
   // If navigated from a related list, use the `from` param for back navigation
   const fromPath = searchParams.get('from');
@@ -76,6 +145,15 @@ export default function RecordDetailPage({
       const next = new Set(prev);
       if (next.has(panelId)) next.delete(panelId);
       else next.add(panelId);
+      return next;
+    });
+  }, []);
+  const [collapsedWidgetIds, setCollapsedWidgetIds] = useState<Set<string>>(new Set());
+  const toggleWidgetCollapse = useCallback((widgetId: string) => {
+    setCollapsedWidgetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(widgetId)) next.delete(widgetId);
+      else next.add(widgetId);
       return next;
     });
   }, []);
@@ -111,17 +189,16 @@ export default function RecordDetailPage({
   // ── Resolve layout ───────────────────────────────────────────────────
   const pageLayout = useMemo(() => {
     if (!record || !objectDef) return null;
-    const findLayout = (id: string) => objectDef.pageLayouts?.find((l) => l.id === id) ?? null;
-    let raw: PageLayout | null = null;
-    if (record.pageLayoutId) raw = findLayout(record.pageLayoutId);
-    if (!raw) {
-      const rt = record.recordTypeId
-        ? objectDef.recordTypes?.find((r) => r.id === record.recordTypeId)
-        : objectDef.recordTypes?.[0];
-      if (rt?.pageLayoutId) raw = findLayout(rt.pageLayoutId);
-    }
-    if (!raw) raw = objectDef.pageLayouts?.[0] ?? null;
-    if (!raw) return null;
+    const result = resolveLayoutForUser(
+      objectDef,
+      { profileId: authUser?.profileId ?? null },
+      {
+        record: { pageLayoutId: record.pageLayoutId as string | null | undefined },
+        layoutType: 'edit',
+      },
+    );
+    if (result.kind !== 'resolved') return null;
+    let raw: PageLayout = result.layout;
     // Migrate legacy layouts (sections → regions/panels/fields)
     if (isLegacyLayout(raw)) {
       raw = migrateLegacyLayout(raw as any);
@@ -131,7 +208,7 @@ export default function RecordDetailPage({
       return { ...raw, tabs: editorTabs as any } as PageLayout;
     }
     return raw;
-  }, [record, objectDef]);
+  }, [record, objectDef, authUser?.profileId]);
 
   useEffect(() => {
     setActiveTabIdx(0);
@@ -158,6 +235,17 @@ export default function RecordDetailPage({
   // ── Build a display title from the record ────────────────────────────
   const getRecordTitle = (): string => {
     if (!record) return '';
+
+    // Opportunity records: show as "OPP#### (Opp Name)"
+    if (objectApiName === 'Opportunity') {
+      const rawOppNum = record.Opportunity__opportunityNumber || record.opportunityNumber || '';
+      // Strip "- Requote N" suffix from the number — the name already carries that info
+      const oppNum = rawOppNum.replace(/\s*-\s*Requote\s+\d+$/i, '');
+      const oppName = record.Opportunity__opportunityName || record.opportunityName || '';
+      if (oppNum && oppName) return `${oppNum} (${oppName})`;
+      if (oppNum) return oppNum;
+    }
+
     const numberKey = Object.keys(record).find(
       (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k],
     );
@@ -271,7 +359,7 @@ export default function RecordDetailPage({
 
   // ── Resolve HeaderHighlights widget config ───────────────────────────
   let highlightApiNames: string[] = [];
-  let visibleActions: Array<'edit' | 'delete' | 'clone' | 'print'> = ['edit', 'delete'];
+  let visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'> = ['edit', 'delete'];
   let hasHighlightsWidget = false;
   let isNewStyleLayout = false;
   if (pageLayout?.tabs) {
@@ -279,7 +367,8 @@ export default function RecordDetailPage({
       const regions = (tab as any).regions ?? [];
       if (regions.length > 0) isNewStyleLayout = true;
       for (const region of regions) {
-        const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights');
+        const hw = region.widgets?.find((w: any) => w.widgetType === 'HeaderHighlights')
+          ?? region.panels?.flatMap((p: any) => p.widgets ?? []).find((w: any) => w.widgetType === 'HeaderHighlights');
         if (hw && hw.config.type === 'HeaderHighlights') {
           hasHighlightsWidget = true;
           highlightApiNames = hw.config.fieldApiNames ?? [];
@@ -312,9 +401,9 @@ export default function RecordDetailPage({
           </Link>
 
           {showHeaderCard && (
-            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
               {/* Identity + Actions row */}
-              <div className="flex items-center justify-between px-5 py-4">
+              <div className="flex items-center justify-between px-5 py-4 relative z-10">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 shrink-0 bg-brand-navy/10 rounded-lg flex items-center justify-center">
                     <IconComponent className="w-5 h-5 text-brand-navy" />
@@ -326,6 +415,9 @@ export default function RecordDetailPage({
                     <h1 className="text-xl font-bold text-gray-900 leading-tight truncate">{title}</h1>
                     {subtitle && subtitle !== title && (
                       <p className="text-sm text-gray-500 truncate">{subtitle}</p>
+                    )}
+                    {objectApiName === 'Opportunity' && params?.id && (
+                      <RequoteVersionSelector objectApiName={objectApiName} recordId={params.id as string} />
                     )}
                   </div>
                 </div>
@@ -361,7 +453,7 @@ export default function RecordDetailPage({
                         <div key={apiName} className="min-w-[100px] max-w-[220px]">
                           <div className="text-xs text-gray-500">{fd.label}</div>
                           <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                            <MemoizedFieldValue apiName={apiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
+                            <MemoizedFieldValue apiName={apiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} compact />
                           </div>
                         </div>
                       );
@@ -378,9 +470,18 @@ export default function RecordDetailPage({
           <div className="space-y-4">
             {/* Tab navigation */}
             {pageLayout.tabs.length > 1 && (() => {
-              const sortedTabsForNav = [...pageLayout.tabs].sort((a: any, b: any) =>
-                (a.order ?? 0) - (b.order ?? 0),
-              );
+              const sortedTabsForNav = [...pageLayout.tabs]
+                .filter((tab: any) => {
+                  // Detail page is "view" mode — check hideOnView (with legacy hideOnExisting fallback)
+                  if (tab.hideOnView || tab.hideOnExisting) return false;
+                  // Hide tabs via formatting rules
+                  const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                  if (tabFx?.hidden) return false;
+                  return true;
+                })
+                .sort((a: any, b: any) =>
+                  (a.order ?? 0) - (b.order ?? 0),
+                );
               return (
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                   {sortedTabsForNav.map((tab: any, idx: number) => (
@@ -403,9 +504,16 @@ export default function RecordDetailPage({
             {/* Render tabs */}
             {pageLayout.tabs.length > 1
               ? (() => {
-                  const sortedTabsForRender = [...pageLayout.tabs].sort((a: any, b: any) =>
-                    (a.order ?? 0) - (b.order ?? 0),
-                  );
+                  const sortedTabsForRender = [...pageLayout.tabs]
+                    .filter((tab: any) => {
+                      if (tab.hideOnView || tab.hideOnExisting) return false;
+                      const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                      if (tabFx?.hidden) return false;
+                      return true;
+                    })
+                    .sort((a: any, b: any) =>
+                      (a.order ?? 0) - (b.order ?? 0),
+                    );
                   const tab = sortedTabsForRender[activeTabIdx] ?? sortedTabsForRender[0];
                   return (
                     <RecordTabRenderer
@@ -420,10 +528,19 @@ export default function RecordDetailPage({
                       setSectionToggles={setSectionToggles}
                       collapsedPanelIds={collapsedPanelIds}
                       togglePanelCollapse={togglePanelCollapse}
+                      collapsedWidgetIds={collapsedWidgetIds}
+                      toggleWidgetCollapse={toggleWidgetCollapse}
                     />
                   );
                 })()
-              : pageLayout.tabs.map((tab, ti) => (
+              : pageLayout.tabs
+                  .filter((tab: any) => {
+                    if (tab.hideOnView || tab.hideOnExisting) return false;
+                    const tabFx = getFormattingEffectsForTab(pageLayout, tab.id, record as any);
+                    if (tabFx?.hidden) return false;
+                    return true;
+                  })
+                  .map((tab, ti) => (
                   <RecordTabRenderer
                     key={(tab as any).id ?? ti}
                     tab={tab}
@@ -437,6 +554,8 @@ export default function RecordDetailPage({
                     setSectionToggles={setSectionToggles}
                     collapsedPanelIds={collapsedPanelIds}
                     togglePanelCollapse={togglePanelCollapse}
+                    collapsedWidgetIds={collapsedWidgetIds}
+                    toggleWidgetCollapse={toggleWidgetCollapse}
                   />
                 ))
             }

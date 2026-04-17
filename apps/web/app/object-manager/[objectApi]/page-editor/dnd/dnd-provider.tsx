@@ -99,6 +99,7 @@ export function DndContextWrapper({
         movePanel,
         swapSections,
         addPanel,
+        addWidgetToPanel: useEditorStore.getState().addWidgetToPanel,
       });
     },
     [addField, addWidget, layout, moveField, movePanel, moveWidget, removeField, swapSections],

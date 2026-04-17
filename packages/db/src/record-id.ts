@@ -7,7 +7,7 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   Account: '003',
   Product: '004',
   Lead: '005',
-  Deal: '006',
+  Opportunity: '006',
   Project: '007',
   Service: '008',
   Quote: '009',
@@ -35,6 +35,16 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   UserPreference: '029',
   Integration: '030',
   UserIntegration: '031',
+  WorkOrder: '032',
+  TeamMember: '033',
+  Task: '034',
+  SupportTicket: '035',
+  TicketComment: '036',
+  TicketAttachment: '037',
+  TicketEvent: '038',
+  ErrorLog: '039',
+  Notification: '040',
+  NotificationTypeSetting: '041',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

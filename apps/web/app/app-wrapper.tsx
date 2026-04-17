@@ -11,11 +11,13 @@ import {
   GripVertical,
   X,
   LogOut,
-  Bell,
   Settings,
   Database,
   ExternalLink,
   Edit,
+  LifeBuoy,
+  Inbox,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import UniversalSearch from '@/components/universal-search';
@@ -26,6 +28,10 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { RecordSetupProvider, useRecordSetupContext } from '@/lib/record-setup-context';
 import { resolveListViewObjectSetup } from '@/lib/list-view-object-setup';
+import { installGlobalErrorHandler } from '@/lib/error-reporter';
+import { SubmitTicketModal } from '@/components/support/submit-ticket-modal';
+import { MyTicketsDrawer } from '@/components/support/my-tickets-drawer';
+import { BellPanel } from '@/components/notifications/bell-panel';
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
@@ -33,7 +39,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const { value: recordSetup } = useRecordSetupContext();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, isImpersonating, returnToAdmin } = useAuth();
   const { canAccess, hasAppPermission } = usePermissions();
   const { schema, loadSchema } = useSchemaStore();
   const [editMode, setEditMode] = useState(false);
@@ -42,9 +48,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [showAddTab, setShowAddTab] = useState(false);
   const [availableObjects, setAvailableObjects] = useState<Array<{ name: string; href: string }>>([]);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSetupMenu, setShowSetupMenu] = useState(false);
+  const [showSubmitTicket, setShowSubmitTicket] = useState(false);
+  const [showMyTickets, setShowMyTickets] = useState(false);
 
   // Map tab hrefs to CRM object apiNames for permission filtering
   const hrefToObjectMap: Record<string, string> = {
@@ -53,11 +60,12 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/accounts': 'Account',
     '/products': 'Product',
     '/leads': 'Lead',
-    '/deals': 'Deal',
+    '/opportunities': 'Opportunity',
     '/projects': 'Project',
     '/service': 'Service',
     '/quotes': 'Quote',
     '/installations': 'Installation',
+    '/tasks': 'Task',
   };
 
   // Also map custom object tabs (href like /objects/myobject) dynamically
@@ -74,7 +82,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   const hrefToAppPermMap: Record<string, string> = {
     '/reports': 'manageReports',
     '/dashboard': 'manageDashboards',
-    '/summary': 'viewSummary',
   };
 
   // Filter tabs so users only see objects they have read access to
@@ -88,7 +95,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
       const appPerm = hrefToAppPermMap[tab.href];
       if (appPerm) return hasAppPermission(appPerm as any);
 
-      // Non-object, non-restricted tabs (Summary, Settings, etc.) are always shown
+      // Non-object, non-restricted tabs (Settings, etc.) are always shown
       return true;
     });
   }, [tabs, canAccess, hasAppPermission, schema]);
@@ -100,7 +107,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/opportunities') ||
     pathname?.startsWith('/properties') ||
     pathname?.startsWith('/accounts') ||
-    pathname?.startsWith('/deals') ||
     pathname?.startsWith('/projects') ||
     pathname?.startsWith('/installations') ||
     pathname?.startsWith('/products') ||
@@ -108,11 +114,14 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/reports') ||
     pathname?.startsWith('/settings') ||
     pathname?.startsWith('/service') ||
+    pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
+    pathname?.startsWith('/support') ||
+    pathname?.startsWith('/notifications') ||
     pathname?.includes('demo');
 
-  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup') && !pathname?.match(/^\/automations\/.+/);
+  const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
 
   // Always refresh schema from the API on mount / when user changes.
   // The persisted Zustand cache provides a value for the very first paint
@@ -126,16 +135,20 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   }, [loadSchema, user]);
 
   useEffect(() => {
+    installGlobalErrorHandler();
+  }, []);
+
+  useEffect(() => {
     (async () => {
       const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
       if (savedTabs && Array.isArray(savedTabs)) {
-        setTabs(savedTabs);
+        setTabs(savedTabs.filter((t) => t.href !== '/summary'));
       } else {
         setTabs(defaultTabs);
       }
 
       if (schema?.objects) {
-        const excludedObjects = new Set(['Home']);
+        const excludedObjects = new Set(['Home', 'TeamMember']);
         
         const builtInRoutes: Record<string, string> = {
           'Property': '/properties',
@@ -143,9 +156,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           'Account': '/accounts',
           'Product': '/products',
           'Lead': '/leads',
-          'Deal': '/deals',
+          'Opportunity': '/opportunities',
           'Project': '/projects',
           'Service': '/service',
+          'WorkOrder': '/workorders',
           'Quote': '/quotes',
           'Installation': '/installations',
         };
@@ -242,6 +256,18 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-screen flex flex-col bg-brand-light overflow-hidden">
+      {/* Impersonation banner */}
+      {isImpersonating && (
+        <div className="bg-amber-500 text-white text-xs font-semibold px-4 py-1.5 flex items-center justify-between z-[60]">
+          <span>You are logged in as <strong>{user?.name ?? user?.email}</strong></span>
+          <button
+            onClick={() => { returnToAdmin(); window.location.href = '/settings/users'; }}
+            className="bg-white/20 hover:bg-white/30 text-white px-3 py-0.5 rounded-full transition-colors"
+          >
+            Return to Admin
+          </button>
+        </div>
+      )}
       {/* Global Header — Salesforce-style navy bar */}
       <header className="bg-brand-navy px-4 py-0 flex items-center justify-between sticky top-0 z-50 h-[48px] shadow-md">
         {/* Left: Logo + App Name */}
@@ -276,38 +302,13 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
         {/* Right: Utilities */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="relative">
-            <button
-              className="p-2 rounded-md hover:bg-white/10 transition-colors"
-              title="Notifications"
-              onClick={() => {
-                setShowNotifications(!showNotifications);
-                setShowHelp(false);
-                setShowSetupMenu(false);
-              }}
-            >
-              <Bell className="w-[18px] h-[18px] text-white/80" />
-            </button>
-            {showNotifications && (
-              <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
-                <div className="p-4 border-b border-gray-100">
-                  <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
-                </div>
-                <div className="p-8 text-center">
-                  <Bell className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No new notifications</p>
-                  <p className="text-xs text-gray-400 mt-1">You&apos;re all caught up!</p>
-                </div>
-              </div>
-            )}
-          </div>
+          <BellPanel />
           <div className="relative">
             <button
               className="p-2 rounded-md hover:bg-white/10 transition-colors"
               title="Help"
               onClick={() => {
                 setShowHelp(!showHelp);
-                setShowNotifications(false);
                 setShowSetupMenu(false);
               }}
             >
@@ -319,8 +320,37 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                   <h3 className="text-sm font-semibold text-gray-900">Help & Support</h3>
                 </div>
                 <div className="py-1">
-                  <a href="mailto:support@tischlerusa.com" className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Contact Support</a>
-                  <button onClick={() => { setShowHelp(false); router.push('/settings'); }} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">System Settings</button>
+                  <button
+                    onClick={() => { setShowHelp(false); setShowSubmitTicket(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <LifeBuoy className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">Submit a ticket</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowHelp(false); setShowMyTickets(true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <Inbox className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">My tickets</span>
+                  </button>
+                  {hasAppPermission('manageSupportTickets') && (
+                    <button
+                      onClick={() => { setShowHelp(false); router.push('/support/tickets'); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <Users className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                      <span className="flex-1">All tickets</span>
+                    </button>
+                  )}
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    onClick={() => { setShowHelp(false); router.push('/settings'); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-brand-navy flex-shrink-0" />
+                    <span className="flex-1">System settings</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -333,7 +363,6 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
               aria-expanded={showSetupMenu}
               onClick={() => {
                 setShowSetupMenu(!showSetupMenu);
-                setShowNotifications(false);
                 setShowHelp(false);
               }}
             >
@@ -383,7 +412,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                             onClick={() => {
                               setShowSetupMenu(false);
                               router.push(
-                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}/page-editor/${encodeURIComponent(setupObjectTarget.pageLayoutId!)}`
+                                `/object-manager/${encodeURIComponent(setupObjectTarget.objectApiName)}/page-editor/${encodeURIComponent(setupObjectTarget.pageLayoutId!)}?returnTo=${encodeURIComponent(pathname)}`
                               );
                             }}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 text-left"
@@ -514,6 +543,17 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      {/* Support ticket modal + drawer */}
+      <SubmitTicketModal
+        open={showSubmitTicket}
+        onClose={() => setShowSubmitTicket(false)}
+        onCreated={(ticket) => {
+          setShowSubmitTicket(false);
+          router.push(`/support/tickets/${ticket.id}`);
+        }}
+      />
+      <MyTicketsDrawer open={showMyTickets} onClose={() => setShowMyTickets(false)} />
 
       {/* Add Tab Modal */}
       {showAddTab && (

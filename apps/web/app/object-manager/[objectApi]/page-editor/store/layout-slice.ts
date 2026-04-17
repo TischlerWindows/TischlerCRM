@@ -43,6 +43,10 @@ export function findWidgetEntry(
     for (const region of tab.regions) {
       const widget = region.widgets.find((w) => w.id === widgetId);
       if (widget) return { tab, region, widget };
+      for (const panel of region.panels) {
+        const pw = (panel.widgets ?? []).find((w) => w.id === widgetId);
+        if (pw) return { tab, region, widget: pw };
+      }
     }
   }
 }
@@ -105,6 +109,7 @@ export interface LayoutSlice {
   // Widget actions
   updateWidget: (widgetId: string, patch: Partial<LayoutWidget>) => void;
   addWidget: (widget: LayoutWidget, regionId: string, atIndex?: number) => void;
+  addWidgetToPanel: (widget: LayoutWidget, panelId: string, atIndex?: number) => void;
   removeWidget: (widgetId: string) => void;
   moveWidget: (widgetId: string, toRegionId: string, atIndex: number) => void;
 
@@ -386,15 +391,6 @@ export const createLayoutSlice: StateCreator<
   },
 
   addField: (field, panelId, atIndex) => {
-    const alreadyPlaced = get().layout.tabs.some((tab) =>
-      tab.regions.some((region) =>
-        region.panels.some((panel) =>
-          panel.fields.some((f) => f.fieldApiName === field.fieldApiName),
-        ),
-      ),
-    );
-    if (alreadyPlaced) return;
-
     get().pushUndo();
     set((s) => ({
       layout: {
@@ -531,6 +527,11 @@ export const createLayoutSlice: StateCreator<
             widgets: region.widgets.map((w) =>
               w.id === widgetId ? { ...w, ...patch } : w,
             ),
+            panels: region.panels.map((panel) =>
+              panel.widgets?.some((w) => w.id === widgetId)
+                ? { ...panel, widgets: panel.widgets.map((w) => w.id === widgetId ? { ...w, ...patch } : w) }
+                : panel,
+            ),
           })),
         })),
       },
@@ -560,6 +561,32 @@ export const createLayoutSlice: StateCreator<
     }));
   },
 
+  addWidgetToPanel: (widget, panelId, atIndex) => {
+    get().pushUndo();
+    set((s) => ({
+      layout: {
+        ...s.layout,
+        tabs: s.layout.tabs.map((tab) => ({
+          ...tab,
+          regions: tab.regions.map((region) => ({
+            ...region,
+            panels: region.panels.map((panel) => {
+              if (panel.id !== panelId) return panel;
+              const widgets = [...(panel.widgets ?? [])];
+              if (atIndex !== undefined) {
+                const insertionIndex = Math.max(0, Math.min(atIndex, widgets.length));
+                widgets.splice(insertionIndex, 0, widget);
+              } else {
+                widgets.push(widget);
+              }
+              return { ...panel, widgets: reindexOrder(widgets) };
+            }),
+          })),
+        })),
+      },
+    }));
+  },
+
   removeWidget: (widgetId) => {
     get().pushUndo();
     set((s) => ({
@@ -570,6 +597,11 @@ export const createLayoutSlice: StateCreator<
           regions: tab.regions.map((region) => ({
             ...region,
             widgets: reindexOrder(region.widgets.filter((w) => w.id !== widgetId)),
+            panels: region.panels.map((panel) =>
+              panel.widgets?.some((w) => w.id === widgetId)
+                ? { ...panel, widgets: reindexOrder(panel.widgets.filter((w) => w.id !== widgetId)) }
+                : panel,
+            ),
           })),
         })),
       },
@@ -676,6 +708,7 @@ export const createLayoutSlice: StateCreator<
     const seen = new Set<string>();
     const sanitized = {
       ...layout,
+      formattingRules: layout.formattingRules ?? [],
       tabs: layout.tabs.map((tab) => ({
         ...tab,
         regions: tab.regions.map((region) => ({

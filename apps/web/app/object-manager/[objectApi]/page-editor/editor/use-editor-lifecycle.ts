@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import {
   generateId,
   type FieldDef,
@@ -49,13 +49,14 @@ function createBlankLayout(objectApi: string): PageLayout {
   };
 }
 
-function createDefaultRegion(regionCount: number): LayoutSection {
+function createDefaultRegion(regions: LayoutSection[]): LayoutSection {
+  const maxRow = regions.reduce((max, r) => Math.max(max, r.gridRow + r.gridRowSpan - 1), 0);
   return {
     id: `region-${Date.now()}`,
-    label: `Section ${regionCount + 1}`,
+    label: `Section ${regions.length + 1}`,
     gridColumn: 1,
     gridColumnSpan: 12,
-    gridRow: regionCount + 1,
+    gridRow: maxRow + 1,
     gridRowSpan: 1,
     style: {},
     panels: [],
@@ -116,6 +117,8 @@ export interface EditorLifecycle {
   handleTemplateSelect: (tabs: TemplateTabDef[]) => void;
 
   /* Navigation hrefs */
+  backHref: string;
+  backLabel: string;
   objectManagerHref: string;
   objectListHref: string | null;
   objectListLabel: string;
@@ -140,10 +143,13 @@ export interface EditorLifecycle {
 export function useEditorLifecycle(): EditorLifecycle {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const objectApiName = toParamValue(params.objectApi);
   const layoutId = toParamValue(params.layoutId);
   const routeKey = `${objectApiName}::${layoutId}`;
   const { showToast } = useToast();
+
+  const returnTo = searchParams.get('returnTo');
 
   const { schema, updateObject } = useSchemaStore();
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
@@ -259,6 +265,16 @@ export function useEditorLifecycle(): EditorLifecycle {
   }, [activeTab, activeTabId, setActiveTab]);
 
   const layoutAssignmentNote = useMemo(() => {
+    // First, warn about the object-level "no default" config error. This is
+    // the most actionable thing for the admin to fix — without a default,
+    // users whose profile doesn't match any role-assigned layout see an error.
+    if (object?.pageLayouts && object.pageLayouts.length > 0) {
+      const activeLayouts = object.pageLayouts.filter((l) => l.active !== false);
+      if (activeLayouts.length > 1 && !activeLayouts.some((l) => l.isDefault === true)) {
+        return "No default layout is set. Users without a role-assigned layout won't be able to open this object — mark one layout as Default (star icon on the Page Layouts list).";
+      }
+    }
+
     if (!object?.recordTypes?.length) return null;
     if (layoutId === 'new') {
       return 'After you save, go back to Page Layouts and use "Assign to record type" so records use this layout.';
@@ -365,7 +381,7 @@ export function useEditorLifecycle(): EditorLifecycle {
   /* ---- Add section ---- */
   const handleAddSection = useCallback(() => {
     if (!activeTab) return;
-    const region = createDefaultRegion(activeTab.regions.length);
+    const region = createDefaultRegion(activeTab.regions);
     addSection(region, activeTab.id);
     setSelectedElement({ type: 'region', id: region.id });
   }, [activeTab, addSection, setSelectedElement]);
@@ -392,6 +408,9 @@ export function useEditorLifecycle(): EditorLifecycle {
   const objectListHref = getObjectListHref(objectApiName);
   const objectListLabel = object?.pluralLabel || object?.label || objectApiName;
 
+  const backHref = returnTo || objectManagerHref;
+  const backLabel = returnTo ? 'Back' : 'Layouts';
+
   return {
     object,
     allFields,
@@ -410,6 +429,8 @@ export function useEditorLifecycle(): EditorLifecycle {
     handleAddSection,
     handleTemplateSelect,
 
+    backHref,
+    backLabel,
     objectManagerHref,
     objectListHref,
     objectListLabel,

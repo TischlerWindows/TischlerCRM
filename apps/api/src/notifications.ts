@@ -1,5 +1,4 @@
-import { prisma } from '@crm/db/client';
-import { decrypt } from './crypto.js';
+import { getAppOnlyToken } from './routes/outlook.js';
 
 function escapeHtml(str: string): string {
   return str
@@ -16,20 +15,8 @@ interface NotifyUser {
   email: string;
 }
 
-async function getOutlookToken(): Promise<string | null> {
-  try {
-    const integration = await prisma.integration.findUnique({
-      where: { provider: 'outlook' },
-    });
-    if (!integration?.apiKey) return null;
-    return decrypt(integration.apiKey);
-  } catch {
-    return null;
-  }
-}
-
-async function sendViaMsGraph(token: string, to: string, subject: string, body: string): Promise<void> {
-  const res = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
+async function sendViaMsGraph(token: string, senderEmail: string, to: string, subject: string, body: string): Promise<void> {
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderEmail)}/sendMail`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -50,12 +37,13 @@ export async function sendInviteEmail(
   user: NotifyUser,
   inviteUrl: string
 ): Promise<{ sent: boolean; inviteUrl: string }> {
-  const token = await getOutlookToken();
-  if (!token) return { sent: false, inviteUrl };
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false, inviteUrl };
   const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
-      token,
+      result.token,
+      result.senderEmail,
       user.email,
       'You have been invited to TischlerCRM',
       `<p>Hello ${displayName},</p>
@@ -69,16 +57,45 @@ export async function sendInviteEmail(
   }
 }
 
+export async function sendSupportTicketAlertEmail(
+  admin: NotifyUser,
+  ticket: { ticketNumber: number; title: string; descriptionPreview: string; submitterName: string; url: string },
+): Promise<{ sent: boolean }> {
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false };
+  const displayName = escapeHtml(admin.name ?? admin.email);
+  const title = escapeHtml(ticket.title);
+  const preview = escapeHtml(ticket.descriptionPreview);
+  const submitter = escapeHtml(ticket.submitterName);
+  try {
+    await sendViaMsGraph(
+      result.token,
+      result.senderEmail,
+      admin.email,
+      `New support ticket: #T-${ticket.ticketNumber} — ${ticket.title}`,
+      `<p>Hello ${displayName},</p>
+       <p><strong>${submitter}</strong> submitted a new support ticket.</p>
+       <p><strong>${title}</strong></p>
+       <blockquote style="border-left:3px solid #ccc;padding-left:10px;margin:8px 0;color:#444;">${preview}</blockquote>
+       <p><a href="${ticket.url}">Open ticket #T-${ticket.ticketNumber}</a></p>`
+    );
+    return { sent: true };
+  } catch {
+    return { sent: false };
+  }
+}
+
 export async function sendPasswordResetEmail(
   user: NotifyUser,
   resetUrl: string
 ): Promise<{ sent: boolean; resetUrl: string }> {
-  const token = await getOutlookToken();
-  if (!token) return { sent: false, resetUrl };
+  const result = await getAppOnlyToken();
+  if (!result) return { sent: false, resetUrl };
   const displayName = escapeHtml(user.name ?? user.email);
   try {
     await sendViaMsGraph(
-      token,
+      result.token,
+      result.senderEmail,
       user.email,
       'Reset your TischlerCRM password',
       `<p>Hello ${displayName},</p>
@@ -92,18 +109,3 @@ export async function sendPasswordResetEmail(
   }
 }
 
-/** Send an email triggered by a workflow rule */
-export async function sendWorkflowEmail(
-  to: string,
-  subject: string,
-  body: string
-): Promise<{ sent: boolean }> {
-  const token = await getOutlookToken();
-  if (!token) return { sent: false };
-  try {
-    await sendViaMsGraph(token, to, subject, body);
-    return { sent: true };
-  } catch {
-    return { sent: false };
-  }
-}

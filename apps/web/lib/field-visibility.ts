@@ -37,13 +37,45 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
     return true;
   }
 
-  const leftValue = recordData[condition.left];
+  const rawLeft = recordData[condition.left];
+
+  // Normalise multi-picklist values (stored as "A;B;C") into arrays so
+  // every operator handles them correctly — not just INCLUDES.
+  const isMulti =
+    Array.isArray(rawLeft) ||
+    (typeof rawLeft === 'string' && rawLeft.includes(';'));
+  const leftParts: string[] | null = isMulti
+    ? (Array.isArray(rawLeft)
+        ? rawLeft
+        : rawLeft.split(/\s*;\s*/).filter(Boolean))
+    : null;
+  const leftValue = rawLeft;
 
   switch (condition.op) {
     case '==':
+      if (leftParts) {
+        // Multi-picklist: true if ANY selected value matches any target
+        if (Array.isArray(condition.right)) {
+          return leftParts.some(v => condition.right.includes(v));
+        }
+        return leftParts.includes(condition.right);
+      }
+      if (Array.isArray(condition.right)) {
+        return condition.right.includes(leftValue);
+      }
       return leftValue === condition.right;
     
     case '!=':
+      if (leftParts) {
+        // Multi-picklist: true if NONE of the selected values match the target
+        if (Array.isArray(condition.right)) {
+          return !leftParts.some(v => condition.right.includes(v));
+        }
+        return !leftParts.includes(condition.right);
+      }
+      if (Array.isArray(condition.right)) {
+        return !condition.right.includes(leftValue);
+      }
       return leftValue !== condition.right;
     
     case '>':
@@ -59,25 +91,22 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
       return Number(leftValue) <= Number(condition.right);
     
     case 'IN':
-      // Check if leftValue is in the array
+      // Check if leftValue (or any of its parts) is in the array
+      if (leftParts) {
+        return Array.isArray(condition.right) && leftParts.some(v => condition.right.includes(v));
+      }
       return Array.isArray(condition.right) && condition.right.includes(leftValue);
     
     case 'INCLUDES':
       // For multi-select fields — check if the field's selected values
-      // contain the target value.  Multi-select values can be stored as:
-      //   - an array: ["A", "B"]
-      //   - a semicolon-separated string: "A;B"
-      //   - a comma-separated string: "A, B"
-      // condition.right is the single value we're looking for.
-      if (Array.isArray(leftValue)) {
-        // leftValue is already an array — just check membership
+      // contain the target value.
+      if (leftParts) {
         if (Array.isArray(condition.right)) {
-          return leftValue.some(val => condition.right.includes(val));
+          return leftParts.some(val => condition.right.includes(val));
         }
-        return leftValue.includes(condition.right);
+        return leftParts.includes(condition.right);
       }
       if (typeof leftValue === 'string' && leftValue.length > 0) {
-        // Split on semicolons or commas (with optional surrounding whitespace)
         const parts = leftValue.split(/\s*[;,]\s*/);
         if (Array.isArray(condition.right)) {
           return parts.some(val => condition.right.includes(val));

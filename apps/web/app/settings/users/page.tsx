@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, Copy, Check, Mail, KeyRound } from 'lucide-react';
+import { Users, Plus, RefreshCw, Trash2, Ban, Send, ExternalLink, Copy, Check, Mail, KeyRound, LogIn } from 'lucide-react';
 import { apiClient, UserRow, CreateUserInput, InviteStatus } from '@/lib/api-client';
+import { useAuth } from '@/lib/auth-context';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { SettingsFilterBar } from '@/components/settings/settings-filter-bar';
 import { SettingsContentCard } from '@/components/settings/settings-content-card';
@@ -50,6 +51,7 @@ interface ConfirmAction {
 }
 
 export default function UsersPage() {
+  const { user: currentUser, impersonate } = useAuth();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,6 +159,16 @@ export default function UsersPage() {
     navigator.clipboard.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleImpersonate(userId: string) {
+    try {
+      const result = await apiClient.impersonateUser(userId);
+      impersonate(result.token, result.user);
+      window.location.href = '/';
+    } catch (e: any) {
+      setError(e.message);
+    }
   }
 
   function closeNewModal() {
@@ -300,6 +312,15 @@ export default function UsersPage() {
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </Link>
+                          {currentUser?.role === 'ADMIN' && user.id !== currentUser.id && user.isActive && (
+                            <button
+                              onClick={() => handleImpersonate(user.id)}
+                              className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50 transition-colors"
+                              title="Login as this user"
+                            >
+                              <LogIn className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           {canResend && (
                             <button
                               onClick={() => handleResendInvite(user.id)}

@@ -29,6 +29,10 @@ export function findWidget(layout: EditorState['layout'], widgetId: string) {
     for (const region of tab.regions) {
       const widget = region.widgets.find((candidate) => candidate.id === widgetId);
       if (widget) return { widget, region };
+      for (const panel of region.panels) {
+        const pw = (panel.widgets ?? []).find((candidate) => candidate.id === widgetId);
+        if (pw) return { widget: pw, region };
+      }
     }
   }
   return undefined;
@@ -44,6 +48,9 @@ export function sortedWidgets(region: LayoutSection): LayoutWidget[] {
 
 // ── Widget type guard ───────────────────────────────────────────────────────
 
+// IMPORTANT: Add every WidgetType value here when registering a new widget.
+// This set validates drag ids at runtime. A missing entry causes the widget
+// to silently fail to drop from the palette.
 const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'RelatedList',
   'CustomComponent',
@@ -51,7 +58,12 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'FileFolder',
   'Spacer',
   'HeaderHighlights',
+  'TeamMembersRollup',
+  'TeamMemberAssociations',
   'ExternalWidget',
+  'Path',
+  'InstallationCostGrid',
+  'Summary',
 ]);
 
 export function isWidgetType(value: string): value is WidgetType {
@@ -99,6 +111,7 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
       kind: 'palette-panel',
       columns: cols,
       label: typeof data.label === 'string' ? data.label : 'New Section',
+      ...(data.panelType === 'components' ? { panelType: 'components' as const } : {}),
     };
   }
 

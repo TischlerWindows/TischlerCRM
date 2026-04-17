@@ -13,11 +13,13 @@ import {
   normalizeFieldType,
 } from '@/lib/schema';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
+import { resolveLayoutForUser } from '@/lib/layout-resolver';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 import {
-  getFormattingEffectsForSection,
+  getFormattingEffectsForPanel,
+  getFormattingEffectsForRegion,
 } from '@/lib/layout-formatting';
 import {
   resolveTabCanvasItems,
@@ -28,6 +30,8 @@ import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
+import { PendingWidgetProvider, usePendingWidgetManager } from './pending-widget-context';
+import { getWidgetSupportsCreate } from '@/lib/widgets/registry-loader';
 import {
   ChevronDown,
   ChevronRight,
@@ -47,9 +51,35 @@ export interface DynamicFormProps {
   objectApiName: string;
   layoutType: 'create' | 'edit';
   layoutId?: string;
+  /** If provided, this layout is rendered directly instead of looking up one via layoutId. */
+  layoutOverride?: PageLayout;
   recordData?: Record<string, any>;
-  onSubmit: (data: Record<string, any>, layoutId?: string) => void | Promise<void>;
+  /**
+   * Called when the form is submitted. For create forms, return the new
+   * record's ID so pending widget data (e.g. team members) can be saved
+   * after the parent record is created. If not returned, pending widget
+   * data is skipped.
+   */
+  onSubmit: (data: Record<string, any>, layoutId?: string) => string | void | Promise<string | void>;
   onCancel?: () => void;
+  /**
+   * Called after the record is created AND all pending widget data has
+   * been saved. Use this for navigation (router.push) instead of
+   * navigating inside onSubmit, so pending data is saved first.
+   * Only relevant for create forms that use widgets.
+   */
+  onCreated?: (recordId: string) => void;
+}
+
+/** Returns true if an element should be hidden based on record lifecycle state.
+ *  Legacy `hideOnExisting` is treated as both `hideOnView` and `hideOnEdit`. */
+function isHiddenByLifecycle(
+  element: { hideOnNew?: boolean; hideOnView?: boolean; hideOnEdit?: boolean; hideOnExisting?: boolean },
+  mode: 'create' | 'edit',
+): boolean {
+  if (mode === 'create') return !!element.hideOnNew;
+  // mode === 'edit'
+  return !!element.hideOnEdit || !!element.hideOnExisting;
 }
 
 // ── DynamicForm ─────────────────────────────────────────────────────
@@ -58,9 +88,11 @@ export default function DynamicForm({
   objectApiName,
   layoutType,
   layoutId,
+  layoutOverride,
   recordData = {},
   onSubmit,
   onCancel,
+  onCreated,
 }: DynamicFormProps) {
   const { schema } = useSchemaStore();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
@@ -144,7 +176,25 @@ export default function DynamicForm({
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
 
+  // Pending widget manager — manages widget registrations for create mode
+  const isCreateMode = layoutType === 'create';
+  const pendingCtx = usePendingWidgetManager(isCreateMode, objectApiName);
+
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
+
+  // Object definition for widgets (simplified shape expected by LayoutWidgetsInline)
+  const widgetObjectDef = useMemo(() => {
+    if (!object) return undefined;
+    return {
+      apiName: object.apiName,
+      label: object.label,
+      fields: object.fields.map((f) => ({
+        apiName: f.apiName,
+        label: f.label,
+        type: f.type,
+      })),
+    };
+  }, [object]);
 
   // Current user
   const { user: authUser } = useAuth();
@@ -152,26 +202,41 @@ export default function DynamicForm({
 
   // ── Layout resolution ─────────────────────────────────────────
   const layout = useMemo(() => {
+    // Caller-supplied layout takes precedence (used by the page-editor preview
+    // to render an unsaved, in-memory draft).
+    if (layoutOverride) {
+      return isLegacyLayout(layoutOverride)
+        ? migrateLegacyLayout(layoutOverride as any)
+        : layoutOverride;
+    }
+
     if (!object?.pageLayouts?.length) return undefined;
 
     let resolved: PageLayout | undefined;
+
+    // Explicit layoutId wins — but only if that layout is still active.
+    // If inactive, drop through to the profile-aware resolver so users
+    // don't see a deactivated layout on an existing record.
     if (layoutId) {
-      resolved = object.pageLayouts.find((l) => l.id === layoutId);
-    } else {
-      const defaultRt = object.defaultRecordTypeId
-        ? object.recordTypes?.find((r) => r.id === object.defaultRecordTypeId)
-        : object.recordTypes?.[0];
-      if (defaultRt?.pageLayoutId) {
-        resolved = object.pageLayouts.find((l) => l.id === defaultRt.pageLayoutId);
+      const match = object.pageLayouts.find((l) => l.id === layoutId);
+      if (match && match.active !== false) {
+        resolved = match;
       }
-      if (!resolved) {
-        const hasFields = (l: any) =>
-          l.tabs?.some((t: any) =>
-            t.regions?.some((r: any) => r.panels?.some((p: any) => (p.fields?.length || 0) > 0)) ||
-            t.sections?.some((s: any) => (s.fields?.length || 0) > 0),
-          );
-        const byType = object.pageLayouts.filter((l) => l.layoutType === layoutType);
-        resolved = byType.find(hasFields) || object.pageLayouts.find(hasFields) || byType[0] || object.pageLayouts[0];
+    }
+
+    if (!resolved) {
+      const result = resolveLayoutForUser(
+        object,
+        { profileId: authUser?.profileId ?? null },
+        {
+          record: recordData?.pageLayoutId
+            ? { pageLayoutId: recordData.pageLayoutId as string }
+            : null,
+          layoutType,
+        },
+      );
+      if (result.kind === 'resolved') {
+        resolved = result.layout;
       }
     }
 
@@ -179,13 +244,15 @@ export default function DynamicForm({
       return migrateLegacyLayout(resolved as any);
     }
     return resolved;
-  }, [object, layoutId, layoutType]);
+  }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId, recordData]);
 
   useEffect(() => {
-    if (layout && layout.tabs.length > 0 && !activeTab && layout.tabs[0]) {
-      setActiveTab(layout.tabs[0].id);
+    if (layout && layout.tabs.length > 0 && !activeTab) {
+      const firstVisible = layout.tabs.find((t) => !isHiddenByLifecycle(t as any, layoutType));
+      if (firstVisible) setActiveTab(firstVisible.id);
+      else if (layout.tabs[0]) setActiveTab(layout.tabs[0].id);
     }
-  }, [layout, activeTab]);
+  }, [layout, activeTab, layoutType]);
 
   // Auto-populate AutoUser fields
   useEffect(() => {
@@ -325,6 +392,10 @@ export default function DynamicForm({
     apiName: string,
     pageField?: PageField,
   ): FieldDef | undefined => {
+    // Always look up the canonical schema field — it's the source of
+    // truth for picklistValues, picklistColors, picklistDependencies, etc.
+    const schemaField = object.fields.find((f) => f.apiName === apiName);
+
     if (pageField && pageField.type && pageField.label) {
       const {
         column,
@@ -339,16 +410,26 @@ export default function DynamicForm({
         ...fieldProps,
         apiName,
         type: normalizeFieldType(fieldProps.type!),
+        // Prefer canonical schema values for picklist data — layout copies
+        // can become stale or corrupted.
+        ...(schemaField?.picklistValues ? { picklistValues: schemaField.picklistValues } : {}),
+        ...(schemaField?.picklistColors ? { picklistColors: schemaField.picklistColors } : {}),
+        ...(schemaField?.picklistDependencies ? { picklistDependencies: schemaField.picklistDependencies } : {}),
       } as FieldDef;
     }
-    const raw = object.fields.find((f) => f.apiName === apiName);
-    if (!raw) return undefined;
-    return { ...raw, type: normalizeFieldType(raw.type) };
+    if (!schemaField) return undefined;
+    return { ...schemaField, type: normalizeFieldType(schemaField.type) };
   };
 
   // ── handleFieldChange ─────────────────────────────────────────
-  const handleFieldChange = (fieldApiName: string, value: any) => {
+  const handleFieldChange = (fieldApiName: string, valueOrFn: any) => {
     setFormData((prev) => {
+      // Support functional updaters so callers can derive the next
+      // value from the latest state (avoids stale-closure problems).
+      const value =
+        typeof valueOrFn === 'function'
+          ? valueOrFn(prev[fieldApiName])
+          : valueOrFn;
       const next = { ...prev, [fieldApiName]: value };
       const stripped = fieldApiName.replace(/^[A-Za-z]+__/, '');
       if (stripped !== fieldApiName) {
@@ -379,9 +460,13 @@ export default function DynamicForm({
       fieldDef: FieldDef;
     }> = [];
     layout.tabs.forEach((tab) => {
+      if (isHiddenByLifecycle(tab as any, layoutType)) return;
       tab.regions.forEach((region) => {
+        if (isHiddenByLifecycle(region as any, layoutType)) return;
         region.panels.forEach((panel) => {
+          if (isHiddenByLifecycle(panel as any, layoutType)) return;
           panel.fields.forEach((field) => {
+            if (isHiddenByLifecycle(field as any, layoutType)) return;
             const fd = getFieldDef(field.fieldApiName, field as any);
             if (fd) pairs.push({ panelField: field, fieldDef: fd });
           });
@@ -415,32 +500,61 @@ export default function DynamicForm({
   // ── Wizard sections ───────────────────────────────────────────
   const wizardSections = (() => {
     if (layoutType !== 'create') return [];
-    const allSections: { section: LayoutPanel; tabLabel: string }[] = [];
+    type WizardSection = {
+      section: LayoutPanel;
+      tabLabel: string;
+      regionLabel: string;
+      /** Parent region — used so the wizard step can render region-level widgets. */
+      region: LayoutSection;
+      /** True only for the last visible panel in this region — widgets render here. */
+      isLastPanelInRegion: boolean;
+    };
+    const allSections: WizardSection[] = [];
     layout.tabs.forEach((tab) => {
+      if (isHiddenByLifecycle(tab as any, layoutType)) return;
       tab.regions.forEach((region) => {
-        region.panels
+        if (isHiddenByLifecycle(region as any, layoutType)) return;
+        // Filter panels first so we can correctly mark the LAST visible panel.
+        const visiblePanels = region.panels
+          .slice()
           .sort((a, b) => a.order - b.order)
-          .forEach((panel) => {
+          .filter((panel) => {
             const isVisible = evaluateVisibility(
               (region as any).visibleIf,
               formData,
               visibilityCtx,
             );
-            const secFx = getFormattingEffectsForSection(
+            const regionFx = getFormattingEffectsForRegion(
               layout,
               region.id,
               formData,
               visibilityCtx,
             );
-            if (
+            const panelFx = getFormattingEffectsForPanel(
+              layout,
+              panel.id,
+              formData,
+              visibilityCtx,
+            );
+            return (
               isVisible &&
               (region as any).showInTemplate !== false &&
-              !secFx?.hidden &&
-              !panel.hidden
-            ) {
-              allSections.push({ section: panel, tabLabel: tab.label });
-            }
+              !regionFx?.hidden &&
+              !panelFx?.hidden &&
+              !panel.hidden &&
+              !isHiddenByLifecycle(panel as any, layoutType) &&
+              evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx)
+            );
           });
+        visiblePanels.forEach((panel, idx) => {
+          allSections.push({
+            section: panel,
+            tabLabel: tab.label,
+            regionLabel: region.label,
+            region,
+            isLastPanelInRegion: idx === visiblePanels.length - 1,
+          });
+        });
       });
     });
     return allSections;
@@ -522,10 +636,29 @@ export default function DynamicForm({
           }
         }
       }
+      // Remove derived dotted keys (e.g. "address_search.city") that come
+      // from flattenRecord expansion — the parent blob is authoritative.
+      for (const key of Object.keys(completeData)) {
+        if (key.includes('.') && !key.startsWith('_')) delete completeData[key];
+      }
       setSubmitError(null);
       setIsSubmitting(true);
       try {
-        await onSubmit(completeData, layoutId);
+        const result = await onSubmit(completeData, layoutId);
+        // If onSubmit returned a record ID (create mode) and there are
+        // pending widget saves (e.g. team members), save them now.
+        const recordId = typeof result === 'string' ? result : undefined;
+        if (recordId && pendingCtx?.hasPendingData()) {
+          const { errors: pendingErrors } = await pendingCtx.saveAllPending(recordId);
+          if (pendingErrors.length > 0) {
+            console.warn('[DynamicForm] Some pending widget data failed to save:', pendingErrors);
+            // Don't block the flow — record is created; user can add related data later
+          }
+        }
+        // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
+        if (recordId && onCreated) {
+          onCreated(recordId);
+        }
       } catch (error) {
         const msg =
           error instanceof Error ? error.message : 'Failed to save record';
@@ -722,6 +855,7 @@ export default function DynamicForm({
       rowSpan: number;
     }[] = [];
     for (const f of panel.fields) {
+      if (isHiddenByLifecycle(f as any, layoutType)) continue;
       const fd = getFieldDef(f.fieldApiName, f as any);
       if (fd) {
         gridFields.push({
@@ -848,6 +982,7 @@ export default function DynamicForm({
   // ══════════════════════════════════════════════════════════════
 
   return (
+    <PendingWidgetProvider value={pendingCtx.contextValue}>
     <>
       <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
         {/* Wizard Step Indicator */}
@@ -890,9 +1025,9 @@ export default function DynamicForm({
                             ? 'text-brand-navy font-semibold'
                             : 'text-gray-500',
                         )}
-                        title={ws.section.label}
+                        title={ws.regionLabel || ws.section.label}
                       >
-                        {ws.section.label}
+                        {ws.regionLabel || ws.section.label}
                       </span>
                     </div>
                     <div
@@ -939,7 +1074,9 @@ export default function DynamicForm({
         {/* Tabs */}
         {!isWizardMode && layout.tabs.length > 1 && (
           <div className="flex gap-2 border-b px-6 pt-4 bg-white">
-            {layout.tabs.map((tab) => (
+            {layout.tabs
+              .filter((tab) => !isHiddenByLifecycle(tab as any, layoutType))
+              .map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -958,23 +1095,47 @@ export default function DynamicForm({
         )}
 
         {/* Wizard mode sections */}
-        {!showReview && isWizardMode && wizardSections[currentStep] && (
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <div className="bg-white rounded-lg border border-gray-200">
-              <div className="p-4 bg-gray-100 rounded-t-lg">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {wizardSections[currentStep]!.section.label}
-                </h3>
-                {(wizardSections[currentStep]!.section as any).description ? (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {(wizardSections[currentStep]!.section as any).description}
-                  </p>
-                ) : null}
+        {!showReview && isWizardMode && wizardSections[currentStep] && (() => {
+          const step = wizardSections[currentStep]!;
+          // Render region widgets in the step for the LAST panel of the region,
+          // matching the detail page's visual order (widgets below panels).
+          const stepWidgets = step.isLastPanelInRegion
+            ? (step.region.widgets ?? []).filter((w: any) => {
+                const cfg = (w as any).config;
+                // External widgets and Summary only belong on the record detail page.
+                if (cfg?.type === 'ExternalWidget') return false;
+                if (cfg?.type === 'Summary') return false;
+                // On create forms, hide widgets that don't support create mode
+                if (isCreateMode && !getWidgetSupportsCreate(cfg?.type)) return false;
+                if (isHiddenByLifecycle(w as any, layoutType)) return false;
+                return true;
+              })
+            : [];
+          return (
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="bg-white rounded-lg border border-gray-200">
+                <div className="p-4 bg-gray-100 rounded-t-lg">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {step.regionLabel || step.section.label}
+                  </h3>
+                  {(step.section as any).description ? (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(step.section as any).description}
+                    </p>
+                  ) : null}
+                </div>
+                {renderSectionContent(step.section)}
               </div>
-              {renderSectionContent(wizardSections[currentStep]!.section)}
+              {stepWidgets.length > 0 && (
+                <LayoutWidgetsInline
+                  widgets={stepWidgets as any}
+                  record={formData}
+                  objectDef={widgetObjectDef}
+                />
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Regions + tab widgets -- 12-column tab canvas */}
         {!showReview && !isWizardMode && (
@@ -991,8 +1152,19 @@ export default function DynamicForm({
                 }
               }
               const filtered = canvasItems.filter((item) => {
-                if (item.kind === 'widget') return true;
+                if (item.kind === 'widget') {
+                  // Hide external widgets and Summary inside the form dialog —
+                  // they only belong on the record detail page (rendered post-creation).
+                  const cfg = (item.widget as any).config;
+                  if (cfg?.type === 'ExternalWidget') return false;
+                  if (cfg?.type === 'Summary') return false;
+                  // On create forms, hide widgets that don't support create mode
+                  if (isCreateMode && !getWidgetSupportsCreate(cfg?.type)) return false;
+                  if (isHiddenByLifecycle(item.widget as any, layoutType)) return false;
+                  return true;
+                }
                 const region = item.region;
+                if (isHiddenByLifecycle(region as any, layoutType)) return false;
                 const isRegionVisible = evaluateVisibility(
                   (region as any).visibleIf,
                   formData,
@@ -1000,13 +1172,13 @@ export default function DynamicForm({
                 );
                 if (!isRegionVisible) return false;
                 if ((region as any).showInTemplate === false) return false;
-                const secFx = getFormattingEffectsForSection(
+                const regionFx = getFormattingEffectsForRegion(
                   layout,
                   region.id,
                   formData,
                   visibilityCtx,
                 );
-                if (secFx?.hidden) return false;
+                if (regionFx?.hidden) return false;
                 if (region.hidden) return false;
                 return true;
               });
@@ -1032,15 +1204,27 @@ export default function DynamicForm({
                             gridRowSpan: (g as any).gridRowSpan ?? 1,
                           })}
                         >
-                          <LayoutWidgetsInline widgets={[g] as any} />
+                          <LayoutWidgetsInline
+                            widgets={[g] as any}
+                            record={formData}
+                            objectDef={widgetObjectDef}
+                          />
                         </div>
                       );
                     }
                     const region = item.region;
-                    return region.panels
-                      .filter((p) => !p.hidden)
-                      .sort((a, b) => a.order - b.order)
-                      .map((panelItem) => {
+                    const visiblePanels = region.panels
+                      .filter((p) => {
+                        if (p.hidden) return false;
+                        if (isHiddenByLifecycle(p as any, layoutType)) return false;
+                        if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
+                        const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
+                        if (panelFx?.hidden) return false;
+                        return true;
+                      })
+                      .sort((a, b) => a.order - b.order);
+                    return visiblePanels
+                      .map((panelItem, panelIdx) => {
                         const isCollapsed = collapsedSections.has(panelItem.id);
                         return (
                           <div
@@ -1050,8 +1234,10 @@ export default function DynamicForm({
                               gridColumn: region.gridColumn ?? 1,
                               gridColumnSpan:
                                 region.gridColumnSpan ?? TAB_GRID_COLUMNS,
-                              gridRow: region.gridRow ?? 1,
-                              gridRowSpan: region.gridRowSpan ?? 1,
+                              gridRow: visiblePanels.length > 1
+                                ? (region.gridRow ?? 1) + panelIdx
+                                : region.gridRow ?? 1,
+                              gridRowSpan: 1,
                             })}
                           >
                             <button
@@ -1112,21 +1298,30 @@ export default function DynamicForm({
                 );
                 if (!isRegionVisible) return [];
                 if ((region as any).showInTemplate === false) return [];
-                const secFx = getFormattingEffectsForSection(
+                const regionFx = getFormattingEffectsForRegion(
                   layout,
                   region.id,
                   formData,
                   visibilityCtx,
                 );
-                if (secFx?.hidden) return [];
+                if (regionFx?.hidden) return [];
 
                 return region.panels
                   .sort((a, b) => a.order - b.order)
-                  .filter((p) => !p.hidden)
+                  .filter((p) => {
+                    if (p.hidden) return false;
+                    if ((p as any).visibleIf?.length > 0 && !evaluateVisibility((p as any).visibleIf, formData, visibilityCtx)) return false;
+                    const panelFx = getFormattingEffectsForPanel(layout, p.id, formData, visibilityCtx);
+                    if (panelFx?.hidden) return false;
+                    return true;
+                  })
                   .map((panelItem) => {
+                    const lifecycleFields = panelItem.fields.filter(
+                      (f) => !isHiddenByLifecycle(f as any, layoutType),
+                    );
                     const columnArrays: FieldDef[][] = [];
                     for (let ci = 0; ci < panelItem.columns; ci++) {
-                      columnArrays[ci] = panelItem.fields
+                      columnArrays[ci] = lifecycleFields
                         .filter(
                           (f) =>
                             ((f as any).column ??
@@ -1531,5 +1726,6 @@ export default function DynamicForm({
         </Dialog>
       )}
     </>
+    </PendingWidgetProvider>
   );
 }

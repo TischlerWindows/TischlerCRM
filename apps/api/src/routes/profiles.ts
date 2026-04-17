@@ -4,7 +4,7 @@ import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
 import { logAudit, extractIp } from '../audit.js';
 
-const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'] as const;
+const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products'] as const;
 const APP_KEYS = [
   'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
   'exportData','importData',

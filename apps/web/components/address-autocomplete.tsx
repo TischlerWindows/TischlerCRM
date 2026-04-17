@@ -39,13 +39,18 @@ export default function AddressAutocomplete({
   value,
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(value ?? '');
+  const [isFocused, setIsFocused] = useState(false);
 
-  // Sync external value into the input when it changes (e.g. on record load)
+  // Sync the search bar text from the parent value prop (built from
+  // sub-field values) — but only when the user is NOT actively typing
+  // in the search bar.  This gives two-way sync: sub-field edits update
+  // the search bar, and search-bar selections update the sub-fields.
   useEffect(() => {
-    if (value !== undefined && value !== query) {
+    if (!isFocused && value !== undefined) {
       setQuery(value);
     }
-  }, [value]);
+  }, [value, isFocused]);
+
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -56,6 +61,7 @@ export default function AddressAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Close dropdown when clicking outside the autocomplete container
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -138,7 +144,11 @@ export default function AddressAutocomplete({
         <Input
           value={query}
           onChange={handleInputChange}
-          onFocus={() => predictions.length > 0 && setIsOpen(true)}
+          onFocus={() => {
+            setIsFocused(true);
+            if (predictions.length > 0) setIsOpen(true);
+          }}
+          onBlur={() => setIsFocused(false)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled || loadingDetails}

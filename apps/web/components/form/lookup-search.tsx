@@ -38,15 +38,19 @@ export function getRecordLabel(record: any): string {
   // Account number as fallback for accounts
   if (record.accountNumber) return record.accountNumber;
 
+  // Lead: show just lead number as label (contactName goes in subtext)
+  const leadNum = record.leadNumber || record.Lead__leadNumber;
+  if (leadNum) return leadNum;
+
   // Contact names
   if (record.firstName || record.lastName) {
     return `${record.firstName || ''} ${record.lastName || ''}`.trim();
   }
   if (record.email) return record.email;
 
-  // Lead/Deal/Project numbers
-  if (record.leadNumber) return record.leadNumber;
-  if (record.dealNumber) return record.dealNumber;
+  // Opportunity: show just opportunity number as label (name goes in subtext)
+  const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
+  if (oppNum) return oppNum;
   if (record.projectNumber) return record.projectNumber;
   if (record.quoteNumber) return record.quoteNumber;
   if (record.serviceNumber) return record.serviceNumber;
@@ -149,6 +153,48 @@ export function getRecordLabel(record: any): string {
   return String(record.id || 'Record');
 }
 
+// ── getRecordSubtext ─────────────────────────────────────────────────
+// Returns an optional secondary line for lookup dropdown items.
+
+export function getRecordSubtext(record: any): string {
+  if (!record) return '';
+
+  // Property: show address as subtext
+  const addr = record.address || record.Property__address;
+  if (addr) {
+    if (typeof addr === 'object') {
+      const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+      if (parts.length > 0) return parts.join(', ');
+    } else if (typeof addr === 'string') {
+      return addr;
+    }
+  }
+
+  // Contact: show email as subtext
+  const email = record.email || record.Contact__email;
+  if (email && typeof email === 'string') return email;
+
+  // Lead: show contactName as subtext
+  const leadContactName = record.contactName || record.Lead__contactName;
+  if (leadContactName) return leadContactName;
+  const leadFn = record.firstName || record.Lead__firstName || '';
+  const leadLn = record.lastName || record.Lead__lastName || '';
+  const rawLeadLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
+  const leadFullName = `${leadFn} ${rawLeadLn}`.trim();
+  if (leadFullName) return leadFullName;
+
+  // Opportunity: show opportunity name as subtext
+  const oppName = record.opportunityName || record.Opportunity__opportunityName;
+  if (oppName) return oppName;
+
+  // Account: show account number as subtext
+  if (record.accountNumber || record.Account__accountNumber) {
+    return record.accountNumber || record.Account__accountNumber;
+  }
+
+  return '';
+}
+
 // ── getLookupTargetApi ──────────────────────────────────────────────
 
 export function getLookupTargetApi(
@@ -232,6 +278,8 @@ export function LookupSearch({
     if (!labelStr) return true;
     const query = lookupQuery.toLowerCase();
     if (labelStr.toLowerCase().includes(query)) return true;
+    const sub = getRecordSubtext(record);
+    if (sub && sub.toLowerCase().includes(query)) return true;
     return Object.values(record).some(
       (val) => typeof val === 'string' && val.toLowerCase().includes(query),
     );
@@ -288,7 +336,11 @@ export function LookupSearch({
                   <div className="font-medium text-gray-900 truncate">
                     {displayLabel}
                   </div>
-                  <div className="text-xs text-gray-500">{record.id}</div>
+                  {(getRecordSubtext(record)) && (
+                    <div className="text-xs text-gray-500 truncate">
+                      {getRecordSubtext(record)}
+                    </div>
+                  )}
                 </button>
               );
             })

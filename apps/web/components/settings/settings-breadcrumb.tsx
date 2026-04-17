@@ -5,78 +5,65 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
 const SEGMENT_LABELS: Record<string, string> = {
-  settings: 'Settings',
+  settings: 'Setup',
+  'object-manager': 'Object Manager',
   users: 'Users',
-  roles: 'Roles',
+  profiles: 'Profiles',
   departments: 'Departments',
   'audit-log': 'Audit Log',
+  'error-log': 'Error Log',
   'recycle-bin': 'Recycle Bin',
   security: 'Security',
   backups: 'Backups',
-  data: 'Data',
   company: 'Company Settings',
   integrations: 'Connected Apps',
   widgets: 'Widgets',
   privacy: 'Privacy Center',
   notifications: 'Notifications',
   offline: 'Offline',
-  automation: 'Process Automation',
-  ui: 'User Interface',
+  automations: 'Automations',
 };
 
-const SEGMENT_GROUPS: Record<string, string> = {
-  users: 'Administration',
-  roles: 'Administration',
-  departments: 'Administration',
-  'audit-log': 'Administration',
-  'recycle-bin': 'Administration',
-  data: 'Administration',
-  backups: 'Administration',
-  security: 'Settings',
-  company: 'Settings',
-  integrations: 'Integrations',
-  widgets: 'Integrations',
-  privacy: 'Settings',
-  notifications: 'Integrations',
-  offline: 'Integrations',
-  automation: 'Automation',
-};
+interface Crumb {
+  label: string;
+  href?: string;
+}
+
+function buildCrumbs(pathname: string): Crumb[] {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 0 || segments[0] !== 'settings') return [];
+
+  const crumbs: Crumb[] = [{ label: 'Tischler CRM', href: '/' }];
+  const isSettingsRoot = segments.length === 1;
+  crumbs.push(isSettingsRoot ? { label: 'Setup' } : { label: 'Setup', href: '/settings' });
+  for (let i = 1; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const label = SEGMENT_LABELS[seg] || decodeURIComponent(seg);
+    const isLast = i === segments.length - 1;
+    crumbs.push(isLast ? { label } : { label, href: '/' + segments.slice(0, i + 1).join('/') });
+  }
+
+  return crumbs;
+}
 
 export function SettingsBreadcrumb() {
   const pathname = usePathname();
   if (!pathname) return null;
-
-  const segments = pathname.split('/').filter(Boolean);
-  // Only show breadcrumb for sub-pages (not the settings hub itself)
-  if (segments.length <= 1) return null;
-
-  const currentSegment = segments[segments.length - 1];
-  const group = SEGMENT_GROUPS[currentSegment];
-
-  const items: Array<{ label: string; href?: string }> = [
-    { label: 'Settings', href: '/settings' },
-  ];
-
-  if (group) {
-    items.push({ label: group });
-  }
-
-  items.push({ label: SEGMENT_LABELS[currentSegment] || currentSegment });
+  const crumbs = buildCrumbs(pathname);
+  if (crumbs.length <= 1) return null;
 
   return (
     <div className="px-8 py-3 text-[12px] text-brand-gray bg-white border-b border-gray-200">
       <div className="flex items-center gap-1.5">
-        {items.map((item, i) => (
+        {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRight className="w-3 h-3 text-gray-300" />}
-            {item.href && i < items.length - 1 ? (
-              <Link href={item.href} className="hover:text-brand-navy transition-colors">
-                {item.label}
+            {c.href ? (
+              <Link href={c.href} className="hover:text-brand-navy transition-colors">
+                {c.label}
               </Link>
-            ) : i === items.length - 1 ? (
-              <span className="text-brand-dark font-medium">{item.label}</span>
             ) : (
-              <span>{item.label}</span>
+              <span className="text-brand-dark font-medium">{c.label}</span>
             )}
           </span>
         ))}

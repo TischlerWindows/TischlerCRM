@@ -43,3 +43,12 @@ export function getExternalRegistration(id: string): WidgetRegistration | undefi
 export function getInternalRegistrationByType(type: string): WidgetRegistration | undefined {
   return internalWidgetRegistrations.find((r) => r.widgetConfigType === type)
 }
+
+/**
+ * Returns true if the widget type supports rendering on create forms
+ * (i.e. before the parent record exists).
+ */
+export function getWidgetSupportsCreate(configType: string): boolean {
+  const reg = getInternalRegistrationByType(configType)
+  return reg?.supportsCreate === true
+}

@@ -13,12 +13,13 @@ const LOOKUP_ROUTE_MAP: Record<string, string> = {
   Account: 'accounts',
   Property: 'properties',
   Lead: 'leads',
-  Deal: 'deals',
+  Opportunity: 'opportunities',
   Product: 'products',
   Quote: 'quotes',
   Project: 'projects',
   Service: 'service',
   Installation: 'installations',
+  User: 'settings/users',
 };
 
 // ── getFieldDef ────────────────────────────────────────────────────────
@@ -98,6 +99,7 @@ export function renderValue(
   fieldDef: FieldDef | undefined,
   record: Record<string, any> | null,
   isLookupLoaded: boolean,
+  compact = false,
 ): React.ReactNode {
   // Auto-parse JSON strings
   let value = rawValue;
@@ -106,33 +108,56 @@ export function renderValue(
   }
   const fieldType = fieldDef?.type;
 
-  // LocationSearch — virtual widget, reads mapped target fields
-  if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
-    const tf = fieldDef.targetFields;
-    const resolve = (key: string | undefined) => {
-      if (!key) return undefined;
-      return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
-    };
-    const lat = Number(resolve(tf.lat));
-    const lng = Number(resolve(tf.lng));
-    const addressParts = [
-      resolve(tf.street),
-      resolve(tf.city),
-      resolve(tf.state),
-      resolve(tf.postalCode),
-      resolve(tf.country),
-    ].filter(Boolean).join(', ');
+  // LocationSearch — works like Address but merges scattered data first
+  if (fieldType === 'LocationSearch' && record) {
+    // Build a merged address object from all data sources (mirrors
+    // buildLocationBlob in address-field.tsx).
+    const valObj: Record<string, any> = (typeof value === 'object' && value) ? { ...value } : {};
+    const tf = fieldDef?.targetFields || {};
+    const fieldBase = (fieldDef?.apiName || '').replace(/^[A-Za-z]+__/, '');
 
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+    // 1. Dotted flat keys (e.g. address_search.city)
+    for (const key of Object.keys(record)) {
+      if (key.startsWith(fieldBase + '.')) {
+        const sub = key.slice(fieldBase.length + 1);
+        if (sub && valObj[sub] == null && record[key] != null && record[key] !== '') {
+          valObj[sub] = record[key];
+        }
+      }
+    }
+
+    // 2. Compound address object at the street target
+    if (tf.street) {
+      const raw = record[tf.street] ?? record[tf.street.replace(/^[A-Za-z]+__/, '')];
+      if (typeof raw === 'object' && raw) {
+        for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+          if (valObj[k] == null && v != null && v !== '') valObj[k] = v;
+        }
+      }
+    }
+
+    // 3. Safe individual target-field columns (skip street)
+    for (const jsonKey of ['city', 'state', 'postalCode', 'country', 'lat', 'lng'] as const) {
+      if (valObj[jsonKey] == null && tf[jsonKey]) {
+        const raw = record[tf[jsonKey]] ?? record[tf[jsonKey].replace(/^[A-Za-z]+__/, '')];
+        if (raw != null && raw !== '' && typeof raw !== 'object') valObj[jsonKey] = raw;
+      }
+    }
+
+    // Render exactly like Address
+    const parts = [valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country].filter(Boolean);
+    const addressText = parts.length > 0 ? parts.join(', ') : '-';
+    const lat = Number(valObj.lat);
+    const lng = Number(valObj.lng);
+    if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
-        <LocationMapPreview
-          lat={lat}
-          lng={lng}
-          address={addressParts || undefined}
-        />
+        <div className="space-y-2">
+          <span>{addressText}</span>
+          <LocationMapPreview lat={lat} lng={lng} address={addressText !== '-' ? addressText : undefined} />
+        </div>
       );
     }
-    return addressParts || '-';
+    return addressText;
   }
 
   if (value === null || value === undefined || value === '') return '-';
@@ -243,7 +268,7 @@ export function renderValue(
     const addressText = parts.length > 0 ? parts.join(', ') : '-';
     const lat = Number(value.lat);
     const lng = Number(value.lng);
-    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+    if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
         <div className="space-y-2">
           <span>{addressText}</span>
@@ -285,6 +310,7 @@ interface MemoizedFieldValueProps {
   fieldDef: FieldDef | undefined;
   record: Record<string, any> | null;
   isLookupLoaded: boolean;
+  compact?: boolean;
 }
 
 function MemoizedFieldValueInner({
@@ -293,10 +319,11 @@ function MemoizedFieldValueInner({
   fieldDef,
   record,
   isLookupLoaded,
+  compact,
 }: MemoizedFieldValueProps) {
   const rendered = React.useMemo(
-    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded),
-    [apiName, rawValue, fieldDef, record, isLookupLoaded],
+    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded, compact),
+    [apiName, rawValue, fieldDef, record, isLookupLoaded, compact],
   );
   return <>{rendered}</>;
 }

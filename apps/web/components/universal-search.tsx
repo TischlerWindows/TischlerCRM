@@ -13,7 +13,7 @@ const DEDICATED_ROUTES: Record<string, string> = {
   Account: '/accounts',
   Contact: '/contacts',
   Lead: '/leads',
-  Deal: '/deals',
+  Opportunity: '/opportunities',
   Project: '/projects',
   Product: '/products',
   Installation: '/installations',
@@ -214,11 +214,6 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
                             {result.subtitle && (
                               <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
                                 {result.subtitle}
-                              </p>
-                            )}
-                            {result.matchedFields.length > 0 && (
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                Matched: {result.matchedFields.join(', ')}
                               </p>
                             )}
                           </div>

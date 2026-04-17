@@ -19,7 +19,12 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   CustomComponent: { type: 'CustomComponent', componentId: '' },
   Spacer: { type: 'Spacer', minHeightPx: 32 },
   HeaderHighlights: { type: 'HeaderHighlights', fieldApiNames: [] },
+  TeamMembersRollup: { type: 'TeamMembersRollup' },
+  TeamMemberAssociations: { type: 'TeamMemberAssociations' },
   ExternalWidget: { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} },
+  Path: { type: 'Path', pathId: '', showLabel: true, showGuidance: true, showKeyFields: true, compact: false },
+  InstallationCostGrid: { type: 'InstallationCostGrid' },
+  Summary: { type: 'Summary' },
 };
 
 // ── Builders ────────────────────────────────────────────────────────────────
@@ -74,6 +79,7 @@ interface DragEndActions {
   movePanel: EditorState['movePanel'];
   swapSections: EditorState['swapSections'];
   addPanel: EditorState['addPanel'];
+  addWidgetToPanel: EditorState['addWidgetToPanel'];
 }
 
 // ── handleDragEnd dispatch logic ────────────────────────────────────────────
@@ -86,7 +92,7 @@ export function dispatchDragEnd(
 ): void {
   if (!active || !target) return;
 
-  const { addField, moveField, removeField, addWidget, moveWidget, movePanel, swapSections, addPanel } = actions;
+  const { addField, moveField, removeField, addWidget, moveWidget, movePanel, swapSections, addPanel, addWidgetToPanel } = actions;
 
   // Dragging an existing field back to the palette remove zone -> remove it
   if (active.kind === 'existing-field' && target.kind === 'palette-remove') {
@@ -136,6 +142,17 @@ export function dispatchDragEnd(
   }
 
   if (active.kind === 'palette-widget' || active.kind === 'existing-widget') {
+    // Widget dropped onto a component panel
+    if (target.kind === 'panel-drop') {
+      const entry = findPanel(layout, target.panelId);
+      if (!entry || entry.panel.panelType !== 'components') return;
+      const panelWidgets = entry.panel.widgets ?? [];
+      if (active.kind === 'palette-widget') {
+        addWidgetToPanel(buildWidget(active.widgetType, panelWidgets.length, active.externalWidgetId), target.panelId);
+      }
+      return;
+    }
+
     let targetRegionId: string | null = null;
     let targetIndex = 0;
 
@@ -184,6 +201,7 @@ export function dispatchDragEnd(
         columns: active.columns,
         style: {},
         fields: [],
+        ...(active.panelType === 'components' ? { panelType: 'components' as const, widgets: [] } : {}),
       },
       target.regionId,
     );

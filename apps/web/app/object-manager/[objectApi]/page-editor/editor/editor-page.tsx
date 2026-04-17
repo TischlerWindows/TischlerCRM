@@ -37,6 +37,8 @@ export default function EditorPage() {
         onPreview={() => lifecycle.setShowPreview(true)}
         onOpenRules={() => lifecycle.setShowFormattingRulesDialog(true)}
         onRequestNavigate={lifecycle.requestNavigate}
+        backHref={lifecycle.backHref}
+        backLabel={lifecycle.backLabel}
         objectManagerHref={lifecycle.objectManagerHref}
         objectListHref={lifecycle.objectListHref}
         objectListLabel={lifecycle.objectListLabel}
@@ -58,9 +60,11 @@ export default function EditorPage() {
       <LayoutPreviewDialog
         open={lifecycle.showPreview}
         onOpenChange={lifecycle.setShowPreview}
-        pageLayout={layout as unknown as PageLayout}
-        allFields={lifecycle.allFields}
+        layout={layout as unknown as PageLayout}
+        objectApiName={lifecycle.objectApiName}
+        objectDef={lifecycle.object}
         objectLabel={lifecycle.object.label}
+        allFields={lifecycle.allFields}
       />
 
       {lifecycle.showFormattingRulesDialog && (

@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
-import { GripVertical, Search, Trash2 } from 'lucide-react';
+import { GripVertical, LayoutGrid, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
@@ -60,21 +60,10 @@ function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4;
 
 // ── Field chips ──────────────────────────────────────────────────────────────
 
-function DraggableFieldChip({
-  field,
-  isPlaced,
-}: {
-  field: FieldDef;
-  isPlaced: boolean;
-}) {
+function ComponentSectionTile() {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `palette-field-${field.apiName}`,
-    data: {
-      type: 'palette-field',
-      fieldApiName: field.apiName,
-      label: field.label,
-    },
-    disabled: isPlaced,
+    id: 'palette-panel-components',
+    data: { type: 'palette-panel', columns: 1, label: 'Component Section', panelType: 'components' },
   });
 
   const style: CSSProperties = {
@@ -86,12 +75,47 @@ function DraggableFieldChip({
       ref={setNodeRef}
       type="button"
       style={style}
-      {...(isPlaced ? {} : { ...listeners, ...attributes })}
+      {...listeners}
+      {...attributes}
+      className="flex w-full items-center gap-2 rounded-md border border-dashed border-gray-300 bg-white px-2 py-1.5 text-left text-xs transition-colors hover:border-gray-400 hover:bg-gray-50 active:cursor-grabbing"
+    >
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+      <span className="min-w-0 flex-1 truncate font-medium text-gray-700">Component Section</span>
+      <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
+    </button>
+  );
+}
+
+function DraggableFieldChip({
+  field,
+  isPlaced,
+}: {
+  field: FieldDef;
+  isPlaced: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `palette-field-${field.apiName}${isPlaced ? `-${Date.now()}` : ''}`,
+    data: {
+      type: 'palette-field',
+      fieldApiName: field.apiName,
+      label: field.label,
+    },
+  });
+
+  const style: CSSProperties = {
+    opacity: isDragging ? 0 : 1,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      style={style}
+      {...listeners}
+      {...attributes}
       className={cn(
         'flex w-full items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 text-left text-xs transition-colors',
-        isPlaced
-          ? 'cursor-not-allowed opacity-50'
-          : 'hover:bg-gray-50 active:cursor-grabbing',
+        'hover:bg-gray-50 active:cursor-grabbing',
       )}
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
@@ -197,6 +221,16 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
             {FIELD_SECTION_TILES.map((tile) => (
               <DraggableFieldSectionTile key={tile.columns} columns={tile.columns} label={tile.label} />
             ))}
+          </div>
+        </section>
+
+        {/* Component Section tile */}
+        <section className="space-y-1.5">
+          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            Component Sections
+          </div>
+          <div className="space-y-1">
+            <ComponentSectionTile />
           </div>
         </section>
 

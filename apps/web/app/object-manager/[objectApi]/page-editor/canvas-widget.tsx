@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { LayoutWidget } from './types';
 import { useEditorStore } from './editor-store';
 import { getWidgetById } from '@/lib/widgets/registry-loader';
+import { useSchemaStore } from '@/lib/schema-store';
 import { CanvasErrorBoundary } from './canvas-error-boundary';
 import {
   Sparkles,
@@ -18,6 +19,9 @@ import {
   Puzzle,
   Rows3,
   List,
+  Users,
+  GitBranch,
+  Table2,
 } from 'lucide-react';
 
 interface CanvasWidgetCardProps {
@@ -31,7 +35,11 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   CustomComponent: Component,
   Spacer: Minus,
   HeaderHighlights: Sparkles,
+  TeamMembersRollup: Users,
+  TeamMemberAssociations: Users,
   ExternalWidget: Puzzle,
+  Path: GitBranch,
+  InstallationCostGrid: Table2,
 };
 
 const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
@@ -41,9 +49,14 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   CustomComponent: 'Custom Component',
   Spacer: 'Spacer',
   HeaderHighlights: 'Header Highlights',
+  TeamMembersRollup: 'Team Members',
+  TeamMemberAssociations: 'Team Member Associations',
+  Path: 'Path',
+  InstallationCostGrid: 'Installation Cost Grid',
 };
 
 function summarizeWidget(widget: LayoutWidget): string {
+  if (!widget.config?.type) return '';
   switch (widget.config.type) {
     case 'RelatedList':
       return widget.config.relatedObjectApiName || 'No related object selected';
@@ -64,10 +77,22 @@ function summarizeWidget(widget: LayoutWidget): string {
       const extraCount = fields.length - preview.length;
       return extraCount > 0 ? `${preview.join(', ')} +${extraCount}` : preview.join(', ');
     }
+    case 'TeamMembersRollup':
+      return `Team Members${widget.config.rollupFromProperty ? ' (Rollup)' : ''}`;
+    case 'TeamMemberAssociations':
+      return 'Associations for Contact / Account';
     case 'ExternalWidget': {
       const manifest = getWidgetById(widget.config.externalWidgetId);
       return manifest?.description ?? widget.config.externalWidgetId;
     }
+    case 'Path': {
+      const schema = useSchemaStore.getState().schema;
+      const obj = schema?.objects.find(o => (o.paths || []).some(p => p.id === widget.config.pathId));
+      const path = obj?.paths?.find(p => p.id === widget.config.pathId);
+      return path?.name || 'No path selected';
+    }
+    case 'InstallationCostGrid':
+      return 'Weekly cost tracking and technician labor expenses';
     default:
       return '';
   }
@@ -77,6 +102,12 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
   const selectedElement = useEditorStore((s) => s.selectedElement);
   const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const removeWidget = useEditorStore((s) => s.removeWidget);
+  const previewMode = useEditorStore((s) => s.previewMode);
+
+  const isHiddenInPreviewMode =
+    (previewMode === 'new' && (widget as any).hideOnNew) ||
+    (previewMode === 'view' && ((widget as any).hideOnView || (widget as any).hideOnExisting)) ||
+    (previewMode === 'edit' && ((widget as any).hideOnEdit || (widget as any).hideOnExisting));
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: widget.id,
     data: { type: 'widget', widgetId: widget.id },
@@ -110,7 +141,7 @@ export function CanvasWidgetCard({ widget }: CanvasWidgetCardProps) {
       tabIndex={0}
       aria-label={`Select ${widgetLabel} widget card`}
       data-editor-sortable-id={widget.id}
-      className={`group rounded-lg border bg-white p-2.5 transition-all ${
+      className={`group rounded-lg border bg-white p-2.5 transition-all ${isHiddenInPreviewMode ? 'opacity-40 ' : ''}${
         isSelected
           ? 'border-brand-navy/60 ring-1 ring-brand-navy/20'
           : 'border-gray-200 hover:border-brand-navy/30'

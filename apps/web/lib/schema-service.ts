@@ -165,10 +165,14 @@ class LocalStorageSchemaService implements SchemaService {
         migratedSchema = this.ensureAccountTemplateLayout(migratedSchema);
         migratedSchema = this.ensureProductTemplateLayout(migratedSchema);
         migratedSchema = this.ensureLeadTemplateLayout(migratedSchema);
-        migratedSchema = this.ensureDealTemplateLayout(migratedSchema);
+        migratedSchema = this.ensureOpportunityTemplateLayout(migratedSchema);
+        migratedSchema = this.ensureInstallationCostObjects(migratedSchema);
 
         // Universal: ensure every object has at least one layout with populated fields
         migratedSchema = this.ensureAllObjectsHavePopulatedLayout(migratedSchema);
+
+        // Ensure system field definitions are up-to-date (type, readOnly, etc.)
+        migratedSchema = this.migrateSystemFieldTypes(migratedSchema);
 
         // Self-contained layouts: embed full FieldDef into every PageField
         // so DynamicForm never needs to cross-reference object.fields.
@@ -194,6 +198,20 @@ class LocalStorageSchemaService implements SchemaService {
       }
     } catch (err) {
       console.warn('[Schema] Could not load from API, trying localStorage migration:', err);
+      // API was unreachable (e.g. during redeployment).  Do NOT fall through
+      // to createSampleData — that would overwrite the real schema once the
+      // API comes back.  Instead, try localStorage or return an in-memory
+      // default WITHOUT saving.
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            return JSON.parse(stored);
+          } catch (_) { /* ignore parse errors, continue to fallback */ }
+        }
+      }
+      console.warn('[Schema] Returning in-memory default (NOT saved) because API is unavailable');
+      return this.createSampleData();
     }
 
     // Migration: try reading from localStorage and push to API
@@ -698,6 +716,29 @@ class LocalStorageSchemaService implements SchemaService {
     return schema;
   }
 
+  /**
+   * Migrate system field definitions so persisted schemas match the
+   * canonical types defined in SYSTEM_FIELDS (e.g. CreatedById → LookupUser).
+   */
+  private migrateSystemFieldTypes(schema: OrgSchema): OrgSchema {
+    const canonical = new Map(SYSTEM_FIELDS.map(f => [f.apiName, f]));
+    let changed = false;
+
+    for (const obj of schema.objects) {
+      for (let i = 0; i < obj.fields.length; i++) {
+        const sf = canonical.get(obj.fields[i].apiName);
+        if (!sf) continue;
+        const cur = obj.fields[i];
+        if (cur.type !== sf.type || cur.readOnly !== sf.readOnly) {
+          obj.fields[i] = { ...cur, type: sf.type, readOnly: sf.readOnly };
+          changed = true;
+        }
+      }
+    }
+
+    return changed ? { ...schema, updatedAt: new Date().toISOString() } : schema;
+  }
+
   private ensurePropertyWoodLayout(schema: OrgSchema): OrgSchema {
     // No-op: Hard-coded template layouts are no longer auto-injected.
     // The universal ensureAllObjectsHavePopulatedLayout method will
@@ -936,6 +977,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Lead__property',
       label: 'Property',
       type: 'Lookup',
+      required: true,
       lookupObject: 'Property',
       relationshipName: 'Properties'
     });
@@ -1024,7 +1066,7 @@ class LocalStorageSchemaService implements SchemaService {
       apiName: 'Lead__leadNumber',
       label: 'Lead Number',
       type: 'AutoNumber',
-      autoNumber: { displayFormat: 'L{00}', startingNumber: 1 }
+      autoNumber: { displayFormat: 'LEAD{0000}', startingNumber: 1 }
     });
 
     const mergedFields = requiredFields.length > 0
@@ -1048,26 +1090,26 @@ class LocalStorageSchemaService implements SchemaService {
     return schema;
   }
 
-  private ensureDealTemplateLayout(schema: OrgSchema): OrgSchema {
-    const deal = schema.objects.find((obj) => obj.apiName === 'Deal');
-    if (!deal) return schema;
+  private ensureOpportunityTemplateLayout(schema: OrgSchema): OrgSchema {
+    const opp = schema.objects.find((obj) => obj.apiName === 'Opportunity');
+    if (!opp) return schema;
 
     const requiredFields: FieldDef[] = [];
     const ensureField = (field: FieldDef) => {
-      const exists = deal.fields.some((f) => f.apiName === field.apiName || f.label === field.label);
+      const exists = opp.fields.some((f) => f.apiName === field.apiName || f.label === field.label);
       if (!exists) requiredFields.push(field);
     };
 
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealName',
-      label: 'Deal Name',
+      apiName: 'Opportunity__opportunityName',
+      label: 'Opportunity Name',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__architectFirm',
+      apiName: 'Opportunity__architectFirm',
       label: 'Architect Firm',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1075,7 +1117,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__architect',
+      apiName: 'Opportunity__architect',
       label: 'Architect',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1083,7 +1125,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__contractorCompany',
+      apiName: 'Opportunity__contractorCompany',
       label: 'Contractor Company',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1091,7 +1133,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__contractor',
+      apiName: 'Opportunity__contractor',
       label: 'Contractor',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1099,7 +1141,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteAccount',
+      apiName: 'Opportunity__quoteAccount',
       label: 'Quote Account',
       type: 'Lookup',
       lookupObject: 'Account',
@@ -1107,7 +1149,7 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteContact',
+      apiName: 'Opportunity__quoteContact',
       label: 'Quote Contact',
       type: 'Lookup',
       lookupObject: 'Contact',
@@ -1115,43 +1157,43 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteEmail',
+      apiName: 'Opportunity__quoteEmail',
       label: 'Quote Email',
       type: 'Email',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quotePhone',
+      apiName: 'Opportunity__quotePhone',
       label: 'Quote Phone',
       type: 'Phone',
       maxLength: 40
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__secondaryQuotePhone',
+      apiName: 'Opportunity__secondaryQuotePhone',
       label: 'Secondary Quote Phone',
       type: 'Phone',
       maxLength: 40
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealOwner',
-      label: 'Deal Owner',
+      apiName: 'Opportunity__opportunityOwner',
+      label: 'Opportunity Owner',
       type: 'Lookup',
       lookupObject: 'User',
-      relationshipName: 'Deal Owners'
+      relationshipName: 'Opportunity Owners'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealNumber',
-      label: 'Deal Number',
+      apiName: 'Opportunity__opportunityNumber',
+      label: 'Opportunity Number',
       type: 'AutoNumber',
-      autoNumber: { displayFormat: 'YY{000}', startingNumber: 1 }
+      autoNumber: { displayFormat: 'OPP{0000}', startingNumber: 1 }
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__property',
+      apiName: 'Opportunity__property',
       label: 'Property',
       type: 'Lookup',
       lookupObject: 'Property',
@@ -1159,39 +1201,39 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__propertyAddress',
+      apiName: 'Opportunity__propertyAddress',
       label: 'Property Address',
       type: 'TextArea',
       maxLength: 2000
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatedContractDate',
+      apiName: 'Opportunity__estimatedContractDate',
       label: 'Estimated Contract Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__productRequiredOnsite',
+      apiName: 'Opportunity__productRequiredOnsite',
       label: 'Product Required Onsite',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteDue',
+      apiName: 'Opportunity__quoteDue',
       label: 'Quote Due',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__stage',
+      apiName: 'Opportunity__stage',
       label: 'Stage',
       type: 'Picklist',
       picklistValues: ['Incomplete', 'Queued', 'Estimating', 'Quoted/Active', 'Requote/Active', 'Closed Won', 'Closed Lost']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__competitors',
+      apiName: 'Opportunity__competitors',
       label: 'Competitors',
       type: 'MultiSelectPicklist',
       picklistValues: [
@@ -1224,14 +1266,14 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__probability',
+      apiName: 'Opportunity__probability',
       label: 'Probability',
       type: 'Picklist',
       picklistValues: ['25%', '50%', '75%', '90%']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__amount',
+      apiName: 'Opportunity__amount',
       label: 'Amount',
       type: 'Currency',
       precision: 16,
@@ -1239,111 +1281,111 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__quoteBudget',
+      apiName: 'Opportunity__quoteBudget',
       label: 'Quote Budget',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__plansDated',
+      apiName: 'Opportunity__plansDated',
       label: 'Plans Dated',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sharedOpportunity',
+      apiName: 'Opportunity__sharedOpportunity',
       label: 'Shared Opportunity',
       type: 'Picklist',
       picklistValues: ['No', 'Yes']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sharedOpportunityUsers',
+      apiName: 'Opportunity__sharedOpportunityUsers',
       label: 'Shared Opportunity Users',
       type: 'MultiSelectPicklist',
       picklistValues: ['Andy', 'Chris', 'Jim', 'Tim', 'Brian']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__dealNotes',
-      label: 'Deal Notes',
+      apiName: 'Opportunity__opportunityNotes',
+      label: 'Opportunity Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__kornPriority',
+      apiName: 'Opportunity__kornPriority',
       label: 'Korn Priority',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimators',
+      apiName: 'Opportunity__estimators',
       label: 'Estimators',
       type: 'MultiSelectPicklist',
       picklistValues: ['Elaine', 'Nancy', 'Krystyna', 'Marianna', 'Estefania', 'Julian']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatingStatus',
+      apiName: 'Opportunity__estimatingStatus',
       label: 'Status',
       type: 'Picklist',
       picklistValues: ['Initial Review', 'Internal Info Request', 'External Info Request', 'In Progress', 'Final Review', 'Completed', 'Paused']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__priorityNextJob',
+      apiName: 'Opportunity__priorityNextJob',
       label: 'Priority/Next Job',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__estimatingNotes',
+      apiName: 'Opportunity__estimatingNotes',
       label: 'Estimating Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__siteMeasurements',
+      apiName: 'Opportunity__siteMeasurements',
       label: 'Site Measurements',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__highAltitude',
+      apiName: 'Opportunity__highAltitude',
       label: 'High Altitude',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__newConstruction',
+      apiName: 'Opportunity__newConstruction',
       label: 'New Construction',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__renovation',
+      apiName: 'Opportunity__renovation',
       label: 'Renovation',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__waterfrontExposure',
+      apiName: 'Opportunity__waterfrontExposure',
       label: 'Waterfront Exposure',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__productSpecifications',
+      apiName: 'Opportunity__productSpecifications',
       label: 'Product Specifications',
       type: 'Picklist',
       picklistValues: ['Premium', 'Coastal', 'Dade (HVHZ)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__deliveryRequirements',
+      apiName: 'Opportunity__deliveryRequirements',
       label: 'Delivery Requirements',
       type: 'Picklist',
       picklistValues: [
@@ -1353,41 +1395,41 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__deliveryNotes',
+      apiName: 'Opportunity__deliveryNotes',
       label: 'Delivery Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__referenceUnitDimensions',
+      apiName: 'Opportunity__referenceUnitDimensions',
       label: 'Reference for Unit Dimensions',
       type: 'Picklist',
       picklistValues: ['Sash', 'Frame', 'Clear Opening', 'Rough Opening', 'Masonry Opening']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windLoadSpeed',
+      apiName: 'Opportunity__windLoadSpeed',
       label: 'Wind Load Speed MPH',
       type: 'Text',
       maxLength: 50
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windSpeedReference',
+      apiName: 'Opportunity__windSpeedReference',
       label: 'Wind Speed Reference',
       type: 'URL',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodType',
+      apiName: 'Opportunity__woodType',
       label: 'Wood Type',
       type: 'Picklist',
       picklistValues: ['Sipo', 'Split Sipo/Specify in Notes', 'Other/Specify in Notes']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finishSpecifications',
+      apiName: 'Opportunity__finishSpecifications',
       label: 'Finish Specifications',
       type: 'Picklist',
       picklistValues: [
@@ -1400,300 +1442,308 @@ class LocalStorageSchemaService implements SchemaService {
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodNotes',
+      apiName: 'Opportunity__woodNotes',
       label: 'Wood Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finalFinish',
+      apiName: 'Opportunity__finalFinish',
       label: 'Final Finish',
       type: 'Checkbox'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__glassType',
+      apiName: 'Opportunity__glassType',
       label: 'Glass Type',
       type: 'Picklist',
       picklistValues: ['Type 1', 'Type 2', 'Type 3', 'Type 4']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__alternativeGlass',
+      apiName: 'Opportunity__alternativeGlass',
       label: 'Alternative Glass',
       type: 'Picklist',
       picklistValues: ['Type 1', 'Type 2', 'Type 3', 'Type 4']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__glassNotes',
+      apiName: 'Opportunity__glassNotes',
       label: 'Glass Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__spacerBars',
+      apiName: 'Opportunity__spacerBars',
       label: 'Spacer Bars',
       type: 'Picklist',
       picklistValues: ['Standard White', 'Silver', 'Brown', 'Black', 'Premium C31', 'C32', 'C33', 'C34', 'Warm Edge']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowHardware',
+      apiName: 'Opportunity__windowHardware',
       label: 'Window Hardware',
       type: 'Picklist',
       picklistValues: ['White Zinc/Titan Silver', 'Corrosion Resistant Metal Alloy (E-Look)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__hardwareFinishNotes',
+      apiName: 'Opportunity__hardwareFinishNotes',
       label: 'Hardware Finish Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__hingeFinishSpecification',
+      apiName: 'Opportunity__hingeFinishSpecification',
       label: 'Hinge Finish Specification',
       type: 'Picklist',
       picklistValues: ['Base (Brushed Stainless Steel)', 'Premium Custom Finish (Specify in Notes)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finials',
+      apiName: 'Opportunity__finials',
       label: 'Finials',
       type: 'Picklist',
       picklistValues: ['Yes', 'No']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__finialType',
+      apiName: 'Opportunity__finialType',
       label: 'Finial Type',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__security',
+      apiName: 'Opportunity__security',
       label: 'Security',
       type: 'MultiSelectPicklist',
       picklistValues: ['Magnetic Contact', 'Integrated Contact', 'Alarm Spider Contact', 'Secondary or Pool Contact']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowType',
+      apiName: 'Opportunity__windowType',
       label: 'Window Type',
       type: 'MultiSelectPicklist',
       picklistValues: ['Inswing', 'Inswing TT', 'Push Outswing', 'Crank Outswing', 'Offset Simulated Double Hung', 'Simulated Double Hung', 'Awning']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__fixedOptions',
+      apiName: 'Opportunity__fixedOptions',
       label: 'Fixed Options',
       type: 'MultiSelectPicklist',
       picklistValues: ['Direct Glaze', 'Fixed with Sash']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__windowTypeNotes',
+      apiName: 'Opportunity__windowTypeNotes',
       label: 'Window Type Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__singleDoubleTripleHung',
+      apiName: 'Opportunity__singleDoubleTripleHung',
       label: 'Single, Double & Triple Hung Windows',
       type: 'MultiSelectPicklist',
       picklistValues: ['Single Hung', 'Double Hung', 'Triple Hung', 'Concealed Balance', 'Weight and Chain', 'Cross Cable Balance System', 'Vent Locks']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__singleDoubleHungNotes',
+      apiName: 'Opportunity__singleDoubleHungNotes',
       label: 'Single/Double Hung Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sill',
+      apiName: 'Opportunity__sill',
       label: 'Sill',
       type: 'Picklist',
       picklistValues: ['No Sill', 'Standard Sill', 'Custom Sill (Specify Dimensions in Notes)']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__sillNotes',
+      apiName: 'Opportunity__sillNotes',
       label: 'Sill Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__doorOptions',
+      apiName: 'Opportunity__doorOptions',
       label: 'Door Options',
       type: 'MultiSelectPicklist',
       picklistValues: ['Inswing', 'Outswing', 'Outswing Folding', 'Inswing Folding', 'Sliding']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__inswingDoorThreshold',
+      apiName: 'Opportunity__inswingDoorThreshold',
       label: 'Inswing Door Threshold',
       type: 'MultiSelectPicklist',
       picklistValues: ['Classic Bronze Threshold #6C', 'Premium Bronze Threshold #6', 'ADA Threshold']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__outswingDoorThreshold',
+      apiName: 'Opportunity__outswingDoorThreshold',
       label: 'Outswing Door Threshold',
       type: 'MultiSelectPicklist',
       picklistValues: ['Bronze Threshold #7 Flush', 'Bronze Threshold #8 Stepdown', 'ADA Threshold']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__liftSlideStrikerBolts',
+      apiName: 'Opportunity__liftSlideStrikerBolts',
       label: 'Lift and Slide Doors Striker Bolts',
       type: 'MultiSelectPicklist',
       picklistValues: ['White Zinc Hooks and Striker Bolts', 'SS Locking Hooks and Striker Bolts']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__doorOptionNotes',
+      apiName: 'Opportunity__doorOptionNotes',
       label: 'Door Option Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__entryDoor',
+      apiName: 'Opportunity__entryDoor',
       label: 'Entry Door',
       type: 'Picklist',
       picklistValues: ['Include in base cost', 'Include as an option', 'Omit']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollScreens',
+      apiName: 'Opportunity__rollScreens',
       label: 'Roll Screens',
       type: 'MultiSelectPicklist',
       picklistValues: ['Low Wind (Brush) Manual', 'Low Wind (Brush) Motorized', 'Zip Motorized', 'Manual Horizontal', 'Centor']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollScreenLocation',
+      apiName: 'Opportunity__rollScreenLocation',
       label: 'Roll Screen Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__screens',
+      apiName: 'Opportunity__screens',
       label: 'Screens',
       type: 'MultiSelectPicklist',
       picklistValues: ['Aluminum Window Screens', 'Wood-covered Aluminum Window Screens', 'Wood Framed Window Screens', 'Wood Framed Door Screens']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__screenLocation',
+      apiName: 'Opportunity__screenLocation',
       label: 'Screen Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__meshType',
+      apiName: 'Opportunity__meshType',
       label: 'Mesh Type',
       type: 'Picklist',
       picklistValues: ['Fiberglass', 'Clearview', 'Bronze', 'Dog']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__rollShades',
+      apiName: 'Opportunity__rollShades',
       label: 'Roll Shades',
       type: 'MultiSelectPicklist',
       picklistValues: ['Sun Shade', 'Blackout Shade']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__shadesLocation',
+      apiName: 'Opportunity__shadesLocation',
       label: 'Shades Location',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__addOnProducts',
+      apiName: 'Opportunity__addOnProducts',
       label: 'Add-on Products',
       type: 'MultiSelectPicklist',
       picklistValues: ['Motorized Operation', '180-Degree Hinges', 'Genius Locks', 'Bent Units', 'Butt Glazing', 'Curtain Wall', 'Retractable', 'Door Closer']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__addOnLocations',
+      apiName: 'Opportunity__addOnLocations',
       label: 'Add-on Locations',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__woodExteriorTrimAndCasing',
+      apiName: 'Opportunity__woodExteriorTrimAndCasing',
       label: 'Wood Exterior Trim and Casing',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__installation',
+      apiName: 'Opportunity__installation',
       label: 'Installation',
       type: 'MultiSelectPicklist',
       picklistValues: ['MHB', 'Korn', 'Arcadia']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__requiredInstallationScope',
+      apiName: 'Opportunity__requiredInstallationScope',
       label: 'Required Installation Scope/Notes',
       type: 'Text',
       maxLength: 255
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revisionStartDate',
+      apiName: 'Opportunity__revisionStartDate',
       label: 'Start Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revisionFinishDate',
+      apiName: 'Opportunity__revisionFinishDate',
       label: 'Finish Date',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__revision',
+      apiName: 'Opportunity__revision',
       label: 'Revision',
       type: 'Date'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__generalNotes',
+      apiName: 'Opportunity__generalNotes',
       label: 'General Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__kornNotes',
+      apiName: 'Opportunity__kornNotes',
       label: 'Korn Notes',
       type: 'RichTextArea'
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__lossReason',
+      apiName: 'Opportunity__lossReason',
       label: 'Loss Reason',
       type: 'MultiSelectPicklist',
       picklistValues: ['Lost Budget', 'Internal Lead Time', 'External Lead Time', 'Lost to Competitor', 'Unresponsive']
     });
     ensureField({
       id: generateId(),
-      apiName: 'Deal__lossNotes',
+      apiName: 'Opportunity__lossNotes',
       label: 'Loss Notes',
       type: 'Text',
       maxLength: 255
     });
+    ensureField({
+      id: generateId(),
+      apiName: 'Opportunity__lead',
+      label: 'Lead',
+      type: 'Lookup',
+      lookupObject: 'Lead',
+      relationshipName: 'Leads'
+    });
 
     const mergedFields = requiredFields.length > 0
-      ? [...deal.fields, ...requiredFields]
-      : deal.fields;
+      ? [...opp.fields, ...requiredFields]
+      : opp.fields;
 
     // Only ensure required fields exist on the object.
     // Hard-coded template layouts are no longer auto-injected;
@@ -1702,7 +1752,7 @@ class LocalStorageSchemaService implements SchemaService {
       return {
         ...schema,
         objects: schema.objects.map((obj) =>
-          obj.apiName === 'Deal'
+          obj.apiName === 'Opportunity'
             ? { ...obj, fields: mergedFields, updatedAt: new Date().toISOString() }
             : obj
         ),
@@ -1916,7 +1966,7 @@ class LocalStorageSchemaService implements SchemaService {
           label: 'Address',
           type: 'Address',
           required: true,
-          helpText: 'May start as a general location during the Leads pipeline before it is converted to the Deals pipeline. Includes Street, City, State, Country, and Zip Code.'
+          helpText: 'May start as a general location during the Leads pipeline before it is converted to the Opportunities pipeline. Includes Street, City, State, Country, and Zip Code.'
         },
         {
           id: generateId(),
@@ -2863,6 +2913,7 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Lead__property',
           label: 'Property',
           type: 'Lookup',
+          required: true,
           lookupObject: 'Property',
           relationshipName: 'Properties'
         },
@@ -2951,29 +3002,29 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Lead__leadNumber',
           label: 'Lead Number',
           type: 'AutoNumber',
-          autoNumber: { displayFormat: 'L{00}', startingNumber: 1 }
+          autoNumber: { displayFormat: 'LEAD{0000}', startingNumber: 1 }
         }
       ]
     ));
 
-    // 6. Deal
+    // 6. Opportunity
     objects.push(createBasicObject(
-      'Deal',
-      'Deal',
-      'Deals',
-      'Sales opportunities and deals',
+      'Opportunity',
+      'Opportunity',
+      'Opportunities',
+      'Sales opportunities',
       [
         {
           id: generateId(),
-          apiName: 'Deal__dealName',
-          label: 'Deal Name',
+          apiName: 'Opportunity__opportunityName',
+          label: 'Opportunity Name',
           type: 'Text',
           required: true,
           maxLength: 255
         },
         {
           id: generateId(),
-          apiName: 'Deal__amount',
+          apiName: 'Opportunity__amount',
           label: 'Amount',
           type: 'Currency',
           precision: 18,
@@ -2981,14 +3032,14 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__closeDate',
+          apiName: 'Opportunity__closeDate',
           label: 'Expected Close Date',
           type: 'Date',
           required: true
         },
         {
           id: generateId(),
-          apiName: 'Deal__stage',
+          apiName: 'Opportunity__stage',
           label: 'Stage',
           type: 'Picklist',
           required: true,
@@ -2997,7 +3048,7 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__probability',
+          apiName: 'Opportunity__probability',
           label: 'Probability (%)',
           type: 'Percent',
           precision: 3,
@@ -3005,7 +3056,7 @@ class LocalStorageSchemaService implements SchemaService {
         },
         {
           id: generateId(),
-          apiName: 'Deal__description',
+          apiName: 'Opportunity__description',
           label: 'Description',
           type: 'TextArea',
           maxLength: 5000
@@ -3070,6 +3121,22 @@ class LocalStorageSchemaService implements SchemaService {
           label: 'Description',
           type: 'LongTextArea',
           maxLength: 10000
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__property',
+          label: 'Property',
+          type: 'Lookup',
+          lookupObject: 'Property',
+          relationshipName: 'Properties'
+        },
+        {
+          id: generateId(),
+          apiName: 'Project__opportunity',
+          label: 'Opportunity',
+          type: 'Lookup',
+          lookupObject: 'Opportunity',
+          relationshipName: 'Opportunities'
         }
       ]
     ));
@@ -3244,13 +3311,137 @@ class LocalStorageSchemaService implements SchemaService {
       ]
     ));
 
+    // 11. Work Order (mirrored from Salesforce – 78 fields)
+    objects.push(createBasicObject(
+      'WorkOrder',
+      'Work Order',
+      'Work Orders',
+      'Scheduled work orders for service and maintenance',
+      [
+        // ── Auto-number & Name ──
+        { id: generateId(), apiName: 'WorkOrder__workOrderNumber', label: 'Work Order Number', type: 'AutoNumber', autoNumber: { displayFormat: 'WO{0000}', startingNumber: 1 } },
+        { id: generateId(), apiName: 'WorkOrder__name', label: 'Work Order', type: 'Text', maxLength: 80 },
+        { id: generateId(), apiName: 'WorkOrder__title', label: 'Title', type: 'TextArea', maxLength: 255 },
+        // ── Type / Status ──
+        { id: generateId(), apiName: 'WorkOrder__workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
+        { id: generateId(), apiName: 'WorkOrder__workStatus', label: 'Work Status', type: 'Picklist', required: true, picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
+        { id: generateId(), apiName: 'WorkOrder__leadTech', label: 'Lead Tech', type: 'Picklist', picklistValues: [] },
+        { id: generateId(), apiName: 'WorkOrder__punchListStatus', label: 'Punch List', type: 'Picklist', picklistValues: ['Not Started', 'In Progress', 'Completed'] },
+        // ── Scheduling ──
+        { id: generateId(), apiName: 'WorkOrder__scheduledStartDate', label: 'Scheduled Start Date', type: 'DateTime' },
+        { id: generateId(), apiName: 'WorkOrder__scheduledEndDate', label: 'Scheduled End Date', type: 'DateTime' },
+        { id: generateId(), apiName: 'WorkOrder__originalInstallationDate', label: 'Original Installation Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__confirmedAppointment', label: 'Confirmed Appointment', type: 'Checkbox' },
+        // ── Contacts & Lookups ──
+        { id: generateId(), apiName: 'WorkOrder__primaryContact', label: 'Primary Contact', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactA', label: 'Additional Contact A', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactB', label: 'Additional Contact B', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'WorkOrder__project', label: 'Job/Project', type: 'Lookup', lookupObject: 'Project' },
+        { id: generateId(), apiName: 'WorkOrder__property', label: 'Property', type: 'Lookup', lookupObject: 'Property' },
+        // ── Location ──
+        { id: generateId(), apiName: 'WorkOrder__location', label: 'Location', type: 'Address' },
+        { id: generateId(), apiName: 'WorkOrder__location2', label: 'Location 2', type: 'Address' },
+        // ── Workforce / Technicians ──
+        { id: generateId(), apiName: 'WorkOrder__assignedTischlerServiceTechs', label: 'Assigned Tischler Service Techs', type: 'MultiSelectPicklist', picklistValues: [] },
+        { id: generateId(), apiName: 'WorkOrder__installationDoneBy', label: 'Installation Done By', type: 'MultiSelectPicklist', picklistValues: ['Tischler', 'Subcontractor', 'Factory', 'Other'] },
+        { id: generateId(), apiName: 'WorkOrder__assignedTechnicianNames', label: 'Assigned Technician Names', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__additionalOutsideServiceTechs', label: 'Additional Outside Service Techs', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__notifiedTechs', label: 'Notified Techs', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__notifyTheTechs', label: 'Notify The Techs', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__hours1', label: 'Hours', type: 'Number', precision: 18, scale: 0 },
+        { id: generateId(), apiName: 'WorkOrder__hours2', label: 'Hours 2', type: 'Number', precision: 18, scale: 0 },
+        { id: generateId(), apiName: 'WorkOrder__men', label: 'Men', type: 'Number', precision: 18, scale: 0 },
+        // ── Financial ──
+        { id: generateId(), apiName: 'WorkOrder__estimateCost', label: 'Estimate Cost', type: 'Currency', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__hotelCosts', label: 'Hotel Costs', type: 'Number', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__perDiem', label: 'Per Diem', type: 'Number', precision: 16, scale: 2 },
+        { id: generateId(), apiName: 'WorkOrder__invoiceNumber', label: 'Invoice Number', type: 'Text', maxLength: 255 },
+        // ── Billing ──
+        { id: generateId(), apiName: 'WorkOrder__billed', label: 'Billed', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__billedDate', label: 'Billed Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__paid', label: 'Paid', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__paidDate', label: 'Paid Date', type: 'Date' },
+        { id: generateId(), apiName: 'WorkOrder__toBeBilledBasedOnEstimate', label: 'To be billed based on estimate', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__toBeBilledOnTimeOfMaterial', label: 'To be billed on time of material', type: 'Checkbox' },
+        // ── Materials ──
+        { id: generateId(), apiName: 'WorkOrder__materialInWarehouse', label: 'Material in WH', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__materialToOrder', label: 'Material TO ORDER', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__materialsAndToolsNeeded', label: 'Materials & Tools Needed', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__specialEquipmentNeeded', label: 'Special Equipment Needed/Comments', type: 'TextArea', maxLength: 255 },
+        // ── Work Description & Notes ──
+        { id: generateId(), apiName: 'WorkOrder__descriptionOfWork', label: 'Description of work', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workDescription', label: 'Work Description', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workPerformed', label: 'Work Performed', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workPerformedAdditionalNotes', label: 'Work Performed/Additional Service Notes', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__workOrderNotes', label: 'Work Order Notes', type: 'LongTextArea', maxLength: 32768 },
+        // ── Punch List ──
+        { id: generateId(), apiName: 'WorkOrder__punchListDetail', label: 'Punch List Detail', type: 'LongTextArea', maxLength: 32768 },
+        { id: generateId(), apiName: 'WorkOrder__punchListCreated', label: 'Punch List Created?', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__punchListPrinted', label: 'Punch List Printed', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__punchListProcessed', label: 'Punch List Processed', type: 'Checkbox' },
+        // ── Signature ──
+        { id: generateId(), apiName: 'WorkOrder__customerSignature', label: 'Customer Signature', type: 'Text', maxLength: 100 },
+        { id: generateId(), apiName: 'WorkOrder__signatureDate', label: 'Signature Date', type: 'Date' },
+        // ── Category Checkboxes ──
+        { id: generateId(), apiName: 'WorkOrder__customer', label: 'Customer', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__factoryBcfInstall', label: 'Factory BCF/Install', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__marketing', label: 'Marketing', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__product', label: 'Product', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__service', label: 'Service', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__tischlerWarranty', label: 'Tischler Und Sohn Warranty', type: 'Checkbox' },
+        { id: generateId(), apiName: 'WorkOrder__reminderEmailSent', label: 'Reminder Email Sent', type: 'Checkbox' },
+        // ── Misc ──
+        { id: generateId(), apiName: 'WorkOrder__combinedField', label: 'Combined Field', type: 'Text', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__unit', label: 'Unit', type: 'TextArea', maxLength: 255 },
+        { id: generateId(), apiName: 'WorkOrder__emailLink', label: 'Email Link', type: 'Text', maxLength: 255 },
+        // ── Formula / Rollup (expressions TBD — placeholders) ──
+        { id: generateId(), apiName: 'WorkOrder__serviceNumber', label: 'Service Number', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__calendarDisplay', label: 'Calendar Display', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__projectLocation', label: 'Project Location', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__originalProjectNumber', label: 'Original Project #', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__primaryContactInfo', label: 'Primary Contact Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__primaryContactInfoServiceTech', label: 'Primary Contact Information (Tech)', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactAInfo', label: 'Additional Contact A Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__additionalContactBInfo', label: 'Additional Contact B Information', type: 'Formula', formulaReturnType: 'Text', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__totalHours', label: 'Total hrs', type: 'Formula', formulaReturnType: 'Number', formulaExpr: '' },
+        { id: generateId(), apiName: 'WorkOrder__totalHoursForAllPunchLists', label: 'Total Hours For all Punch Lists', type: 'Number', precision: 18, scale: 2 },
+      ]
+    ));
+
+    // 12. Team Member (junction object linking contacts/accounts to parent objects)
+    objects.push(createBasicObject(
+      'TeamMember',
+      'Team Member',
+      'Team Members',
+      'Junction object linking contacts and accounts to properties, opportunities, projects, work orders, and installations',
+      [
+        // ── Auto-number ──
+        { id: generateId(), apiName: 'TeamMember__teamMemberNumber', label: 'Team Member Number', type: 'AutoNumber', autoNumber: { displayFormat: 'TM{0000}', startingNumber: 1 } },
+        // ── Contact / Account ──
+        { id: generateId(), apiName: 'TeamMember__contact', label: 'Contact', type: 'Lookup', lookupObject: 'Contact' },
+        { id: generateId(), apiName: 'TeamMember__account', label: 'Account', type: 'Lookup', lookupObject: 'Account' },
+        // ── Parent Lookups ──
+        { id: generateId(), apiName: 'TeamMember__property', label: 'Property', type: 'Lookup', lookupObject: 'Property' },
+        { id: generateId(), apiName: 'TeamMember__opportunity', label: 'Opportunity', type: 'Lookup', lookupObject: 'Opportunity' },
+        { id: generateId(), apiName: 'TeamMember__project', label: 'Project', type: 'Lookup', lookupObject: 'Project' },
+        { id: generateId(), apiName: 'TeamMember__workOrder', label: 'Work Order', type: 'Lookup', lookupObject: 'WorkOrder' },
+        { id: generateId(), apiName: 'TeamMember__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation' },
+        // ── Role & Flags ──
+        { id: generateId(), apiName: 'TeamMember__role', label: 'Role', type: 'Picklist', required: true, picklistValues: ['Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer', 'Property Manager', 'Sales Rep', 'Installer', 'Inspector', 'Engineer', 'Other'] },
+        { id: generateId(), apiName: 'TeamMember__primaryContact', label: 'Primary Contact', type: 'Checkbox' },
+        { id: generateId(), apiName: 'TeamMember__contractHolder', label: 'Contract Holder', type: 'Checkbox' },
+        // ── Notes ──
+        { id: generateId(), apiName: 'TeamMember__notes', label: 'Notes', type: 'LongTextArea', maxLength: 10000 },
+      ]
+    ));
+
     const baseSchema: OrgSchema = {
       version: 1,
       objects,
       updatedAt: now
     };
 
-    return this.ensureDealTemplateLayout(
+    return this.ensureOpportunityTemplateLayout(
       this.ensureLeadTemplateLayout(
         this.ensureProductTemplateLayout(
           this.ensureAccountTemplateLayout(
@@ -3273,7 +3464,7 @@ class LocalStorageSchemaService implements SchemaService {
     } catch {
       // Settings may not exist yet
     }
-    
+
     // Also clear any remaining localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
@@ -3281,14 +3472,202 @@ class LocalStorageSchemaService implements SchemaService {
       localStorage.removeItem('schema-store');
       localStorage.removeItem('propertyLayoutAssociations');
     }
-    
+
     // Create fresh schema with all new fields
     const freshSchema = this.createSampleData();
-    
+
     // Save to API
     await this.saveSchema(freshSchema);
-    
+
     return freshSchema;
+  }
+
+  private ensureInstallationCostObjects(schema: OrgSchema): OrgSchema {
+    let updated = false;
+    const objects = [...schema.objects];
+    const now = new Date().toISOString();
+
+    // 1. Find Installation object and add missing fields
+    const instIdx = objects.findIndex(o => o.apiName === 'Installation');
+    if (instIdx >= 0) {
+      const inst = objects[instIdx];
+      const existingApiNames = new Set(inst.fields.map((f: FieldDef) => f.apiName));
+
+      const newFields: FieldDef[] = [
+        // Core
+        { id: generateId(), apiName: 'Installation__startDate', label: 'Start Date', type: 'Date', custom: true },
+        { id: generateId(), apiName: 'Installation__endDate', label: 'End Date', type: 'Date', custom: true },
+        { id: generateId(), apiName: 'Installation__project', label: 'Project', type: 'Lookup', lookupObject: 'Project', custom: true },
+        { id: generateId(), apiName: 'Installation__installationBudget', label: 'Installation Budget', type: 'Currency', custom: true },
+        // Calculated (read-only)
+        { id: generateId(), apiName: 'Installation__finalCost', label: 'Final Cost', type: 'Currency', readOnly: true, custom: true },
+        { id: generateId(), apiName: 'Installation__finalProfit', label: 'Final Profit', type: 'Currency', readOnly: true, custom: true },
+        { id: generateId(), apiName: 'Installation__techExpenseTotal', label: 'Tech Expense Total', type: 'Currency', readOnly: true, custom: true },
+        // Estimated costs
+        { id: generateId(), apiName: 'Installation__estimatedLaborCost', label: 'Estimated Labor Cost', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedHotel', label: 'Estimated Hotel', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedTravelExp', label: 'Estimated Travel Expense', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMileage', label: 'Estimated Mileage', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedPerDiem', label: 'Estimated Per Diem', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedFlights', label: 'Estimated Flights', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedCarRental', label: 'Estimated Car Rental', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedParking', label: 'Estimated Parking', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedEquipment', label: 'Estimated Equipment', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMiscellaneous', label: 'Estimated Miscellaneous', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWaterproofing', label: 'Estimated Waterproofing', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWoodBucks', label: 'Estimated Wood Bucks', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedAirportTransportation', label: 'Estimated Airport Transportation', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedMaterials', label: 'Estimated Materials', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedContainerUnload', label: 'Estimated Container Unload', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedLaborHours', label: 'Estimated Labor Hours', type: 'Number', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWaterproofingLabor', label: 'Estimated WP Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency', custom: true },
+        { id: generateId(), apiName: 'Installation__estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency', custom: true },
+      ].filter((f: FieldDef) => !existingApiNames.has(f.apiName));
+
+      if (newFields.length > 0) {
+        objects[instIdx] = {
+          ...inst,
+          fields: [...inst.fields, ...newFields],
+          updatedAt: now,
+        };
+        updated = true;
+      }
+    }
+
+    // 2. Add missing objects
+    const existingObjectNames = new Set(objects.map((o: ObjectDef) => o.apiName));
+
+    const addObjectIfMissing = (
+      apiName: string,
+      label: string,
+      pluralLabel: string,
+      description: string,
+      fields: FieldDef[]
+    ) => {
+      if (existingObjectNames.has(apiName)) return;
+
+      const customFields = fields.map((field: FieldDef) => ({ ...field, custom: true }));
+      const layoutId = generateId();
+      const recordTypeId = generateId();
+
+      const panelFields = customFields.map((f: FieldDef, i: number) => ({
+        fieldApiName: f.apiName,
+        colSpan: 1,
+        order: i,
+        labelStyle: {},
+        valueStyle: {},
+        behavior: 'none' as const,
+      }));
+
+      const newObj: ObjectDef = {
+        id: generateId(),
+        apiName,
+        label,
+        pluralLabel,
+        description,
+        fields: [...cloneSystemFields(), ...customFields],
+        recordTypes: [{ id: recordTypeId, name: 'Master', default: true }],
+        pageLayouts: [{
+          id: layoutId,
+          name: `${apiName} Layout`,
+          layoutType: 'edit' as const,
+          tabs: [{
+            id: generateId(),
+            label: 'Details',
+            order: 0,
+            regions: [{
+              id: generateId(),
+              label: 'Information',
+              gridColumn: 1,
+              gridColumnSpan: 12,
+              gridRow: 1,
+              gridRowSpan: 1,
+              panels: [{
+                id: generateId(),
+                label: 'Details',
+                order: 0,
+                columns: 2 as 1 | 2 | 3 | 4,
+                style: {},
+                fields: panelFields,
+              }],
+              widgets: [],
+            }],
+          }],
+        }],
+        validationRules: [],
+        defaultRecordTypeId: recordTypeId,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      objects.push(newObj);
+      existingObjectNames.add(apiName);
+      updated = true;
+    };
+
+    // Technician
+    addObjectIfMissing('Technician', 'Technician', 'Technicians', 'Installation technicians for cost analysis', [
+      { id: generateId(), apiName: 'Technician__technicianName', label: 'Technician Name', type: 'Text', required: true, custom: true },
+      { id: generateId(), apiName: 'Technician__hourlyRate', label: 'Hourly Rate', type: 'Currency', required: true, custom: true },
+      { id: generateId(), apiName: 'Technician__phone', label: 'Phone', type: 'Phone', custom: true },
+      { id: generateId(), apiName: 'Technician__email', label: 'Email', type: 'Email', custom: true },
+      { id: generateId(), apiName: 'Technician__status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active', custom: true },
+    ]);
+
+    // InstallationTechnician junction
+    addObjectIfMissing('InstallationTechnician', 'Installation Technician', 'Installation Technicians', 'Junction linking technicians to installations with frozen hourly rate', [
+      { id: generateId(), apiName: 'InstallationTechnician__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechnician__technician', label: 'Technician', type: 'Lookup', lookupObject: 'Technician', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechnician__assignedHourlyRate', label: 'Assigned Hourly Rate', type: 'Currency', required: true, custom: true },
+    ]);
+
+    // InstallationCost
+    addObjectIfMissing('InstallationCost', 'Installation Cost', 'Installation Costs', 'Weekly project-level cost records', [
+      { id: generateId(), apiName: 'InstallationCost__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekNumber', label: 'Week Number', type: 'Number', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekStartDate', label: 'Week Start Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__weekEndDate', label: 'Week End Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationCost__flightsActual', label: 'Flights', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__lodgingActual', label: 'Lodging', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__carRental', label: 'Car Rental', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__airportTransportation', label: 'Airport Transportation', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__parking', label: 'Parking', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__equipment', label: 'Equipment', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__miscellaneousExpenses', label: 'Miscellaneous', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__waterproofing', label: 'Waterproofing', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationCost__woodBucks', label: 'Wood Bucks', type: 'Currency', custom: true },
+    ]);
+
+    // InstallationTechExpense
+    addObjectIfMissing('InstallationTechExpense', 'Installation Tech Expense', 'Installation Tech Expenses', 'Per-technician weekly labor hours and expenses', [
+      { id: generateId(), apiName: 'InstallationTechExpense__installation', label: 'Installation', type: 'Lookup', lookupObject: 'Installation', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__installationTechnician', label: 'Installation Technician', type: 'Lookup', lookupObject: 'InstallationTechnician', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekNumber', label: 'Week Number', type: 'Number', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekStartDate', label: 'Week Start Date', type: 'Date', required: true, custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__weekEndDate', label: 'Week End Date', type: 'Date', required: true, custom: true },
+      // Labor hours
+      { id: generateId(), apiName: 'InstallationTechExpense__containerUnload', label: 'Container Unload', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__woodbucks', label: 'Woodbucks', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__waterproofing', label: 'Waterproofing', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__installationLabor', label: 'Installation Labor', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__travel', label: 'Travel', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__waterTesting', label: 'Water Testing', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__sills', label: 'Sills', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finishCaulking', label: 'Finish Caulking', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__screenLutronShades', label: 'Screen/Lutron/Shades', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__punchListWork', label: 'Punch List Work', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finishHardware', label: 'Finish Hardware', type: 'Number', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__finalAdjustments', label: 'Final Adjustments', type: 'Number', custom: true },
+      // Expenses
+      { id: generateId(), apiName: 'InstallationTechExpense__perDiem', label: 'Per Diem', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__mileage', label: 'Mileage', type: 'Currency', custom: true },
+      { id: generateId(), apiName: 'InstallationTechExpense__materials', label: 'Materials', type: 'Currency', custom: true },
+    ]);
+
+    if (!updated) return schema;
+    return { ...schema, objects, updatedAt: now };
   }
 }
 

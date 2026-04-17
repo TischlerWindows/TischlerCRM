@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Eye, Plus, Redo2, Save, Undo2, Wand2, X } from 'lucide-react';
+import { ArrowLeft, Eye, Plus, Redo2, Save, Settings, Undo2, Wand2, X } from 'lucide-react';
 import { useEditorStore } from './editor-store';
 import { selectUndoCount, selectRedoCount } from './store';
 import type { PageLayout } from './types';
@@ -15,6 +15,8 @@ export function EditorToolbar({
   onPreview,
   onOpenRules,
   onRequestNavigate,
+  backHref,
+  backLabel,
   objectManagerHref,
   objectListHref: _objectListHref,
   objectListLabel: _objectListLabel,
@@ -24,6 +26,8 @@ export function EditorToolbar({
   onPreview: () => void;
   onOpenRules: () => void;
   onRequestNavigate: (href: string) => void;
+  backHref: string;
+  backLabel: string;
   objectManagerHref: string;
   objectListHref: string | null;
   objectListLabel: string;
@@ -37,6 +41,7 @@ export function EditorToolbar({
   const setActiveTab = useEditorStore((s) => s.setActiveTab);
   const addTab = useEditorStore((s) => s.addTab);
   const removeTab = useEditorStore((s) => s.removeTab);
+  const setSelectedElement = useEditorStore((s) => s.setSelectedElement);
   const pushUndo = useEditorStore((s) => s.pushUndo);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
@@ -239,11 +244,11 @@ export function EditorToolbar({
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
-            onClick={() => onRequestNavigate(objectManagerHref)}
+            onClick={() => onRequestNavigate(backHref)}
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition-colors hover:text-brand-navy"
           >
             <ArrowLeft className="h-4 w-4" />
-            Layouts
+            {backLabel}
           </button>
           <div className="h-5 w-px bg-gray-200" />
           {isEditingName ? (
@@ -312,15 +317,29 @@ export function EditorToolbar({
                           className="w-24 bg-transparent text-sm font-medium text-white outline-none"
                         />
                       ) : (
-                        <span
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setDraftTabLabel(tab.label);
-                            setEditingTabId(tab.id);
-                          }}
-                          title="Double-click to rename"
-                        >
-                          {tab.label}
+                        <span className="inline-flex items-center gap-1">
+                          <span
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              setDraftTabLabel(tab.label);
+                              setEditingTabId(tab.id);
+                            }}
+                            title="Double-click to rename"
+                          >
+                            {tab.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedElement({ type: 'tab', id: tab.id });
+                            }}
+                            className="ml-0.5 rounded p-0.5 opacity-60 hover:opacity-100 transition-opacity"
+                            aria-label={`${tab.label} tab settings`}
+                            title="Tab properties"
+                          >
+                            <Settings className="h-3 w-3" />
+                          </button>
                         </span>
                       )
                     ) : (

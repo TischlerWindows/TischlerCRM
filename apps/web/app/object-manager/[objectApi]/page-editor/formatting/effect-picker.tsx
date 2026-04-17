@@ -18,9 +18,11 @@ interface EffectPickerProps {
 }
 
 export function EffectPicker({ rule, onUpdateRule }: EffectPickerProps) {
+  const isTabTarget = rule.target.kind === 'tab';
+
   return (
     <div className="space-y-3 rounded-md border border-gray-200 p-3">
-      <Label>Effects</Label>
+      <Label>Effects{isTabTarget ? ' (only Hidden is available for tabs)' : ''}</Label>
       <div className="flex flex-wrap gap-4">
         <label className="inline-flex items-center gap-2 text-sm text-gray-800">
           <input
@@ -39,25 +41,27 @@ export function EffectPicker({ rule, onUpdateRule }: EffectPickerProps) {
           />
           Hidden
         </label>
-        <label className="inline-flex items-center gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            checked={!!rule.effects.readOnly}
-            onChange={(event) =>
-              onUpdateRule(rule.id, (current) => ({
-                ...current,
-                effects: {
-                  ...current.effects,
-                  readOnly: event.target.checked ? true : undefined,
-                },
-              }))
-            }
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          Read-only
-        </label>
+        {!isTabTarget && (
+          <label className="inline-flex items-center gap-2 text-sm text-gray-800">
+            <input
+              type="checkbox"
+              checked={!!rule.effects.readOnly}
+              onChange={(event) =>
+                onUpdateRule(rule.id, (current) => ({
+                  ...current,
+                  effects: {
+                    ...current.effects,
+                    readOnly: event.target.checked ? true : undefined,
+                  },
+                }))
+              }
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Read-only
+          </label>
+        )}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      {!isTabTarget && <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label>Badge</Label>
           <Select
@@ -111,7 +115,7 @@ export function EffectPicker({ rule, onUpdateRule }: EffectPickerProps) {
             </SelectContent>
           </Select>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -44,6 +44,9 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_widget_settings_org_idx',
     sql: `CREATE INDEX IF NOT EXISTS "WidgetSetting_orgId_idx" ON "WidgetSetting"("orgId")`,
   },
+  // Integration and UserIntegration tables are created by prisma db push.
+  // These are kept as no-op safety nets (IF NOT EXISTS) and must use single
+  // statements per entry because $executeRawUnsafe does not support batches.
 ];
 
 export async function runPendingMigrations() {
@@ -56,7 +59,8 @@ export async function runPendingMigrations() {
       if (err.message?.includes('already exists')) {
         console.log(`[migrations] SKIP (already exists): ${m.name}`);
       } else {
-        throw err;
+        // Log but don't crash — prisma db push handles table creation in prod
+        console.error(`[migrations] WARN: ${m.name} failed:`, err.message);
       }
     }
   }

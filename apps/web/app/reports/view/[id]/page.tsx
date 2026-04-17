@@ -14,6 +14,7 @@ import {
 import PageHeader from '@/components/page-header';
 import { getSetting } from '@/lib/preferences';
 import { recordsService } from '@/lib/records-service';
+import { useSchemaStore } from '@/lib/schema-store';
 
 interface ReportData {
   id: string;
@@ -45,6 +46,7 @@ export default function ReportViewerPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [groupedData, setGroupedData] = useState<{ [key: string]: any[] }>({});
+  const { schema } = useSchemaStore();
 
   useEffect(() => {
     loadReport();
@@ -101,9 +103,12 @@ export default function ReportViewerPage() {
     // Map records to use clean field names
     records = records.map((record) => {
       const cleanRecord: any = {};
+      const data = record.data && typeof record.data === 'object' ? record.data : record;
       reportConfig.fields.forEach(field => {
         const cleanField = stripPrefix(field, reportConfig.objectType);
-        cleanRecord[field] = record[cleanField] || record[field];
+        // Try prefixed key in data, then clean key, then top-level fields
+        const prefixedKey = `${reportConfig.objectType}__${cleanField}`;
+        cleanRecord[field] = data[prefixedKey] ?? data[cleanField] ?? data[field] ?? record[cleanField] ?? record[field];
       });
       return cleanRecord;
     });
@@ -379,7 +384,7 @@ export default function ReportViewerPage() {
           <div className="grid grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium text-gray-500">Object:</span>
-              <span className="ml-2 text-gray-900 capitalize">{report.objectType}</span>
+              <span className="ml-2 text-gray-900">{schema?.objects?.find(o => o.apiName === report.objectType)?.pluralLabel || schema?.objects?.find(o => o.apiName === report.objectType)?.label || report.objectType}</span>
             </div>
             <div>
               <span className="font-medium text-gray-500">Format:</span>

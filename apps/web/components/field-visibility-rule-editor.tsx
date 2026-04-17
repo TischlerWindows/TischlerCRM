@@ -187,7 +187,8 @@ export default function FieldVisibilityRuleEditor({
                   <div
                     key={f.apiName}
                     onClick={() => {
-                      const isMultiOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN';
+                      const isPicklist = f.type === 'Picklist' || f.type === 'MultiPicklist';
+                      const isMultiOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN' || ((newCondition.op === '==' || newCondition.op === '!=') && isPicklist);
                       setNewCondition({ ...newCondition, left: f.apiName, right: isMultiOp ? [] : '' });
                       setFieldSearchTerm(f.label);
                       setShowFieldDropdown(false);
@@ -222,7 +223,9 @@ export default function FieldVisibilityRuleEditor({
             value={newCondition.op || '=='}
             onChange={(e) => {
               const op = e.target.value as ConditionExpr['op'];
-              const isMultiOp = op === 'INCLUDES' || op === 'IN';
+              const selectedField = availableFields.find(f => f.apiName === newCondition.left);
+              const isPicklist = selectedField && (selectedField.type === 'Picklist' || selectedField.type === 'MultiPicklist');
+              const isMultiOp = op === 'INCLUDES' || op === 'IN' || ((op === '==' || op === '!=') && isPicklist);
               setSelectedIncludesValues([]);
               setNewCondition({
                 ...newCondition,
@@ -284,7 +287,7 @@ export default function FieldVisibilityRuleEditor({
             }
             
             if (isPicklist && selectedField?.picklistValues) {
-              const isMultiValueOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN';
+              const isMultiValueOp = newCondition.op === 'INCLUDES' || newCondition.op === 'IN' || newCondition.op === '==' || newCondition.op === '!=';
               const filteredValues = selectedField.picklistValues.filter(v =>
                 valueSearchTerm === '' || v.toLowerCase().includes(valueSearchTerm.toLowerCase())
               );

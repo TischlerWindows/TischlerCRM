@@ -40,6 +40,8 @@ export interface WidgetManifest {
   integration: string | null          // provider ID or null
   defaultDisplayMode: DisplayMode
   configSchema: SchemaField[]
+  /** If true the widget won't appear in the page-editor palette */
+  hideFromPalette?: boolean
 }
 
 // Stored in layout JSON for external widget placements
@@ -95,4 +97,14 @@ export interface WidgetRegistration {
    * If omitted, the stored config is passed through as-is (cast).
    */
   transformConfig?: (stored: Record<string, unknown>) => Record<string, unknown>
+  /**
+   * When true, this widget can render on create forms (before the parent
+   * record exists). The widget must use `usePendingWidget()` from
+   * `pending-widget-context` to register pending data that will be saved
+   * after the parent record is created.
+   *
+   * Widgets without this flag are automatically hidden on create forms,
+   * regardless of the layout's `hideOnNew` setting.
+   */
+  supportsCreate?: boolean
 }

@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import serveStatic from '@fastify/static';
+import qs from 'qs';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -32,6 +33,16 @@ import { integrationRoutes } from './routes/integrations.js';
 import { placesRoutes } from './routes/places.js';
 import { widgetRoutes } from './routes/widgets.js';
 import { externalWidgetRouteModules } from './widgets/external/registry.js';
+import { automationRoutes } from './routes/automations.js';
+import { controllerRegistrations } from './controllers/registry.js';
+import { dropboxRoutes } from './routes/dropbox.js';
+import { errorLogRoutes } from './routes/error-log.js';
+import { outlookRoutes } from './routes/outlook.js';
+import { ticketRoutes } from './routes/tickets.js';
+import { notificationRoutes } from './routes/notifications.js';
+import { initNotificationListener } from './lib/notifications/listen-manager.js';
+import { supportTicketConfigRoutes } from './routes/support-ticket-config.js';
+import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -67,7 +78,11 @@ function buildInviteUrl(inviteToken: string): string {
 export function buildApp() {
   // H-1: bodyLimit — the settings endpoint stores the full OrgSchema as a single
   // JSON blob which can easily reach several MB with many objects/layouts.
-  const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
+  const app = Fastify({
+    logger: true,
+    bodyLimit: 10 * 1024 * 1024,
+    querystringParser: (str) => qs.parse(str),
+  });
 
   // H-2: security headers — must be registered before CORS
   app.register(helmet, { contentSecurityPolicy: false });
@@ -87,6 +102,11 @@ export function buildApp() {
     credentials: false,
   });
 
+  // Allow raw binary uploads (used by Dropbox file upload)
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   // Serve Next.js static files (if built)
   const nextStaticPath = path.join(__dirname, '../../web/.next/static');
   if (fs.existsSync(nextStaticPath)) {
@@ -97,7 +117,7 @@ export function buildApp() {
   }
 
   // ── Health check ──────────────────────────────────────────────────────────
-  app.get('/health', async () => ({ ok: true, version: '2026-03-18-user-management' }));
+  app.get('/health', async () => ({ ok: true, version: '2026-03-24-v4' }));
 
   // ── Auth: login ───────────────────────────────────────────────────────────
   app.post('/auth/login', async (req, reply) => {
@@ -137,7 +157,7 @@ export function buildApp() {
     }
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
 
     await prisma.loginEvent.create({
       data: {
@@ -150,9 +170,19 @@ export function buildApp() {
       },
     });
 
+    // `profileId` is required by the client-side page-layout resolver
+    // (apps/web/lib/layout-resolver.ts) to match the current user against
+    // `layout.roles`. Keep it in sync across accept-invite / reset / impersonate
+    // response shapes so the resolver has a consistent profile to match on.
     const response: Record<string, unknown> = {
       token,
-      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        profileId: user.profileId ?? null,
+      },
     };
     if (user.mustChangePassword) {
       response.mustChangePassword = true;
@@ -196,8 +226,8 @@ export function buildApp() {
     });
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
   // ── Auth: forgot password ─────────────────────────────────────────────────
@@ -263,8 +293,8 @@ export function buildApp() {
     });
 
     const env = loadEnv();
-    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 24 * 7);
-    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+    const token = signJwt({ sub: user.id, role: user.role }, env.JWT_SECRET, 60 * 60 * 8);
+    return reply.send({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, profileId: user.profileId ?? null } });
   });
 
   // ── Auth: change password (requires valid JWT) ────────────────────────────
@@ -355,10 +385,14 @@ export function buildApp() {
     // auth even if routeOptions.url is unset in edge cases.
     const pathOnly = (req.url ?? '').split('?')[0] ?? '';
     if (pathOnly === '/places/static-map' || routeUrl === '/places/static-map') return;
+    // SSE notification stream accepts auth via query-param token (EventSource
+    // cannot set Authorization). The route handler verifies it itself.
+    if (pathOnly === '/me/notifications/stream' || routeUrl === '/me/notifications/stream') return;
 
     if (routeUrl?.startsWith('/auth')) return;
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
+    if (routeUrl === '/dropbox/callback') return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
@@ -394,13 +428,14 @@ export function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const OBJECTS = ['leads','deals','projects','service','quotes','installations','properties','contacts','companies','products'];
+    const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products'];
     const APP_KEYS = [
       'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
       'exportData','importData',
       'viewReports','manageReports','manageDashboards',
       'viewSummary','viewSetup','viewAuditLog',
       'customizeApplication','viewAllData','modifyAllData',
+      'manageSupportTickets',
     ];
 
     // ADMIN users get full access regardless of profile
@@ -444,12 +479,39 @@ export function buildApp() {
   app.register(integrationRoutes);
   app.register(placesRoutes);
   app.register(widgetRoutes);
+  app.register(dropboxRoutes);
+  app.register(errorLogRoutes);
+  app.register(outlookRoutes);
+  app.register(ticketRoutes);
+  app.register(notificationRoutes);
+  app.register(supportTicketConfigRoutes);
+  app.register(automationRoutes);
+
+  // Start the Postgres LISTEN connection so notify() events broadcast
+  // from any process reach SSE subscribers on this process.
+  initNotificationListener().catch((err) => {
+    app.log.error({ err }, 'Failed to initialize notification listener');
+  });
+
+  // Seed the default ticket categories if the Setting row is missing.
+  // Idempotent: never overwrites admin edits.
+  seedCategoriesIfMissing().catch((err) => {
+    app.log.error({ err }, 'Failed to seed default ticket categories');
+  });
 
   // Register per-widget server-side route modules under /api/widgets/:widgetId/
   for (const { widgetId, registerRoutes } of externalWidgetRouteModules) {
     app.register(
       async (instance) => { await registerRoutes(instance) },
       { prefix: `/widgets/${widgetId}` }
+    );
+  }
+
+  // Register per-controller server-side route modules
+  for (const { manifest, registerRoutes } of controllerRegistrations) {
+    app.register(
+      async (instance) => { await registerRoutes(instance) },
+      { prefix: manifest.routePrefix }
     );
   }
 

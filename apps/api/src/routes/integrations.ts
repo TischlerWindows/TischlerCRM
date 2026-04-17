@@ -108,8 +108,12 @@ function sanitizeIntegration(row: any) {
 // ── Routes ─────────────────────────────────────────────────────────
 
 export async function integrationRoutes(app: FastifyInstance) {
-  // Seed provider rows on startup
-  await seedProviders();
+  // Seed provider rows on startup — wrapped so a failure never prevents route registration
+  try {
+    await seedProviders();
+  } catch (err: any) {
+    console.error('[integrations] seedProviders failed (non-fatal):', err.message);
+  }
 
   // ── List all integrations (any authenticated user) ──
   app.get('/integrations', async (_req, reply) => {

@@ -126,7 +126,7 @@ class ApiClient {
     this.baseUrl = baseUrl;
     // Try to load token from localStorage on init
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('auth_token');
+      this.token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
     }
   }
 
@@ -134,8 +134,10 @@ class ApiClient {
     this.token = token;
     if (typeof window !== 'undefined') {
       if (token) {
-        localStorage.setItem('auth_token', token);
+        sessionStorage.setItem('auth_token', token);
+        localStorage.removeItem('auth_token');
       } else {
+        sessionStorage.removeItem('auth_token');
         localStorage.removeItem('auth_token');
       }
     }
@@ -188,8 +190,8 @@ class ApiClient {
       // Guard against redirect loop: don't redirect if we're already on /login.
       if (response.status === 401 && typeof window !== 'undefined') {
         this.setToken(null);
-        sessionStorage.removeItem('user');
-        document.cookie = 'auth-token=; Max-Age=0; path=/;';
+        localStorage.removeItem('user');
+        document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
         }
@@ -223,6 +225,13 @@ class ApiClient {
   async put<T = any>(endpoint: string, body?: any): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  async patch<T = any>(endpoint: string, body?: any): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: 'PATCH',
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   }
@@ -286,6 +295,14 @@ class ApiClient {
 
   async resendUserInvite(id: string): Promise<{ inviteUrl?: string; inviteSent: boolean }> {
     return this.post(`/admin/users/${id}/resend-invite`);
+  }
+
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
+  }
+
+  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
+    return this.post(`/admin/users/${id}/impersonate`);
   }
 
   async getUserLoginHistory(id: string): Promise<LoginEventRow[]> {
@@ -454,10 +471,33 @@ class ApiClient {
     });
   }
 
+  async createRequote(objectApiName: string, recordId: string, name?: string) {
+    return this.request<any>(`/objects/${objectApiName}/records/${recordId}/requote`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async getRequoteVersions(objectApiName: string, recordId: string) {
+    return this.request<{ versions: Array<{ id: string; label: string; isCurrent: boolean }> }>(
+      `/objects/${objectApiName}/records/${recordId}/requote-versions`
+    );
+  }
+
   async deleteRecord(objectApiName: string, recordId: string) {
     return this.request<void>(`/objects/${objectApiName}/records/${recordId}`, {
       method: 'DELETE',
     });
+  }
+
+  async importRecords(objectApiName: string, records: Record<string, any>[]): Promise<{ created: number; errors: Array<{ row: number; error: string }> }> {
+    return this.request<{ created: number; errors: Array<{ row: number; error: string }> }>(
+      `/objects/${objectApiName}/records/import`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ records }),
+      },
+    );
   }
 
   async migrateRecordLayouts(objectApiName: string, fromPageLayoutId: string): Promise<{ updatedCount: number }> {
@@ -521,7 +561,7 @@ class ApiClient {
 
   async updateDashboard(dashboardId: string, data: Partial<any>) {
     return this.request<any>(`/dashboards/${dashboardId}`, {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   }
@@ -660,6 +700,29 @@ class ApiClient {
     });
   }
 
+  // Automations (Triggers & Controllers)
+  async getTriggerSettings() {
+    return this.request<Array<{ triggerId: string; enabled: boolean; name: string; description: string; icon: string; objectApiName: string; events: string[] }>>('/automations/triggers');
+  }
+
+  async updateTriggerSetting(triggerId: string, enabled: boolean): Promise<void> {
+    return this.request(`/automations/triggers/${encodeURIComponent(triggerId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
+  async getControllerSettings() {
+    return this.request<Array<{ controllerId: string; enabled: boolean; name: string; description: string; icon: string; objectApiName: string; routePrefix: string }>>('/automations/controllers');
+  }
+
+  async updateControllerSetting(controllerId: string, enabled: boolean): Promise<void> {
+    return this.request(`/automations/controllers/${encodeURIComponent(controllerId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    });
+  }
+
   // Google Places (proxied through backend — API key never reaches the browser)
   async placesAutocomplete(input: string, sessionToken: string) {
     const params = new URLSearchParams({ input, sessionToken });
@@ -686,6 +749,181 @@ class ApiClient {
         formattedAddress: string;
       };
     }>(`/places/details?${params}`);
+  }
+
+  // ── Outlook / Microsoft ────────────────────────────────────────────────────
+
+  async getOutlookStatus() {
+    return this.request<{
+      enabled: boolean;
+      configured: boolean;
+      connected: boolean;
+      senderEmail: string | null;
+      tenantId: string | null;
+    }>('/outlook/status');
+  }
+
+  async sendOutlookTestEmail() {
+    return this.request<{ sent: boolean; message: string }>('/outlook/test-email', { method: 'POST' });
+  }
+
+  // ── Dropbox ────────────────────────────────────────────────────────────────
+
+  async getDropboxConnectUrl() {
+    return this.request<{ url: string }>('/dropbox/connect');
+  }
+
+  async getDropboxStatus() {
+    return this.request<{
+      enabled: boolean;
+      configured: boolean;
+      connected: boolean;
+      externalEmail: string | null;
+      connectedAt: string | null;
+    }>('/dropbox/status');
+  }
+
+  async disconnectDropbox() {
+    return this.request<void>('/dropbox/disconnect', { method: 'DELETE' });
+  }
+
+  async listDropboxFiles(objectApiName: string, recordId: string, subPath?: string, folderName?: string) {
+    const p = new URLSearchParams();
+    if (subPath) p.set('subPath', subPath);
+    if (folderName) p.set('folderName', folderName);
+    const qs = p.toString() ? `?${p.toString()}` : '';
+    return this.request<{
+      connected: boolean;
+      needsReauth?: boolean;
+      files: Array<{
+        id: string;
+        name: string;
+        path: string;
+        size: number;
+        modifiedAt: string | null;
+        isFolder: boolean;
+      }>;
+    }>(`/dropbox/files/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}${qs}`);
+  }
+
+  async getDropboxDownloadUrl(fileId: string) {
+    return this.request<{ url: string }>(`/dropbox/download/${encodeURIComponent(fileId)}`);
+  }
+
+  async createDropboxFolder(objectApiName: string, recordId: string, name: string, subPath?: string, folderName?: string) {
+    return this.request<{ id: string; name: string; path: string }>(`/dropbox/folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`, {
+      method: 'POST',
+      body: JSON.stringify({ name, subPath, folderName }),
+    });
+  }
+
+  async ensureDropboxFolder(objectApiName: string, recordId: string, folderName?: string) {
+    return this.request<{ created: boolean; path: string; exists?: boolean; linked?: boolean }>(
+      `/dropbox/ensure-folder/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`,
+      { method: 'POST', body: JSON.stringify({ folderName }) }
+    );
+  }
+
+  async resolveDropboxPath(objectApiName: string, recordId: string) {
+    return this.request<{
+      linked: boolean;
+      parentObjectApiName?: string;
+      parentRecordId?: string;
+      parentFolderName?: string;
+      subfolder?: string;
+      childFolderName?: string;
+      linkedOpportunityFolderName?: string;
+      isRequote?: boolean;
+      parentOpportunityNumber?: string;
+      parentOpportunityFolderName?: string;
+    }>(
+      `/dropbox/resolve-path/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}`
+    );
+  }
+
+  async ensureDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentRecordId: string;
+    parentFolderName?: string;
+    childObjectApiName: string;
+    childFolderName: string;
+  }) {
+    return this.request<{ created: boolean; path: string; reason?: string }>(
+      '/dropbox/ensure-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async renameDropboxFolder(opts: {
+    objectApiName: string;
+    recordId: string;
+    oldFolderName: string;
+    newFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async renameDropboxLinkedFolder(opts: {
+    parentObjectApiName: string;
+    parentFolderName: string;
+    childObjectApiName: string;
+    oldChildFolderName: string;
+    newChildFolderName: string;
+  }) {
+    return this.request<{ renamed: boolean; oldPath?: string; newPath?: string; reason?: string }>(
+      '/dropbox/rename-linked-folder',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async copyDropboxFile(opts: {
+    fromPath: string;
+    toObjectApiName: string;
+    toRecordId: string;
+    toFolderName?: string;
+    toSubPath?: string;
+  }) {
+    return this.request<{ success: boolean; path: string }>(
+      '/dropbox/copy',
+      { method: 'POST', body: JSON.stringify(opts) }
+    );
+  }
+
+  async deleteDropboxFile(fileId: string) {
+    return this.request<void>(`/dropbox/file/${encodeURIComponent(fileId)}`, { method: 'DELETE' });
+  }
+
+  async uploadDropboxFile(objectApiName: string, recordId: string, file: File, subPath?: string, folderName?: string) {
+    const fileName = subPath ? `${subPath}/${file.name}` : file.name;
+    const p = new URLSearchParams({ fileName });
+    if (folderName) p.set('folderName', folderName);
+    const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?${p.toString()}`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/octet-stream',
+    };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: file,
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return resp.json() as Promise<{
+      id: string;
+      name: string;
+      path: string;
+      size: number;
+      modifiedAt: string;
+    }>;
   }
 }
 

@@ -94,11 +94,12 @@ function resolveCompositeTextValue(obj: any): string | null {
 export function resolveLookupDisplayName(value: any, objectType: string): string {
   if (!value) return '-';
   
-  // If the value doesn't look like an ID (numeric/timestamp), it might already be a name
-  // IDs are typically numeric strings (timestamps) or UUIDs
+  // If the value doesn't look like an ID, it might already be a name
+  // IDs are typically numeric strings, UUIDs, or alphanumeric hashes
   const stringValue = String(value);
   const looksLikeId = /^\d+$/.test(stringValue) || 
-                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stringValue);
+                      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(stringValue) ||
+                      /^[0-9a-zA-Z]{10,}$/.test(stringValue);
   
   if (!looksLikeId) {
     // Value is likely already a display name, return it as-is
@@ -140,10 +141,20 @@ export function resolveLookupDisplayName(value: any, objectType: string): string
       return record.propertyNumber || record.Property__propertyNumber || record.name || stringValue;
     }
     if (objectType === 'Lead') {
-      return record.leadNumber || record.name || stringValue;
+      const leadNum = record.leadNumber || record.Lead__leadNumber;
+      const contactName = record.contactName || record.Lead__contactName;
+      const leadFn = record.firstName || record.Lead__firstName || '';
+      const leadLn = record.lastName || record.Lead__lastName || '';
+      const rawLn = leadLn && leadLn !== 'N/A' ? leadLn : '';
+      const leadName = contactName || `${leadFn} ${rawLn}`.trim();
+      if (leadNum && leadName) return `${leadNum} - ${leadName}`;
+      return leadNum || leadName || record.name || stringValue;
     }
-    if (objectType === 'Deal') {
-      return record.dealNumber || record.dealName || record.name || stringValue;
+    if (objectType === 'Opportunity') {
+      const oppNum = record.opportunityNumber || record.Opportunity__opportunityNumber;
+      const oppName = record.opportunityName || record.Opportunity__opportunityName;
+      if (oppNum && oppName) return `${oppNum} - ${oppName}`;
+      return oppNum || oppName || record.name || stringValue;
     }
     if (objectType === 'Product') {
       return record.productName || record.name || stringValue;
@@ -230,11 +241,15 @@ export function inferLookupObjectType(fieldName: string): string | null {
     'relatedlead': 'Lead',
     'relatedleadid': 'Lead',
     
-    // Deal lookups
-    'dealid': 'Deal',
-    'deal': 'Deal',
-    'relateddeal': 'Deal',
-    'relateddealid': 'Deal',
+    // Opportunity lookups
+    'opportunityid': 'Opportunity',
+    'opportunity': 'Opportunity',
+    'relatedopportunity': 'Opportunity',
+    'relatedopportunityid': 'Opportunity',
+    'dealid': 'Opportunity',
+    'deal': 'Opportunity',
+    'relateddeal': 'Opportunity',
+    'relateddealid': 'Opportunity',
     
     // User lookups (only for actual ID fields)
     'userid': 'User',

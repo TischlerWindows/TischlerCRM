@@ -26,6 +26,7 @@ const conditionExprSchema = z.object({
 const formattingRuleTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('field'), fieldApiName: z.string() }),
   z.object({ kind: z.literal('section'), sectionId: z.string() }),
+  z.object({ kind: z.literal('tab'), tabId: z.string() }),
 ]);
 
 const formattingRuleSchema = z.object({
@@ -62,6 +63,11 @@ const layoutFieldSchema = z.object({
   colSpan: z.number().min(1).max(3).optional(),
   rowSpan: z.number().min(1).max(6).optional(),
   presentation: fieldPresentationSchema.optional(),
+  hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
+  hideOnExisting: z.boolean().optional(),
 });
 
 const layoutSectionSchema = z.object({
@@ -74,6 +80,11 @@ const layoutSectionSchema = z.object({
   visibleIf: z.array(conditionExprSchema).optional(),
   description: z.string().max(500).optional().nullable(),
   fields: z.array(layoutFieldSchema),
+  hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
+  hideOnExisting: z.boolean().optional(),
 });
 
 const layoutTabSchema = z.object({
@@ -81,6 +92,11 @@ const layoutTabSchema = z.object({
   label: z.string(),
   order: z.number(),
   sections: z.array(layoutSectionSchema),
+  hideOnNew: z.boolean().optional(),
+  hideOnView: z.boolean().optional(),
+  hideOnEdit: z.boolean().optional(),
+  // Deprecated — kept for backwards compatibility
+  hideOnExisting: z.boolean().optional(),
 });
 
 const extensionsObjectSchema = z
@@ -118,7 +134,12 @@ function buildExtensionsJson(
 }
 
 export async function layoutRoutes(app: FastifyInstance) {
-  // Get all layouts for an object
+  // Get all layouts for an object.
+  // Note: the runtime page-layout resolver lives on the web side
+  // (apps/web/lib/layout-resolver.ts) and treats only `active === true` as
+  // live — undefined / false both count as Draft. The Prisma `isActive`
+  // column here uses the same semantics; the schema-blob path goes through
+  // the JSON-stored `active` field on each layout.
   app.get('/objects/:apiName/layouts', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
 

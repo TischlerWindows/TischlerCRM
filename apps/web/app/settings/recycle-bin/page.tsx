@@ -6,7 +6,9 @@ import {
   RotateCcw,
   Users,
   Building2,
+  Database,
   X,
+  AlertTriangle,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
@@ -29,9 +31,19 @@ interface DeletedDepartment {
   deletedBy: { id: string; name: string | null; email: string } | null;
 }
 
+interface DeletedRecord {
+  id: string;
+  name: string;
+  objectApiName: string;
+  objectLabel: string;
+  deletedAt: string;
+  deletedBy: { id: string; name: string | null; email: string } | null;
+}
+
 interface RecycleBinData {
   users: DeletedUser[];
   departments: DeletedDepartment[];
+  records: DeletedRecord[];
 }
 
 export default function RecycleBinPage() {
@@ -39,7 +51,7 @@ export default function RecycleBinPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'departments'>('users');
+  const [activeTab, setActiveTab] = useState<'records' | 'users' | 'departments'>('records');
   const [restoring, setRestoring] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -84,6 +96,34 @@ export default function RecycleBinPage() {
     }
   };
 
+  const handleRestoreRecord = async (record: DeletedRecord) => {
+    if (!confirm(`Restore ${record.objectLabel} "${record.name}"?`)) return;
+    setRestoring(record.id);
+    try {
+      await apiClient.post(`/admin/recycle-bin/records/${record.id}/restore`, {});
+      setSuccess(`${record.objectLabel} "${record.name}" restored`);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to restore record');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  const handlePermanentDelete = async (record: DeletedRecord) => {
+    if (!confirm(`Permanently delete ${record.objectLabel} "${record.name}"? This cannot be undone.`)) return;
+    setRestoring(record.id);
+    try {
+      await apiClient.delete(`/admin/recycle-bin/records/${record.id}`);
+      setSuccess(`${record.objectLabel} "${record.name}" permanently deleted`);
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete record');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
   const formatDate = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -91,6 +131,7 @@ export default function RecycleBinPage() {
 
   const userCount = data?.users.length || 0;
   const deptCount = data?.departments.length || 0;
+  const recordCount = data?.records.length || 0;
 
   return (
     <>
@@ -113,6 +154,12 @@ export default function RecycleBinPage() {
         <div className="px-6 pt-4">
           <div className="flex gap-1 border-b border-gray-200">
             <button
+              onClick={() => setActiveTab('records')}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'records' ? 'border-brand-navy text-brand-navy' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              <Database className="w-4 h-4" /> Deleted Records ({recordCount})
+            </button>
+            <button
               onClick={() => setActiveTab('users')}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'users' ? 'border-brand-navy text-brand-navy' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
@@ -130,6 +177,52 @@ export default function RecycleBinPage() {
         <div className="px-6 py-4 pb-8">
           {loading ? (
             <div className="bg-white rounded-lg border border-gray-200 p-12 text-center text-gray-500">Loading...</div>
+          ) : activeTab === 'records' ? (
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              {recordCount === 0 ? (
+                <div className="p-12 text-center text-gray-500">No deleted records</div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[#fafafa] border-b border-gray-200">
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Name</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Object</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Deleted By</th>
+                      <th className="px-4 py-3 text-left text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Deleted At</th>
+                      <th className="px-4 py-3 text-right text-[11px] font-semibold text-brand-gray uppercase tracking-[0.04em]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {data!.records.map(record => (
+                      <tr key={record.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">{record.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{record.objectLabel}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{record.deletedBy?.name || record.deletedBy?.email || '—'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{formatDate(record.deletedAt)}</td>
+                        <td className="px-4 py-3 text-right flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleRestoreRecord(record)}
+                            disabled={restoring === record.id}
+                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-brand-navy hover:bg-brand-navy/10 rounded transition-colors disabled:opacity-50"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            {restoring === record.id ? 'Restoring...' : 'Restore'}
+                          </button>
+                          <button
+                            onClick={() => handlePermanentDelete(record)}
+                            disabled={restoring === record.id}
+                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           ) : activeTab === 'users' ? (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
               {userCount === 0 ? (

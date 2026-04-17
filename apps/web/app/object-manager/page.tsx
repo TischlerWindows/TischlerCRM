@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSchemaStore } from '@/lib/schema-store';
 import { ObjectDef, generateId, generateApiName, createDefaultPageLayout, createDefaultRecordType, cloneSystemFields } from '@/lib/schema';
 import { getSetting, setSetting } from '@/lib/preferences';
@@ -34,6 +33,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { ObjectManagerTopBar } from '@/components/object-manager/object-manager-top-bar';
+import { useSetupHistoryTracking } from '@/lib/use-setup-history-tracking';
 
 import {
   Table,
@@ -67,7 +68,7 @@ const CORE_OBJECTS = new Set([
   'Account',
   'Product',
   'Lead',
-  'Deal',
+  'Opportunity',
   'Project',
   'Service',
   'Quote',
@@ -107,6 +108,8 @@ export default function ObjectManagerPage() {
   useEffect(() => {
     loadSchema();
   }, [loadSchema]);
+
+  useSetupHistoryTracking();
 
   const filteredObjects = schema?.objects.filter(obj =>
     obj.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -255,69 +258,45 @@ export default function ObjectManagerPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-brand-navy shadow-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-[48px]">
-            <div className="flex items-center gap-3">
-              <Link href="/" className="flex items-center gap-2.5 group">
-                <div className="w-8 h-8 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <Image
-                    src="/tces-logo.png"
-                    alt="Tischler"
-                    width={32}
-                    height={32}
-                    priority
-                    className="object-contain"
-                    style={{ maxWidth: '100%', height: 'auto' }}
-                  />
-                </div>
-                <span className="text-white/80 text-sm font-semibold group-hover:text-white transition-colors hidden sm:inline">Tischler CRM</span>
-              </Link>
-              <span className="text-white/30">|</span>
-              <span className="text-base font-semibold text-white">Object Manager</span>
+      <ObjectManagerTopBar crumbs={[{ label: 'Object Manager' }]}>
+        <Button variant="outline" onClick={handleExportAll} className="!text-white !border-white/20 hover:!bg-white/10">
+          <Download className="h-4 w-4 mr-2" />
+          Export All
+        </Button>
+        <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="!text-white !border-white/20 hover:!bg-white/10">
+              <Upload className="h-4 w-4 mr-2" />
+              Import Schema
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Import Schema</DialogTitle>
+              <DialogDescription>
+                Paste your JSON schema data below. This will be merged with your existing objects.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Textarea
+                value={importData}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportData(e.target.value)}
+                placeholder="Paste JSON schema data here..."
+                rows={12}
+                className="font-mono text-sm"
+              />
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleImportSchema} disabled={!importData.trim()}>
+                  Import
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={handleExportAll}>
-                <Download className="h-4 w-4 mr-2" />
-                Export All
-              </Button>
-              <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Schema
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Import Schema</DialogTitle>
-                    <DialogDescription>
-                      Paste your JSON schema data below. This will be merged with your existing objects.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <Textarea
-                      value={importData}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportData(e.target.value)}
-                      placeholder="Paste JSON schema data here..."
-                      rows={12}
-                      className="font-mono text-sm"
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <Button variant="outline" onClick={() => setShowImportDialog(false)}>
-                        Cancel
-                      </Button>
-                      <Button onClick={handleImportSchema} disabled={!importData.trim()}>
-                        Import
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </div>
-      </div>
+          </DialogContent>
+        </Dialog>
+      </ObjectManagerTopBar>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Overview Stats */}

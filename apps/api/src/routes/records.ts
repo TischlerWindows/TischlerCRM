@@ -1,8 +1,12 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
-import { z } from 'zod';
+import { getPropertyPrefix, extractAddressFromRecord } from '@crm/types';
+import { logAudit, extractIp } from '../audit.js';
+import { tryRenameDropboxFolder, tryEnsureLinkedFolder, tryEnsurePropertyRootFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
+import { runTriggers } from '../lib/triggers/trigger-engine.js';
+import { z } from 'zod';
 
 // ── Permission helper ──────────────────────────────────────────────
 async function checkObjectPermission(
@@ -57,13 +61,16 @@ export async function recordRoutes(app: FastifyInstance) {
     return String(val);
   }
 
+  // Keys to exclude from composite display values (e.g. address lat/lng)
+  const HIDDEN_COMPOSITE_KEYS = new Set(['lat', 'lng', 'latitude', 'longitude']);
+
   // Build a display-friendly string from a data value
   function displayValue(val: unknown): string {
     if (val == null) return '';
     if (typeof val === 'object') {
-      return Object.values(val as Record<string, unknown>)
-        .filter(v => v != null && v !== '')
-        .map(v => String(v))
+      return Object.entries(val as Record<string, unknown>)
+        .filter(([k, v]) => v != null && v !== '' && !HIDDEN_COMPOSITE_KEYS.has(k.toLowerCase()))
+        .map(([, v]) => String(v))
         .join(', ');
     }
     return String(val);
@@ -99,14 +106,47 @@ export async function recordRoutes(app: FastifyInstance) {
       if (!customObj) return [];
 
       const records = await prisma.record.findMany({
-        where: { objectId: customObj.id },
+        where: { objectId: customObj.id, deletedAt: null },
         take: 50,
       });
 
       const config = objDef.searchConfig;
       const searchFields: string[] = config.searchableFields ?? [];
-      const titleField: string = config.titleField || searchFields[0] || '';
-      const subtitleFields: string[] = config.subtitleFields || [];
+      const apiName: string = objDef.apiName;
+
+      // ── Smart field resolution for title / subtitle ──────────────
+      // Auto-detect number, name, and address fields from object field definitions
+      const fields: any[] = objDef.fields ?? [];
+      const fieldApis = fields.map((f: any) => f.apiName as string);
+
+      // Find the object number field (e.g. Property__propertyNumber or propertyNumber)
+      const numberField = fieldApis.find((f: string) =>
+        f.toLowerCase().endsWith('number') &&
+        (f.toLowerCase().includes(apiName.toLowerCase()) || f.toLowerCase().startsWith(apiName.toLowerCase()))
+      ) || '';
+
+      // For Property: use address as subtitle; for others: use the name field
+      const isProperty = apiName === 'Property';
+      let nameField = '';
+      let addressField = '';
+
+      if (isProperty) {
+        addressField = fieldApis.find((f: string) => f.toLowerCase().endsWith('__address') || f.toLowerCase() === 'address') || '';
+      } else {
+        // Find a name field: opportunityName, projectName, accountName, contactName, subject, name, etc.
+        nameField = fieldApis.find((f: string) => {
+          const lower = f.toLowerCase();
+          return (lower.endsWith('name') || lower.endsWith('subject')) &&
+            !lower.includes('number') &&
+            (lower.includes(apiName.toLowerCase()) || lower === 'name' || lower === 'subject');
+        }) || '';
+      }
+
+      // Fall back to explicit searchConfig fields if set
+      const titleField: string = config.titleField || numberField || searchFields[0] || '';
+      const subtitleFields: string[] = config.subtitleFields?.length
+        ? config.subtitleFields
+        : (isProperty ? [addressField].filter(Boolean) : [nameField].filter(Boolean));
 
       const matched: any[] = [];
       for (const record of records) {
@@ -133,13 +173,28 @@ export async function recordRoutes(app: FastifyInstance) {
         }
 
         if (hitFields.length > 0) {
-          const titleVal = resolveDataValue(data, titleField);
+          // Build display title: prefer "NUMBER (Name)" format
+          const numVal = numberField ? displayValue(resolveDataValue(data, numberField)) : '';
+          const titleVal = displayValue(resolveDataValue(data, titleField));
+          let title = '';
+
+          if (numVal && titleField !== numberField && titleVal && titleVal !== numVal) {
+            // Both number and a separate title field — combine them
+            title = `${numVal} (${titleVal})`;
+          } else if (numVal) {
+            title = numVal;
+          } else if (titleVal) {
+            title = titleVal;
+          } else {
+            title = record.id;
+          }
+
           matched.push({
             id: record.id,
             objectApiName: objDef.apiName,
             objectLabel: objDef.label,
             objectPluralLabel: objDef.pluralLabel || objDef.label,
-            title: displayValue(titleVal) || record.id,
+            title,
             subtitle: subtitleFields
               .map(f => displayValue(resolveDataValue(data, f)))
               .filter(Boolean)
@@ -183,6 +238,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
       },
       include: {
         createdBy: {
@@ -253,6 +309,7 @@ export async function recordRoutes(app: FastifyInstance) {
     const records = await prisma.record.findMany({
       where: {
         objectId: object.id,
+        deletedAt: null,
         ...(jsonFilters.length > 0 ? { AND: jsonFilters } : {}),
       },
       include: {
@@ -314,7 +371,7 @@ export async function recordRoutes(app: FastifyInstance) {
     }
 
     const record = await prisma.record.findFirst({
-      where: { id: idParam, objectId: object.id },
+      where: { id: idParam, objectId: object.id, deletedAt: null },
       include: {
         pageLayout: {
           select: {
@@ -394,19 +451,26 @@ export async function recordRoutes(app: FastifyInstance) {
       propertyNumber: 'P',
       contactNumber: 'C',
       leadNumber: 'LEAD',
-      dealNumber: 'DEAL',
+      opportunityNumber: 'OPP',
       productCode: 'PROD',
       projectNumber: 'PRJ',
       quoteNumber: 'QTE',
       serviceNumber: 'SRV',
       installationNumber: 'INST',
+      workOrderNumber: 'WO',
+      teamMemberNumber: 'TM',
+      taskNumber: 'TSK',
     };
     for (const field of object.fields) {
-      if (field.apiName in autoNumberFormats && !normalizedData[field.apiName]) {
-        // Find the highest existing number for this field
-        const prefix = autoNumberFormats[field.apiName];
+      const currentVal = normalizedData[field.apiName];
+      const isEmpty = !currentVal || currentVal === 'N/A';
+      if (field.apiName in autoNumberFormats && isEmpty) {
+        // For propertyNumber, derive a smart prefix from address data
+        const prefix = field.apiName === 'propertyNumber'
+          ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
+          : autoNumberFormats[field.apiName];
         const existing = await prisma.record.findMany({
-          where: { objectId: object.id },
+          where: { objectId: object.id, deletedAt: null },
           select: { data: true },
         });
         let maxNum = 0;
@@ -416,14 +480,120 @@ export async function recordRoutes(app: FastifyInstance) {
         for (const rec of existing) {
           const recData = rec.data as Record<string, any> | null;
           if (!recData) continue;
-          const val = recData[field.apiName];
+          // Check both bare field name and prefixed variants (e.g. Opportunity__opportunityNumber)
+          let val: string | undefined;
+          for (const [k, v] of Object.entries(recData)) {
+            const stripped = k.replace(/^[A-Za-z]+__/, '');
+            if (stripped === field.apiName && typeof v === 'string') { val = v; break; }
+          }
           if (typeof val === 'string') {
             const m = val.match(prefixRegex);
             if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
           }
         }
-        const padWidth = field.apiName === 'propertyNumber' ? 4 : 3;
-        normalizedData[field.apiName] = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
+        const generatedNum = `${prefix}${String(maxNum + 1).padStart(padWidth, '0')}`;
+        normalizedData[field.apiName] = generatedNum;
+        // Also set the prefixed key so the stored JSON is consistent
+        const prefixedKey = `${apiName}__${field.apiName}`;
+        normalizedData[prefixedKey] = generatedNum;
+      }
+    }
+
+    // ---- TeamMember validations (POST) ----
+    if (apiName === 'TeamMember') {
+      const getTeamMemberField = (data: Record<string, any>, fieldName: string): string | null => {
+        const val = data[fieldName] || data[`TeamMember__${fieldName}`];
+        return val && String(val).trim() ? String(val) : null;
+      };
+
+      // Contact or Account required
+      const contactVal = getTeamMemberField(normalizedData, 'contact');
+      const accountVal = getTeamMemberField(normalizedData, 'account');
+      if (!contactVal && !accountVal) {
+        return reply.code(400).send({ error: 'Either a contact or an account is required for TeamMember records.' });
+      }
+
+      // Exactly one parent required
+      const parentFields = ['property', 'opportunity', 'project', 'workOrder', 'installation'];
+      const setParents = parentFields.filter(f => getTeamMemberField(normalizedData, f) !== null);
+      if (setParents.length !== 1) {
+        return reply.code(400).send({ error: 'Exactly one parent is required. Set one of: property, opportunity, project, workOrder, installation.' });
+      }
+
+      // Duplicate prevention
+      const parentField = setParents[0];
+      const parentValue = getTeamMemberField(normalizedData, parentField)!;
+      if (contactVal) {
+        // Check duplicates based on contact + parent
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            deletedAt: null,
+            data: { path: ['contact'], equals: contactVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+        // Also check with prefixed contact key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            deletedAt: null,
+            data: { path: [`TeamMember__contact`], equals: contactVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+      } else if (accountVal) {
+        // Check duplicates based on account + parent (account-only team member)
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            deletedAt: null,
+            data: { path: ['account'], equals: accountVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
+        // Also check with prefixed account key
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            deletedAt: null,
+            data: { path: [`TeamMember__account`], equals: accountVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
       }
     }
 
@@ -507,19 +677,277 @@ export async function recordRoutes(app: FastifyInstance) {
       },
     });
 
+    // Audit: log record creation
+    const recordName = normalizedData.name || normalizedData[`${apiName}__name`]
+      || normalizedData.accountName || normalizedData[`${apiName}__accountName`]
+      || normalizedData.contactName || normalizedData[`${apiName}__contactName`]
+      || normalizedData.opportunityName || normalizedData[`${apiName}__opportunityName`]
+      || normalizedData.leadName || normalizedData[`${apiName}__leadName`]
+      || normalizedData.projectName || normalizedData[`${apiName}__projectName`]
+      || normalizedData.productName || normalizedData[`${apiName}__productName`]
+      || normalizedData.propertyNumber || normalizedData[`${apiName}__propertyNumber`]
+      || normalizedData.teamMemberNumber || normalizedData[`${apiName}__teamMemberNumber`]
+      || record.id;
+    logAudit({
+      actorId: userId,
+      action: 'CREATE',
+      objectType: apiName,
+      objectId: record.id,
+      objectName: typeof recordName === 'string' ? recordName : String(recordName),
+      after: normalizedData,
+      ipAddress: extractIp(req),
+    });
+
+    // ── Ensure linked Dropbox folder inside parent Property ──
+    try {
+      await tryEnsureLinkedFolder(userId, apiName, record.id, normalizedData);
+    } catch { /* non-fatal */ }
+
+    // ── Ensure Property root folder + subfolders when a Property is created ──
+    if (apiName.toLowerCase() === 'property') {
+      tryEnsurePropertyRootFolder(userId, record.id, normalizedData)
+        .catch(() => { /* non-fatal */ });
+    }
+
+    // ── Workflow automation ──
+    runWorkflows({
+      event: 'create',
+      objectApi: apiName,
+      recordId: record.id,
+      recordData: normalizedData,
+      userId,
+    }).catch(() => { /* non-fatal — workflow errors must not break record creation */ });
+
+    // ── Trigger automation ──
+    runTriggers({
+      event: 'create',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: record.id,
+      recordData: normalizedData,
+      userId,
+      orgId: userId,
+    }).catch(() => { /* non-fatal — trigger errors must not break record creation */ });
+
+    reply.code(201).send(record);
+  });
+
+  // ── Create Requote of an Opportunity ────────────────────────────────────
+  // POST /objects/Opportunity/records/:id/requote
+  // Clones the Opportunity record and names it "OPP#### - Requote N"
+  app.post('/objects/:apiName/records/:id/requote', async (req, reply) => {
+    const { apiName, id } = req.params as { apiName: string; id: string };
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+
+    if (apiName !== 'Opportunity') {
+      return reply.code(400).send({ error: 'Requote is only available for Opportunity records' });
+    }
+
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records for this object' });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+      include: { fields: { where: { isActive: true } } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    // Fetch the source record
+    const sourceRecord = await prisma.record.findFirst({
+      where: { id, objectId: object.id, deletedAt: null },
+    });
+    if (!sourceRecord) return reply.code(404).send({ error: 'Source record not found' });
+
+    const sourceData = { ...(sourceRecord.data as Record<string, any>) };
+
+    // Find the opportunity number from the source record
+    let oppNumber = '';
+    for (const [k, v] of Object.entries(sourceData)) {
+      const stripped = k.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber' && typeof v === 'string') {
+        oppNumber = v;
+        break;
+      }
+    }
+    // If the source is itself a requote, extract the base opportunity number
+    const baseOppNumber = oppNumber.replace(/\s*-\s*Requote\s*\d+$/i, '');
+
+    // Count existing requotes for this base opportunity number
+    const allRecords = await prisma.record.findMany({
+      where: { objectId: object.id, deletedAt: null },
+      select: { data: true },
+    });
+    let maxRequoteNum = 0;
+    for (const rec of allRecords) {
+      const recData = rec.data as Record<string, any> | null;
+      if (!recData) continue;
+      for (const [k, v] of Object.entries(recData)) {
+        const stripped = k.replace(/^[A-Za-z]+__/, '');
+        if (stripped === 'opportunityNumber' && typeof v === 'string') {
+          const m = v.match(new RegExp(`^${baseOppNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*Requote\\s*(\\d+)$`, 'i'));
+          if (m) {
+            const num = parseInt(m[1], 10);
+            if (num > maxRequoteNum) maxRequoteNum = num;
+          }
+        }
+      }
+    }
+    const requoteNum = maxRequoteNum + 1;
+    const newOppNumber = `${baseOppNumber} - Requote ${requoteNum}`;
+
+    // Clone the data and update the opportunity number
+    const cloneData = { ...sourceData };
+    // Remove internal tracking fields and stale IDs from the source record
+    delete cloneData._dropboxFolderId;
+    delete cloneData.id;
+    delete cloneData.Id;
+    delete cloneData.createdAt;
+    delete cloneData.updatedAt;
+    delete cloneData.CreatedDate;
+    delete cloneData.LastModifiedDate;
+    delete cloneData.CreatedById;
+    delete cloneData.LastModifiedById;
+    delete cloneData.createdBy;
+    delete cloneData.modifiedBy;
+    // Mark as a requote with metadata for filtering/linking
+    cloneData._isRequote = true;
+    cloneData._parentOpportunityNumber = baseOppNumber;
+    // Update opportunityNumber fields
+    for (const key of Object.keys(cloneData)) {
+      const stripped = key.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber') {
+        cloneData[key] = newOppNumber;
+      }
+    }
+    if (!cloneData.opportunityNumber) {
+      cloneData.opportunityNumber = newOppNumber;
+    }
+
+    // Set the opportunity name — use the user-supplied name if provided,
+    // otherwise fall back to auto-generated "<base> - Requote N"
+    const body = req.body as { name?: string } | null;
+    const userSuppliedName = body?.name?.trim();
+    for (const key of Object.keys(cloneData)) {
+      const stripped = key.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityName' || stripped === 'name') {
+        if (userSuppliedName) {
+          cloneData[key] = userSuppliedName;
+        } else {
+          const origName = String(cloneData[key] || '');
+          const baseName = origName.replace(/\s*-\s*Requote\s*\d+$/i, '');
+          cloneData[key] = `${baseName} - Requote ${requoteNum}`;
+        }
+      }
+    }
+
+    // Generate a new record ID
+    const newId = generateRecordId(apiName);
+
+    // Validate pageLayoutId format
+    const srcLayoutId = sourceRecord.pageLayoutId;
+    const isValidLayout = srcLayoutId && /^[0-9]{3}[A-Za-z0-9]{12}$/.test(srcLayoutId);
+
+    // Create the requote record
+    const record = await prisma.record.create({
+      data: {
+        id: newId,
+        objectId: object.id,
+        data: cloneData,
+        ...(isValidLayout ? { pageLayoutId: srcLayoutId } : {}),
+        createdById: userId,
+        modifiedById: userId,
+      },
+    });
+
+    // Audit log
+    logAudit({
+      actorId: userId,
+      action: 'CREATE',
+      objectType: apiName,
+      objectId: record.id,
+      objectName: newOppNumber,
+      after: cloneData,
+      ipAddress: extractIp(req),
+    });
+
+    // Send response immediately so the frontend can redirect
     reply.code(201).send(record);
 
-    // Fire workflow rules asynchronously (don't block the response)
-    runWorkflows({
-      objectApiName: apiName,
-      recordId: record.id,
-      newData: record.data as Record<string, any>,
-      oldData: null,
-      userId,
-      objectId: object.id,
-      isCreate: true,
-      logger: req.log,
-    }).catch(err => req.log.error({ err }, 'Workflow execution error (create)'));
+    // Ensure linked Dropbox folder (fire-and-forget so file copies don't block the response)
+    tryEnsureLinkedFolder(userId, apiName, record.id, cloneData).catch((err) => {
+      console.error('[dropbox] Requote folder creation failed (non-fatal):', err);
+    });
+  });
+
+  // ── Get requote versions for an Opportunity ──────────────────────────────
+  // GET /objects/Opportunity/records/:id/requote-versions
+  // Returns the original opportunity + all requotes sharing the same base number
+  app.get('/objects/:apiName/records/:id/requote-versions', async (req, reply) => {
+    const { apiName, id } = req.params as { apiName: string; id: string };
+    if (apiName !== 'Opportunity') return reply.send({ versions: [] });
+
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+    });
+    if (!object) return reply.send({ versions: [] });
+
+    const currentRecord = await prisma.record.findFirst({
+      where: { id, objectId: object.id, deletedAt: null },
+    });
+    if (!currentRecord) return reply.send({ versions: [] });
+
+    const currentData = currentRecord.data as Record<string, any>;
+
+    // Find the opportunity number
+    let oppNumber = '';
+    for (const [k, v] of Object.entries(currentData)) {
+      const stripped = k.replace(/^[A-Za-z]+__/, '');
+      if (stripped === 'opportunityNumber' && typeof v === 'string') {
+        oppNumber = v; break;
+      }
+    }
+
+    // Get the base opportunity number (strip "- Requote N")
+    const baseOppNumber = oppNumber.replace(/\s*-\s*Requote\s*\d+$/i, '');
+
+    // Find all records with this base number
+    const allRecords = await prisma.record.findMany({
+      where: { objectId: object.id, deletedAt: null },
+      select: { id: true, data: true },
+    });
+
+    const versions: Array<{ id: string; label: string; isCurrent: boolean }> = [];
+    for (const rec of allRecords) {
+      const recData = rec.data as Record<string, any> | null;
+      if (!recData) continue;
+      let recOppNum = '';
+      for (const [k, v] of Object.entries(recData)) {
+        const stripped = k.replace(/^[A-Za-z]+__/, '');
+        if (stripped === 'opportunityNumber' && typeof v === 'string') {
+          recOppNum = v; break;
+        }
+      }
+      // Match: exact base number or base number + "- Requote N"
+      if (recOppNum === baseOppNumber || recOppNum.match(new RegExp(`^${baseOppNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*-\\s*Requote\\s*\\d+$`, 'i'))) {
+        versions.push({
+          id: rec.id,
+          label: recOppNum,
+          isCurrent: rec.id === id,
+        });
+      }
+    }
+
+    // Sort: original first, then requotes by number
+    versions.sort((a, b) => {
+      const aMatch = a.label.match(/Requote\s*(\d+)$/i);
+      const bMatch = b.label.match(/Requote\s*(\d+)$/i);
+      const aNum = aMatch ? parseInt(aMatch[1], 10) : 0;
+      const bNum = bMatch ? parseInt(bMatch[1], 10) : 0;
+      return aNum - bNum;
+    });
+
+    reply.send({ versions });
   });
 
   // ── Bulk migrate per-record layout overrides ────────────────────────────
@@ -559,7 +987,7 @@ export async function recordRoutes(app: FastifyInstance) {
     // Pass 1 — FK column match
     while (true) {
       const batch = await prisma.record.findMany({
-        where: { objectId: object.id, pageLayoutId: fromPageLayoutId },
+        where: { objectId: object.id, pageLayoutId: fromPageLayoutId, deletedAt: null },
         select: { id: true, data: true },
         take: BATCH_SIZE,
         skip,
@@ -588,6 +1016,7 @@ export async function recordRoutes(app: FastifyInstance) {
         where: {
           objectId: object.id,
           pageLayoutId: null, // FK already cleared records are excluded; only touch un-cleared ones
+          deletedAt: null,
           data: { path: ['_pageLayoutId'], equals: fromPageLayoutId },
         },
         select: { id: true, data: true },
@@ -637,7 +1066,7 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
@@ -645,9 +1074,10 @@ export async function recordRoutes(app: FastifyInstance) {
 
     // Strip auto-number fields — these are system-generated and must not be overwritten.
     const AUTO_NUMBER_FIELDS = new Set([
-      'accountNumber', 'contactNumber', 'leadNumber', 'dealNumber',
+      'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
-      'serviceNumber', 'installationNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
+      'taskNumber',
     ]);
     const sanitizedUpdate = { ...updateData };
     for (const key of Object.keys(sanitizedUpdate)) {
@@ -655,10 +1085,127 @@ export async function recordRoutes(app: FastifyInstance) {
       if (AUTO_NUMBER_FIELDS.has(stripped)) delete sanitizedUpdate[key];
     }
 
+    const beforeData = existingRecord.data as Record<string, any>;
     const mergedData = {
-      ...(existingRecord.data as Record<string, any>),
+      ...beforeData,
       ...sanitizedUpdate,
     };
+
+    // ---- TeamMember validations (PUT) ----
+    if (apiName === 'TeamMember') {
+      const getTeamMemberField = (data: Record<string, any>, fieldName: string): string | null => {
+        const val = data[fieldName] || data[`TeamMember__${fieldName}`];
+        return val && String(val).trim() ? String(val) : null;
+      };
+
+      // Contact or Account required
+      const contactVal = getTeamMemberField(mergedData, 'contact');
+      const accountVal = getTeamMemberField(mergedData, 'account');
+      if (!contactVal && !accountVal) {
+        return reply.code(400).send({ error: 'Either a contact or an account is required for TeamMember records.' });
+      }
+
+      // Exactly one parent required
+      const parentFields = ['property', 'opportunity', 'project', 'workOrder', 'installation'];
+      const setParents = parentFields.filter(f => getTeamMemberField(mergedData, f) !== null);
+      if (setParents.length !== 1) {
+        return reply.code(400).send({ error: 'Exactly one parent is required. Set one of: property, opportunity, project, workOrder, installation.' });
+      }
+
+      // Duplicate prevention (exclude the current record)
+      const parentField = setParents[0];
+      const parentValue = getTeamMemberField(mergedData, parentField)!;
+      if (contactVal) {
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            deletedAt: null,
+            data: { path: ['contact'], equals: contactVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            deletedAt: null,
+            data: { path: [`TeamMember__contact`], equals: contactVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
+            }
+          }
+        }
+      } else if (accountVal) {
+        const duplicate = await prisma.record.findFirst({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            deletedAt: null,
+            data: { path: ['account'], equals: accountVal },
+          },
+        });
+        if (duplicate) {
+          const dupData = duplicate.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
+        const duplicates = await prisma.record.findMany({
+          where: {
+            objectId: object.id,
+            id: { not: existingRecord.id },
+            deletedAt: null,
+            data: { path: [`TeamMember__account`], equals: accountVal },
+          },
+        });
+        for (const dup of duplicates) {
+          const dupData = dup.data as Record<string, any> | null;
+          if (dupData) {
+            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+            if (dupParent && String(dupParent) === parentValue) {
+              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
+            }
+          }
+        }
+      }
+    }
+
+    // ── Re-derive propertyNumber when address changes on a Property ──
+    if (apiName.toLowerCase() === 'property') {
+      const oldAddr = extractAddressFromRecord(beforeData);
+      const newAddr = extractAddressFromRecord(mergedData);
+      if (oldAddr.state !== newAddr.state || oldAddr.country !== newAddr.country) {
+        const oldNumber: string = beforeData.propertyNumber
+          || beforeData.Property__propertyNumber || '';
+        // Keep the same sequence number, just swap the prefix
+        const seqMatch = oldNumber.match(/[A-Za-z]+(\d+)$/);
+        const seq = seqMatch ? seqMatch[1] : null;
+        if (seq) {
+          const newPrefix = getPropertyPrefix(newAddr);
+          const newPropertyNumber = `${newPrefix}${seq}`;
+          mergedData.propertyNumber = newPropertyNumber;
+          mergedData.Property__propertyNumber = newPropertyNumber;
+        }
+      }
+    }
 
     const record = await prisma.record.update({
       where: { id: existingRecord.id },
@@ -684,19 +1231,74 @@ export async function recordRoutes(app: FastifyInstance) {
       },
     });
 
-    reply.send(record);
+    // ── Rename Dropbox folder if the derived name changed ──
+    // Await so the rename completes before the client re-renders the widget
+    try {
+      await tryRenameDropboxFolder(userId, apiName, existingRecord.id, beforeData, mergedData);
+    } catch { /* non-fatal — Dropbox errors must not block record updates */ }
 
-    // Fire workflow rules asynchronously (don't block the response)
+    // ── Ensure linked Dropbox folder if Property lookup was set/changed ──
+    try {
+      await tryEnsureLinkedFolder(userId, apiName, existingRecord.id, mergedData);
+    } catch { /* non-fatal */ }
+
+    // Audit: log record update (only changed fields)
+    const changedBefore: Record<string, any> = {};
+    const changedAfter: Record<string, any> = {};
+    for (const key of Object.keys(sanitizedUpdate)) {
+      const oldVal = beforeData[key];
+      const newVal = sanitizedUpdate[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        changedBefore[key] = oldVal;
+        changedAfter[key] = newVal;
+      }
+    }
+    if (Object.keys(changedAfter).length > 0) {
+      const recName = mergedData.name || mergedData[`${apiName}__name`]
+        || mergedData.accountName || mergedData[`${apiName}__accountName`]
+        || mergedData.contactName || mergedData[`${apiName}__contactName`]
+        || mergedData.opportunityName || mergedData[`${apiName}__opportunityName`]
+        || mergedData.leadName || mergedData[`${apiName}__leadName`]
+        || mergedData.projectName || mergedData[`${apiName}__projectName`]
+        || mergedData.productName || mergedData[`${apiName}__productName`]
+        || mergedData.propertyNumber || mergedData[`${apiName}__propertyNumber`]
+        || mergedData.teamMemberNumber || mergedData[`${apiName}__teamMemberNumber`]
+        || existingRecord.id;
+      logAudit({
+        actorId: userId,
+        action: 'UPDATE',
+        objectType: apiName,
+        objectId: existingRecord.id,
+        objectName: typeof recName === 'string' ? recName : String(recName),
+        before: changedBefore,
+        after: changedAfter,
+        ipAddress: extractIp(req),
+      });
+    }
+
+    // ── Workflow automation ──
     runWorkflows({
-      objectApiName: apiName,
-      recordId: record.id,
-      newData: record.data as Record<string, any>,
-      oldData: existingRecord.data as Record<string, any> | null,
+      event: 'update',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: mergedData,
+      beforeData,
       userId,
-      objectId: object.id,
-      isCreate: false,
-      logger: req.log,
-    }).catch(err => req.log.error({ err }, 'Workflow execution error (update)'));
+    }).catch(() => { /* non-fatal */ });
+
+    // ── Trigger automation ──
+    runTriggers({
+      event: 'update',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: mergedData,
+      beforeData,
+      userId,
+      orgId: userId,
+    }).catch(() => { /* non-fatal */ });
+
+    reply.send(record);
   });
 
   app.delete('/objects/:apiName/records/:recordId', async (req, reply) => {
@@ -715,17 +1317,212 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id } });
+    const existingRecord = await prisma.record.findFirst({ where: { id: idParam, objectId: object.id, deletedAt: null } });
 
     if (!existingRecord) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
-    await prisma.record.delete({
+    // Audit: log record deletion
+    const delData = existingRecord.data as Record<string, any>;
+    const delName = delData?.name || delData?.[`${apiName}__name`]
+      || delData?.accountName || delData?.[`${apiName}__accountName`]
+      || delData?.contactName || delData?.[`${apiName}__contactName`]
+      || delData?.opportunityName || delData?.[`${apiName}__opportunityName`]
+      || delData?.leadName || delData?.[`${apiName}__leadName`]
+      || delData?.projectName || delData?.[`${apiName}__projectName`]
+      || delData?.productName || delData?.[`${apiName}__productName`]
+      || delData?.propertyNumber || delData?.[`${apiName}__propertyNumber`]
+      || delData?.teamMemberNumber || delData?.[`${apiName}__teamMemberNumber`]
+      || existingRecord.id;
+    logAudit({
+      actorId: userId,
+      action: 'DELETE',
+      objectType: apiName,
+      objectId: existingRecord.id,
+      objectName: typeof delName === 'string' ? delName : String(delName),
+      before: delData,
+      ipAddress: extractIp(req),
+    });
+
+    await prisma.record.update({
       where: { id: existingRecord.id },
+      data: { deletedAt: new Date(), deletedById: userId },
     });
 
     reply.code(204).send();
+  });
+
+  // ── Bulk import records (CSV import) ──────────────────────────────────
+  // POST /objects/:apiName/records/import
+  // Body: { records: Array<Record<string, any>> }
+  // Returns: { created: number, errors: Array<{ row: number, error: string }> }
+  app.post('/objects/:apiName/records/import', async (req, reply) => {
+    const { apiName } = req.params as { apiName: string };
+    const { records: rows } = req.body as { records?: Record<string, any>[] };
+
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      return reply.code(400).send({ error: 'Request body must contain a non-empty "records" array.' });
+    }
+
+    // Hard limit to prevent abuse
+    if (rows.length > 5000) {
+      return reply.code(400).send({ error: 'Maximum 5,000 records per import.' });
+    }
+
+    const userId = req.user!.sub;
+    const userRole = req.user!.role;
+
+    // Check create permission on the object
+    const allowed = await checkObjectPermission(userId, userRole, apiName, 'create');
+    if (!allowed) return reply.code(403).send({ error: 'You do not have permission to create records on this object.' });
+
+    // Check importData app permission (non-admin users)
+    if (userRole !== 'ADMIN') {
+      const user = await prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+      const perms = (user?.profile?.permissions as any) || {};
+      if (!perms?.app?.importData) {
+        return reply.code(403).send({ error: 'You do not have the Import Data permission.' });
+      }
+    }
+
+    // Load the object + fields
+    const object = await prisma.customObject.findFirst({
+      where: { apiName: { equals: apiName, mode: 'insensitive' } },
+      include: { fields: { where: { isActive: true } } },
+    });
+    if (!object) return reply.code(404).send({ error: 'Object not found' });
+
+    // Prepare auto-number info once
+    const autoNumberFormats: Record<string, string> = {
+      accountNumber: 'A', propertyNumber: 'P', contactNumber: 'C',
+      leadNumber: 'LEAD', opportunityNumber: 'OPP', productCode: 'PROD',
+      projectNumber: 'PRJ', quoteNumber: 'QTE', serviceNumber: 'SRV',
+      installationNumber: 'INST', workOrderNumber: 'WO', teamMemberNumber: 'TM',
+      taskNumber: 'TSK',
+    };
+
+    // Pre-fetch existing records for auto-number sequence
+    let maxAutoNumbers: Record<string, number> = {};
+    const autoNumberFields = object.fields.filter(f => f.apiName in autoNumberFormats);
+    if (autoNumberFields.length > 0) {
+      const existing = await prisma.record.findMany({
+        where: { objectId: object.id, deletedAt: null },
+        select: { data: true },
+      });
+      for (const field of autoNumberFields) {
+        const prefix = autoNumberFormats[field.apiName]!;
+        const prefixRegex = field.apiName === 'propertyNumber'
+          ? /^[A-Za-z]+-?(\d+)$/
+          : new RegExp(`^${prefix}-?(\\d+)$`);
+        let maxNum = 0;
+        for (const rec of existing) {
+          const recData = rec.data as Record<string, any> | null;
+          if (!recData) continue;
+          for (const [k, v] of Object.entries(recData)) {
+            const stripped = k.replace(/^[A-Za-z]+__/, '');
+            if (stripped === field.apiName && typeof v === 'string') {
+              const m = v.match(prefixRegex);
+              if (m) { const num = parseInt(m[1], 10); if (num > maxNum) maxNum = num; }
+            }
+          }
+        }
+        maxAutoNumbers[field.apiName] = maxNum;
+      }
+    }
+
+    const autoGeneratedFieldNames = new Set(Object.keys(autoNumberFormats));
+    const requiredFields = object.fields.filter(
+      f => f.required && !autoGeneratedFieldNames.has(f.apiName)
+    );
+
+    let created = 0;
+    const errors: Array<{ row: number; error: string }> = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      try {
+        const rawData = rows[i]!;
+
+        // Normalize keys
+        const normalizedData: Record<string, any> = {};
+        for (const [key, value] of Object.entries(rawData)) {
+          if (value === '' || value === null || value === undefined) continue; // skip empty
+          normalizedData[key] = value;
+          const stripped = key.replace(/^[A-Za-z]+__/, '');
+          if (stripped !== key) normalizedData[stripped] = value;
+        }
+
+        // Auto-generate number fields
+        for (const field of autoNumberFields) {
+          const currentVal = normalizedData[field.apiName];
+          const isEmpty = !currentVal || currentVal === 'N/A';
+          if (isEmpty) {
+            const prefix = field.apiName === 'propertyNumber'
+              ? getPropertyPrefix(extractAddressFromRecord(normalizedData))
+              : autoNumberFormats[field.apiName]!;
+            const padWidth = (field.apiName === 'propertyNumber' || field.apiName === 'leadNumber' || field.apiName === 'opportunityNumber' || field.apiName === 'workOrderNumber' || field.apiName === 'teamMemberNumber' || field.apiName === 'taskNumber') ? 4 : 3;
+            maxAutoNumbers[field.apiName] = (maxAutoNumbers[field.apiName] || 0) + 1;
+            const generatedNum = `${prefix}${String(maxAutoNumbers[field.apiName]).padStart(padWidth, '0')}`;
+            normalizedData[field.apiName] = generatedNum;
+            normalizedData[`${apiName}__${field.apiName}`] = generatedNum;
+          }
+        }
+
+        // Validate required fields
+        const camelPrefix = apiName.charAt(0).toLowerCase() + apiName.slice(1);
+        const missing = requiredFields.filter(f => {
+          const nd = normalizedData;
+          const direct = nd[f.apiName];
+          const unprefixed = nd[f.apiName.replace(/^[A-Za-z]+__/, '')];
+          const objectPrefixed = nd[`${apiName}__${f.apiName}`];
+          const camelKey = `${camelPrefix}${f.apiName.charAt(0).toUpperCase()}${f.apiName.slice(1)}`;
+          const camelCased = nd[camelKey];
+          const hasValue = (v: any) => v !== undefined && v !== null;
+          return !hasValue(direct) && !hasValue(unprefixed) && !hasValue(objectPrefixed) && !hasValue(camelCased);
+        });
+
+        if (missing.length > 0) {
+          errors.push({ row: i + 1, error: `Missing required fields: ${missing.map(f => f.apiName).join(', ')}` });
+          continue;
+        }
+
+        // Generate record ID
+        let recordIdValue: string;
+        try {
+          recordIdValue = generateRecordId(apiName);
+        } catch {
+          registerRecordIdPrefix(apiName);
+          recordIdValue = generateRecordId(apiName);
+        }
+
+        await prisma.record.create({
+          data: {
+            id: recordIdValue,
+            objectId: object.id,
+            data: normalizedData,
+            createdById: userId,
+            modifiedById: userId,
+          },
+        });
+
+        created++;
+      } catch (err: any) {
+        errors.push({ row: i + 1, error: err.message || 'Unknown error' });
+      }
+    }
+
+    // Audit: log the import
+    logAudit({
+      actorId: userId,
+      action: 'IMPORT',
+      objectType: apiName,
+      objectId: object.id,
+      objectName: `Imported ${created} ${apiName} records`,
+      after: { totalRows: rows.length, created, errorCount: errors.length },
+      ipAddress: extractIp(req),
+    });
+
+    reply.send({ created, errors });
   });
 
 }

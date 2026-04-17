@@ -1,3 +1,7 @@
+/**
+ * Internal widget registry — maps widget type keys to lazy-loaded components,
+ * config panels, and manifest metadata for the page builder and renderer.
+ */
 import dynamic from 'next/dynamic'
 import type { WidgetRegistration } from '@/lib/widgets/types'
 import { config as spacerManifest } from './spacer/widget.config'
@@ -5,8 +9,16 @@ import { config as activityFeedManifest } from './activity-feed/widget.config'
 import { config as headerHighlightsManifest } from './header-highlights/widget.config'
 import { config as fileFolderManifest } from './file-folder/widget.config'
 import { config as relatedListManifest } from './related-list/widget.config'
+import { config as teamMembersRollupManifest } from './team-members-rollup/widget.config'
+import { config as teamMemberAssociationsManifest } from './team-member-associations/widget.config'
+import { config as pathManifest } from './path/widget.config'
+import { config as installationCostGridManifest } from './installation-cost-grid/widget.config'
+import { config as summaryManifest } from './summary/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
+import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
+import TeamMemberAssociationsConfigPanel from './team-member-associations/ConfigPanel'
+import PathConfigPanel from './path/ConfigPanel'
 
 export const internalWidgetRegistrations: WidgetRegistration[] = [
   {
@@ -37,6 +49,35 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'RelatedList',
     Component: dynamic(() => import('./related-list/index')),
     ConfigPanel: RelatedListConfigPanel,
+  },
+  {
+    manifest: teamMembersRollupManifest,
+    widgetConfigType: 'TeamMembersRollup',
+    Component: dynamic(() => import('./team-members-rollup/index')),
+    ConfigPanel: TeamMembersRollupConfigPanel,
+    supportsCreate: true,
+  },
+  {
+    manifest: teamMemberAssociationsManifest,
+    widgetConfigType: 'TeamMemberAssociations',
+    Component: dynamic(() => import('./team-member-associations/index')),
+    ConfigPanel: TeamMemberAssociationsConfigPanel,
+  },
+  {
+    manifest: pathManifest,
+    widgetConfigType: 'Path',
+    Component: dynamic(() => import('./path/index')),
+    ConfigPanel: PathConfigPanel,
+  },
+  {
+    manifest: installationCostGridManifest,
+    widgetConfigType: 'InstallationCostGrid',
+    Component: dynamic(() => import('./installation-cost-grid/index')),
+  },
+  {
+    manifest: summaryManifest,
+    widgetConfigType: 'Summary',
+    Component: dynamic(() => import('./summary/index')),
   },
 ]
 

@@ -1,16 +1,17 @@
 /**
- * Server-side workflow engine.
- *
- * Evaluates workflow rules defined in the schema JSON after record
- * create / update and executes matching actions (field updates, email
- * alerts, task creation).
+ * Workflow Engine
+ * Evaluates workflow rules from the OrgSchema on record create/update and
+ * executes configured actions (field updates, email alerts, task creation).
  */
 
 import { prisma } from '@crm/db/client';
-import { generateId } from '@crm/db/record-id';
-import { sendWorkflowEmail } from './notifications.js';
+import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id';
+import { getAppOnlyToken } from './routes/outlook.js';
+import { logAudit, extractIp } from './audit.js';
 
-// ── Types (mirrors apps/web/lib/schema.ts — keep in sync) ──────────
+// ── Types (mirror schema.ts) ──────────────────────────────────────
+
+type WorkflowTriggerType = 'onCreate' | 'onCreateOrEdit' | 'onCreateOrEditToMeetCriteria';
 
 interface ConditionExpr {
   left: string;
@@ -18,16 +19,10 @@ interface ConditionExpr {
   right: any;
 }
 
-type WorkflowTriggerType =
-  | 'onCreate'
-  | 'onCreateOrEdit'
-  | 'onCreateOrEditToMeetCriteria';
-
 interface FieldUpdateAction {
   type: 'FieldUpdate';
   fieldApiName: string;
   value: any;
-  useFormula?: boolean;
 }
 
 interface EmailAlertAction {
@@ -41,10 +36,9 @@ interface EmailAlertAction {
 interface TaskAction {
   type: 'Task';
   subject: string;
-  assignToField?: string;
-  assignToUserId?: string;
-  dueInDays?: number;
   priority?: 'High' | 'Normal' | 'Low';
+  dueInDays?: number;
+  assignToUserId?: string;
   description?: string;
 }
 
@@ -53,257 +47,322 @@ type WorkflowAction = FieldUpdateAction | EmailAlertAction | TaskAction;
 interface WorkflowRule {
   id: string;
   name: string;
+  description?: string;
   active: boolean;
   triggerType: WorkflowTriggerType;
   conditions: ConditionExpr[];
   actions: WorkflowAction[];
-  order?: number;
 }
 
-interface ObjectDef {
-  apiName: string;
-  workflowRules?: WorkflowRule[];
-  fields: { apiName: string; type: string }[];
-}
-
-// ── Condition evaluator ────────────────────────────────────────────
-
-function resolveValue(data: Record<string, any>, field: string): any {
-  if (field in data) return data[field];
-  // Strip "Object__" prefix
-  const short = field.replace(/^[^_]+__/, '');
-  if (short in data) return data[short];
-  return undefined;
-}
+// ── Condition evaluator ───────────────────────────────────────────
 
 function evaluateCondition(cond: ConditionExpr, data: Record<string, any>): boolean {
-  const left = resolveValue(data, cond.left);
-  const right = cond.right;
+  const rawVal = data[cond.left];
+  const target = cond.right;
+
+  // Normalise multi-picklist values (stored as "A;B;C") into arrays
+  const isMulti =
+    Array.isArray(rawVal) ||
+    (typeof rawVal === 'string' && rawVal.includes(';'));
+  const parts: string[] | null = isMulti
+    ? (Array.isArray(rawVal) ? rawVal : rawVal.split(/\s*;\s*/).filter(Boolean))
+    : null;
 
   switch (cond.op) {
-    case '==': return left == right;
-    case '!=': return left != right;
-    case '>':  return Number(left) > Number(right);
-    case '<':  return Number(left) < Number(right);
-    case '>=': return Number(left) >= Number(right);
-    case '<=': return Number(left) <= Number(right);
+    case '==':
+      if (parts) {
+        return Array.isArray(target)
+          ? parts.some(v => target.includes(v))
+          : parts.includes(String(target ?? ''));
+      }
+      return String(rawVal ?? '') === String(target ?? '');
+    case '!=':
+      if (parts) {
+        return Array.isArray(target)
+          ? !parts.some(v => target.includes(v))
+          : !parts.includes(String(target ?? ''));
+      }
+      return String(rawVal ?? '') !== String(target ?? '');
+    case '>':   return Number(rawVal) > Number(target);
+    case '<':   return Number(rawVal) < Number(target);
+    case '>=':  return Number(rawVal) >= Number(target);
+    case '<=':  return Number(rawVal) <= Number(target);
     case 'CONTAINS':
-      return typeof left === 'string' && typeof right === 'string' && left.includes(right);
+      if (parts) return parts.some(v => typeof target === 'string' && v.toLowerCase().includes(target.toLowerCase()));
+      return typeof rawVal === 'string' && typeof target === 'string'
+        && rawVal.toLowerCase().includes(target.toLowerCase());
     case 'STARTS_WITH':
-      return typeof left === 'string' && typeof right === 'string' && left.startsWith(right);
+      if (parts) return parts.some(v => typeof target === 'string' && v.toLowerCase().startsWith(target.toLowerCase()));
+      return typeof rawVal === 'string' && typeof target === 'string'
+        && rawVal.toLowerCase().startsWith(target.toLowerCase());
     case 'IN':
-      return Array.isArray(right) && right.includes(left);
+      if (parts) return Array.isArray(target) && parts.some(v => target.includes(v));
+      return Array.isArray(target) && target.includes(rawVal);
     case 'INCLUDES':
-      return Array.isArray(left) && left.includes(right);
+      if (parts) {
+        return Array.isArray(target) ? parts.some(v => target.includes(v)) : parts.includes(target);
+      }
+      return Array.isArray(rawVal) && rawVal.includes(target);
     default:
       return false;
   }
 }
 
 function allConditionsMet(conditions: ConditionExpr[], data: Record<string, any>): boolean {
-  if (!conditions || conditions.length === 0) return true;
+  if (conditions.length === 0) return true;
   return conditions.every(c => evaluateCondition(c, data));
 }
 
-// ── Merge-token replacement ────────────────────────────────────────
+// ── Merge-token replacer ──────────────────────────────────────────
 
 function replaceMergeTokens(template: string, data: Record<string, any>): string {
-  return template.replace(/\{\{(\w+)\}\}/g, (_match, field) => {
-    const val = resolveValue(data, field);
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
+    const val = data[key];
     return val != null ? String(val) : '';
   });
 }
 
-// ── Schema loader ──────────────────────────────────────────────────
+// ── Email sender (reuses MS Graph) ────────────────────────────────
 
-async function loadObjectSchema(objectApiName: string): Promise<ObjectDef | null> {
-  const setting = await prisma.setting.findUnique({
-    where: { key: 'tces-object-manager-schema' },
-  });
-  if (!setting?.value) return null;
-
-  const schema = typeof setting.value === 'string'
-    ? JSON.parse(setting.value)
-    : setting.value;
-
-  const objects: ObjectDef[] = schema.objects || [];
-  return objects.find(o => o.apiName.toLowerCase() === objectApiName.toLowerCase()) || null;
+async function sendWorkflowEmail(to: string, subject: string, body: string): Promise<void> {
+  const result = await getAppOnlyToken();
+  if (!result) {
+    console.error('[workflow] Cannot send email — no MS Graph token');
+    return;
+  }
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(result.senderEmail)}/sendMail`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${result.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: {
+          subject,
+          body: { contentType: 'HTML', content: body },
+          toRecipients: [{ emailAddress: { address: to } }],
+        },
+      }),
+    }
+  );
+  if (!res.ok) {
+    console.error(`[workflow] Email send failed: ${res.status}`);
+  }
 }
 
-// ── Action executors ───────────────────────────────────────────────
+// ── Action executors ──────────────────────────────────────────────
+
+interface ActionContext {
+  objectApi: string;
+  recordId: string;
+  recordData: Record<string, any>;
+  userId: string;
+}
 
 async function executeFieldUpdate(
   action: FieldUpdateAction,
-  recordId: string,
-  currentData: Record<string, any>,
-  logger?: { info: (...a: any[]) => void }
+  ctx: ActionContext
 ): Promise<Record<string, any> | null> {
-  const newVal = action.useFormula ? evaluateSimpleFormula(action.value, currentData) : action.value;
-  const updated = { ...currentData, [action.fieldApiName]: newVal };
-  await prisma.record.update({
-    where: { id: recordId },
-    data: { data: updated },
-  });
-  logger?.info({ recordId, field: action.fieldApiName, value: newVal }, 'Workflow: field updated');
-  return updated;
-}
+  // Resolve value — supports {{fieldApiName}} merge tokens
+  const resolvedValue = typeof action.value === 'string'
+    ? replaceMergeTokens(action.value, ctx.recordData)
+    : action.value;
 
-/** Minimal formula evaluator for field-update expressions (server side) */
-function evaluateSimpleFormula(expr: string, data: Record<string, any>): any {
-  // Support basic merge: "{{field}}" → value
-  const merged = replaceMergeTokens(expr, data);
-  // If the whole expression was a single merge token, return the raw value
-  if (/^\{\{\w+\}\}$/.test(expr.trim())) {
-    return resolveValue(data, expr.trim().slice(2, -2));
-  }
-  return merged;
+  // Return the field update to be applied in batch
+  return { [action.fieldApiName]: resolvedValue };
 }
 
 async function executeEmailAlert(
   action: EmailAlertAction,
-  recordData: Record<string, any>,
-  logger?: { info: (...a: any[]) => void }
+  ctx: ActionContext
 ): Promise<void> {
-  const to = action.toField ? resolveValue(recordData, action.toField) : action.toAddress;
-  if (!to || typeof to !== 'string') {
-    logger?.info({ action }, 'Workflow email: no recipient resolved, skipping');
+  let toAddress = action.toAddress;
+
+  // If toField is set, read the email from the record data
+  if (action.toField) {
+    const fieldVal = ctx.recordData[action.toField];
+    if (typeof fieldVal === 'string' && fieldVal.includes('@')) {
+      toAddress = fieldVal;
+    }
+  }
+
+  if (!toAddress) {
+    console.warn(`[workflow] EmailAlert skipped — no recipient`);
     return;
   }
 
-  const subject = replaceMergeTokens(action.subject, recordData);
-  const body = replaceMergeTokens(action.body, recordData);
-
-  try {
-    await sendWorkflowEmail(to, subject, body);
-    logger?.info({ to, subject }, 'Workflow: email sent');
-  } catch (err) {
-    logger?.info({ to, err }, 'Workflow: email send failed');
-  }
+  const subject = replaceMergeTokens(action.subject, ctx.recordData);
+  const body = replaceMergeTokens(action.body, ctx.recordData);
+  await sendWorkflowEmail(toAddress, subject, body);
 }
 
-async function executeTask(
+async function executeTaskAction(
   action: TaskAction,
-  recordData: Record<string, any>,
-  triggeredByUserId: string,
-  objectId: string,
-  logger?: { info: (...a: any[]) => void }
+  ctx: ActionContext
 ): Promise<void> {
-  const subject = replaceMergeTokens(action.subject, recordData);
-  const assignTo = action.assignToField
-    ? resolveValue(recordData, action.assignToField)
-    : (action.assignToUserId || triggeredByUserId);
-
-  const dueDate = action.dueInDays
-    ? new Date(Date.now() + action.dueInDays * 86400000).toISOString()
-    : undefined;
-
-  // Store as a record on a "Task" object if it exists, otherwise log
+  // Find or verify the "Task" or "Activity" custom object
   const taskObject = await prisma.customObject.findFirst({
-    where: { apiName: { equals: 'Task', mode: 'insensitive' } },
+    where: {
+      apiName: { in: ['Task', 'Activity'], mode: 'insensitive' },
+    },
   });
 
-  if (taskObject) {
-    const taskId = generateId();
-    await prisma.record.create({
-      data: {
-        id: taskId,
-        objectId: taskObject.id,
-        data: {
-          subject,
-          status: 'Not Started',
-          priority: action.priority || 'Normal',
-          description: action.description ? replaceMergeTokens(action.description, recordData) : '',
-          dueDate,
-          assignedTo: assignTo,
-          _workflowGenerated: true,
-        } as any,
-        createdById: triggeredByUserId,
-        modifiedById: triggeredByUserId,
-      },
-    });
-    logger?.info({ subject, assignTo }, 'Workflow: task created');
-  } else {
-    logger?.info({ subject, assignTo }, 'Workflow: Task object not found, skipping task creation');
+  if (!taskObject) {
+    console.warn('[workflow] Task action skipped — no Task/Activity object found');
+    return;
   }
+
+  let recordId: string;
+  try {
+    recordId = generateRecordId(taskObject.apiName);
+  } catch {
+    registerRecordIdPrefix(taskObject.apiName);
+    recordId = generateRecordId(taskObject.apiName);
+  }
+
+  const subject = replaceMergeTokens(action.subject, ctx.recordData);
+  const description = action.description
+    ? replaceMergeTokens(action.description, ctx.recordData)
+    : '';
+
+  const dueDate = action.dueInDays
+    ? new Date(Date.now() + action.dueInDays * 86400000).toISOString().split('T')[0]
+    : undefined;
+
+  const assignee = action.assignToUserId || ctx.userId;
+
+  const taskData: Record<string, any> = {
+    subject,
+    status: 'Open',
+    priority: action.priority || 'Normal',
+    relatedObjectApi: ctx.objectApi,
+    relatedRecordId: ctx.recordId,
+    ...(description && { description }),
+    ...(dueDate && { dueDate }),
+    assignedToUserId: assignee,
+  };
+
+  await prisma.record.create({
+    data: {
+      id: recordId,
+      objectId: taskObject.id,
+      data: taskData,
+      createdById: ctx.userId,
+      modifiedById: ctx.userId,
+    },
+  });
 }
 
-// ── Main entry point ───────────────────────────────────────────────
+// ── Main entry point ──────────────────────────────────────────────
 
-export interface WorkflowContext {
-  objectApiName: string;
+interface WorkflowInput {
+  event: 'create' | 'update';
+  objectApi: string;
   recordId: string;
-  newData: Record<string, any>;
-  oldData?: Record<string, any> | null; // null on create
+  recordData: Record<string, any>;
+  beforeData?: Record<string, any>;
   userId: string;
-  objectId: string;
-  isCreate: boolean;
-  logger?: { info: (...a: any[]) => void };
 }
 
 /**
  * Run all active workflow rules for a record event.
- *
- * Returns the (possibly mutated) record data after field-update actions.
+ * Returns field updates (if any) that were applied to the record.
  */
-export async function runWorkflows(ctx: WorkflowContext): Promise<Record<string, any>> {
-  const { objectApiName, recordId, newData, oldData, userId, objectId, isCreate, logger } = ctx;
-
-  let objectDef: ObjectDef | null;
+export async function runWorkflows(input: WorkflowInput): Promise<Record<string, any> | null> {
   try {
-    objectDef = await loadObjectSchema(objectApiName);
-  } catch (err) {
-    logger?.info({ err }, 'Workflow: failed to load schema');
-    return newData;
-  }
+    // Load schema from settings
+    const schemaSetting = await prisma.setting.findUnique({
+      where: { key: 'tces-object-manager-schema' },
+    });
+    if (!schemaSetting) return null;
 
-  if (!objectDef?.workflowRules || objectDef.workflowRules.length === 0) {
-    return newData;
-  }
+    const orgSchema = schemaSetting.value as any;
+    const objectDef = orgSchema?.objects?.find(
+      (o: any) => o.apiName.toLowerCase() === input.objectApi.toLowerCase()
+    );
+    if (!objectDef) return null;
 
-  // Sort by order (lower first), then by name
-  const rules = [...objectDef.workflowRules]
-    .filter(r => r.active)
-    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || a.name.localeCompare(b.name));
+    const rules: WorkflowRule[] = objectDef.workflowRules || [];
+    const activeRules = rules.filter(r => r.active);
+    if (activeRules.length === 0) return null;
 
-  let currentData = { ...newData };
+    const ctx: ActionContext = {
+      objectApi: input.objectApi,
+      recordId: input.recordId,
+      recordData: input.recordData,
+      userId: input.userId,
+    };
 
-  for (const rule of rules) {
-    // Check trigger type
-    if (rule.triggerType === 'onCreate' && !isCreate) continue;
+    let allFieldUpdates: Record<string, any> = {};
 
-    // For "onCreateOrEditToMeetCriteria", conditions must be newly met
-    if (rule.triggerType === 'onCreateOrEditToMeetCriteria' && !isCreate) {
-      const metNow = allConditionsMet(rule.conditions, currentData);
-      const metBefore = oldData ? allConditionsMet(rule.conditions, oldData) : false;
-      if (!metNow || metBefore) continue; // skip if not newly met
-    } else {
-      // For other types, conditions must be met now
-      if (!allConditionsMet(rule.conditions, currentData)) continue;
-    }
-
-    logger?.info({ ruleId: rule.id, ruleName: rule.name }, 'Workflow: rule matched');
-
-    // Execute actions
-    for (const action of rule.actions) {
-      try {
-        switch (action.type) {
-          case 'FieldUpdate': {
-            const updated = await executeFieldUpdate(action, recordId, currentData, logger);
-            if (updated) currentData = updated;
-            break;
-          }
-          case 'EmailAlert':
-            await executeEmailAlert(action, currentData, logger);
-            break;
-          case 'Task':
-            await executeTask(action, currentData, userId, objectId, logger);
-            break;
+    for (const rule of activeRules) {
+      // Check trigger type matches the event
+      if (input.event === 'create') {
+        // All trigger types fire on create
+      } else if (input.event === 'update') {
+        if (rule.triggerType === 'onCreate') continue;
+        // For 'onCreateOrEditToMeetCriteria', only fire if conditions
+        // were NOT met before but ARE met now
+        if (rule.triggerType === 'onCreateOrEditToMeetCriteria' && input.beforeData) {
+          const metBefore = allConditionsMet(rule.conditions, input.beforeData);
+          const metNow = allConditionsMet(rule.conditions, input.recordData);
+          if (metBefore || !metNow) continue;
+          // Conditions newly met — proceed (skip condition check below)
+          await executeRuleActions(rule, ctx, allFieldUpdates);
+          continue;
         }
-      } catch (err) {
-        logger?.info({ err, ruleId: rule.id, actionType: action.type }, 'Workflow: action failed');
       }
+
+      // Check conditions (AND logic)
+      if (!allConditionsMet(rule.conditions, input.recordData)) continue;
+
+      await executeRuleActions(rule, ctx, allFieldUpdates);
+    }
+
+    // Apply field updates to the record if any
+    if (Object.keys(allFieldUpdates).length > 0) {
+      const updatedData = { ...input.recordData, ...allFieldUpdates };
+      await prisma.record.update({
+        where: { id: input.recordId },
+        data: {
+          data: updatedData,
+          modifiedById: input.userId,
+        },
+      });
+      return allFieldUpdates;
+    }
+
+    return null;
+  } catch (err) {
+    console.error('[workflow] Error executing workflows:', err);
+    return null;
+  }
+}
+
+async function executeRuleActions(
+  rule: WorkflowRule,
+  ctx: ActionContext,
+  allFieldUpdates: Record<string, any>
+): Promise<void> {
+  for (const action of rule.actions) {
+    try {
+      switch (action.type) {
+        case 'FieldUpdate': {
+          const updates = await executeFieldUpdate(action, ctx);
+          if (updates) Object.assign(allFieldUpdates, updates);
+          break;
+        }
+        case 'EmailAlert':
+          await executeEmailAlert(action, ctx);
+          break;
+        case 'Task':
+          await executeTaskAction(action, ctx);
+          break;
+      }
+    } catch (err) {
+      console.error(`[workflow] Action ${action.type} failed for rule "${rule.name}":`, err);
     }
   }
-
-  return currentData;
 }

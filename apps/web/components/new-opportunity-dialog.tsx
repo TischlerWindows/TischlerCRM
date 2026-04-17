@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NewOpportunityFormData, OpportunityStage } from '@/lib/types';
+import { DateInput } from '@/components/date-input';
 
 interface NewOpportunityDialogProps {
   isOpen: boolean;
@@ -222,11 +223,10 @@ export function NewOpportunityDialog({ isOpen, onClose, onSubmit }: NewOpportuni
               <label htmlFor="opp-closeDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                 Close Date <span className="text-red-500">*</span>
               </label>
-              <input
+              <DateInput
                 id="opp-closeDate"
-                type="date"
                 value={formData.closeDate}
-                onChange={(e) => handleChange('closeDate', e.target.value)}
+                onChange={(iso) => handleChange('closeDate', iso)}
                 className={cn(
                   'w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/40 dark:bg-gray-800 dark:text-white dark:[color-scheme:dark]',
                   errors.closeDate

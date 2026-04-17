@@ -7,6 +7,30 @@ import { FieldDef } from '@/lib/schema';
 import { cn } from '@/lib/utils';
 import { evaluateVisibility, VisibilityContext } from '@/lib/field-visibility';
 
+// ── Default alternating row colors ──────────────────────────────────
+const ALT_COLOR_A = '#ffffff';   // white
+const ALT_COLOR_B = '#dbeafe';   // light blue (tailwind blue-100)
+
+function getOptionColor(
+  option: string,
+  index: number,
+  customColors?: Record<string, string>,
+): string {
+  if (customColors?.[option]) return customColors[option];
+  return index % 2 === 0 ? ALT_COLOR_A : ALT_COLOR_B;
+}
+
+/** Return black or white depending on perceived luminance of a hex color. */
+function contrastText(hex: string): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  // Perceived luminance (ITU-R BT.709)
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? '#000000' : '#ffffff';
+}
+
 // ── PicklistTextDropdown ─────────────────────────────────────────────
 // Custom dropdown for PicklistText / PicklistLookup that allows the
 // selected value to wrap (unlike a native <select>).
@@ -16,11 +40,13 @@ export function PicklistTextDropdown({
   value,
   onChange,
   disabled,
+  colors,
 }: {
   options: string[];
   value: string;
   onChange: (val: string) => void;
   disabled?: boolean;
+  colors?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,7 +72,7 @@ export function PicklistTextDropdown({
           disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
         )}
       >
-        <span className="break-words whitespace-normal flex-1">
+        <span className="break-words whitespace-normal flex-1 text-sm">
           {value || <span className="text-gray-500">-- Select --</span>}
         </span>
         <ChevronDown className="h-4 w-4 shrink-0 text-gray-400 mt-0.5" />
@@ -65,21 +91,27 @@ export function PicklistTextDropdown({
           >
             -- Select --
           </div>
-          {options.map((option) => (
-            <div
-              key={option}
-              className={cn(
-                'px-3 py-2 cursor-pointer hover:bg-gray-100 break-words whitespace-normal',
-                value === option && 'bg-blue-50 font-medium',
-              )}
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-            >
-              {option}
-            </div>
-          ))}
+          {options.map((option, idx) => {
+            const c = getOptionColor(option, idx, colors);
+            const isWhite = c === ALT_COLOR_A;
+            return (
+              <div
+                key={option}
+                className={cn(
+                  'px-3 py-2 cursor-pointer break-words whitespace-normal text-sm',
+                  value === option && 'font-medium',
+                  isWhite && 'hover:bg-gray-100',
+                )}
+                style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
+                onClick={() => {
+                  onChange(option);
+                  setOpen(false);
+                }}
+              >
+                {option}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -143,25 +175,70 @@ export function PicklistInput({
     formData,
     visibilityCtx,
   );
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
+
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
-    <select
-      id={fieldDef.apiName}
-      value={value || ''}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      className={cn(
-        'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent',
-        error && 'border-red-500',
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(!open)}
+        className={cn(
+          'w-full min-h-[2.5rem] px-3 py-2 text-left border rounded-lg bg-white',
+          'focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent focus:outline-none',
+          'flex items-center justify-between gap-2',
+          error ? 'border-red-500' : 'border-gray-300',
+          disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
+        )}
+      >
+        <span className="flex-1 min-w-0 text-sm truncate">
+          {value || <span className="text-gray-500 truncate">-- Select --</span>}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
+      </button>
+      {open && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          <div
+            className={cn(
+              'px-3 py-2 cursor-pointer hover:bg-gray-100 text-gray-500',
+              !value && 'bg-blue-50',
+            )}
+            onClick={() => { onChange(''); setOpen(false); }}
+          >
+            -- Select --
+          </div>
+          {options.map((option, idx) => {
+            const c = getOptionColor(option, idx, colors);
+            const isWhite = c === ALT_COLOR_A;
+            return (
+              <div
+                key={option}
+                className={cn(
+                  'px-3 py-2 cursor-pointer text-sm',
+                  value === option && 'font-medium',
+                  isWhite && 'hover:bg-gray-100',
+                )}
+                style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
+                onClick={() => { onChange(option); setOpen(false); }}
+              >
+                {option}
+              </div>
+            );
+          })}
+        </div>
       )}
-    >
-      <option value="">-- Select --</option>
-      {options.map((option) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
+    </div>
   );
 }
 
@@ -188,35 +265,47 @@ export function MultiPicklistInput({
     formData,
     visibilityCtx,
   );
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
   const selectedValues: string[] = value
     ? value.split(';').map((v: string) => v.trim()).filter(Boolean)
     : [];
 
   return (
     <div className="border border-gray-300 rounded-lg p-2 max-h-48 overflow-y-auto">
-      {options.map((option) => (
-        <div key={option} className="flex items-center space-x-2 py-1">
-          <input
-            type="checkbox"
-            id={`${fieldDef.apiName}-${option}`}
-            checked={selectedValues.includes(option)}
-            onChange={(e) => {
-              let newValues = [...selectedValues];
-              if (e.target.checked) {
-                newValues.push(option);
-              } else {
-                newValues = newValues.filter((v) => v !== option);
-              }
-              onChange(newValues.join(';'));
-            }}
-            disabled={disabled}
-            className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-          />
-          <label htmlFor={`${fieldDef.apiName}-${option}`} className="text-sm">
-            {option}
-          </label>
-        </div>
-      ))}
+      {options.map((option, idx) => {
+        const c = getOptionColor(option, idx, colors);
+        const isWhite = c === ALT_COLOR_A;
+        return (
+          <div
+            key={option}
+            className="flex items-center space-x-2 py-1 px-2 rounded"
+            style={isWhite ? undefined : { backgroundColor: c, color: contrastText(c) }}
+          >
+            <input
+              type="checkbox"
+              id={`${fieldDef.apiName}-${option}`}
+              checked={selectedValues.includes(option)}
+              onChange={(e) => {
+                let newValues = [...selectedValues];
+                if (e.target.checked) {
+                  newValues.push(option);
+                } else {
+                  newValues = newValues.filter((v) => v !== option);
+                }
+                onChange(newValues.join(';'));
+              }}
+              disabled={disabled}
+              className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+            />
+            <label
+              htmlFor={`${fieldDef.apiName}-${option}`}
+              className="text-sm cursor-pointer"
+            >
+              {option}
+            </label>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -250,12 +339,15 @@ export function PicklistTextInput({
       : { picklist: '', text: '' };
   const ptPosition = (fieldDef as any).picklistPosition || 'left';
 
+  const colors = (fieldDef as any).picklistColors as Record<string, string> | undefined;
+
   const picklistSelect = (
     <PicklistTextDropdown
       options={options}
       value={ptValue.picklist || ''}
       onChange={(val) => onChange({ ...ptValue, picklist: val })}
       disabled={disabled}
+      colors={colors}
     />
   );
   const textInput = (

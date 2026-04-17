@@ -33,12 +33,19 @@ export interface StackedChartDataPoint {
   [key: string]: string | number; // Dynamic keys for each stack
 }
 
+export interface WhereFilter {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal' | 'contains' | 'not_contains' | 'starts_with' | 'is_empty' | 'is_not_empty';
+  value: string;
+}
+
 export interface AggregationConfig {
   xAxisField: string;
   yAxisField: string;
   objectType: string;
   aggregationType?: 'sum' | 'count' | 'avg' | 'max' | 'min';
   stackByField?: string; // For stacked charts
+  whereFilters?: WhereFilter[];
 }
 
 /**
@@ -63,15 +70,20 @@ export function getPluralObjectKey(objectType: string): string {
     contact: 'contacts',
     account: 'accounts',
     lead: 'leads',
-    deal: 'deals',
+    opportunity: 'opportunities',
     product: 'products',
     project: 'projects',
     quote: 'quotes',
     installation: 'installations',
     service: 'services',
+    workorder: 'workorders',
+    task: 'tasks',
   };
 
+  // Reverse map: if input is already plural, return as-is
+  const knownPlurals = new Set(Object.values(pluralMap));
   const key = objectType.toLowerCase();
+  if (knownPlurals.has(key)) return key;
   return pluralMap[key] || key + 's';
 }
 
@@ -109,7 +121,52 @@ function formatDisplayValue(value: any): string {
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No';
   }
+  // Handle nested objects (e.g. address objects)
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    // Address-like object: format as readable string
+    if (value.street || value.city || value.state) {
+      const parts = [value.street, value.city, value.state, value.postalCode].filter(Boolean);
+      return parts.join(', ').substring(0, 80) || 'Unspecified';
+    }
+    // Generic object: try name or id
+    if (value.name) return String(value.name).substring(0, 50);
+    if (value.label) return String(value.label).substring(0, 50);
+    return 'Unspecified';
+  }
+  if (Array.isArray(value)) {
+    return value.map(v => String(v)).join(', ').substring(0, 50) || 'Unspecified';
+  }
   return String(value).substring(0, 50); // Limit display length
+}
+
+/**
+ * Apply WHERE filters to a set of records
+ */
+export function applyWhereFilters(records: any[], filters?: WhereFilter[]): any[] {
+  if (!filters || filters.length === 0) return records;
+  return records.filter(record => {
+    return filters.every(filter => {
+      const fieldName = stripFieldPrefix(filter.field);
+      const rawVal = record[filter.field] ?? record[fieldName];
+      const recordVal = rawVal === null || rawVal === undefined ? '' : String(rawVal).toLowerCase();
+      const filterVal = (filter.value || '').toLowerCase();
+
+      switch (filter.operator) {
+        case 'equals': return recordVal === filterVal;
+        case 'not_equals': return recordVal !== filterVal;
+        case 'contains': return recordVal.includes(filterVal);
+        case 'not_contains': return !recordVal.includes(filterVal);
+        case 'starts_with': return recordVal.startsWith(filterVal);
+        case 'greater_than': return toNumber(rawVal) > toNumber(filter.value);
+        case 'less_than': return toNumber(rawVal) < toNumber(filter.value);
+        case 'greater_equal': return toNumber(rawVal) >= toNumber(filter.value);
+        case 'less_equal': return toNumber(rawVal) <= toNumber(filter.value);
+        case 'is_empty': return rawVal === null || rawVal === undefined || rawVal === '';
+        case 'is_not_empty': return rawVal !== null && rawVal !== undefined && rawVal !== '';
+        default: return true;
+      }
+    });
+  });
 }
 
 /**
@@ -119,12 +176,15 @@ function formatDisplayValue(value: any): string {
 export function aggregateChartData(config: AggregationConfig): ChartDataPoint[] {
   // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const records = recordsCache[storageKey] || [];
+  const allRecords = recordsCache[storageKey] || [];
   
-  if (records.length === 0) {
+  if (allRecords.length === 0) {
     console.warn(`No records found for ${storageKey}`);
     return [];
   }
+
+  // Apply WHERE filters
+  const records = applyWhereFilters(allRecords, config.whereFilters);
 
   // Strip prefixes from field names for lookups
   const xField = stripFieldPrefix(config.xAxisField);
@@ -277,13 +337,13 @@ export function getAvailableFields(objectType: string): string[] {
       'Lead__estimatedValue',
       'Lead__rating',
     ],
-    deals: [
-      'Deal__name',
-      'Deal__amount',
-      'Deal__stage',
-      'Deal__probability',
-      'Deal__closeDate',
-      'Deal__owner',
+    opportunities: [
+      'Opportunity__name',
+      'Opportunity__amount',
+      'Opportunity__stage',
+      'Opportunity__probability',
+      'Opportunity__closeDate',
+      'Opportunity__owner',
     ],
     products: [
       'Product__name',
@@ -332,12 +392,15 @@ export function getAvailableFields(objectType: string): string[] {
 export function aggregateStackedChartData(config: AggregationConfig): { data: StackedChartDataPoint[]; stackKeys: string[] } {
   // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const records = recordsCache[storageKey] || [];
+  const allRecords = recordsCache[storageKey] || [];
   
-  if (records.length === 0 || !config.stackByField) {
+  if (allRecords.length === 0 || !config.stackByField) {
     console.warn(`No records found for ${storageKey} or stackByField not provided`);
     return { data: [], stackKeys: [] };
   }
+
+  // Apply WHERE filters
+  const records = applyWhereFilters(allRecords, config.whereFilters);
 
   // Strip prefixes from field names for lookups
   const xField = stripFieldPrefix(config.xAxisField);

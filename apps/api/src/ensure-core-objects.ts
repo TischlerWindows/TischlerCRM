@@ -81,20 +81,23 @@ const CORE_OBJECTS = [
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
       { apiName: 'leadSource', label: 'Lead Source', type: 'Picklist', picklistValues: ['Web', 'Phone', 'Referral', 'Partner', 'Other'] },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['New', 'Contacted', 'Qualified', 'Converted', 'Lost'], defaultValue: 'New' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
     ],
   },
   {
-    apiName: 'Deal',
-    label: 'Deal',
-    pluralLabel: 'Deals',
-    description: 'Sales opportunities and deals',
+    apiName: 'Opportunity',
+    label: 'Opportunity',
+    pluralLabel: 'Opportunities',
+    description: 'Sales opportunities',
     fields: [
-      { apiName: 'dealNumber', label: 'Deal Number', type: 'Text', unique: true },
-      { apiName: 'dealName', label: 'Deal Name', type: 'Text', required: true },
+      { apiName: 'opportunityNumber', label: 'Opportunity Number', type: 'Text', unique: true },
+      { apiName: 'opportunityName', label: 'Opportunity Name', type: 'Text', required: true },
       { apiName: 'amount', label: 'Amount', type: 'Currency' },
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
       { apiName: 'probability', label: 'Probability (%)', type: 'Percent' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'lead', label: 'Lead', type: 'Lookup' },
     ],
   },
   {
@@ -109,6 +112,8 @@ const CORE_OBJECTS = [
       { apiName: 'startDate', label: 'Start Date', type: 'Date' },
       { apiName: 'endDate', label: 'End Date', type: 'Date' },
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Planning', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'Planning' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'opportunity', label: 'Opportunity', type: 'Lookup' },
     ],
   },
   {
@@ -148,6 +153,163 @@ const CORE_OBJECTS = [
       { apiName: 'scheduledDate', label: 'Scheduled Date', type: 'Date' },
       { apiName: 'completedDate', label: 'Completed Date', type: 'Date' },
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Scheduled', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Scheduled' },
+      // Core
+      { apiName: 'startDate', label: 'Start Date', type: 'Date' },
+      { apiName: 'endDate', label: 'End Date', type: 'Date' },
+      { apiName: 'project', label: 'Project', type: 'Lookup' },
+      { apiName: 'installationBudget', label: 'Installation Budget', type: 'Currency' },
+      // Calculated (set by controller)
+      { apiName: 'finalCost', label: 'Final Cost', type: 'Currency' },
+      { apiName: 'finalProfit', label: 'Final Profit', type: 'Currency' },
+      { apiName: 'techExpenseTotal', label: 'Tech Expense Total', type: 'Currency' },
+      // Estimated costs (for variance reporting)
+      { apiName: 'estimatedLaborCost', label: 'Estimated Labor Cost', type: 'Currency' },
+      { apiName: 'estimatedHotel', label: 'Estimated Hotel', type: 'Currency' },
+      { apiName: 'estimatedTravelExp', label: 'Estimated Travel Expense', type: 'Currency' },
+      { apiName: 'estimatedMileage', label: 'Estimated Mileage', type: 'Currency' },
+      { apiName: 'estimatedPerDiem', label: 'Estimated Per Diem', type: 'Currency' },
+      { apiName: 'estimatedFlights', label: 'Estimated Flights', type: 'Currency' },
+      { apiName: 'estimatedCarRental', label: 'Estimated Car Rental', type: 'Currency' },
+      { apiName: 'estimatedParking', label: 'Estimated Parking', type: 'Currency' },
+      { apiName: 'estimatedEquipment', label: 'Estimated Equipment', type: 'Currency' },
+      { apiName: 'estimatedMiscellaneous', label: 'Estimated Miscellaneous', type: 'Currency' },
+      { apiName: 'estimatedWaterproofing', label: 'Estimated Waterproofing', type: 'Currency' },
+      { apiName: 'estimatedWoodBucks', label: 'Estimated Wood Bucks', type: 'Currency' },
+      { apiName: 'estimatedAirportTransportation', label: 'Estimated Airport Transportation', type: 'Currency' },
+      { apiName: 'estimatedMaterials', label: 'Estimated Materials', type: 'Currency' },
+      { apiName: 'estimatedContainerUnload', label: 'Estimated Container Unload', type: 'Currency' },
+      { apiName: 'estimatedLaborHours', label: 'Estimated Labor Hours', type: 'Number' },
+      { apiName: 'estimatedWaterproofingLabor', label: 'Estimated WP Labor', type: 'Currency' },
+      { apiName: 'estimatedWoodBucksLabor', label: 'Estimated WB Labor', type: 'Currency' },
+      { apiName: 'estimatedTravelTime', label: 'Estimated Travel Time', type: 'Currency' },
+      { apiName: 'estimatedInternalLabor', label: 'Estimated Internal Labor', type: 'Currency' },
+    ],
+  },
+  {
+    apiName: 'WorkOrder',
+    label: 'Work Order',
+    pluralLabel: 'Work Orders',
+    description: 'Scheduled work orders for service and maintenance',
+    fields: [
+      { apiName: 'workOrderNumber', label: 'Work Order Number', type: 'Text', unique: true },
+      { apiName: 'name', label: 'Work Order', type: 'Text' },
+      { apiName: 'title', label: 'Title', type: 'TextArea' },
+      { apiName: 'workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
+      { apiName: 'workStatus', label: 'Work Status', type: 'Picklist', picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
+      { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
+      { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
+      { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
+    ],
+  },
+  {
+    apiName: 'TeamMember',
+    label: 'Team Member',
+    pluralLabel: 'Team Members',
+    description: 'Junction object linking contacts and accounts to properties, opportunities, projects, work orders, and installations',
+    fields: [
+      { apiName: 'teamMemberNumber', label: 'Team Member Number', type: 'Text', unique: true },
+      { apiName: 'contact', label: 'Contact', type: 'Lookup' },
+      { apiName: 'account', label: 'Account', type: 'Lookup' },
+      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'opportunity', label: 'Opportunity', type: 'Lookup' },
+      { apiName: 'project', label: 'Project', type: 'Lookup' },
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup' },
+      { apiName: 'installation', label: 'Installation', type: 'Lookup' },
+      { apiName: 'role', label: 'Role', type: 'Picklist', required: true, picklistValues: ['Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer', 'Property Manager', 'Sales Rep', 'Installer', 'Inspector', 'Engineer', 'Other'] },
+      { apiName: 'primaryContact', label: 'Primary Contact', type: 'Checkbox' },
+      { apiName: 'contractHolder', label: 'Contract Holder', type: 'Checkbox' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+    ],
+  },
+  {
+    apiName: 'Technician',
+    label: 'Technician',
+    pluralLabel: 'Technicians',
+    description: 'Installation technicians for cost analysis',
+    fields: [
+      { apiName: 'technicianName', label: 'Technician Name', type: 'Text', required: true },
+      { apiName: 'hourlyRate', label: 'Hourly Rate', type: 'Currency', required: true },
+      { apiName: 'phone', label: 'Phone', type: 'Phone' },
+      { apiName: 'email', label: 'Email', type: 'Email' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active' },
+    ],
+  },
+  {
+    apiName: 'InstallationTechnician',
+    label: 'Installation Technician',
+    pluralLabel: 'Installation Technicians',
+    description: 'Junction linking technicians to installations with frozen hourly rate',
+    fields: [
+      { apiName: 'installation', label: 'Installation', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'assignedHourlyRate', label: 'Assigned Hourly Rate', type: 'Currency', required: true },
+    ],
+  },
+  {
+    apiName: 'InstallationCost',
+    label: 'Installation Cost',
+    pluralLabel: 'Installation Costs',
+    description: 'Weekly project-level cost records for an installation',
+    fields: [
+      { apiName: 'installation', label: 'Installation', type: 'Lookup', required: true },
+      { apiName: 'weekNumber', label: 'Week Number', type: 'Number', required: true },
+      { apiName: 'weekStartDate', label: 'Week Start Date', type: 'Date', required: true },
+      { apiName: 'weekEndDate', label: 'Week End Date', type: 'Date', required: true },
+      { apiName: 'flightsActual', label: 'Flights', type: 'Currency' },
+      { apiName: 'lodgingActual', label: 'Lodging', type: 'Currency' },
+      { apiName: 'carRental', label: 'Car Rental', type: 'Currency' },
+      { apiName: 'airportTransportation', label: 'Airport Transportation', type: 'Currency' },
+      { apiName: 'parking', label: 'Parking', type: 'Currency' },
+      { apiName: 'equipment', label: 'Equipment', type: 'Currency' },
+      { apiName: 'miscellaneousExpenses', label: 'Miscellaneous', type: 'Currency' },
+      { apiName: 'waterproofing', label: 'Waterproofing', type: 'Currency' },
+      { apiName: 'woodBucks', label: 'Wood Bucks', type: 'Currency' },
+    ],
+  },
+  {
+    apiName: 'InstallationTechExpense',
+    label: 'Installation Tech Expense',
+    pluralLabel: 'Installation Tech Expenses',
+    description: 'Per-technician weekly labor hours and expenses',
+    fields: [
+      { apiName: 'installation', label: 'Installation', type: 'Lookup', required: true },
+      { apiName: 'installationTechnician', label: 'Installation Technician', type: 'Lookup', required: true },
+      { apiName: 'weekNumber', label: 'Week Number', type: 'Number', required: true },
+      { apiName: 'weekStartDate', label: 'Week Start Date', type: 'Date', required: true },
+      { apiName: 'weekEndDate', label: 'Week End Date', type: 'Date', required: true },
+      { apiName: 'containerUnload', label: 'Container Unload', type: 'Number' },
+      { apiName: 'woodbucks', label: 'Woodbucks', type: 'Number' },
+      { apiName: 'waterproofing', label: 'Waterproofing', type: 'Number' },
+      { apiName: 'installationLabor', label: 'Installation Labor', type: 'Number' },
+      { apiName: 'travel', label: 'Travel', type: 'Number' },
+      { apiName: 'waterTesting', label: 'Water Testing', type: 'Number' },
+      { apiName: 'sills', label: 'Sills', type: 'Number' },
+      { apiName: 'finishCaulking', label: 'Finish Caulking', type: 'Number' },
+      { apiName: 'screenLutronShades', label: 'Screen/Lutron/Shades', type: 'Number' },
+      { apiName: 'punchListWork', label: 'Punch List Work', type: 'Number' },
+      { apiName: 'finishHardware', label: 'Finish Hardware', type: 'Number' },
+      { apiName: 'finalAdjustments', label: 'Final Adjustments', type: 'Number' },
+      { apiName: 'perDiem', label: 'Per Diem', type: 'Currency' },
+      { apiName: 'mileage', label: 'Mileage', type: 'Currency' },
+      { apiName: 'materials', label: 'Materials', type: 'Currency' },
+    ],
+  },
+  {
+    apiName: 'Task',
+    label: 'Task',
+    pluralLabel: 'Tasks',
+    description: 'Tasks and activities',
+    fields: [
+      { apiName: 'taskNumber', label: 'Task Number', type: 'Text', unique: true },
+      { apiName: 'subject', label: 'Subject', type: 'Text', required: true },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'In Progress', 'Completed', 'Cancelled'], defaultValue: 'Open' },
+      { apiName: 'priority', label: 'Priority', type: 'Picklist', picklistValues: ['High', 'Normal', 'Low'], defaultValue: 'Normal' },
+      { apiName: 'dueDate', label: 'Due Date', type: 'Date' },
+      { apiName: 'description', label: 'Description', type: 'LongTextArea' },
+      { apiName: 'assignedToUserId', label: 'Assigned To', type: 'Lookup' },
+      { apiName: 'relatedObjectApi', label: 'Related Object', type: 'Text' },
+      { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
     ],
   },
 ];
@@ -160,6 +322,26 @@ const CORE_OBJECTS = [
  */
 export async function ensureCoreObjects(): Promise<void> {
   console.log('[ensure-core-objects] Checking core objects...');
+
+  // Rename Deal→Opportunity if the legacy name still exists
+  const legacyDeal = await prisma.customObject.findFirst({ where: { apiName: 'Deal' } });
+  if (legacyDeal) {
+    // Check if Opportunity already exists separately
+    const existingOpp = await prisma.customObject.findFirst({ where: { apiName: 'Opportunity' } });
+    if (existingOpp) {
+      // Both exist — migrate records from Deal to Opportunity, then delete Deal
+      await prisma.record.updateMany({ where: { objectId: legacyDeal.id }, data: { objectId: existingOpp.id } });
+      await prisma.customObject.delete({ where: { id: legacyDeal.id } });
+      console.log('[ensure-core-objects] Merged Deal records into Opportunity and removed Deal object');
+    } else {
+      // Rename Deal → Opportunity in place (preserves records + fields)
+      await prisma.customObject.update({
+        where: { id: legacyDeal.id },
+        data: { apiName: 'Opportunity', label: 'Opportunity', pluralLabel: 'Opportunities' },
+      });
+      console.log('[ensure-core-objects] Renamed Deal → Opportunity (preserved records)');
+    }
+  }
 
   // Grab any existing user to use as the creator/modifier
   let systemUser = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
@@ -256,8 +438,8 @@ export async function ensureCoreObjects(): Promise<void> {
   try {
     const autoNumberFieldNames = [
       'accountNumber', 'propertyNumber', 'contactNumber', 'leadNumber',
-      'dealNumber', 'productCode', 'projectNumber', 'quoteNumber',
-      'serviceNumber', 'installationNumber',
+      'opportunityNumber', 'productCode', 'projectNumber', 'quoteNumber',
+      'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
     ];
     await prisma.customField.updateMany({
       where: {
@@ -283,6 +465,26 @@ export async function ensureCoreObjects(): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);
+  }
+
+  // Fix: ensure Lead 'property' lookup field is required.
+  // Every Lead must be linked to a Property so Dropbox folder auto-creation works.
+  try {
+    const leadObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+    });
+    if (leadObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: leadObj.id,
+          apiName: 'property',
+          required: false,
+        },
+        data: { required: true },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
   }
 
   // Also sync any user-created objects from the schema settings to the DB.
