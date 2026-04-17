@@ -155,27 +155,36 @@ export function LocationSearchInput({
 }) {
   const tf = fieldDef.targetFields || {};
 
-  // Build display value from saved target fields if the field's own value is empty
-  let locationValue = value as string | undefined;
-  if (!locationValue && fieldDef.targetFields) {
-    const parts = [
-      formData[tf.street ?? ''],
-      formData[tf.city ?? ''],
-      formData[tf.state ?? ''],
-      formData[tf.postalCode ?? ''],
-      formData[tf.country ?? ''],
-    ].filter(Boolean);
-    if (parts.length > 0) locationValue = parts.join(', ');
-  }
+  // Parse this field's own value as a JSON object (legacy records store
+  // all address data inside one JSON blob rather than separate fields).
+  const valueObj = toAddressObject(value);
 
-  // Resolve a target-field value from formData (handles prefixed & un-prefixed keys)
-  const resolve = (key: string | undefined) => {
-    if (!key) return '';
-    return formData[key] ?? formData[key.replace(/^[A-Za-z]+__/, '')] ?? '';
+  // Resolve a sub-field: prefer the dedicated target-field column in
+  // formData, fall back to the JSON blob stored in the field's own value.
+  const resolve = (targetKey: string | undefined, jsonKey: string): string => {
+    if (targetKey) {
+      const v = formData[targetKey] ?? formData[targetKey.replace(/^[A-Za-z]+__/, '')];
+      if (v !== undefined && v !== null && v !== '') return String(v);
+    }
+    return valueObj[jsonKey] != null ? String(valueObj[jsonKey]) : '';
   };
 
-  const handleSubField = (targetKey: string | undefined, val: string) => {
+  const street = resolve(tf.street, 'street');
+  const city = resolve(tf.city, 'city');
+  const state = resolve(tf.state, 'state');
+  const postalCode = resolve(tf.postalCode, 'postalCode');
+  const country = resolve(tf.country, 'country');
+
+  // Always build the search-bar display from current sub-field values so
+  // editing or clearing a sub-field immediately updates the search bar.
+  const locationValue = [street, city, state, postalCode].filter(Boolean).join(', ');
+
+  // When a sub-field is edited, update the target field AND the field's
+  // own JSON value so the search bar and saved data stay in sync.
+  const handleSubField = (targetKey: string | undefined, jsonKey: string, val: string) => {
     if (targetKey) onFieldChange(targetKey, val);
+    const updated = { ...valueObj, [jsonKey]: val };
+    onChange(updated);
   };
 
   return (
@@ -184,7 +193,7 @@ export function LocationSearchInput({
         <AddressAutocomplete
           disabled={disabled}
           placeholder="Search for an address..."
-          value={locationValue || ''}
+          value={locationValue}
           onAddressSelected={(addr) => {
             if (tf.street) onFieldChange(tf.street, addr.street);
             if (tf.city) onFieldChange(tf.city, addr.city);
@@ -193,54 +202,52 @@ export function LocationSearchInput({
             if (tf.country) onFieldChange(tf.country, addr.country);
             if (tf.lat) onFieldChange(tf.lat, String(addr.lat));
             if (tf.lng) onFieldChange(tf.lng, String(addr.lng));
-            // Persist the formatted address in the field's own value
-            onChange(addr.formattedAddress);
+            // Keep the JSON blob in sync
+            onChange({
+              street: addr.street,
+              city: addr.city,
+              state: addr.state,
+              postalCode: addr.postalCode,
+              country: addr.country,
+              lat: addr.lat,
+              lng: addr.lng,
+            });
           }}
         />
       )}
-      {tf.street && (
+      <Input
+        placeholder="Street"
+        value={street}
+        onChange={(e) => handleSubField(tf.street, 'street', e.target.value)}
+        disabled={disabled}
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <Input
-          placeholder="Street"
-          value={resolve(tf.street)}
-          onChange={(e) => handleSubField(tf.street, e.target.value)}
+          placeholder="City"
+          value={city}
+          onChange={(e) => handleSubField(tf.city, 'city', e.target.value)}
           disabled={disabled}
         />
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {tf.city && (
-          <Input
-            placeholder="City"
-            value={resolve(tf.city)}
-            onChange={(e) => handleSubField(tf.city, e.target.value)}
-            disabled={disabled}
-          />
-        )}
-        {tf.state && (
-          <Input
-            placeholder="State/Province"
-            value={resolve(tf.state)}
-            onChange={(e) => handleSubField(tf.state, e.target.value)}
-            disabled={disabled}
-          />
-        )}
+        <Input
+          placeholder="State/Province"
+          value={state}
+          onChange={(e) => handleSubField(tf.state, 'state', e.target.value)}
+          disabled={disabled}
+        />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {tf.postalCode && (
-          <Input
-            placeholder="Postal Code"
-            value={resolve(tf.postalCode)}
-            onChange={(e) => handleSubField(tf.postalCode, e.target.value)}
-            disabled={disabled}
-          />
-        )}
-        {tf.country && (
-          <Input
-            placeholder="Country"
-            value={resolve(tf.country)}
-            onChange={(e) => handleSubField(tf.country, e.target.value)}
-            disabled={disabled}
-          />
-        )}
+        <Input
+          placeholder="Postal Code"
+          value={postalCode}
+          onChange={(e) => handleSubField(tf.postalCode, 'postalCode', e.target.value)}
+          disabled={disabled}
+        />
+        <Input
+          placeholder="Country"
+          value={country}
+          onChange={(e) => handleSubField(tf.country, 'country', e.target.value)}
+          disabled={disabled}
+        />
       </div>
     </div>
   );

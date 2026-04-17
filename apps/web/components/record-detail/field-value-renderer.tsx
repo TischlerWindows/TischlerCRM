@@ -115,15 +115,31 @@ export function renderValue(
       if (!key) return undefined;
       return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
     };
-    const lat = Number(resolve(tf.lat));
-    const lng = Number(resolve(tf.lng));
-    const addressParts = [
+
+    // Parse the field's own value as a JSON blob (legacy records store
+    // all address data inside address_search rather than separate cols).
+    const valObj = (typeof value === 'object' && value) ? value : {};
+
+    let lat = Number(resolve(tf.lat));
+    let lng = Number(resolve(tf.lng));
+    // Fall back to the JSON blob for lat/lng
+    if ((isNaN(lat) || lat === 0) && valObj.lat != null) lat = Number(valObj.lat);
+    if ((isNaN(lng) || lng === 0) && valObj.lng != null) lng = Number(valObj.lng);
+
+    let addressParts = [
       resolve(tf.street),
       resolve(tf.city),
       resolve(tf.state),
       resolve(tf.postalCode),
       resolve(tf.country),
     ].filter(Boolean).join(', ');
+
+    // Fall back to JSON blob for address text
+    if (!addressParts) {
+      addressParts = [
+        valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country,
+      ].filter(Boolean).join(', ');
+    }
 
     if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
       return (
