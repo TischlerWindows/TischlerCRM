@@ -771,7 +771,8 @@ export default function DashboardPage() {
                 changed = true;
               }
             } catch { /* skip */ }
-          } else {
+          } else if (widget.type !== 'stacked-horizontal-bar' && widget.type !== 'stacked-vertical-bar') {
+            // Only run regular aggregation for non-stacked chart types
             try {
               const aggregatedData = aggregateChartData({
                 objectType: objType,
@@ -883,6 +884,13 @@ export default function DashboardPage() {
 
   const handleSaveWidget = () => {
     if (!selectedDashboard || !selectedWidgetType) return;
+
+    // Validate stacked charts require Stack By field
+    const isStacked = selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar';
+    if (isStacked && !widgetConfig.stackBy) {
+      alert('Stacked charts require a Stack By field. Please select one before saving.');
+      return;
+    }
 
     // Ensure at least one section exists
     let sections = selectedDashboard.sections || [];
@@ -1258,6 +1266,13 @@ export default function DashboardPage() {
 
   const handleUpdateWidget = () => {
     if (!selectedDashboard || !editingWidget || !selectedWidgetType) return;
+
+    // Validate stacked charts require Stack By field
+    const isStacked = selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar';
+    if (isStacked && !widgetConfig.stackBy) {
+      alert('Stacked charts require a Stack By field. Please select one before saving.');
+      return;
+    }
 
     // Get the existing widget to preserve its position
     const existingWidget = selectedDashboard.widgets.find(w => w.id === editingWidget);
