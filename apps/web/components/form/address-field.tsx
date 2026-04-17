@@ -155,31 +155,59 @@ export function LocationSearchInput({
 }) {
   const tf = fieldDef.targetFields || {};
 
-  // Parse this field's own value as a JSON object (legacy records store
-  // all address data inside one JSON blob rather than separate fields).
-  const valueObj = toAddressObject(value);
+  // Build a merged address object from every available data source so
+  // we always show the most complete data regardless of storage format.
+  //
+  // Sources (checked in priority order):
+  //  1. The field's own JSON blob  (address_search = {street, city, …})
+  //  2. Dotted flat keys            (address_search.city = "Stone Ridge")
+  //  3. Compound address object     (address = {lat, lng, street, …})
+  //  4. Individual target-field cols (city, state, zipCode – BUT NOT the
+  //     'address' col because it often stores a full formatted string)
+  const blob = toAddressObject(value);
+  const fieldBase = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
 
-  // Resolve a sub-field.  Prefer the JSON blob stored in the field's own
-  // value — it is per-component and avoids name collisions (e.g. the
-  // target key "Property__address" strips to "address", which may hold a
-  // full formatted address string rather than just the street).
-  const resolve = (targetKey: string | undefined, jsonKey: string): string => {
-    if (valueObj[jsonKey] != null && valueObj[jsonKey] !== '') return String(valueObj[jsonKey]);
-    if (!targetKey) return '';
-    const raw = formData[targetKey] ?? formData[targetKey.replace(/^[A-Za-z]+__/, '')];
-    if (raw == null || raw === '') return '';
-    // Skip compound values (JSON objects or formatted multi-part addresses)
-    if (typeof raw === 'object') return '';
-    const s = String(raw);
-    if (s.includes(',')) return '';
-    return s;
-  };
+  // Merge dotted keys (e.g. address_search.city → city)
+  for (const key of Object.keys(formData)) {
+    if (key.startsWith(fieldBase + '.')) {
+      const sub = key.slice(fieldBase.length + 1);
+      if (sub && !blob[sub] && formData[key] != null && formData[key] !== '') {
+        blob[sub] = formData[key];
+      }
+    }
+  }
 
-  const street = resolve(tf.street, 'street');
-  const city = resolve(tf.city, 'city');
-  const state = resolve(tf.state, 'state');
-  const postalCode = resolve(tf.postalCode, 'postalCode');
-  const country = resolve(tf.country, 'country');
+  // Check if the street target field holds a compound address object
+  const streetTargetRaw = tf.street
+    ? (formData[tf.street] ?? formData[tf.street.replace(/^[A-Za-z]+__/, '')])
+    : undefined;
+  const compoundAddr = (typeof streetTargetRaw === 'object' && streetTargetRaw) ? streetTargetRaw as Record<string, any> : {};
+  for (const [k, v] of Object.entries(compoundAddr)) {
+    if (!blob[k] && v != null && v !== '') blob[k] = v;
+  }
+
+  // Fill remaining gaps from individual target-field columns (skip the
+  // street target — "address" — because it collides with the formatted string)
+  const safeKeys: Array<[string, string]> = [
+    ['city', tf.city ?? ''],
+    ['state', tf.state ?? ''],
+    ['postalCode', tf.postalCode ?? ''],
+    ['country', tf.country ?? ''],
+    ['lat', tf.lat ?? ''],
+    ['lng', tf.lng ?? ''],
+  ];
+  for (const [jsonKey, tfKey] of safeKeys) {
+    if (!blob[jsonKey] && tfKey) {
+      const v = formData[tfKey] ?? formData[tfKey.replace(/^[A-Za-z]+__/, '')];
+      if (v != null && v !== '' && typeof v !== 'object') blob[jsonKey] = v;
+    }
+  }
+
+  const street = blob.street ? String(blob.street) : '';
+  const city = blob.city ? String(blob.city) : '';
+  const state = blob.state ? String(blob.state) : '';
+  const postalCode = blob.postalCode ? String(blob.postalCode) : '';
+  const country = blob.country ? String(blob.country) : '';
 
   // Always build the search-bar display from current sub-field values so
   // editing or clearing a sub-field immediately updates the search bar.
@@ -189,7 +217,7 @@ export function LocationSearchInput({
   // own JSON value so the search bar and saved data stay in sync.
   const handleSubField = (targetKey: string | undefined, jsonKey: string, val: string) => {
     if (targetKey) onFieldChange(targetKey, val);
-    const updated = { ...valueObj, [jsonKey]: val };
+    const updated = { ...blob, [jsonKey]: val };
     onChange(updated);
   };
 

@@ -111,47 +111,47 @@ export function renderValue(
   // LocationSearch — virtual widget, reads mapped target fields
   if (fieldType === 'LocationSearch' && fieldDef?.targetFields && record) {
     const tf = fieldDef.targetFields;
-    const rawResolve = (key: string | undefined) => {
-      if (!key) return undefined;
-      return record[key] ?? record[key.replace(/^[A-Za-z]+__/, '')];
-    };
+    const fieldBase = fieldDef.apiName.replace(/^[A-Za-z]+__/, '');
 
-    // Parse the field's own value as a JSON blob (address_search).
-    const valObj = (typeof value === 'object' && value) ? value : {};
+    // Build a merged address object from all available data sources
+    // (same approach as the form input — see address-field.tsx).
+    const valObj: Record<string, any> = (typeof value === 'object' && value) ? { ...value } : {};
 
-    // The street target field (Property__address → "address") may hold a full
-    // formatted address string or even a compound JSON object from legacy data.
-    // Check it for lat/lng if it is a JSON object.
-    const streetRaw = rawResolve(tf.street);
-    const addrObj = (typeof streetRaw === 'object' && streetRaw) ? streetRaw as Record<string, any> : {};
+    // 1. Dotted flat keys (e.g. address_search.city)
+    for (const key of Object.keys(record)) {
+      if (key.startsWith(fieldBase + '.')) {
+        const sub = key.slice(fieldBase.length + 1);
+        if (sub && !valObj[sub] && record[key] != null && record[key] !== '') {
+          valObj[sub] = record[key];
+        }
+      }
+    }
 
-    // Resolve individual address components — prefer JSON blob, then
-    // compound-address object, then individual target-field columns.
-    const resolveField = (targetKey: string | undefined, jsonKey: string) => {
-      if (valObj[jsonKey] != null && valObj[jsonKey] !== '') return String(valObj[jsonKey]);
-      if (addrObj[jsonKey] != null && addrObj[jsonKey] !== '') return String(addrObj[jsonKey]);
-      const raw = rawResolve(targetKey);
-      if (raw == null || raw === '') return '';
-      if (typeof raw === 'object') return '';
-      const s = String(raw);
-      if (s.includes(',')) return '';  // skip formatted multi-part addresses
-      return s;
-    };
+    // 2. Compound address object at the street target (legacy records
+    //    store {lat, lng, street, city, …} in the 'address' key)
+    const streetRaw = tf.street ? (record[tf.street] ?? record[tf.street.replace(/^[A-Za-z]+__/, '')]) : undefined;
+    if (typeof streetRaw === 'object' && streetRaw) {
+      for (const [k, v] of Object.entries(streetRaw as Record<string, any>)) {
+        if (!valObj[k] && v != null && v !== '') valObj[k] = v;
+      }
+    }
 
-    // Lat / lng — try blob, compound-address object, then individual columns
-    let lat = valObj.lat != null ? Number(valObj.lat)
-      : addrObj.lat != null ? Number(addrObj.lat)
-      : Number(rawResolve(tf.lat));
-    let lng = valObj.lng != null ? Number(valObj.lng)
-      : addrObj.lng != null ? Number(addrObj.lng)
-      : Number(rawResolve(tf.lng));
+    // 3. Individual target-field columns (skip street target — collides
+    //    with formatted address string)
+    for (const jsonKey of ['city', 'state', 'postalCode', 'country', 'lat', 'lng'] as const) {
+      if (!valObj[jsonKey]) {
+        const tfKey = tf[jsonKey];
+        if (tfKey) {
+          const raw = record[tfKey] ?? record[tfKey.replace(/^[A-Za-z]+__/, '')];
+          if (raw != null && raw !== '' && typeof raw !== 'object') valObj[jsonKey] = raw;
+        }
+      }
+    }
 
+    const lat = Number(valObj.lat);
+    const lng = Number(valObj.lng);
     const addressParts = [
-      resolveField(tf.street, 'street'),
-      resolveField(tf.city, 'city'),
-      resolveField(tf.state, 'state'),
-      resolveField(tf.postalCode, 'postalCode'),
-      resolveField(tf.country, 'country'),
+      valObj.street, valObj.city, valObj.state, valObj.postalCode, valObj.country,
     ].filter(Boolean).join(', ');
 
     if (!compact && !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
