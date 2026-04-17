@@ -42,34 +42,49 @@ interface NavGroup {
 
 const NAV_GROUPS: NavGroup[] = [
   {
-    title: 'Administration',
-    items: [
-      { name: 'Users', href: '/settings/users', icon: Users },
-      { name: 'Profiles', href: '/settings/profiles', icon: Shield },
-      { name: 'Departments', href: '/settings/departments', icon: Building2 },
-      { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
-      { name: 'Error Log', href: '/settings/error-log', icon: AlertTriangle },
-      { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
-      { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
-      { name: 'Backups', href: '/settings/backups', icon: Database },
-    ],
-  },
-  {
-    title: 'Settings',
+    title: 'Company',
     items: [
       { name: 'Company Settings', href: '/settings/company', icon: Home },
+      { name: 'Departments', href: '/settings/departments', icon: Building2 },
       { name: 'Security', href: '/settings/security', icon: Lock },
       { name: 'Privacy Center', href: '/settings/privacy', icon: ShieldAlert, disabled: true },
     ],
   },
   {
-    title: 'Integrations',
+    title: 'Users & Access',
     items: [
-      { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
-      { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
+      { name: 'Users', href: '/settings/users', icon: Users },
+      { name: 'Profiles', href: '/settings/profiles', icon: Shield },
+    ],
+  },
+  {
+    title: 'Data Model',
+    items: [
+      { name: 'Backups', href: '/settings/backups', icon: Database },
+      { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
+      { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
+    ],
+  },
+  {
+    title: 'Automation',
+    items: [
       { name: 'Automations', href: '/settings/automations', icon: Zap },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell },
+      { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
+    ],
+  },
+  {
+    title: 'Connections',
+    items: [
+      { name: 'Connected Apps', href: '/settings/integrations', icon: Plug },
       { name: 'Offline', href: '/settings/offline', icon: WifiOff, disabled: true },
+    ],
+  },
+  {
+    title: 'Monitoring',
+    items: [
+      { name: 'Audit Log', href: '/settings/audit-log', icon: FileText },
+      { name: 'Error Log', href: '/settings/error-log', icon: AlertTriangle },
     ],
   },
 ];
