@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Check, Loader2, AlertCircle, X } from 'lucide-react';
+import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import {
   notificationsClient,
   type NotificationTypeItem,
@@ -64,21 +65,13 @@ export default function NotificationSettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-8 shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center">
-            <Bell className="w-6 h-6 text-indigo-500" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-brand-dark">Notifications</h1>
-            <p className="text-sm text-brand-gray mt-0.5">
-              Enable or disable in-app notification types org-wide. Disabled types are suppressed for every user.
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full">
+      <SettingsPageHeader
+        icon={Bell}
+        title="Notifications"
+        subtitle="Enable or disable in-app notification types org-wide. Disabled types are suppressed for every user."
+      />
+      <div className="p-8">
       {error && (
         <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -166,6 +159,7 @@ export default function NotificationSettingsPage() {
             <p className="text-sm">No notification types registered yet.</p>
           </div>
         )}
+      </div>
       </div>
     </div>
   );
