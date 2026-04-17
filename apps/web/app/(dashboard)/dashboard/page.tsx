@@ -1626,6 +1626,7 @@ export default function DashboardPage() {
                       tick={tickStyle}
                     />
                     <Tooltip 
+                      cursor={false}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Count']}
                     />
@@ -1780,6 +1781,7 @@ export default function DashboardPage() {
                     />
                     <YAxis tick={tickStyle11} />
                     <Tooltip
+                      cursor={false}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
                     />
                     <Legend />
@@ -1986,6 +1988,7 @@ export default function DashboardPage() {
                     />
                     <YAxis tick={tickStyle11} />
                     <Tooltip
+                      cursor={false}
                       contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
                       formatter={(value: any) => [Number(value).toLocaleString(), 'Value']}
                     />
