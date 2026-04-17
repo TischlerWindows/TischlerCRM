@@ -33,12 +33,19 @@ export interface StackedChartDataPoint {
   [key: string]: string | number; // Dynamic keys for each stack
 }
 
+export interface WhereFilter {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal' | 'contains' | 'not_contains' | 'starts_with' | 'is_empty' | 'is_not_empty';
+  value: string;
+}
+
 export interface AggregationConfig {
   xAxisField: string;
   yAxisField: string;
   objectType: string;
   aggregationType?: 'sum' | 'count' | 'avg' | 'max' | 'min';
   stackByField?: string; // For stacked charts
+  whereFilters?: WhereFilter[];
 }
 
 /**
@@ -133,18 +140,51 @@ function formatDisplayValue(value: any): string {
 }
 
 /**
+ * Apply WHERE filters to a set of records
+ */
+export function applyWhereFilters(records: any[], filters?: WhereFilter[]): any[] {
+  if (!filters || filters.length === 0) return records;
+  return records.filter(record => {
+    return filters.every(filter => {
+      const fieldName = stripFieldPrefix(filter.field);
+      const rawVal = record[filter.field] ?? record[fieldName];
+      const recordVal = rawVal === null || rawVal === undefined ? '' : String(rawVal).toLowerCase();
+      const filterVal = (filter.value || '').toLowerCase();
+
+      switch (filter.operator) {
+        case 'equals': return recordVal === filterVal;
+        case 'not_equals': return recordVal !== filterVal;
+        case 'contains': return recordVal.includes(filterVal);
+        case 'not_contains': return !recordVal.includes(filterVal);
+        case 'starts_with': return recordVal.startsWith(filterVal);
+        case 'greater_than': return toNumber(rawVal) > toNumber(filter.value);
+        case 'less_than': return toNumber(rawVal) < toNumber(filter.value);
+        case 'greater_equal': return toNumber(rawVal) >= toNumber(filter.value);
+        case 'less_equal': return toNumber(rawVal) <= toNumber(filter.value);
+        case 'is_empty': return rawVal === null || rawVal === undefined || rawVal === '';
+        case 'is_not_empty': return rawVal !== null && rawVal !== undefined && rawVal !== '';
+        default: return true;
+      }
+    });
+  });
+}
+
+/**
  * Aggregate chart data based on configuration
  * Groups records by X-axis field and aggregates Y-axis values
  */
 export function aggregateChartData(config: AggregationConfig): ChartDataPoint[] {
   // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const records = recordsCache[storageKey] || [];
+  const allRecords = recordsCache[storageKey] || [];
   
-  if (records.length === 0) {
+  if (allRecords.length === 0) {
     console.warn(`No records found for ${storageKey}`);
     return [];
   }
+
+  // Apply WHERE filters
+  const records = applyWhereFilters(allRecords, config.whereFilters);
 
   // Strip prefixes from field names for lookups
   const xField = stripFieldPrefix(config.xAxisField);
@@ -352,12 +392,15 @@ export function getAvailableFields(objectType: string): string[] {
 export function aggregateStackedChartData(config: AggregationConfig): { data: StackedChartDataPoint[]; stackKeys: string[] } {
   // Get records from cache (populated from API)
   const storageKey = getPluralObjectKey(config.objectType);
-  const records = recordsCache[storageKey] || [];
+  const allRecords = recordsCache[storageKey] || [];
   
-  if (records.length === 0 || !config.stackByField) {
+  if (allRecords.length === 0 || !config.stackByField) {
     console.warn(`No records found for ${storageKey} or stackByField not provided`);
     return { data: [], stackKeys: [] };
   }
+
+  // Apply WHERE filters
+  const records = applyWhereFilters(allRecords, config.whereFilters);
 
   // Strip prefixes from field names for lookups
   const xField = stripFieldPrefix(config.xAxisField);

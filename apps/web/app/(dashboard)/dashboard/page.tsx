@@ -51,7 +51,8 @@ import {
   Legend, 
   ResponsiveContainer 
 } from 'recharts';
-import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords, getCachedRecords, stripFieldPrefix } from '@/lib/chart-data-utils';
+import { aggregateChartData, aggregateStackedChartData, getAvailableFields, setCachedRecords, getCachedRecords, stripFieldPrefix, applyWhereFilters } from '@/lib/chart-data-utils';
+import type { WhereFilter } from '@/lib/chart-data-utils';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import PageHeader from '@/components/page-header';
@@ -252,6 +253,7 @@ export default function DashboardPage() {
     hBarValuePos: 'right',
     hiddenUntilFilter: false,
     filterButtons: [] as Array<{ label: string; field: string; value: string }>,
+    whereFilters: [] as WhereFilter[],
     title: '',
     subtitle: '',
     footer: '',
@@ -362,10 +364,12 @@ export default function DashboardPage() {
     if (widgetConfig.dataSourceMode === 'object') {
       const objType = widgetConfig.dataSource || '';
       if (!objType) return { data: [{ label: 'Select an object type', value: 30 }, { label: 'to see preview', value: 20 }] };
+      const activeFilters: WhereFilter[] = (widgetConfig.whereFilters || []).filter((f: WhereFilter) => f.field && f.operator);
 
       // Metric/card: return record count or sum of a field
       if (selectedWidgetType === 'metric' || selectedWidgetType === 'card') {
-        const records = getCachedRecords(objType);
+        const allRecords = getCachedRecords(objType);
+        const records = applyWhereFilters(allRecords, activeFilters);
         if (widgetConfig.yAxis) {
           const field = stripFieldPrefix(widgetConfig.yAxis);
           const total = records.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
@@ -386,7 +390,8 @@ export default function DashboardPage() {
             xAxisField: widgetConfig.xAxis,
             yAxisField: widgetConfig.yAxis,
             stackByField: widgetConfig.stackBy,
-            aggregationType: widgetConfig.aggregationType || 'sum'
+            aggregationType: widgetConfig.aggregationType || 'sum',
+            whereFilters: activeFilters,
           });
           return data && data.length > 0 ? { data, stackKeys } : { data: [], stackKeys: [] };
         } catch { return { data: [], stackKeys: [] }; }
@@ -398,7 +403,8 @@ export default function DashboardPage() {
           objectType: objType,
           xAxisField: widgetConfig.xAxis,
           yAxisField: widgetConfig.yAxis,
-          aggregationType: widgetConfig.aggregationType || 'sum'
+          aggregationType: widgetConfig.aggregationType || 'sum',
+          whereFilters: activeFilters,
         });
         return aggregatedData && aggregatedData.length > 0 ? { data: aggregatedData } : { data: [] };
       } catch { return { data: [] }; }
@@ -722,7 +728,9 @@ export default function DashboardPage() {
 
       for (const widget of objectWidgets) {
         const objType = widget.dataSource;
-        const records = getCachedRecords(objType);
+        const allRecords = getCachedRecords(objType);
+        const wFilters: WhereFilter[] = (widget.config?.whereFilters || []).filter((f: WhereFilter) => f.field && f.operator);
+        const records = applyWhereFilters(allRecords, wFilters);
         const isMetricWidget = widget.type === 'metric' || widget.type === 'card';
         const xField = widget.config?.xAxis;
         const yField = widget.config?.yAxis;
@@ -749,7 +757,8 @@ export default function DashboardPage() {
                 xAxisField: xField,
                 yAxisField: effectiveYField,
                 stackByField,
-                aggregationType: widget.config?.aggregationType || 'sum'
+                aggregationType: widget.config?.aggregationType || 'sum',
+                whereFilters: wFilters,
               });
               if (data && data.length > 0) {
                 updatedWidgets = updatedWidgets.map(w =>
@@ -764,7 +773,8 @@ export default function DashboardPage() {
                 objectType: objType,
                 xAxisField: xField,
                 yAxisField: effectiveYField,
-                aggregationType: widget.config?.aggregationType || 'sum'
+                aggregationType: widget.config?.aggregationType || 'sum',
+                whereFilters: wFilters,
               });
               if (aggregatedData && aggregatedData.length > 0) {
                 updatedWidgets = updatedWidgets.map(w =>
@@ -1079,12 +1089,15 @@ export default function DashboardPage() {
       const flatRecords = recordsService.flattenRecords(records);
       setCachedRecords(objectType, flatRecords);
 
+      const wFilters: WhereFilter[] = (widget.config?.whereFilters || []).filter((f: WhereFilter) => f.field && f.operator);
+
       // Metric/card widgets: compute value from record count or field sum
       if (isMetric) {
-        let value = flatRecords.length;
+        const filteredRecords = applyWhereFilters(flatRecords, wFilters);
+        let value = filteredRecords.length;
         if (yField) {
           const field = stripFieldPrefix(yField);
-          value = flatRecords.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
+          value = filteredRecords.reduce((sum: number, r: any) => sum + (Number(r[field]) || 0), 0);
         }
         const updatedWidgets = selectedDashboard.widgets.map(w =>
           w.id === widget.id
@@ -1112,7 +1125,8 @@ export default function DashboardPage() {
           xAxisField: xField,
           yAxisField: yField,
           stackByField: stackByField,
-          aggregationType: widget.config?.aggregationType || 'sum'
+          aggregationType: widget.config?.aggregationType || 'sum',
+          whereFilters: wFilters,
         });
 
         if (!data || data.length === 0) {
@@ -1145,7 +1159,8 @@ export default function DashboardPage() {
           objectType,
           xAxisField: xField,
           yAxisField: yField,
-          aggregationType: widget.config?.aggregationType || 'sum'
+          aggregationType: widget.config?.aggregationType || 'sum',
+          whereFilters: wFilters,
         });
 
         if (!aggregatedData || aggregatedData.length === 0) {
@@ -1226,6 +1241,7 @@ export default function DashboardPage() {
         const sec = sId ? (selectedDashboard?.sections || []).find(s => s.id === sId) : null;
         return sec?.filterButtons || widget.config?.filterButtons || [];
       })(),
+      whereFilters: widget.config?.whereFilters || [],
       title: widget.title || '',
       subtitle: widget.config?.subtitle || '',
       footer: widget.config?.footer || '',
@@ -3487,6 +3503,89 @@ export default function DashboardPage() {
                         </select>
                       </div>
 
+                      {/* WHERE Filters */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Filters (WHERE)
+                          <span className="text-xs text-gray-500 ml-2">Narrow down records</span>
+                        </label>
+                        {(widgetConfig.whereFilters || []).map((wf: WhereFilter, idx: number) => (
+                          <div key={idx} className="flex gap-1.5 mb-2 items-center">
+                            <select
+                              value={wf.field}
+                              onChange={(e) => {
+                                const updated = [...(widgetConfig.whereFilters || [])];
+                                updated[idx] = { ...wf, field: e.target.value };
+                                setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                              }}
+                              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                            >
+                              <option value="">Field…</option>
+                              {objectFields.map(f => (
+                                <option key={f.value} value={f.value}>{f.label}</option>
+                              ))}
+                            </select>
+                            <select
+                              value={wf.operator}
+                              onChange={(e) => {
+                                const updated = [...(widgetConfig.whereFilters || [])];
+                                updated[idx] = { ...wf, operator: e.target.value as WhereFilter['operator'] };
+                                setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                              }}
+                              className="w-[100px] px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                            >
+                              <option value="equals">=</option>
+                              <option value="not_equals">≠</option>
+                              <option value="greater_than">&gt;</option>
+                              <option value="less_than">&lt;</option>
+                              <option value="greater_equal">≥</option>
+                              <option value="less_equal">≤</option>
+                              <option value="contains">contains</option>
+                              <option value="not_contains">excludes</option>
+                              <option value="starts_with">starts with</option>
+                              <option value="is_empty">is empty</option>
+                              <option value="is_not_empty">has value</option>
+                            </select>
+                            {wf.operator !== 'is_empty' && wf.operator !== 'is_not_empty' && (
+                              <input
+                                type="text"
+                                value={wf.value}
+                                onChange={(e) => {
+                                  const updated = [...(widgetConfig.whereFilters || [])];
+                                  updated[idx] = { ...wf, value: e.target.value };
+                                  setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                                }}
+                                placeholder="Value…"
+                                className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = (widgetConfig.whereFilters || []).filter((_: any, i: number) => i !== idx);
+                                setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                              }}
+                              className="p-1 text-red-400 hover:text-red-600 rounded"
+                              title="Remove filter"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWidgetConfig({
+                              ...widgetConfig,
+                              whereFilters: [...(widgetConfig.whereFilters || []), { field: '', operator: 'equals', value: '' }]
+                            });
+                          }}
+                          className="text-xs text-brand-navy hover:underline font-medium"
+                        >
+                          + Add Filter
+                        </button>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Legend Position</label>
                         <select
@@ -3505,6 +3604,7 @@ export default function DashboardPage() {
                   )}
 
                   {widgetConfig.dataSource && ['metric', 'card'].includes(selectedWidgetType) && (
+                    <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Count Field</label>
                       <select
@@ -3518,6 +3618,89 @@ export default function DashboardPage() {
                         ))}
                       </select>
                     </div>
+                    {/* WHERE Filters for metric/card */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Filters (WHERE)
+                        <span className="text-xs text-gray-500 ml-2">Narrow down records</span>
+                      </label>
+                      {(widgetConfig.whereFilters || []).map((wf: WhereFilter, idx: number) => (
+                        <div key={idx} className="flex gap-1.5 mb-2 items-center">
+                          <select
+                            value={wf.field}
+                            onChange={(e) => {
+                              const updated = [...(widgetConfig.whereFilters || [])];
+                              updated[idx] = { ...wf, field: e.target.value };
+                              setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                            }}
+                            className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                          >
+                            <option value="">Field…</option>
+                            {objectFields.map(f => (
+                              <option key={f.value} value={f.value}>{f.label}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={wf.operator}
+                            onChange={(e) => {
+                              const updated = [...(widgetConfig.whereFilters || [])];
+                              updated[idx] = { ...wf, operator: e.target.value as WhereFilter['operator'] };
+                              setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                            }}
+                            className="w-[100px] px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                          >
+                            <option value="equals">=</option>
+                            <option value="not_equals">≠</option>
+                            <option value="greater_than">&gt;</option>
+                            <option value="less_than">&lt;</option>
+                            <option value="greater_equal">≥</option>
+                            <option value="less_equal">≤</option>
+                            <option value="contains">contains</option>
+                            <option value="not_contains">excludes</option>
+                            <option value="starts_with">starts with</option>
+                            <option value="is_empty">is empty</option>
+                            <option value="is_not_empty">has value</option>
+                          </select>
+                          {wf.operator !== 'is_empty' && wf.operator !== 'is_not_empty' && (
+                            <input
+                              type="text"
+                              value={wf.value}
+                              onChange={(e) => {
+                                const updated = [...(widgetConfig.whereFilters || [])];
+                                updated[idx] = { ...wf, value: e.target.value };
+                                setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                              }}
+                              placeholder="Value…"
+                              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = (widgetConfig.whereFilters || []).filter((_: any, i: number) => i !== idx);
+                              setWidgetConfig({ ...widgetConfig, whereFilters: updated });
+                            }}
+                            className="p-1 text-red-400 hover:text-red-600 rounded"
+                            title="Remove filter"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWidgetConfig({
+                            ...widgetConfig,
+                            whereFilters: [...(widgetConfig.whereFilters || []), { field: '', operator: 'equals', value: '' }]
+                          });
+                        }}
+                        className="text-xs text-brand-navy hover:underline font-medium"
+                      >
+                        + Add Filter
+                      </button>
+                    </div>
+                    </>
                   )}
                 </>
                 );
