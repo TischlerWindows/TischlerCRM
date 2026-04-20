@@ -631,6 +631,181 @@ export async function ensureCoreObjects(): Promise<void> {
     console.warn('[ensure-core-objects] Failed to seed internal Tischler properties:', err)
   }
 
+  // --- Service Department + Profile seeding (Task 13) ---
+  //
+  // PERMISSION SYSTEM NOTE:
+  // The Profile.permissions JSON uses a flat boolean CRUD schema validated by
+  // the profilesRoutes Zod schema:
+  //   {
+  //     objects: Record<'leads'|'opportunities'|...|'service'|..., {
+  //       create, read, edit, delete, viewAll, modifyAll  (all boolean)
+  //     }>,
+  //     app: Record<APP_KEY, boolean>
+  //   }
+  //
+  // The plan's walled-garden predicate tokens ('ownAssignments', 'ownTech',
+  // 'viaWorkOrder', 'ownTechWithin24h', 'sameAssignedWos') are NOT supported
+  // by the current permission engine — it only evaluates booleans. Fine-grained
+  // row-level scoping (e.g. "only see WOs you're assigned to") is already
+  // enforced client-side inside the Task 6–8 widgets (AssignmentWidget,
+  // PunchListWidget, TimeEntryWidget, WorkOrderExpenseWidget) which filter
+  // by the authenticated user's Technician record. Full server-side walled-garden
+  // predicates would require a permission engine upgrade (out of scope Task 13).
+  //
+  // Approach chosen: encode the NEAREST available booleans.
+  // - Service Manager: full CRUD on service + read on properties
+  // - Service Technician: read+create+edit on service (row-level walled garden
+  //   is client-side); everything outside service is explicitly false (walled
+  //   garden via denial). No delete permission for techs.
+  //
+  // Department model has no createdById/modifiedById — those fields do not exist.
+
+  try {
+    // 1. Ensure Service department exists
+    const serviceDept = await prisma.department.findFirst({
+      where: { name: { equals: 'Service', mode: 'insensitive' }, deletedAt: null },
+    });
+    if (!serviceDept) {
+      await prisma.department.create({
+        data: {
+          id: generateId('Department'),
+          name: 'Service',
+          description: 'Service Department — manages work orders, technicians, and field service',
+          isActive: true,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service department');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service department:', err);
+  }
+
+  try {
+    // 2. Ensure Service Manager profile exists
+    // Full CRUD on service objects; read+edit on properties (no delete).
+    // All non-service objects are false (minimal privilege outside the module).
+    const allObjectsFalse = {
+      create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false,
+    };
+    const managerPermissions = {
+      objects: {
+        leads:         allObjectsFalse,
+        opportunities: allObjectsFalse,
+        projects:      allObjectsFalse,
+        service:       { create: true,  read: true, edit: true, delete: true, viewAll: true,  modifyAll: true  },
+        quotes:        allObjectsFalse,
+        installations: { create: false, read: true, edit: false, delete: false, viewAll: true, modifyAll: false },
+        properties:    { create: true,  read: true, edit: true,  delete: false, viewAll: true, modifyAll: false },
+        contacts:      { create: false, read: true, edit: false, delete: false, viewAll: false, modifyAll: false },
+        companies:     allObjectsFalse,
+        products:      allObjectsFalse,
+      },
+      app: {
+        manageUsers:            false,
+        manageProfiles:         false,
+        manageDepartments:      false,
+        manageIntegrations:     false,
+        manageCompanySettings:  false,
+        exportData:             true,
+        importData:             false,
+        viewReports:            true,
+        manageReports:          false,
+        manageDashboards:       false,
+        viewSummary:            true,
+        viewSetup:              false,
+        viewAuditLog:           false,
+        customizeApplication:   false,
+        viewAllData:            false,
+        modifyAllData:          false,
+      },
+    };
+
+    const managerProfile = await prisma.profile.findFirst({
+      where: { name: { equals: 'Service Manager', mode: 'insensitive' } },
+    });
+    if (!managerProfile) {
+      await prisma.profile.create({
+        data: {
+          id: generateId('Profile'),
+          name: 'Service Manager',
+          label: 'Service Manager',
+          description: 'Full access to service module objects (Work Orders, Technicians, Time Entries, Expenses, Punch Lists). Read access to Properties and Installations.',
+          permissions: managerPermissions,
+          isSystem: false,
+          grantsAdminAccess: false,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service Manager profile');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service Manager profile:', err);
+  }
+
+  try {
+    // 3. Ensure Service Technician profile exists
+    // Walled garden via boolean denial of all non-service objects.
+    // Row-level scoping (own WOs, own time entries) is enforced client-side
+    // in the Task 6–8 widgets — see note above about predicate tokens.
+    // Techs get read+create+edit on service but NOT delete and NOT viewAll/modifyAll.
+    const allObjectsFalse = {
+      create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false,
+    };
+    const techPermissions = {
+      objects: {
+        leads:         allObjectsFalse,
+        opportunities: allObjectsFalse,
+        projects:      allObjectsFalse,
+        // Service objects: read+create+edit only; no delete; no viewAll (client filters to own records)
+        service:       { create: true,  read: true, edit: true,  delete: false, viewAll: false, modifyAll: false },
+        quotes:        allObjectsFalse,
+        installations: allObjectsFalse,
+        // Properties: read-only (need to see site address on their WOs)
+        properties:    { create: false, read: true, edit: false, delete: false, viewAll: false, modifyAll: false },
+        contacts:      allObjectsFalse,
+        companies:     allObjectsFalse,
+        products:      allObjectsFalse,
+      },
+      app: {
+        manageUsers:            false,
+        manageProfiles:         false,
+        manageDepartments:      false,
+        manageIntegrations:     false,
+        manageCompanySettings:  false,
+        exportData:             false,
+        importData:             false,
+        viewReports:            false,
+        manageReports:          false,
+        manageDashboards:       false,
+        viewSummary:            false,
+        viewSetup:              false,
+        viewAuditLog:           false,
+        customizeApplication:   false,
+        viewAllData:            false,
+        modifyAllData:          false,
+      },
+    };
+
+    const techProfile = await prisma.profile.findFirst({
+      where: { name: { equals: 'Service Technician', mode: 'insensitive' } },
+    });
+    if (!techProfile) {
+      await prisma.profile.create({
+        data: {
+          id: generateId('Profile'),
+          name: 'Service Technician',
+          label: 'Service Technician',
+          description: 'Walled garden — access limited to service module. Read/create/edit on Work Orders, Assignments, Punch Lists, Time Entries, and Expenses (row-level filtering to own assignments is enforced by each widget client-side). Read-only on Properties.',
+          permissions: techPermissions,
+          isSystem: false,
+          grantsAdminAccess: false,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service Technician profile');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service Technician profile:', err);
+  }
+
   // Also sync any user-created objects from the schema settings to the DB.
   // The schema (stored in the Setting table under 'orgSchema') may contain
   // objects that were created in the UI but whose apiClient.createObject call
