@@ -175,11 +175,25 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Resolve project name from lookup
+    let projectName: string | null = null
+    const projectId = (installation.data as Record<string, any>).project
+    if (projectId) {
+      const projectRecord = await prisma.record.findUnique({
+        where: { id: projectId },
+        select: { data: true },
+      })
+      if (projectRecord) {
+        projectName = (projectRecord.data as Record<string, any>).projectName ?? null
+      }
+    }
+
     return {
       installation,
       costs,
       techExpenses,
       weekCount: costs.length,
+      projectName,
     }
     } catch (err: any) {
       request.log.error(err, 'GET data failed')

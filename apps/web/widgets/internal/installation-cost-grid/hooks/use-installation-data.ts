@@ -16,6 +16,7 @@ interface InstallationData {
     expenses: Array<{ id: string; data: Record<string, any> }>
   }>
   weekCount: number
+  projectName?: string | null
 }
 
 interface DirtyState {
