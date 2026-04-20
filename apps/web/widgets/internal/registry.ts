@@ -15,6 +15,7 @@ import { config as pathManifest } from './path/widget.config'
 import { config as installationCostGridManifest } from './installation-cost-grid/widget.config'
 import { config as summaryManifest } from './summary/widget.config'
 import { config as dropboxFilesManifest } from './dropbox-files/widget.config'
+import { config as workOrderAssignmentsManifest } from './work-order-assignments/widget.config'
 import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
@@ -84,6 +85,11 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     manifest: dropboxFilesManifest,
     widgetConfigType: 'DropboxFiles',
     Component: dynamic(() => import('./dropbox-files/index')),
+  },
+  {
+    manifest: workOrderAssignmentsManifest,
+    widgetConfigType: 'WorkOrderAssignments',
+    Component: dynamic(() => import('./work-order-assignments/index')),
   },
 ]
 
