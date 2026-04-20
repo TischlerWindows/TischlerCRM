@@ -67,8 +67,9 @@ export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpense
                     <td className="px-2 py-0.5 border-b border-gray-100 font-medium sticky left-0 bg-white z-10">{d.weekNumber}</td>
                     {LABOR_COLUMNS.map((col, laborColIndex) => (
                       <td key={col.key} className="p-0.5 border-b border-gray-100">
-                        <input type="number" step="0.5" value={getValue(exp.id, col.key, d)}
+                        <input type="number" step="0.5" value={getValue(exp.id, col.key, d) || ''}
                           onChange={e => onFieldChange(exp.id, col.key, parseFloat(e.target.value) || 0)}
+                          onFocus={e => e.target.select()}
                           {...getCellProps(expIndex, laborColIndex)}
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-center text-[10px] focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                           style={{ background: `${col.color}08` }} />
@@ -76,8 +77,9 @@ export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpense
                     ))}
                     {TECH_EXPENSE_COLUMNS.map((col, expenseColIndex) => (
                       <td key={col.key} className="p-0.5 border-b border-gray-100">
-                        <input type="number" step="0.01" value={getValue(exp.id, col.key, d)}
+                        <input type="number" step="0.01" value={getValue(exp.id, col.key, d) || ''}
                           onChange={e => onFieldChange(exp.id, col.key, parseFloat(e.target.value) || 0)}
+                          onFocus={e => e.target.select()}
                           {...getCellProps(expIndex, LABOR_COLUMNS.length + expenseColIndex)}
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-center text-[10px] focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                           style={{ background: `${col.color}08` }} />
