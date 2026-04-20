@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Plus, FileText, Loader2 } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
@@ -77,8 +77,14 @@ export default function PunchListWidget({ record }: WidgetProps) {
   const [techNames, setTechNames] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+
+  // Keep a ref to the current techNames cache so reload() can read it
+  // without adding techNames to its dependency array
+  const techNamesRef = useRef(techNames)
+  useEffect(() => { techNamesRef.current = techNames }, [techNames])
 
   // Add-item form state
   const [adding, setAdding] = useState(false)
@@ -115,9 +121,10 @@ export default function PunchListWidget({ record }: WidgetProps) {
         .sort((a, b) => (a.data.itemNumber ?? 0) - (b.data.itemNumber ?? 0))
       setItems(list)
 
-      // Resolve tech names for any assignedTech IDs we haven't seen
+      // Resolve tech names for IDs not already in our cache
+      const currentCache = techNamesRef.current
       const missingIds = [...new Set(
-        list.map(i => i.data.assignedTech).filter((id): id is string => !!id)
+        list.map(i => i.data.assignedTech).filter((id): id is string => !!id && !currentCache[id])
       )]
       const newNames: Record<string, string> = {}
       await Promise.all(
@@ -141,7 +148,7 @@ export default function PunchListWidget({ record }: WidgetProps) {
   async function addItem() {
     if (!workOrderId || !newDesc.trim()) return
     setSaving(true)
-    setError(null)
+    setMutationError(null)
     try {
       // Auto-increment: find max itemNumber across current items, add 1
       const maxNum = items.reduce((max, i) => Math.max(max, i.data.itemNumber ?? 0), 0)
@@ -159,7 +166,7 @@ export default function PunchListWidget({ record }: WidgetProps) {
       setAdding(false)
       await reload()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to add item. Please try again.')
+      setMutationError(e instanceof Error ? e.message : 'Failed to add item. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -168,14 +175,14 @@ export default function PunchListWidget({ record }: WidgetProps) {
   async function updateStatus(item: PunchItem, status: string) {
     if (saving) return
     setSaving(true)
-    setError(null)
+    setMutationError(null)
     try {
       await recordsService.updateRecord('PunchListItem', item.id, {
         data: { status },
       })
       await reload()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to update status')
+      setMutationError(e instanceof Error ? e.message : 'Failed to update status')
     } finally {
       setSaving(false)
     }
@@ -184,7 +191,7 @@ export default function PunchListWidget({ record }: WidgetProps) {
   async function printPdf() {
     if (!workOrderId || items.length === 0) return
     setPdfLoading(true)
-    setError(null)
+    setMutationError(null)
     try {
       const wo = await recordsService.getRecord('WorkOrder', workOrderId) as any
       const propertyId = wo?.data?.property
@@ -204,7 +211,7 @@ export default function PunchListWidget({ record }: WidgetProps) {
       }))
       await generatePunchListPdf(wo?.data?.name || `WO-${workOrderId}`, propAddress, pdfItems)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to generate PDF')
+      setMutationError(e instanceof Error ? e.message : 'Failed to generate PDF')
     } finally {
       setPdfLoading(false)
     }
@@ -228,8 +235,8 @@ export default function PunchListWidget({ record }: WidgetProps) {
     )
   }
 
-  // ── Error ──
-  if (error) {
+  // ── Initial load error (nothing to show) ──
+  if (error && items.length === 0) {
     return (
       <div className="rounded-xl border border-red-100 bg-red-50 p-4 text-xs text-red-600">
         {error}
@@ -239,6 +246,21 @@ export default function PunchListWidget({ record }: WidgetProps) {
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      {/* Mutation error banner — sits above the table, doesn't hide it */}
+      {mutationError && (
+        <div className="px-4 py-2.5 bg-red-50 border-b border-red-100 flex items-center justify-between">
+          <span className="text-xs text-red-600">{mutationError}</span>
+          <button
+            type="button"
+            onClick={() => setMutationError(null)}
+            className="ml-3 text-red-400 hover:text-red-600 text-xs leading-none"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-4 py-2.5 flex items-center justify-between border-b border-gray-100">
         <span className="text-xs font-semibold text-brand-gray uppercase tracking-wide">
