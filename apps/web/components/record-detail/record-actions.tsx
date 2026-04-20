@@ -265,6 +265,8 @@ export function RecordActions({
                 <div className="absolute right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-modal">
                   <Link
                     href={`/object-manager/${encodeURIComponent(objectApiName)}?returnTo=${encodeURIComponent(pathname)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                     onClick={() => setShowAdminMenu(false)}
                   >
@@ -275,6 +277,8 @@ export function RecordActions({
                   {pageLayout && (
                     <Link
                       href={`/object-manager/${encodeURIComponent(objectApiName)}/page-editor/${encodeURIComponent(pageLayout.id)}?returnTo=${encodeURIComponent(pathname)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                       onClick={() => setShowAdminMenu(false)}
                     >
