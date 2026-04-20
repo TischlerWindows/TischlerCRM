@@ -103,17 +103,17 @@ export default function WorkOrderAssignmentsWidget({ record }: WidgetProps) {
       setAssignments(list)
 
       // Resolve tech names (fetch each unknown technician)
-      const techMap: Record<string, Tech> = { ...techs }
+      const techMap: Record<string, Tech> = {}
       const missing = list
         .map(a => a.data.technician)
-        .filter((tid): tid is string => !!tid && !techMap[tid])
+        .filter((tid): tid is string => !!tid)
       await Promise.all(
         [...new Set(missing)].map(async (tid) => {
           const t = await recordsService.getRecord('Technician', tid)
           if (t) techMap[tid] = t as unknown as Tech
         })
       )
-      setTechs(techMap)
+      setTechs(prev => ({ ...prev, ...techMap }))
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load assignments')
     } finally {
@@ -172,8 +172,8 @@ export default function WorkOrderAssignmentsWidget({ record }: WidgetProps) {
       }
       setShowPicker(false)
       await reload()
-    } catch {
-      // stay open so user can retry
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to add technician. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -194,6 +194,8 @@ export default function WorkOrderAssignmentsWidget({ record }: WidgetProps) {
         data: { leadTech: assignment.data.technician ?? null },
       })
       await reload()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to update lead technician')
     } finally {
       setSaving(false)
     }
@@ -205,6 +207,8 @@ export default function WorkOrderAssignmentsWidget({ record }: WidgetProps) {
     try {
       await recordsService.deleteRecord('WorkOrderAssignment', assignmentId)
       await reload()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to remove assignment. Please try again.')
     } finally {
       setSaving(false)
     }
