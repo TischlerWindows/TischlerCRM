@@ -599,36 +599,36 @@ export async function ensureCoreObjects(): Promise<void> {
   try {
     const propertyObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Property', mode: 'insensitive' } },
-    });
+    })
     if (propertyObj) {
       const internalProps = [
-        { name: 'Tischler HQ — Office' },
-        { name: 'Tischler HQ — Warehouse' },
-        { name: 'Tischler Fleet — Service Trucks' },
-      ];
+        { address: 'Tischler HQ — Office',         city: 'Internal', state: 'Internal', status: 'Active' },
+        { address: 'Tischler HQ — Warehouse',      city: 'Internal', state: 'Internal', status: 'Active' },
+        { address: 'Tischler Fleet — Service Trucks', city: 'Internal', state: 'Internal', status: 'Active' },
+      ]
       for (const p of internalProps) {
         const exists = await prisma.record.findFirst({
           where: {
             objectId: propertyObj.id,
-            data: { path: ['name'], equals: p.name },
+            data: { path: ['address'], equals: p.address },
           },
-        });
+        })
         if (!exists) {
           await prisma.record.create({
             data: {
               id: generateId('Property'),
               objectId: propertyObj.id,
-              data: { name: p.name },
+              data: p,
               createdById: systemUser.id,
               modifiedById: systemUser.id,
             },
-          });
-          console.log(`[ensure-core-objects] Seeded internal property: ${p.name}`);
+          })
+          console.log(`[ensure-core-objects] Seeded internal property: ${p.address}`)
         }
       }
     }
   } catch (err) {
-    console.warn('[ensure-core-objects] Could not seed Tischler internal properties:', err);
+    console.warn('[ensure-core-objects] Failed to seed internal Tischler properties:', err)
   }
 
   // Also sync any user-created objects from the schema settings to the DB.
