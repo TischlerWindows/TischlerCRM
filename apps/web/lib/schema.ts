@@ -220,7 +220,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -342,6 +342,12 @@ export interface SummaryConfig {
   type: 'Summary';
 }
 
+export interface DropboxFilesConfig {
+  type: 'DropboxFiles';
+  /** Optional folder name override (supports {record.fieldName} tokens) */
+  folderName?: string;
+}
+
 export type WidgetConfig =
   | RelatedListConfig
   | CustomComponentConfig
@@ -354,7 +360,8 @@ export type WidgetConfig =
   | TeamMemberAssociationsConfig
   | PathConfig
   | InstallationCostGridConfig
-  | SummaryConfig;
+  | SummaryConfig
+  | DropboxFilesConfig;
 
 export interface PageWidget {
   id: string;

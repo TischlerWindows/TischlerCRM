@@ -8,6 +8,7 @@ import { internalWidgets } from '@/widgets/internal/registry';
 import { externalWidgets } from '@/widgets/external/registry';
 import {
   Activity,
+  Cloud,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -21,6 +22,7 @@ import type { ElementType } from 'react';
 
 const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Activity,
+  Cloud,
   Component,
   FolderOpen,
   LayoutGrid,
@@ -51,6 +53,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'path': 'Path',
   'installation-cost-grid': 'InstallationCostGrid',
   'summary': 'Summary',
+  'dropbox-files': 'DropboxFiles',
 };
 
 function InternalDraggableCard({ manifest }: { manifest: WidgetManifest }): JSX.Element {
