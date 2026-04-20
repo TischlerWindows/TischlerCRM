@@ -1,12 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { Briefcase, ArrowRight } from 'lucide-react';
+import { Briefcase, ExternalLink } from 'lucide-react';
 
 export function ObjectManagerHeroCard() {
   return (
     <Link
       href="/object-manager"
+      target="_blank"
+      rel="noopener noreferrer"
       className="group block bg-white rounded-2xl border border-brand-navy/15 hover:border-brand-navy/30 p-6 transition-all duration-200 hover:shadow-md relative overflow-hidden mb-8"
       style={{ backgroundImage: 'linear-gradient(135deg, rgba(21,31,109,0.05), rgba(21,31,109,0.01))' }}
     >
@@ -21,8 +23,8 @@ export function ObjectManagerHeroCard() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm font-semibold text-brand-navy group-hover:translate-x-1 transition-transform">
-          <span>Open</span>
-          <ArrowRight className="w-4 h-4" />
+          <span>Open in new tab</span>
+          <ExternalLink className="w-4 h-4" />
         </div>
       </div>
     </Link>
