@@ -1,16 +1,16 @@
 /**
  * Layout resolver — picks the one page layout a user should see for a given
- * object (and optional record), based on active/roles/default assignment.
+ * object, based on active/roles/default assignment.
  *
- * Pure + synchronous so it can be used from event handlers, `useMemo`, tests,
- * and both DynamicForm and RecordDetailPage resolution.
+ * The active layout always wins: records no longer pin themselves to a
+ * historical layout. Existing records automatically render with whichever
+ * layout is currently active for the viewer's profile.
  *
- * Priority (first match wins, all steps filter `layout.active !== false`):
- *   1. Preserve context: record's stored pageLayoutId if still active
- *   2. Role match: layout whose `roles` contains the user's profileId
- *   3. Default: layout marked `isDefault: true`
- *   4. Single active: if only one active layout exists, use it
- *   5. Error: admin config problem, return an actionable message
+ * Priority (first match wins, all steps filter `layout.active === true`):
+ *   1. Role match: layout whose `roles` contains the user's profileId
+ *   2. Default: layout marked `isDefault: true`
+ *   3. Single active: if only one active layout exists, use it
+ *   4. Error: admin config problem, return an actionable message
  */
 
 import type { ObjectDef, PageLayout } from './schema';
@@ -20,7 +20,6 @@ export type LayoutResolveResult =
   | { kind: 'error'; reason: 'no-layouts' | 'no-match'; message: string };
 
 export type ResolveReason =
-  | 'record-layout'
   | 'role-match'
   | 'default'
   | 'single-active';
@@ -31,8 +30,9 @@ export interface ResolveUserContext {
 }
 
 export interface ResolveOptions {
-  /** When provided, the record's `pageLayoutId` preempts role/default lookup
-   *  (if the layout is still active). */
+  /** Accepted for source-compat with older callers; ignored. The active
+   *  layout now always wins regardless of what layout a record was saved
+   *  against historically. */
   record?: { pageLayoutId?: string | null } | null;
   /** Informational only — the resolver doesn't split layouts by type today. */
   layoutType?: 'create' | 'edit';
@@ -71,33 +71,27 @@ export function resolveLayoutForUser(
     };
   }
 
-  // 1. Preserve record's stored layout (when still active).
-  const recordLayoutId = options?.record?.pageLayoutId;
-  if (recordLayoutId) {
-    const match = activeLayouts.find((l) => l.id === recordLayoutId);
-    if (match) return { kind: 'resolved', layout: match, reason: 'record-layout' };
-    // If the record references an inactive/deleted layout, fall through.
-  }
+  void options;
 
-  // 2. Role match — first active layout whose roles include the user's profileId.
+  // 1. Role match — first active layout whose roles include the user's profileId.
   const profileId = user.profileId ?? null;
   if (profileId) {
     const match = activeLayouts.find((l) => (l.roles ?? []).includes(profileId));
     if (match) return { kind: 'resolved', layout: match, reason: 'role-match' };
   }
 
-  // 3. Default layout.
+  // 2. Default layout.
   const defaultLayout = activeLayouts.find((l) => l.isDefault === true);
   if (defaultLayout) {
     return { kind: 'resolved', layout: defaultLayout, reason: 'default' };
   }
 
-  // 4. Single active — unambiguous, use it.
+  // 3. Single active — unambiguous, use it.
   if (activeLayouts.length === 1) {
     return { kind: 'resolved', layout: activeLayouts[0]!, reason: 'single-active' };
   }
 
-  // 5. Admin configuration gap.
+  // 4. Admin configuration gap.
   return {
     kind: 'error',
     reason: 'no-match',

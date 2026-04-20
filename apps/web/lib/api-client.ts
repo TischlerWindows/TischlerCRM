@@ -500,16 +500,6 @@ class ApiClient {
     );
   }
 
-  async migrateRecordLayouts(objectApiName: string, fromPageLayoutId: string): Promise<{ updatedCount: number }> {
-    return this.request<{ updatedCount: number }>(
-      `/objects/${objectApiName}/records/page-layout/migrate`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ fromPageLayoutId }),
-      },
-    );
-  }
-
   // Reports
   async getReports() {
     return this.request<any[]>('/reports');

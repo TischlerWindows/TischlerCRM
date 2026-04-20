@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { validateFields } from './form-validation';
 import { FieldInput, getFieldIcon } from './field-input';
 import { getRecordLabel, getLookupTargetApi } from './lookup-search';
+import { MissingRequiredModal } from './missing-required-modal';
 
 // ── DynamicFormProps ─────────────────────────────────────────────────
 
@@ -160,6 +161,7 @@ export default function DynamicForm({
     return data;
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [missingRequiredLabels, setMissingRequiredLabels] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -228,12 +230,7 @@ export default function DynamicForm({
       const result = resolveLayoutForUser(
         object,
         { profileId: authUser?.profileId ?? null },
-        {
-          record: recordData?.pageLayoutId
-            ? { pageLayoutId: recordData.pageLayoutId as string }
-            : null,
-          layoutType,
-        },
+        { layoutType },
       );
       if (result.kind === 'resolved') {
         resolved = result.layout;
@@ -244,7 +241,7 @@ export default function DynamicForm({
       return migrateLegacyLayout(resolved as any);
     }
     return resolved;
-  }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId, recordData]);
+  }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId]);
 
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab) {
@@ -477,8 +474,22 @@ export default function DynamicForm({
   };
 
   const runFullValidation = (): boolean => {
-    const newErrors = validateFields(collectAllFields(), formData);
+    const pairs = collectAllFields();
+    const newErrors = validateFields(pairs, formData);
     setErrors(newErrors);
+    // Recompute "missing required" from the same source of truth as
+    // validateFields (field- or layout-level required) instead of matching
+    // the error-message string, so localization / prefix changes don't
+    // silently break the modal.
+    const missing: string[] = [];
+    for (const { panelField, fieldDef } of pairs) {
+      const required = fieldDef.required || panelField.behavior === 'required';
+      if (!required) continue;
+      if (newErrors[panelField.fieldApiName]) {
+        missing.push(fieldDef.label);
+      }
+    }
+    setMissingRequiredLabels(missing);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -1725,6 +1736,11 @@ export default function DynamicForm({
           </DialogContent>
         </Dialog>
       )}
+      <MissingRequiredModal
+        open={missingRequiredLabels.length > 0}
+        labels={missingRequiredLabels}
+        onClose={() => setMissingRequiredLabels([])}
+      />
     </>
     </PendingWidgetProvider>
   );

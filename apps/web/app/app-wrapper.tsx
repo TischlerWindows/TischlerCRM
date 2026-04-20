@@ -242,8 +242,10 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
         pageLayoutId: recordSetup.pageLayoutId,
       };
     }
-    return resolveListViewObjectSetup(pathname, schema?.objects);
-  }, [recordSetup, pathname, schema?.objects]);
+    return resolveListViewObjectSetup(pathname, schema?.objects, {
+      profileId: user?.profileId ?? null,
+    });
+  }, [recordSetup, pathname, schema?.objects, user?.profileId]);
 
   const showEditObject =
     canCustomize && !!setupObjectTarget?.objectApiName && setupObjectTarget.objectApiName !== 'Home';
