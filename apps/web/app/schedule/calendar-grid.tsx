@@ -9,7 +9,7 @@ export interface GridWO {
   id: string
   name: string
   status: string
-  workOrderType?: string
+  workOrderCategory?: string
   scheduledStartDate?: string
   /** resolved tech ID — may differ from leadTech if assigned via WorkOrderAssignment */
   techId?: string
@@ -68,7 +68,7 @@ function DroppableCell({
     >
       <div className="space-y-1">
         {wos.map((wo) => {
-          const isInternal = wo.workOrderType?.toLowerCase().includes('internal')
+          const isInternal = wo.workOrderCategory === 'Internal'
           return (
             <Link
               key={wo.id}

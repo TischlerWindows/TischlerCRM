@@ -89,7 +89,7 @@ interface RawWO {
   id: string
   name: string
   status: string
-  workOrderType?: string
+  workOrderCategory?: string
   scheduledStartDate?: string
   leadTech?: string
 }
@@ -164,7 +164,7 @@ export default function SchedulePage() {
         id: str(r.id),
         name: str(getField(r, 'name')) || str(r.id),
         status: str(getField(r, 'workOrderStatus')) || 'Open',
-        workOrderType: str(getField(r, 'workOrderType')) || undefined,
+        workOrderCategory: str(getField(r, 'workOrderCategory')) || undefined,
         scheduledStartDate: str(getField(r, 'scheduledStartDate')) || undefined,
         leadTech: str(getField(r, 'leadTech')) || undefined,
       }))
@@ -207,7 +207,7 @@ export default function SchedulePage() {
       id: wo.id,
       name: wo.name,
       status: wo.status,
-      workOrderType: wo.workOrderType,
+      workOrderCategory: wo.workOrderCategory,
       scheduledStartDate: wo.scheduledStartDate,
     }))
 
@@ -223,7 +223,7 @@ export default function SchedulePage() {
       id: wo.id,
       name: wo.name,
       status: wo.status,
-      workOrderType: wo.workOrderType,
+      workOrderCategory: wo.workOrderCategory,
       scheduledStartDate: wo.scheduledStartDate,
       techId: assignedMap[wo.id] || wo.leadTech,
     }))
@@ -242,6 +242,13 @@ export default function SchedulePage() {
 
     const { techId, date } = e.over.data.current as { techId: string; date: string }
     const woId = e.active.id as string
+
+    // Capture original state for precise rollback
+    const original = allWOs.find((w) => w.id === woId)
+    const originalStatus = original?.status ?? 'Open'
+    const originalLeadTech = original?.leadTech ?? undefined
+    const originalScheduledStartDate = original?.scheduledStartDate ?? undefined
+    const hadAssignment = woId in assignedMap
 
     // Optimistic update
     setAssignedMap((prev) => ({ ...prev, [woId]: techId }))
@@ -266,16 +273,16 @@ export default function SchedulePage() {
       })
     } catch (err) {
       console.error('Failed to save assignment:', err)
-      // Revert optimistic update on error
+      // Revert optimistic update — restore exact original state
       setAssignedMap((prev) => {
         const next = { ...prev }
-        delete next[woId]
+        if (!hadAssignment) delete next[woId]
         return next
       })
       setAllWOs((prev) =>
         prev.map((wo) =>
           wo.id === woId
-            ? { ...wo, scheduledStartDate: undefined, status: 'Open', leadTech: undefined }
+            ? { ...wo, scheduledStartDate: originalScheduledStartDate, status: originalStatus, leadTech: originalLeadTech }
             : wo
         )
       )

@@ -9,7 +9,7 @@ export interface UnassignedWO {
   id: string
   name: string
   status: string
-  workOrderType?: string
+  workOrderCategory?: string
   scheduledStartDate?: string
 }
 
@@ -37,7 +37,7 @@ function DraggableCard({ wo }: { wo: UnassignedWO }) {
     data: { wo },
   })
 
-  const isInternal = wo.workOrderType?.toLowerCase().includes('internal')
+  const isInternal = wo.workOrderCategory === 'Internal'
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
@@ -89,7 +89,7 @@ export function UnassignedPool({
   onStatusFilterChange,
 }: UnassignedPoolProps) {
   const filtered = wos.filter((w) => {
-    const isInternal = w.workOrderType?.toLowerCase().includes('internal')
+    const isInternal = w.workOrderCategory === 'Internal'
     if (categoryFilter === 'client' && isInternal) return false
     if (categoryFilter === 'internal' && !isInternal) return false
     if (statusFilter !== 'all' && w.status !== statusFilter) return false
