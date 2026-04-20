@@ -1,5 +1,7 @@
 # Service Department Module — Design Spec
 
+> **⚠️ SUPERSEDED 2026-04-20** — This v1 spec is preserved for history only. The authoritative design is now [v2 spec (2026-04-20)](./2026-04-20-service-department-module-design-v2.md), which was produced from a pressure-test brainstorming pass. Material changes include: 7-state lifecycle (Open/On Hold/Cancelled added), walled garden tech permissions, merged Schedule page (Calendar + Assignment Board), Tischler-as-Property pattern for Internal WOs, intake source tracking, dropped overtime logic, and dropped structured Tool object. See the "Deltas from v1 spec" section of the v2 spec for the full list.
+
 ## Context
 
 Tischler Windows is migrating their Service Department from Salesforce to the TischlerCRM. The Salesforce system had significant limitations: all 10-15 service technicians shared a single login, tech email addresses were hardcoded across 4+ code files, the tech assignment system was mid-migration between a legacy multi-picklist and a junction table, and half the automation flows were in Draft state.
