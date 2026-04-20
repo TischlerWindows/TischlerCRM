@@ -38,14 +38,7 @@ export default function UniversalSearch({ inputClassName, iconClassName }: { inp
   const router = useRouter();
   const { schema } = useSchemaStore();
 
-  // Build dynamic placeholder from search-enabled objects
-  const searchEnabledLabels = (schema?.objects ?? [])
-    .filter(o => o.searchConfig?.enabled)
-    .map(o => (o.pluralLabel || o.label || o.apiName).toLowerCase());
-
-  const placeholder = searchEnabledLabels.length > 0
-    ? `Search ${searchEnabledLabels.join(', ')}…`
-    : 'Search…';
+  const placeholder = 'Search…';
 
   const performSearch = async (query: string) => {
     if (!query.trim()) {
