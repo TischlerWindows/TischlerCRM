@@ -10,6 +10,7 @@ export const DEFAULT_TAB_ORDER = [
   { name: 'Work Orders', href: '/workorders' },
   { name: 'Tech Dashboard', href: '/tech-dashboard' },
   { name: 'Schedule', href: '/schedule' },
+  { name: 'Cost Dashboard', href: '/cost-dashboard' },
   { name: 'Quotes', href: '/quotes' },
   { name: 'Installations', href: '/installations' },
   { name: 'Tasks', href: '/tasks' },
