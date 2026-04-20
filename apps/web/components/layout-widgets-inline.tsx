@@ -4,25 +4,9 @@ import React from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { getExternalRegistration, getInternalRegistrationByType } from '@/lib/widgets/registry-loader'
 import { resolveConfig } from '@/lib/widgets/merge-resolver'
-import { externalWidgets } from '@/widgets/external/registry'
+import { widgetIdForConfig } from '@/lib/use-widget-settings'
 import type { PageWidget, WidgetConfig } from '@/lib/schema'
 import type { WidgetProps } from '@/lib/widgets/types'
-
-function WidgetDisabledPlaceholder({ widgetId }: { widgetId: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center text-xs text-gray-400">
-      Widget &ldquo;{widgetId}&rdquo; is not enabled for this organization.
-    </div>
-  )
-}
-
-function WidgetUnavailablePlaceholder({ widgetId }: { widgetId: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-red-100 bg-red-50/50 px-3 py-4 text-center text-xs text-red-400">
-      Widget &ldquo;{widgetId}&rdquo; is unavailable.
-    </div>
-  )
-}
 
 function WidgetLoadingPlaceholder() {
   return (
@@ -141,7 +125,11 @@ function getWidgetLabel(config: WidgetConfig): string {
 
 interface LayoutWidgetsInlineProps {
   widgets?: PageWidget[]
-  enabledIds?: string[]
+  /**
+   * Set of enabled widget manifest ids for this org. Widgets whose id is
+   * absent from the set render nothing (no placeholder, no gap).
+   */
+  enabledIds: Set<string>
   /** The live CRM record being rendered */
   record?: Record<string, unknown>
   /** The object definition for the current record */
@@ -212,8 +200,18 @@ export function LayoutWidgetsInline({
 }: LayoutWidgetsInlineProps) {
   if (!widgets?.length) return null
 
-  const effectiveEnabledIds = enabledIds ?? externalWidgets.map((w) => w.id)
-  const sorted = [...widgets].sort((a, b) => a.order - b.order)
+  // Drop widgets whose manifest id is not enabled for this org. The record
+  // silently omits them — intentionally no placeholder, no gap, so that
+  // disabling a widget removes it cleanly from existing layouts.
+  const enabledWidgets = widgets.filter((w) => {
+    const id = widgetIdForConfig(w.config)
+    if (!id) return true
+    return enabledIds.has(id)
+  })
+
+  if (!enabledWidgets.length) return null
+
+  const sorted = [...enabledWidgets].sort((a, b) => a.order - b.order)
   const liveRecord = record ?? STUB_RECORD
   const liveObject = objectDef ?? STUB_OBJECT
   const canCollapse = collapsedWidgetIds != null && toggleWidgetCollapse != null
@@ -240,8 +238,6 @@ export function LayoutWidgetsInline({
                 externalWidgetId={externalWidgetId}
               />
             )
-          } else if (!effectiveEnabledIds.includes(externalWidgetId)) {
-            content = <WidgetDisabledPlaceholder key={w.id} widgetId={externalWidgetId} />
           } else {
             const { Component } = registration
             const resolvedConfig = resolveConfig(widgetConfig, liveRecord)

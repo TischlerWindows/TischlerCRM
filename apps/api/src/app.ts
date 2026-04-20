@@ -98,6 +98,13 @@ export function buildApp() {
   if (!allowedOrigins.includes(railwayFrontend)) {
     allowedOrigins.push(railwayFrontend);
   }
+  // Expose the allowlist so hijacked responses (SSE) can set CORS headers
+  // manually. `@fastify/cors` only intercepts the normal reply pipeline; any
+  // route that calls `reply.hijack()` is responsible for its own headers.
+  app.decorate('isAllowedOrigin', (origin: string | undefined | null): boolean => {
+    if (!origin) return false;
+    return allowedOrigins.includes(origin);
+  });
   app.register(cors, {
     origin: (origin, cb) => {
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true);

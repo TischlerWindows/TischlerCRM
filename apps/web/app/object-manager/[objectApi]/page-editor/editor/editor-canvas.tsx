@@ -10,6 +10,7 @@ import { PaletteComponents } from '../palette-components';
 import { PaletteFields } from '../palette-fields';
 import { useEditorStore } from '../editor-store';
 import { useEditorSidePanels } from '../use-editor-side-panels';
+import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import type { LayoutSection, LayoutTab } from '../types';
 
 /* ------------------------------------------------------------------ */
@@ -43,6 +44,7 @@ export function EditorCanvas({
 
   const [paletteTab, setPaletteTab] = useState<'fields' | 'components'>('fields');
 
+  const { ids: enabledWidgetIds } = useEnabledWidgetIds();
   const sidePanels = useEditorSidePanels();
   const leftPanelContainerId = `page-editor-left-panel-${encodeURIComponent(routeKey || 'new')}`;
 
@@ -117,7 +119,7 @@ export function EditorCanvas({
               {paletteTab === 'fields' ? (
                 <PaletteFields availableFields={allFields} />
               ) : (
-                <PaletteComponents />
+                <PaletteComponents enabledWidgetIds={enabledWidgetIds} />
               )}
             </div>
           </div>

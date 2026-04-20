@@ -34,7 +34,7 @@ export default function SettingsPage() {
       try {
         const [usersData, profilesData, deptsData, triggersData, controllersData] = await Promise.all([
           apiClient.get<any[]>('/admin/users').catch(() => []),
-          apiClient.get<any[]>('/profiles').catch(() => []),
+          apiClient.get<any[]>('/admin/profiles').catch(() => []),
           apiClient.get<any[]>('/departments').catch(() => []),
           apiClient.get<any[]>('/automations/triggers').catch(() => []),
           apiClient.get<any[]>('/automations/controllers').catch(() => []),

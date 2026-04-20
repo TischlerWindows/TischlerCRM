@@ -4,19 +4,23 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Puzzle,
   Check,
-  X,
   Loader2,
-  AlertCircle,
   ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api-client';
 import { externalWidgets } from '@/widgets/external/registry';
+import { internalWidgets } from '@/widgets/internal/registry';
 import type { WidgetManifest } from '@/lib/widgets/types';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { useToast } from '@/components/toast';
+import { invalidateWidgetSettingsCache } from '@/lib/use-widget-settings';
+
+type WidgetKind = 'external' | 'internal';
 
 interface WidgetRow {
   manifest: WidgetManifest;
+  kind: WidgetKind;
   enabled: boolean;
   integration: any | null;
 }
@@ -25,7 +29,7 @@ export default function WidgetsPage() {
   const [rows, setRows] = useState<WidgetRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -41,19 +45,26 @@ export default function WidgetsPage() {
         integrations.map((i: any) => [i.provider, i])
       );
 
-      setRows(
-        externalWidgets.map((manifest) => ({
-          manifest,
-          enabled: settingsMap[manifest.id] ?? false,
-          integration: manifest.integration ? (integrationMap[manifest.integration] ?? null) : null,
-        }))
-      );
+      const externalRows: WidgetRow[] = externalWidgets.map((manifest) => ({
+        manifest,
+        kind: 'external',
+        enabled: settingsMap[manifest.id] ?? false,
+        integration: manifest.integration ? (integrationMap[manifest.integration] ?? null) : null,
+      }));
+      const internalRows: WidgetRow[] = internalWidgets.map((manifest) => ({
+        manifest,
+        kind: 'internal',
+        enabled: settingsMap[manifest.id] ?? false,
+        integration: null,
+      }));
+
+      setRows([...internalRows, ...externalRows]);
     } catch (err: any) {
-      setError(err.message || 'Failed to load widgets');
+      showToast(err.message || 'Failed to load widgets', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     load();
@@ -61,12 +72,18 @@ export default function WidgetsPage() {
 
   const handleToggle = async (row: WidgetRow) => {
     if (toggling) return;
+    const next = !row.enabled;
     setToggling(row.manifest.id);
     try {
-      await apiClient.updateWidgetSetting(row.manifest.id, !row.enabled);
+      await apiClient.updateWidgetSetting(row.manifest.id, next);
+      invalidateWidgetSettingsCache();
+      showToast(
+        `${row.manifest.name} ${next ? 'enabled' : 'disabled'}.`,
+        'success',
+      );
       await load();
     } catch (err: any) {
-      setError(err.message || 'Failed to update widget');
+      showToast(err.message || 'Failed to update widget', 'error');
     } finally {
       setToggling(null);
     }
@@ -85,23 +102,12 @@ export default function WidgetsPage() {
       <SettingsPageHeader
         icon={Puzzle}
         title="Widgets"
-        subtitle="Enable external widgets to embed on record pages"
+        subtitle="Enable widgets to embed on record pages"
       />
       <div className="p-8">
-      {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-4 flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-700">{error}</p>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Widget cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {rows.map((row) => {
-          const { manifest, enabled, integration } = row;
+          const { manifest, kind, enabled, integration } = row;
           const integrationConfigured = integration ? integration.enabled && (integration.hasApiKey || integration.hasClientId) : true;
           const needsIntegration = manifest.integration !== null;
           const toggleDisabled = needsIntegration && !integrationConfigured;
@@ -111,7 +117,6 @@ export default function WidgetsPage() {
               key={manifest.id}
               className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all hover:shadow-md"
             >
-              {/* Card header */}
               <div className="p-6 pb-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -121,12 +126,11 @@ export default function WidgetsPage() {
                     <div>
                       <h3 className="text-sm font-semibold text-brand-dark">{manifest.name}</h3>
                       <span className="text-[10px] uppercase tracking-wider font-medium text-brand-gray">
-                        External
+                        {kind === 'external' ? 'External' : 'Internal'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Status badge */}
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
                       enabled
@@ -147,7 +151,6 @@ export default function WidgetsPage() {
                 <p className="text-xs text-brand-gray leading-relaxed">{manifest.description}</p>
               </div>
 
-              {/* Integration row */}
               {needsIntegration && (
                 <div className="px-6 pb-3">
                   <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2 flex items-center justify-between">
@@ -179,7 +182,6 @@ export default function WidgetsPage() {
                 </div>
               )}
 
-              {/* Card footer — enable toggle */}
               <div className="px-6 py-3 bg-gray-50/70 border-t border-gray-100 flex items-center justify-between">
                 <span className="text-[11px] text-brand-gray">
                   {toggleDisabled ? 'Configure the required integration first' : 'Enable on record pages'}
@@ -212,7 +214,7 @@ export default function WidgetsPage() {
         {rows.length === 0 && (
           <div className="col-span-full text-center py-16 text-brand-gray">
             <Puzzle className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No external widgets are registered yet.</p>
+            <p className="text-sm">No widgets are registered yet.</p>
           </div>
         )}
       </div>
