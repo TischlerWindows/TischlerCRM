@@ -68,6 +68,16 @@ export function SetupSearchTypeahead() {
 
   const open = focused && query.trim().length > 0;
 
+  const navigateTo = (href: string) => {
+    if (href === '/object-manager' || href.startsWith('/object-manager/')) {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } else {
+      router.push(href);
+    }
+    setQuery('');
+    setFocused(false);
+  };
+
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!open) return;
     if (e.key === 'ArrowDown') {
@@ -79,11 +89,7 @@ export function SetupSearchTypeahead() {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const target = flatVisible[activeIndex];
-      if (target) {
-        router.push(target.href);
-        setQuery('');
-        setFocused(false);
-      }
+      if (target) navigateTo(target.href);
     } else if (e.key === 'Escape') {
       setQuery('');
       setFocused(false);
@@ -132,7 +138,7 @@ export function SetupSearchTypeahead() {
                       <button
                         key={`${item.group}-${item.href}-${item.primary}`}
                         onMouseEnter={() => setActiveIndex(flatIndex)}
-                        onClick={() => { router.push(item.href); setQuery(''); setFocused(false); }}
+                        onClick={() => navigateTo(item.href)}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${active ? 'bg-[#ede9f5]' : 'hover:bg-gray-50'}`}
                       >
                         <Icon className="w-[18px] h-[18px] text-brand-navy flex-shrink-0" />
