@@ -348,7 +348,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                           {displayLabel}
                         </div>
                         <div className="text-sm text-gray-900" style={valueStyle}>
-                          <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} />
+                          <MemoizedFieldValue apiName={f.fieldApiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectDef?.apiName} />
                         </div>
                       </div>
                     );
@@ -627,7 +627,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
                           className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2"
                           style={rowSpan > 1 ? { flex: 1 } : undefined}
                         >
-                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
+                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectDef?.apiName} />
                           {badgeC ? <span className={badgeC}>Status</span> : null}
                         </dd>
                       </div>
@@ -667,7 +667,7 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
                           ) : null}
                         </dt>
                         <dd className="mt-1 text-sm text-gray-900 flex flex-wrap items-center gap-2">
-                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} />
+                          <MemoizedFieldValue apiName={layoutField.apiName} rawValue={value} fieldDef={fieldDef} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectDef?.apiName} />
                           {badgeC ? <span className={badgeC}>Status</span> : null}
                         </dd>
                       </div>

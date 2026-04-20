@@ -118,6 +118,8 @@ function getWidgetLabel(config: WidgetConfig): string {
       return 'Installation Cost Grid'
     case 'Summary':
       return 'Summary'
+    case 'DropboxFiles':
+      return 'Dropbox Files'
     default:
       return 'Widget'
   }

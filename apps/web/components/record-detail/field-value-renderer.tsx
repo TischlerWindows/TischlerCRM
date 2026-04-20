@@ -6,6 +6,7 @@ import { formatFieldValue, resolveLookupDisplayName } from '@/lib/utils';
 import { FieldDef, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
+import { DropboxFileBrowser } from '@/components/dropbox-file-browser';
 
 // ── Lookup route map ───────────────────────────────────────────────────
 const LOOKUP_ROUTE_MAP: Record<string, string> = {
@@ -100,6 +101,7 @@ export function renderValue(
   record: Record<string, any> | null,
   isLookupLoaded: boolean,
   compact = false,
+  objectApiName?: string,
 ): React.ReactNode {
   // Auto-parse JSON strings
   let value = rawValue;
@@ -107,6 +109,29 @@ export function renderValue(
     try { value = JSON.parse(value); } catch { /* not JSON */ }
   }
   const fieldType = fieldDef?.type;
+
+  // DropboxFiles — render Dropbox browser panel on record pages
+  if (fieldType === 'DropboxFiles' && record) {
+    const recordId = String(record.id ?? record.Id ?? '');
+    if (!recordId) return '-';
+
+    // Prefer explicitly passed objectApiName, fall back to prefix on the field API name
+    const sourceApiName = fieldDef?.apiName || apiName;
+    const resolvedObjectApiName =
+      objectApiName ||
+      sourceApiName.match(/^([A-Za-z][A-Za-z0-9]*)__/)?.[1];
+    if (!resolvedObjectApiName) return '-';
+
+    const folderName = typeof value === 'string' && value.trim() ? value : undefined;
+
+    return (
+      <DropboxFileBrowser
+        objectApiName={resolvedObjectApiName}
+        recordId={recordId}
+        folderName={folderName}
+      />
+    );
+  }
 
   // LocationSearch — works like Address but merges scattered data first
   if (fieldType === 'LocationSearch' && record) {
@@ -311,6 +336,7 @@ interface MemoizedFieldValueProps {
   record: Record<string, any> | null;
   isLookupLoaded: boolean;
   compact?: boolean;
+  objectApiName?: string;
 }
 
 function MemoizedFieldValueInner({
@@ -320,10 +346,11 @@ function MemoizedFieldValueInner({
   record,
   isLookupLoaded,
   compact,
+  objectApiName,
 }: MemoizedFieldValueProps) {
   const rendered = React.useMemo(
-    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded, compact),
-    [apiName, rawValue, fieldDef, record, isLookupLoaded, compact],
+    () => renderValue(apiName, rawValue, fieldDef, record, isLookupLoaded, compact, objectApiName),
+    [apiName, rawValue, fieldDef, record, isLookupLoaded, compact, objectApiName],
   );
   return <>{rendered}</>;
 }

@@ -450,7 +450,7 @@ export default function RecordDetailPage({
                         <div key={apiName} className="min-w-[100px] max-w-[220px]">
                           <div className="text-xs text-gray-500">{fd.label}</div>
                           <div className="text-sm font-medium text-gray-900 mt-0.5 break-words">
-                            <MemoizedFieldValue apiName={apiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} compact />
+                            <MemoizedFieldValue apiName={apiName} rawValue={raw} fieldDef={fd} record={record} isLookupLoaded={isLookupLoaded} objectApiName={objectApiName} compact />
                           </div>
                         </div>
                       );
