@@ -98,16 +98,18 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
 // ── Main page ──────────────────────────────────────────────────────────
 
 export default function CostDashboardPage() {
-  // Default date range: month-to-date (timezone-safe)
-  const today = localDateString(new Date())
-  const monthStart = new Date()
-  monthStart.setDate(1)
-
-  const [from, setFrom] = useState(localDateString(monthStart))
-  const [to, setTo] = useState(today)
+  // Default date range: month-to-date (timezone-safe).
+  // Lazy initialisers run once so today/monthStart are stable across renders.
+  const [from, setFrom] = useState<string>(() => {
+    const d = new Date()
+    d.setDate(1)
+    return localDateString(d)
+  })
+  const [to, setTo] = useState<string>(() => localDateString(new Date()))
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [truncationWarning, setTruncationWarning] = useState(false)
 
   // Raw records
   const [entries, setEntries] = useState<RawRecord[]>([])
@@ -124,15 +126,15 @@ export default function CostDashboardPage() {
 
       try {
         // Parallel fetch all four collections.
-        // NOTE: The API caps list responses at 500 records by default (1000 max).
-        // For orgs with high time-entry / expense volumes in the selected date
-        // range, totals may be under-counted. Increase limits or add server-side
-        // date filtering if volume becomes an issue.
+        // The API hard-caps responses at 200 records. The API only supports
+        // equality filters on data fields — no gte/lte — so date filtering
+        // must be done client-side. If either raw result set hits the cap we
+        // set a visible truncation warning.
         const [rawEntries, rawExpenses, rawTechs, rawWos] = await Promise.all([
-          apiClient.get<unknown>('/objects/TimeEntry/records?limit=1000'),
-          apiClient.get<unknown>('/objects/WorkOrderExpense/records?limit=1000'),
-          apiClient.get<unknown>('/objects/Technician/records?limit=500'),
-          apiClient.get<unknown>('/objects/WorkOrder/records?limit=1000'),
+          apiClient.get<unknown>('/objects/TimeEntry/records?limit=200'),
+          apiClient.get<unknown>('/objects/WorkOrderExpense/records?limit=200'),
+          apiClient.get<unknown>('/objects/Technician/records?limit=200'),
+          apiClient.get<unknown>('/objects/WorkOrder/records?limit=200'),
         ])
 
         if (cancelled) return
@@ -141,6 +143,11 @@ export default function CostDashboardPage() {
         const allExpenses = parseRecords(rawExpenses)
         const allTechs = parseRecords(rawTechs)
         const allWos = parseRecords(rawWos)
+
+        // Detect truncation: if either raw list hit the API cap, totals may
+        // be silently under-counted. Show a warning so the user knows.
+        const API_CAP = 200
+        setTruncationWarning(allEntries.length >= API_CAP || allExpenses.length >= API_CAP)
 
         // Client-side date filter — compare YYYY-MM-DD strings directly
         const filteredEntries = allEntries.filter(e => {
@@ -283,6 +290,16 @@ export default function CostDashboardPage() {
         </div>
       </div>
 
+      {/* Truncation warning */}
+      {truncationWarning && (
+        <div className="flex items-start gap-3 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+          <AlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 shrink-0" />
+          <p className="text-sm text-yellow-800">
+            Results may be incomplete (reached the 200-record fetch limit). Consider narrowing the date range.
+          </p>
+        </div>
+      )}
+
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SummaryCard label="Total Labor" value={fmt(totalLabor)} />
@@ -412,6 +429,20 @@ export default function CostDashboardPage() {
                   )
                 })}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 bg-gray-50">
+                  <td className="px-4 py-2.5 font-bold text-brand-dark" colSpan={2}>Total</td>
+                  <td className="px-4 py-2.5 text-right font-bold text-brand-dark">
+                    {fmt(Object.values(perWo).reduce((s, r) => s + r.labor, 0))}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-bold text-brand-dark">
+                    {fmt(Object.values(perWo).reduce((s, r) => s + r.expenses, 0))}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-bold text-brand-dark">
+                    {fmt(Object.values(perWo).reduce((s, r) => s + r.labor + r.expenses, 0))}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
