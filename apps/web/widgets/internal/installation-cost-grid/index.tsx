@@ -61,7 +61,19 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
   ]
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Installation Header */}
+      <div className="text-center py-2">
+        <h2 className="text-lg font-bold text-brand-navy">
+          {instData.installationName || 'Installation'}
+        </h2>
+        {data.projectName && (
+          <p className="text-sm text-gray-500 mt-0.5">
+            Project: <span className="font-medium text-brand-dark">{data.projectName}</span>
+          </p>
+        )}
+      </div>
+
       <KpiBar
         budget={num(instData.installationBudget)}
         totalCost={num(instData.finalCost)}
@@ -86,7 +98,7 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-semibold rounded-t-md transition-colors ${
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors ${
               activeTab === tab.id
                 ? 'bg-brand-navy text-white'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'

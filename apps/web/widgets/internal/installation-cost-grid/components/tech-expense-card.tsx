@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { LABOR_COLUMNS, TECH_EXPENSE_COLUMNS, totalHours, techWeeklyCost, num, fmt, fmtNum } from '../utils/calculations'
+import { useGridNavigation } from '../hooks/use-grid-navigation'
 
 interface TechExpenseCardProps {
   junctionId: string
@@ -13,6 +14,7 @@ interface TechExpenseCardProps {
 
 export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpenses, onFieldChange }: TechExpenseCardProps) {
   const [collapsed, setCollapsed] = useState(false)
+  const { containerRef, getCellProps } = useGridNavigation()
 
   const getValue = (recordId: string, field: string, data: Record<string, any>): number => {
     return dirtyExpenses[recordId]?.[field] !== undefined ? dirtyExpenses[recordId][field] : num(data[field])
@@ -27,8 +29,8 @@ export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpense
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <button onClick={() => setCollapsed(!collapsed)} className="w-full px-3 py-2 bg-gray-50 flex items-center justify-between text-left hover:bg-gray-100 transition-colors">
+    <div className="border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+      <button onClick={() => setCollapsed(!collapsed)} className="w-full px-4 py-2.5 bg-gray-50 flex items-center justify-between text-left hover:bg-gray-100 transition-colors">
         <div className="flex items-center gap-2">
           {collapsed ? <ChevronRight className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
           <span className="text-xs font-semibold text-brand-dark">{technician.name}</span>
@@ -40,7 +42,7 @@ export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpense
         </div>
       </button>
       {!collapsed && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" ref={containerRef}>
           <table className="w-full border-collapse text-[10px] min-w-[800px]">
             <thead>
               <tr className="bg-gray-50/50">
@@ -56,25 +58,27 @@ export function TechExpenseCard({ junctionId, technician, expenses, dirtyExpense
               </tr>
             </thead>
             <tbody>
-              {expenses.map(exp => {
+              {expenses.map((exp, expIndex) => {
                 const d = exp.data as Record<string, any>
                 const hours = totalHours(d, dirtyExpenses[exp.id])
                 const cost = techWeeklyCost(d, technician.assignedHourlyRate, dirtyExpenses[exp.id])
                 return (
                   <tr key={exp.id} className="hover:bg-gray-50/50">
                     <td className="px-2 py-0.5 border-b border-gray-100 font-medium sticky left-0 bg-white z-10">{d.weekNumber}</td>
-                    {LABOR_COLUMNS.map(col => (
+                    {LABOR_COLUMNS.map((col, laborColIndex) => (
                       <td key={col.key} className="p-0.5 border-b border-gray-100">
                         <input type="number" step="0.5" value={getValue(exp.id, col.key, d)}
                           onChange={e => onFieldChange(exp.id, col.key, parseFloat(e.target.value) || 0)}
+                          {...getCellProps(expIndex, laborColIndex)}
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-center text-[10px] focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                           style={{ background: `${col.color}08` }} />
                       </td>
                     ))}
-                    {TECH_EXPENSE_COLUMNS.map(col => (
+                    {TECH_EXPENSE_COLUMNS.map((col, expenseColIndex) => (
                       <td key={col.key} className="p-0.5 border-b border-gray-100">
                         <input type="number" step="0.01" value={getValue(exp.id, col.key, d)}
                           onChange={e => onFieldChange(exp.id, col.key, parseFloat(e.target.value) || 0)}
+                          {...getCellProps(expIndex, LABOR_COLUMNS.length + expenseColIndex)}
                           className="w-full border border-gray-200 rounded px-1 py-0.5 text-center text-[10px] focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                           style={{ background: `${col.color}08` }} />
                       </td>

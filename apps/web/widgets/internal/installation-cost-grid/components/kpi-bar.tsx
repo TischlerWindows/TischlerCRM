@@ -12,19 +12,18 @@ export function KpiBar({ budget, totalCost, profit }: KpiBarProps) {
   const isPositive = profit >= 0
 
   return (
-    <div className="flex items-center gap-0 rounded-lg border border-blue-100 overflow-hidden"
-         style={{ background: 'linear-gradient(135deg, #f0f4ff, #e8eeff)' }}>
-      <div className="flex-1 text-center py-3 px-4">
+    <div className="flex items-center gap-0 rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex-1 text-center py-4 px-5">
         <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Budget</div>
         <div className="text-xl font-bold text-brand-navy">{fmt(budget)}</div>
       </div>
-      <div className="w-px bg-blue-200 self-stretch" />
-      <div className="flex-1 text-center py-3 px-4">
+      <div className="w-px bg-gray-200 self-stretch" />
+      <div className="flex-1 text-center py-4 px-5">
         <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Total Cost</div>
         <div className="text-xl font-bold text-brand-navy">{fmt(totalCost)}</div>
       </div>
-      <div className="w-px bg-blue-200 self-stretch" />
-      <div className="flex-1 text-center py-3 px-4">
+      <div className="w-px bg-gray-200 self-stretch" />
+      <div className="flex-1 text-center py-4 px-5">
         <div className="text-[10px] uppercase tracking-wider text-gray-500 font-medium">Profit</div>
         <div className={`text-xl font-bold ${isPositive ? 'text-green-700' : 'text-red-600'}`}>
           {isPositive ? '+' : ''}{fmt(profit)}
