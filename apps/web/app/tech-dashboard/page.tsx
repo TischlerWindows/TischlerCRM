@@ -79,6 +79,13 @@ function parseRecords<T>(raw: unknown): T[] {
   return []
 }
 
+function localDateString(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${dd}`
+}
+
 function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
   try {
@@ -112,12 +119,20 @@ function statusBadge(status: string | undefined): string {
 function WOCard({
   wo,
   techNames,
+  woToTechIds,
+  myTechId,
 }: {
   wo: WORecord
   techNames: Record<string, string>
+  woToTechIds: Record<string, string[]>
+  myTechId: string
 }) {
   const status = wo.data.workOrderStatus ?? ''
   const name = wo.data.name || wo.id
+
+  // All co-assigned techs, excluding myself
+  const teammateIds = (woToTechIds[wo.id] ?? []).filter(id => id !== myTechId)
+  const teammateNames = teammateIds.map(id => techNames[id]).filter(Boolean)
 
   return (
     <li className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -141,10 +156,10 @@ function WOCard({
           {formatDate(wo.data.scheduledStartDate)}
         </div>
 
-        {/* Teammates (lead tech) */}
-        {wo.data.leadTech && techNames[wo.data.leadTech] && (
-          <div className="mt-1.5 text-xs text-brand-gray">
-            Lead: {techNames[wo.data.leadTech]}
+        {/* Teammates — all co-assigned techs (excluding self) */}
+        {teammateNames.length > 0 && (
+          <div className="mt-1.5 text-xs text-brand-gray break-words">
+            Team: {teammateNames.join(', ')}
           </div>
         )}
 
@@ -168,12 +183,16 @@ function Section({
   items,
   empty,
   techNames,
+  woToTechIds,
+  myTechId,
   accent,
 }: {
   title: string
   items: WORecord[]
   empty: string
   techNames: Record<string, string>
+  woToTechIds: Record<string, string[]>
+  myTechId: string
   accent?: string
 }) {
   return (
@@ -189,7 +208,7 @@ function Section({
       ) : (
         <ul className="space-y-3">
           {items.map((wo) => (
-            <WOCard key={wo.id} wo={wo} techNames={techNames} />
+            <WOCard key={wo.id} wo={wo} techNames={techNames} woToTechIds={woToTechIds} myTechId={myTechId} />
           ))}
         </ul>
       )}
@@ -211,6 +230,8 @@ export default function TechDashboardPage() {
   const [pendingReview, setPendingReview] = useState<WORecord[]>([])
   const [missingHours, setMissingHours] = useState<WORecord[]>([])
   const [techNames, setTechNames] = useState<Record<string, string>>({})
+  const [woToTechIds, setWoToTechIds] = useState<Record<string, string[]>>({})
+  const [myTechId, setMyTechId] = useState<string>('')
 
   useEffect(() => {
     if (!user) return
@@ -254,6 +275,17 @@ export default function TechDashboardPage() {
 
         const woIds = [...new Set(assignments.map((a) => a.data.workOrder).filter(Boolean))] as string[]
 
+        // Build a map of WO id → all assigned tech ids (for teammates display)
+        const woToTechIdsMap: Record<string, string[]> = {}
+        for (const a of assignments) {
+          const woId = a.data.workOrder
+          const techId = a.data.technician
+          if (woId && techId) {
+            if (!woToTechIdsMap[woId]) woToTechIdsMap[woId] = []
+            woToTechIdsMap[woId].push(techId)
+          }
+        }
+
         if (woIds.length === 0) {
           if (!cancelled) {
             setTodayWOs([])
@@ -292,7 +324,7 @@ export default function TechDashboardPage() {
 
         // 4. Compute date windows
         const now = new Date()
-        const todayStr = now.toISOString().split('T')[0]
+        const todayStr = localDateString(now)
         const in14Days = new Date(now)
         in14Days.setDate(in14Days.getDate() + 14)
 
@@ -314,8 +346,10 @@ export default function TechDashboardPage() {
 
           // Today / Upcoming
           if (startRaw && !isClosed) {
-            const startDate = new Date(startRaw)
-            const startStr = startDate.toISOString().split('T')[0]
+            // Extract date-only portion, handle both "2026-04-20" and "2026-04-20T08:00" formats
+            const startDatePart = startRaw.length > 10 ? startRaw.substring(0, 10) : startRaw
+            const startStr = startDatePart  // already YYYY-MM-DD format
+            const startDate = new Date(startDatePart + 'T00:00:00')  // parse as local midnight
             if (startStr === todayStr) {
               todayList.push(w)
             } else if (startDate > now && startDate <= in14Days) {
@@ -331,6 +365,9 @@ export default function TechDashboardPage() {
         upcomingList.sort(byDate)
 
         // 5. Fetch my TimeEntry records to find completed WOs with no entry from me
+        // Note: capped at 1000 entries. If a tech has more historical entries, oldest
+        // completed WOs may incorrectly appear in "Missing Hours". Not an issue for
+        // typical field techs; revisit if feedback indicates truncation.
         const teResp = await apiClient.get<unknown>(
           `/objects/TimeEntry/records?filter[technician]=${encodeURIComponent(myTechId)}&limit=1000`
         )
@@ -345,17 +382,23 @@ export default function TechDashboardPage() {
         )
         const woIdsWithMyEntries = new Set(myEntries.map((e) => e.data.workOrder).filter(Boolean))
 
-        const missingList = wos.filter(
-          (w) => w.data.workOrderStatus === 'Completed' && !woIdsWithMyEntries.has(w.id)
+        const pendingIds = new Set(pendingList.map(w => w.id))
+        const missingList = wos.filter(w =>
+          w.data.workOrderStatus === 'Completed' &&
+          !woIdsWithMyEntries.has(w.id) &&
+          !pendingIds.has(w.id)
         )
 
-        // 6. Resolve lead tech names for cards
-        const leadTechIds = [
-          ...new Set(wos.map((w) => w.data.leadTech).filter(Boolean) as string[]),
+        // 6. Resolve tech names for all teammates (all assigned techs + lead techs)
+        const allTechIds = [
+          ...new Set([
+            ...Object.values(woToTechIdsMap).flat(),
+            ...wos.map((w) => w.data.leadTech).filter(Boolean) as string[],
+          ]),
         ]
         const nameMap: Record<string, string> = {}
         await Promise.all(
-          leadTechIds.map(async (tid) => {
+          allTechIds.map(async (tid) => {
             try {
               const t = await apiClient.get<Record<string, unknown>>(
                 `/objects/Technician/records/${tid}`
@@ -375,6 +418,8 @@ export default function TechDashboardPage() {
           setPendingReview(pendingList)
           setMissingHours(missingList)
           setTechNames(nameMap)
+          setWoToTechIds(woToTechIdsMap)
+          setMyTechId(myTechId)
         }
       } catch (e: unknown) {
         if (!cancelled) {
@@ -440,6 +485,8 @@ export default function TechDashboardPage() {
         items={todayWOs}
         empty="Nothing scheduled for today."
         techNames={techNames}
+        woToTechIds={woToTechIds}
+        myTechId={myTechId}
       />
 
       {/* Upcoming */}
@@ -448,6 +495,8 @@ export default function TechDashboardPage() {
         items={upcomingWOs}
         empty="No upcoming work in the next 14 days."
         techNames={techNames}
+        woToTechIds={woToTechIds}
+        myTechId={myTechId}
       />
 
       {/* Pending Review */}
@@ -456,6 +505,8 @@ export default function TechDashboardPage() {
         items={pendingReview}
         empty="Nothing in the 24-hr edit window."
         techNames={techNames}
+        woToTechIds={woToTechIds}
+        myTechId={myTechId}
       />
 
       {/* Missing Hours */}
@@ -464,6 +515,8 @@ export default function TechDashboardPage() {
         items={missingHours}
         empty="All hours logged — great work!"
         techNames={techNames}
+        woToTechIds={woToTechIds}
+        myTechId={myTechId}
         accent="text-amber-600"
       />
     </div>
