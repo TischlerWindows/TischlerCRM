@@ -97,16 +97,21 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
     // If an intercept context is provided (e.g. WorkOrder detail page),
     // give it a chance to show a modal and collect extra fields before we
     // commit. A null return means the user cancelled.
-    let interceptExtra: Record<string, string> | null = null;
+    let interceptExtra: Record<string, string> | null | undefined;
     if (pathIntercept && !extraFields) {
+      // Lock the UI immediately so the chevron bar is not clickable during
+      // the modal (Issue 2).
+      setUpdating(true);
       try {
         interceptExtra = await pathIntercept.onBeforeAdvance(stage.name);
       } catch {
         // Intercept threw — treat as cancellation
+        setUpdating(false);
         return;
       }
       if (interceptExtra === null) {
-        // User cancelled the modal
+        // User cancelled the modal — abort transition
+        setUpdating(false);
         setPopoverStageId(null);
         setPopoverRect(null);
         setConfirmBack(null);
@@ -115,7 +120,10 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       }
     }
 
-    setUpdating(true);
+    // Only set updating here if the intercept path didn't already set it.
+    if (!pathIntercept || extraFields) {
+      setUpdating(true);
+    }
     try {
       const updateData: Record<string, unknown> = {
         [pathDef!.trackingFieldApiName]: stage.id,

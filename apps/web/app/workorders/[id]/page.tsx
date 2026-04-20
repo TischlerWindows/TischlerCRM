@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
 import RecordDetailPage from '@/components/record-detail-page';
 import { WorkOrderReasonModal, type ReasonModalMode } from '@/components/work-order-reason-modal';
@@ -25,46 +25,55 @@ const INTERCEPT_STAGES: Record<string, ReasonModalMode> = {
 export default function WorkOrderDetailPage() {
   const [modalMode, setModalMode] = useState<ReasonModalMode | null>(null);
 
-  // Resolve / reject refs let the async onBeforeAdvance callback wait for the
-  // modal to close before returning to the Path widget.
-  const resolveRef = useRef<((extra: Record<string, string> | null) => void) | null>(null);
+  // pendingRef stores both the modal mode and resolve function together so
+  // handleConfirm never has to read from React state (avoids stale-closure
+  // bugs under React 18 batching).
+  const pendingRef = useRef<{
+    mode: ReasonModalMode;
+    resolve: (v: Record<string, string> | null) => void;
+  } | null>(null);
 
-  const handleBeforeAdvance = useCallback<PathInterceptCallback>(
-    (stageName) => {
-      const mode = INTERCEPT_STAGES[stageName];
-      if (!mode) {
-        // Not an intercepted stage — proceed immediately with no extra fields.
-        return Promise.resolve({});
-      }
+  // Issue 3: cancel any pending transition when the page unmounts.
+  useEffect(() => {
+    return () => {
+      pendingRef.current?.resolve(null);
+      pendingRef.current = null;
+    };
+  }, []);
 
-      // Show the modal and wait for the user to confirm or cancel.
-      return new Promise<Record<string, string> | null>((resolve) => {
-        resolveRef.current = resolve;
-        setModalMode(mode);
-      });
-    },
-    [],
-  );
+  const handleBeforeAdvance = useCallback<PathInterceptCallback>((stageName) => {
+    const mode = INTERCEPT_STAGES[stageName];
+    if (!mode) {
+      // Not an intercepted stage — proceed immediately with no extra fields.
+      return Promise.resolve({});
+    }
 
-  const handleConfirm = useCallback(
-    (reason: string, notes: string) => {
-      setModalMode(null);
-      if (!resolveRef.current) return;
-      const mode = modalMode;
-      resolveRef.current(
-        mode === 'hold'
-          ? { holdReason: reason, holdNotes: notes }
-          : { cancelReason: reason, cancelNotes: notes },
-      );
-      resolveRef.current = null;
-    },
-    [modalMode],
-  );
+    // Show the modal and wait for the user to confirm or cancel.
+    return new Promise<Record<string, string> | null>((resolve) => {
+      // If an earlier modal was somehow still pending, abort it (Issue 4).
+      pendingRef.current?.resolve(null);
+      pendingRef.current = { mode, resolve };
+      setModalMode(mode);
+    });
+  }, []);
+
+  const handleConfirm = useCallback((reason: string, notes: string) => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    setModalMode(null);
+    if (!pending) return;
+    pending.resolve(
+      pending.mode === 'hold'
+        ? { holdReason: reason, holdNotes: notes }
+        : { cancelReason: reason, cancelNotes: notes },
+    );
+  }, []);
 
   const handleCancel = useCallback(() => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
     setModalMode(null);
-    resolveRef.current?.(null);
-    resolveRef.current = null;
+    pending?.resolve(null);
   }, []);
 
   return (
