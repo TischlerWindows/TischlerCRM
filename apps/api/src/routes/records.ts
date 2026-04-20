@@ -1292,6 +1292,20 @@ export async function recordRoutes(app: FastifyInstance) {
       data: { deletedAt: new Date(), deletedById: userId },
     });
 
+    // ── Trigger automation (afterDelete) ──
+    // Pass pre-delete data as both recordData and beforeData so trigger handlers
+    // can read the workOrder / parent-link from either location.
+    runTriggers({
+      event: 'delete',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: delData,
+      beforeData: delData,
+      userId,
+      orgId: userId,
+    }).catch(() => { /* non-fatal — trigger errors must not break record deletion */ });
+
     reply.code(204).send();
   });
 

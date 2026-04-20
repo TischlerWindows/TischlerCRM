@@ -8,5 +8,7 @@ export const TRIGGER_IDS = [
   'rate-change-history',
   'snapshot-rate-on-time-entry',
   'work-order-lifecycle',
+  'work-order-rollup',
+  'work-order-rollup-expense',
 ] as const
 export type TriggerId = (typeof TRIGGER_IDS)[number]
