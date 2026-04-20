@@ -44,6 +44,19 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_widget_settings_org_idx',
     sql: `CREATE INDEX IF NOT EXISTS "WidgetSetting_orgId_idx" ON "WidgetSetting"("orgId")`,
   },
+  // Convert SupportTicket.category from TicketCategory enum to plain TEXT.
+  // Idempotent: only runs if the TicketCategory type still exists.
+  {
+    name: 'convert_ticket_category_to_text',
+    sql: `DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TicketCategory') THEN
+        EXECUTE 'ALTER TABLE "SupportTicket" ALTER COLUMN "category" DROP DEFAULT';
+        EXECUTE 'ALTER TABLE "SupportTicket" ALTER COLUMN "category" TYPE TEXT USING "category"::TEXT';
+        EXECUTE 'ALTER TABLE "SupportTicket" ALTER COLUMN "category" SET DEFAULT ''UNTRIAGED''';
+        EXECUTE 'DROP TYPE "TicketCategory"';
+      END IF;
+    END $$`,
+  },
   // Integration and UserIntegration tables are created by prisma db push.
   // These are kept as no-op safety nets (IF NOT EXISTS) and must use single
   // statements per entry because $executeRawUnsafe does not support batches.
