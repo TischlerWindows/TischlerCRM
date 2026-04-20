@@ -610,14 +610,21 @@ export async function tryRenameDropboxFolder(
       return `${parentPath}/${subfolder}/${safeChild}`;
     };
 
-    const oldPath = oldPropertyId ? await buildLinkedPath(oldPropertyId, oldChildName) : null;
+    // Prefer the stored Dropbox folder ID to find the child record's actual
+    // current path — the guessed path may be stale if the folder was renamed
+    // or created via a different code path (e.g. bulk sync).
+    const storedChildFolder = await resolveStoredFolder(accessToken!, recordId);
+    const resolvedOldPath = storedChildFolder?.found
+      ? storedChildFolder.fullPath
+      : (oldPropertyId ? await buildLinkedPath(oldPropertyId, oldChildName) : null);
+
     const newPath = newPropertyId ? await buildLinkedPath(newPropertyId, newChildName) : null;
 
-    if (!oldPath || !newPath || oldPath === newPath) return;
+    if (!resolvedOldPath || !newPath || resolvedOldPath === newPath) return;
 
-    console.log(`[dropbox] Moving linked folder: ${oldPath} → ${newPath}`);
+    console.log(`[dropbox] Moving linked folder: ${resolvedOldPath} → ${newPath}`);
     await dropboxApi(accessToken, '/files/move_v2', {
-      from_path: oldPath,
+      from_path: resolvedOldPath,
       to_path: newPath,
       autorename: false,
       allow_ownership_transfer: false,

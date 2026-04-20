@@ -891,7 +891,7 @@ class ApiClient {
     const p = new URLSearchParams({ fileName });
     if (folderName) p.set('folderName', folderName);
     const url = `${this.baseUrl}/dropbox/upload/${encodeURIComponent(objectApiName)}/${encodeURIComponent(recordId)}?${p.toString()}`;
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    const token = this.token;
     const headers: HeadersInit = {
       'Content-Type': 'application/octet-stream',
     };
