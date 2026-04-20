@@ -31,7 +31,7 @@ export function SetupSearchTypeahead() {
     (async () => {
       const [u, p] = await Promise.all([
         apiClient.get<any[]>('/admin/users').catch(() => []),
-        apiClient.get<any[]>('/profiles').catch(() => []),
+        apiClient.get<any[]>('/admin/profiles').catch(() => []),
       ]);
       setUsers(u.map((x: any) => ({ id: x.id, name: x.name, email: x.email })));
       setProfiles(p.map((x: any) => ({ id: x.id, name: x.name, label: x.label })));

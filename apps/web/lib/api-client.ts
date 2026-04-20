@@ -679,7 +679,7 @@ class ApiClient {
   }
 
   // Widgets
-  async getWidgetSettings(): Promise<Array<{ widgetId: string; enabled: boolean }>> {
+  async getWidgetSettings(): Promise<Array<{ widgetId: string; kind?: 'external' | 'internal'; enabled: boolean }>> {
     return this.request('/widgets');
   }
 

@@ -111,11 +111,22 @@ export async function notificationRoutes(app: FastifyInstance) {
     }
     if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
 
+    // SSE bypasses @fastify/cors because we hijack the raw response; emit the
+    // CORS headers manually so browsers accept events from cross-origin pages.
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+    const allowOrigin = (app as any).isAllowedOrigin?.(origin);
+    const corsHeaders: Record<string, string> = {};
+    if (allowOrigin) {
+      corsHeaders['Access-Control-Allow-Origin'] = origin;
+      corsHeaders['Vary'] = 'Origin';
+    }
+
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
+      ...corsHeaders,
     });
     reply.hijack();
 

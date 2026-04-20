@@ -22,6 +22,7 @@ import {
   TAB_GRID_COLUMNS,
 } from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
+import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -43,6 +44,10 @@ export interface RecordTabRendererProps {
   /** Widget-level collapse state */
   collapsedWidgetIds: Set<string>;
   toggleWidgetCollapse: (widgetId: string) => void;
+}
+
+interface InternalRendererProps extends RecordTabRendererProps {
+  enabledWidgetIds: Set<string>;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -142,7 +147,7 @@ function groupIntoColumnTracks<T>(
 
 // ── NEW model renderer: tab.regions ────────────────────────────────────
 
-function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
+function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
   const {
     tab,
     tabIndex: ti,
@@ -155,6 +160,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
     togglePanelCollapse,
     collapsedWidgetIds,
     toggleWidgetCollapse,
+    enabledWidgetIds,
   } = props;
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
@@ -251,6 +257,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
                     {panelWidgets.length > 0 ? (
                       <LayoutWidgetsInline
                         widgets={panelWidgets as any}
+                        enabledIds={enabledWidgetIds}
                         record={record ?? undefined}
                         objectDef={buildObjectDefPayload(objectDef)}
                         collapsedWidgetIds={collapsedWidgetIds}
@@ -356,6 +363,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
         {sortedWidgets.length > 0 && (
           <LayoutWidgetsInline
             widgets={sortedWidgets as any}
+            enabledIds={enabledWidgetIds}
             record={record ?? undefined}
             objectDef={buildObjectDefPayload(objectDef)}
             collapsedWidgetIds={collapsedWidgetIds}
@@ -395,7 +403,7 @@ function renderNewModelTab(props: RecordTabRendererProps): React.ReactNode {
 
 // ── LEGACY model renderer: tab.sections ────────────────────────────────
 
-function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
+function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
   const {
     tab,
     tabIndex: ti,
@@ -408,6 +416,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
     setSectionToggles,
     collapsedWidgetIds,
     toggleWidgetCollapse,
+    enabledWidgetIds,
   } = props;
 
   const layoutVisibilityData = { ...record, ...formulaValues } as Record<string, unknown>;
@@ -475,6 +484,7 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
         <div key={g.id} className="min-w-0">
           <LayoutWidgetsInline
             widgets={[g]}
+            enabledIds={enabledWidgetIds}
             record={record ?? undefined}
             objectDef={buildObjectDefPayload(objectDef)}
             collapsedWidgetIds={collapsedWidgetIds}
@@ -709,10 +719,12 @@ function renderLegacyTab(props: RecordTabRendererProps): React.ReactNode {
  */
 export function RecordTabRenderer(props: RecordTabRendererProps): React.ReactNode {
   const { tab } = props;
+  const { ids: enabledWidgetIds } = useEnabledWidgetIds();
+  const internalProps: InternalRendererProps = { ...props, enabledWidgetIds };
 
   if ('regions' in tab && Array.isArray((tab as any).regions)) {
-    return renderNewModelTab(props);
+    return renderNewModelTab(internalProps);
   }
 
-  return renderLegacyTab(props);
+  return renderLegacyTab(internalProps);
 }

@@ -164,14 +164,20 @@ function ExternalDraggableCard({
 }
 
 interface PaletteComponentsProps {
-  enabledExternalWidgetIds?: string[];
+  /** Set of widget manifest ids (internal + external) that are enabled for this org. */
+  enabledWidgetIds: Set<string>;
   connectedProviders?: string[];
 }
 
 export function PaletteComponents({
-  enabledExternalWidgetIds = externalWidgets.map((w) => w.id),
+  enabledWidgetIds,
   connectedProviders = [],
 }: PaletteComponentsProps): JSX.Element {
+  const visibleInternal = internalWidgets.filter((m) => enabledWidgetIds.has(m.id));
+  const visibleExternal = externalWidgets.filter(
+    (m) => !m.hideFromPalette && enabledWidgetIds.has(m.id),
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col p-2">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
@@ -179,20 +185,24 @@ export function PaletteComponents({
           <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
             Components
           </div>
-          {internalWidgets.map((manifest) => (
+          {visibleInternal.map((manifest) => (
             <InternalDraggableCard key={manifest.id} manifest={manifest} />
           ))}
+          {visibleInternal.length === 0 && (
+            <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+              All internal widgets are disabled. Enable them in Settings → Widgets.
+            </div>
+          )}
         </div>
 
-        {externalWidgets.length > 0 && (
+        {visibleExternal.length > 0 && (
           <div className="space-y-2">
             <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
               External
             </div>
-            {externalWidgets.filter((m) => !m.hideFromPalette).map((manifest) => {
+            {visibleExternal.map((manifest) => {
               const enabled =
-                enabledExternalWidgetIds.includes(manifest.id) &&
-                (manifest.integration === null || connectedProviders.includes(manifest.integration));
+                manifest.integration === null || connectedProviders.includes(manifest.integration);
               return (
                 <ExternalDraggableCard key={manifest.id} manifest={manifest} enabled={enabled} />
               );

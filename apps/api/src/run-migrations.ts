@@ -44,6 +44,46 @@ const MIGRATIONS: { name: string; sql: string }[] = [
     name: 'add_widget_settings_org_idx',
     sql: `CREATE INDEX IF NOT EXISTS "WidgetSetting_orgId_idx" ON "WidgetSetting"("orgId")`,
   },
+  {
+    name: 'add_trigger_setting',
+    sql: `CREATE TABLE IF NOT EXISTS "TriggerSetting" (
+      "id" TEXT NOT NULL,
+      "orgId" TEXT NOT NULL,
+      "triggerId" TEXT NOT NULL,
+      "enabled" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TriggerSetting_pkey" PRIMARY KEY ("id")
+    )`,
+  },
+  {
+    name: 'add_trigger_setting_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "TriggerSetting_orgId_triggerId_key" ON "TriggerSetting"("orgId", "triggerId")`,
+  },
+  {
+    name: 'add_trigger_setting_org_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "TriggerSetting_orgId_idx" ON "TriggerSetting"("orgId")`,
+  },
+  {
+    name: 'add_controller_setting',
+    sql: `CREATE TABLE IF NOT EXISTS "ControllerSetting" (
+      "id" TEXT NOT NULL,
+      "orgId" TEXT NOT NULL,
+      "controllerId" TEXT NOT NULL,
+      "enabled" BOOLEAN NOT NULL DEFAULT false,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "ControllerSetting_pkey" PRIMARY KEY ("id")
+    )`,
+  },
+  {
+    name: 'add_controller_setting_unique_idx',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "ControllerSetting_orgId_controllerId_key" ON "ControllerSetting"("orgId", "controllerId")`,
+  },
+  {
+    name: 'add_controller_setting_org_idx',
+    sql: `CREATE INDEX IF NOT EXISTS "ControllerSetting_orgId_idx" ON "ControllerSetting"("orgId")`,
+  },
   // Convert SupportTicket.category from TicketCategory enum to plain TEXT.
   // Idempotent: only runs if the TicketCategory type still exists.
   {

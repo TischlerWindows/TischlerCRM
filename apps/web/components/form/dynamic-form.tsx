@@ -27,6 +27,7 @@ import {
   TAB_GRID_COLUMNS,
 } from '@/lib/tab-canvas-grid';
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
+import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
@@ -183,6 +184,7 @@ export default function DynamicForm({
   const pendingCtx = usePendingWidgetManager(isCreateMode, objectApiName);
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
+  const { ids: enabledWidgetIds } = useEnabledWidgetIds();
 
   // Object definition for widgets (simplified shape expected by LayoutWidgetsInline)
   const widgetObjectDef = useMemo(() => {
@@ -1140,6 +1142,7 @@ export default function DynamicForm({
               {stepWidgets.length > 0 && (
                 <LayoutWidgetsInline
                   widgets={stepWidgets as any}
+                  enabledIds={enabledWidgetIds}
                   record={formData}
                   objectDef={widgetObjectDef}
                 />
@@ -1217,6 +1220,7 @@ export default function DynamicForm({
                         >
                           <LayoutWidgetsInline
                             widgets={[g] as any}
+                            enabledIds={enabledWidgetIds}
                             record={formData}
                             objectDef={widgetObjectDef}
                           />
