@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 
@@ -46,6 +47,13 @@ export function WorkOrderReasonModal({ open, mode, onConfirm, onCancel }: Props)
   const [reason, setReason] = useState('')
   const [notes, setNotes] = useState('')
 
+  useEffect(() => {
+    if (open) {
+      setReason('')
+      setNotes('')
+    }
+  }, [open, mode])
+
   const title = mode === 'hold' ? 'Put Work Order On Hold' : 'Cancel Work Order'
   const reasons = mode === 'hold' ? HOLD_REASONS : CANCEL_REASONS
   const confirmLabel = mode === 'hold' ? 'Put On Hold' : 'Cancel WO'
@@ -73,17 +81,17 @@ export function WorkOrderReasonModal({ open, mode, onConfirm, onCancel }: Props)
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="reason">Reason</Label>
-            <select
+            <Select
               id="reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/40"
             >
-              <option value="" disabled>Select a reason</option>
+              <option value="" disabled hidden>Select a reason</option>
               {reasons.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="notes">Notes</Label>
