@@ -93,6 +93,11 @@ export function buildApp() {
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+  // Always allow the known Railway frontend URL
+  const railwayFrontend = 'https://tischlercrm.up.railway.app';
+  if (!allowedOrigins.includes(railwayFrontend)) {
+    allowedOrigins.push(railwayFrontend);
+  }
   app.register(cors, {
     origin: (origin, cb) => {
       if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
