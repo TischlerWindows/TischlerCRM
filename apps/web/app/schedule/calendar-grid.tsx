@@ -73,7 +73,7 @@ function DroppableCell({
             <Link
               key={wo.id}
               href={`/workorders/${wo.id}`}
-              className={woBlockClass(wo.status, isInternal ?? false)}
+              className={woBlockClass(wo.status, isInternal)}
               title={wo.name}
               onClick={(e) => e.stopPropagation()}
             >
@@ -124,12 +124,11 @@ function extractDatePart(iso: string | undefined): string | undefined {
 interface CalendarGridProps {
   techs: GridTech[]
   wos: GridWO[]
-  weekStart: Date
   /** 7 date strings for the current week, in YYYY-MM-DD format */
   weekDates: string[]
 }
 
-export function CalendarGrid({ techs, wos, weekStart: _weekStart, weekDates }: CalendarGridProps) {
+export function CalendarGrid({ techs, wos, weekDates }: CalendarGridProps) {
   const todayStr = toLocalDateStr(new Date())
 
   // Build lookup: techId → date → WO[]

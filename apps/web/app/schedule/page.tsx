@@ -117,6 +117,8 @@ export default function SchedulePage() {
   const [allWOs, setAllWOs] = useState<RawWO[]>([])
   /** woId → techId for assigned WOs (from WorkOrderAssignment) */
   const [assignedMap, setAssignedMap] = useState<Record<string, string>>({})
+  /** woId → assignmentId — used to upsert instead of always creating */
+  const [assignmentIdMap, setAssignmentIdMap] = useState<Record<string, string>>({})
 
   // Loading / error
   const [loading, setLoading] = useState(true)
@@ -172,7 +174,9 @@ export default function SchedulePage() {
       // Parse WorkOrderAssignments → woId → techId (first / lead assignment wins)
       const rawAssigns = parseRecords<Record<string, unknown>>(assignResp)
       const newAssignedMap: Record<string, string> = {}
+      const newAssignmentIdMap: Record<string, string> = {}
       for (const a of rawAssigns) {
+        const assignId = str(a.id)
         const woId = str(getField(a, 'workOrder'))
         const techId = str(getField(a, 'technician'))
         const isLead = getField(a, 'isLead')
@@ -180,6 +184,7 @@ export default function SchedulePage() {
           // Lead assignment wins; otherwise first seen
           if (!newAssignedMap[woId] || isLead === true || isLead === 'true') {
             newAssignedMap[woId] = techId
+            if (assignId) newAssignmentIdMap[woId] = assignId
           }
         }
       }
@@ -187,6 +192,7 @@ export default function SchedulePage() {
       setTechs(parsedTechs)
       setAllWOs(parsedWOs)
       setAssignedMap(newAssignedMap)
+      setAssignmentIdMap(newAssignmentIdMap)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to load schedule data')
     } finally {
@@ -249,6 +255,7 @@ export default function SchedulePage() {
     const originalLeadTech = original?.leadTech ?? undefined
     const originalScheduledStartDate = original?.scheduledStartDate ?? undefined
     const hadAssignment = woId in assignedMap
+    const existingAssignmentId = assignmentIdMap[woId]
 
     // Optimistic update
     setAssignedMap((prev) => ({ ...prev, [woId]: techId }))
@@ -261,9 +268,7 @@ export default function SchedulePage() {
     )
 
     try {
-      await recordsService.createRecord('WorkOrderAssignment', {
-        data: { workOrder: woId, technician: techId, isLead: true },
-      })
+      // Step 1: Update WO first (idempotent — safe if next step fails)
       await recordsService.updateRecord('WorkOrder', woId, {
         data: {
           scheduledStartDate: `${date}T08:00:00`,
@@ -271,6 +276,21 @@ export default function SchedulePage() {
           leadTech: techId,
         },
       })
+
+      // Step 2: Upsert assignment — update existing to avoid duplicates
+      if (existingAssignmentId) {
+        await recordsService.updateRecord('WorkOrderAssignment', existingAssignmentId, {
+          data: { technician: techId, isLead: true },
+        })
+      } else {
+        const created = await recordsService.createRecord('WorkOrderAssignment', {
+          data: { workOrder: woId, technician: techId, isLead: true },
+        })
+        // Track the new assignment ID so subsequent drags update rather than duplicate
+        if (created?.id) {
+          setAssignmentIdMap((prev) => ({ ...prev, [woId]: created.id }))
+        }
+      }
     } catch (err) {
       console.error('Failed to save assignment:', err)
       // Revert optimistic update — restore exact original state
@@ -405,7 +425,6 @@ export default function SchedulePage() {
             <CalendarGrid
               techs={gridTechs}
               wos={gridWOs}
-              weekStart={monday}
               weekDates={dates}
             />
           </div>
