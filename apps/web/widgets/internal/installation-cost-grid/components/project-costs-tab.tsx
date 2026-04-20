@@ -1,5 +1,6 @@
 'use client'
 import { COST_COLUMNS, costWeeklyTotal, num, fmt } from '../utils/calculations'
+import { useGridNavigation } from '../hooks/use-grid-navigation'
 
 interface ProjectCostsTabProps {
   costs: Array<{ id: string; data: Record<string, any> }>
@@ -8,6 +9,8 @@ interface ProjectCostsTabProps {
 }
 
 export function ProjectCostsTab({ costs, dirtyCosts, onFieldChange }: ProjectCostsTabProps) {
+  const { containerRef, getCellProps } = useGridNavigation()
+
   const getValue = (recordId: string, field: string, data: Record<string, any>): number => {
     return dirtyCosts[recordId]?.[field] !== undefined ? dirtyCosts[recordId][field] : num(data[field])
   }
@@ -22,7 +25,7 @@ export function ProjectCostsTab({ costs, dirtyCosts, onFieldChange }: ProjectCos
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto" ref={containerRef}>
       <table className="w-full border-collapse text-xs min-w-[700px]">
         <thead>
           <tr className="bg-gray-50">
@@ -34,16 +37,18 @@ export function ProjectCostsTab({ costs, dirtyCosts, onFieldChange }: ProjectCos
           </tr>
         </thead>
         <tbody>
-          {costs.map(cost => {
+          {costs.map((cost, rowIndex) => {
             const d = cost.data as Record<string, any>
             const weekTotal = costWeeklyTotal(d, dirtyCosts[cost.id])
             return (
               <tr key={cost.id} className="hover:bg-gray-50/50">
                 <td className="px-2 py-1 border-b border-gray-100 font-medium sticky left-0 bg-white z-10">Wk {d.weekNumber}</td>
-                {COST_COLUMNS.map(col => (
+                {COST_COLUMNS.map((col, colIndex) => (
                   <td key={col.key} className="p-0.5 border-b border-gray-100">
-                    <input type="number" step="0.01" value={getValue(cost.id, col.key, d)}
+                    <input type="number" step="0.01" value={getValue(cost.id, col.key, d) || ''}
                       onChange={e => onFieldChange(cost.id, col.key, parseFloat(e.target.value) || 0)}
+                      onFocus={e => e.target.select()}
+                      {...getCellProps(rowIndex, colIndex)}
                       className="w-full border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none" />
                   </td>
                 ))}

@@ -1,6 +1,7 @@
 'use client'
 import { Save, Loader2 } from 'lucide-react'
 import { VARIANCE_CATEGORIES, calculateActual, num, fmt, fmtNum } from '../utils/calculations'
+import { useGridNavigation } from '../hooks/use-grid-navigation'
 
 interface VarianceReportTabProps {
   installationData: Record<string, any>
@@ -19,6 +20,7 @@ export function VarianceReportTab({
   installationData, costs, techExpenses,
   dirtyEstimates, onEstimateChange, onSaveEstimates, saving,
 }: VarianceReportTabProps) {
+  const { containerRef, getCellProps } = useGridNavigation()
   const hasDirty = Object.keys(dirtyEstimates).length > 0
 
   const getEstimated = (field: string): number => {
@@ -63,6 +65,7 @@ export function VarianceReportTab({
         </button>
       </div>
 
+      <div ref={containerRef}>
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr style={{ background: '#2c3e50', color: 'white' }}>
@@ -73,7 +76,7 @@ export function VarianceReportTab({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, rowIndex) => (
             <tr
               key={row.estimatedField}
               className={row.isSubcategory ? 'italic' : ''}
@@ -86,8 +89,10 @@ export function VarianceReportTab({
                 <input
                   type="number"
                   step={row.type === 'hours' ? '0.5' : '0.01'}
-                  value={getEstimated(row.estimatedField)}
+                  value={getEstimated(row.estimatedField) || ''}
                   onChange={e => onEstimateChange(row.estimatedField, parseFloat(e.target.value) || 0)}
+                  onFocus={e => e.target.select()}
+                  {...getCellProps(rowIndex, 0)}
                   className="w-24 border border-gray-200 rounded px-2 py-1 text-right text-xs focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                 />
               </td>
@@ -109,6 +114,7 @@ export function VarianceReportTab({
           </tr>
         </tbody>
       </table>
+      </div>
 
       <p className="text-[10px] text-gray-400 mt-3 italic">
         Actuals are calculated from the cost grid and technician data. Estimates are editable above.

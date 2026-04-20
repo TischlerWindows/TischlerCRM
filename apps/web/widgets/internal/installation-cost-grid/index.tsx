@@ -4,8 +4,8 @@
  * and the technician assignment modal for a single Installation record.
  */
 'use client'
-import { useState } from 'react'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Loader2, AlertCircle, Save } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import { useInstallationData } from './hooks/use-installation-data'
 import { KpiBar } from './components/kpi-bar'
@@ -30,6 +30,17 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
 
   const [activeTab, setActiveTab] = useState<Tab>('costs')
   const [techModalOpen, setTechModalOpen] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        if (isDirty) save()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isDirty, save])
 
   if (loading) {
     return (
@@ -61,7 +72,19 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
   ]
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+      {/* Installation Header */}
+      <div className="text-center py-2">
+        <h2 className="text-lg font-bold text-brand-navy">
+          {instData.installationName || 'Installation'}
+        </h2>
+        {data.projectName && (
+          <p className="text-sm text-gray-500 mt-0.5">
+            Project: <span className="font-medium text-brand-dark">{data.projectName}</span>
+          </p>
+        )}
+      </div>
+
       <KpiBar
         budget={num(instData.installationBudget)}
         totalCost={num(instData.finalCost)}
@@ -86,7 +109,7 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-xs font-semibold rounded-t-md transition-colors ${
+            className={`px-5 py-2.5 text-sm font-semibold rounded-t-md transition-colors ${
               activeTab === tab.id
                 ? 'bg-brand-navy text-white'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
@@ -124,6 +147,26 @@ export default function InstallationCostGridWidget({ record }: WidgetProps) {
           />
         )}
       </div>
+
+      {/* Bottom save bar — visible when there are unsaved changes */}
+      {isDirty && (
+        <div className="flex items-center justify-between px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <span className="text-xs text-amber-700 font-medium">
+            You have unsaved changes
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-amber-600">Ctrl+S to save</span>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="text-xs px-4 py-1.5 bg-brand-navy text-white rounded hover:bg-brand-navy/90 transition-colors flex items-center gap-1.5 font-semibold disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              Save Changes
+            </button>
+          </div>
+        </div>
+      )}
 
       {techModalOpen && (
         <TechnicianModal

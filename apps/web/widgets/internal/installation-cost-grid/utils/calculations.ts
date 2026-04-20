@@ -25,24 +25,16 @@ export const COST_COLUMNS = [
 ] as const
 
 export const LABOR_COLUMNS = [
-  { key: 'woodbucks', label: 'Woodbucks', short: 'WB', color: '#b3d9ff' },
-  { key: 'waterproofing', label: 'Waterproofing', short: 'WP', color: '#b3ffb3' },
-  { key: 'installationLabor', label: 'Installation Labor', short: 'Labor', color: '#ffe6b3' },
+  { key: 'woodbucks', label: 'Woodbucks', short: 'Woodbucks', color: '#b3d9ff' },
+  { key: 'waterproofing', label: 'Waterproofing', short: 'Waterproofing', color: '#b3ffb3' },
+  { key: 'installationLabor', label: 'Installation Labor', short: 'Installation Labor', color: '#ffe6b3' },
   { key: 'travel', label: 'Travel', short: 'Travel', color: '#ffe6b3' },
-  { key: 'waterTesting', label: 'Water Testing', short: 'WTest', color: '#ffe6b3' },
-  { key: 'sills', label: 'Sills', short: 'Sills', color: '#ffe6b3' },
-  { key: 'finishCaulking', label: 'Finish Caulking', short: 'Caulk', color: '#ffe6b3' },
-  { key: 'screenLutronShades', label: 'Screen/Lutron', short: 'Screen', color: '#ffe6b3' },
-  { key: 'punchListWork', label: 'Punch List', short: 'Punch', color: '#ffe6b3' },
-  { key: 'finishHardware', label: 'Finish Hardware', short: 'HW', color: '#ffe6b3' },
-  { key: 'finalAdjustments', label: 'Final Adjustments', short: 'Adj', color: '#ffe6b3' },
-  { key: 'containerUnload', label: 'Container Unload', short: 'Unload', color: '#ffe6b3' },
 ] as const
 
 export const TECH_EXPENSE_COLUMNS = [
-  { key: 'perDiem', label: 'Per Diem', short: 'P/D', color: '#ffb366' },
-  { key: 'mileage', label: 'Mileage', short: 'Mile', color: '#ffb366' },
-  { key: 'materials', label: 'Materials', short: 'Mat', color: '#ffb366' },
+  { key: 'perDiem', label: 'Per Diem', short: 'Per Diem', color: '#ffb366' },
+  { key: 'mileage', label: 'Mileage', short: 'Mileage', color: '#ffb366' },
+  { key: 'materials', label: 'Materials', short: 'Materials', color: '#ffb366' },
 ] as const
 
 export function num(v: unknown): number {
