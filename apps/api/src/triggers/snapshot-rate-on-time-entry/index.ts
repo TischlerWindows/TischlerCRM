@@ -11,7 +11,7 @@ import type { TriggerHandler, TriggerContext } from '../../lib/triggers/types.js
 
 export const handler: TriggerHandler = async (ctx: TriggerContext) => {
   try {
-    const { event, recordData } = ctx
+    const { event, recordData, beforeData } = ctx
     const techId = recordData.technician
     if (!techId) return null
 
@@ -27,10 +27,16 @@ export const handler: TriggerHandler = async (ctx: TriggerContext) => {
     const miscHours = Number(recordData.miscHours) || 0
     const totalHours = workHours + travelHours + prepHours + miscHours
 
-    // On create: snapshot current rate. On update: preserve existing rateAtEntry (immutable after save).
-    const rateAtEntry = event === 'beforeCreate'
-      ? currentRate
-      : (Number(recordData.rateAtEntry) || currentRate)
+    // On create: snapshot current rate. On update: use the persisted rateAtEntry
+    // from beforeData (the pre-update record), not from recordData (the incoming
+    // payload). Partial PATCHes must never re-snapshot the rate.
+    let rateAtEntry: number
+    if (event === 'beforeCreate') {
+      rateAtEntry = currentRate
+    } else {
+      const persistedRate = Number((beforeData as Record<string, any> | undefined)?.rateAtEntry)
+      rateAtEntry = persistedRate > 0 ? persistedRate : currentRate
+    }
 
     const totalCost = totalHours * rateAtEntry
 
