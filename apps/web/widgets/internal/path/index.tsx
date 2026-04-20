@@ -7,6 +7,7 @@ import type { PathDef, PathStage, PathTransitionField, FieldDef } from '@/lib/sc
 import { useSchemaStore } from '@/lib/schema-store';
 import { apiClient } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import { usePathIntercept } from '@/lib/path-intercept-context';
 
 function daysAgo(isoDate: string | undefined): number | null {
   if (!isoDate) return null;
@@ -29,6 +30,10 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   const showGuidance = (config.showGuidance as boolean) ?? true;
   const showKeyFields = (config.showKeyFields as boolean) ?? true;
   const compact = (config.compact as boolean) ?? false;
+
+  // Optional intercept context — provided by WorkOrder detail page to wire
+  // WorkOrderReasonModal into the On Hold / Cancelled transitions.
+  const pathIntercept = usePathIntercept();
 
   const [popoverStageId, setPopoverStageId] = useState<string | null>(null);
   const [popoverRect, setPopoverRect] = useState<{ top: number; left: number } | null>(null);
@@ -89,6 +94,27 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
     const recordId = record.id as string;
     if (!recordId) return;
 
+    // If an intercept context is provided (e.g. WorkOrder detail page),
+    // give it a chance to show a modal and collect extra fields before we
+    // commit. A null return means the user cancelled.
+    let interceptExtra: Record<string, string> | null = null;
+    if (pathIntercept && !extraFields) {
+      try {
+        interceptExtra = await pathIntercept.onBeforeAdvance(stage.name);
+      } catch {
+        // Intercept threw — treat as cancellation
+        return;
+      }
+      if (interceptExtra === null) {
+        // User cancelled the modal
+        setPopoverStageId(null);
+        setPopoverRect(null);
+        setConfirmBack(null);
+        setConfirmReopen(null);
+        return;
+      }
+    }
+
     setUpdating(true);
     try {
       const updateData: Record<string, unknown> = {
@@ -97,8 +123,12 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       if (pathDef!.stageEnteredAtFieldApiName) {
         updateData[pathDef!.stageEnteredAtFieldApiName] = new Date().toISOString();
       }
+      // Merge in fields from the transitionFields modal (extraFields) or
+      // the intercept context modal (interceptExtra).
       if (extraFields) {
         Object.assign(updateData, extraFields);
+      } else if (interceptExtra && Object.keys(interceptExtra).length > 0) {
+        Object.assign(updateData, interceptExtra);
       }
       await apiClient.updateRecord(object.apiName, recordId, updateData);
       record[pathDef!.trackingFieldApiName] = stage.id;
@@ -107,6 +137,8 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       }
       if (extraFields) {
         Object.entries(extraFields).forEach(([k, v]) => { record[k] = v; });
+      } else if (interceptExtra) {
+        Object.entries(interceptExtra).forEach(([k, v]) => { record[k] = v; });
       }
     } catch {
       // Silent — record stays at previous stage
