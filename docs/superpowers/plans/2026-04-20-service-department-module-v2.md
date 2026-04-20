@@ -20,14 +20,16 @@
 
 ## Prefix Map (v2)
 
+> **Update 2026-04-20 during Task 1 execution:** Prefixes 035-041 were already taken by existing models (SupportTicket, TicketComment, TicketAttachment, TicketEvent, ErrorLog, Notification, NotificationTypeSetting). The plan's original assignments collided. The correct prefixes for this plan are reflected in the table below and in every task's "register prefix" step.
+
 | Object | Prefix | Status |
 |--------|--------|--------|
-| Technician | `035` | New (currently unregistered) |
-| WorkOrderAssignment | `036` | New |
-| PunchListItem | `037` | New |
-| TimeEntry | `038` | New |
-| WorkOrderExpense | `039` | New |
-| TechnicianRateHistory | `040` | New |
+| Technician | `042` | Done (Task 1) |
+| WorkOrderAssignment | `043` | New |
+| PunchListItem | `044` | New |
+| TimeEntry | `045` | New |
+| WorkOrderExpense | `046` | New |
+| TechnicianRateHistory | `047` | New |
 
 ---
 
@@ -250,15 +252,17 @@ Note: `totalHours` / `totalCost` / `rateAtEntry` are computed and stored by the 
 
 - [ ] **Step 7: Register all new prefixes in record-id.ts**
 
-Add after `Technician: '035'`:
+Add after `Technician: '042'` (Task 1 already added that entry):
 
 ```typescript
-  WorkOrderAssignment: '036',
-  PunchListItem: '037',
-  TimeEntry: '038',
-  WorkOrderExpense: '039',
-  TechnicianRateHistory: '040',
+  WorkOrderAssignment: '043',
+  PunchListItem: '044',
+  TimeEntry: '045',
+  WorkOrderExpense: '046',
+  TechnicianRateHistory: '047',
 ```
+
+(The plan originally proposed 036-040 but those were already taken by Ticket* / ErrorLog / Notification* models.)
 
 - [ ] **Step 8: Seed Tischler-owned Property records**
 
