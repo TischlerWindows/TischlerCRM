@@ -74,7 +74,7 @@ export default function TimeEntriesWidget({ record }: WidgetProps) {
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [techNames, setTechNames] = useState<Record<string, string>>({})
   const [myTechId, setMyTechId] = useState<string | null | undefined>(undefined) // undefined = loading
-  const [isManager, setIsManager] = useState(false)
+  const [isManager, setIsManager] = useState<boolean | undefined>(undefined) // undefined = loading
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -106,21 +106,17 @@ export default function TimeEntriesWidget({ record }: WidgetProps) {
 
     // For other roles: check if there's a Technician record linked to this user.
     // If yes → tech (show own entries only). If no → treat as manager (show all).
-    apiClient.get<Record<string, unknown>[]>(
-      `/objects/Technician/records?limit=500`
-    ).then(raw => {
-      const all = Array.isArray(raw) ? raw : []
-      const myTech = all.find(r => {
-        const linked = str(getDataField(r, 'user'))
-        return linked === user.id
-      })
-      if (myTech) {
-        setMyTechId(String(myTech.id))
+    apiClient.get<{ records?: any[]; data?: any[] }>(
+      `/objects/Technician/records?filter[user]=${encodeURIComponent(user.id)}&limit=1`
+    ).then(techResp => {
+      const techList: any[] = techResp?.records ?? techResp?.data ?? []
+      const myTech = techList[0]
+      if (myTech?.id) {
+        setMyTechId(myTech.id as string)
         setIsManager(false)
       } else {
-        // No linked Technician record → treat as manager/office staff
-        setIsManager(true)
         setMyTechId(null)
+        setIsManager(true)  // fallback: no linked tech = manager/office staff
       }
     }).catch(() => {
       // Fallback: show all (manager behaviour) so nothing is hidden on error
@@ -257,12 +253,8 @@ export default function TimeEntriesWidget({ record }: WidgetProps) {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-brand-navy" />
-      </div>
-    )
+  if (loading || isManager === undefined) {
+    return <div className="p-4 text-sm text-brand-gray">Loading…</div>
   }
 
   if (error && entries.length === 0) {
@@ -431,7 +423,7 @@ export default function TimeEntriesWidget({ record }: WidgetProps) {
                   <td className="px-3 py-2 font-semibold text-brand-dark text-xs">{totalHrs.toFixed(2)}</td>
                   <td className="px-3 py-2" />
                   <td className="px-3 py-2 font-semibold text-brand-dark text-xs">{formatCurrency(totalCost)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={(isManager || within24hWindow) ? 2 : 1} />
                 </tr>
               </tfoot>
             )}

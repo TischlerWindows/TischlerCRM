@@ -74,7 +74,7 @@ export default function WorkOrderExpensesWidget({ record }: WidgetProps) {
   const [expenses, setExpenses] = useState<WorkOrderExpense[]>([])
   const [techNames, setTechNames] = useState<Record<string, string>>({})
   const [myTechId, setMyTechId] = useState<string | null | undefined>(undefined) // undefined = loading
-  const [isManager, setIsManager] = useState(false)
+  const [isManager, setIsManager] = useState<boolean | undefined>(undefined) // undefined = loading
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mutationError, setMutationError] = useState<string | null>(null)
@@ -105,17 +105,17 @@ export default function WorkOrderExpensesWidget({ record }: WidgetProps) {
 
     // Check if a Technician record is linked to this user.
     // If yes → tech (see own only). If no → manager/office staff (see all).
-    apiClient.get<Record<string, unknown>[]>(
-      `/objects/Technician/records?limit=500`
-    ).then(raw => {
-      const all = Array.isArray(raw) ? raw : []
-      const myTech = all.find(r => str(getDataField(r, 'user')) === user.id)
-      if (myTech) {
-        setMyTechId(String(myTech.id))
+    apiClient.get<{ records?: any[]; data?: any[] }>(
+      `/objects/Technician/records?filter[user]=${encodeURIComponent(user.id)}&limit=1`
+    ).then(techResp => {
+      const techList: any[] = techResp?.records ?? techResp?.data ?? []
+      const myTech = techList[0]
+      if (myTech?.id) {
+        setMyTechId(myTech.id as string)
         setIsManager(false)
       } else {
-        setIsManager(true)
         setMyTechId(null)
+        setIsManager(true)  // fallback: no linked tech = manager/office staff
       }
     }).catch(() => {
       // On error: fall back to manager view (show all)
@@ -247,12 +247,8 @@ export default function WorkOrderExpensesWidget({ record }: WidgetProps) {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-brand-navy" />
-      </div>
-    )
+  if (loading || isManager === undefined) {
+    return <div className="p-4 text-sm text-brand-gray">Loading…</div>
   }
 
   if (error && expenses.length === 0) {
