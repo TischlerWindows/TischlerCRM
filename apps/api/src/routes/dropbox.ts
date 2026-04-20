@@ -610,13 +610,51 @@ export async function tryRenameDropboxFolder(
       return `${parentPath}/${subfolder}/${safeChild}`;
     };
 
-    // Prefer the stored Dropbox folder ID to find the child record's actual
-    // current path — the guessed path may be stale if the folder was renamed
-    // or created via a different code path (e.g. bulk sync).
+    // Resolve the child record's actual current Dropbox path.
+    // Priority: stored folder ID (survives renames) → verify guessed path → search parent dir.
     const storedChildFolder = await resolveStoredFolder(accessToken!, recordId);
-    const resolvedOldPath = storedChildFolder?.found
-      ? storedChildFolder.fullPath
-      : (oldPropertyId ? await buildLinkedPath(oldPropertyId, oldChildName) : null);
+    let resolvedOldPath: string | null = null;
+
+    if (storedChildFolder?.found) {
+      resolvedOldPath = storedChildFolder.fullPath;
+    } else if (oldPropertyId) {
+      const guessedPath = await buildLinkedPath(oldPropertyId, oldChildName);
+      if (guessedPath) {
+        try {
+          // Verify the guessed path actually exists in Dropbox
+          const meta = await dropboxApi(accessToken!, '/files/get_metadata', { path: guessedPath }) as {
+            '.tag': string; id: string; name: string; path_display: string;
+          };
+          if (meta['.tag'] === 'folder') {
+            resolvedOldPath = meta.path_display;
+            await storeFolderIdOnRecord(recordId, meta.id);
+          }
+        } catch {
+          // Guessed path not found — scan the property subfolder by auto-number
+          const parentDir = guessedPath.substring(0, guessedPath.lastIndexOf('/'));
+          const numberKey = Object.keys(beforeData).find(
+            (k) => k.toLowerCase().includes('number') && typeof beforeData[k] === 'string' && beforeData[k],
+          );
+          const autoNumber = numberKey ? (beforeData[numberKey] as string) : '';
+          if (autoNumber) {
+            try {
+              const listResult = await dropboxApi(accessToken!, '/files/list_folder', {
+                path: parentDir,
+                limit: 2000,
+              }) as { entries: Array<{ '.tag': string; id: string; name: string; path_display: string }> };
+              for (const entry of listResult.entries ?? []) {
+                if (entry['.tag'] === 'folder' && entry.name.includes(autoNumber)) {
+                  resolvedOldPath = entry.path_display;
+                  await storeFolderIdOnRecord(recordId, entry.id);
+                  console.log(`[dropbox] Found linked folder by listing for ${recordId}: ${entry.path_display}`);
+                  break;
+                }
+              }
+            } catch { /* parent dir may not exist yet */ }
+          }
+        }
+      }
+    }
 
     const newPath = newPropertyId ? await buildLinkedPath(newPropertyId, newChildName) : null;
 
@@ -771,7 +809,8 @@ export async function tryEnsureLinkedFolder(
       }
 
       if (oppId) {
-        // Linked to an Opportunity — copy files within the Opportunity's folder
+        // Linked to an Opportunity — create a PRJ#### folder under the
+        // Opportunity's "4. Project Management" subfolder.
         const oppObj = await prisma.customObject.findFirst({
           where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
         });
@@ -780,53 +819,47 @@ export async function tryEnsureLinkedFolder(
             where: { id: oppId, objectId: oppObj.id },
           });
           if (oppRecord) {
+            // Check if already tracked
+            const existingProjectFolder = await resolveStoredFolder(accessToken, childRecordId);
+            if (existingProjectFolder?.found) {
+              console.log(`[dropbox] Project folder already tracked for ${childRecordId} at ${existingProjectFolder.fullPath}`);
+              return;
+            }
+
             const oppData = oppRecord.data as Record<string, any>;
-            // Resolve Opportunity folder via stored ID to handle renames
-            let oppFolderName: string;
+            // Resolve the Opportunity's full Dropbox path via stored ID (most accurate)
+            let oppFullPath: string;
             const oppFolder = await resolveStoredFolder(accessToken, oppId);
             if (oppFolder?.found) {
-              oppFolderName = oppFolder.folderName;
+              oppFullPath = oppFolder.fullPath;
             } else {
-              oppFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
+              const oppFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
+              const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+              oppFullPath = `${parentPath}/Project Books/${safeOpp}`;
             }
-            const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
-            const oppPath = `${parentPath}/Project Books/${safeOpp}`;
-            const estimationPath = `${oppPath}/1. Estimation`;
-            const projectMgmtPath = `${oppPath}/4. Project Management`;
 
-            console.log(`[dropbox] Project linked to Opportunity — copying ${estimationPath} → ${projectMgmtPath}`);
+            // Derive the project folder name from its auto-number / address fields
+            const projectFolderName = deriveDropboxFolderName(childData, childRecordId);
+            const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+            const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
 
+            console.log(`[dropbox] Creating project folder under Opportunity PM: ${projectPath}`);
             try {
-              const result = await dropboxApi(accessToken, '/files/list_folder', {
-                path: estimationPath,
-                limit: 2000,
-              }) as { entries: Array<{ '.tag': string; path_display: string; name: string }> };
-
-              if (result.entries && result.entries.length > 0) {
-                console.log(`[dropbox] Copying ${result.entries.length} items from Estimation → Project Management`);
-                for (const entry of result.entries) {
-                  try {
-                    await dropboxApi(accessToken, '/files/copy_v2', {
-                      from_path: entry.path_display,
-                      to_path: `${projectMgmtPath}/${entry.name}`,
-                      autorename: true,
-                    });
-                  } catch (err: any) {
-                    console.error(`[dropbox] Failed to copy ${entry.name}: ${err.message}`);
-                  }
-                }
-                console.log(`[dropbox] Finished copying files to ${projectMgmtPath}`);
-              } else {
-                console.log(`[dropbox] Estimation folder empty: ${estimationPath}`);
-              }
+              const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+                path: projectPath,
+                autorename: false,
+              }) as { metadata: { id: string } };
+              await storeFolderIdOnRecord(childRecordId, result.metadata.id);
+              console.log(`[dropbox] Successfully created project folder: ${projectPath}`);
             } catch (err: any) {
-              if (err.message?.includes('409') || err.message?.includes('not_found')) {
-                console.log(`[dropbox] Estimation folder not found: ${estimationPath}`);
+              if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+                console.error('[dropbox] Project folder creation failed (non-fatal):', err.message);
               } else {
-                console.error('[dropbox] Copy failed (non-fatal):', err.message);
+                console.log(`[dropbox] Project folder already exists: ${projectPath}`);
+                await backfillFolderId(accessToken, childRecordId, projectPath);
               }
             }
-            return; // Done — no separate Project folder needed
+            return;
           }
         }
       }
