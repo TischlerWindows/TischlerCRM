@@ -45,12 +45,6 @@ export const handler: TriggerHandler = async (ctx: TriggerContext) => {
       updates.completedBy = null
     }
 
-    // If recovering from Cancelled back to Open, clear cancel fields
-    if (oldStatus === 'Cancelled' && newStatus === 'Open') {
-      updates.cancelReason = null
-      updates.cancelNotes = null
-    }
-
     return Object.keys(updates).length > 0 ? updates : null
   } catch (err) {
     console.error('[work-order-lifecycle] Trigger failed:', err)

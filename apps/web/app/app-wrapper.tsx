@@ -120,6 +120,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/workorders') ||
     pathname?.startsWith('/tech-dashboard') ||
     pathname?.startsWith('/cost-dashboard') ||
+    pathname?.startsWith('/schedule') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/support') ||
