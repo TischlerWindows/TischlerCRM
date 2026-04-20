@@ -25,7 +25,6 @@ import {
   ChevronRight,
   AlertTriangle,
   LifeBuoy,
-  ExternalLink,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -158,7 +157,6 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
         >
           <Briefcase className="w-[18px] h-[18px] flex-shrink-0 text-gray-600" />
           <span className="text-sm font-medium">Object Manager</span>
-          <ExternalLink className="w-3.5 h-3.5 ml-auto text-gray-400 flex-shrink-0" />
         </Link>
       </div>
 
