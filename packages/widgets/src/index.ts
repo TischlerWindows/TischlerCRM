@@ -19,6 +19,7 @@ export const INTERNAL_WIDGET_IDS = [
   'path',
   'installation-cost-grid',
   'summary',
+  'dropbox-files',
 ] as const
 export type InternalWidgetId = (typeof INTERNAL_WIDGET_IDS)[number]
 
