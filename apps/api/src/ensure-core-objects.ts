@@ -194,12 +194,31 @@ const CORE_OBJECTS = [
       { apiName: 'workOrderNumber', label: 'Work Order Number', type: 'Text', unique: true },
       { apiName: 'name', label: 'Work Order', type: 'Text' },
       { apiName: 'title', label: 'Title', type: 'TextArea' },
-      { apiName: 'workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
-      { apiName: 'workStatus', label: 'Work Status', type: 'Picklist', picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
-      { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
-      { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
-      { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
-      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'property', label: 'Property', type: 'Lookup', required: true },
+      { apiName: 'workOrderCategory', label: 'Category', type: 'Picklist', picklistValues: ['Client Service', 'Internal'], defaultValue: 'Client Service' },
+      { apiName: 'workOrderSource', label: 'Source', type: 'Picklist', picklistValues: ['Customer Call', 'Warranty Claim', 'Maintenance Contract', 'Internal Request', 'Referred from Project', 'Other'] },
+      { apiName: 'workOrderStatus', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Closed', 'Cancelled'], defaultValue: 'Open' },
+      { apiName: 'holdReason', label: 'Hold Reason', type: 'Picklist', picklistValues: ['Waiting on Parts', 'Waiting on Materials', 'Weather Delay', 'Customer Delay', 'Warranty Decision Pending', 'Subcontractor Delay', 'Tech Unavailable', 'Other'] },
+      { apiName: 'holdNotes', label: 'Hold Notes', type: 'LongTextArea' },
+      { apiName: 'cancelReason', label: 'Cancel Reason', type: 'Picklist', picklistValues: ['Customer Cancelled', 'Duplicate Work Order', 'Issue Resolved', 'Covered Under Different WO', 'Warranty Denied', 'Not Reproducible', 'Other'] },
+      { apiName: 'cancelNotes', label: 'Cancel Notes', type: 'LongTextArea' },
+      { apiName: 'project', label: 'Project', type: 'Lookup' },
+      { apiName: 'leadTech', label: 'Lead Tech', type: 'Lookup' },
+      { apiName: 'scheduledStartDate', label: 'Scheduled Start', type: 'DateTime' },
+      { apiName: 'scheduledEndDate', label: 'Scheduled End', type: 'DateTime' },
+      { apiName: 'completedDate', label: 'Completed Date', type: 'DateTime' },
+      { apiName: 'completedBy', label: 'Completed By', type: 'Lookup' },
+      { apiName: 'closedDate', label: 'Closed Date', type: 'DateTime' },
+      { apiName: 'closedBy', label: 'Closed By', type: 'Lookup' },
+      { apiName: 'workDescription', label: 'Work Description', type: 'LongTextArea' },
+      { apiName: 'toolsNeeded', label: 'Tools Needed', type: 'LongTextArea' },
+      { apiName: 'outsideContractors', label: 'Outside Contractors', type: 'LongTextArea' },
+      { apiName: 'invoiceNumber', label: 'Invoice Number', type: 'Text' },
+      { apiName: 'totalEstimatedHours', label: 'Total Estimated Hours', type: 'Number' },
+      { apiName: 'totalActualHours', label: 'Total Actual Hours', type: 'Number' },
+      { apiName: 'totalLaborCost', label: 'Total Labor Cost', type: 'Currency' },
+      { apiName: 'totalExpenses', label: 'Total Expenses', type: 'Currency' },
+      { apiName: 'totalJobCost', label: 'Total Job Cost', type: 'Currency' },
     ],
   },
   {
@@ -316,6 +335,89 @@ const CORE_OBJECTS = [
       { apiName: 'assignedToUserId', label: 'Assigned To', type: 'Lookup' },
       { apiName: 'relatedObjectApi', label: 'Related Object', type: 'Text' },
       { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
+    ],
+  },
+  {
+    apiName: 'WorkOrderAssignment',
+    label: 'Work Order Assignment',
+    pluralLabel: 'Work Order Assignments',
+    description: 'Junction linking technicians to work orders',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'isLead', label: 'Lead Tech', type: 'Checkbox' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+      { apiName: 'notified', label: 'Notified', type: 'Checkbox' },
+      { apiName: 'notifiedDate', label: 'Notified Date', type: 'DateTime' },
+    ],
+  },
+  {
+    apiName: 'PunchListItem',
+    label: 'Punch List Item',
+    pluralLabel: 'Punch List Items',
+    description: 'Work items within a work order',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'itemNumber', label: 'Item Number', type: 'Number' },
+      { apiName: 'location', label: 'Location', type: 'Text' },
+      { apiName: 'description', label: 'Description', type: 'LongTextArea' },
+      { apiName: 'assignedTech', label: 'Assigned Tech', type: 'Lookup' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'In Progress', 'Completed', 'N/A'], defaultValue: 'Open' },
+      { apiName: 'estimatedHours', label: 'Estimated Hours', type: 'Number' },
+      { apiName: 'estimatedMen', label: 'Estimated Men', type: 'Number' },
+      { apiName: 'materialsInWarehouse', label: 'Materials in Warehouse', type: 'LongTextArea' },
+      { apiName: 'materialsToOrder', label: 'Materials to Order', type: 'LongTextArea' },
+      { apiName: 'specialEquipment', label: 'Special Equipment', type: 'LongTextArea' },
+      { apiName: 'elevationPage', label: 'Elevation Page', type: 'Text' },
+      { apiName: 'serviceDate', label: 'Service Date', type: 'Date' },
+    ],
+  },
+  {
+    apiName: 'TimeEntry',
+    label: 'Time Entry',
+    pluralLabel: 'Time Entries',
+    description: 'Hours tracking per technician per work order',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'date', label: 'Date', type: 'Date', required: true },
+      { apiName: 'workHours', label: 'Work Hours', type: 'Number' },
+      { apiName: 'travelHours', label: 'Travel Hours', type: 'Number' },
+      { apiName: 'prepHours', label: 'Prep Hours', type: 'Number' },
+      { apiName: 'miscHours', label: 'Misc Hours', type: 'Number' },
+      { apiName: 'totalHours', label: 'Total Hours', type: 'Number' },
+      { apiName: 'rateAtEntry', label: 'Rate at Entry', type: 'Currency' },
+      { apiName: 'totalCost', label: 'Total Cost', type: 'Currency' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+    ],
+  },
+  {
+    apiName: 'WorkOrderExpense',
+    label: 'Work Order Expense',
+    pluralLabel: 'Work Order Expenses',
+    description: 'Per diem, mileage, materials, and other job expenses',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup' },
+      { apiName: 'expenseType', label: 'Expense Type', type: 'Picklist', picklistValues: ['Per Diem', 'Mileage', 'Materials', 'Equipment', 'Other'], required: true },
+      { apiName: 'amount', label: 'Amount', type: 'Currency', required: true },
+      { apiName: 'quantity', label: 'Quantity', type: 'Number' },
+      { apiName: 'rate', label: 'Rate', type: 'Currency' },
+      { apiName: 'date', label: 'Date', type: 'Date', required: true },
+      { apiName: 'description', label: 'Description', type: 'Text' },
+    ],
+  },
+  {
+    apiName: 'TechnicianRateHistory',
+    label: 'Technician Rate History',
+    pluralLabel: 'Technician Rate History',
+    description: 'Audit trail for technician hourly rate changes',
+    fields: [
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'effectiveDate', label: 'Effective Date', type: 'Date', required: true },
+      { apiName: 'previousRate', label: 'Previous Rate', type: 'Currency', required: true },
+      { apiName: 'newRate', label: 'New Rate', type: 'Currency', required: true },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
     ],
   },
 ];
@@ -491,6 +593,42 @@ export async function ensureCoreObjects(): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
+  }
+
+  // Seed Tischler-owned Property records used as anchors for Internal WOs
+  try {
+    const propertyObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+    });
+    if (propertyObj) {
+      const internalProps = [
+        { name: 'Tischler HQ — Office' },
+        { name: 'Tischler HQ — Warehouse' },
+        { name: 'Tischler Fleet — Service Trucks' },
+      ];
+      for (const p of internalProps) {
+        const exists = await prisma.record.findFirst({
+          where: {
+            objectId: propertyObj.id,
+            data: { path: ['name'], equals: p.name },
+          },
+        });
+        if (!exists) {
+          await prisma.record.create({
+            data: {
+              id: generateId('Property'),
+              objectId: propertyObj.id,
+              data: { name: p.name },
+              createdById: systemUser.id,
+              modifiedById: systemUser.id,
+            },
+          });
+          console.log(`[ensure-core-objects] Seeded internal property: ${p.name}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not seed Tischler internal properties:', err);
   }
 
   // Also sync any user-created objects from the schema settings to the DB.
