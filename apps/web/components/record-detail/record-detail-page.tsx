@@ -104,10 +104,10 @@ function RequoteVersionSelector({ objectApiName, recordId }: { objectApiName: st
 /**
  * Universal record detail page.
  *
- * Renders a record using the EXACT page layout that was used to create it
- * (stored as `pageLayoutId` on the record). Falls back to the record-type
- * layout or the first available layout only if the record has no stored
- * layout reference.
+ * Renders every record with the object's currently-active page layout,
+ * resolved via `resolveLayoutForUser` (role match → default → single-active).
+ * Records are not pinned to the layout they were created with — changing
+ * which layout is active takes effect on the next view/edit.
  *
  * Edit also uses the same layout so the form matches the view 1-to-1.
  */
@@ -192,10 +192,7 @@ export default function RecordDetailPage({
     const result = resolveLayoutForUser(
       objectDef,
       { profileId: authUser?.profileId ?? null },
-      {
-        record: { pageLayoutId: record.pageLayoutId as string | null | undefined },
-        layoutType: 'edit',
-      },
+      { layoutType: 'edit' },
     );
     if (result.kind !== 'resolved') return null;
     let raw: PageLayout = result.layout;
