@@ -33,15 +33,17 @@ export function useGridNavigation() {
           nextRow = row + 1
           break
         case 'ArrowLeft':
-          if (target.selectionStart !== 0) return
           e.preventDefault()
           nextCol = col - 1
           break
         case 'ArrowRight':
-          if (target.selectionStart !== target.value.length) return
           e.preventDefault()
           nextCol = col + 1
           break
+        case 'Tab':
+          // Let Tab work naturally but also select text in the next input
+          // Don't preventDefault — browser handles Tab natively
+          return
         default:
           return
       }

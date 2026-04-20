@@ -45,8 +45,9 @@ export function ProjectCostsTab({ costs, dirtyCosts, onFieldChange }: ProjectCos
                 <td className="px-2 py-1 border-b border-gray-100 font-medium sticky left-0 bg-white z-10">Wk {d.weekNumber}</td>
                 {COST_COLUMNS.map((col, colIndex) => (
                   <td key={col.key} className="p-0.5 border-b border-gray-100">
-                    <input type="number" step="0.01" value={getValue(cost.id, col.key, d)}
+                    <input type="number" step="0.01" value={getValue(cost.id, col.key, d) || ''}
                       onChange={e => onFieldChange(cost.id, col.key, parseFloat(e.target.value) || 0)}
+                      onFocus={e => e.target.select()}
                       {...getCellProps(rowIndex, colIndex)}
                       className="w-full border border-gray-200 rounded px-1.5 py-1 text-right text-xs focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none" />
                   </td>

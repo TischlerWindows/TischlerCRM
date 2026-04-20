@@ -89,8 +89,9 @@ export function VarianceReportTab({
                 <input
                   type="number"
                   step={row.type === 'hours' ? '0.5' : '0.01'}
-                  value={getEstimated(row.estimatedField)}
+                  value={getEstimated(row.estimatedField) || ''}
                   onChange={e => onEstimateChange(row.estimatedField, parseFloat(e.target.value) || 0)}
+                  onFocus={e => e.target.select()}
                   {...getCellProps(rowIndex, 0)}
                   className="w-24 border border-gray-200 rounded px-2 py-1 text-right text-xs focus:border-brand-navy focus:ring-1 focus:ring-brand-navy/20 outline-none"
                 />
