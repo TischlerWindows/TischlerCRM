@@ -382,11 +382,33 @@ function deriveOpportunityFolderName(data: Record<string, any>): string {
 
 // ── Derive Dropbox folder name from record data ───────────────────
 // Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
-function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string): string {
-  // Find auto-number field
-  const numberKey = Object.keys(recordData).find(
+function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string, objectApiName?: string): string {
+  // Find auto-number field.
+  // When objectApiName is provided, prefer the record's OWN number (e.g. projectNumber for
+  // a Project) over numbers inherited from linked entities (e.g. opportunityNumber,
+  // propertyNumber). This prevents a Project from accidentally being named after its
+  // linked Opportunity folder when both numbers are present in the record data.
+  const allNumberKeys = Object.keys(recordData).filter(
     (k) => k.toLowerCase().includes('number') && typeof recordData[k] === 'string' && recordData[k],
   );
+  let numberKey: string | undefined;
+  if (objectApiName && allNumberKeys.length > 1) {
+    const selfPrefix = objectApiName.toLowerCase(); // e.g. 'project'
+    // 1. Exact match: stripped key === {objectApiName}number
+    const strippedKey = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
+    numberKey = allNumberKeys.find(k => strippedKey(k) === selfPrefix + 'number');
+    // 2. Key contains the self prefix (e.g. 'project' is in 'projectNumber')
+    if (!numberKey) {
+      numberKey = allNumberKeys.find(k => strippedKey(k).startsWith(selfPrefix));
+    }
+    // 3. Key does NOT contain any other known entity name
+    if (!numberKey) {
+      const foreignPrefixes = ['opportunity', 'property', 'lead', 'workorder', 'work_order', 'service', 'contact', 'account']
+        .filter(p => p !== selfPrefix);
+      numberKey = allNumberKeys.find(k => !foreignPrefixes.some(p => strippedKey(k).includes(p)));
+    }
+  }
+  if (!numberKey) numberKey = allNumberKeys[0];
   const autoNumber = numberKey ? (recordData[numberKey] as string) : '';
 
   // Find address — prefer the LocationSearch blob (address_search) which
@@ -633,11 +655,11 @@ export async function tryRenameDropboxFolder(
     let oldChildName: string;
     let newChildName: string;
     if (objectApiName === 'Opportunity') {
-      oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId);
-      newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId);
+      oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId, objectApiName);
+      newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId, objectApiName);
     } else {
-      oldChildName = deriveDropboxFolderName(beforeData, recordId);
-      newChildName = deriveDropboxFolderName(afterData, recordId);
+      oldChildName = deriveDropboxFolderName(beforeData, recordId, objectApiName);
+      newChildName = deriveDropboxFolderName(afterData, recordId, objectApiName);
     }
 
     // Resolve Property folder paths
@@ -890,7 +912,7 @@ export async function tryEnsureLinkedFolder(
             }
 
             // Derive the project folder name from its auto-number / address fields
-            const projectFolderName = deriveDropboxFolderName(childData, childRecordId);
+            const projectFolderName = deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
             const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
             const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
 
@@ -921,9 +943,9 @@ export async function tryEnsureLinkedFolder(
     let childFolderName: string;
     if (childObjectApiName === 'Opportunity') {
       // Use opportunity number + name (e.g. "OPP0001 (Test)" or "OPP0001 (Test) - Requote 1")
-      childFolderName = deriveOpportunityFolderName(childData) || deriveDropboxFolderName(childData, childRecordId);
+      childFolderName = deriveOpportunityFolderName(childData) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
     } else {
-      childFolderName = deriveDropboxFolderName(childData, childRecordId);
+      childFolderName = deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
     }
 
     const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
@@ -1569,9 +1591,9 @@ export async function dropboxRoutes(app: FastifyInstance) {
       // For Opportunity, use opportunity number + name as the folder name
       let childFolderName: string;
       if (objectApiName === 'Opportunity') {
-        childFolderName = deriveOpportunityFolderName(recordData) || deriveDropboxFolderName(recordData, recordId);
+        childFolderName = deriveOpportunityFolderName(recordData) || deriveDropboxFolderName(recordData, recordId, objectApiName);
       } else {
-        childFolderName = deriveDropboxFolderName(recordData, recordId);
+        childFolderName = deriveDropboxFolderName(recordData, recordId, objectApiName);
       }
 
       // Resolve actual folder names from stored Dropbox folder IDs (handles renames)
@@ -1721,7 +1743,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
             const oppData = oppRecord.data as Record<string, any>;
             const oppFolder = await resolveStoredFolder(accessToken, oppId);
             if (oppFolder?.found) {
-              const safeProject = deriveDropboxFolderName(pData, recordId).replace(/[\\/:*?"<>|]/g, '_').trim();
+              const safeProject = deriveDropboxFolderName(pData, recordId, 'Project').replace(/[\\/:*?"<>|]/g, '_').trim();
               basePath = `${oppFolder.fullPath}/4. Project Management/${safeProject}`;
             }
           }
@@ -1961,8 +1983,11 @@ export async function dropboxRoutes(app: FastifyInstance) {
         });
         if (projRecord) {
           const pData = projRecord.data as Record<string, any>;
+          console.log(`[dropbox][ensure-folder] Project ${recordId} data keys: ${Object.keys(pData).join(', ')}`);
+          console.log(`[dropbox][ensure-folder] Project derivedName: "${deriveDropboxFolderName(pData, recordId, 'Project')}"`);
           // Resolve linked Opportunity ID
           const oppId = await findLinkedOpportunityId(pData, 'Project');
+          console.log(`[dropbox][ensure-folder] Project ${recordId} linked oppId: ${oppId ?? 'NOT FOUND'}`);
           if (oppId) {
             const oppObj = await prisma.customObject.findFirst({
               where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
@@ -2014,7 +2039,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
               }
 
               if (oppFullPath) {
-                const projectFolderName = deriveDropboxFolderName(pData, recordId);
+                const projectFolderName = deriveDropboxFolderName(pData, recordId, 'Project');
                 const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
                 const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
 
