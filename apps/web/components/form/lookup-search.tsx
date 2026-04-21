@@ -4,6 +4,7 @@ import React from 'react';
 import { Input } from '@/components/ui/input';
 import { FieldDef, ObjectDef } from '@/lib/schema';
 import { cn } from '@/lib/utils';
+import LocationMapPreview from '@/components/location-map-preview';
 
 // ── getRecordLabel ───────────────────────────────────────────────────
 // Derives a human-readable label from a flattened lookup record.
@@ -313,7 +314,35 @@ export function LookupSearch({
     schemaObjects,
   );
 
+  // For Property lookups, extract lat/lng from the selected record to show a map
+  const propertyLat = targetApi === 'Property' && selectedRecord
+    ? parseFloat(
+        selectedRecord.latitude ??
+        selectedRecord.Property__latitude ??
+        // scan for any prefixed lat field
+        (Object.entries(selectedRecord).find(([k]) =>
+          k.toLowerCase().endsWith('__latitude') || k.toLowerCase() === 'latitude',
+        )?.[1] as string | undefined) ??
+        ''
+      )
+    : NaN;
+  const propertyLng = targetApi === 'Property' && selectedRecord
+    ? parseFloat(
+        selectedRecord.longitude ??
+        selectedRecord.Property__longitude ??
+        (Object.entries(selectedRecord).find(([k]) =>
+          k.toLowerCase().endsWith('__longitude') || k.toLowerCase() === 'longitude',
+        )?.[1] as string | undefined) ??
+        ''
+      )
+    : NaN;
+  const propertyAddress = targetApi === 'Property' && selectedRecord
+    ? getRecordSubtext(selectedRecord) || undefined
+    : undefined;
+  const hasPropertyMap = !isNaN(propertyLat) && !isNaN(propertyLng) && propertyLat !== 0 && propertyLng !== 0;
+
   return (
+    <>
     <div className="relative">
       <Input
         id={fieldDef.apiName}
@@ -391,6 +420,15 @@ export function LookupSearch({
         </div>
       )}
     </div>
+    {hasPropertyMap && !isActive && (
+      <LocationMapPreview
+        lat={propertyLat}
+        lng={propertyLng}
+        address={propertyAddress}
+        className="mt-2"
+      />
+    )}
+    </>
   );
 }
 
