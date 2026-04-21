@@ -78,9 +78,11 @@ const OPPORTUNITY_SUBFOLDERS = [
   '6. Installation',
   '7. Final Shop Drawings',
   '8. Project Accounting',
-  '9. Photos/Site',
-  '9. Photos/Finished',
+  '9. Photos',
 ];
+
+/** Sub-subfolders created inside the Opportunity's '9. Photos' folder. */
+const OPPORTUNITY_PHOTOS_SUBFOLDERS = ['Site', 'Finished'];
 
 /** Return a small HTML page that posts a message to the opener window and closes itself. */
 function oauthResultPage(status: 'connected' | 'error', reason?: string): string {
@@ -1054,6 +1056,15 @@ export async function tryEnsureLinkedFolder(
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
             path: `${childPath}/${sf}`,
+            autorename: false,
+          });
+        } catch { /* folder already exists — ignore */ }
+      }
+      // Create Site / Finished inside 9. Photos
+      for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: `${childPath}/9. Photos/${sub}`,
             autorename: false,
           });
         } catch { /* folder already exists — ignore */ }
@@ -2129,6 +2140,15 @@ export async function dropboxRoutes(app: FastifyInstance) {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
             path: `${childPath}/${sf}`,
+            autorename: false,
+          });
+        } catch { /* folder already exists — ignore */ }
+      }
+      // Create Site / Finished inside 9. Photos
+      for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
+        try {
+          await dropboxApi(accessToken, '/files/create_folder_v2', {
+            path: `${childPath}/9. Photos/${sub}`,
             autorename: false,
           });
         } catch { /* folder already exists — ignore */ }
