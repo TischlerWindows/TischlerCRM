@@ -159,11 +159,33 @@ export function getRecordLabel(record: any): string {
 export function getRecordSubtext(record: any): string {
   if (!record) return '';
 
-  // Property: show address as subtext
-  const addr = record.address || record.Property__address;
+  // Property: show address as subtext.
+  // Check both the legacy Address field (address / Property__address) and the
+  // newer LocationSearch field (address_search / Property__address_search).
+  const addrBlob =
+    record.address_search ||
+    record.Property__address_search ||
+    // Also handle any prefixed __address_search key
+    (() => {
+      const k = Object.keys(record).find(
+        (key) => key.toLowerCase().endsWith('__address_search') || key.toLowerCase() === 'address_search',
+      );
+      return k ? record[k] : undefined;
+    })();
+  const addrLegacy =
+    record.address ||
+    record.Property__address ||
+    (() => {
+      const k = Object.keys(record).find(
+        (key) => (key.toLowerCase().endsWith('__address') || key.toLowerCase() === 'address') &&
+                 !key.toLowerCase().includes('_search'),
+      );
+      return k ? record[k] : undefined;
+    })();
+  const addr = addrBlob || addrLegacy;
   if (addr) {
     if (typeof addr === 'object') {
-      const parts = [addr.street, addr.city, addr.state, addr.zip].filter(Boolean);
+      const parts = [addr.street, addr.city, addr.state, addr.zip || addr.postalCode].filter(Boolean);
       if (parts.length > 0) return parts.join(', ');
     } else if (typeof addr === 'string') {
       return addr;

@@ -131,7 +131,11 @@ export async function recordRoutes(app: FastifyInstance) {
       let addressField = '';
 
       if (isProperty) {
-        addressField = fieldApis.find((f: string) => f.toLowerCase().endsWith('__address') || f.toLowerCase() === 'address') || '';
+        // Prefer LocationSearch field (address_search) over legacy Address field.
+        addressField =
+          fieldApis.find((f: string) => f.toLowerCase().endsWith('__address_search') || f.toLowerCase() === 'address_search') ||
+          fieldApis.find((f: string) => (f.toLowerCase().endsWith('__address') || f.toLowerCase() === 'address') && !f.toLowerCase().includes('_search')) ||
+          '';
       } else {
         // Find a name field: opportunityName, projectName, accountName, contactName, subject, name, etc.
         nameField = fieldApis.find((f: string) => {
