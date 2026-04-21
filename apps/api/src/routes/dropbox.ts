@@ -434,6 +434,63 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
 }
 
 /**
+ * Find the linked Opportunity ID from a record's JSON data.
+ * Checks well-known field names first, then scans all keys, then falls back
+ * to a DB query to validate any candidate ID values against Opportunity records.
+ * This is robust against any field API name convention.
+ */
+async function findLinkedOpportunityId(
+  pData: Record<string, any>,
+  objectApiName: string,
+): Promise<string | undefined> {
+  // 1. Well-known keys (fast path, covers most setups)
+  const wellKnown = ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity', 'Opportunity'];
+  for (const key of wellKnown) {
+    const v = pData[key] ?? pData[`${objectApiName}__${key}`];
+    if (v && typeof v === 'string') return v;
+    // Handle object-valued lookups: { id: "...", label: "..." }
+    if (v && typeof v === 'object' && typeof (v as any).id === 'string') return (v as any).id;
+  }
+  // 2. Scan all keys for anything containing 'opportunity'
+  for (const [key, val] of Object.entries(pData)) {
+    if (key.startsWith('_')) continue;
+    if (
+      key.toLowerCase().includes('opportunity') &&
+      !key.toLowerCase().includes('number') &&
+      !key.toLowerCase().includes('name')
+    ) {
+      if (typeof val === 'string' && val) return val;
+      if (val && typeof val === 'object' && typeof (val as any).id === 'string') return (val as any).id;
+    }
+  }
+  // 3. DB-validated fallback: find any Opportunity record whose ID appears in pData values
+  try {
+    const oppObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+    });
+    if (!oppObj) return undefined;
+
+    const candidates = new Set<string>();
+    for (const val of Object.values(pData)) {
+      if (typeof val === 'string' && val.length >= 8 && !val.includes(' ')) {
+        candidates.add(val);
+      } else if (val && typeof val === 'object' && typeof (val as any).id === 'string') {
+        candidates.add((val as any).id);
+      }
+    }
+    if (candidates.size === 0) return undefined;
+
+    const oppRecord = await prisma.record.findFirst({
+      where: { id: { in: [...candidates] }, objectId: oppObj.id, deletedAt: null },
+      select: { id: true },
+    });
+    return oppRecord?.id;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * For a Project (or similar) record that has no direct PropertyId,
  * look it up via the linked Opportunity.
  */
@@ -531,13 +588,9 @@ export async function tryRenameDropboxFolder(
     }
 
     // ── Linked object (Lead, Opportunity, Project, WorkOrder, Service) ──
-    // Projects linked to Opportunities don't have their own folder, skip.
+    // Projects linked to Opportunities use the Opp PM subfolder — skip rename.
     if (objectApiName === 'Project') {
-      let oppId: string | undefined;
-      for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
-        const v = afterData[key] ?? afterData[`Project__${key}`];
-        if (v && typeof v === 'string') { oppId = v; break; }
-      }
+      const oppId = await findLinkedOpportunityId(afterData, 'Project');
       if (oppId) return; // Project uses Opportunity's folder — nothing to rename
     }
 
@@ -795,18 +848,7 @@ export async function tryEnsureLinkedFolder(
     // Don't create a separate Project folder — use the linked Opportunity's
     // existing folder and copy Estimation → Project Management within it.
     if (childObjectApiName === 'Project') {
-      let oppId: string | undefined;
-      for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
-        const v = childData[key] ?? childData[`Project__${key}`];
-        if (v && typeof v === 'string') { oppId = v; break; }
-      }
-      if (!oppId) {
-        for (const [key, val] of Object.entries(childData)) {
-          if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
-            oppId = val; break;
-          }
-        }
-      }
+      const oppId = await findLinkedOpportunityId(childData, 'Project');
 
       if (oppId) {
         // Linked to an Opportunity — create a PRJ#### folder under the
@@ -1547,18 +1589,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
       // For Project, also resolve the linked Opportunity folder name
       let linkedOpportunityFolderName: string | undefined;
       if (objectApiName === 'Project') {
-        let oppId: string | undefined;
-        for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
-          const v = recordData[key] ?? recordData[`Project__${key}`];
-          if (v && typeof v === 'string') { oppId = v; break; }
-        }
-        if (!oppId) {
-          for (const [k, v] of Object.entries(recordData)) {
-            if (k.toLowerCase().includes('opportunity') && !k.toLowerCase().includes('name') && !k.toLowerCase().includes('number') && typeof v === 'string' && v) {
-              oppId = v; break;
-            }
-          }
-        }
+        const oppId = await findLinkedOpportunityId(recordData, 'Project');
         if (oppId) {
           const oppObj = await prisma.customObject.findFirst({
             where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
@@ -1673,18 +1704,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
       const projRecord = await prisma.record.findFirst({ where: { id: recordId } });
       const pData = projRecord?.data as Record<string, any> | null;
       if (pData) {
-        let oppId: string | undefined;
-        for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
-          const v = pData[key] ?? pData[`Project__${key}`];
-          if (v && typeof v === 'string') { oppId = v; break; }
-        }
-        if (!oppId) {
-          for (const [key, val] of Object.entries(pData)) {
-            if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
-              oppId = val; break;
-            }
-          }
-        }
+        const oppId = await findLinkedOpportunityId(pData, 'Project');
         if (oppId) {
           const oppObj = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
           const oppRecord = oppObj ? await prisma.record.findFirst({ where: { id: oppId, objectId: oppObj.id } }) : null;
@@ -1933,18 +1953,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         if (projRecord) {
           const pData = projRecord.data as Record<string, any>;
           // Resolve linked Opportunity ID
-          let oppId: string | undefined;
-          for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
-            const v = pData[key] ?? pData[`Project__${key}`];
-            if (v && typeof v === 'string') { oppId = v; break; }
-          }
-          if (!oppId) {
-            for (const [key, val] of Object.entries(pData)) {
-              if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
-                oppId = val; break;
-              }
-            }
-          }
+          const oppId = await findLinkedOpportunityId(pData, 'Project');
           if (oppId) {
             const oppObj = await prisma.customObject.findFirst({
               where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
