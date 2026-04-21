@@ -1146,11 +1146,15 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const ewQty = sumField(s.rows, 'qty'), ewFields = sumField(s.rows, 'fieldsTotal');
-    const ewSqFt = sumField(s.rows, 'sqFeetTotal'), ewNet = sumField(s.rows, 'netEuroTotal');
+    const pdfHungRows = s.rows.filter((r: SummaryRow) => r.type?.toLowerCase().includes('hung'));
+    const pdfNonHungRows = s.rows.filter((r: SummaryRow) => !r.type?.toLowerCase().includes('hung'));
+    const ewQty = sumField(pdfNonHungRows, 'qty'), ewFields = sumField(pdfNonHungRows, 'fieldsTotal');
+    const ewSqFt = sumField(pdfNonHungRows, 'sqFeetTotal'), ewNet = sumField(pdfNonHungRows, 'netEuroTotal');
+    const dhQty = sumField(pdfHungRows, 'qty'), dhFields = sumField(pdfHungRows, 'fieldsTotal');
+    const dhSqFt = sumField(pdfHungRows, 'sqFeetTotal'), dhNet = sumField(pdfHungRows, 'netEuroTotal');
     const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
     const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
-    const tQty = ewQty + dQty, tFields = ewFields + dFields, tSqFt = ewSqFt + dSqFt, tNet = ewNet + dNet;
+    const tQty = ewQty + dhQty + dQty, tFields = ewFields + dhFields + dFields, tSqFt = ewSqFt + dhSqFt + dSqFt, tNet = ewNet + dhNet + dNet;
     const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
     const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
@@ -1161,7 +1165,7 @@ export default function SummaryPage() {
     ];
     const qtRows = [
       qtRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows),
-      qtRow('Double Hung', 0, 0, 0, 0, qt.doubleHung),
+      qtRow('Double Hung', dhQty, dhFields, dhSqFt, dhNet, qt.doubleHung),
       qtRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors),
       qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
@@ -2827,10 +2831,18 @@ export default function SummaryPage() {
                     const sumField = (rows: (SummaryRow | DoorRow)[], field: string) =>
                       rows.reduce((acc, row) => acc + (parseFloat((row as any)[field]) || 0), 0);
 
-                    const euroWindowQty = sumField(editingSummary.rows, 'qty');
-                    const euroWindowFields = sumField(editingSummary.rows, 'fieldsTotal');
-                    const euroWindowSqFt = sumField(editingSummary.rows, 'sqFeetTotal');
-                    const euroWindowNet = sumField(editingSummary.rows, 'netEuroTotal');
+                    const hungRows = editingSummary.rows.filter(r => r.type?.toLowerCase().includes('hung'));
+                    const nonHungRows = editingSummary.rows.filter(r => !r.type?.toLowerCase().includes('hung'));
+
+                    const euroWindowQty = sumField(nonHungRows, 'qty');
+                    const euroWindowFields = sumField(nonHungRows, 'fieldsTotal');
+                    const euroWindowSqFt = sumField(nonHungRows, 'sqFeetTotal');
+                    const euroWindowNet = sumField(nonHungRows, 'netEuroTotal');
+
+                    const doubleHungQty = sumField(hungRows, 'qty');
+                    const doubleHungFields = sumField(hungRows, 'fieldsTotal');
+                    const doubleHungSqFt = sumField(hungRows, 'sqFeetTotal');
+                    const doubleHungNet = sumField(hungRows, 'netEuroTotal');
 
                     const doorQty = sumField(editingSummary.doorRows, 'qty');
                     const doorFields = sumField(editingSummary.doorRows, 'fieldsTotal');
@@ -2840,10 +2852,10 @@ export default function SummaryPage() {
                     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
 
-                    const totalQty = euroWindowQty + doorQty;
-                    const totalFields = euroWindowFields + doorFields;
-                    const totalSqFt = euroWindowSqFt + doorSqFt;
-                    const totalNet = euroWindowNet + doorNet;
+                    const totalQty = euroWindowQty + doubleHungQty + doorQty;
+                    const totalFields = euroWindowFields + doubleHungFields + doorFields;
+                    const totalSqFt = euroWindowSqFt + doubleHungSqFt + doorSqFt;
+                    const totalNet = euroWindowNet + doubleHungNet + doorNet;
 
                     const qtot = editingSummary.quoteTotals;
                     const p = (s: string | undefined) => parseFloat(s || '0') || 0;
@@ -2858,7 +2870,7 @@ export default function SummaryPage() {
                     };
 
                     const ewCalc = calcRow(euroWindowNet, qtot?.euroWindows);
-                    const dhCalc = calcRow(0, qtot?.doubleHung);
+                    const dhCalc = calcRow(doubleHungNet, qtot?.doubleHung);
                     const edCalc = calcRow(doorNet, qtot?.euroDoors);
                     const gtCalc = {
                       full: ewCalc.full + dhCalc.full + edCalc.full,
@@ -2931,10 +2943,10 @@ export default function SummaryPage() {
                               {/* Double Hung */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
-                                <td className="px-4 py-3 text-right text-gray-400">—</td>
-                                <td className="px-4 py-3 text-right text-gray-400">—</td>
-                                <td className="px-4 py-3 text-right text-gray-400">—</td>
-                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmt(doubleHungSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`dh-${f}`} className="px-1 py-1">
                                     <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
