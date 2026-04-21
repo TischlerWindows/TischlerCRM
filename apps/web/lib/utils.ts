@@ -22,6 +22,11 @@ export function getLookupCachedRecord(objectType: string, id: string): any | nul
   return records.find((r: any) => String(r.id) === String(id)) ?? null;
 }
 
+/** Seed the global lookup cache directly (e.g. from data already fetched by the page). */
+export function seedLookupCache(objectType: string, records: any[]): void {
+  lookupCache[objectType] = records;
+}
+
 async function getLookupRecords(objectType: string): Promise<any[]> {
   // Clear cache periodically
   if (Date.now() - lastCacheClear > CACHE_TTL) {

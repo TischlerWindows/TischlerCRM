@@ -36,7 +36,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord, seedLookupCache } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
@@ -460,7 +460,11 @@ export default function ProjectsPage() {
     setOppListLoading(true);
     try {
       const records = await recordsService.getRecords('Opportunity');
-      setOppList(recordsService.flattenRecords(records));
+      const flat = recordsService.flattenRecords(records);
+      setOppList(flat);
+      // Seed the global lookup cache so resolveLookupDisplayName can resolve
+      // the selected opportunity's name immediately when the form opens.
+      seedLookupCache('Opportunity', flat);
     } catch {
       setOppList([]);
     } finally {
