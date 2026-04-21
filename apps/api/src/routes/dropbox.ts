@@ -903,70 +903,6 @@ export async function tryEnsureLinkedFolder(
       }
     }
 
-    // ── Special handling: Project linked to an Opportunity ──
-    // Don't create a separate Project folder — use the linked Opportunity's
-    // existing folder and copy Estimation → Project Management within it.
-    if (childObjectApiName === 'Project') {
-      const oppId = await findLinkedOpportunityId(childData, 'Project');
-
-      if (oppId) {
-        // Linked to an Opportunity — create a PRJ#### folder under the
-        // Opportunity's "4. Project Management" subfolder.
-        const oppObj = await prisma.customObject.findFirst({
-          where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
-        });
-        if (oppObj) {
-          const oppRecord = await prisma.record.findFirst({
-            where: { id: oppId, objectId: oppObj.id },
-          });
-          if (oppRecord) {
-            // Check if already tracked
-            const existingProjectFolder = await resolveStoredFolder(accessToken, childRecordId);
-            if (existingProjectFolder?.found) {
-              console.log(`[dropbox] Project folder already tracked for ${childRecordId} at ${existingProjectFolder.fullPath}`);
-              return;
-            }
-
-            const oppData = oppRecord.data as Record<string, any>;
-            // Resolve the Opportunity's full Dropbox path via stored ID (most accurate)
-            let oppFullPath: string;
-            const oppFolder = await resolveStoredFolder(accessToken, oppId);
-            if (oppFolder?.found) {
-              oppFullPath = oppFolder.fullPath;
-            } else {
-              const oppFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
-              const safeOpp = oppFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
-              oppFullPath = `${parentPath}/Project Books/${safeOpp}`;
-            }
-
-            // Derive the project folder name from its auto-number / address fields
-            const projectFolderName = deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
-            const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
-            const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
-
-            console.log(`[dropbox] Creating project folder under Opportunity PM: ${projectPath}`);
-            try {
-              const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
-                path: projectPath,
-                autorename: false,
-              }) as { metadata: { id: string } };
-              await storeFolderIdOnRecord(childRecordId, result.metadata.id);
-              console.log(`[dropbox] Successfully created project folder: ${projectPath}`);
-            } catch (err: any) {
-              if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
-                console.error('[dropbox] Project folder creation failed (non-fatal):', err.message);
-              } else {
-                console.log(`[dropbox] Project folder already exists: ${projectPath}`);
-                await backfillFolderId(accessToken, childRecordId, projectPath);
-              }
-            }
-            return;
-          }
-        }
-      }
-      // No linked Opportunity — fall through to create a standalone Project folder
-    }
-
     // Derive child folder name
     let childFolderName: string;
     if (childObjectApiName === 'Opportunity') {
@@ -1641,12 +1577,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         // Check if child folder was renamed in Dropbox
         const childFolder = await resolveStoredFolder(accessToken, recordId);
         if (childFolder?.found) {
-          // For Projects, the stored folder ID might incorrectly point to the Opportunity
-          // folder (a known migration bug). Only use it if the path is actually under
-          // '4. Project Management/' — otherwise fall back to the derived name.
-          if (objectApiName !== 'Project' || childFolder.fullPath.includes('/4. Project Management/')) {
-            childFolderName = childFolder.folderName;
-          }
+          childFolderName = childFolder.folderName;
         }
       }
 
@@ -1758,29 +1689,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
         basePath = renamedFolder.fullPath;
       } else {
         basePath = buildFolderPath(objectApiName, recordId, folderName);
-      }
-    }
-
-    // For Projects linked to an Opportunity, the folder lives under
-    // {OppFolder}/4. Project Management/{PRJ####}. If the resolved basePath
-    // is not under that path (stale stored ID or first load), re-resolve.
-    if (objectApiName === 'Project' && !basePath.includes('/4. Project Management/')) {
-      const projRecord = await prisma.record.findFirst({ where: { id: recordId } });
-      const pData = projRecord?.data as Record<string, any> | null;
-      if (pData) {
-        const oppId = await findLinkedOpportunityId(pData, 'Project');
-        if (oppId) {
-          const oppObj = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
-          const oppRecord = oppObj ? await prisma.record.findFirst({ where: { id: oppId, objectId: oppObj.id } }) : null;
-          if (oppRecord) {
-            const oppData = oppRecord.data as Record<string, any>;
-            const oppFolder = await resolveStoredFolder(accessToken, oppId);
-            if (oppFolder?.found) {
-              const safeProject = deriveDropboxFolderName(pData, recordId, 'Project').replace(/[\\/:*?"<>|]/g, '_').trim();
-              basePath = `${oppFolder.fullPath}/4. Project Management/${safeProject}`;
-            }
-          }
-        }
       }
     }
 
@@ -1964,19 +1872,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     // ── Check if this record already has a tracked Dropbox folder ID ──
     // This prevents duplicate folder creation when a folder was renamed in Dropbox.
-    // For Project records: only trust the stored path when it's correctly placed
-    // under an Opportunity's "4. Project Management" subfolder. Older records may
-    // have a stale ID pointing to {Property}/Project Books/{PRJ####} — fall through
-    // so the Project+Opp block below can detect and correct it.
     const storedFolder = await resolveStoredFolder(accessToken, recordId);
     if (storedFolder?.found) {
-      if (objectApiName !== 'Project' || storedFolder.fullPath.includes('/4. Project Management/')) {
-        return reply.send({
-          created: false,
-          path: storedFolder.fullPath,
-          folderName: storedFolder.folderName,
-        });
-      }
+      return reply.send({
+        created: false,
+        path: storedFolder.fullPath,
+        folderName: storedFolder.folderName,
+      });
     }
 
     // ── Search for an existing folder that may have been renamed in Dropbox ──
@@ -1998,111 +1900,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
               path: renamedFolder.fullPath,
               folderName: renamedFolder.folderName,
             });
-          }
-        }
-      }
-    }
-
-    // ── Special handling: Project linked to an Opportunity ──
-    // The project folder lives under {OppFolder}/4. Project Management/{PRJ####}.
-    // Detect this before falling into the generic LINKED_RECORD_SUBFOLDER path.
-    if (objectApiName === 'Project') {
-      const projObj = await prisma.customObject.findFirst({
-        where: { apiName: { equals: 'Project', mode: 'insensitive' } },
-      });
-      if (projObj) {
-        const projRecord = await prisma.record.findFirst({
-          where: { id: recordId, objectId: projObj.id },
-        });
-        if (projRecord) {
-          const pData = projRecord.data as Record<string, any>;
-          console.log(`[dropbox][ensure-folder] Project ${recordId} data keys: ${Object.keys(pData).join(', ')}`);
-          console.log(`[dropbox][ensure-folder] Project derivedName: "${deriveDropboxFolderName(pData, recordId, 'Project')}"`);
-          // Resolve linked Opportunity ID
-          const oppId = await findLinkedOpportunityId(pData, 'Project');
-          console.log(`[dropbox][ensure-folder] Project ${recordId} linked oppId: ${oppId ?? 'NOT FOUND'}`);
-          if (oppId) {
-            const oppObj = await prisma.customObject.findFirst({
-              where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
-            });
-            const oppRecord = oppObj
-              ? await prisma.record.findFirst({ where: { id: oppId, objectId: oppObj.id } })
-              : null;
-            if (oppRecord) {
-              const oppData = oppRecord.data as Record<string, any>;
-              // Resolve the Opportunity's full Dropbox path via stored ID
-              let oppFullPath: string | null = null;
-              const oppFolder = await resolveStoredFolder(accessToken, oppId);
-              if (oppFolder?.found) {
-                oppFullPath = oppFolder.fullPath;
-              } else {
-                // Fall back: resolve via property + opp folder name
-                let propertyId: string | undefined;
-                for (const key of ['property', 'propertyId', 'propertyAddress', 'relatedProperty']) {
-                  const v = oppData[key] ?? oppData[`Opportunity__${key}`];
-                  if (v && typeof v === 'string') { propertyId = v; break; }
-                }
-                if (!propertyId) {
-                  for (const [key, val] of Object.entries(oppData)) {
-                    if (key.toLowerCase().includes('property') && typeof val === 'string' && val) {
-                      propertyId = val; break;
-                    }
-                  }
-                }
-                if (propertyId) {
-                  const propObj = await prisma.customObject.findFirst({
-                    where: { apiName: { equals: 'Property', mode: 'insensitive' } },
-                  });
-                  const propRecord = propObj
-                    ? await prisma.record.findFirst({ where: { id: propertyId, objectId: propObj.id } })
-                    : null;
-                  if (propRecord) {
-                    const propData = propRecord.data as Record<string, any>;
-                    let parentPath: string;
-                    const parentFolder = await resolveStoredFolder(accessToken, propertyId);
-                    if (parentFolder?.found) {
-                      parentPath = parentFolder.fullPath;
-                    } else {
-                      parentPath = buildFolderPath('Property', propertyId, deriveDropboxFolderName(propData, propertyId));
-                    }
-                    const oppName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
-                    oppFullPath = `${parentPath}/Project Books/${oppName.replace(/[\\/:*?"<>|]/g, '_').trim()}`;
-                  }
-                }
-              }
-
-              if (oppFullPath) {
-                const projectFolderName = deriveDropboxFolderName(pData, recordId, 'Project');
-                const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
-                const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
-
-                let projectFolderId: string | undefined;
-                try {
-                  const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
-                    path: projectPath,
-                    autorename: false,
-                  }) as { metadata: { id: string } };
-                  projectFolderId = result.metadata.id;
-                } catch {
-                  // Already exists — backfill
-                  try {
-                    const meta = await dropboxApi(accessToken, '/files/get_metadata', { path: projectPath }) as {
-                      id: string; '.tag': string; path_display: string;
-                    };
-                    if (meta['.tag'] === 'folder') projectFolderId = meta.id;
-                  } catch { /* non-fatal */ }
-                }
-
-                if (projectFolderId) await storeFolderIdOnRecord(recordId, projectFolderId);
-
-                return reply.send({
-                  created: !projectFolderId,
-                  path: projectPath,
-                  folderName: safeProject,
-                  linked: true,
-                });
-              }
-            }
           }
         }
       }
