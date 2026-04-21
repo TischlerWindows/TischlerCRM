@@ -69,11 +69,19 @@ function fmt(n: number): string {
 // ── CSV export ─────────────────────────────────────────────────────────
 
 function exportCsv(filename: string, headers: string[], rows: string[][]) {
+  // Prefix cells starting with =, +, -, @, tab, or CR with a tab to neutralise
+  // Excel / Google Sheets formula injection. Without this, a malicious payload
+  // like "=cmd|'/c calc'!A1" in a tech name, note, or description field would
+  // execute as a formula when the exported CSV is opened in Excel.
+  const safe = (c: string | undefined) => {
+    const v = c ?? ''
+    const needsGuard = /^[=+\-@\t\r]/.test(v)
+    const escaped = (needsGuard ? '\t' + v : v).replace(/"/g, '""')
+    return `"${escaped}"`
+  }
   const csv = [
-    headers.join(','),
-    ...rows.map(r =>
-      r.map(c => `"${(c || '').replace(/"/g, '""')}"`).join(',')
-    ),
+    headers.map(safe).join(','),
+    ...rows.map(r => r.map(safe).join(',')),
   ].join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
   const url = URL.createObjectURL(blob)
