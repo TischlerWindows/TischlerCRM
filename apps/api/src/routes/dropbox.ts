@@ -63,8 +63,9 @@ const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
 const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
   Lead: 'Leads',
   Opportunity: 'Project Books',
-  // Project intentionally omitted — Projects open to the linked Opportunity's
-  // Dropbox folder and do not get their own separate folder.
+  // Project shares the linked Opportunity's folder — no separate creation.
+  // Kept here so resolve-path can still build the correct path for the UI.
+  Project: 'Project Books',
   WorkOrder: 'Service',
   Service: 'Service',
 };
@@ -806,6 +807,13 @@ export async function tryEnsureLinkedFolder(
     const subfolder = LINKED_RECORD_SUBFOLDER[childObjectApiName];
     if (!subfolder) {
       console.log(`[dropbox] No subfolder mapping for ${childObjectApiName}, skipping`);
+      return;
+    }
+
+    // Projects don't get their own Dropbox folder — they share the linked
+    // Opportunity's folder. Path resolution still works via LINKED_RECORD_SUBFOLDER.
+    if (childObjectApiName === 'Project') {
+      console.log('[dropbox] Project record: skipping folder creation (uses linked Opportunity folder)');
       return;
     }
 
