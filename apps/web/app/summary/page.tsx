@@ -3001,6 +3001,9 @@ export default function SummaryPage() {
                         const ao = editingSummary.addOns || {} as any;
                         const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
+                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
+                        const aoSum = (field: string) => aoKeys.reduce((acc, k) => acc + (parseFloat(getAo(k)[field]) || 0), 0);
+                        const fmtAo = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                         const setAo = (key: string, field: string, value: string) => {
                           setEditingSummary({
                             ...editingSummary,
@@ -3172,6 +3175,21 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Total row */}
+                                  <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                    <td className="px-4 py-3 text-gray-900">Total</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('qty'))}</td>
+                                    <td colSpan={2}></td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('netEuro'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('full'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('pct'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('final'))}</td>
+                                    <td></td>
+                                    <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{fmtAo(aoSum('calcFull'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{fmtAo(aoSum('calcDisc'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{fmtAo(aoSum('calcFinal'))}</td>
+                                    <td className="bg-purple-50/60"></td>
                                   </tr>
                                 </tbody>
                               </table>
