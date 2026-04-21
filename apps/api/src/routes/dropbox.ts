@@ -443,15 +443,15 @@ async function findLinkedOpportunityId(
   pData: Record<string, any>,
   objectApiName: string,
 ): Promise<string | undefined> {
-  // 1. Well-known keys (fast path, covers most setups)
+  // 1. Well-known keys (fast path)
   const wellKnown = ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity', 'Opportunity'];
   for (const key of wellKnown) {
     const v = pData[key] ?? pData[`${objectApiName}__${key}`];
-    if (v && typeof v === 'string') return v;
-    // Handle object-valued lookups: { id: "...", label: "..." }
+    if (typeof v === 'string' && v) return v;
     if (v && typeof v === 'object' && typeof (v as any).id === 'string') return (v as any).id;
   }
-  // 2. Scan all keys for anything containing 'opportunity'
+
+  // 2. Scan all keys containing 'opportunity' (any field naming convention)
   for (const [key, val] of Object.entries(pData)) {
     if (key.startsWith('_')) continue;
     if (
@@ -463,31 +463,40 @@ async function findLinkedOpportunityId(
       if (val && typeof val === 'object' && typeof (val as any).id === 'string') return (val as any).id;
     }
   }
-  // 3. DB-validated fallback: find any Opportunity record whose ID appears in pData values
+
+  // 3. DB-validated fallback: load all Opportunity IDs and scan pData recursively.
+  // This works regardless of how the field API name is spelled.
   try {
     const oppObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
     });
     if (!oppObj) return undefined;
 
-    const candidates = new Set<string>();
-    for (const val of Object.values(pData)) {
-      if (typeof val === 'string' && val.length >= 8 && !val.includes(' ')) {
-        candidates.add(val);
-      } else if (val && typeof val === 'object' && typeof (val as any).id === 'string') {
-        candidates.add((val as any).id);
-      }
-    }
-    if (candidates.size === 0) return undefined;
-
-    const oppRecord = await prisma.record.findFirst({
-      where: { id: { in: [...candidates] }, objectId: oppObj.id, deletedAt: null },
+    // Fetch all non-deleted Opportunity IDs (just IDs, very cheap)
+    const allOpps = await prisma.record.findMany({
+      where: { objectId: oppObj.id, deletedAt: null },
       select: { id: true },
+      take: 5000,
     });
-    return oppRecord?.id;
+    if (allOpps.length === 0) return undefined;
+    const allOppIdSet = new Set(allOpps.map(r => r.id));
+
+    // Recursively extract every string leaf value from the project's JSON data
+    const collectStrings = (v: unknown): string[] => {
+      if (typeof v === 'string' && v.length >= 6) return [v];
+      if (Array.isArray(v)) return v.flatMap(collectStrings);
+      if (v && typeof v === 'object') return Object.values(v as Record<string, unknown>).flatMap(collectStrings);
+      return [];
+    };
+
+    for (const candidate of collectStrings(pData)) {
+      if (allOppIdSet.has(candidate)) return candidate;
+    }
   } catch {
     return undefined;
   }
+
+  return undefined;
 }
 
 /**
