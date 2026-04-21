@@ -1665,6 +1665,41 @@ export async function dropboxRoutes(app: FastifyInstance) {
         basePath = buildFolderPath(objectApiName, recordId, folderName);
       }
     }
+
+    // For Projects linked to an Opportunity, the folder lives under
+    // {OppFolder}/4. Project Management/{PRJ####}. If the resolved basePath
+    // is not under that path (stale stored ID or first load), re-resolve.
+    if (objectApiName === 'Project' && !basePath.includes('/4. Project Management/')) {
+      const projRecord = await prisma.record.findFirst({ where: { id: recordId } });
+      const pData = projRecord?.data as Record<string, any> | null;
+      if (pData) {
+        let oppId: string | undefined;
+        for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+          const v = pData[key] ?? pData[`Project__${key}`];
+          if (v && typeof v === 'string') { oppId = v; break; }
+        }
+        if (!oppId) {
+          for (const [key, val] of Object.entries(pData)) {
+            if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
+              oppId = val; break;
+            }
+          }
+        }
+        if (oppId) {
+          const oppObj = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+          const oppRecord = oppObj ? await prisma.record.findFirst({ where: { id: oppId, objectId: oppObj.id } }) : null;
+          if (oppRecord) {
+            const oppData = oppRecord.data as Record<string, any>;
+            const oppFolder = await resolveStoredFolder(accessToken, oppId);
+            if (oppFolder?.found) {
+              const safeProject = deriveDropboxFolderName(pData, recordId).replace(/[\\/:*?"<>|]/g, '_').trim();
+              basePath = `${oppFolder.fullPath}/4. Project Management/${safeProject}`;
+            }
+          }
+        }
+      }
+    }
+
     const folderPath = subPath ? `${basePath}/${subPath}` : basePath;
 
     try {
@@ -1845,13 +1880,19 @@ export async function dropboxRoutes(app: FastifyInstance) {
 
     // ── Check if this record already has a tracked Dropbox folder ID ──
     // This prevents duplicate folder creation when a folder was renamed in Dropbox.
+    // For Project records: only trust the stored path when it's correctly placed
+    // under an Opportunity's "4. Project Management" subfolder. Older records may
+    // have a stale ID pointing to {Property}/Project Books/{PRJ####} — fall through
+    // so the Project+Opp block below can detect and correct it.
     const storedFolder = await resolveStoredFolder(accessToken, recordId);
     if (storedFolder?.found) {
-      return reply.send({
-        created: false,
-        path: storedFolder.fullPath,
-        folderName: storedFolder.folderName,
-      });
+      if (objectApiName !== 'Project' || storedFolder.fullPath.includes('/4. Project Management/')) {
+        return reply.send({
+          created: false,
+          path: storedFolder.fullPath,
+          folderName: storedFolder.folderName,
+        });
+      }
     }
 
     // ── Search for an existing folder that may have been renamed in Dropbox ──
