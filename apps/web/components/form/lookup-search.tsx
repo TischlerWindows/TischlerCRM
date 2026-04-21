@@ -314,28 +314,62 @@ export function LookupSearch({
     schemaObjects,
   );
 
-  // For Property lookups, extract lat/lng from the selected record to show a map
-  const propertyLat = targetApi === 'Property' && selectedRecord
-    ? parseFloat(
-        selectedRecord.latitude ??
-        selectedRecord.Property__latitude ??
-        // scan for any prefixed lat field
-        (Object.entries(selectedRecord).find(([k]) =>
-          k.toLowerCase().endsWith('__latitude') || k.toLowerCase() === 'latitude',
-        )?.[1] as string | undefined) ??
-        ''
-      )
-    : NaN;
-  const propertyLng = targetApi === 'Property' && selectedRecord
-    ? parseFloat(
-        selectedRecord.longitude ??
-        selectedRecord.Property__longitude ??
-        (Object.entries(selectedRecord).find(([k]) =>
-          k.toLowerCase().endsWith('__longitude') || k.toLowerCase() === 'longitude',
-        )?.[1] as string | undefined) ??
-        ''
-      )
-    : NaN;
+  // Resolve lat/lng from a Property lookup record.
+  // Priority: address_search blob (lat/lng keys) → top-level latitude/longitude
+  // fields (either plain or prefixed) → any field whose value is numeric and
+  // whose key ends with __lat / __lng.
+  const resolvePropertyLatLng = (rec: any): { lat: number; lng: number } => {
+    // 1. address_search blob (LocationSearch field stores {lat, lng} here)
+    const blob =
+      rec.address_search ??
+      rec.Property__address_search ??
+      (() => {
+        const k = Object.keys(rec).find(
+          (key) => key.toLowerCase().endsWith('__address_search') || key.toLowerCase() === 'address_search',
+        );
+        return k ? rec[k] : undefined;
+      })();
+    if (blob && typeof blob === 'object' && blob.lat != null && blob.lng != null) {
+      const lat = parseFloat(String(blob.lat));
+      const lng = parseFloat(String(blob.lng));
+      if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+    }
+
+    // 2. Top-level latitude/longitude (or any prefix variant)
+    const latVal =
+      rec.latitude ?? rec.Property__latitude ??
+      (() => {
+        const k = Object.keys(rec).find(
+          (key) => key.toLowerCase().endsWith('__latitude') || key.toLowerCase() === 'latitude',
+        );
+        return k ? rec[k] : undefined;
+      })();
+    const lngVal =
+      rec.longitude ?? rec.Property__longitude ??
+      (() => {
+        const k = Object.keys(rec).find(
+          (key) => key.toLowerCase().endsWith('__longitude') || key.toLowerCase() === 'longitude',
+        );
+        return k ? rec[k] : undefined;
+      })();
+    const lat2 = parseFloat(String(latVal ?? ''));
+    const lng2 = parseFloat(String(lngVal ?? ''));
+    if (!isNaN(lat2) && !isNaN(lng2)) return { lat: lat2, lng: lng2 };
+
+    // 3. Any field ending in __lat / __lng (mapped targetFields)
+    const latKey = Object.keys(rec).find((k) => /(__lat|^lat)$/i.test(k));
+    const lngKey = Object.keys(rec).find((k) => /(__lng|^lng)$/i.test(k));
+    const lat3 = parseFloat(String(latKey ? rec[latKey] : ''));
+    const lng3 = parseFloat(String(lngKey ? rec[lngKey] : ''));
+    if (!isNaN(lat3) && !isNaN(lng3)) return { lat: lat3, lng: lng3 };
+
+    return { lat: NaN, lng: NaN };
+  };
+
+  const { lat: propertyLat, lng: propertyLng } =
+    targetApi === 'Property' && selectedRecord
+      ? resolvePropertyLatLng(selectedRecord)
+      : { lat: NaN, lng: NaN };
   const propertyAddress = targetApi === 'Property' && selectedRecord
     ? getRecordSubtext(selectedRecord) || undefined
     : undefined;
