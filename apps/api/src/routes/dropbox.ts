@@ -465,6 +465,34 @@ async function findLinkedOpportunityId(
   pData: Record<string, any>,
   objectApiName: string,
 ): Promise<string | undefined> {
+  // 0. Schema-driven: look up the Relationship table to find the exact field API
+  //    name used on this object to reference an Opportunity. This is 100% reliable
+  //    regardless of how the admin named the Lookup field.
+  try {
+    const [obj, oppObj] = await Promise.all([
+      prisma.customObject.findFirst({ where: { apiName: { equals: objectApiName, mode: 'insensitive' } } }),
+      prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } }),
+    ]);
+    if (obj && oppObj) {
+      const rel = await prisma.relationship.findFirst({
+        where: { childObjectId: obj.id, parentObjectId: oppObj.id },
+        include: { field: true },
+      });
+      if (rel?.field?.apiName) {
+        const fieldApiName = rel.field.apiName;
+        // Field values may be stored as `fieldApiName` or `ObjectName__fieldApiName`
+        const v = pData[fieldApiName] ?? pData[`${objectApiName}__${fieldApiName}`];
+        if (typeof v === 'string' && v) {
+          console.log(`[dropbox] findLinkedOpportunityId: found via schema field "${fieldApiName}" = ${v}`);
+          return v;
+        }
+        if (v && typeof v === 'object' && typeof (v as any).id === 'string') return (v as any).id;
+      }
+    }
+  } catch (err: any) {
+    console.warn('[dropbox] findLinkedOpportunityId schema lookup failed:', err.message);
+  }
+
   // 1. Well-known keys (fast path)
   const wellKnown = ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity', 'Opportunity'];
   for (const key of wellKnown) {
@@ -1613,7 +1641,12 @@ export async function dropboxRoutes(app: FastifyInstance) {
         // Check if child folder was renamed in Dropbox
         const childFolder = await resolveStoredFolder(accessToken, recordId);
         if (childFolder?.found) {
-          childFolderName = childFolder.folderName;
+          // For Projects, the stored folder ID might incorrectly point to the Opportunity
+          // folder (a known migration bug). Only use it if the path is actually under
+          // '4. Project Management/' — otherwise fall back to the derived name.
+          if (objectApiName !== 'Project' || childFolder.fullPath.includes('/4. Project Management/')) {
+            childFolderName = childFolder.folderName;
+          }
         }
       }
 

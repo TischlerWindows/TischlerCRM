@@ -8,14 +8,32 @@ import { apiClient } from '@/lib/api-client'
 /**
  * Build a human-readable Dropbox folder name from record data.
  * Tries: "address (autoNumber)", then "address", then "autoNumber", then recordId.
+ * Pass objectApiName to prefer the record's OWN auto-number over numbers from
+ * linked entities (e.g. prefer projectNumber over opportunityNumber for a Project).
  */
-function deriveDropboxFolderName(record: Record<string, unknown>): string {
+function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?: string): string {
   const id = (record.id as string) || ''
 
-  // Find the auto-number field (propertyNumber, contactNumber, etc.)
-  const numberKey = Object.keys(record).find(
+  // Find the auto-number field, preferring the record's own entity number.
+  const allNumberKeys = Object.keys(record).filter(
     (k) => k.toLowerCase().includes('number') && typeof record[k] === 'string' && record[k],
   )
+  let numberKey: string | undefined
+  if (objectApiName && allNumberKeys.length > 1) {
+    const selfPrefix = objectApiName.toLowerCase()
+    const stripped = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
+    // 1. Exact match: stripped key === `${objectApiName}number`
+    numberKey = allNumberKeys.find(k => stripped(k) === selfPrefix + 'number')
+    // 2. Key starts with the object's own name
+    if (!numberKey) numberKey = allNumberKeys.find(k => stripped(k).startsWith(selfPrefix))
+    // 3. Key doesn't contain any foreign entity name
+    if (!numberKey) {
+      const foreign = ['opportunity', 'property', 'lead', 'workorder', 'work_order', 'service', 'contact', 'account']
+        .filter(p => p !== selfPrefix)
+      numberKey = allNumberKeys.find(k => !foreign.some(p => stripped(k).includes(p)))
+    }
+  }
+  if (!numberKey) numberKey = allNumberKeys[0]
   const autoNumber = numberKey ? (record[numberKey] as string) : ''
 
   // Find address — prefer address_search (LocationSearch blob) which always
@@ -66,7 +84,7 @@ function deriveDropboxFolderName(record: Record<string, unknown>): string {
 export default function DropboxBrowserWidget({ config, record, object }: WidgetProps) {
   const recordId = (record.id as string) || ''
   const objectApiName = object.apiName
-  const folderName = (config.folderName as string) || deriveDropboxFolderName(record)
+  const folderName = (config.folderName as string) || deriveDropboxFolderName(record, objectApiName)
 
   // For linked record types (Lead, Opportunity, etc.), resolve the path to
   // point inside the parent Property folder instead of a top-level folder.
@@ -94,8 +112,8 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
           // Opportunity → open the OPP#### folder inside 1. Estimation
           subPath = `${res.subfolder}/${res.childFolderName}/1. Estimation/${res.childFolderName}`
         } else if (objectApiName === 'Project' && res.linkedOpportunityFolderName) {
-          // Project → open the linked Opportunity's full folder
-          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}`
+          // Project → open PRJ#### folder inside Opportunity's "4. Project Management"
+          subPath = `${res.subfolder}/${res.linkedOpportunityFolderName}/4. Project Management/${res.childFolderName}`
         }
 
         setResolved({
