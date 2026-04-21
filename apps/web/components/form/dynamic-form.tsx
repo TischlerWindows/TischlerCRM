@@ -40,7 +40,7 @@ import {
   Check,
   Layout,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, resolveLookupDisplayName } from '@/lib/utils';
 
 import { validateFields } from './form-validation';
 import { FieldInput, getFieldIcon } from './field-input';
@@ -169,7 +169,26 @@ export default function DynamicForm({
   const [activeTab, setActiveTab] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
   const stepIndicatorRef = useRef<HTMLDivElement>(null);
-  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
+  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>(() => {
+    // Pre-seed display labels for any pre-filled lookup fields so the input
+    // shows the label immediately rather than a blank placeholder.
+    if (!recordData || !object) return {};
+    const queries: Record<string, string> = {};
+    for (const field of object.fields) {
+      if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
+      if (!field.lookupObject) continue;
+      const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+      const val = recordData[stripped] ?? recordData[field.apiName];
+      if (!val) continue;
+      const label = resolveLookupDisplayName(String(val), field.lookupObject);
+      // Only use the label if it resolved to something other than the raw ID
+      if (label && label !== '-' && label !== String(val)) {
+        queries[field.apiName] = label;
+        queries[stripped] = label;
+      }
+    }
+    return queries;
+  });
   const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
   // Inline record creation from lookup fields
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null);
