@@ -25,6 +25,7 @@ import {
   Edit3,
   GripVertical,
   Upload,
+  Link2,
 } from 'lucide-react';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import CsvImportDialog from '@/components/csv-import-dialog';
@@ -99,6 +100,11 @@ export default function ProjectsPage() {
   >(null);
   const [showFilterSettings, setShowFilterSettings] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showOppPicker, setShowOppPicker] = useState(false);
+  const [oppPickerSearch, setOppPickerSearch] = useState('');
+  const [oppList, setOppList] = useState<any[]>([]);
+  const [oppListLoading, setOppListLoading] = useState(false);
+  const [prefillData, setPrefillData] = useState<Record<string, any> | undefined>(undefined);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -444,6 +450,42 @@ export default function ProjectsPage() {
     }
   };
 
+  const openOppPicker = useCallback(async () => {
+    if (!projectObject) {
+      setShowNoLayoutsDialog(true);
+      return;
+    }
+    setShowOppPicker(true);
+    setOppPickerSearch('');
+    setOppListLoading(true);
+    try {
+      const records = await recordsService.getRecords('Opportunity');
+      setOppList(recordsService.flattenRecords(records));
+    } catch {
+      setOppList([]);
+    } finally {
+      setOppListLoading(false);
+    }
+  }, [projectObject]);
+
+  const handleSelectOpportunity = useCallback((opp: any) => {
+    if (!projectObject) return;
+    const result = resolveLayoutForUser(projectObject, { profileId: user?.profileId ?? null });
+    if (result.kind !== 'resolved') {
+      setShowOppPicker(false);
+      if (result.reason === 'no-layouts') setShowNoLayoutsDialog(true);
+      else setLayoutError(result);
+      return;
+    }
+    const fill: Record<string, any> = { opportunity: opp.id };
+    if (opp.property) fill.property = opp.property;
+    setPrefillData(fill);
+    setSelectedLayoutId(result.layout.id);
+    setShowDynamicForm(true);
+    setShowOppPicker(false);
+    setOppPickerSearch('');
+  }, [projectObject, user]);
+
   const handleDeleteProject = async (id: string) => {
     if (confirm('Are you sure you want to delete this project?')) {
       try {
@@ -620,7 +662,17 @@ export default function ProjectsPage() {
             >
               <Settings className="w-5 h-5 mr-2" />
               Configure Columns
-            </button>            {canCreateProject && (            <button
+            </button>
+            {canCreateProject && (
+              <button
+                onClick={openOppPicker}
+                className="inline-flex items-center px-4 py-2 border border-brand-navy text-brand-navy rounded-lg hover:bg-[#f0f1fa] transition-colors"
+              >
+                <Link2 className="w-5 h-5 mr-2" />
+                Create from Opportunity
+              </button>
+            )}
+            {canCreateProject && (            <button
                 onClick={() => {
                   if (!projectObject) {
                     setShowNoLayoutsDialog(true);
@@ -856,14 +908,81 @@ export default function ProjectsPage() {
           open={showDynamicForm}
           onOpenChange={(open) => {
             setShowDynamicForm(open);
-            if (!open) setSelectedLayoutId(null);
+            if (!open) {
+              setSelectedLayoutId(null);
+              setPrefillData(undefined);
+            }
           }}
           objectApiName="Project"
           layoutType="create"
           layoutId={selectedLayoutId}
+          recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
-          title="New Project"
+          title={prefillData?.opportunity ? 'New Project from Opportunity' : 'New Project'}
         />
+      )}
+
+      {/* Opportunity Picker */}
+      {showOppPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+          onClick={() => setShowOppPicker(false)}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Create from Opportunity</h2>
+              <button onClick={() => setShowOppPicker(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Select an Opportunity — the project will be linked to it and matching lookup fields will be pre-filled.
+              </p>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search opportunities..."
+                  value={oppPickerSearch}
+                  onChange={(e) => setOppPickerSearch(e.target.value)}
+                  autoFocus
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent"
+                />
+              </div>
+              <div className="max-h-72 overflow-y-auto space-y-1">
+                {oppListLoading ? (
+                  <p className="text-sm text-gray-500 text-center py-8">Loading opportunities...</p>
+                ) : (() => {
+                  const q = oppPickerSearch.toLowerCase();
+                  const filtered = oppList.filter(opp =>
+                    !q ||
+                    (opp.opportunityName || '').toLowerCase().includes(q) ||
+                    (opp.opportunityNumber || '').toLowerCase().includes(q)
+                  );
+                  if (filtered.length === 0) {
+                    return <p className="text-sm text-gray-500 text-center py-8">No opportunities found.</p>;
+                  }
+                  return filtered.map(opp => (
+                    <button
+                      key={opp.id}
+                      onClick={() => handleSelectOpportunity(opp)}
+                      className="w-full text-left px-4 py-3 hover:bg-[#f0f1fa] rounded-lg transition-colors border border-transparent hover:border-[#b8bfe8]"
+                    >
+                      <div className="text-sm font-medium text-gray-900">
+                        {opp.opportunityNumber ? `${opp.opportunityNumber} – ` : ''}{opp.opportunityName || opp.id}
+                      </div>
+                      {opp.stage && <div className="text-xs text-gray-500 mt-0.5">{opp.stage}</div>}
+                    </button>
+                  ));
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Column Filter Settings Dialog */}
