@@ -169,26 +169,7 @@ export default function DynamicForm({
   const [activeTab, setActiveTab] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
   const stepIndicatorRef = useRef<HTMLDivElement>(null);
-  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>(() => {
-    // Pre-seed display labels for any pre-filled lookup fields so the input
-    // shows the label immediately rather than a blank placeholder.
-    if (!recordData || !object) return {};
-    const queries: Record<string, string> = {};
-    for (const field of object.fields) {
-      if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
-      if (!field.lookupObject) continue;
-      const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
-      const val = recordData[stripped] ?? recordData[field.apiName];
-      if (!val) continue;
-      const label = resolveLookupDisplayName(String(val), field.lookupObject);
-      // Only use the label if it resolved to something other than the raw ID
-      if (label && label !== '-' && label !== String(val)) {
-        queries[field.apiName] = label;
-        queries[stripped] = label;
-      }
-    }
-    return queries;
-  });
+  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
   const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
   // Inline record creation from lookup fields
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null);
@@ -204,6 +185,33 @@ export default function DynamicForm({
 
   const object = schema?.objects.find((o) => o.apiName === objectApiName);
   const { ids: enabledWidgetIds } = useEnabledWidgetIds();
+
+  // Seed display labels for pre-filled lookup fields once the object schema is available.
+  // This ensures the lookup input shows the resolved name rather than a blank placeholder.
+  useEffect(() => {
+    if (!object || !recordData) return;
+    const hasPreFill = Object.keys(recordData).some((k) => recordData[k]);
+    if (!hasPreFill) return;
+    setLookupQueries((prev) => {
+      const updates: Record<string, string> = {};
+      for (const field of object.fields) {
+        if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
+        if (!field.lookupObject) continue;
+        const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+        const val = recordData[stripped] ?? recordData[field.apiName];
+        if (!val) continue;
+        // Skip if already set (user may have typed something)
+        if (prev[field.apiName] || prev[stripped]) continue;
+        const label = resolveLookupDisplayName(String(val), field.lookupObject);
+        if (label && label !== '-' && label !== String(val)) {
+          updates[field.apiName] = label;
+          updates[stripped] = label;
+        }
+      }
+      return Object.keys(updates).length > 0 ? { ...prev, ...updates } : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [object]);
 
   // Object definition for widgets (simplified shape expected by LayoutWidgetsInline)
   const widgetObjectDef = useMemo(() => {
