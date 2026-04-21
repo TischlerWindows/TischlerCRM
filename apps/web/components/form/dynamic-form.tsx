@@ -414,6 +414,9 @@ export default function DynamicForm({
         ...(schemaField?.picklistValues ? { picklistValues: schemaField.picklistValues } : {}),
         ...(schemaField?.picklistColors ? { picklistColors: schemaField.picklistColors } : {}),
         ...(schemaField?.picklistDependencies ? { picklistDependencies: schemaField.picklistDependencies } : {}),
+        // Always carry lookupObject from the canonical schema field so lookup
+        // fields resolve correctly even if the layout copy omits it.
+        ...(schemaField?.lookupObject ? { lookupObject: schemaField.lookupObject } : {}),
       } as FieldDef;
     }
     if (!schemaField) return undefined;
