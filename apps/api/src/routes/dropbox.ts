@@ -63,7 +63,8 @@ const PROPERTY_SUBFOLDERS: Array<{ name: string; children?: string[] }> = [
 const LINKED_RECORD_SUBFOLDER: Record<string, string> = {
   Lead: 'Leads',
   Opportunity: 'Project Books',
-  Project: 'Project Books',
+  // Project intentionally omitted — Projects open to the linked Opportunity's
+  // Dropbox folder and do not get their own separate folder.
   WorkOrder: 'Service',
   Service: 'Service',
 };
@@ -2009,6 +2010,12 @@ export async function dropboxRoutes(app: FastifyInstance) {
           }
         }
       }
+    }
+
+    // Projects don't get their own Dropbox folder — they share the linked
+    // Opportunity's folder. Return without creating anything.
+    if (objectApiName === 'Project') {
+      return reply.send({ created: false, folderName: folderName || '' });
     }
 
     // ── Default: create top-level folder (Property, Account, Contact, etc.) ──
