@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { formatFieldValue, resolveLookupDisplayName } from '@/lib/utils';
+import { formatFieldValue, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
 import { FieldDef, normalizeFieldType, type PageField } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import LocationMapPreview from '@/components/location-map-preview';
@@ -192,6 +192,35 @@ export function renderValue(
     const lookupTarget = fieldDef?.lookupObject || 'User';
     const route = LOOKUP_ROUTE_MAP[lookupTarget];
     const displayLabel = resolveLookupDisplayName(value, lookupTarget);
+    const link = route ? (
+      <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">
+        {displayLabel}
+      </Link>
+    ) : displayLabel;
+
+    // For Property lookups, show a Google Maps preview if the property has lat/lng
+    if (lookupTarget === 'Property' && !compact) {
+      const propRecord = getLookupCachedRecord('Property', String(value));
+      if (propRecord) {
+        // lat/lng may live inside address_search blob or as top-level fields
+        const blob = propRecord.address_search ?? propRecord.Property__address_search ??
+          (() => { const k = Object.keys(propRecord).find(x => x.toLowerCase().endsWith('__address_search') || x.toLowerCase() === 'address_search'); return k ? propRecord[k] : undefined; })();
+        const lat = parseFloat(String(blob?.lat ?? propRecord.latitude ?? propRecord.Property__latitude ?? ''));
+        const lng = parseFloat(String(blob?.lng ?? propRecord.longitude ?? propRecord.Property__longitude ?? ''));
+        const address = typeof blob === 'object' && blob
+          ? [blob.street, blob.city, blob.state, blob.postalCode].filter(Boolean).join(', ')
+          : undefined;
+        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+          return (
+            <div>
+              {link}
+              <LocationMapPreview lat={lat} lng={lng} address={address} className="mt-2" />
+            </div>
+          );
+        }
+      }
+    }
+
     if (route) {
       return (
         <Link href={`/${route}/${value}`} className="text-brand-navy hover:underline underline-offset-2">

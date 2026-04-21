@@ -15,6 +15,13 @@ let lookupLoadingPromises: Record<string, Promise<any[]>> = {};
 let lastCacheClear = Date.now();
 const CACHE_TTL = 30000; // 30 seconds
 
+/** Return the full cached record for a given object type + ID, or null if not cached. */
+export function getLookupCachedRecord(objectType: string, id: string): any | null {
+  const records = lookupCache[objectType];
+  if (!records) return null;
+  return records.find((r: any) => String(r.id) === String(id)) ?? null;
+}
+
 async function getLookupRecords(objectType: string): Promise<any[]> {
   // Clear cache periodically
   if (Date.now() - lastCacheClear > CACHE_TTL) {
