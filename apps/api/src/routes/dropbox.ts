@@ -1878,6 +1878,119 @@ export async function dropboxRoutes(app: FastifyInstance) {
       }
     }
 
+    // ── Special handling: Project linked to an Opportunity ──
+    // The project folder lives under {OppFolder}/4. Project Management/{PRJ####}.
+    // Detect this before falling into the generic LINKED_RECORD_SUBFOLDER path.
+    if (objectApiName === 'Project') {
+      const projObj = await prisma.customObject.findFirst({
+        where: { apiName: { equals: 'Project', mode: 'insensitive' } },
+      });
+      if (projObj) {
+        const projRecord = await prisma.record.findFirst({
+          where: { id: recordId, objectId: projObj.id },
+        });
+        if (projRecord) {
+          const pData = projRecord.data as Record<string, any>;
+          // Resolve linked Opportunity ID
+          let oppId: string | undefined;
+          for (const key of ['opportunity', 'opportunityId', 'OpportunityId', 'relatedOpportunity']) {
+            const v = pData[key] ?? pData[`Project__${key}`];
+            if (v && typeof v === 'string') { oppId = v; break; }
+          }
+          if (!oppId) {
+            for (const [key, val] of Object.entries(pData)) {
+              if (key.toLowerCase().includes('opportunity') && !key.toLowerCase().includes('number') && !key.toLowerCase().includes('name') && typeof val === 'string' && val) {
+                oppId = val; break;
+              }
+            }
+          }
+          if (oppId) {
+            const oppObj = await prisma.customObject.findFirst({
+              where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+            });
+            const oppRecord = oppObj
+              ? await prisma.record.findFirst({ where: { id: oppId, objectId: oppObj.id } })
+              : null;
+            if (oppRecord) {
+              const oppData = oppRecord.data as Record<string, any>;
+              // Resolve the Opportunity's full Dropbox path via stored ID
+              let oppFullPath: string | null = null;
+              const oppFolder = await resolveStoredFolder(accessToken, oppId);
+              if (oppFolder?.found) {
+                oppFullPath = oppFolder.fullPath;
+              } else {
+                // Fall back: resolve via property + opp folder name
+                let propertyId: string | undefined;
+                for (const key of ['property', 'propertyId', 'propertyAddress', 'relatedProperty']) {
+                  const v = oppData[key] ?? oppData[`Opportunity__${key}`];
+                  if (v && typeof v === 'string') { propertyId = v; break; }
+                }
+                if (!propertyId) {
+                  for (const [key, val] of Object.entries(oppData)) {
+                    if (key.toLowerCase().includes('property') && typeof val === 'string' && val) {
+                      propertyId = val; break;
+                    }
+                  }
+                }
+                if (propertyId) {
+                  const propObj = await prisma.customObject.findFirst({
+                    where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+                  });
+                  const propRecord = propObj
+                    ? await prisma.record.findFirst({ where: { id: propertyId, objectId: propObj.id } })
+                    : null;
+                  if (propRecord) {
+                    const propData = propRecord.data as Record<string, any>;
+                    let parentPath: string;
+                    const parentFolder = await resolveStoredFolder(accessToken, propertyId);
+                    if (parentFolder?.found) {
+                      parentPath = parentFolder.fullPath;
+                    } else {
+                      parentPath = buildFolderPath('Property', propertyId, deriveDropboxFolderName(propData, propertyId));
+                    }
+                    const oppName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
+                    oppFullPath = `${parentPath}/Project Books/${oppName.replace(/[\\/:*?"<>|]/g, '_').trim()}`;
+                  }
+                }
+              }
+
+              if (oppFullPath) {
+                const projectFolderName = deriveDropboxFolderName(pData, recordId);
+                const safeProject = projectFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+                const projectPath = `${oppFullPath}/4. Project Management/${safeProject}`;
+
+                let projectFolderId: string | undefined;
+                try {
+                  const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+                    path: projectPath,
+                    autorename: false,
+                  }) as { metadata: { id: string } };
+                  projectFolderId = result.metadata.id;
+                } catch {
+                  // Already exists — backfill
+                  try {
+                    const meta = await dropboxApi(accessToken, '/files/get_metadata', { path: projectPath }) as {
+                      id: string; '.tag': string; path_display: string;
+                    };
+                    if (meta['.tag'] === 'folder') projectFolderId = meta.id;
+                  } catch { /* non-fatal */ }
+                }
+
+                if (projectFolderId) await storeFolderIdOnRecord(recordId, projectFolderId);
+
+                return reply.send({
+                  created: !projectFolderId,
+                  path: projectPath,
+                  folderName: safeProject,
+                  linked: true,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
     // ── If this record type is linked to a Property, ensure the linked
     //    subfolder instead of creating a top-level folder. ──
     const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
