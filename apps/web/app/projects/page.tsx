@@ -666,7 +666,7 @@ export default function ProjectsPage() {
             {canCreateProject && (
               <button
                 onClick={openOppPicker}
-                className="inline-flex items-center px-4 py-2 border border-brand-navy text-brand-navy rounded-lg hover:bg-[#f0f1fa] transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Link2 className="w-5 h-5 mr-2" />
                 Create from Opportunity

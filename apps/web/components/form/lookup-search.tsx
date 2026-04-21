@@ -3,7 +3,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { FieldDef, ObjectDef } from '@/lib/schema';
-import { cn } from '@/lib/utils';
+import { cn, resolveLookupDisplayName } from '@/lib/utils';
 import LocationMapPreview from '@/components/location-map-preview';
 
 // ── getRecordLabel ───────────────────────────────────────────────────
@@ -281,14 +281,25 @@ export function LookupSearch({
   schemaObjects,
 }: LookupSearchProps) {
   const recordsArray = Array.isArray(records) ? records : [];
+  const targetApi = getLookupTargetApi(
+    fieldDef,
+    [],
+    schemaObjects,
+  );
   const selectedRecord = value
     ? recordsArray.find((r) => String(r.id) === String(value))
     : null;
-  const selectedLabel = selectedRecord ? getRecordLabel(selectedRecord) : '';
+  // When the local form cache hasn't loaded yet but a value is pre-filled,
+  // fall back to the global lookup cache (populated by resolveLookupDisplayName).
+  const selectedLabel = selectedRecord
+    ? getRecordLabel(selectedRecord)
+    : value && targetApi
+    ? resolveLookupDisplayName(value, targetApi)
+    : '';
 
   // Determine what to display:
   // - If lookup is active (user is typing), show the query
-  // - If we have a selected label (found the record), show that
+  // - If we have a selected label (found the record or global cache), show that
   // - If a value is set but record isn't in cache yet, fall back to lookupQuery
   // - Otherwise show empty
   const displayValue = isActive
@@ -307,12 +318,6 @@ export function LookupSearch({
       (val) => typeof val === 'string' && val.toLowerCase().includes(query),
     );
   });
-
-  const targetApi = getLookupTargetApi(
-    fieldDef,
-    [],
-    schemaObjects,
-  );
 
   // Resolve lat/lng from a Property lookup record.
   // Priority: address_search blob (lat/lng keys) → top-level latitude/longitude
