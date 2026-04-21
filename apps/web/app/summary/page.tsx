@@ -173,9 +173,13 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const filteredOptions = options.filter(option =>
-    option.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOptions = [
+    // Blank entry at top so Enter doesn't auto-select the first real option
+    ...(searchTerm === '' ? [''] : []),
+    ...options.filter(option =>
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    ),
+  ];
 
   const adjustHeight = (textarea: HTMLTextAreaElement | null) => {
     if (textarea) {
@@ -310,13 +314,13 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
         <div ref={dropdownRef} className="absolute z-50 w-64 max-h-60 overflow-y-auto bg-white border border-gray-300 shadow-lg rounded mt-1">
           {filteredOptions.map((option, index) => (
             <div
-              key={option}
+              key={option === '' ? '__blank__' : option}
               onClick={() => handleSelectOption(option)}
               className={`px-2 py-1 text-xs cursor-pointer whitespace-normal break-words ${
                 index === highlightedIndex ? 'bg-[#e8eaf6] text-brand-dark' : 'hover:bg-[#f0f1fa]'
               }`}
             >
-              {option}
+              {option === '' ? <span className="text-gray-300 select-none">&nbsp;</span> : option}
             </div>
           ))}
         </div>
