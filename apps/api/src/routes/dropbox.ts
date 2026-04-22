@@ -1990,6 +1990,61 @@ export async function dropboxRoutes(app: FastifyInstance) {
                   })()
                 : deriveDropboxFolderName(rData, recordId));
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
+
+              // ── Special handling: Requote Opportunity ──
+              // Requotes don't get their own Project Books folder; they live inside
+              // the original Opportunity's 1. Estimation subfolder.
+              if (objectApiName === 'Opportunity' && rData._isRequote && rData._parentOpportunityNumber) {
+                const parentOppNumber = String(rData._parentOpportunityNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+                let parentOppFolderName = parentOppNumber;
+                const oppObj2 = await prisma.customObject.findFirst({
+                  where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+                });
+                if (oppObj2) {
+                  const allOpps = await prisma.record.findMany({
+                    where: { objectId: oppObj2.id, deletedAt: null },
+                    select: { id: true, data: true },
+                  });
+                  for (const opp of allOpps) {
+                    const oppData = opp.data as Record<string, any> | null;
+                    if (!oppData) continue;
+                    for (const [k, v] of Object.entries(oppData)) {
+                      const stripped = k.replace(/^[A-Za-z]+__/, '');
+                      if (stripped === 'opportunityNumber' && v === rData._parentOpportunityNumber) {
+                        const parentOppFolder = await resolveStoredFolder(accessToken, opp.id);
+                        if (parentOppFolder?.found) {
+                          parentOppFolderName = parentOppFolder.folderName;
+                        } else {
+                          parentOppFolderName = (deriveOpportunityFolderName(oppData) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+                        }
+                        break;
+                      }
+                    }
+                    if (parentOppFolderName !== parentOppNumber) break;
+                  }
+                }
+
+                const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${safeName}`;
+                let requoteFolderId: string | undefined;
+                try {
+                  const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
+                    path: requotePath,
+                    autorename: false,
+                  }) as { metadata: { id: string } };
+                  requoteFolderId = result.metadata.id;
+                } catch (err: any) {
+                  if (!err.message?.includes('409') && !err.message?.includes('conflict')) {
+                    return reply.code(500).send({ error: 'Failed to create requote folder' });
+                  }
+                  // Already exists — backfill ID
+                  await backfillFolderId(accessToken, recordId, requotePath);
+                }
+                if (requoteFolderId) {
+                  await storeFolderIdOnRecord(recordId, requoteFolderId);
+                }
+                return reply.send({ created: !!requoteFolderId, path: requotePath, linked: true, folderName: childFolderName });
+              }
+
               const childPath = `${parentPath}/${subfolder}/${safeName}`;
 
               // Ensure the parent Property folder + subfolder exist
