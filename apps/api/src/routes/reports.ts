@@ -2,6 +2,11 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
+import { assertReportAccess } from '../lib/report-access.js';
+
+function denyMessage(code: 403 | 404): string {
+  return code === 404 ? 'Report not found' : 'Forbidden';
+}
 
 const reportSchema = z.object({
   name: z.string().min(1),
@@ -83,6 +88,10 @@ export async function reportRoutes(app: FastifyInstance) {
   // Get single report
   app.get('/reports/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'read');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
 
     const report = await prisma.report.findUnique({
       where: { id },
@@ -176,6 +185,8 @@ export async function reportRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const userId = req.user?.sub;
     if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'write');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
 
     try {
       const data = reportSchema.partial().parse(req.body);
@@ -213,9 +224,16 @@ export async function reportRoutes(app: FastifyInstance) {
     }
   });
 
-  // Toggle favorite
+  // Toggle favorite. Uses 'read' mode: anyone who can see the report may
+  // toggle the flag, which is sensible today because isFavorite is a
+  // report-level attribute (not per-user). If favorites become per-user later,
+  // this should move to a dedicated per-user favorites table.
   app.patch('/reports/:id/favorite', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'read');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
 
     const report = await prisma.report.findUnique({
       where: { id },
@@ -250,9 +268,14 @@ export async function reportRoutes(app: FastifyInstance) {
     reply.send(updated);
   });
 
-  // Toggle private
+  // Toggle private. Uses 'write' mode because flipping privacy affects every
+  // other user's access to the report.
   app.patch('/reports/:id/private', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'write');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
 
     const report = await prisma.report.findUnique({
       where: { id },
@@ -287,9 +310,15 @@ export async function reportRoutes(app: FastifyInstance) {
     reply.send(updated);
   });
 
-  // Share report
+  // Share report. Uses 'write' mode — only the owner (or admin) may grant
+  // access to others.
   app.post('/reports/:id/share', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'write');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
+
     const { emails } = req.body as { emails: string[] };
 
     if (!emails || !Array.isArray(emails)) {
@@ -337,6 +366,10 @@ export async function reportRoutes(app: FastifyInstance) {
   // Delete report
   app.delete('/reports/:id', async (req, reply) => {
     const { id } = req.params as { id: string };
+    const userId = req.user?.sub;
+    if (!userId) return reply.code(401).send({ error: 'Unauthorized' });
+    const access = await assertReportAccess(id, userId, req.user!.role, 'write');
+    if ('code' in access) return reply.code(access.code).send({ error: denyMessage(access.code) });
 
     try {
       await prisma.report.delete({
