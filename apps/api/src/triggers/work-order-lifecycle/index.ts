@@ -1,3 +1,20 @@
+/**
+ * work-order-lifecycle trigger
+ *
+ * Fires beforeUpdate on WorkOrder. Enforces the 7-state machine defined in
+ * VALID_TRANSITIONS below and auto-stamps completedDate/closedDate + user
+ * fields when entering terminal states. Invalid transitions are silently
+ * reverted by returning the old status in the update payload (the before-phase
+ * trigger infra in records.ts merges trigger output into the write payload
+ * before prisma.record.update is called).
+ *
+ * State diagram:
+ *   Open → Scheduled → In Progress → Completed → Closed
+ *                 ↓           ↓
+ *              On Hold     On Hold  (both bidirectional)
+ *   Open/Scheduled/In Progress/On Hold → Cancelled
+ *   Cancelled → Open  (manager recovery; reason fields preserved per spec §2)
+ */
 import type { TriggerHandler, TriggerContext } from '../../lib/triggers/types.js'
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
