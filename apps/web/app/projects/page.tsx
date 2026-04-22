@@ -482,8 +482,20 @@ export default function ProjectsPage() {
       else setLayoutError(result);
       return;
     }
-    const fill: Record<string, any> = { opportunity: opp.id };
-    if (opp.property) fill.property = opp.property;
+    const fill: Record<string, any> = {
+      opportunity: opp.id,
+      'Project__opportunity': opp.id,  // explicit prefixed key — don't rely on schema mirroring
+    };
+    if (opp.property) {
+      fill.property = opp.property;
+      fill['Project__property'] = opp.property;
+    }
+      'Project__opportunity': opp.id,  // explicit prefixed key — don't rely on schema mirroring
+    };
+    if (opp.property) {
+      fill.property = opp.property;
+      fill['Project__property'] = opp.property;
+    }
     // Compute the display label from the opp object we already have — no cache needed
     const oppLabel = [opp.opportunityNumber, opp.opportunityName].filter(Boolean).join(' – ') || opp.id;
     const oppLookupQueries: Record<string, string> = {
