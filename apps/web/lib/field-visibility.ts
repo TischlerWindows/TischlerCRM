@@ -37,7 +37,15 @@ function evaluateCondition(condition: ConditionExpr, recordData: RecordData, con
     return true;
   }
 
-  const rawLeft = recordData[condition.left];
+  // Look up the field value by exact key, then fall back to the stripped
+  // (un-prefixed) key.  This handles records where data was saved without the
+  // "ObjectName__" prefix while the visibility rule was authored with it, and
+  // vice-versa.  flattenRecord adds stripped aliases for prefixed DB keys, but
+  // NOT prefixed aliases for stripped DB keys, so the fallback is essential.
+  const strippedLeft = condition.left.replace(/^[A-Za-z]+__/, '');
+  const rawLeft = condition.left in recordData
+    ? recordData[condition.left]
+    : recordData[strippedLeft];
 
   // Normalise multi-picklist values (stored as "A;B;C") into arrays so
   // every operator handles them correctly — not just INCLUDES.
