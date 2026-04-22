@@ -10,6 +10,7 @@
     "build:lambda": "esbuild src/lambda.ts --bundle --platform=node --format=cjs --outfile=dist/lambda.cjs",
     "package:lambda": "mkdir -p dist/lambda && copy dist\\lambda.cjs dist\\lambda\\index.js && powershell Compress-Archive -Path dist\\lambda\\index.js -DestinationPath dist\\lambda.zip -Force",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --passWithNoTests",
     "seed": "tsx seed.ts",
     "db:generate": "cd ../../packages/db && pnpm exec prisma generate",
     "db:migrate": "cd ../../packages/db && pnpm exec prisma migrate dev",
@@ -37,9 +38,14 @@
     "zod": "3.23.8"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "20.11.19",
+    "cross-env": "^7.0.3",
     "dotenv-cli": "7.4.2",
     "esbuild": "0.21.5",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.6",
     "tsx": "4.15.7",
     "typescript": "5.4.5"
   }
