@@ -565,9 +565,9 @@ interface Summary {
     totalPerPosition: string;
   };
   quoteTotals: {
-    euroWindows: { productType: string; full: string; pct: string; final: string; finalAdj: string };
-    doubleHung: { productType: string; full: string; pct: string; final: string; finalAdj: string };
-    euroDoors: { productType: string; full: string; pct: string; final: string; finalAdj: string };
+    euroWindows: { full: string; pct: string; final: string; finalAdj: string; breakdown: Array<{ type: string; full: string; pct: string; final: string; finalAdj: string }> };
+    doubleHung: { full: string; pct: string; final: string; finalAdj: string; breakdown: Array<{ type: string; full: string; pct: string; final: string; finalAdj: string }> };
+    euroDoors: { full: string; pct: string; final: string; finalAdj: string; breakdown: Array<{ type: string; full: string; pct: string; final: string; finalAdj: string }> };
   };
   addOns: {
     windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
@@ -619,6 +619,7 @@ export default function SummaryPage() {
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -848,9 +849,9 @@ export default function SummaryPage() {
         totalPerPosition: ''
       },
       quoteTotals: {
-        euroWindows: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
-        doubleHung: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
-        euroDoors: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
+        euroWindows: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] },
+        doubleHung: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] },
+        euroDoors: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] },
       },
       addOns: {
         windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
@@ -1155,7 +1156,7 @@ export default function SummaryPage() {
     const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
     const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
     const tQty = ewQty + dhQty + dQty, tFields = ewFields + dhFields + dFields, tSqFt = ewSqFt + dhSqFt + dSqFt, tNet = ewNet + dhNet + dNet;
-    const qt = s.quoteTotals || { euroWindows: { productType: '', full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { productType: '', full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { productType: '', full: '', pct: '', final: '', finalAdj: '' } };
+    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] }, doubleHung: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] }, euroDoors: { full: '', pct: '', final: '', finalAdj: '', breakdown: [] } };
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
     const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
@@ -2926,19 +2927,10 @@ export default function SummaryPage() {
                               {/* Euro Windows */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">Euro Windows</div>
-                                  <select
-                                    value={(editingSummary.quoteTotals?.euroWindows as any)?.productType || ''}
-                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
-                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
-                                  >
-                                    <option value="">Type...</option>
-                                    <option value="Double Hung Windows">Double Hung Windows</option>
-                                    <option value="Inswing Windows">Inswing Windows</option>
-                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
-                                    <option value="Swing Doors">Swing Doors</option>
-                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
-                                  </select>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-gray-900">Euro Windows</span>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroWindows: !p['euroWindows'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroWindows'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
@@ -2946,7 +2938,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ew-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:'',breakdown:[]}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? `€${fmt(ewCalc.full)}` : '—'}</td>
@@ -2954,22 +2946,50 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
                               </tr>
+                              {expandedQtRows['euroWindows'] && (() => {
+                                const qt = editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}};
+                                const bds: any[] = (qt.euroWindows as any)?.breakdown || [];
+                                return (<>
+                                  <tr className="bg-indigo-50/60 border-y border-indigo-200">
+                                    <td className="pl-8 pr-2 py-1.5 text-xs font-semibold text-indigo-700 uppercase tracking-wide">↳ Type</td>
+                                    <td colSpan={4}></td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Full</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">%</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final W/Adj</td>
+                                    <td colSpan={4}></td>
+                                  </tr>
+                                  {bds.map((bd: any, bdi: number) => (
+                                    <tr key={bdi} className="bg-indigo-50/20 border-b border-indigo-100">
+                                      <td className="pl-8 pr-1 py-1">
+                                        <div className="flex items-center gap-1">
+                                          <button onClick={() => { const nb = bds.filter((_: any, i: number) => i !== bdi); setEditingSummary({...editingSummary,quoteTotals:{...qt,euroWindows:{...(qt.euroWindows as any),breakdown:nb}}}); }} className="shrink-0 text-gray-400 hover:text-red-500 text-xs">✕</button>
+                                          <input type="text" value={bd.type || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],type:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroWindows:{...(qt.euroWindows as any),breakdown:nb}}}); }} className="w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300 bg-white" placeholder="Product type..." />
+                                        </div>
+                                      </td>
+                                      <td colSpan={4}></td>
+                                      {['full','pct','final','finalAdj'].map(f => (
+                                        <td key={f} className="px-1 py-1">
+                                          <input type="text" value={bd[f] || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],[f]:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroWindows:{...(qt.euroWindows as any),breakdown:nb}}}); }} className="w-full px-2 py-1 text-right text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300" placeholder="—" />
+                                        </td>
+                                      ))}
+                                      <td colSpan={4}></td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-indigo-50/20">
+                                    <td colSpan={13} className="pl-8 py-1.5">
+                                      <button onClick={() => { const nb=[...bds,{type:'',full:'',pct:'',final:'',finalAdj:''}]; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroWindows:{...(qt.euroWindows as any),breakdown:nb}}}); }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add type</button>
+                                    </td>
+                                  </tr>
+                                </>);
+                              })()}
                               {/* Double Hung */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">Double Hung</div>
-                                  <select
-                                    value={(editingSummary.quoteTotals?.doubleHung as any)?.productType || ''}
-                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
-                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
-                                  >
-                                    <option value="">Type...</option>
-                                    <option value="Double Hung Windows">Double Hung Windows</option>
-                                    <option value="Inswing Windows">Inswing Windows</option>
-                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
-                                    <option value="Swing Doors">Swing Doors</option>
-                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
-                                  </select>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-gray-900">Double Hung</span>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, doubleHung: !p['doubleHung'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['doubleHung'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
@@ -2977,7 +2997,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`dh-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:'',breakdown:[]}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? `€${fmt(dhCalc.full)}` : '—'}</td>
@@ -2985,22 +3005,50 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-400 bg-green-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-400 bg-purple-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
                               </tr>
+                              {expandedQtRows['doubleHung'] && (() => {
+                                const qt = editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}};
+                                const bds: any[] = (qt.doubleHung as any)?.breakdown || [];
+                                return (<>
+                                  <tr className="bg-indigo-50/60 border-y border-indigo-200">
+                                    <td className="pl-8 pr-2 py-1.5 text-xs font-semibold text-indigo-700 uppercase tracking-wide">↳ Type</td>
+                                    <td colSpan={4}></td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Full</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">%</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final W/Adj</td>
+                                    <td colSpan={4}></td>
+                                  </tr>
+                                  {bds.map((bd: any, bdi: number) => (
+                                    <tr key={bdi} className="bg-indigo-50/20 border-b border-indigo-100">
+                                      <td className="pl-8 pr-1 py-1">
+                                        <div className="flex items-center gap-1">
+                                          <button onClick={() => { const nb = bds.filter((_: any, i: number) => i !== bdi); setEditingSummary({...editingSummary,quoteTotals:{...qt,doubleHung:{...(qt.doubleHung as any),breakdown:nb}}}); }} className="shrink-0 text-gray-400 hover:text-red-500 text-xs">✕</button>
+                                          <input type="text" value={bd.type || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],type:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,doubleHung:{...(qt.doubleHung as any),breakdown:nb}}}); }} className="w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300 bg-white" placeholder="Product type..." />
+                                        </div>
+                                      </td>
+                                      <td colSpan={4}></td>
+                                      {['full','pct','final','finalAdj'].map(f => (
+                                        <td key={f} className="px-1 py-1">
+                                          <input type="text" value={bd[f] || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],[f]:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,doubleHung:{...(qt.doubleHung as any),breakdown:nb}}}); }} className="w-full px-2 py-1 text-right text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300" placeholder="—" />
+                                        </td>
+                                      ))}
+                                      <td colSpan={4}></td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-indigo-50/20">
+                                    <td colSpan={13} className="pl-8 py-1.5">
+                                      <button onClick={() => { const nb=[...bds,{type:'',full:'',pct:'',final:'',finalAdj:''}]; setEditingSummary({...editingSummary,quoteTotals:{...qt,doubleHung:{...(qt.doubleHung as any),breakdown:nb}}}); }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add type</button>
+                                    </td>
+                                  </tr>
+                                </>);
+                              })()}
                               {/* Euro Doors */}
                               <tr className="hover:bg-gray-50">
                                 <td className="px-4 py-3">
-                                  <div className="font-medium text-gray-900">Euro Doors</div>
-                                  <select
-                                    value={(editingSummary.quoteTotals?.euroDoors as any)?.productType || ''}
-                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
-                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
-                                  >
-                                    <option value="">Type...</option>
-                                    <option value="Double Hung Windows">Double Hung Windows</option>
-                                    <option value="Inswing Windows">Inswing Windows</option>
-                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
-                                    <option value="Swing Doors">Swing Doors</option>
-                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
-                                  </select>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-medium text-gray-900">Euro Doors</span>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroDoors: !p['euroDoors'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroDoors'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                  </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
@@ -3008,7 +3056,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ed-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:'',breakdown:[]}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? `€${fmt(edCalc.full)}` : '—'}</td>
@@ -3016,6 +3064,43 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
                               </tr>
+                              {expandedQtRows['euroDoors'] && (() => {
+                                const qt = editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},doubleHung:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]},euroDoors:{full:'',pct:'',final:'',finalAdj:'',breakdown:[]}};
+                                const bds: any[] = (qt.euroDoors as any)?.breakdown || [];
+                                return (<>
+                                  <tr className="bg-indigo-50/60 border-y border-indigo-200">
+                                    <td className="pl-8 pr-2 py-1.5 text-xs font-semibold text-indigo-700 uppercase tracking-wide">↳ Type</td>
+                                    <td colSpan={4}></td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Full</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">%</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final</td>
+                                    <td className="px-1 py-1.5 text-xs font-semibold text-gray-500 text-right">Final W/Adj</td>
+                                    <td colSpan={4}></td>
+                                  </tr>
+                                  {bds.map((bd: any, bdi: number) => (
+                                    <tr key={bdi} className="bg-indigo-50/20 border-b border-indigo-100">
+                                      <td className="pl-8 pr-1 py-1">
+                                        <div className="flex items-center gap-1">
+                                          <button onClick={() => { const nb = bds.filter((_: any, i: number) => i !== bdi); setEditingSummary({...editingSummary,quoteTotals:{...qt,euroDoors:{...(qt.euroDoors as any),breakdown:nb}}}); }} className="shrink-0 text-gray-400 hover:text-red-500 text-xs">✕</button>
+                                          <input type="text" value={bd.type || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],type:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroDoors:{...(qt.euroDoors as any),breakdown:nb}}}); }} className="w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300 bg-white" placeholder="Product type..." />
+                                        </div>
+                                      </td>
+                                      <td colSpan={4}></td>
+                                      {['full','pct','final','finalAdj'].map(f => (
+                                        <td key={f} className="px-1 py-1">
+                                          <input type="text" value={bd[f] || ''} onChange={(e) => { const nb=[...bds]; nb[bdi]={...nb[bdi],[f]:e.target.value}; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroDoors:{...(qt.euroDoors as any),breakdown:nb}}}); }} className="w-full px-2 py-1 text-right text-xs border border-gray-300 rounded focus:ring-1 focus:ring-indigo-300" placeholder="—" />
+                                        </td>
+                                      ))}
+                                      <td colSpan={4}></td>
+                                    </tr>
+                                  ))}
+                                  <tr className="bg-indigo-50/20">
+                                    <td colSpan={13} className="pl-8 py-1.5">
+                                      <button onClick={() => { const nb=[...bds,{type:'',full:'',pct:'',final:'',finalAdj:''}]; setEditingSummary({...editingSummary,quoteTotals:{...qt,euroDoors:{...(qt.euroDoors as any),breakdown:nb}}}); }} className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Add type</button>
+                                    </td>
+                                  </tr>
+                                </>);
+                              })()}
                               {/* Grand Total */}
                               <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                                 <td className="px-4 py-3 text-gray-900">Grand Total</td>
@@ -3025,7 +3110,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
                                   const qt = editingSummary.quoteTotals;
-                                  const sum = (parseFloat(qt?.euroWindows?.[f as keyof typeof qt.euroWindows] || '0') || 0) + (parseFloat(qt?.doubleHung?.[f as keyof typeof qt.doubleHung] || '0') || 0) + (parseFloat(qt?.euroDoors?.[f as keyof typeof qt.euroDoors] || '0') || 0);
+                                  const sum = (parseFloat((qt?.euroWindows as any)?.[f] || '0') || 0) + (parseFloat((qt?.doubleHung as any)?.[f] || '0') || 0) + (parseFloat((qt?.euroDoors as any)?.[f] || '0') || 0);
                                   return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
