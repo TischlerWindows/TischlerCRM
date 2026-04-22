@@ -442,6 +442,10 @@ function renderLegacyTab(props: InternalRendererProps): React.ReactNode {
           return true;
         });
     }
+    // If the section has an explicit visibility rule that already passed, show it
+    // regardless of whether its fields are populated (e.g. a newly-created record).
+    if (section.visibleIf?.length > 0) return true;
+
     const allFieldsEmpty = columnArrays.every((col) =>
       col.every(({ layoutField, fieldDef }: any) => {
         const v = getRecordValue(layoutField.apiName, record, fieldDef, formulaValues);
