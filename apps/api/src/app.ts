@@ -85,8 +85,27 @@ export function buildApp() {
     querystringParser: (str) => qs.parse(str),
   });
 
-  // H-2: security headers — must be registered before CORS
-  app.register(helmet, { contentSecurityPolicy: false });
+  // H-2: security headers — must be registered before CORS.
+  // CSP runs in report-only mode so the browser logs violations without
+  // blocking responses. Flip `reportOnly` to false in a follow-up PR once a
+  // week of production traffic has landed with no unexpected violations.
+  app.register(helmet, {
+    contentSecurityPolicy: {
+      reportOnly: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        fontSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+  });
 
   // H-3: explicit CORS origin whitelist — never reflect arbitrary origins
   const allowedOrigins = (process.env.CORS_ORIGIN ?? 'http://localhost:3000')
