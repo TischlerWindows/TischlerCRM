@@ -40,7 +40,7 @@ import {
   Check,
   Layout,
 } from 'lucide-react';
-import { cn, resolveLookupDisplayName } from '@/lib/utils';
+import { cn, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
 
 import { validateFields } from './form-validation';
 import { FieldInput, getFieldIcon } from './field-input';
@@ -175,7 +175,24 @@ export default function DynamicForm({
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null);
   const [inlineCreateForField, setInlineCreateForField] = useState<string | null>(null);
   const [inlineCreateLayoutId, setInlineCreateLayoutId] = useState<string | null>(null);
-  const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>({});
+  const [lookupRecordsCache, setLookupRecordsCache] = useState<Record<string, any[]>>(() => {
+    // Pre-seed the local cache from the global lookup cache for any pre-filled
+    // lookup fields so selectedRecord resolves on the very first render.
+    if (!recordData) return {};
+    const seed: Record<string, any[]> = {};
+    const obj = schema?.objects.find((o) => o.apiName === objectApiName);
+    if (!obj) return seed;
+    for (const field of obj.fields) {
+      if (field.type !== 'Lookup' && field.type !== 'ExternalLookup') continue;
+      if (!field.lookupObject) continue;
+      const stripped = field.apiName.replace(/^[A-Za-z]+__/, '');
+      const val = recordData[stripped] ?? recordData[field.apiName];
+      if (!val) continue;
+      const rec = getLookupCachedRecord(field.lookupObject, String(val));
+      if (rec) seed[field.lookupObject] = [rec];
+    }
+    return seed;
+  });
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
 
