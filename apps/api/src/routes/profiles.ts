@@ -90,7 +90,10 @@ export async function profilesRoutes(app: FastifyInstance) {
       select: {
         id: true, name: true, email: true, title: true, isActive: true,
         department: { select: { id: true, name: true } },
-        inviteAcceptedAt: true, inviteToken: true, inviteTokenExpiry: true,
+        // inviteToken intentionally omitted: it is a bearer credential that would
+        // let any authenticated caller hijack pending invitations. Expiry is kept
+        // so the admin UI can still render "expires in N days" badges.
+        inviteAcceptedAt: true, inviteTokenExpiry: true,
       },
       orderBy: { name: 'asc' },
     });
