@@ -179,8 +179,8 @@ export default function ContactsPage() {
 
 
   useEffect(() => {
-    loadSchema();
-  }, [loadSchema]);
+    if (user) loadSchema();
+  }, [loadSchema, user]);
 
   useEffect(() => {
     (async () => {

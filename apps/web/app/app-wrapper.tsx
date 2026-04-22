@@ -139,6 +139,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const savedTabs = await getSetting<Array<{ name: string; href: string }>>('tabConfiguration');
       if (savedTabs && Array.isArray(savedTabs)) {
@@ -175,7 +176,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
       setIsLoaded(true);
     })();
-  }, [schema]);
+  }, [schema, user]);
 
   const saveTabConfiguration = (newTabs: Array<{ name: string; href: string }>) => {
     setSetting('tabConfiguration', newTabs);

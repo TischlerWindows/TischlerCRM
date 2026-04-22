@@ -117,7 +117,7 @@ export default function TasksPage() {
     });
   }, [taskObject]);
 
-  useEffect(() => { loadSchema(); }, [loadSchema]);
+  useEffect(() => { if (user) loadSchema(); }, [loadSchema, user]);
 
 
   const fetchTasks = useCallback(async () => {
