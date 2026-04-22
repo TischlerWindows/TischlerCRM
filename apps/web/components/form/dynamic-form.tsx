@@ -57,7 +57,12 @@ export interface DynamicFormProps {
   layoutOverride?: PageLayout;
   recordData?: Record<string, any>;
   /**
-   * Called when the form is submitted. For create forms, return the new
+   * Pre-seeded display labels for lookup fields. Keyed by field apiName
+   * (both prefixed and unprefixed accepted). Used to show labels immediately
+   * when opening a form with pre-filled lookup values.
+   */
+  initialLookupQueries?: Record<string, string>;
+  /** For create forms, return the new
    * record's ID so pending widget data (e.g. team members) can be saved
    * after the parent record is created. If not returned, pending widget
    * data is skipped.
@@ -92,6 +97,7 @@ export default function DynamicForm({
   layoutId,
   layoutOverride,
   recordData = {},
+  initialLookupQueries,
   onSubmit,
   onCancel,
   onCreated,
@@ -169,7 +175,7 @@ export default function DynamicForm({
   const [activeTab, setActiveTab] = useState<string>('');
   const [currentStep, setCurrentStep] = useState(0);
   const stepIndicatorRef = useRef<HTMLDivElement>(null);
-  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>({});
+  const [lookupQueries, setLookupQueries] = useState<Record<string, string>>(initialLookupQueries ?? {});
   const [activeLookupField, setActiveLookupField] = useState<string | null>(null);
   // Inline record creation from lookup fields
   const [inlineCreateTarget, setInlineCreateTarget] = useState<string | null>(null);

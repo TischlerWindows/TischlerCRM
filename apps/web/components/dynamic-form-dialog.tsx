@@ -16,6 +16,7 @@ interface DynamicFormDialogProps {
   layoutType: 'create' | 'edit';
   layoutId?: string;
   recordData?: Record<string, any>;
+  initialLookupQueries?: Record<string, string>;
   onSubmit: (data: Record<string, any>, layoutId?: string) => string | void | Promise<string | void>;
   title?: string;
   /**
@@ -33,6 +34,7 @@ export default function DynamicFormDialog({
   layoutType,
   layoutId,
   recordData,
+  initialLookupQueries,
   onSubmit,
   title,
   onCreated,
@@ -115,6 +117,7 @@ export default function DynamicFormDialog({
               layoutType={layoutType}
               layoutId={layoutId}
               recordData={recordData}
+              initialLookupQueries={initialLookupQueries}
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               onCreated={onCreated}

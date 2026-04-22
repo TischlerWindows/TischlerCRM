@@ -105,6 +105,7 @@ export default function ProjectsPage() {
   const [oppList, setOppList] = useState<any[]>([]);
   const [oppListLoading, setOppListLoading] = useState(false);
   const [prefillData, setPrefillData] = useState<Record<string, any> | undefined>(undefined);
+  const [prefillLookupQueries, setPrefillLookupQueries] = useState<Record<string, string> | undefined>(undefined);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -483,7 +484,21 @@ export default function ProjectsPage() {
     }
     const fill: Record<string, any> = { opportunity: opp.id };
     if (opp.property) fill.property = opp.property;
+    // Compute the display label from the opp object we already have — no cache needed
+    const oppLabel = [opp.opportunityNumber, opp.opportunityName].filter(Boolean).join(' – ') || opp.id;
+    const oppLookupQueries: Record<string, string> = {
+      'Project__opportunity': oppLabel,
+      opportunity: oppLabel,
+    };
+    if (opp.property) {
+      const propLabel = opp.propertyNumber || opp.Property__propertyNumber || opp.property;
+      if (propLabel) {
+        oppLookupQueries['Project__property'] = propLabel;
+        oppLookupQueries.property = propLabel;
+      }
+    }
     setPrefillData(fill);
+    setPrefillLookupQueries(oppLookupQueries);
     setSelectedLayoutId(result.layout.id);
     setShowDynamicForm(true);
     setShowOppPicker(false);
@@ -915,12 +930,14 @@ export default function ProjectsPage() {
             if (!open) {
               setSelectedLayoutId(null);
               setPrefillData(undefined);
+              setPrefillLookupQueries(undefined);
             }
           }}
           objectApiName="Project"
           layoutType="create"
           layoutId={selectedLayoutId}
           recordData={prefillData}
+          initialLookupQueries={prefillLookupQueries}
           onSubmit={handleDynamicFormSubmit}
           title={prefillData?.opportunity ? 'New Project from Opportunity' : 'New Project'}
         />
