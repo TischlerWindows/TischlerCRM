@@ -205,9 +205,12 @@ class ApiClient {
         if (fieldMsgs) errorMessage = `Validation failed: ${fieldMsgs}`;
       }
 
-      // On 401 (expired/invalid token), clear stale credentials and redirect
-      // to login so the user can re-authenticate instead of seeing empty pages.
-      // Guard against redirect loop: don't redirect if we're already on /login.
+      // 401 handling: only force logout when the server's auth guard actually
+      // rejected the token. Many endpoints return 401 for non-auth reasons
+      // (e.g. "Dropbox not connected", "Unauthorized" defensive checks on
+      // routes where req.user was unexpectedly missing) — those must NOT wipe
+      // the session, otherwise a single permission or integration hiccup
+      // turns into a logout loop.
       if (response.status === 401 && typeof window !== 'undefined') {
         // If the server says we sent no token at all ("Missing bearer token"),
         // but a valid cookie still exists, it means the in-memory token state
@@ -231,11 +234,26 @@ class ApiClient {
             return this.request<T>(endpoint, { ...options, _authRetried: true });
           }
         }
-        this.setToken(null);
-        localStorage.removeItem('user');
-        document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
-        if (!window.location.pathname.startsWith('/login')) {
-          window.location.href = '/login';
+
+        // These are the only messages produced by the server's auth guard
+        // (apps/api/src/app.ts onRequest hook). Any other 401 is business-logic.
+        const AUTH_GUARD_FAILURES = new Set([
+          'Missing bearer token',
+          'Invalid token',
+          'Account is inactive or has been removed.',
+        ]);
+        const isAuthGuardFailure = AUTH_GUARD_FAILURES.has(errorData.error);
+
+        if (isAuthGuardFailure) {
+          console.warn('[auth] forced logout:', errorData.error, 'on', endpoint);
+          this.setToken(null);
+          localStorage.removeItem('user');
+          document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
+          if (!window.location.pathname.startsWith('/login')) {
+            window.location.href = '/login';
+          }
+        } else {
+          console.warn('[api] non-auth 401 on', endpoint, '-', errorData.error ?? '(no message)');
         }
       }
 
