@@ -149,7 +149,7 @@ class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit & { _authRetried?: boolean } = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     
@@ -162,6 +162,26 @@ class ApiClient {
     // to parse the empty body as JSON → 400 Bad Request.
     if (options.body) {
       (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    }
+
+    // Recover token from cookie if the in-memory singleton is null.
+    // This handles the case where a new tab opens directly to a protected page:
+    // sessionStorage is per-tab and is empty on fresh loads, so the constructor
+    // gets this.token = null. React runs children effects BEFORE parent effects,
+    // so AuthProvider.useEffect (which would restore the token) hasn't run yet
+    // when child components fire their first API requests.
+    if (!this.token && typeof window !== 'undefined') {
+      const allCookies = document.cookie;
+      if (allCookies) {
+        for (const cookiePart of allCookies.split(';')) {
+          const [key, value] = cookiePart.split('=');
+          if (key?.trim() === 'auth-token' && value) {
+            this.token = decodeURIComponent(value.trim());
+            sessionStorage.setItem('auth_token', this.token);
+            break;
+          }
+        }
+      }
     }
 
     if (this.token) {
@@ -189,6 +209,28 @@ class ApiClient {
       // to login so the user can re-authenticate instead of seeing empty pages.
       // Guard against redirect loop: don't redirect if we're already on /login.
       if (response.status === 401 && typeof window !== 'undefined') {
+        // If the server says we sent no token at all ("Missing bearer token"),
+        // but a valid cookie still exists, it means the in-memory token state
+        // went stale in this context (race condition or hard-reload).  Restore
+        // from the cookie and retry the request ONCE before logging out.
+        if (errorData.error === 'Missing bearer token' && !options._authRetried) {
+          let cookieToken: string | null = null;
+          const allCookies = document.cookie;
+          if (allCookies) {
+            for (const cookiePart of allCookies.split(';')) {
+              const [key, value] = cookiePart.split('=');
+              if (key?.trim() === 'auth-token' && value) {
+                cookieToken = decodeURIComponent(value.trim());
+                break;
+              }
+            }
+          }
+          if (cookieToken) {
+            this.token = cookieToken;
+            sessionStorage.setItem('auth_token', cookieToken);
+            return this.request<T>(endpoint, { ...options, _authRetried: true });
+          }
+        }
         this.setToken(null);
         localStorage.removeItem('user');
         document.cookie = 'auth-token=; Max-Age=0; path=/; Secure; SameSite=Strict';
@@ -295,10 +337,6 @@ class ApiClient {
 
   async resendUserInvite(id: string): Promise<{ inviteUrl?: string; inviteSent: boolean }> {
     return this.post(`/admin/users/${id}/resend-invite`);
-  }
-
-  async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
-    return this.post(`/admin/users/${id}/impersonate`);
   }
 
   async impersonateUser(id: string): Promise<{ token: string; user: { id: string; email: string; name: string | null; role: string } }> {
