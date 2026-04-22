@@ -565,16 +565,16 @@ interface Summary {
     totalPerPosition: string;
   };
   quoteTotals: {
-    euroWindows: { full: string; pct: string; final: string; finalAdj: string };
-    doubleHung: { full: string; pct: string; final: string; finalAdj: string };
-    euroDoors: { full: string; pct: string; final: string; finalAdj: string };
+    euroWindows: { productType: string; full: string; pct: string; final: string; finalAdj: string };
+    doubleHung: { productType: string; full: string; pct: string; final: string; finalAdj: string };
+    euroDoors: { productType: string; full: string; pct: string; final: string; finalAdj: string };
   };
   addOns: {
     windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     entryDoor: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    magneticContact: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    magneticContact: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
   };
@@ -848,16 +848,16 @@ export default function SummaryPage() {
         totalPerPosition: ''
       },
       quoteTotals: {
-        euroWindows: { full: '', pct: '', final: '', finalAdj: '' },
-        doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
-        euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
+        euroWindows: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
+        doubleHung: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
+        euroDoors: { productType: '', full: '', pct: '', final: '', finalAdj: '' },
       },
       addOns: {
         windowScreens: { qty: '', frameType: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         doorScreenSash: { qty: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         entryDoor: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        magneticContact: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        magneticContact: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
       },
@@ -1155,7 +1155,7 @@ export default function SummaryPage() {
     const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
     const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
     const tQty = ewQty + dhQty + dQty, tFields = ewFields + dhFields + dFields, tSqFt = ewSqFt + dhSqFt + dSqFt, tNet = ewNet + dhNet + dNet;
-    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    const qt = s.quoteTotals || { euroWindows: { productType: '', full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { productType: '', full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { productType: '', full: '', pct: '', final: '', finalAdj: '' } };
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
     const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
@@ -2925,7 +2925,21 @@ export default function SummaryPage() {
                             <tbody className="divide-y divide-gray-100">
                               {/* Euro Windows */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">Euro Windows</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">Euro Windows</div>
+                                  <select
+                                    value={(editingSummary.quoteTotals?.euroWindows as any)?.productType || ''}
+                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
+                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
+                                  >
+                                    <option value="">Type...</option>
+                                    <option value="Double Hung Windows">Double Hung Windows</option>
+                                    <option value="Inswing Windows">Inswing Windows</option>
+                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                                    <option value="Swing Doors">Swing Doors</option>
+                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
+                                  </select>
+                                </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmt(euroWindowSqFt)}</td>
@@ -2942,7 +2956,21 @@ export default function SummaryPage() {
                               </tr>
                               {/* Double Hung */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">Double Hung</div>
+                                  <select
+                                    value={(editingSummary.quoteTotals?.doubleHung as any)?.productType || ''}
+                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
+                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
+                                  >
+                                    <option value="">Type...</option>
+                                    <option value="Double Hung Windows">Double Hung Windows</option>
+                                    <option value="Inswing Windows">Inswing Windows</option>
+                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                                    <option value="Swing Doors">Swing Doors</option>
+                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
+                                  </select>
+                                </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmt(doubleHungSqFt)}</td>
@@ -2959,7 +2987,21 @@ export default function SummaryPage() {
                               </tr>
                               {/* Euro Doors */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-medium text-gray-900">Euro Doors</td>
+                                <td className="px-4 py-3">
+                                  <div className="font-medium text-gray-900">Euro Doors</div>
+                                  <select
+                                    value={(editingSummary.quoteTotals?.euroDoors as any)?.productType || ''}
+                                    onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{productType:'',full:'',pct:'',final:'',finalAdj:''},doubleHung:{productType:'',full:'',pct:'',final:'',finalAdj:''},euroDoors:{productType:'',full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {productType:'',full:'',pct:'',final:'',finalAdj:''}), productType: e.target.value}}})}
+                                    className="mt-0.5 w-full px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 bg-white text-gray-700"
+                                  >
+                                    <option value="">Type...</option>
+                                    <option value="Double Hung Windows">Double Hung Windows</option>
+                                    <option value="Inswing Windows">Inswing Windows</option>
+                                    <option value="Flush Outswing Windows">Flush Outswing Windows</option>
+                                    <option value="Swing Doors">Swing Doors</option>
+                                    <option value="Lift Rolling Door">Lift Rolling Door</option>
+                                  </select>
+                                </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmt(doorSqFt)}</td>
@@ -3134,7 +3176,7 @@ export default function SummaryPage() {
                                   {/* Magnetic Contact */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
-                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1">{inp('magneticContact', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
