@@ -99,7 +99,13 @@ export default function DropboxBrowserWidget({ config, record, object }: WidgetP
     if (!recordId) return
     let cancelled = false
 
-    apiClient.resolveDropboxPath(objectApiName, recordId).then((res) => {
+    // Run path resolution and folder-ensure in parallel.
+    // The ensure call regenerates any deleted subfolder (e.g. a deleted
+    // Opportunity folder inside its parent Property) before the browser loads.
+    const resolvePromise = apiClient.resolveDropboxPath(objectApiName, recordId)
+    const ensurePromise = apiClient.ensureDropboxFolder(objectApiName, recordId, folderName).catch(() => null)
+
+    Promise.all([resolvePromise, ensurePromise]).then(([res]) => {
       if (cancelled) return
       if (res.linked && res.parentObjectApiName && res.parentRecordId && res.parentFolderName && res.subfolder && res.childFolderName) {
         let subPath = `${res.subfolder}/${res.childFolderName}`
