@@ -66,6 +66,9 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     '/quotes': 'Quote',
     '/installations': 'Installation',
     '/tasks': 'Task',
+    '/tech-dashboard': 'WorkOrder',
+    '/schedule': 'WorkOrder',
+    '/cost-dashboard': 'WorkOrder',
   };
 
   // Also map custom object tabs (href like /objects/myobject) dynamically
@@ -115,6 +118,9 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/settings') ||
     pathname?.startsWith('/service') ||
     pathname?.startsWith('/workorders') ||
+    pathname?.startsWith('/tech-dashboard') ||
+    pathname?.startsWith('/cost-dashboard') ||
+    pathname?.startsWith('/schedule') ||
     pathname?.startsWith('/summary') ||
     pathname?.startsWith('/dashboard') ||
     pathname?.startsWith('/support') ||

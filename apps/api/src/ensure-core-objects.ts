@@ -194,12 +194,31 @@ const CORE_OBJECTS = [
       { apiName: 'workOrderNumber', label: 'Work Order Number', type: 'Text', unique: true },
       { apiName: 'name', label: 'Work Order', type: 'Text' },
       { apiName: 'title', label: 'Title', type: 'TextArea' },
-      { apiName: 'workOrderType', label: 'Work Order Type', type: 'Picklist', picklistValues: ['Installation', 'Repair', 'Maintenance', 'Inspection', 'Warranty', 'Punch List', 'Other'], defaultValue: 'Repair' },
-      { apiName: 'workStatus', label: 'Work Status', type: 'Picklist', picklistValues: ['New', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Cancelled'], defaultValue: 'New' },
-      { apiName: 'scheduledStartDate', label: 'Scheduled Start Date', type: 'Date' },
-      { apiName: 'scheduledEndDate', label: 'Scheduled End Date', type: 'Date' },
-      { apiName: 'estimateCost', label: 'Estimate Cost', type: 'Currency' },
-      { apiName: 'property', label: 'Property', type: 'Lookup' },
+      { apiName: 'property', label: 'Property', type: 'Lookup', required: true },
+      { apiName: 'workOrderCategory', label: 'Category', type: 'Picklist', picklistValues: ['Client Service', 'Internal'], defaultValue: 'Client Service' },
+      { apiName: 'workOrderSource', label: 'Source', type: 'Picklist', picklistValues: ['Customer Call', 'Warranty Claim', 'Maintenance Contract', 'Internal Request', 'Referred from Project', 'Other'] },
+      { apiName: 'workOrderStatus', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'Scheduled', 'In Progress', 'On Hold', 'Completed', 'Closed', 'Cancelled'], defaultValue: 'Open' },
+      { apiName: 'holdReason', label: 'Hold Reason', type: 'Picklist', picklistValues: ['Waiting on Parts', 'Waiting on Materials', 'Weather Delay', 'Customer Delay', 'Warranty Decision Pending', 'Subcontractor Delay', 'Tech Unavailable', 'Other'] },
+      { apiName: 'holdNotes', label: 'Hold Notes', type: 'LongTextArea' },
+      { apiName: 'cancelReason', label: 'Cancel Reason', type: 'Picklist', picklistValues: ['Customer Cancelled', 'Duplicate Work Order', 'Issue Resolved', 'Covered Under Different WO', 'Warranty Denied', 'Not Reproducible', 'Other'] },
+      { apiName: 'cancelNotes', label: 'Cancel Notes', type: 'LongTextArea' },
+      { apiName: 'project', label: 'Project', type: 'Lookup' },
+      { apiName: 'leadTech', label: 'Lead Tech', type: 'Lookup' },
+      { apiName: 'scheduledStartDate', label: 'Scheduled Start', type: 'DateTime' },
+      { apiName: 'scheduledEndDate', label: 'Scheduled End', type: 'DateTime' },
+      { apiName: 'completedDate', label: 'Completed Date', type: 'DateTime' },
+      { apiName: 'completedBy', label: 'Completed By', type: 'Lookup' },
+      { apiName: 'closedDate', label: 'Closed Date', type: 'DateTime' },
+      { apiName: 'closedBy', label: 'Closed By', type: 'Lookup' },
+      { apiName: 'workDescription', label: 'Work Description', type: 'LongTextArea' },
+      { apiName: 'toolsNeeded', label: 'Tools Needed', type: 'LongTextArea' },
+      { apiName: 'outsideContractors', label: 'Outside Contractors', type: 'LongTextArea' },
+      { apiName: 'invoiceNumber', label: 'Invoice Number', type: 'Text' },
+      { apiName: 'totalEstimatedHours', label: 'Total Estimated Hours', type: 'Number' },
+      { apiName: 'totalActualHours', label: 'Total Actual Hours', type: 'Number' },
+      { apiName: 'totalLaborCost', label: 'Total Labor Cost', type: 'Currency' },
+      { apiName: 'totalExpenses', label: 'Total Expenses', type: 'Currency' },
+      { apiName: 'totalJobCost', label: 'Total Job Cost', type: 'Currency' },
     ],
   },
   {
@@ -226,12 +245,18 @@ const CORE_OBJECTS = [
     apiName: 'Technician',
     label: 'Technician',
     pluralLabel: 'Technicians',
-    description: 'Installation technicians for cost analysis',
+    description: 'Service and installation technicians',
     fields: [
       { apiName: 'technicianName', label: 'Technician Name', type: 'Text', required: true },
+      { apiName: 'techCode', label: 'Tech Code', type: 'Text', unique: true },
+      { apiName: 'departmentTags', label: 'Department Tags', type: 'MultiPicklist', picklistValues: ['Install', 'Service'] },
       { apiName: 'hourlyRate', label: 'Hourly Rate', type: 'Currency', required: true },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
       { apiName: 'email', label: 'Email', type: 'Email' },
+      { apiName: 'skills', label: 'Skills', type: 'MultiPicklist', picklistValues: ['Glazing', 'Framing', 'Electrical', 'Plumbing', 'General'] },
+      { apiName: 'user', label: 'User', type: 'Lookup' },
+      { apiName: 'active', label: 'Active', type: 'Checkbox', defaultValue: 'true' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
       { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Active', 'Inactive'], defaultValue: 'Active' },
     ],
   },
@@ -310,6 +335,89 @@ const CORE_OBJECTS = [
       { apiName: 'assignedToUserId', label: 'Assigned To', type: 'Lookup' },
       { apiName: 'relatedObjectApi', label: 'Related Object', type: 'Text' },
       { apiName: 'relatedRecordId', label: 'Related Record', type: 'Text' },
+    ],
+  },
+  {
+    apiName: 'WorkOrderAssignment',
+    label: 'Work Order Assignment',
+    pluralLabel: 'Work Order Assignments',
+    description: 'Junction linking technicians to work orders',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'isLead', label: 'Lead Tech', type: 'Checkbox' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+      { apiName: 'notified', label: 'Notified', type: 'Checkbox' },
+      { apiName: 'notifiedDate', label: 'Notified Date', type: 'DateTime' },
+    ],
+  },
+  {
+    apiName: 'PunchListItem',
+    label: 'Punch List Item',
+    pluralLabel: 'Punch List Items',
+    description: 'Work items within a work order',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'itemNumber', label: 'Item Number', type: 'Number' },
+      { apiName: 'location', label: 'Location', type: 'Text' },
+      { apiName: 'description', label: 'Description', type: 'LongTextArea' },
+      { apiName: 'assignedTech', label: 'Assigned Tech', type: 'Lookup' },
+      { apiName: 'status', label: 'Status', type: 'Picklist', picklistValues: ['Open', 'In Progress', 'Completed', 'N/A'], defaultValue: 'Open' },
+      { apiName: 'estimatedHours', label: 'Estimated Hours', type: 'Number' },
+      { apiName: 'estimatedMen', label: 'Estimated Men', type: 'Number' },
+      { apiName: 'materialsInWarehouse', label: 'Materials in Warehouse', type: 'LongTextArea' },
+      { apiName: 'materialsToOrder', label: 'Materials to Order', type: 'LongTextArea' },
+      { apiName: 'specialEquipment', label: 'Special Equipment', type: 'LongTextArea' },
+      { apiName: 'elevationPage', label: 'Elevation Page', type: 'Text' },
+      { apiName: 'serviceDate', label: 'Service Date', type: 'Date' },
+    ],
+  },
+  {
+    apiName: 'TimeEntry',
+    label: 'Time Entry',
+    pluralLabel: 'Time Entries',
+    description: 'Hours tracking per technician per work order',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'date', label: 'Date', type: 'Date', required: true },
+      { apiName: 'workHours', label: 'Work Hours', type: 'Number' },
+      { apiName: 'travelHours', label: 'Travel Hours', type: 'Number' },
+      { apiName: 'prepHours', label: 'Prep Hours', type: 'Number' },
+      { apiName: 'miscHours', label: 'Misc Hours', type: 'Number' },
+      { apiName: 'totalHours', label: 'Total Hours', type: 'Number' },
+      { apiName: 'rateAtEntry', label: 'Rate at Entry', type: 'Currency' },
+      { apiName: 'totalCost', label: 'Total Cost', type: 'Currency' },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
+    ],
+  },
+  {
+    apiName: 'WorkOrderExpense',
+    label: 'Work Order Expense',
+    pluralLabel: 'Work Order Expenses',
+    description: 'Per diem, mileage, materials, and other job expenses',
+    fields: [
+      { apiName: 'workOrder', label: 'Work Order', type: 'Lookup', required: true },
+      { apiName: 'technician', label: 'Technician', type: 'Lookup' },
+      { apiName: 'expenseType', label: 'Expense Type', type: 'Picklist', picklistValues: ['Per Diem', 'Mileage', 'Materials', 'Equipment', 'Other'], required: true },
+      { apiName: 'amount', label: 'Amount', type: 'Currency', required: true },
+      { apiName: 'quantity', label: 'Quantity', type: 'Number' },
+      { apiName: 'rate', label: 'Rate', type: 'Currency' },
+      { apiName: 'date', label: 'Date', type: 'Date', required: true },
+      { apiName: 'description', label: 'Description', type: 'Text' },
+    ],
+  },
+  {
+    apiName: 'TechnicianRateHistory',
+    label: 'Technician Rate History',
+    pluralLabel: 'Technician Rate History',
+    description: 'Audit trail for technician hourly rate changes',
+    fields: [
+      { apiName: 'technician', label: 'Technician', type: 'Lookup', required: true },
+      { apiName: 'effectiveDate', label: 'Effective Date', type: 'Date', required: true },
+      { apiName: 'previousRate', label: 'Previous Rate', type: 'Currency', required: true },
+      { apiName: 'newRate', label: 'New Rate', type: 'Currency', required: true },
+      { apiName: 'notes', label: 'Notes', type: 'LongTextArea' },
     ],
   },
 ];
@@ -485,6 +593,217 @@ export async function ensureCoreObjects(): Promise<void> {
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
+  }
+
+  // Seed Tischler-owned Property records used as anchors for Internal WOs
+  try {
+    const propertyObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+    })
+    if (propertyObj) {
+      const internalProps = [
+        { address: 'Tischler HQ — Office',         city: 'Internal', state: 'Internal', status: 'Active' },
+        { address: 'Tischler HQ — Warehouse',      city: 'Internal', state: 'Internal', status: 'Active' },
+        { address: 'Tischler Fleet — Service Trucks', city: 'Internal', state: 'Internal', status: 'Active' },
+      ]
+      for (const p of internalProps) {
+        const exists = await prisma.record.findFirst({
+          where: {
+            objectId: propertyObj.id,
+            data: { path: ['address'], equals: p.address },
+          },
+        })
+        if (!exists) {
+          await prisma.record.create({
+            data: {
+              id: generateId('Property'),
+              objectId: propertyObj.id,
+              data: p,
+              createdById: systemUser.id,
+              modifiedById: systemUser.id,
+            },
+          })
+          console.log(`[ensure-core-objects] Seeded internal property: ${p.address}`)
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed internal Tischler properties:', err)
+  }
+
+  // --- Service Department + Profile seeding (Task 13) ---
+  //
+  // PERMISSION SYSTEM NOTE:
+  // The Profile.permissions JSON uses a flat boolean CRUD schema validated by
+  // the profilesRoutes Zod schema:
+  //   {
+  //     objects: Record<'leads'|'opportunities'|...|'service'|..., {
+  //       create, read, edit, delete, viewAll, modifyAll  (all boolean)
+  //     }>,
+  //     app: Record<APP_KEY, boolean>
+  //   }
+  //
+  // The plan's walled-garden predicate tokens ('ownAssignments', 'ownTech',
+  // 'viaWorkOrder', 'ownTechWithin24h', 'sameAssignedWos') are NOT supported
+  // by the current permission engine — it only evaluates booleans. Fine-grained
+  // row-level scoping (e.g. "only see WOs you're assigned to") is already
+  // enforced client-side inside the Task 6–8 widgets (AssignmentWidget,
+  // PunchListWidget, TimeEntryWidget, WorkOrderExpenseWidget) which filter
+  // by the authenticated user's Technician record. Full server-side walled-garden
+  // predicates would require a permission engine upgrade (out of scope Task 13).
+  //
+  // Approach chosen: encode the NEAREST available booleans.
+  // - Service Manager: full CRUD on service + read on properties
+  // - Service Technician: read+create+edit on service (row-level walled garden
+  //   is client-side); everything outside service is explicitly false (walled
+  //   garden via denial). No delete permission for techs.
+  //
+  // Department model has no createdById/modifiedById — those fields do not exist.
+
+  try {
+    // 1. Ensure Service department exists
+    const serviceDept = await prisma.department.findFirst({
+      where: { name: { equals: 'Service', mode: 'insensitive' }, deletedAt: null },
+    });
+    if (!serviceDept) {
+      await prisma.department.create({
+        data: {
+          id: generateId('Department'),
+          name: 'Service',
+          description: 'Service Department — manages work orders, technicians, and field service',
+          isActive: true,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service department');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service department:', err);
+  }
+
+  try {
+    // 2. Ensure Service Manager profile exists
+    // Full CRUD on service objects; read+edit on properties (no delete).
+    // All non-service objects are false (minimal privilege outside the module).
+    const allObjectsFalse = {
+      create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false,
+    };
+    const managerPermissions = {
+      objects: {
+        leads:         allObjectsFalse,
+        opportunities: allObjectsFalse,
+        projects:      allObjectsFalse,
+        service:       { create: true,  read: true, edit: true, delete: true, viewAll: true,  modifyAll: true  },
+        quotes:        allObjectsFalse,
+        installations: { create: false, read: true, edit: false, delete: false, viewAll: true, modifyAll: false },
+        properties:    { create: true,  read: true, edit: true,  delete: false, viewAll: true, modifyAll: false },
+        contacts:      { create: false, read: true, edit: false, delete: false, viewAll: false, modifyAll: false },
+        companies:     allObjectsFalse,
+        products:      allObjectsFalse,
+      },
+      app: {
+        manageUsers:            false,
+        manageProfiles:         false,
+        manageDepartments:      false,
+        manageIntegrations:     false,
+        manageCompanySettings:  false,
+        exportData:             true,
+        importData:             false,
+        viewReports:            true,
+        manageReports:          false,
+        manageDashboards:       false,
+        viewSummary:            true,
+        viewSetup:              false,
+        viewAuditLog:           false,
+        customizeApplication:   false,
+        viewAllData:            false,
+        modifyAllData:          false,
+      },
+    };
+
+    const managerProfile = await prisma.profile.findFirst({
+      where: { name: { equals: 'Service Manager', mode: 'insensitive' } },
+    });
+    if (!managerProfile) {
+      await prisma.profile.create({
+        data: {
+          id: generateId('Profile'),
+          name: 'Service Manager',
+          label: 'Service Manager',
+          description: 'Full access to service module objects (Work Orders, Technicians, Time Entries, Expenses, Punch Lists). Read access to Properties and Installations.',
+          permissions: managerPermissions,
+          isSystem: false,
+          grantsAdminAccess: false,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service Manager profile');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service Manager profile:', err);
+  }
+
+  try {
+    // 3. Ensure Service Technician profile exists
+    // Walled garden via boolean denial of all non-service objects.
+    // Row-level scoping (own WOs, own time entries) is enforced client-side
+    // in the Task 6–8 widgets — see note above about predicate tokens.
+    // Techs get read+create+edit on service but NOT delete and NOT viewAll/modifyAll.
+    const allObjectsFalse = {
+      create: false, read: false, edit: false, delete: false, viewAll: false, modifyAll: false,
+    };
+    const techPermissions = {
+      objects: {
+        leads:         allObjectsFalse,
+        opportunities: allObjectsFalse,
+        projects:      allObjectsFalse,
+        // Service objects: read+create+edit only; no delete; no viewAll (client filters to own records)
+        service:       { create: true,  read: true, edit: true,  delete: false, viewAll: false, modifyAll: false },
+        quotes:        allObjectsFalse,
+        installations: allObjectsFalse,
+        // Properties: read-only (need to see site address on their WOs)
+        properties:    { create: false, read: true, edit: false, delete: false, viewAll: false, modifyAll: false },
+        contacts:      allObjectsFalse,
+        companies:     allObjectsFalse,
+        products:      allObjectsFalse,
+      },
+      app: {
+        manageUsers:            false,
+        manageProfiles:         false,
+        manageDepartments:      false,
+        manageIntegrations:     false,
+        manageCompanySettings:  false,
+        exportData:             false,
+        importData:             false,
+        viewReports:            false,
+        manageReports:          false,
+        manageDashboards:       false,
+        viewSummary:            false,
+        viewSetup:              false,
+        viewAuditLog:           false,
+        customizeApplication:   false,
+        viewAllData:            false,
+        modifyAllData:          false,
+      },
+    };
+
+    const techProfile = await prisma.profile.findFirst({
+      where: { name: { equals: 'Service Technician', mode: 'insensitive' } },
+    });
+    if (!techProfile) {
+      await prisma.profile.create({
+        data: {
+          id: generateId('Profile'),
+          name: 'Service Technician',
+          label: 'Service Technician',
+          description: 'Walled garden — access limited to service module. Read/create/edit on Work Orders, Assignments, Punch Lists, Time Entries, and Expenses (row-level filtering to own assignments is enforced by each widget client-side). Read-only on Properties.',
+          permissions: techPermissions,
+          isSystem: false,
+          grantsAdminAccess: false,
+        },
+      });
+      console.log('[ensure-core-objects] Created Service Technician profile');
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Failed to seed Service Technician profile:', err);
   }
 
   // Also sync any user-created objects from the schema settings to the DB.

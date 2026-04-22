@@ -1,5 +1,7 @@
 # Service Department Module Implementation Plan
 
+> **⚠️ SUPERSEDED 2026-04-20** — Do NOT implement from this v1 plan. It was written against the v1 spec which has since been replaced by [v2 spec (2026-04-20)](../specs/2026-04-20-service-department-module-design-v2.md). A fresh implementation plan aligned with v2 will be generated at `docs/superpowers/plans/2026-04-20-service-department-module-v2.md` via `superpowers:writing-plans`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a complete Service Department module — data model (7 objects/enhancements), 3 triggers, path-guided lifecycle, 4 custom pages (Tech Dashboard, Schedule Calendar, Assignment Board, Cost Dashboard), punch list PDF, and role profiles — on top of the existing metadata-driven CRM architecture.

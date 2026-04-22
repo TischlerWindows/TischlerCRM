@@ -652,6 +652,24 @@ export async function recordRoutes(app: FastifyInstance) {
 
     void pageLayoutId;
 
+    // ── Before-phase trigger automation (awaited, result merged into payload) ──
+    try {
+      const beforeTriggerResult = await runTriggers({
+        event: 'create',
+        phase: 'before',
+        objectApi: apiName,
+        recordId: recordIdValue,
+        recordData: normalizedData,
+        userId,
+        orgId: userId,
+      })
+      if (beforeTriggerResult) {
+        Object.assign(normalizedData, beforeTriggerResult)
+      }
+    } catch (err) {
+      console.error('[records] beforeCreate trigger error:', err)
+    }
+
     const record = await prisma.record.create({
       data: {
         id: recordIdValue,
@@ -1111,6 +1129,26 @@ export async function recordRoutes(app: FastifyInstance) {
       }
     }
 
+    // ── Before-phase trigger automation (awaited, result merged into mergedData) ──
+    try {
+      const beforeTriggerResult = await runTriggers({
+        event: 'update',
+        phase: 'before',
+        objectApi: apiName,
+        recordId: existingRecord.id,
+        recordData: mergedData,
+        beforeData,
+        userId,
+        orgId: userId,
+      })
+      if (beforeTriggerResult) {
+        Object.assign(mergedData, beforeTriggerResult)
+      }
+    } catch (err) {
+      // Non-fatal — a failing before-phase trigger should not block the update
+      console.error('[records] beforeUpdate trigger error:', err)
+    }
+
     const record = await prisma.record.update({
       where: { id: existingRecord.id },
       data: {
@@ -1253,6 +1291,20 @@ export async function recordRoutes(app: FastifyInstance) {
       where: { id: existingRecord.id },
       data: { deletedAt: new Date(), deletedById: userId },
     });
+
+    // ── Trigger automation (afterDelete) ──
+    // Pass pre-delete data as both recordData and beforeData so trigger handlers
+    // can read the workOrder / parent-link from either location.
+    runTriggers({
+      event: 'delete',
+      phase: 'after',
+      objectApi: apiName,
+      recordId: existingRecord.id,
+      recordData: delData,
+      beforeData: delData,
+      userId,
+      orgId: userId,
+    }).catch(() => { /* non-fatal — trigger errors must not break record deletion */ });
 
     reply.code(204).send();
   });
