@@ -1,3 +1,21 @@
+/**
+ * Trigger registry
+ *
+ * Central map of all code-based triggers that ship with the application.
+ * Each registration pairs a TriggerManifest (metadata shown in Settings >
+ * Automations) with a TriggerHandler (the function that runs on the
+ * matching lifecycle event).
+ *
+ * A single handler can be registered multiple times against different
+ * objectApiName values — see work-order-rollup, which runs the same logic
+ * for both TimeEntry and WorkOrderExpense but registers as two distinct
+ * manifest IDs so admins can enable/disable each independently.
+ *
+ * The IDs listed here must match the string literals in
+ * `packages/triggers/src/index.ts::TRIGGER_IDS` — that file is the source
+ * of truth for which IDs can appear in the TriggerSetting table (opt-out
+ * enablement).
+ */
 import type { TriggerRegistration } from '../lib/triggers/types.js'
 import { config as createInstCostsConfig } from './create-installation-costs/trigger.config.js'
 import { handler as createInstCostsHandler } from './create-installation-costs/index.js'

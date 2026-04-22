@@ -1,8 +1,17 @@
 /**
  * rate-change-history trigger
- * Fires afterUpdate on Technician records.
- * Auto-creates a TechnicianRateHistory record when hourlyRate changes.
- * Hourly rate only — no overtime tracking (v2 design).
+ *
+ * Fires afterUpdate on Technician records. Auto-creates a
+ * TechnicianRateHistory audit record whenever hourlyRate changes to a new
+ * non-zero value.
+ *
+ * Design notes:
+ * - Hourly rate only. v2 dropped overtime tracking (spec §1.1).
+ * - No-ops when rate is unchanged or the new rate is 0 (guards against
+ *   spurious history on partial PATCHes that don't touch hourlyRate).
+ * - TechnicianRateHistory has a static prefix `047` registered in
+ *   packages/db/src/record-id.ts. The registerRecordIdPrefix call below is
+ *   idempotent — it short-circuits when the prefix is already registered.
  */
 import { prisma } from '@crm/db/client'
 import { generateRecordId, registerRecordIdPrefix } from '@crm/db/record-id'

@@ -1,17 +1,32 @@
 /**
  * work-order-rollup trigger
- * Fires afterCreate / afterUpdate / afterDelete on TimeEntry and WorkOrderExpense records.
- * Re-queries ALL TimeEntry + WorkOrderExpense records for the parent WorkOrder
- * and writes 4 computed totals back to the WO:
+ *
+ * Fires afterCreate / afterUpdate / afterDelete on TimeEntry and WorkOrderExpense
+ * records. Re-queries ALL TimeEntry + WorkOrderExpense records for the parent
+ * WorkOrder and writes 4 computed totals back to the WO:
+ *
  *   totalActualHours  = sum of TimeEntry.totalHours
  *   totalLaborCost    = sum of TimeEntry.totalCost
  *   totalExpenses     = sum of WorkOrderExpense.amount
  *   totalJobCost      = totalLaborCost + totalExpenses
  *
- * For afterDelete: the deleted record is already soft-deleted (deletedAt set), so
- * querying with deletedAt: null automatically excludes it — the sums are correct.
- * The workOrder ID is carried in recordData for create/update, or in beforeData for
- * delete (the trigger-engine passes the pre-delete snapshot as beforeData).
+ * Registry: this single handler is registered TWICE in triggers/registry.ts —
+ * once against TimeEntry (id: 'work-order-rollup') and once against
+ * WorkOrderExpense (id: 'work-order-rollup-expense'). Each registration is
+ * independently disable-able from Settings > Automations without affecting
+ * the other.
+ *
+ * Delete semantics:
+ *   For afterDelete, the deleted record is already soft-deleted (deletedAt
+ *   is non-null) by the time this trigger fires — the Prisma query
+ *   `where: { deletedAt: null }` naturally excludes it. The parent workOrder
+ *   ID is recovered from `recordData?.workOrder || beforeData?.workOrder`
+ *   (records.ts passes the pre-delete snapshot as both for compatibility).
+ *
+ * Concurrency:
+ *   Two concurrent writes can race on the parent WO. Last writer wins.
+ *   Acceptable for a cost rollup — the next write will recompute from
+ *   fresh sums. Not used for ordering-sensitive state.
  */
 import { prisma } from '@crm/db/client'
 import type { TriggerHandler, TriggerContext } from '../../lib/triggers/types.js'
