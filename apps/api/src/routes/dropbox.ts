@@ -2013,6 +2013,25 @@ export async function dropboxRoutes(app: FastifyInstance) {
               // Backfill parent ID if not stored
               await backfillFolderId(accessToken, propertyId, parentPath);
 
+              // Create (or recreate) Opportunity subfolders — always attempt so
+              // they're restored if the folder was deleted and recreated.
+              if (objectApiName === 'Opportunity') {
+                for (const sf of OPPORTUNITY_SUBFOLDERS) {
+                  try {
+                    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/${sf}`, autorename: false });
+                  } catch { /* already exists — ignore */ }
+                }
+                for (const sub of OPPORTUNITY_PHOTOS_SUBFOLDERS) {
+                  try {
+                    await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/9. Photos/${sub}`, autorename: false });
+                  } catch { /* already exists — ignore */ }
+                }
+                // Create OPP#### working folder inside 1. Estimation
+                try {
+                  await dropboxApi(accessToken, '/files/create_folder_v2', { path: `${childPath}/1. Estimation/${safeName}`, autorename: false });
+                } catch { /* already exists — ignore */ }
+              }
+
               return reply.send({ created: true, path: childPath, linked: true, folderName: childFolderName });
             }
           }
