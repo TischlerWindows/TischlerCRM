@@ -3122,6 +3122,19 @@ export default function SummaryPage() {
                         const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
                         const aoSum = (field: string) => aoKeys.reduce((acc, k) => acc + (parseFloat(getAo(k)[field]) || 0), 0);
                         const fmtAo = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+                        const calcAo = (key: string) => {
+                          const a = getAo(key);
+                          const net = parseFloat(a.netEuro) || 0;
+                          return {
+                            full:  net ? (parseFloat(a.full)  || 0) / net : 0,
+                            disc:  net ? (parseFloat(a.pct)   || 0) / net : 0,
+                            final: net ? (parseFloat(a.final) || 0) / net : 0,
+                          };
+                        };
+                        const aoCalcDisplay = (key: string, field: 'full' | 'disc' | 'final') => {
+                          const v = calcAo(key)[field];
+                          return <div className="w-full px-2 py-1.5 text-right text-sm text-gray-700">{v ? fmtAo(v) : '—'}</div>;
+                        };
                         const setAo = (key: string, field: string, value: string) => {
                           setEditingSummary({
                             ...editingSummary,
@@ -3198,9 +3211,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('windowScreens', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('windowScreens', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('windowScreens', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('windowScreens', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Door Screen Sash */}
@@ -3214,9 +3227,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('doorScreenSash', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('doorScreenSash', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('doorScreenSash', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('doorScreenSash', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Entry Door */}
@@ -3229,9 +3242,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('entryDoor', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('entryDoor', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('entryDoor', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('entryDoor', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Jamb Extensions */}
@@ -3244,9 +3257,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('jambExtensions', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('jambExtensions', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('jambExtensions', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('jambExtensions', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Magnetic Contact */}
@@ -3259,9 +3272,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('magneticContact', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('magneticContact', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Final Finish */}
@@ -3274,9 +3287,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('finalFinish', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('finalFinish', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('finalFinish', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('finalFinish', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Installation */}
@@ -3289,9 +3302,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('installation', 'pct')}</td>
                                     <td className="px-1 py-1">{inp('installation', 'final')}</td>
                                     <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{inp('installation', 'calcFull')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'calcDisc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'calcFinal')}</td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('installation', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Total row */}
@@ -3304,9 +3317,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('pct'))}</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('final'))}</td>
                                     <td></td>
-                                    <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{fmtAo(aoSum('calcFull'))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{fmtAo(aoSum('calcDisc'))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{fmtAo(aoSum('calcFinal'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).full,0))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).disc,0))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).final,0))}</td>
                                     <td className="bg-purple-50/60"></td>
                                   </tr>
                                 </tbody>
