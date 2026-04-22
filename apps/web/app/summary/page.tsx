@@ -2873,11 +2873,12 @@ export default function SummaryPage() {
                     const ewCalc = calcRow(euroWindowNet, qtot?.euroWindows);
                     const dhCalc = calcRow(doubleHungNet, qtot?.doubleHung);
                     const edCalc = calcRow(doorNet, qtot?.euroDoors);
+                    const gtNet = euroWindowNet + doubleHungNet + doorNet;
                     const gtCalc = {
-                      full: ewCalc.full + dhCalc.full + edCalc.full,
-                      disc: ewCalc.disc + dhCalc.disc + edCalc.disc,
-                      final: ewCalc.final + dhCalc.final + edCalc.final,
-                      finalAdj: ewCalc.finalAdj + dhCalc.finalAdj + edCalc.finalAdj,
+                      full:     gtNet ? (p(qtot?.euroWindows?.full)     + p(qtot?.doubleHung?.full)     + p(qtot?.euroDoors?.full))     / gtNet : 0,
+                      disc:     gtNet ? (p(qtot?.euroWindows?.pct)      + p(qtot?.doubleHung?.pct)      + p(qtot?.euroDoors?.pct))      / gtNet : 0,
+                      final:    gtNet ? (p(qtot?.euroWindows?.final)    + p(qtot?.doubleHung?.final)    + p(qtot?.euroDoors?.final))    / gtNet : 0,
+                      finalAdj: gtNet ? (p(qtot?.euroWindows?.finalAdj) + p(qtot?.doubleHung?.finalAdj) + p(qtot?.euroDoors?.finalAdj)) / gtNet : 0,
                     };
 
                     return (
@@ -3317,9 +3318,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('pct'))}</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('final'))}</td>
                                     <td></td>
-                                    <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).full,0))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).disc,0))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{fmtAo(aoKeys.reduce((s,k)=>s+calcAo(k).final,0))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('full')/n) : '—'; })()}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('pct')/n) : '—'; })()}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('final')/n) : '—'; })()}</td>
                                     <td className="bg-purple-50/60"></td>
                                   </tr>
                                 </tbody>
