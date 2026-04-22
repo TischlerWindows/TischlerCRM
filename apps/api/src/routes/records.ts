@@ -6,36 +6,8 @@ import { logAudit, extractIp } from '../audit.js';
 import { tryRenameDropboxFolder, tryEnsureLinkedFolder, tryEnsurePropertyRootFolder } from './dropbox.js';
 import { runWorkflows } from '../workflow-engine.js';
 import { runTriggers } from '../lib/triggers/trigger-engine.js';
+import { checkObjectPermission } from '../lib/check-object-permission.js';
 import { z } from 'zod';
-
-// ── Permission helper ──────────────────────────────────────────────
-async function checkObjectPermission(
-  userId: string,
-  userRole: string,
-  objectApiName: string,
-  action: 'read' | 'create' | 'edit' | 'delete'
-): Promise<boolean> {
-  // ADMIN users always have full access
-  if (userRole === 'ADMIN') return true;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      profile: true,
-    },
-  });
-  if (!user) return false;
-
-  // If user has no profile — no permissions configured yet, allow access
-  if (!user.profile) return true;
-
-  // Check profile object permissions
-  const profilePerms = (user.profile?.permissions as any) || {};
-  const objPerms = profilePerms?.objects?.[objectApiName];
-  if (objPerms?.[action]) return true;
-
-  return false;
-}
 
 export async function recordRoutes(app: FastifyInstance) {
   // ── Global search across all search-enabled objects ──────────────────
