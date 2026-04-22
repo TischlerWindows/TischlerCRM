@@ -484,13 +484,7 @@ export default function ProjectsPage() {
     }
     const fill: Record<string, any> = {
       opportunity: opp.id,
-      'Project__opportunity': opp.id,  // explicit prefixed key — don't rely on schema mirroring
-    };
-    if (opp.property) {
-      fill.property = opp.property;
-      fill['Project__property'] = opp.property;
-    }
-      'Project__opportunity': opp.id,  // explicit prefixed key — don't rely on schema mirroring
+      'Project__opportunity': opp.id,
     };
     if (opp.property) {
       fill.property = opp.property;

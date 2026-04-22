@@ -300,11 +300,11 @@ export function LookupSearch({
   // Determine what to display:
   // - If lookup is active (user is typing), show the query
   // - If we have a selected label (found the record or global cache), show that
-  // - If a value is set but record isn't in cache yet, fall back to lookupQuery
+  // - If a pre-filled query label exists, show it (covers schema-not-yet-loaded case)
   // - Otherwise show empty
   const displayValue = isActive
     ? lookupQuery
-    : selectedLabel || (value ? lookupQuery : '');
+    : selectedLabel || lookupQuery;
 
   const filteredRecords = recordsArray.filter((record) => {
     const label = getRecordLabel(record);
