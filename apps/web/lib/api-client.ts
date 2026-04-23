@@ -546,12 +546,16 @@ class ApiClient {
     });
   }
 
-  async importRecords(objectApiName: string, records: Record<string, any>[]): Promise<{ created: number; errors: Array<{ row: number; error: string }> }> {
-    return this.request<{ created: number; errors: Array<{ row: number; error: string }> }>(
+  async importRecords(
+    objectApiName: string,
+    records: Record<string, any>[],
+    sfIdField?: string,
+  ): Promise<{ created: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }> {
+    return this.request<{ created: number; errors: Array<{ row: number; error: string }>; idMap: Record<string, string> }>(
       `/objects/${objectApiName}/records/import`,
       {
         method: 'POST',
-        body: JSON.stringify({ records }),
+        body: JSON.stringify({ records, sfIdField }),
       },
     );
   }

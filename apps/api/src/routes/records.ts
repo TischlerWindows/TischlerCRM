@@ -1259,11 +1259,12 @@ export async function recordRoutes(app: FastifyInstance) {
 
   // ── Bulk import records (CSV import) ──────────────────────────────────
   // POST /objects/:apiName/records/import
-  // Body: { records: Array<Record<string, any>> }
-  // Returns: { created: number, errors: Array<{ row: number, error: string }> }
+  // Body: { records: Array<Record<string, any>>, sfIdField?: string }
+  // Returns: { created: number, errors: Array<{ row: number, error: string }>, idMap: Record<string, string> }
+  // idMap maps original sfId values → new CRM record IDs (for relational re-linking)
   app.post('/objects/:apiName/records/import', async (req, reply) => {
     const { apiName } = req.params as { apiName: string };
-    const { records: rows } = req.body as { records?: Record<string, any>[] };
+    const { records: rows, sfIdField } = req.body as { records?: Record<string, any>[]; sfIdField?: string };
 
     if (!rows || !Array.isArray(rows) || rows.length === 0) {
       return reply.code(400).send({ error: 'Request body must contain a non-empty "records" array.' });
@@ -1343,10 +1344,15 @@ export async function recordRoutes(app: FastifyInstance) {
 
     let created = 0;
     const errors: Array<{ row: number; error: string }> = [];
+    // Maps original SF Id value → newly created CRM record id
+    const idMap: Record<string, string> = {};
 
     for (let i = 0; i < rows.length; i++) {
       try {
         const rawData = rows[i]!;
+        // Capture the original SF id before normalisation (used for idMap)
+        const originalSfId = sfIdField ? (rawData[sfIdField] ?? rawData['Id'] ?? rawData['id']) : (rawData['Id'] ?? rawData['id']);
+        const sfIdValue = originalSfId ? String(originalSfId) : null;
 
         // Normalize keys
         const normalizedData: Record<string, any> = {};
@@ -1410,6 +1416,9 @@ export async function recordRoutes(app: FastifyInstance) {
           },
         });
 
+        // Track SF id → new CRM id mapping for relational re-linking
+        if (sfIdValue) idMap[sfIdValue] = recordIdValue;
+
         created++;
       } catch (err: any) {
         errors.push({ row: i + 1, error: err.message || 'Unknown error' });
@@ -1427,7 +1436,7 @@ export async function recordRoutes(app: FastifyInstance) {
       ipAddress: extractIp(req),
     });
 
-    reply.send({ created, errors });
+    reply.send({ created, errors, idMap });
   });
 
 }

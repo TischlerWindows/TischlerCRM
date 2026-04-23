@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Users, Shield, Building2, FileText, Trash2, Lock, Database,
   Settings2, ArrowRight, Home, Plug, Zap, Bell, Puzzle, AlertTriangle,
-  LifeBuoy, Pin, PinOff, type LucideIcon,
+  LifeBuoy, Pin, PinOff, Upload, type LucideIcon,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ObjectManagerHeroCard } from '@/components/settings/object-manager-hero-card';
@@ -60,6 +60,7 @@ export default function SettingsPage() {
     { title: 'Profiles', icon: Shield, href: '/settings/profiles', count: counts.profiles, description: 'Role-based permissions', color: '#1e2a7a', group: 'Users & Access' },
     { title: 'Backups', icon: Database, href: '/settings/backups', description: 'Database snapshots and restore', color: '#d97706', group: 'Data Model' },
     { title: 'Recycle Bin', icon: Trash2, href: '/settings/recycle-bin', description: 'Restore deleted records', color: '#da291c', group: 'Data Model' },
+    { title: 'Salesforce Import', icon: Upload, href: '/sf-import', description: 'One-time relational data migration from Salesforce', color: '#00A1E0', group: 'Data Model' },
     { title: 'Automations', icon: Zap, href: '/settings/automations', count: counts.automations, description: 'Triggers and controllers', color: '#f59e0b', group: 'Automation' },
     { title: 'Notifications', icon: Bell, href: '/settings/notifications', description: 'Org-wide notification preferences', color: '#6366f1', group: 'Automation' },
     { title: 'Widgets', icon: Puzzle, href: '/settings/widgets', description: 'Reusable page widgets', color: '#7c3aed', group: 'Automation' },
