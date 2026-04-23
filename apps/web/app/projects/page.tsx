@@ -482,21 +482,55 @@ export default function ProjectsPage() {
       else setLayoutError(result);
       return;
     }
-    const fill: Record<string, any> = {
-      opportunity: opp.id,
-      'Project__opportunity': opp.id,
-    };
-    if (opp.property) {
-      fill.property = opp.property;
-      fill['Project__property'] = opp.property;
+    // Dynamically find the actual field apiNames from the schema so we don't
+    // rely on hardcoded names that may differ per deployment.
+    const oppField = projectObject.fields.find(
+      (f) => (f.type === 'Lookup' || f.type === 'ExternalLookup') &&
+             f.lookupObject === 'Opportunity',
+    );
+    const propField = projectObject.fields.find(
+      (f) => (f.type === 'Lookup' || f.type === 'ExternalLookup') &&
+             f.lookupObject === 'Property',
+    );
+
+    const fill: Record<string, any> = {};
+    if (oppField) {
+      const stripped = oppField.apiName.replace(/^Project__/, '');
+      fill[oppField.apiName] = opp.id;
+      fill[stripped] = opp.id;
+    } else {
+      // Fallback in case schema lookup fails
+      fill['Project__opportunity'] = opp.id;
+      fill.opportunity = opp.id;
     }
+    if (opp.property && propField) {
+      const stripped = propField.apiName.replace(/^Project__/, '');
+      fill[propField.apiName] = opp.property;
+      fill[stripped] = opp.property;
+    } else if (opp.property) {
+      fill['Project__property'] = opp.property;
+      fill.property = opp.property;
+    }
+
     // Compute the display label from the opp object we already have — no cache needed
     const oppLabel = [opp.opportunityNumber, opp.opportunityName].filter(Boolean).join(' – ') || opp.id;
-    const oppLookupQueries: Record<string, string> = {
-      'Project__opportunity': oppLabel,
-      opportunity: oppLabel,
-    };
-    if (opp.property) {
+    const oppLookupQueries: Record<string, string> = {};
+    if (oppField) {
+      const stripped = oppField.apiName.replace(/^Project__/, '');
+      oppLookupQueries[oppField.apiName] = oppLabel;
+      oppLookupQueries[stripped] = oppLabel;
+    } else {
+      oppLookupQueries['Project__opportunity'] = oppLabel;
+      oppLookupQueries.opportunity = oppLabel;
+    }
+    if (opp.property && propField) {
+      const propLabel = opp.propertyNumber || opp.Property__propertyNumber || opp.property;
+      if (propLabel) {
+        const stripped = propField.apiName.replace(/^Project__/, '');
+        oppLookupQueries[propField.apiName] = propLabel;
+        oppLookupQueries[stripped] = propLabel;
+      }
+    } else if (opp.property) {
       const propLabel = opp.propertyNumber || opp.Property__propertyNumber || opp.property;
       if (propLabel) {
         oppLookupQueries['Project__property'] = propLabel;
@@ -945,7 +979,7 @@ export default function ProjectsPage() {
           recordData={prefillData}
           initialLookupQueries={prefillLookupQueries}
           onSubmit={handleDynamicFormSubmit}
-          title={prefillData?.opportunity ? 'New Project from Opportunity' : 'New Project'}
+          title={prefillData && Object.keys(prefillData).length > 0 ? 'New Project from Opportunity' : 'New Project'}
         />
       )}
 
