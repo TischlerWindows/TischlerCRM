@@ -1575,81 +1575,26 @@ export default function DynamicForm({
         )}
       </form>
 
-      {/* Inline record creation -- layout selector step */}
+      {/* Inline record creation -- auto-resolve active layout (no picker) */}
       {inlineCreateTarget &&
         !inlineCreateLayoutId &&
         (() => {
           const targetObj = schema?.objects.find(
             (o) => o.apiName === inlineCreateTarget,
           );
-          const targetLayouts = targetObj?.pageLayouts || [];
-          if (targetLayouts.length <= 1) {
-            const autoLayoutId = targetLayouts[0]?.id || null;
+          if (targetObj) {
+            const result = resolveLayoutForUser(
+              targetObj,
+              { profileId: authUser?.profileId ?? null },
+              { layoutType: 'create' },
+            );
+            const autoLayoutId =
+              result.kind === 'resolved'
+                ? result.layout.id
+                : (targetObj.pageLayouts?.[0]?.id ?? null);
             queueMicrotask(() => setInlineCreateLayoutId(autoLayoutId));
-            return null;
           }
-          return (
-            <Dialog
-              open={true}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setInlineCreateTarget(null);
-                  setInlineCreateForField(null);
-                }
-              }}
-            >
-              <DialogContent className="max-w-md p-0">
-                <DialogHeader className="px-6 pt-6 pb-4 border-b">
-                  <DialogTitle>Select a Page Layout</DialogTitle>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Choose which form layout to use for creating a new{' '}
-                    {targetObj?.label || inlineCreateTarget}
-                  </p>
-                </DialogHeader>
-                <div className="p-6 space-y-3">
-                  {targetLayouts.map((tl) => (
-                    <button
-                      key={tl.id}
-                      type="button"
-                      onClick={() => setInlineCreateLayoutId(tl.id)}
-                      className="w-full flex items-start gap-3 p-4 border border-gray-200 rounded-lg hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-left"
-                    >
-                      <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <Layout className="w-5 h-5 text-indigo-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900">
-                          {tl.name}
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {tl.tabs?.length || 0}{' '}
-                          {(tl.tabs?.length || 0) === 1 ? 'tab' : 'tabs'} •{' '}
-                          {tl.tabs?.reduce(
-                            (acc: number, tab: any) =>
-                              acc + (tab.regions?.length || 0),
-                            0,
-                          ) || 0}{' '}
-                          sections
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-                <div className="p-6 border-t border-gray-200 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setInlineCreateTarget(null);
-                      setInlineCreateForField(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          );
+          return null;
         })()}
 
       {/* Inline record creation -- form step */}
