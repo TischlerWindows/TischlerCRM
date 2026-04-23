@@ -299,12 +299,15 @@ export function LookupSearch({
 
   // Determine what to display:
   // - If lookup is active (user is typing), show the query
-  // - If we have a selected label (found the record or global cache), show that
-  // - If a pre-filled query label exists, show it (covers schema-not-yet-loaded case)
-  // - Otherwise show empty
+  // - If we have a locally-matched record, use its resolved label
+  // - If the record isn't in the local cache yet, prefer the pre-filled lookupQuery
+  //   (avoids showing a raw UUID when the cache hasn't loaded)
+  // - Otherwise fall back to whatever resolveLookupDisplayName returned
   const displayValue = isActive
     ? lookupQuery
-    : selectedLabel || lookupQuery;
+    : selectedRecord
+    ? selectedLabel
+    : lookupQuery || selectedLabel;
 
   const filteredRecords = recordsArray.filter((record) => {
     const label = getRecordLabel(record);
