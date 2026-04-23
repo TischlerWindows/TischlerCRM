@@ -25,6 +25,7 @@ import {
   ChevronRight,
   AlertTriangle,
   LifeBuoy,
+  Upload,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -62,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Backups', href: '/settings/backups', icon: Database },
       { name: 'Recycle Bin', href: '/settings/recycle-bin', icon: Trash2 },
+      { name: 'Salesforce Import', href: '/sf-import', icon: Upload },
       { name: 'Data', href: '/settings/data', icon: Database, disabled: true },
     ],
   },
