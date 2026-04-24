@@ -520,6 +520,8 @@ export interface LayoutWidget {
   config: WidgetConfig;
   /** When false the collapsible header bar is hidden and content renders directly. */
   collapsible?: boolean;
+  /** When true the widget starts collapsed when the detail page opens. */
+  collapsedAsDefault?: boolean;
   hideOnNew?: boolean;       // Hide on New Record form (creation)
   hideOnView?: boolean;      // Hide on View (read-only detail page)
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)

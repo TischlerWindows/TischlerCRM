@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ObjectDef, PageLayout } from '@/lib/schema';
 import { getFormattingEffectsForTab } from '@/lib/layout-formatting';
+import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { RecordTabRenderer } from './record-tab-renderer';
 
 export interface PreviewDetailViewProps {
@@ -22,7 +23,9 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
   const [activeTabIdx, setActiveTabIdx] = useState(0);
   const [sectionToggles, setSectionToggles] = useState<Record<string, boolean>>({});
   const [collapsedPanelIds, setCollapsedPanelIds] = useState<Set<string>>(new Set());
-  const [collapsedWidgetIds, setCollapsedWidgetIds] = useState<Set<string>>(new Set());
+  const [collapsedWidgetIds, setCollapsedWidgetIds] = useState<Set<string>>(
+    () => collectDefaultCollapsedWidgetIds(layout),
+  );
 
   const togglePanelCollapse = (panelId: string) => {
     setCollapsedPanelIds((prev) => {
@@ -41,6 +44,10 @@ export function PreviewDetailView({ layout, record, objectDef }: PreviewDetailVi
       return next;
     });
   };
+
+  useEffect(() => {
+    setCollapsedWidgetIds(collectDefaultCollapsedWidgetIds(layout));
+  }, [layout]);
 
   const visibleTabs = useMemo(() => {
     return [...layout.tabs]

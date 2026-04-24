@@ -18,6 +18,7 @@ import { getFormattingEffectsForField, getFormattingEffectsForTab } from '@/lib/
 import { recordsService, RecordData } from '@/lib/records-service';
 import { useFormulaFields } from '@/lib/use-formula-fields';
 import { useRecordSetupContext } from '@/lib/record-setup-context';
+import { collectDefaultCollapsedWidgetIds } from '@/lib/widget-collapse-defaults';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { RecordTabRenderer } from './record-tab-renderer';
 import { RecordActions } from './record-actions';
@@ -209,6 +210,11 @@ export default function RecordDetailPage({
 
   useEffect(() => {
     setActiveTabIdx(0);
+  }, [pageLayout?.id]);
+
+  useEffect(() => {
+    if (!pageLayout) return;
+    setCollapsedWidgetIds(collectDefaultCollapsedWidgetIds(pageLayout));
   }, [pageLayout?.id]);
 
   useEffect(() => {

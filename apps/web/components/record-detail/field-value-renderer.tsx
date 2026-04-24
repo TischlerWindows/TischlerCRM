@@ -349,6 +349,23 @@ export function renderValue(
     }
   }
 
+  // Currency — US dollar format (e.g. $1,234.56)
+  if (fieldType === 'Currency') {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!isNaN(n)) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(n);
+    }
+  }
+
+  // Percent — append % sign
+  if (fieldType === 'Percent') {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!isNaN(n)) return `${n}%`;
+  }
+
   return formatFieldValue(value, fieldType, fieldDef?.lookupObject);
 }
 
