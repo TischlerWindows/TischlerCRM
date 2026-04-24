@@ -799,10 +799,11 @@ export default function DynamicForm({
       }
       case 'Address': {
         if (typeof val === 'object' && val !== null) {
-          const { street, city, state, zipCode, country } = val as any;
+          const v = val as any;
           return (
-            [street, city, state, zipCode, country].filter(Boolean).join(', ') ||
-            '\u2014'
+            [v.street, v.city, v.state, v.postalCode ?? v.zipCode, v.country]
+              .filter(Boolean)
+              .join(', ') || '\u2014'
           );
         }
         return String(val);
@@ -822,6 +823,18 @@ export default function DynamicForm({
         return String(val);
       }
       default:
+        if (typeof val === 'object' && val !== null) {
+          const v = val as any;
+          const addressKeys = ['street', 'city', 'state', 'postalCode', 'zipCode', 'country'];
+          if (addressKeys.some((k) => k in v)) {
+            return (
+              [v.street, v.city, v.state, v.postalCode ?? v.zipCode, v.country]
+                .filter(Boolean)
+                .join(', ') || '\u2014'
+            );
+          }
+          return '\u2014';
+        }
         return String(val);
     }
   };
