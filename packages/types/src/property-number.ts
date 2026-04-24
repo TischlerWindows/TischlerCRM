@@ -480,7 +480,11 @@ export function extractAddressFromRecord(normalizedData: Record<string, any>): {
 
   for (const [key, value] of Object.entries(normalizedData)) {
     const lk = key.toLowerCase().replace(/^[a-z]+__/, '');
-    if (lk === 'address' && value && typeof value === 'object' && !Array.isArray(value)) {
+    // Accept both the legacy 'address' field and the LocationSearch 'address_search' field
+    if (
+      (lk === 'address' || lk === 'address_search') &&
+      value && typeof value === 'object' && !Array.isArray(value)
+    ) {
       addr = value;
     }
     if (lk === 'state' && typeof value === 'string') stateField = value;
