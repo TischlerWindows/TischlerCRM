@@ -985,7 +985,11 @@ export async function tryEnsureLinkedFolder(
         }
       }
 
-      const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${safeName}`;
+      const now = new Date();
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const dateStr = `${String(now.getDate()).padStart(2,'0')} ${months[now.getMonth()]} ${now.getFullYear()}`;
+      const requoteSafeName = `${safeName} ${dateStr}`.replace(/[\\/:*?"<>|]/g, '_').trim();
+      const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName}`;
       const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${parentOppFolderName}`;
       console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
 
@@ -2039,7 +2043,11 @@ export async function dropboxRoutes(app: FastifyInstance) {
                   }
                 }
 
-                const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${safeName}`;
+                const rMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const rDate = record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt);
+                const rDateStr = `${String(rDate.getDate()).padStart(2,'0')} ${rMonths[rDate.getMonth()]} ${rDate.getFullYear()}`;
+                const requoteSafeName2 = `${safeName} ${rDateStr}`.replace(/[\\/:*?"<>|]/g, '_').trim();
+                const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName2}`;
                 let requoteFolderId: string | undefined;
                 try {
                   const result = await dropboxApi(accessToken, '/files/create_folder_v2', {
