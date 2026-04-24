@@ -4,9 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Eye } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import type { PanelField } from './types';
 import { useEditorStore } from './editor-store';
 import { CanvasErrorBoundary } from './canvas-error-boundary';
+import { useSchemaStore } from '@/lib/schema-store';
+import { getFieldTypeLabel } from '@/lib/schema';
 
 interface CanvasFieldCardProps {
   field: PanelField;
@@ -41,6 +44,14 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
   const resizeField = useEditorStore((s) => s.resizeField);
   const formattingRules = useEditorStore((s) => s.layout.formattingRules ?? EMPTY_RULES);
   const previewMode = useEditorStore((s) => s.previewMode);
+
+  const routeParams = useParams();
+  const objectApi = typeof routeParams?.objectApi === 'string' ? routeParams.objectApi : undefined;
+  const fieldType = useSchemaStore((s) => {
+    if (!objectApi) return undefined;
+    const obj = s.schema?.objects.find((o) => o.apiName === objectApi);
+    return obj?.fields.find((f) => f.apiName === field.fieldApiName)?.type;
+  });
 
   const isHiddenInPreviewMode =
     (previewMode === 'new' && field.hideOnNew) ||
@@ -224,6 +235,14 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
             {field.fieldApiName}
           </div>
           <div className="mt-1 flex items-center gap-2">
+            {fieldType && (
+              <span
+                className="rounded-full bg-brand-navy/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brand-navy"
+                title={`Field type: ${getFieldTypeLabel(fieldType)}`}
+              >
+                {getFieldTypeLabel(fieldType)}
+              </span>
+            )}
             {field.behavior !== 'none' && (
               <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-600">
                 {toBehaviorLabel(field.behavior)}
