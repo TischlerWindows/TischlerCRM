@@ -1069,27 +1069,48 @@ export default function SummaryPage() {
       r.tusPosition || r.archPosition || r.qty || r.widthMM || r.heightMM || r.type || r.type2
     );
 
-    // Data table columns (streamlined — 16 core columns)
+    // Data table columns (streamlined — 17 core columns)
     const dtHeaders = [
       'TuS Pos', 'Arch Pos', 'Qty', 'W (MM)', 'H (MM)', 'W (Ft/In)', 'H (Ft/In)',
       'Sq Ft Ea', 'Sq Ft Tot', 'Op.Sash Ea', 'Op.Sash Tot',
       'Type', 'Remarks',
-      'Fields Tot', 'Site Mull', 'NET \u20AC Tot',
+      'Fields Tot', 'Site Mull', '\u20AC/Unit', 'NET \u20AC Tot',
     ];
-    const dtColW = [14, 14, 9, 13, 13, 16, 16, 14, 14, 14, 14, 30, 28, 14, 14, 14];
+    const dtColW = [14, 14, 9, 13, 13, 16, 16, 14, 14, 14, 14, 30, 28, 14, 14, 14, 14];
     const buildDtRow = (r: any): string[] => [
       r.tusPosition, r.archPosition, r.qty, r.widthMM, r.heightMM,
       r.widthFtIn, r.heightFtIn, r.sqFeetEach, r.sqFeetTotal,
       r.operableSashesEach, r.operableSashesTotal,
       r.type, r.specialRemarks,
-      r.fieldsTotal, r.siteMullionsTotal, r.netEuroTotal,
+      r.fieldsTotal, r.siteMullionsTotal, r.netEuroEach, r.netEuroTotal,
     ].map(v => v || '');
+
+    const buildTotalRow = (rows: any[]): string[] => {
+      const tQtyV = sumField(rows, 'qty');
+      const tSqFtV = sumField(rows, 'sqFeetTotal');
+      const tOpV = sumField(rows, 'operableSashesTotal');
+      const tFieldsV = sumField(rows, 'fieldsTotal');
+      const tSiteMullV = sumField(rows, 'siteMullionsTotal');
+      const tNetV = sumField(rows, 'netEuroTotal');
+      const unitV = tQtyV > 0 ? tNetV / tQtyV : 0;
+      return [
+        'Total', '', tQtyV ? String(tQtyV) : '', '', '', '', '',
+        '', tSqFtV ? fmt(tSqFtV) : '', '', tOpV ? String(tOpV) : '',
+        '', '',
+        tFieldsV ? String(Math.round(tFieldsV)) : '',
+        tSiteMullV ? String(Math.round(tSiteMullV)) : '',
+        unitV ? '\u20AC' + fmt(unitV) : '',
+        tNetV ? '\u20AC' + fmt(tNetV) : '',
+      ];
+    };
 
     // Windows
     const winRows = filterRows(s.rows);
     if (winRows.length > 0) {
       y = drawSectionTitle(doc, y, 'Windows');
-      y = drawTable(doc, y, dtHeaders, dtColW, winRows.map(buildDtRow), { rightAlignFrom: 2 });
+      const winDataRows = winRows.map(buildDtRow);
+      winDataRows.push(buildTotalRow(winRows));
+      y = drawTable(doc, y, dtHeaders, dtColW, winDataRows, { rightAlignFrom: 2, highlightLast: true });
       y += 4;
     }
 
@@ -1099,7 +1120,9 @@ export default function SummaryPage() {
       const maxY = doc.internal.pageSize.getHeight() - 20;
       if (y + 20 > maxY) { doc.addPage(); drawHeader(doc, 'Quote Summary — Data Entry (cont.)'); y = 28; }
       y = drawSectionTitle(doc, y, 'Doors');
-      y = drawTable(doc, y, dtHeaders, dtColW, doorRows.map(buildDtRow), { rightAlignFrom: 2 });
+      const doorDataRows = doorRows.map(buildDtRow);
+      doorDataRows.push(buildTotalRow(doorRows));
+      y = drawTable(doc, y, dtHeaders, dtColW, doorDataRows, { rightAlignFrom: 2, highlightLast: true });
     }
 
     // ════════════════════════════════════════════════
