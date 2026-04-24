@@ -268,6 +268,41 @@ export function WidgetConfigPanel({ selection, availableFields }: WidgetConfigPa
         </div>
       )}
 
+      {selection.widget.config.type !== 'Spacer' &&
+        selection.widget.config.type !== 'HeaderHighlights' &&
+        selection.widget.collapsible !== false && (
+        <div className="space-y-1.5">
+          <Label className="text-xs text-gray-600">Collapsed as Default</Label>
+          <div className="flex rounded-md border border-gray-200 overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => updateWidget(selection.widget.id, { collapsedAsDefault: true })}
+              className={`flex-1 py-1.5 font-medium transition-colors ${
+                selection.widget.collapsedAsDefault === true
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              Yes
+            </button>
+            <button
+              type="button"
+              onClick={() => updateWidget(selection.widget.id, { collapsedAsDefault: false })}
+              className={`flex-1 py-1.5 font-medium transition-colors border-l border-gray-200 ${
+                selection.widget.collapsedAsDefault !== true
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              No
+            </button>
+          </div>
+          <p className="text-[11px] text-gray-400">
+            When enabled, the widget opens collapsed on the record detail page.
+          </p>
+        </div>
+      )}
+
       <div className="border-t border-gray-200 pt-3">
         <HideOnCheckboxes
           hideOnNew={selection.widget.hideOnNew}
