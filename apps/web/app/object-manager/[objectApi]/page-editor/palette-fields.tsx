@@ -7,6 +7,7 @@ import { GripVertical, LayoutGrid, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
+import { getFieldTypeLabel } from '@/lib/schema';
 import { useEditorStore } from './editor-store';
 
 export interface PaletteFieldsProps {
@@ -120,6 +121,12 @@ function DraggableFieldChip({
     >
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-gray-700">{field.label}</span>
+      <span
+        className="shrink-0 rounded-full bg-brand-navy/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-brand-navy"
+        title={`Field type: ${getFieldTypeLabel(field.type)}`}
+      >
+        {getFieldTypeLabel(field.type)}
+      </span>
       {isPlaced ? (
         <span className="text-[10px] text-gray-400" aria-label="Field already placed">✓</span>
       ) : null}
