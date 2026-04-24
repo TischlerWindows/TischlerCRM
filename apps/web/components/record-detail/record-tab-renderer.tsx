@@ -209,10 +209,6 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
 
     return (
       <div key={region.id} style={regionStyle} className="min-w-0 space-y-4 p-2">
-        {/* Region header */}
-        {region.label && (
-          <h3 className="text-sm font-semibold text-gray-700 px-1">{region.label}</h3>
-        )}
         {/* Panels */}
           {sortedPanels.map((panel: any) => {
             if (panel.hidden) return null;
