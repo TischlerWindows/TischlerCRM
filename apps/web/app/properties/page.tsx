@@ -463,10 +463,10 @@ export default function PropertiesPage() {
       normalizedData[cleanKey] = value;
     });
     
-    // Derive country & state from the composite Address field or the standalone text fields.
-    // The composite Address object has { street, city, state, postalCode, country }.
-    // The standalone fields are Property__city, Property__state, Property__zipCode (no country).
-    const addr = normalizedData.address;
+    // Derive country & state from the composite Address/LocationSearch field or the standalone text fields.
+    // The composite object has { street, city, state, postalCode, country }.
+    // LocationSearch fields are stored under address_search; legacy Address fields under address.
+    const addr = normalizedData.address_search || normalizedData.address;
     const isAddrObj = typeof addr === 'object' && addr !== null;
     const addrCountry = (isAddrObj && addr.country) || normalizedData.country || '';
     const addrState = (isAddrObj && addr.state) || normalizedData.state || '';
