@@ -6,6 +6,8 @@ import { Plus, Search, ChevronUp, ChevronDown, MoreHorizontal, Trash2, ExternalL
 import type { WidgetProps } from '@/lib/widgets/types'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
+import { formatFieldValue } from '@/lib/utils'
+import type { FieldDef } from '@/lib/schema'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -128,8 +130,17 @@ function applyFilters(rows: Record<string, unknown>[], rules: FilterRule[]): Rec
 
 // ── Cell value helper ─────────────────────────────────────────────────
 
-function getCellValue(row: Record<string, unknown>, col: string): string {
+function getCellValue(
+  row: Record<string, unknown>,
+  col: string,
+  fieldDef?: FieldDef,
+): string {
   const val = getVal(row, col)
+  if (val === undefined || val === null || val === '') return '—'
+  if (fieldDef?.type) {
+    const formatted = formatFieldValue(val, fieldDef.type, fieldDef.lookupObject)
+    return formatted === '-' ? '—' : formatted
+  }
   if (val && typeof val === 'object' && !Array.isArray(val)) {
     const v = val as Record<string, unknown>
     if (v.street || v.city || v.state || v.postalCode || v.country) {
@@ -137,7 +148,7 @@ function getCellValue(row: Record<string, unknown>, col: string): string {
     }
     return JSON.stringify(val)
   }
-  return val !== undefined && val !== null ? String(val) : '—'
+  return String(val)
 }
 
 // ── Skeleton loader ───────────────────────────────────────────────────
@@ -204,6 +215,27 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
     return map
   }, [schema?.objects, objectApiName])
 
+  // Build field-def map for type-aware cell formatting (Currency, Percent, etc.)
+  const fieldDefMap = useMemo(() => {
+    const map: Record<string, FieldDef> = {}
+    const obj = schema?.objects?.find(o => o.apiName === objectApiName)
+    if (obj?.fields) {
+      for (const f of obj.fields) {
+        map[f.apiName] = f
+        map[f.apiName.toLowerCase()] = f
+        const stripped = f.apiName.replace(/^[A-Za-z]+__/, '')
+        if (stripped !== f.apiName) {
+          map[stripped] = f
+          map[stripped.toLowerCase()] = f
+        }
+      }
+    }
+    return map
+  }, [schema?.objects, objectApiName])
+
+  const resolveFieldDef = (col: string): FieldDef | undefined =>
+    fieldDefMap[col] ?? fieldDefMap[col.toLowerCase()]
+
   const [allRows, setAllRows] = useState<Record<string, unknown>[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -254,8 +286,8 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
   const sorted = useMemo(() => {
     if (!sortCol) return searchFiltered
     return [...searchFiltered].sort((a, b) => {
-      const aVal = getCellValue(a, sortCol)
-      const bVal = getCellValue(b, sortCol)
+      const aVal = getCellValue(a, sortCol, resolveFieldDef(sortCol))
+      const bVal = getCellValue(b, sortCol, resolveFieldDef(sortCol))
       return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
     })
   }, [searchFiltered, sortCol, sortAsc])
@@ -338,7 +370,7 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
                   {displayColumns.map(col => (
                     <div key={col} className="mb-1.5 last:mb-0">
                       <p className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide">{fieldLabelMap[col] || fieldLabelMap[col.toLowerCase()] || col}</p>
-                      <p className="text-xs font-medium text-brand-dark truncate">{getCellValue(row, col)}</p>
+                      <p className="text-xs font-medium text-brand-dark truncate">{getCellValue(row, col, resolveFieldDef(col))}</p>
                     </div>
                   ))}
                   <div className="mt-2 flex items-center text-[10px] text-brand-navy font-medium opacity-0 group-hover:opacity-100 transition-opacity">
@@ -423,10 +455,10 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
                               className="font-medium text-brand-navy hover:underline"
                               onClick={e => e.stopPropagation()}
                             >
-                              {getCellValue(row, col)}
+                              {getCellValue(row, col, resolveFieldDef(col))}
                             </Link>
                           ) : (
-                            getCellValue(row, col)
+                            getCellValue(row, col, resolveFieldDef(col))
                           )}
                         </td>
                       ))}

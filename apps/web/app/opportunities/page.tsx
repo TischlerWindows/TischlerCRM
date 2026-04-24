@@ -415,15 +415,8 @@ export default function OpportunitiesPage() {
       return formatFieldValue(value, fieldType, schemaField?.lookupObject);
     }
     
-    if (typeof value === 'number' && columnId === 'value') {
-      return `$${value.toLocaleString()}`;
-    }
-    
-    if (typeof value === 'number' && columnId === 'probability') {
-      return `${value}%`;
-    }
-    
     // Route remaining values through formatFieldValue for field-type-aware display
+    // (Currency → $1,234.56, Percent → 50%, etc.)
     const schemaFieldFinal = oppObject?.fields?.find(f => f.apiName === `Opportunity__${columnId}` || f.apiName === columnId);
     if (schemaFieldFinal?.type) return formatFieldValue(value, schemaFieldFinal.type, schemaFieldFinal.lookupObject);
     return String(value);
