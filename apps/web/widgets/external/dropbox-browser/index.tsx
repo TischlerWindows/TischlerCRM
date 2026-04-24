@@ -75,6 +75,21 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
     }
   }
 
+  // Special case for Lead: format as "LEAD#### (Lead Name)" instead of address-based name
+  if (objectApiName?.toLowerCase() === 'lead') {
+    const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
+    const contactNameKey = Object.keys(record).find(k => sk(k) === 'contactname')
+    const firstNameKey = Object.keys(record).find(k => sk(k) === 'firstname')
+    const lastNameKey = Object.keys(record).find(k => sk(k) === 'lastname')
+    const leadName = (contactNameKey ? (record[contactNameKey] as string) : '') ||
+      [firstNameKey ? record[firstNameKey] : '', lastNameKey ? record[lastNameKey] : '']
+        .filter(Boolean).join(' ').trim()
+    if (autoNumber && leadName) return `${autoNumber} (${leadName})`
+    if (autoNumber) return autoNumber
+    if (leadName) return leadName
+    return id
+  }
+
   if (addrStr && autoNumber) return `${addrStr} (${autoNumber})`
   if (addrStr) return addrStr
   if (autoNumber) return autoNumber
