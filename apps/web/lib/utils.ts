@@ -451,6 +451,30 @@ export function formatFieldValue(rawValue: any, fieldType?: string, lookupObject
     return value.split(';').map(s => s.trim()).filter(Boolean).join(', ') || '-';
   }
 
+  // Currency — US dollar format (e.g. $1,234.56)
+  if (fieldType === 'Currency') {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!isNaN(n)) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(n);
+    }
+  }
+
+  // Percent — append % sign
+  if (fieldType === 'Percent') {
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!isNaN(n)) return `${n}%`;
+  }
+
+  // Checkbox — human-readable Yes/No (matches renderValue)
+  if (fieldType === 'Checkbox') {
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    if (value === 'true') return 'Yes';
+    if (value === 'false') return 'No';
+  }
+
   // Handle primitives
   return String(value);
 }
