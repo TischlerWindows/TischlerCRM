@@ -90,6 +90,18 @@ export function SlotInput({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // The /records and /records/search API endpoints return raw rows of shape
+  // { id, data: {...}, createdBy: {...} } — but LookupSearch (and the lookup
+  // cache pattern in lib/utils.ts:getLookupRecords) expects flattened records
+  // of shape { id, ...data }. Without flattening, getRecordLabel(record) reads
+  // record.accountName / record.name from the wrong place and returns empty.
+  function flatten(arr: Record<string, unknown>[]): Record<string, unknown>[] {
+    return arr.map(r => {
+      const inner = (r.data && typeof r.data === 'object') ? (r.data as Record<string, unknown>) : {}
+      return { id: r.id, ...inner }
+    })
+  }
+
   // Debounced account search
   useEffect(() => {
     if (!accountActive) return
@@ -103,7 +115,7 @@ export function SlotInput({
         const data = await apiClient.get<Record<string, unknown>[]>(
           `/objects/Account/records/search?q=${encodeURIComponent(accountQuery.trim())}`,
         )
-        setAccountResults(Array.isArray(data) ? data : [])
+        setAccountResults(Array.isArray(data) ? flatten(data) : [])
       } catch {
         setAccountResults([])
       }
@@ -122,7 +134,7 @@ export function SlotInput({
           const data = await apiClient.get<Record<string, unknown>[]>(
             `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId)}&limit=200`,
           )
-          const arr = Array.isArray(data) ? data : []
+          const arr = Array.isArray(data) ? flatten(data) : []
           if (!contactQuery.trim()) {
             setContactResults(arr)
           } else {
@@ -143,7 +155,7 @@ export function SlotInput({
           const data = await apiClient.get<Record<string, unknown>[]>(
             `/objects/Contact/records/search?q=${encodeURIComponent(contactQuery.trim())}`,
           )
-          setContactResults(Array.isArray(data) ? data : [])
+          setContactResults(Array.isArray(data) ? flatten(data) : [])
         }
       } catch {
         setContactResults([])
