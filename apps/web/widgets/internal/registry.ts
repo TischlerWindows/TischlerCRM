@@ -11,6 +11,7 @@ import { config as fileFolderManifest } from './file-folder/widget.config'
 import { config as relatedListManifest } from './related-list/widget.config'
 import { config as teamMembersRollupManifest } from './team-members-rollup/widget.config'
 import { config as teamMemberAssociationsManifest } from './team-member-associations/widget.config'
+import { config as teamMemberSlotManifest } from './team-member-slot/widget.config'
 import { config as pathManifest } from './path/widget.config'
 import { config as installationCostGridManifest } from './installation-cost-grid/widget.config'
 import { config as summaryManifest } from './summary/widget.config'
@@ -19,6 +20,7 @@ import HeaderHighlightsConfigPanel from './header-highlights/ConfigPanel'
 import RelatedListConfigPanel from './related-list/ConfigPanel'
 import TeamMembersRollupConfigPanel from './team-members-rollup/ConfigPanel'
 import TeamMemberAssociationsConfigPanel from './team-member-associations/ConfigPanel'
+import TeamMemberSlotConfigPanel from './team-member-slot/ConfigPanel'
 import PathConfigPanel from './path/ConfigPanel'
 
 export const internalWidgetRegistrations: WidgetRegistration[] = [
@@ -63,6 +65,13 @@ export const internalWidgetRegistrations: WidgetRegistration[] = [
     widgetConfigType: 'TeamMemberAssociations',
     Component: dynamic(() => import('./team-member-associations/index')),
     ConfigPanel: TeamMemberAssociationsConfigPanel,
+  },
+  {
+    manifest: teamMemberSlotManifest,
+    widgetConfigType: 'TeamMemberSlot',
+    Component: dynamic(() => import('./team-member-slot/index')),
+    ConfigPanel: TeamMemberSlotConfigPanel,
+    supportsCreate: true,
   },
   {
     manifest: pathManifest,

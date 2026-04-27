@@ -220,7 +220,7 @@ export interface PageLayoutExtensions {
 
 // ── Widget system ──────────────────────────────────────────────
 
-export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles';
+export type WidgetType = 'RelatedList' | 'CustomComponent' | 'ActivityFeed' | 'FileFolder' | 'Spacer' | 'HeaderHighlights' | 'ExternalWidget' | 'TeamMembersRollup' | 'TeamMemberAssociations' | 'TeamMemberSlot' | 'Path' | 'InstallationCostGrid' | 'Summary' | 'DropboxFiles';
 
 export type RelatedListFilterOperator =
   | 'equals'
@@ -325,6 +325,31 @@ export interface TeamMemberAssociationsConfig {
   };
 }
 
+export type TeamMemberFlag = 'primaryContact' | 'contractHolder' | 'quoteRecipient';
+
+export type TeamMemberSlotCriterion =
+  | { kind: 'flag'; flag: TeamMemberFlag }
+  | { kind: 'role'; role: string };
+
+export interface TeamMemberSlotConfig {
+  type: 'TeamMemberSlot';
+  /** Visible label for the slot. Falls back to a label derived from the criterion. */
+  label?: string;
+  /** What this slot represents on the TeamMember junction. */
+  criterion: TeamMemberSlotCriterion;
+  /** Single = one row, one input; Multi = chip strip with quick-add. */
+  cardinality: 'single' | 'multi';
+  /** Whether the slot picks a contact, an account, or both (paired Account→Contact cascade). */
+  mode: 'contact' | 'account' | 'paired';
+  /** Optional fields to surface inline alongside the picked contact/account. */
+  displayFields?: {
+    Contact?: string[];
+    Account?: string[];
+  };
+  /** Optional placeholder copy for the lookup input(s). */
+  placeholder?: string;
+}
+
 export interface PathConfig {
   type: 'Path';
   pathId: string;
@@ -358,6 +383,7 @@ export type WidgetConfig =
   | ExternalWidgetLayoutConfig
   | TeamMembersRollupConfig
   | TeamMemberAssociationsConfig
+  | TeamMemberSlotConfig
   | PathConfig
   | InstallationCostGridConfig
   | SummaryConfig
@@ -597,8 +623,21 @@ export interface LegacyPageLayout {
 
 // ── Path definitions ────────────────────────────────────────────────────────
 
+export type PathTransitionFieldKind = 'field' | 'teamMemberFlag' | 'teamMemberRole';
+
 export interface PathTransitionField {
-  fieldApiName: string;
+  /** Discriminator. Defaults to 'field' when absent (back-compat with existing path configs). */
+  kind?: PathTransitionFieldKind;
+  /** Used when kind='field' (the existing behavior). */
+  fieldApiName?: string;
+  /** Used when kind='teamMemberFlag'. */
+  flag?: TeamMemberFlag;
+  /** Used when kind='teamMemberRole' — any value from TeamMember.role picklist. */
+  role?: string;
+  /** Render mode for TM criteria in the transition modal. Defaults to 'paired'. */
+  tmMode?: 'contact' | 'account' | 'paired';
+  /** Cardinality for TM criteria. Defaults to 'single' for transitions. */
+  tmCardinality?: 'single' | 'multi';
   required?: boolean;
 }
 
