@@ -388,8 +388,49 @@ function deriveOpportunityFolderName(data: Record<string, any>): string {
 // Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
 function fmtLeadDate(d: Date | string | null | undefined): string {
   const dt = d ? (d instanceof Date ? d : new Date(d)) : new Date();
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${String(dt.getDate()).padStart(2,'0')} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+  // Format: M-D-YY (no leading zeros, 2-digit year)
+  return `${dt.getMonth() + 1}-${dt.getDate()}-${String(dt.getFullYear()).slice(-2)}`;
+}
+
+/**
+ * Resolve the display name for the Contact lookup on a Lead record.
+ * Looks for a `contact` field (UUID), queries the Contact record, and
+ * returns "Salutation FirstName LastName" (omitting any empty parts).
+ */
+async function resolveLeadContactDisplayName(leadData: Record<string, any>): Promise<string> {
+  try {
+    const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
+    // Find the contact lookup field (value should be a record UUID)
+    let contactId: string | undefined;
+    for (const [k, v] of Object.entries(leadData)) {
+      if (sk(k) === 'contact' && typeof v === 'string' && v && !/^N\/A$/i.test(v.trim()) && v.length > 10) {
+        contactId = v;
+        break;
+      }
+    }
+    if (!contactId) return '';
+
+    const contactObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
+    });
+    if (!contactObj) return '';
+
+    const contactRecord = await prisma.record.findFirst({
+      where: { id: contactId, objectId: contactObj.id },
+    });
+    if (!contactRecord) return '';
+
+    const cData = contactRecord.data as Record<string, any>;
+    const get = (field: string) => {
+      for (const [k, v] of Object.entries(cData)) {
+        if (sk(k) === field && typeof v === 'string' && v) return v as string;
+      }
+      return '';
+    };
+    return [get('salutation'), get('firstname'), get('lastname')].filter(Boolean).join(' ').trim();
+  } catch {
+    return '';
+  }
 }
 
 function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string, objectApiName?: string, createdAt?: Date | string | null): string {
@@ -459,21 +500,17 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
     }
   }
 
-  // Special case for Lead: format as "LD#### (Contact Name) DD Mon YYYY"
+  // Special case for Lead: format as "Lead#### (Contact Name) M-D-YY"
+  // Note: contact name resolution from the DB is done async by callers;
+  // this sync path uses whatever pre-resolved name was injected into recordData._resolvedContactName.
   if (objectApiName === 'Lead') {
-    const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
-    const contactNameKey = Object.keys(recordData).find(k => sk(k) === 'contactname');
-    const firstNameKey = Object.keys(recordData).find(k => sk(k) === 'firstname');
-    const lastNameKey = Object.keys(recordData).find(k => sk(k) === 'lastname');
-    const leadName = (contactNameKey ? (recordData[contactNameKey] as string) : '') ||
-      [firstNameKey ? recordData[firstNameKey] : '', lastNameKey ? recordData[lastNameKey] : '']
-        .filter(Boolean).join(' ').trim();
-    // Replace LEAD prefix with LD (e.g. LEAD0001 → LD0001)
-    const ldNumber = autoNumber ? autoNumber.replace(/^LEAD/i, 'LD') : '';
+    const resolvedContactName = (recordData._resolvedContactName as string) || '';
+    // Reformat number: LEAD0001 → Lead0001 (capitalize first letter only)
+    const leadNumber = autoNumber ? autoNumber.replace(/^LEAD/i, (m) => 'Lead' + m.slice(4)) : '';
     const dateStr = fmtLeadDate(createdAt);
-    if (ldNumber && leadName) return `${ldNumber} (${leadName}) ${dateStr}`;
-    if (ldNumber) return `${ldNumber} ${dateStr}`;
-    if (leadName) return `${leadName} ${dateStr}`;
+    if (leadNumber && resolvedContactName) return `${leadNumber} (${resolvedContactName}) ${dateStr}`;
+    if (leadNumber) return `${leadNumber} ${dateStr}`;
+    if (resolvedContactName) return `${resolvedContactName} ${dateStr}`;
     return recordId;
   }
 
@@ -723,6 +760,13 @@ export async function tryRenameDropboxFolder(
     if (objectApiName === 'Opportunity') {
       oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId, objectApiName);
       newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId, objectApiName);
+    } else if (objectApiName === 'Lead') {
+      // Resolve Contact name (use afterData as source of truth; contact rarely changes)
+      const resolvedContactName = await resolveLeadContactDisplayName(afterData);
+      const enrichBefore = { ...beforeData, _resolvedContactName: resolvedContactName };
+      const enrichAfter = { ...afterData, _resolvedContactName: resolvedContactName };
+      oldChildName = deriveDropboxFolderName(enrichBefore, recordId, 'Lead', leadCreatedAt);
+      newChildName = deriveDropboxFolderName(enrichAfter, recordId, 'Lead', leadCreatedAt);
     } else {
       oldChildName = deriveDropboxFolderName(beforeData, recordId, objectApiName, leadCreatedAt);
       newChildName = deriveDropboxFolderName(afterData, recordId, objectApiName, leadCreatedAt);
@@ -953,6 +997,14 @@ export async function tryEnsureLinkedFolder(
     if (childObjectApiName === 'Opportunity') {
       // Use opportunity number + name (e.g. "OPP0001 (Test)" or "OPP0001 (Test) - Requote 1")
       childFolderName = deriveOpportunityFolderName(childData) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
+    } else if (childObjectApiName === 'Lead') {
+      // Resolve the Contact lookup display name asynchronously before deriving the folder name
+      const resolvedContactName = await resolveLeadContactDisplayName(childData);
+      const enrichedData = { ...childData, _resolvedContactName: resolvedContactName };
+      // Fetch the record's createdAt for the date suffix
+      const leadObj2 = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Lead', mode: 'insensitive' } } });
+      const leadRec2 = leadObj2 ? await prisma.record.findFirst({ where: { id: childRecordId, objectId: leadObj2.id }, select: { createdAt: true } }) : null;
+      childFolderName = deriveDropboxFolderName(enrichedData, childRecordId, 'Lead', leadRec2?.createdAt);
     } else {
       childFolderName = deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
     }
@@ -1614,6 +1666,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
       let childFolderName: string;
       if (objectApiName === 'Opportunity') {
         childFolderName = deriveOpportunityFolderName(recordData) || deriveDropboxFolderName(recordData, recordId, objectApiName);
+      } else if (objectApiName === 'Lead') {
+        const resolvedContactName = await resolveLeadContactDisplayName(recordData);
+        const enriched = { ...recordData, _resolvedContactName: resolvedContactName };
+        childFolderName = deriveDropboxFolderName(enriched, recordId, 'Lead', record.createdAt);
       } else {
         childFolderName = deriveDropboxFolderName(recordData, recordId, objectApiName);
       }
@@ -2026,7 +2082,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
                     }
                     return oppNum || deriveDropboxFolderName(rData, recordId);
                   })()
-                : deriveDropboxFolderName(rData, recordId));
+                : objectApiName === 'Lead'
+                  ? await (async () => {
+                      const resolvedContactName = await resolveLeadContactDisplayName(rData);
+                      const enriched = { ...rData, _resolvedContactName: resolvedContactName };
+                      return deriveDropboxFolderName(enriched, recordId, 'Lead', record.createdAt);
+                    })()
+                  : deriveDropboxFolderName(rData, recordId));
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
 
               // ── Special handling: Requote Opportunity ──

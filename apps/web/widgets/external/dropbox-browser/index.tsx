@@ -75,25 +75,27 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
     }
   }
 
-  // Special case for Lead: format as "LD#### (Contact Name) DD Mon YYYY"
+  // Special case for Lead: format as "Lead#### (Contact Name) M-D-YY"
   if (objectApiName?.toLowerCase() === 'lead') {
-    const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
-    const contactNameKey = Object.keys(record).find(k => sk(k) === 'contactname')
-    const firstNameKey = Object.keys(record).find(k => sk(k) === 'firstname')
-    const lastNameKey = Object.keys(record).find(k => sk(k) === 'lastname')
-    const leadName = (contactNameKey ? (record[contactNameKey] as string) : '') ||
-      [firstNameKey ? record[firstNameKey] : '', lastNameKey ? record[lastNameKey] : '']
-        .filter(Boolean).join(' ').trim()
-    // Replace LEAD prefix with LD (e.g. LEAD0001 → LD0001)
-    const ldNumber = autoNumber ? autoNumber.replace(/^LEAD/i, 'LD') : ''
+    // Reformat number: LEAD0001 → Lead0001
+    const leadNumber = autoNumber ? autoNumber.replace(/^LEAD/i, (m) => 'Lead' + m.slice(4)) : ''
     // Use record's createdAt if available, otherwise today
     const rawDate = (record.createdAt || record.CreatedDate) as string | undefined
     const dt = rawDate ? new Date(rawDate) : new Date()
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    const dateStr = `${String(dt.getDate()).padStart(2,'0')} ${months[dt.getMonth()]} ${dt.getFullYear()}`
-    if (ldNumber && leadName) return `${ldNumber} (${leadName}) ${dateStr}`
-    if (ldNumber) return `${ldNumber} ${dateStr}`
-    if (leadName) return `${leadName} ${dateStr}`
+    // Format: M-D-YY (no leading zeros, 2-digit year)
+    const dateStr = `${dt.getMonth() + 1}-${dt.getDate()}-${String(dt.getFullYear()).slice(-2)}`
+    // Contact name: try resolved display name (injected by backend), skip UUID values
+    const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
+    const contactNameKey = Object.keys(record).find(k => sk(k) === 'contactname' || sk(k) === 'contactdisplayname')
+    const rawContactName = contactNameKey ? (record[contactNameKey] as string) : ''
+    // Only use if it looks like a real name (not a UUID or "N/A")
+    const isUuid = (v: string) => /^[0-9a-f-]{30,}$/i.test(v)
+    const contactName = rawContactName && !isUuid(rawContactName) && !/^N\/A$/i.test(rawContactName.trim())
+      ? rawContactName.trim()
+      : ''
+    if (leadNumber && contactName) return `${leadNumber} (${contactName}) ${dateStr}`
+    if (leadNumber) return `${leadNumber} ${dateStr}`
+    if (contactName) return `${contactName} ${dateStr}`
     return id
   }
 
