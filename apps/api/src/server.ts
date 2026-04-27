@@ -1,3 +1,4 @@
+// API server entrypoint
 import path from 'path';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';

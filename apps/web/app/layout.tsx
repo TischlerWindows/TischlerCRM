@@ -1,3 +1,4 @@
+// Root layout for Tischler CRM web app
 export const metadata = {
   title: 'Tischler CRM',
   description: 'Tischler und Sohn CRM — Custom Windows & Doors',
