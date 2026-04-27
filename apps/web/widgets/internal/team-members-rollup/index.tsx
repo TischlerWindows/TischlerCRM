@@ -12,7 +12,7 @@ import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
 import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
-import { subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
+import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -815,6 +815,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       setEditingId(null)
       await fetchTeamMembers()
       tmPool?.bumpVersion()
+      notifyTeamMembersChanged()
     } catch {
       // keep editing on failure
     } finally {
@@ -842,6 +843,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       setDeleteTarget(null)
       await fetchTeamMembers()
       tmPool?.bumpVersion()
+      notifyTeamMembersChanged()
     } catch {
       // ignore
     } finally {
@@ -1047,7 +1049,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           objectApiName={objectApiName}
           recordId={recordId ?? ''}
           onClose={() => setShowAddModal(false)}
-          onSaved={() => { setShowAddModal(false); fetchTeamMembers(); tmPool?.bumpVersion() }}
+          onSaved={() => { setShowAddModal(false); fetchTeamMembers(); tmPool?.bumpVersion(); notifyTeamMembersChanged() }}
           pendingMode={isCreateMode}
           onAddPending={isCreateMode ? (data) => { addPendingMember(data); setShowAddModal(false) } : undefined}
         />
@@ -1060,7 +1062,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           recordId={recordId!}
           existingMemberIds={rawMembers.map(m => String(m.id))}
           onClose={() => setShowCopyModal(false)}
-          onSaved={() => { setShowCopyModal(false); fetchTeamMembers(); tmPool?.bumpVersion() }}
+          onSaved={() => { setShowCopyModal(false); fetchTeamMembers(); tmPool?.bumpVersion(); notifyTeamMembersChanged() }}
         />
       )}
     </>

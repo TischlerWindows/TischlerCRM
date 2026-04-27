@@ -2,10 +2,31 @@
 
 import React, { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
-import { preloadLookupRecords } from '@/lib/utils'
+import { preloadLookupRecords, resolveLookupDisplayName } from '@/lib/utils'
 import type { PanelField, TeamMemberSlotConfig } from '@/lib/schema'
 import { SlotInput } from './SlotInput'
-import { useTeamMemberSlot } from './useTeamMemberSlot'
+import { useTeamMemberSlot, type TeamMemberRow } from './useTeamMemberSlot'
+
+function resolveRowDisplay(row: TeamMemberRow): { contact: string; account: string } {
+  const contactId = (row.data.contact as string | undefined) ?? null
+  const accountId = (row.data.account as string | undefined) ?? null
+  const denormContact =
+    (row.data.contactName as string | undefined) ||
+    (row.data.TeamMember__contactName as string | undefined) ||
+    ''
+  const denormAccount =
+    (row.data.accountName as string | undefined) ||
+    (row.data.TeamMember__accountName as string | undefined) ||
+    ''
+  const contact =
+    denormContact || (contactId ? resolveLookupDisplayName(contactId, 'Contact') : '')
+  const account =
+    denormAccount || (accountId ? resolveLookupDisplayName(accountId, 'Account') : '')
+  return {
+    contact: contact && contact !== '-' ? contact : '',
+    account: account && account !== '-' ? account : '',
+  }
+}
 
 interface TeamMemberSlotFieldProps {
   /** Parent record's object api name (e.g. 'Opportunity'). */
@@ -16,6 +37,13 @@ interface TeamMemberSlotFieldProps {
   slotConfig: TeamMemberSlotConfig
   /** The panel field's label/style overrides — same shape used by regular fields. */
   panelField?: Pick<PanelField, 'labelOverride' | 'labelStyle' | 'valueStyle' | 'behavior'>
+  /**
+   * When true, render the slot value(s) as plain read-only text — no inputs,
+   * no clear buttons, no add buttons. Used in view mode (record detail page)
+   * so accidental clicks can't delete linked TeamMember rows. Edits go through
+   * Edit mode like regular fields.
+   */
+  readOnly?: boolean
 }
 
 function defaultLabel(config: TeamMemberSlotConfig): string {
@@ -41,6 +69,7 @@ export function TeamMemberSlotField({
   parentRecordId,
   slotConfig,
   panelField,
+  readOnly,
 }: TeamMemberSlotFieldProps) {
   const { rows, loading, fillSlot, clearRow, error } = useTeamMemberSlot({
     parentObjectApiName,
@@ -71,6 +100,30 @@ export function TeamMemberSlotField({
   const renderBody = () => {
     if (loading && rows.length === 0) {
       return <div className="h-9 rounded-md bg-gray-100 animate-pulse" />
+    }
+    if (readOnly) {
+      // Plain-text rendering — no inputs, no clear/add buttons. Edits happen in
+      // Edit mode like every other field, so accidental clicks can't delete data.
+      if (rows.length === 0) {
+        return <div className="text-sm text-gray-400">—</div>
+      }
+      return (
+        <div className="text-sm text-gray-900 space-y-0.5">
+          {rows.map(row => {
+            const { contact, account } = resolveRowDisplay(row)
+            if (!contact && !account) {
+              return <div key={row.id} className="text-gray-400 italic">—</div>
+            }
+            return (
+              <div key={row.id}>
+                {contact && <span className="font-medium">{contact}</span>}
+                {contact && account && <span className="text-gray-400 mx-1">·</span>}
+                {account && <span className="text-gray-700">{account}</span>}
+              </div>
+            )
+          })}
+        </div>
+      )
     }
     if (cardinality === 'single') {
       const bound = rows[0]

@@ -7,7 +7,7 @@ import {
   usePendingTeamMemberPool,
   type PendingTeamMemberRow,
 } from '@/components/form/pending-team-member-pool'
-import { notifyTeamMembersChanged } from './teamMemberEvents'
+import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from './teamMemberEvents'
 
 /** Plain field name on TeamMember for each parent object. */
 const OBJECT_TO_FIELD: Record<string, string> = {
@@ -68,6 +68,12 @@ function rowMatches(data: Record<string, unknown>, criterion: TeamMemberSlotCrit
     return v === true || v === 'true'
   }
   return data.role === criterion.role
+}
+
+/** Heuristic match for "API said this record doesn't exist". */
+function isNotFoundError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : ''
+  return /Record not found|status:\s*404|\b404\b/i.test(msg)
 }
 
 interface UseTeamMemberSlotOptions {
@@ -165,6 +171,14 @@ export function useTeamMemberSlot({
     fetchRows()
   }, [fetchRows])
 
+  // Stay in sync with TeamMember writes anywhere in the app (rollup deletes,
+  // other slots, etc.) so we don't try to PUT/DELETE a stale row id.
+  useEffect(() => {
+    return subscribeTeamMembersChanged(() => {
+      void fetchRows()
+    })
+  }, [fetchRows])
+
   // Filter to matching rows (saved + pending) by criterion.
   const matchingSaved: TeamMemberRow[] = savedRows
     .filter(r => rowMatches(dataOf(r), criterion))
@@ -221,15 +235,23 @@ export function useTeamMemberSlot({
           return c === (contactId ?? null) && a === (accountId ?? null)
         })
         if (existingSaved) {
-          await apiClient.put(`/objects/TeamMember/records/${String(existingSaved.id)}`, {
-            data: { [flagName]: true },
-          })
-          await fetchRows()
-          pool?.bumpVersion()
-          return {
-            id: String(existingSaved.id),
-            isPending: false,
-            data: { ...dataOf(existingSaved), [flagName]: true },
+          try {
+            await apiClient.put(`/objects/TeamMember/records/${String(existingSaved.id)}`, {
+              data: { [flagName]: true },
+            })
+            await fetchRows()
+            pool?.bumpVersion()
+            notifyTeamMembersChanged()
+            return {
+              id: String(existingSaved.id),
+              isPending: false,
+              data: { ...dataOf(existingSaved), [flagName]: true },
+            }
+          } catch (err) {
+            // Row was deleted out from under us (e.g. via the rollup widget).
+            // Refetch and fall through to create a new row.
+            if (!isNotFoundError(err)) throw err
+            await fetchRows()
           }
         }
 
@@ -290,13 +312,17 @@ export function useTeamMemberSlot({
         return
       }
 
-      // Saved row
-      if (cur.kind === 'flag') {
-        await apiClient.put(`/objects/TeamMember/records/${rowId}`, {
-          data: { [cur.flag]: false },
-        })
-      } else {
-        await apiClient.delete(`/objects/TeamMember/records/${rowId}`)
+      // Saved row — tolerate 404 (already deleted via another widget / tab).
+      try {
+        if (cur.kind === 'flag') {
+          await apiClient.put(`/objects/TeamMember/records/${rowId}`, {
+            data: { [cur.flag]: false },
+          })
+        } else {
+          await apiClient.delete(`/objects/TeamMember/records/${rowId}`)
+        }
+      } catch (err) {
+        if (!isNotFoundError(err)) throw err
       }
       await fetchRows()
       pool?.bumpVersion()

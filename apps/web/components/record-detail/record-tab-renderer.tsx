@@ -339,6 +339,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                             parentRecordId={(record?.id as string | undefined) ?? null}
                             slotConfig={f.slotConfig}
                             panelField={f}
+                            readOnly
                           />
                         </div>
                       );
