@@ -433,13 +433,19 @@ async function resolveLeadContactDisplayName(leadData: Record<string, any>): Pro
     if (!contactRecord) return '';
 
     const cData = contactRecord.data as Record<string, any>;
-    const get = (field: string) => {
-      for (const [k, v] of Object.entries(cData)) {
-        if (sk(k) === field && typeof v === 'string' && v) return v as string;
+    // Name may be a nested object: { Contact__name_salutation, Contact__name_firstName, Contact__name_lastName }
+    const nameObj = cData.name && typeof cData.name === 'object' ? cData.name as Record<string, any> : null;
+    const getStr = (obj: Record<string, any>, field: string) => {
+      for (const [k, v] of Object.entries(obj)) {
+        const norm = k.replace(/^[A-Za-z]+__[A-Za-z]+_/, '').toLowerCase(); // strip e.g. "Contact__name_"
+        if ((norm === field || sk(k) === field) && typeof v === 'string' && v && !/^n\/a$/i.test(v.trim())) return v as string;
       }
       return '';
     };
-    return [get('salutation'), get('firstname'), get('lastname')].filter(Boolean).join(' ').trim();
+    const salutation = getStr(cData, 'salutation') || (nameObj ? getStr(nameObj, 'salutation') : '');
+    const firstName  = getStr(cData, 'firstname')  || (nameObj ? getStr(nameObj, 'firstname')  : '');
+    const lastName   = getStr(cData, 'lastname')   || (nameObj ? getStr(nameObj, 'lastname')   : '');
+    return [salutation, firstName, lastName].filter(Boolean).join(' ').trim();
   } catch {
     return '';
   }
@@ -2000,6 +2006,37 @@ export async function dropboxRoutes(app: FastifyInstance) {
     // This prevents duplicate folder creation when a folder was renamed in Dropbox.
     const storedFolder = await resolveStoredFolder(accessToken, recordId);
     if (storedFolder?.found) {
+      // For Lead folders, verify the stored name matches the expected derived name.
+      // If not (e.g. contact name was unresolvable when created), rename it now.
+      if (objectApiName === 'Lead') {
+        try {
+          const leadObj = await prisma.customObject.findFirst({
+            where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+          });
+          const leadRecord = leadObj
+            ? await prisma.record.findFirst({ where: { id: recordId, objectId: leadObj.id } })
+            : null;
+          if (leadRecord) {
+            const rData = leadRecord.data as Record<string, any>;
+            const resolvedContactName = await resolveLeadContactDisplayName(rData);
+            const enriched = { ...rData, _resolvedContactName: resolvedContactName };
+            const expectedName = deriveDropboxFolderName(enriched, recordId, 'Lead', leadRecord.createdAt);
+            if (expectedName && expectedName !== storedFolder.folderName) {
+              const safeExpected = expectedName.replace(/[\\\/:*?"<>|]/g, '_').trim();
+              const newPath = storedFolder.fullPath.replace(/\/[^\/]+$/, `/${safeExpected}`);
+              try {
+                await dropboxApi(accessToken, '/files/move_v2', {
+                  from_path: storedFolder.fullPath,
+                  to_path: newPath,
+                  autorename: false,
+                  allow_ownership_transfer: false,
+                });
+                return reply.send({ created: false, path: newPath, folderName: expectedName });
+              } catch { /* rename failed — return existing name */ }
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
       return reply.send({
         created: false,
         path: storedFolder.fullPath,
@@ -2085,22 +2122,24 @@ export async function dropboxRoutes(app: FastifyInstance) {
                 }
               }
 
-              const childFolderName = folderName || (objectApiName === 'Opportunity'
-                ? (() => {
-                    let oppNum = '';
-                    for (const [k, v] of Object.entries(rData)) {
-                      const stripped = k.replace(/^[A-Za-z]+__/, '');
-                      if (stripped === 'opportunityNumber' && typeof v === 'string') { oppNum = v; break; }
-                    }
-                    return oppNum || deriveDropboxFolderName(rData, recordId);
+              // For Lead, always compute server-side so the contact name is resolved from the DB
+              // (the frontend can only pass the UUID, not the display name).
+              const childFolderName = objectApiName === 'Lead'
+                ? await (async () => {
+                    const resolvedContactName = await resolveLeadContactDisplayName(rData);
+                    const enriched = { ...rData, _resolvedContactName: resolvedContactName };
+                    return deriveDropboxFolderName(enriched, recordId, 'Lead', record.createdAt);
                   })()
-                : objectApiName === 'Lead'
-                  ? await (async () => {
-                      const resolvedContactName = await resolveLeadContactDisplayName(rData);
-                      const enriched = { ...rData, _resolvedContactName: resolvedContactName };
-                      return deriveDropboxFolderName(enriched, recordId, 'Lead', record.createdAt);
+                : (folderName || (objectApiName === 'Opportunity'
+                  ? (() => {
+                      let oppNum = '';
+                      for (const [k, v] of Object.entries(rData)) {
+                        const stripped = k.replace(/^[A-Za-z]+__/, '');
+                        if (stripped === 'opportunityNumber' && typeof v === 'string') { oppNum = v; break; }
+                      }
+                      return oppNum || deriveDropboxFolderName(rData, recordId);
                     })()
-                  : deriveDropboxFolderName(rData, recordId));
+                  : deriveDropboxFolderName(rData, recordId)));
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
 
               // ── Special handling: Requote Opportunity ──
