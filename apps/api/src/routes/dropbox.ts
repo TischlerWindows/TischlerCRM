@@ -359,7 +359,7 @@ async function findExistingFolderInDropbox(
  * Build an Opportunity folder name in the format "OPP0001 (Name)" or
  * "OPP0001 (Name) - Requote 1". Falls back to just the number if no name.
  */
-function deriveOpportunityFolderName(data: Record<string, any>): string {
+function deriveOpportunityFolderName(data: Record<string, any>, createdAt?: Date | string | null): string {
   let oppNum = '';
   let oppName = '';
   for (const [k, v] of Object.entries(data)) {
@@ -378,10 +378,13 @@ function deriveOpportunityFolderName(data: Record<string, any>): string {
   const requoteSuffix = requoteMatch ? requoteMatch[1] : '';
   // Strip requote suffix from name if present (we'll re-add from number)
   const baseName = oppName.replace(/\s*-\s*Requote\s*\d+$/i, '').trim();
+  // Resolve creation date: explicit > data blob > today
+  const resolvedDate = createdAt ?? (data.createdAt || data.CreatedDate || null);
+  const dateStr = ` - ${fmtLeadDate(resolvedDate)}`;
   if (baseName) {
-    return `${baseNum} (${baseName})${requoteSuffix}`;
+    return `${baseNum} (${baseName})${requoteSuffix}${dateStr}`;
   }
-  return oppNum;
+  return `${oppNum}${dateStr}`;
 }
 
 // ── Derive Dropbox folder name from record data ───────────────────
@@ -763,7 +766,7 @@ export async function tryRenameDropboxFolder(
     // Need at least one property ID to work with
     if (!oldPropertyId && !newPropertyId) return;
 
-    // For Lead renames, fetch the record's createdAt so the date suffix stays consistent
+    // For Lead/Opportunity renames, fetch the record's createdAt so the date suffix stays consistent
     let leadCreatedAt: Date | null = null;
     if (objectApiName === 'Lead') {
       const leadObj = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Lead', mode: 'insensitive' } } });
@@ -772,12 +775,20 @@ export async function tryRenameDropboxFolder(
         if (leadRec) leadCreatedAt = leadRec.createdAt;
       }
     }
+    let oppCreatedAt: Date | null = null;
+    if (objectApiName === 'Opportunity') {
+      const oppObj0 = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+      if (oppObj0) {
+        const oppRec0 = await prisma.record.findFirst({ where: { id: recordId, objectId: oppObj0.id }, select: { createdAt: true } });
+        if (oppRec0) oppCreatedAt = oppRec0.createdAt;
+      }
+    }
 
     let oldChildName: string;
     let newChildName: string;
     if (objectApiName === 'Opportunity') {
-      oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId, objectApiName);
-      newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId, objectApiName);
+      oldChildName = deriveOpportunityFolderName(beforeData, oppCreatedAt) || deriveDropboxFolderName(beforeData, recordId, objectApiName);
+      newChildName = deriveOpportunityFolderName(afterData, oppCreatedAt) || deriveDropboxFolderName(afterData, recordId, objectApiName);
     } else if (objectApiName === 'Lead') {
       // Resolve Contact name (use afterData as source of truth; contact rarely changes)
       const resolvedContactName = await resolveLeadContactDisplayName(afterData);
@@ -1013,8 +1024,10 @@ export async function tryEnsureLinkedFolder(
     // Derive child folder name
     let childFolderName: string;
     if (childObjectApiName === 'Opportunity') {
-      // Use opportunity number + name (e.g. "OPP0001 (Test)" or "OPP0001 (Test) - Requote 1")
-      childFolderName = deriveOpportunityFolderName(childData) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
+      // Fetch the record's createdAt for the date suffix
+      const oppObj0 = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+      const oppRec0 = oppObj0 ? await prisma.record.findFirst({ where: { id: childRecordId, objectId: oppObj0.id }, select: { createdAt: true } }) : null;
+      childFolderName = deriveOpportunityFolderName(childData, oppRec0?.createdAt) || deriveDropboxFolderName(childData, childRecordId, childObjectApiName);
     } else if (childObjectApiName === 'Lead') {
       // Resolve the Contact lookup display name asynchronously before deriving the folder name
       const resolvedContactName = await resolveLeadContactDisplayName(childData);
@@ -1052,7 +1065,7 @@ export async function tryEnsureLinkedFolder(
         // Find the parent OPP record by its opportunity number
         const allOpps = await prisma.record.findMany({
           where: { objectId: oppObj.id, deletedAt: null },
-          select: { id: true, data: true },
+          select: { id: true, data: true, createdAt: true },
         });
         for (const opp of allOpps) {
           const oppData = opp.data as Record<string, any> | null;
@@ -1065,7 +1078,7 @@ export async function tryEnsureLinkedFolder(
               if (parentOppFolder?.found) {
                 parentOppFolderName = parentOppFolder.folderName;
               } else {
-                parentOppFolderName = (deriveOpportunityFolderName(oppData) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+                parentOppFolderName = (deriveOpportunityFolderName(oppData, opp.createdAt) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
               }
               break;
             }
@@ -1074,10 +1087,8 @@ export async function tryEnsureLinkedFolder(
         }
       }
 
-      const now = new Date();
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const dateStr = `${String(now.getDate()).padStart(2,'0')} ${months[now.getMonth()]} ${now.getFullYear()}`;
-      const requoteSafeName = `${safeName} ${dateStr}`.replace(/[\\/:*?"<>|]/g, '_').trim();
+      // The date is already embedded in safeName via deriveOpportunityFolderName
+      const requoteSafeName = safeName.replace(/[\\/:*?"<>|]/g, '_').trim();
       const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName}`;
       const parentOppEstimationFolder = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${parentOppFolderName}`;
       console.log(`[dropbox] Creating requote folder inside parent estimation: ${requotePath}`);
@@ -1683,7 +1694,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
       // For Opportunity, use opportunity number + name as the folder name
       let childFolderName: string;
       if (objectApiName === 'Opportunity') {
-        childFolderName = deriveOpportunityFolderName(recordData) || deriveDropboxFolderName(recordData, recordId, objectApiName);
+        childFolderName = deriveOpportunityFolderName(recordData, record.createdAt) || deriveDropboxFolderName(recordData, recordId, objectApiName);
       } else if (objectApiName === 'Lead') {
         const resolvedContactName = await resolveLeadContactDisplayName(recordData);
         const enriched = { ...recordData, _resolvedContactName: resolvedContactName };
@@ -1727,7 +1738,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
             });
             if (oppRecord) {
               const oppData = oppRecord.data as Record<string, any>;
-              linkedOpportunityFolderName = deriveOpportunityFolderName(oppData) || deriveDropboxFolderName(oppData, oppId);
+              linkedOpportunityFolderName = deriveOpportunityFolderName(oppData, oppRecord.createdAt) || deriveDropboxFolderName(oppData, oppId);
               // Check if Opportunity folder was renamed in Dropbox
               if (accessToken) {
                 const oppFolder = await resolveStoredFolder(accessToken, oppId);
@@ -1751,7 +1762,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
         if (oppObj2) {
           const allOpps = await prisma.record.findMany({
             where: { objectId: oppObj2.id, deletedAt: null },
-            select: { id: true, data: true },
+            select: { id: true, data: true, createdAt: true },
           });
           for (const opp of allOpps) {
             const oppData = opp.data as Record<string, any> | null;
@@ -1764,10 +1775,10 @@ export async function dropboxRoutes(app: FastifyInstance) {
                   if (oppFolder?.found) {
                     parentOpportunityFolderName = oppFolder.folderName;
                   } else {
-                    parentOpportunityFolderName = deriveOpportunityFolderName(oppData) || pOppNum;
+                    parentOpportunityFolderName = deriveOpportunityFolderName(oppData, opp.createdAt) || pOppNum;
                   }
                 } else {
-                  parentOpportunityFolderName = deriveOpportunityFolderName(oppData) || pOppNum;
+                  parentOpportunityFolderName = deriveOpportunityFolderName(oppData, opp.createdAt) || pOppNum;
                 }
                 break;
               }
@@ -2130,16 +2141,9 @@ export async function dropboxRoutes(app: FastifyInstance) {
                     const enriched = { ...rData, _resolvedContactName: resolvedContactName };
                     return deriveDropboxFolderName(enriched, recordId, 'Lead', record.createdAt);
                   })()
-                : (folderName || (objectApiName === 'Opportunity'
-                  ? (() => {
-                      let oppNum = '';
-                      for (const [k, v] of Object.entries(rData)) {
-                        const stripped = k.replace(/^[A-Za-z]+__/, '');
-                        if (stripped === 'opportunityNumber' && typeof v === 'string') { oppNum = v; break; }
-                      }
-                      return oppNum || deriveDropboxFolderName(rData, recordId);
-                    })()
-                  : deriveDropboxFolderName(rData, recordId)));
+                : objectApiName === 'Opportunity'
+                  ? (deriveOpportunityFolderName(rData, record.createdAt) || deriveDropboxFolderName(rData, recordId, objectApiName))
+                  : (folderName || deriveDropboxFolderName(rData, recordId));
               const safeName = childFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
 
               // ── Special handling: Requote Opportunity ──
@@ -2154,7 +2158,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
                 if (oppObj2) {
                   const allOpps = await prisma.record.findMany({
                     where: { objectId: oppObj2.id, deletedAt: null },
-                    select: { id: true, data: true },
+                    select: { id: true, data: true, createdAt: true },
                   });
                   for (const opp of allOpps) {
                     const oppData = opp.data as Record<string, any> | null;
@@ -2166,7 +2170,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
                         if (parentOppFolder?.found) {
                           parentOppFolderName = parentOppFolder.folderName;
                         } else {
-                          parentOppFolderName = (deriveOpportunityFolderName(oppData) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+                          parentOppFolderName = (deriveOpportunityFolderName(oppData, opp.createdAt) || parentOppNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
                         }
                         break;
                       }
@@ -2175,10 +2179,8 @@ export async function dropboxRoutes(app: FastifyInstance) {
                   }
                 }
 
-                const rMonths = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-                const rDate = record.createdAt instanceof Date ? record.createdAt : new Date(record.createdAt);
-                const rDateStr = `${String(rDate.getDate()).padStart(2,'0')} ${rMonths[rDate.getMonth()]} ${rDate.getFullYear()}`;
-                const requoteSafeName2 = `${safeName} ${rDateStr}`.replace(/[\\/:*?"<>|]/g, '_').trim();
+                // The date is already embedded in safeName via deriveOpportunityFolderName
+                const requoteSafeName2 = safeName.replace(/[\\/:*?"<>|]/g, '_').trim();
                 const requotePath = `${parentPath}/${subfolder}/${parentOppFolderName}/1. Estimation/${requoteSafeName2}`;
                 let requoteFolderId: string | undefined;
                 try {
