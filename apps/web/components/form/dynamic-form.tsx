@@ -32,6 +32,7 @@ import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PendingWidgetProvider, usePendingWidgetManager } from './pending-widget-context';
+import { PendingTeamMemberPoolProvider } from './pending-team-member-pool';
 import { getWidgetSupportsCreate } from '@/lib/widgets/registry-loader';
 import {
   ChevronDown,
@@ -1062,6 +1063,7 @@ export default function DynamicForm({
 
   return (
     <PendingWidgetProvider value={pendingCtx.contextValue}>
+    <PendingTeamMemberPoolProvider>
     <>
       <form onKeyDown={handleFormKeyDown} className="flex flex-col h-full">
         {/* Wizard Step Indicator */}
@@ -1757,6 +1759,7 @@ export default function DynamicForm({
         onClose={() => setMissingRequiredLabels([])}
       />
     </>
+    </PendingTeamMemberPoolProvider>
     </PendingWidgetProvider>
   );
 }

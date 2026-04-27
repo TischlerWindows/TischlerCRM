@@ -7,6 +7,7 @@ import type { PathDef, PathStage, PathTransitionField, FieldDef } from '@/lib/sc
 import { useSchemaStore } from '@/lib/schema-store';
 import { apiClient } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
+import PathTmTransitionField from '../team-member-slot/PathTmTransitionField';
 
 function daysAgo(isoDate: string | undefined): number | null {
   if (!isoDate) return null;
@@ -38,6 +39,8 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
   const [hoveredStageId, setHoveredStageId] = useState<string | null>(null);
   const [transitionTarget, setTransitionTarget] = useState<PathStage | null>(null);
   const [transitionValues, setTransitionValues] = useState<Record<string, string>>({});
+  /** Map of synthetic TM-transition keys → whether the criterion is currently filled (≥1 row). */
+  const [transitionTmFilled, setTransitionTmFilled] = useState<Record<string, boolean>>({});
 
   const popoverRef = useRef<HTMLDivElement>(null);
   const stageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -118,6 +121,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
       setConfirmReopen(null);
       setTransitionTarget(null);
       setTransitionValues({});
+      setTransitionTmFilled({});
     }
   }
 
@@ -128,6 +132,9 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
     if (tf && tf.length > 0) {
       const initial: Record<string, string> = {};
       tf.forEach(f => {
+        // TM-criterion transitions don't seed from record fields — handled separately by Chunk 7.
+        if (f.kind && f.kind !== 'field') return;
+        if (!f.fieldApiName) return;
         const existing = record[f.fieldApiName];
         if (existing != null && existing !== '') initial[f.fieldApiName] = String(existing);
       });
@@ -192,23 +199,39 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
 
   function handleTransitionSubmit() {
     if (!transitionTarget) return;
-    const tf = transitionTarget.transitionFields || [];
-    const allFilled = tf.every(f => !f.required || (transitionValues[f.fieldApiName]?.trim()));
-    if (!allFilled) return;
+    const allTf = transitionTarget.transitionFields || [];
+    const fieldTf = allTf.filter(
+      (f): f is PathTransitionField & { fieldApiName: string } =>
+        (!f.kind || f.kind === 'field') && typeof f.fieldApiName === 'string'
+    );
+    const fieldsFilled = fieldTf.every(f => !f.required || (transitionValues[f.fieldApiName]?.trim()));
+    const tmFilled = allTf
+      .filter(f => f.kind === 'teamMemberFlag' || f.kind === 'teamMemberRole')
+      .every(f => !f.required || transitionTmFilled[tmKey(f)] === true);
+    if (!fieldsFilled || !tmFilled) return;
     advanceToStage(transitionTarget, transitionValues);
+  }
+
+  function tmKey(tf: PathTransitionField): string {
+    if (tf.kind === 'teamMemberFlag') return `__tm:flag:${tf.flag ?? ''}`;
+    if (tf.kind === 'teamMemberRole') return `__tm:role:${tf.role ?? ''}`;
+    return '';
   }
 
   // Render a field input for transition fields using full FieldDef from schema
   function renderTransitionField(tf: PathTransitionField) {
-    const fieldDef = fullFields.find(fd => fd.apiName === tf.fieldApiName);
+    // TM-criterion transitions are rendered by the slot input — extended in Chunk 7.
+    if ((tf.kind && tf.kind !== 'field') || !tf.fieldApiName) return null;
+    const apiName = tf.fieldApiName;
+    const fieldDef = fullFields.find(fd => fd.apiName === apiName);
     const fieldType = fieldDef?.type;
-    const label = fieldDef?.label || tf.fieldApiName;
+    const label = fieldDef?.label || apiName;
     const picklistValues = fieldDef?.picklistValues || [];
     const isPicklist = fieldType === 'Picklist' || fieldType === 'MultiPicklist' || fieldType === 'PicklistText';
     const isLongText = fieldType === 'LongTextArea' || fieldType === 'RichTextArea' || fieldType === 'TextArea';
 
     return (
-      <div key={tf.fieldApiName}>
+      <div key={apiName}>
         <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">
           {label}
           {tf.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -216,8 +239,8 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
         {isPicklist && picklistValues.length > 0 ? (
           <select
             className="w-full h-9 rounded-md border border-gray-300 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy"
-            value={transitionValues[tf.fieldApiName] || ''}
-            onChange={e => setTransitionValues(v => ({ ...v, [tf.fieldApiName]: e.target.value }))}
+            value={transitionValues[apiName] || ''}
+            onChange={e => setTransitionValues(v => ({ ...v, [apiName]: e.target.value }))}
           >
             <option value="">Select...</option>
             {picklistValues.map((val: string) => (
@@ -227,15 +250,15 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
         ) : isLongText ? (
           <textarea
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm min-h-[60px] focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy"
-            value={transitionValues[tf.fieldApiName] || ''}
-            onChange={e => setTransitionValues(v => ({ ...v, [tf.fieldApiName]: e.target.value }))}
+            value={transitionValues[apiName] || ''}
+            onChange={e => setTransitionValues(v => ({ ...v, [apiName]: e.target.value }))}
             placeholder={`Enter ${label}...`}
           />
         ) : (
           <input
             className="w-full h-9 rounded-md border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30 focus:border-brand-navy"
-            value={transitionValues[tf.fieldApiName] || ''}
-            onChange={e => setTransitionValues(v => ({ ...v, [tf.fieldApiName]: e.target.value }))}
+            value={transitionValues[apiName] || ''}
+            onChange={e => setTransitionValues(v => ({ ...v, [apiName]: e.target.value }))}
             placeholder={`Enter ${label}...`}
           />
         )}
@@ -420,8 +443,15 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
 
       {/* Transition fields modal */}
       {transitionTarget && (() => {
-        const tf = transitionTarget.transitionFields || [];
-        const allValid = tf.every(f => !f.required || (transitionValues[f.fieldApiName]?.trim()));
+        const allTf = transitionTarget.transitionFields || [];
+        const fieldTf = allTf.filter(
+          (f): f is PathTransitionField & { fieldApiName: string } =>
+            (!f.kind || f.kind === 'field') && typeof f.fieldApiName === 'string'
+        );
+        const tmTf = allTf.filter(f => f.kind === 'teamMemberFlag' || f.kind === 'teamMemberRole');
+        const fieldsValid = fieldTf.every(f => !f.required || (transitionValues[f.fieldApiName]?.trim()));
+        const tmValid = tmTf.every(f => !f.required || transitionTmFilled[tmKey(f)] === true);
+        const allValid = fieldsValid && tmValid;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
             <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4 w-full">
@@ -432,11 +462,24 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
                 Please fill in the following before proceeding.
               </p>
               <div className="space-y-3 mb-5">
-                {tf.map(f => renderTransitionField(f))}
+                {fieldTf.map(f => renderTransitionField(f))}
+                {tmTf.map(f => (
+                  <PathTmTransitionField
+                    key={tmKey(f)}
+                    parentObjectApiName={object.apiName}
+                    parentRecordId={(record.id as string | undefined) ?? null}
+                    tf={f}
+                    onFilledChange={(filled) =>
+                      setTransitionTmFilled(prev =>
+                        prev[tmKey(f)] === filled ? prev : { ...prev, [tmKey(f)]: filled }
+                      )
+                    }
+                  />
+                ))}
               </div>
               <div className="flex justify-end gap-2">
                 <button
-                  onClick={() => { setTransitionTarget(null); setTransitionValues({}); }}
+                  onClick={() => { setTransitionTarget(null); setTransitionValues({}); setTransitionTmFilled({}); }}
                   className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
                 >
                   Cancel

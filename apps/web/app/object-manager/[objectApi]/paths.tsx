@@ -35,6 +35,27 @@ function generateStageId(): string {
   return Math.random().toString(36).substr(2, 9);
 }
 
+const TM_FLAG_OPTIONS: Array<{ value: 'primaryContact' | 'contractHolder' | 'quoteRecipient'; label: string }> = [
+  { value: 'primaryContact', label: 'Primary Contact' },
+  { value: 'contractHolder', label: 'Contract Holder' },
+  { value: 'quoteRecipient', label: 'Quote Recipient' },
+];
+
+function tmTransitionKey(tf: PathTransitionField): string {
+  if (tf.kind === 'teamMemberFlag') return `__tm:flag:${tf.flag ?? ''}`;
+  if (tf.kind === 'teamMemberRole') return `__tm:role:${tf.role ?? ''}`;
+  return '';
+}
+
+function tmTransitionLabel(tf: PathTransitionField): string {
+  if (tf.kind === 'teamMemberFlag') {
+    const opt = TM_FLAG_OPTIONS.find(o => o.value === tf.flag);
+    return opt?.label ?? 'Team Member';
+  }
+  if (tf.kind === 'teamMemberRole' && tf.role) return tf.role;
+  return 'Team Member';
+}
+
 export default function Paths({ objectApiName }: PathsProps) {
   const { schema, addPath, updatePath, deletePath } = useSchemaStore();
   const object = schema?.objects.find(o => o.apiName === objectApiName);
@@ -258,6 +279,13 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
   const [expandedStageId, setExpandedStageId] = useState<string | null>(null);
   const [fieldSearch, setFieldSearch] = useState('');
   const [transitionFieldSearch, setTransitionFieldSearch] = useState('');
+  const [tmAdderStageId, setTmAdderStageId] = useState<string | null>(null);
+  const tmRoleSchema = useSchemaStore(s =>
+    s.schema?.objects.find(o => o.apiName === 'TeamMember')?.fields.find(f => f.apiName === 'role')
+  );
+  const tmRoleValues: string[] = tmRoleSchema?.picklistValues && tmRoleSchema.picklistValues.length > 0
+    ? tmRoleSchema.picklistValues
+    : ['Homeowner', 'General Contractor', 'Subcontractor', 'Architect / Designer', 'Property Manager', 'Sales Rep', 'Installer', 'Inspector', 'Engineer', 'Other'];
 
   function updateStage(stageId: string, updates: Partial<PathStage>) {
     onChange({
@@ -327,6 +355,54 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
       f.fieldApiName === fieldApi ? { ...f, required: !f.required } : f
     );
     updateStage(stageId, { transitionFields: updated });
+  }
+
+  function toggleTmTransitionRequired(stageId: string, key: string) {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const updated = (stage.transitionFields || []).map(f =>
+      tmTransitionKey(f) === key ? { ...f, required: !f.required } : f
+    );
+    updateStage(stageId, { transitionFields: updated });
+  }
+
+  function removeTmTransition(stageId: string, key: string) {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const updated = (stage.transitionFields || []).filter(f => tmTransitionKey(f) !== key);
+    updateStage(stageId, { transitionFields: updated });
+  }
+
+  function addTmFlagTransition(stageId: string, flag: 'primaryContact' | 'contractHolder' | 'quoteRecipient') {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const current = stage.transitionFields || [];
+    const key = `__tm:flag:${flag}`;
+    if (current.some(f => tmTransitionKey(f) === key)) return;
+    const next: PathTransitionField = {
+      kind: 'teamMemberFlag',
+      flag,
+      tmMode: 'paired',
+      tmCardinality: 'single',
+      required: true,
+    };
+    updateStage(stageId, { transitionFields: [...current, next] });
+  }
+
+  function addTmRoleTransition(stageId: string, role: string) {
+    const stage = path.stages.find(s => s.id === stageId);
+    if (!stage) return;
+    const current = stage.transitionFields || [];
+    const key = `__tm:role:${role}`;
+    if (current.some(f => tmTransitionKey(f) === key)) return;
+    const next: PathTransitionField = {
+      kind: 'teamMemberRole',
+      role,
+      tmMode: 'paired',
+      tmCardinality: 'single',
+      required: true,
+    };
+    updateStage(stageId, { transitionFields: [...current, next] });
   }
 
   const sortedStages = [...path.stages].sort((a, b) => a.order - b.order);
@@ -560,35 +636,40 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
                         </span>
                       </label>
                       <div className="flex flex-wrap gap-1.5 mb-2">
-                        {(stage.transitionFields || []).map(tf => {
-                          const field = objectFields.find(f => f.apiName === tf.fieldApiName);
-                          return (
-                            <span
-                              key={tf.fieldApiName}
-                              className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1 text-xs text-amber-800"
-                            >
-                              {field?.label || tf.fieldApiName}
-                              <button
-                                onClick={() => toggleTransitionRequired(stage.id, tf.fieldApiName)}
-                                className={cn(
-                                  'text-[10px] font-bold rounded px-1',
-                                  tf.required
-                                    ? 'text-red-600 bg-red-50'
-                                    : 'text-gray-400 bg-gray-100'
-                                )}
-                                title={tf.required ? 'Required — click to make optional' : 'Optional — click to make required'}
+                        {(stage.transitionFields || [])
+                          // TM-criterion transitions get their own chip rendering in Chunk 7.
+                          .filter((tf): tf is PathTransitionField & { fieldApiName: string } =>
+                            (!tf.kind || tf.kind === 'field') && typeof tf.fieldApiName === 'string'
+                          )
+                          .map(tf => {
+                            const field = objectFields.find(f => f.apiName === tf.fieldApiName);
+                            return (
+                              <span
+                                key={tf.fieldApiName}
+                                className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1 text-xs text-amber-800"
                               >
-                                {tf.required ? 'REQ' : 'OPT'}
-                              </button>
-                              <button
-                                onClick={() => toggleTransitionField(stage.id, tf.fieldApiName)}
-                                className="text-gray-400 hover:text-gray-600"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          );
-                        })}
+                                {field?.label || tf.fieldApiName}
+                                <button
+                                  onClick={() => toggleTransitionRequired(stage.id, tf.fieldApiName)}
+                                  className={cn(
+                                    'text-[10px] font-bold rounded px-1',
+                                    tf.required
+                                      ? 'text-red-600 bg-red-50'
+                                      : 'text-gray-400 bg-gray-100'
+                                  )}
+                                  title={tf.required ? 'Required — click to make optional' : 'Optional — click to make required'}
+                                >
+                                  {tf.required ? 'REQ' : 'OPT'}
+                                </button>
+                                <button
+                                  onClick={() => toggleTransitionField(stage.id, tf.fieldApiName)}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
                       </div>
                       <div className="relative">
                         <input
@@ -622,6 +703,97 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
                           </div>
                         )}
                       </div>
+
+                      {/* Team-member criterion chips + adder */}
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {(stage.transitionFields || [])
+                          .filter(tf => tf.kind === 'teamMemberFlag' || tf.kind === 'teamMemberRole')
+                          .map(tf => {
+                            const key = tmTransitionKey(tf);
+                            return (
+                              <span
+                                key={key}
+                                className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 rounded-md px-2.5 py-1 text-xs text-purple-800"
+                              >
+                                <span className="text-[10px] font-bold text-purple-500 uppercase mr-0.5">
+                                  {tf.kind === 'teamMemberFlag' ? 'Flag' : 'Role'}
+                                </span>
+                                {tmTransitionLabel(tf)}
+                                <button
+                                  onClick={() => toggleTmTransitionRequired(stage.id, key)}
+                                  className={cn(
+                                    'text-[10px] font-bold rounded px-1',
+                                    tf.required
+                                      ? 'text-red-600 bg-red-50'
+                                      : 'text-gray-400 bg-gray-100'
+                                  )}
+                                  title={tf.required ? 'Required — click to make optional' : 'Optional — click to make required'}
+                                >
+                                  {tf.required ? 'REQ' : 'OPT'}
+                                </button>
+                                <button
+                                  onClick={() => removeTmTransition(stage.id, key)}
+                                  className="text-purple-400 hover:text-purple-700"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            );
+                          })}
+                      </div>
+                      {tmAdderStageId === stage.id ? (
+                        <div className="mt-2 rounded-md border border-dashed border-purple-300 bg-purple-50/30 p-2 space-y-2">
+                          <div>
+                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Team Member Flags</p>
+                            <div className="flex flex-wrap gap-1">
+                              {TM_FLAG_OPTIONS
+                                .filter(o => !(stage.transitionFields || []).some(tf => tf.kind === 'teamMemberFlag' && tf.flag === o.value))
+                                .map(o => (
+                                  <button
+                                    key={o.value}
+                                    type="button"
+                                    onClick={() => addTmFlagTransition(stage.id, o.value)}
+                                    className="px-2 py-1 text-[11px] rounded border border-purple-200 bg-white text-purple-700 hover:bg-purple-100"
+                                  >
+                                    + {o.label}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Team Member Roles</p>
+                            <div className="flex flex-wrap gap-1">
+                              {tmRoleValues
+                                .filter(r => !(stage.transitionFields || []).some(tf => tf.kind === 'teamMemberRole' && tf.role === r))
+                                .map(r => (
+                                  <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => addTmRoleTransition(stage.id, r)}
+                                    className="px-2 py-1 text-[11px] rounded border border-purple-200 bg-white text-purple-700 hover:bg-purple-100"
+                                  >
+                                    + {r}
+                                  </button>
+                                ))}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTmAdderStageId(null)}
+                            className="text-[11px] text-gray-500 hover:text-gray-700"
+                          >
+                            Done
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setTmAdderStageId(stage.id)}
+                          className="mt-2 text-[11px] text-purple-600 hover:text-purple-800 underline"
+                        >
+                          + Add team-member criterion (flag or role)
+                        </button>
+                      )}
                     </div>
 
                     {path.stages.length > 1 && (

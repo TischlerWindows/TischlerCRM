@@ -11,6 +11,7 @@ import type { TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
+import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -361,25 +362,35 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
   // ── Pending widget support (create mode) ──
   const pendingCtx = usePendingWidget()
+  const tmPool = usePendingTeamMemberPool()
   const isCreateMode = pendingCtx?.isCreateMode === true && !recordId
-  const [pendingMembers, setPendingMembers] = useState<TeamMemberRecord[]>([])
-  const pendingMembersRef = useRef(pendingMembers)
-  pendingMembersRef.current = pendingMembers
+  const [privatePending, setPrivatePending] = useState<TeamMemberRecord[]>([])
+  const privatePendingRef = useRef(privatePending)
+  privatePendingRef.current = privatePending
 
-  // Register with pending widget context so saves happen after parent creation
+  // When the shared pool is available, view its rows as TeamMemberRecord[];
+  // otherwise fall back to the widget-private pending list (older layouts).
+  const pendingMembers: TeamMemberRecord[] = useMemo(() => {
+    if (tmPool) {
+      return tmPool.rows.map(r => ({ id: r.id, data: r.data, createdAt: '' } as TeamMemberRecord))
+    }
+    return privatePending
+  }, [tmPool, tmPool?.rows, tmPool?.version, privatePending])
+
+  // Register only when no pool is present — the pool registers itself once for all writers.
   useEffect(() => {
-    if (!isCreateMode || !pendingCtx || !isSupported) return
+    if (!isCreateMode || !pendingCtx || !isSupported || tmPool) return
 
     const widgetId = `team-members-${objectApiName}`
 
     pendingCtx.registerWidget({
       widgetId,
-      hasPendingData: () => pendingMembersRef.current.length > 0,
+      hasPendingData: () => privatePendingRef.current.length > 0,
       savePendingData: async (parentRecordId: string) => {
         const parentField = OBJECT_TO_FIELD[objectApiName]
         if (!parentField) throw new Error(`No FK field for ${objectApiName}`)
 
-        for (const member of pendingMembersRef.current) {
+        for (const member of privatePendingRef.current) {
           await apiClient.post('/objects/TeamMember/records', {
             data: {
               ...member.data,
@@ -389,30 +400,41 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       },
       getPendingSummary: () =>
-        `${pendingMembersRef.current.length} team member(s)`,
+        `${privatePendingRef.current.length} team member(s)`,
     })
 
     return () => {
       pendingCtx.unregisterWidget(widgetId)
     }
-  }, [isCreateMode, pendingCtx, objectApiName, isSupported])
+  }, [isCreateMode, pendingCtx, objectApiName, isSupported, tmPool])
 
   /** Add a pending team member (create mode only) */
   const addPendingMember = useCallback(
     (data: Record<string, unknown>) => {
+      if (tmPool) {
+        tmPool.addRow(data)
+        return
+      }
       const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      setPendingMembers((prev) => [
+      setPrivatePending((prev) => [
         ...prev,
         { id: tempId, data, createdAt: new Date().toISOString() },
       ])
     },
-    [],
+    [tmPool],
   )
 
   /** Remove a pending team member by temp ID */
-  const removePendingMember = useCallback((id: string) => {
-    setPendingMembers((prev) => prev.filter((m) => m.id !== id))
-  }, [])
+  const removePendingMember = useCallback(
+    (id: string) => {
+      if (tmPool) {
+        tmPool.removeRow(id)
+        return
+      }
+      setPrivatePending((prev) => prev.filter((m) => m.id !== id))
+    },
+    [tmPool],
+  )
 
   // ── 5b: Data Fetching ──
   const fetchTeamMembers = useCallback(async () => {
@@ -565,6 +587,16 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   useEffect(() => {
     fetchTeamMembers()
   }, [fetchTeamMembers])
+
+  // Refetch when the shared TM pool reports a version bump (slot writes/deletes).
+  useEffect(() => {
+    if (!tmPool || !recordId) return
+    // Invalidate cache so fetchTeamMembers re-fetches fresh.
+    const key = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+    teamMembersCache.delete(key)
+    fetchTeamMembers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tmPool?.version])
 
   // ── 5c: De-duplication & merge ──
   const currentField = OBJECT_TO_FIELD[objectApiName] ?? ''
@@ -748,6 +780,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       })
       setEditingId(null)
       await fetchTeamMembers()
+      tmPool?.bumpVersion()
     } catch {
       // keep editing on failure
     } finally {
@@ -774,6 +807,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       await apiClient.delete(`/objects/TeamMember/records/${memberId}`)
       setDeleteTarget(null)
       await fetchTeamMembers()
+      tmPool?.bumpVersion()
     } catch {
       // ignore
     } finally {
@@ -979,7 +1013,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           objectApiName={objectApiName}
           recordId={recordId ?? ''}
           onClose={() => setShowAddModal(false)}
-          onSaved={() => { setShowAddModal(false); fetchTeamMembers() }}
+          onSaved={() => { setShowAddModal(false); fetchTeamMembers(); tmPool?.bumpVersion() }}
           pendingMode={isCreateMode}
           onAddPending={isCreateMode ? (data) => { addPendingMember(data); setShowAddModal(false) } : undefined}
         />
@@ -992,7 +1026,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           recordId={recordId!}
           existingMemberIds={rawMembers.map(m => String(m.id))}
           onClose={() => setShowCopyModal(false)}
-          onSaved={() => { setShowCopyModal(false); fetchTeamMembers() }}
+          onSaved={() => { setShowCopyModal(false); fetchTeamMembers(); tmPool?.bumpVersion() }}
         />
       )}
     </>
