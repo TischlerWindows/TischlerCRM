@@ -590,6 +590,7 @@ interface Summary {
   tdl: string;
   tdlCustom: string;
   spacerBars: string;
+  spacerBarType: string;
   spacerBarColors: string;
   projectContains: string[];
   createdBy: string;
@@ -660,7 +661,7 @@ export default function SummaryPage() {
       router.replace('/summary');
       // Fetch the opportunity record to pre-populate fields
       (async () => {
-        let oppFields: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } = {};
+        let oppFields: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string } = {};
         let address = '';
         try {
           const rec = await recordsService.getRecord('Opportunity', opportunityId);
@@ -672,6 +673,7 @@ export default function SummaryPage() {
               finish: pick('finishSpecifications'),
               glassType: pick('glassType'),
               spacerBars: pick('spacerBars'),
+              spacerBarType: pick('spacer_bar_type'),
               spacerBarColors: pick('spacerBarColors'),
               product: pick('productSpecifications'),
             };
@@ -821,13 +823,14 @@ export default function SummaryPage() {
         finish: pick('finishSpecifications'),
         glassType: pick('glassType'),
         spacerBars: pick('spacerBars'),
+        spacerBarType: pick('spacer_bar_type'),
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
       },
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string; product?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -952,6 +955,7 @@ export default function SummaryPage() {
       tdl: '',
       tdlCustom: '',
       spacerBars: opts?.oppFields?.spacerBars || '',
+      spacerBarType: opts?.oppFields?.spacerBarType || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
       projectContains: [],
       createdBy: 'Development User',
@@ -1247,7 +1251,8 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W, y, 'TDL', s.tdl === 'Custom Option' ? (s.tdlCustom || '—') : (s.tdl || '—'), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Spacer Bars', val(s.spacerBars), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
+    drawField(doc, 15, y, 'Spacer Bar Type', val(s.spacerBarType), col3W);
+    drawField(doc, 15 + col3W, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
     y += 10;
     drawField(doc, 15, y, 'Project Contains', (s.projectContains || []).join(', ') || '—', pw2 - 30);
     y += 12;
@@ -2927,7 +2932,7 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row 4: Spacer Bars + Spacer Bar Colors */}
+                      {/* Row 4: Spacer Bars + Spacer Bar Type + Spacer Bar Colors */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
@@ -2942,6 +2947,21 @@ export default function SummaryPage() {
                             ))}
                           </select>
                         </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Type</label>
+                          <select
+                            value={editingSummary.spacerBarType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar type...</option>
+                            {getOppPicklist('Opportunity__spacer_bar_type').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
                           <select
