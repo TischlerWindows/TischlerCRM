@@ -670,6 +670,7 @@ export default function SummaryPage() {
               glassType: pick('glassType'),
               spacerBars: pick('spacerBars'),
               spacerBarColors: pick('spacerBarColors'),
+              product: pick('productSpecifications'),
             };
             address = await resolveOppPropertyAddress(d);
           }
@@ -818,11 +819,12 @@ export default function SummaryPage() {
         glassType: pick('glassType'),
         spacerBars: pick('spacerBars'),
         spacerBarColors: pick('spacerBarColors'),
+        product: pick('productSpecifications'),
       },
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string; product?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -938,6 +940,7 @@ export default function SummaryPage() {
       product: '',
       productType: '',
       productTypeOptions: [],
+      product: opts?.oppFields?.product || '',
       woodType: opts?.oppFields?.woodType || '',
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
@@ -2730,13 +2733,16 @@ export default function SummaryPage() {
                       <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
                     </div>
                     <div className="p-6 space-y-5">
-                      {/* Row 1: Product (auto-filled) */}
+                      {/* Row 1: Product (auto-filled from Opportunity, editable) */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                          {editingSummary.jobType || '—'}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Type on Page 1</p>
+                        <input
+                          type="text"
+                          value={editingSummary.product || editingSummary.jobType || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, product: e.target.value })}
+                          placeholder="Enter product..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                        />
                       </div>
 
                       {/* Row 2: Product Type + Dependent Options */}
