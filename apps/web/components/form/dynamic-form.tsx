@@ -33,6 +33,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PendingWidgetProvider, usePendingWidgetManager } from './pending-widget-context';
 import { PendingTeamMemberPoolProvider } from './pending-team-member-pool';
+import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 import { getWidgetSupportsCreate } from '@/lib/widgets/registry-loader';
 import {
   ChevronDown,
@@ -897,29 +898,44 @@ export default function DynamicForm({
     fieldDef: FieldDef,
     stretch?: boolean,
     layoutField?: PageField,
-  ) => (
-    <FieldInput
-      key={fieldDef.apiName}
-      fieldDef={fieldDef}
-      layoutField={layoutField}
-      layout={layout}
-      formData={formData}
-      errors={errors}
-      visibilityCtx={visibilityCtx}
-      objectApiName={objectApiName}
-      schema={schema}
-      stretch={stretch}
-      onFieldChange={handleFieldChange}
-      lookupQueries={lookupQueries}
-      activeLookupField={activeLookupField}
-      lookupRecordsCache={lookupRecordsCache}
-      objectFields={object.fields}
-      onLookupQueryChange={handleLookupQueryChange}
-      onLookupFocus={handleLookupFocus}
-      onLookupBlur={handleLookupBlur}
-      onInlineCreate={handleInlineCreate}
-    />
-  );
+  ) => {
+    // Synthetic TeamMemberSlot fields render through their own component, not FieldInput.
+    const lf = layoutField as unknown as { kind?: string; slotConfig?: import('@/lib/schema').TeamMemberSlotConfig };
+    if (lf?.kind === 'teamMemberSlot' && lf.slotConfig) {
+      return (
+        <TeamMemberSlotField
+          key={fieldDef.apiName}
+          parentObjectApiName={objectApiName}
+          parentRecordId={(record?.id as string | undefined) ?? null}
+          slotConfig={lf.slotConfig}
+          panelField={layoutField as unknown as import('@/lib/schema').PanelField}
+        />
+      );
+    }
+    return (
+      <FieldInput
+        key={fieldDef.apiName}
+        fieldDef={fieldDef}
+        layoutField={layoutField}
+        layout={layout}
+        formData={formData}
+        errors={errors}
+        visibilityCtx={visibilityCtx}
+        objectApiName={objectApiName}
+        schema={schema}
+        stretch={stretch}
+        onFieldChange={handleFieldChange}
+        lookupQueries={lookupQueries}
+        activeLookupField={activeLookupField}
+        lookupRecordsCache={lookupRecordsCache}
+        objectFields={object.fields}
+        onLookupQueryChange={handleLookupQueryChange}
+        onLookupFocus={handleLookupFocus}
+        onLookupBlur={handleLookupBlur}
+        onInlineCreate={handleInlineCreate}
+      />
+    );
+  };
 
   // ── renderSectionContent ──────────────────────────────────────
   const currentTab = layout.tabs.find((t) => t.id === activeTab);
@@ -936,6 +952,19 @@ export default function DynamicForm({
     }[] = [];
     for (const f of panel.fields) {
       if (isHiddenByLifecycle(f as any, layoutType)) continue;
+      // Synthetic TeamMemberSlot fields bypass the FieldDef lookup; the renderer
+      // dispatches on kind below and renders TeamMemberSlotField instead of FieldInput.
+      if ((f as any).kind === 'teamMemberSlot' && (f as any).slotConfig) {
+        gridFields.push({
+          fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
+          pageField: f as any,
+          column: (f as any).column ?? f.order % panel.columns,
+          order: f.order,
+          colSpan: f.colSpan ?? 1,
+          rowSpan: (f as any).rowSpan ?? 1,
+        });
+        continue;
+      }
       const fd = getFieldDef(f.fieldApiName, f as any);
       if (fd) {
         gridFields.push({

@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
-import { GripVertical, LayoutGrid, Search, Trash2 } from 'lucide-react';
+import { GripVertical, LayoutGrid, Search, Trash2, UserCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
@@ -60,6 +60,31 @@ function DraggableFieldSectionTile({ columns, label }: { columns: 1 | 2 | 3 | 4;
 }
 
 // ── Field chips ──────────────────────────────────────────────────────────────
+
+function TeamMemberSlotTile() {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: 'palette-team-member-slot',
+    data: {
+      type: 'palette-team-member-slot',
+      label: 'Team Member Slot',
+    },
+  });
+  const style: CSSProperties = { opacity: isDragging ? 0 : 1 };
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      style={style}
+      {...listeners}
+      {...attributes}
+      className="flex w-full items-center gap-2 rounded-md border border-dashed border-purple-300 bg-purple-50/30 px-2 py-1.5 text-left text-xs transition-colors hover:border-purple-400 hover:bg-purple-50 active:cursor-grabbing"
+    >
+      <GripVertical className="h-3.5 w-3.5 shrink-0 text-purple-400" aria-hidden />
+      <span className="min-w-0 flex-1 truncate font-medium text-purple-800">Team Member Slot</span>
+      <UserCheck className="h-3.5 w-3.5 shrink-0 text-purple-500" aria-hidden />
+    </button>
+  );
+}
 
 function ComponentSectionTile() {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -243,6 +268,16 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
 
         {/* Divider */}
         <div className="border-t border-gray-200" />
+
+        {/* Team-member synthetic fields (drop into a Field Section like a regular field) */}
+        <section className="space-y-1.5">
+          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+            Team Member Fields
+          </div>
+          <div className="space-y-1">
+            <TeamMemberSlotTile />
+          </div>
+        </section>
 
         {/* Flat fields list */}
         <section className="space-y-1.5">

@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutTab, LayoutSection, LayoutPanel, PanelField } from '../types';
+import type { TeamMemberSlotConfig } from '@/lib/schema';
 import { useEditorStore } from '../editor-store';
 import { ColorControl } from './shared';
+import TeamMemberSlotConfigPanel from '@/widgets/internal/team-member-slot/ConfigPanel';
 
 interface FieldPropertiesProps {
   selection: {
@@ -22,8 +24,28 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const removeField = useEditorStore((s) => s.removeField);
 
+  const isSlot = selection.field.kind === 'teamMemberSlot' && !!selection.field.slotConfig;
+
   return (
     <>
+      {isSlot && selection.field.slotConfig && (
+        <div className="space-y-2 rounded-md border border-purple-200 bg-purple-50/40 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">
+            Team Member Slot
+          </div>
+          <TeamMemberSlotConfigPanel
+            config={selection.field.slotConfig as unknown as Record<string, unknown>}
+            onChange={(next) =>
+              updateField(selection.field.fieldApiName, selection.panel.id, {
+                slotConfig: next as unknown as TeamMemberSlotConfig,
+              })
+            }
+            record={{}}
+            integration={null}
+            object={{ apiName: '', label: '', fields: [] }}
+          />
+        </div>
+      )}
       <div className="space-y-1.5">
         <Label className="text-xs text-gray-600">Label Override</Label>
         <Input

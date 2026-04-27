@@ -35,6 +35,30 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
 
 // ── Builders ────────────────────────────────────────────────────────────────
 
+/**
+ * Build a synthetic TeamMemberSlot panel field. Each instance gets a unique
+ * identity so multiple slots with the same criterion can coexist on a panel.
+ * The criterion lives inside slotConfig and is decoupled from the apiName.
+ */
+export function buildTeamMemberSlotField(atIndex: number): PanelField {
+  const uniqueId = `__tm:slot:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    kind: 'teamMemberSlot',
+    fieldApiName: uniqueId,
+    slotConfig: {
+      type: 'TeamMemberSlot',
+      criterion: { kind: 'flag', flag: 'primaryContact' },
+      cardinality: 'single',
+      mode: 'paired',
+    },
+    colSpan: 1,
+    order: atIndex,
+    behavior: 'none',
+    labelStyle: {},
+    valueStyle: {},
+  };
+}
+
 export function buildField(fieldApiName: string, atIndex: number): PanelField {
   return {
     fieldApiName,
@@ -106,7 +130,11 @@ export function dispatchDragEnd(
     return;
   }
 
-  if (active.kind === 'palette-field' || active.kind === 'existing-field') {
+  if (
+    active.kind === 'palette-field' ||
+    active.kind === 'existing-field' ||
+    active.kind === 'palette-team-member-slot'
+  ) {
     let targetPanelId: string | null = null;
     let targetIndex = 0;
 
@@ -124,6 +152,11 @@ export function dispatchDragEnd(
 
     if (active.kind === 'palette-field') {
       addField(buildField(active.fieldApiName, targetIndex), targetPanelId, targetIndex);
+      return;
+    }
+
+    if (active.kind === 'palette-team-member-slot') {
+      addField(buildTeamMemberSlotField(targetIndex), targetPanelId, targetIndex);
       return;
     }
 

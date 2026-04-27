@@ -508,8 +508,27 @@ export interface ValueStyle {
   italic?: boolean;
 }
 
+export type PanelFieldKind = 'field' | 'teamMemberSlot';
+
 export interface PanelField {
+  /**
+   * Discriminator. Defaults to 'field' when absent (back-compat).
+   * - 'field' — fieldApiName references a real FieldDef on the parent object.
+   * - 'teamMemberSlot' — fieldApiName is synthetic (e.g. '__tm:flag:quoteRecipient'
+   *   or '__tm:role:Architect / Designer'); slotConfig holds the inline config.
+   */
+  kind?: PanelFieldKind;
+  /**
+   * For kind='field': the real field's apiName.
+   * For kind='teamMemberSlot': a synthetic id derived from the criterion.
+   * Always non-empty so existing identity-by-apiName lookups keep working.
+   */
   fieldApiName: string;
+  /**
+   * Inline config for kind='teamMemberSlot' fields. The criterion inside this
+   * config is the source of truth; fieldApiName is derived from it for identity.
+   */
+  slotConfig?: TeamMemberSlotConfig;
   labelOverride?: string;
   colSpan: number;
   order: number;
@@ -521,6 +540,18 @@ export interface PanelField {
   hideOnEdit?: boolean;      // Hide on Edit (edit dialog)
   /** @deprecated Use hideOnView + hideOnEdit. Kept for backwards compatibility. */
   hideOnExisting?: boolean;
+}
+
+/** Build the synthetic fieldApiName for a TeamMemberSlot panel-field criterion. */
+export function teamMemberSlotFieldApiName(criterion: TeamMemberSlotCriterion): string {
+  return criterion.kind === 'flag'
+    ? `__tm:flag:${criterion.flag}`
+    : `__tm:role:${criterion.role}`;
+}
+
+/** Returns true if a fieldApiName is the synthetic form used for TeamMemberSlot fields. */
+export function isTeamMemberSlotApiName(apiName: string): boolean {
+  return apiName.startsWith('__tm:');
 }
 
 export interface LayoutPanel {
