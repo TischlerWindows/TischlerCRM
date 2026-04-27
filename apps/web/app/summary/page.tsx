@@ -997,6 +997,18 @@ export default function SummaryPage() {
     const val = (v: string | undefined | null) => v || '—';
     const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
+    // ── Load logo ──
+    let logoDataUrl: string | null = null;
+    try {
+      const res = await fetch('/tces-logo.png');
+      const blob = await res.blob();
+      logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch { /* logo optional */ }
+
     // ── Brand colors ──
     const navy = [30, 58, 95] as const;     // #1e3a5f
     const red = [218, 41, 28] as const;      // Tischler red
@@ -1009,14 +1021,19 @@ export default function SummaryPage() {
     // ── Helpers ──
     const drawHeader = (doc: any, title: string) => {
       const w = doc.internal.pageSize.getWidth();
+      // Logo (big red T)
+      if (logoDataUrl) {
+        doc.addImage(logoDataUrl, 'PNG', 15, 5, 14, 14);
+      }
+      const textX = logoDataUrl ? 32 : 15;
       doc.setFontSize(16);
       doc.setTextColor(...navy);
       doc.setFont('helvetica', 'bold');
-      doc.text('TISCHLER UND SOHN', 15, 14);
+      doc.text('TISCHLER UND SOHN', textX, 13);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...gray80);
-      doc.text(title, 15, 20);
+      doc.text(title, textX, 20);
       doc.text(`${val(s.name)}  |  ${dateStr}`, w - 15, 14, { align: 'right' });
       doc.text(`${val(s.opportunityNumber)}`, w - 15, 20, { align: 'right' });
       doc.setDrawColor(...red);
