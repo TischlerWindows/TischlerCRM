@@ -658,10 +658,11 @@ export default function SummaryPage() {
       // Fetch the opportunity record to pre-populate fields
       (async () => {
         let oppFields: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } = {};
+        let address = '';
         try {
           const rec = await recordsService.getRecord('Opportunity', opportunityId);
           if (rec) {
-            const d: any = rec.data ?? rec;
+            const d: any = (rec as any).data ?? rec;
             const pick = (bare: string) => d[bare] || d[`Opportunity__${bare}`] || '';
             oppFields = {
               woodType: pick('woodType'),
@@ -670,9 +671,10 @@ export default function SummaryPage() {
               spacerBars: pick('spacerBars'),
               spacerBarColors: pick('spacerBarColors'),
             };
+            address = await resolveOppPropertyAddress(d);
           }
         } catch { /* non-fatal */ }
-        createNewSummary({ opportunityId, opportunityName, opportunityNumber, oppFields });
+        createNewSummary({ opportunityId, opportunityName, opportunityNumber, address, oppFields });
       })();
       return;
     }
@@ -765,14 +767,51 @@ export default function SummaryPage() {
     }
   };
 
-  const handleOpportunitySelected = (record: any) => {
+  // Resolve a human-readable address string from an Opportunity record's data.
+  // Strategy:
+  //   1. Use the Opportunity__propertyAddress TextArea if already populated.
+  //   2. Otherwise fetch the linked Property record and format its address object.
+  const resolveOppPropertyAddress = async (data: any): Promise<string> => {
+    const textAddr = data?.propertyAddress || data?.['Opportunity__propertyAddress'] || '';
+    if (textAddr) return textAddr;
+
+    const propertyId = data?.property || data?.['Opportunity__property'] || '';
+    if (!propertyId || typeof propertyId !== 'string') return '';
+
+    try {
+      const propRec = await recordsService.getRecord('Property', propertyId);
+      if (!propRec) return '';
+      const d: any = (propRec as any).data ?? propRec;
+      const raw = d?.address || d?.['Property__address'];
+      const obj: any =
+        raw && typeof raw === 'object'
+          ? raw
+          : typeof raw === 'string'
+          ? (() => { try { return JSON.parse(raw); } catch { return null; } })()
+          : null;
+      if (obj?.street || obj?.city) {
+        return [obj.street, obj.city, obj.state, obj.postalCode].filter(Boolean).join(', ');
+      }
+      // Fall back to separate city/state/zip fields on the property record
+      const city = d?.city || d?.['Property__city'] || '';
+      const state = d?.state || d?.['Property__state'] || '';
+      const zip = d?.zipCode || d?.['Property__zipCode'] || '';
+      return [city, state, zip].filter(Boolean).join(', ');
+    } catch {
+      return '';
+    }
+  };
+
+  const handleOpportunitySelected = async (record: any) => {
     setShowOpportunityPicker(false);
     // Helper: try both bare key and prefixed key
     const pick = (bare: string) => record[bare] || record[`Opportunity__${bare}`] || '';
+    const address = await resolveOppPropertyAddress(record);
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
       opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+      address,
       oppFields: {
         woodType: pick('woodType'),
         finish: pick('finishSpecifications'),
@@ -783,7 +822,7 @@ export default function SummaryPage() {
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -793,7 +832,7 @@ export default function SummaryPage() {
       jobType: '',
       estimator: '',
       date: '',
-      address: '',
+      address: opts?.address || '',
       quoteType: '',
       requoteDescription: '',
       rows: [{
