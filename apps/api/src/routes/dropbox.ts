@@ -1046,8 +1046,12 @@ export async function tryEnsureLinkedFolder(
     // Requotes don't get their own top-level Project Books folder.
     // Instead, create only a subfolder inside the original Opportunity's
     // 1. Estimation folder (e.g. .../OPP0001/1. Estimation/OPP0001 - Requote 1/)
-    if (childObjectApiName === 'Opportunity' && childData._isRequote && childData._parentOpportunityNumber) {
-      const parentOppNumber = (childData._parentOpportunityNumber as string).replace(/[\\/:*?"<>|]/g, '_').trim();
+    // Detect requote via explicit flag OR by opportunityNumber pattern (guards against missing flag).
+    const _reqOppNumEL = (Object.entries(childData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
+    const _isRequoteEL = !!childData._isRequote || /\s*-\s*Requote\s*\d+$/i.test(_reqOppNumEL);
+    const _parentOppNumEL = (childData._parentOpportunityNumber as string | undefined) || (_isRequoteEL ? _reqOppNumEL.replace(/\s*-\s*Requote\s*\d+$/i, '') : '');
+    if (childObjectApiName === 'Opportunity' && _isRequoteEL && _parentOppNumEL) {
+      const parentOppNumber = _parentOppNumEL.replace(/[\\/:*?"<>|]/g, '_').trim();
 
       // Check if already tracked
       const existingChildFolder = await resolveStoredFolder(accessToken, childRecordId);
@@ -2067,13 +2071,20 @@ export async function dropboxRoutes(app: FastifyInstance) {
         });
         if (record) {
           const rData = record.data as Record<string, any>;
-          const renamedFolder = await findExistingFolderInDropbox(accessToken, objectApiName, recordId, rData);
-          if (renamedFolder) {
-            return reply.send({
-              created: false,
-              path: renamedFolder.fullPath,
-              folderName: renamedFolder.folderName,
-            });
+          // Skip top-level folder search for requotes — they live inside a parent Opp's 1. Estimation,
+          // not at the root of /TischlerCRM/Opportunity. Searching there would either miss the real
+          // folder or lock in a previously-wrongly-placed folder.
+          const _rOppNum = (Object.entries(rData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
+          const _rIsReq = Boolean(rData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_rOppNum);
+          if (!_rIsReq) {
+            const renamedFolder = await findExistingFolderInDropbox(accessToken, objectApiName, recordId, rData);
+            if (renamedFolder) {
+              return reply.send({
+                created: false,
+                path: renamedFolder.fullPath,
+                folderName: renamedFolder.folderName,
+              });
+            }
           }
         }
       }
@@ -2149,8 +2160,12 @@ export async function dropboxRoutes(app: FastifyInstance) {
               // ── Special handling: Requote Opportunity ──
               // Requotes don't get their own Project Books folder; they live inside
               // the original Opportunity's 1. Estimation subfolder.
-              if (objectApiName === 'Opportunity' && rData._isRequote && rData._parentOpportunityNumber) {
-                const parentOppNumber = String(rData._parentOpportunityNumber).replace(/[\\/:*?"<>|]/g, '_').trim();
+              // Detect via explicit flag OR opportunityNumber pattern (guards against missing flag).
+              const _ensOppNum = (Object.entries(rData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
+              const _ensIsReq = Boolean(rData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_ensOppNum);
+              const _ensParentOppNum = (rData._parentOpportunityNumber as string | undefined) || (_ensIsReq ? _ensOppNum.replace(/\s*-\s*Requote\s*\d+$/i, '') : '');
+              if (objectApiName === 'Opportunity' && _ensIsReq && _ensParentOppNum) {
+                const parentOppNumber = _ensParentOppNum.replace(/[\\/:*?"<>|]/g, '_').trim();
                 let parentOppFolderName = parentOppNumber;
                 const oppObj2 = await prisma.customObject.findFirst({
                   where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
