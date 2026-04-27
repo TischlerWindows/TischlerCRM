@@ -12,6 +12,7 @@ import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
 import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
+import { subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -191,6 +192,26 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
 
 function getRecordName(raw: Record<string, unknown>): string {
   const d = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : raw
+
+  // 0. Composite `name` object (Contact's CompositeText name field).
+  // Shape: { salutation, firstName, lastName } possibly with prefixed keys
+  // like Contact__name_firstName. Resolve to "Sal First Last".
+  for (const key of Object.keys(d)) {
+    const lower = key.toLowerCase()
+    const isNameKey = lower === 'name' || lower.endsWith('__name')
+    if (isNameKey && d[key] && typeof d[key] === 'object' && !Array.isArray(d[key])) {
+      const nameObj = d[key] as Record<string, unknown>
+      const findVal = (suffix: string) => {
+        const k = Object.keys(nameObj).find(kk => kk.toLowerCase().endsWith(suffix))
+        return k ? nameObj[k] : undefined
+      }
+      const sal = nameObj.salutation ?? findVal('salutation')
+      const fn = nameObj.firstName ?? findVal('firstname')
+      const ln = nameObj.lastName ?? findVal('lastname')
+      const parts = [sal, fn, ln].filter(v => v && String(v).trim()).map(v => String(v).trim())
+      if (parts.length > 0) return parts.join(' ')
+    }
+  }
 
   // 1. Check for Contact-style first+last name fields (prefixed or plain)
   for (const key of Object.keys(d)) {
@@ -598,6 +619,17 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tmPool?.version])
 
+  // Refetch on the global TeamMember-changed channel — covers view mode where
+  // there's no PendingTeamMemberPoolProvider for slot writes to bump.
+  useEffect(() => {
+    if (!recordId) return
+    return subscribeTeamMembersChanged(() => {
+      const key = cacheKey(objectApiName, recordId, !!rollupFromProperty)
+      teamMembersCache.delete(key)
+      fetchTeamMembers()
+    })
+  }, [recordId, objectApiName, rollupFromProperty, fetchTeamMembers])
+
   // ── 5c: De-duplication & merge ──
   const currentField = OBJECT_TO_FIELD[objectApiName] ?? ''
 
@@ -686,11 +718,13 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       }
 
-      // Merge account — only account-only members (no contact) get their own
-      // tile in the Accounts column.  Contact-linked members contribute to the
-      // Contacts column only (they already show the account as a subtitle).
-      const isAccountOnly = accountId && !contactId
-      if (isAccountOnly) {
+      // Merge account — surface every account-bearing TM row in the Accounts
+      // column, including rows that ALSO carry a contact. Same row contributes
+      // to both the Contacts column (via the contact) and the Accounts column
+      // (via the account); accountMap is keyed by accountId so duplicates
+      // collapse. This makes "I picked Acme + John" show John on the Contacts
+      // side AND Acme on the Accounts side.
+      if (accountId) {
         const existing = accountMap.get(accountId)
         if (existing) {
           if (role && !existing.roles.includes(role)) existing.roles.push(role)

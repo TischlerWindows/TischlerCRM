@@ -263,6 +263,10 @@ export interface LookupSearchProps {
   onBlur: () => void;
   onInlineCreate?: (targetApi: string) => void;
   schemaObjects?: ObjectDef[];
+  /** When true, suppress the "-- None --" dropdown option. The clear control
+   * provided by the parent (e.g. an X button on the bound row) is the user's
+   * way to clear. Used by TeamMemberSlot to keep the dropdown feeling lighter. */
+  hideNoneOption?: boolean;
 }
 
 export function LookupSearch({
@@ -279,6 +283,7 @@ export function LookupSearch({
   onBlur,
   onInlineCreate,
   schemaObjects,
+  hideNoneOption,
 }: LookupSearchProps) {
   const recordsArray = Array.isArray(records) ? records : [];
   const targetApi = getLookupTargetApi(
@@ -398,19 +403,21 @@ export function LookupSearch({
       />
       {isActive && (
         <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-          <button
-            type="button"
-            onClick={() => {
-              onChange('');
-              onQueryChange('');
-            }}
-            className={cn(
-              'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
-              !value && 'bg-blue-50',
-            )}
-          >
-            -- None --
-          </button>
+          {!hideNoneOption && (
+            <button
+              type="button"
+              onClick={() => {
+                onChange('');
+                onQueryChange('');
+              }}
+              className={cn(
+                'w-full px-3 py-2 text-left text-sm hover:bg-gray-100 text-gray-500',
+                !value && 'bg-blue-50',
+              )}
+            >
+              -- None --
+            </button>
+          )}
           {filteredRecords.length > 0 ? (
             filteredRecords.slice(0, 20).map((record) => {
               const label = getRecordLabel(record);
