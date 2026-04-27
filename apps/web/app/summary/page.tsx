@@ -585,9 +585,9 @@ interface Summary {
   woodType: string;
   finish: string;
   glassType: string;
-  sdl: string[];
+  sdl: string;
   sdlCustom: string;
-  tdl: string[];
+  tdl: string;
   tdlCustom: string;
   spacerBars: string;
   spacerBarColors: string;
@@ -947,9 +947,9 @@ export default function SummaryPage() {
       woodType: opts?.oppFields?.woodType || '',
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
-      sdl: [],
+      sdl: '',
       sdlCustom: '',
-      tdl: [],
+      tdl: '',
       tdlCustom: '',
       spacerBars: opts?.oppFields?.spacerBars || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
@@ -1243,14 +1243,8 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
     y += 10;
-    drawField(doc, 15, y, 'SDL', [
-      ...(s.sdl || []).filter((v: string) => v !== 'custom'),
-      ...((s.sdl || []).includes('custom') && s.sdlCustom ? [s.sdlCustom] : []),
-    ].join(', ') || '—', col3W);
-    drawField(doc, 15 + col3W, y, 'TDL', [
-      ...(s.tdl || []).filter((v: string) => v !== 'custom'),
-      ...((s.tdl || []).includes('custom') && s.tdlCustom ? [s.tdlCustom] : []),
-    ].join(', ') || '—', col3W);
+    drawField(doc, 15, y, 'SDL', s.sdl === 'Custom Option' ? (s.sdlCustom || '—') : (s.sdl || '—'), col3W);
+    drawField(doc, 15 + col3W, y, 'TDL', s.tdl === 'Custom Option' ? (s.tdlCustom || '—') : (s.tdl || '—'), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Spacer Bars', val(s.spacerBars), col3W);
     y += 10;
     drawField(doc, 15, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
@@ -2882,101 +2876,54 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row: SDL + TDL multiselects */}
+                      {/* Row: SDL + TDL */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
-                          <div className="border border-gray-300 rounded-lg overflow-hidden">
-                            {['22MM', '44MM'].map(opt => (
-                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                                <input
-                                  type="checkbox"
-                                  checked={(editingSummary.sdl || []).includes(opt)}
-                                  onChange={() => {
-                                    const cur = editingSummary.sdl || [];
-                                    setEditingSummary({ ...editingSummary, sdl: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] });
-                                  }}
-                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                />
-                                <span className="text-sm text-gray-700">{opt}</span>
-                              </label>
-                            ))}
-                            {/* Custom Option row */}
-                            <div className="border-t border-gray-100">
-                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={(editingSummary.sdl || []).includes('custom')}
-                                  onChange={() => {
-                                    const cur = editingSummary.sdl || [];
-                                    const next = cur.includes('custom') ? cur.filter(v => v !== 'custom') : [...cur, 'custom'];
-                                    setEditingSummary({ ...editingSummary, sdl: next, sdlCustom: next.includes('custom') ? (editingSummary.sdlCustom || '') : '' });
-                                  }}
-                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                />
-                                <span className="text-sm text-gray-700">Custom Option</span>
-                              </label>
-                              {(editingSummary.sdl || []).includes('custom') && (
-                                <div className="px-3 pb-2">
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    value={editingSummary.sdlCustom || ''}
-                                    onChange={(e) => setEditingSummary({ ...editingSummary, sdlCustom: e.target.value })}
-                                    placeholder="Enter custom value..."
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          <select
+                            value={editingSummary.sdl === 'Custom Option' ? 'Custom Option' : (editingSummary.sdl || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value, sdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.sdlCustom })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select SDL...</option>
+                            <option>22MM</option>
+                            <option>44MM</option>
+                            <option value="Custom Option">Custom Option</option>
+                          </select>
+                          {editingSummary.sdl === 'Custom Option' && (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSummary.sdlCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, sdlCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TDL</label>
-                          <div className="border border-gray-300 rounded-lg overflow-hidden">
-                            {['48MM', '70MM', '125MM'].map(opt => (
-                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                                <input
-                                  type="checkbox"
-                                  checked={(editingSummary.tdl || []).includes(opt)}
-                                  onChange={() => {
-                                    const cur = editingSummary.tdl || [];
-                                    setEditingSummary({ ...editingSummary, tdl: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] });
-                                  }}
-                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                />
-                                <span className="text-sm text-gray-700">{opt}</span>
-                              </label>
-                            ))}
-                            {/* Custom Option row */}
-                            <div className="border-t border-gray-100">
-                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={(editingSummary.tdl || []).includes('custom')}
-                                  onChange={() => {
-                                    const cur = editingSummary.tdl || [];
-                                    const next = cur.includes('custom') ? cur.filter(v => v !== 'custom') : [...cur, 'custom'];
-                                    setEditingSummary({ ...editingSummary, tdl: next, tdlCustom: next.includes('custom') ? (editingSummary.tdlCustom || '') : '' });
-                                  }}
-                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                />
-                                <span className="text-sm text-gray-700">Custom Option</span>
-                              </label>
-                              {(editingSummary.tdl || []).includes('custom') && (
-                                <div className="px-3 pb-2">
-                                  <input
-                                    type="text"
-                                    autoFocus
-                                    value={editingSummary.tdlCustom || ''}
-                                    onChange={(e) => setEditingSummary({ ...editingSummary, tdlCustom: e.target.value })}
-                                    placeholder="Enter custom value..."
-                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          <select
+                            value={editingSummary.tdl === 'Custom Option' ? 'Custom Option' : (editingSummary.tdl || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value, tdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.tdlCustom })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select TDL...</option>
+                            <option>48MM</option>
+                            <option>70MM</option>
+                            <option>125MM</option>
+                            <option value="Custom Option">Custom Option</option>
+                          </select>
+                          {editingSummary.tdl === 'Custom Option' && (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSummary.tdlCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, tdlCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
                         </div>
                       </div>
 
