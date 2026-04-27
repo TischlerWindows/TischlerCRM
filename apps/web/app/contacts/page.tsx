@@ -112,8 +112,7 @@ export default function ContactsPage() {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [filterConditions, setFilterConditions] = useState<FilterCondition[]>([]);
-  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
-  const [showBulkActions, setShowBulkActions] = useState(false);
+
   const { schema, loadSchema } = useSchemaStore();
   const { canAccess, hasAppPermission } = usePermissions();
   const canCreateContact = canAccess('Contact', 'create');
@@ -354,39 +353,7 @@ export default function ContactsPage() {
     setFilterConditions([]);
   };
 
-  const toggleSelectContact = (contactId: string) => {
-    const newSelected = new Set(selectedContacts);
-    if (newSelected.has(contactId)) {
-      newSelected.delete(contactId);
-    } else {
-      newSelected.add(contactId);
-    }
-    setSelectedContacts(newSelected);
-  };
 
-  const toggleSelectAll = () => {
-    if (selectedContacts.size === filteredContacts.length) {
-      setSelectedContacts(new Set());
-    } else {
-      setSelectedContacts(new Set(filteredContacts.map(c => c.id)));
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (confirm(`Delete ${selectedContacts.size} selected contacts?`)) {
-      const updatedContacts = contacts.filter(c => !selectedContacts.has(c.id));
-      setContacts(updatedContacts);
-      setSelectedContacts(new Set());
-    }
-  };
-
-  const handleBulkFavorite = () => {
-    const updatedContacts = contacts.map(c => 
-      selectedContacts.has(c.id) ? { ...c, isFavorite: true } : c
-    );
-    setContacts(updatedContacts);
-    setSelectedContacts(new Set());
-  };
 
   const filteredContacts = useMemo(() => {
     // First apply search filter
@@ -656,31 +623,7 @@ export default function ContactsPage() {
         <div className="mb-6 flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">Contact Records</h3>
           <div className="flex gap-3">
-            {selectedContacts.size > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">
-                  {selectedContacts.size} selected
-                </span>
-                <button
-                  onClick={handleBulkFavorite}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  title="Add to favorites"
-                >
-                  <Star className="w-4 h-4 mr-2" />
-                  Favorite
-                </button>
-                {canDeleteContact && (
-                <button
-                  onClick={handleBulkDelete}
-                  className="inline-flex items-center px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                  title="Delete selected"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </button>
-                )}
-              </div>
-            )}
+
             {hasAppPermission('importData') && (
               <button
                 onClick={() => setShowImportDialog(true)}
@@ -780,14 +723,6 @@ export default function ContactsPage() {
             <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 w-12">
-                    <input
-                      type="checkbox"
-                      checked={selectedContacts.size === filteredContacts.length && filteredContacts.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                    />
-                  </th>
                   {visibleColumns.map(columnId => {
                     const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                     if (!column) return null;
@@ -815,14 +750,6 @@ export default function ContactsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredContacts.map((contact) => (
                   <tr key={contact.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => router.push(`/contacts/${contact.id}`)}>
-                    <td className="px-6 py-4 w-12">
-                      <input
-                        type="checkbox"
-                        checked={selectedContacts.has(contact.id)}
-                        onChange={() => toggleSelectContact(contact.id)}
-                        className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                      />
-                    </td>
                     {visibleColumns.map(columnId => {
                       const column = AVAILABLE_COLUMNS.find(col => col.id === columnId);
                       if (!column) return null;
