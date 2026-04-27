@@ -81,7 +81,11 @@ export function SlotInput({
   const [contactActive, setContactActive] = useState(false)
   const [accountResults, setAccountResults] = useState<Record<string, unknown>[]>([])
   const [contactResults, setContactResults] = useState<Record<string, unknown>[]>([])
-  const [skipAccount, setSkipAccount] = useState(mode !== 'paired' || !!boundRow?.data.contact && !boundRow?.data.account)
+  const [skipAccount, setSkipAccount] = useState(
+    // Skip account picker in contact-only mode, or when editing a paired row that has a contact but no account.
+    // Account-only mode must NEVER skip — the account picker is its only input.
+    mode === 'contact' || (mode === 'paired' && !!boundRow?.data.contact && !boundRow?.data.account)
+  )
   const [pendingRole, setPendingRole] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

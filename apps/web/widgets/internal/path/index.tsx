@@ -479,7 +479,7 @@ export default function PathWidget({ config, record, object }: WidgetProps) {
               </div>
               <div className="flex justify-end gap-2">
                 <button
-                  onClick={() => { setTransitionTarget(null); setTransitionValues({}); }}
+                  onClick={() => { setTransitionTarget(null); setTransitionValues({}); setTransitionTmFilled({}); }}
                   className="px-3 py-1.5 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
                 >
                   Cancel

@@ -61,7 +61,10 @@ function dataOf(rec: Record<string, unknown>): Record<string, unknown> {
 /** Returns true if a row matches the slot's criterion. */
 function rowMatches(data: Record<string, unknown>, criterion: TeamMemberSlotCriterion): boolean {
   if (criterion.kind === 'flag') {
-    return data[criterion.flag] === true
+    // The API may return Checkbox fields as either a boolean true or the string "true"; the
+    // team-members-rollup widget has matched both since the TeamMember object was introduced.
+    const v = data[criterion.flag]
+    return v === true || v === 'true'
   }
   return data.role === criterion.role
 }
