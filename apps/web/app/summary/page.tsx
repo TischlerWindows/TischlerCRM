@@ -788,7 +788,19 @@ export default function SummaryPage() {
       const propRec = await recordsService.getRecord('Property', propertyId);
       if (!propRec) return '';
       const d: any = (propRec as any).data ?? propRec;
-      const raw = d?.address || d?.['Property__address'];
+      // Check LocationSearch field (address_search) first — this is the newer,
+      // Google-Maps-backed field that properties use for address entry.
+      // Fall back to the legacy Address field (Property__address / address).
+      const raw =
+        d?.address_search ||
+        d?.['Property__address_search'] ||
+        // also scan for any __address_search suffixed key
+        (() => {
+          const k = Object.keys(d || {}).find(k => k.toLowerCase().endsWith('__address_search'));
+          return k ? d[k] : null;
+        })() ||
+        d?.address ||
+        d?.['Property__address'];
       const obj: any =
         raw && typeof raw === 'object'
           ? raw
