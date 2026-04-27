@@ -173,7 +173,7 @@ function Skeleton() {
 
 // ── Main widget ───────────────────────────────────────────────────────
 
-export default function RelatedListWidget({ config, record }: WidgetProps) {
+export default function RelatedListWidget({ config, record, object }: WidgetProps) {
   const pathname = usePathname()
   const schema = useSchemaStore((s) => s.schema)
   const {
@@ -247,6 +247,15 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
   const [openRowMenu, setOpenRowMenu] = useState<string | null>(null)
 
   const recordId = record?.id ? String(record.id) : null
+
+  // Labels for the empty-state diagnostic. Falls back to apiName / linkField
+  // when the schema entry isn't loaded yet.
+  const relatedObjectMeta = schema?.objects?.find(o => o.apiName === objectApiName)
+  const relatedObjectLabel = (relatedObjectMeta?.pluralLabel || relatedObjectMeta?.label || objectApiName || 'records').toString()
+  const linkFieldLabel = linkField
+    ? (relatedObjectMeta?.fields?.find(f => f.apiName === linkField)?.label || linkField)
+    : ''
+  const currentObjectLabel = (object?.label || 'record').toString()
 
   // Fetch all rows matching the link field (up to 200 for client-side ops)
   useEffect(() => {
@@ -355,7 +364,12 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
           allCount={allRows.length}
         />
         {displayRows.length === 0 ? (
-          <p className="p-6 text-xs text-brand-gray text-center">No related records</p>
+          <div className="p-6 text-center space-y-1">
+            <p className="text-xs text-brand-gray">No related {relatedObjectLabel.toLowerCase()} found</p>
+            <p className="text-[10px] text-gray-400">
+              No {relatedObjectLabel.toLowerCase()} have <span className="font-mono">{linkFieldLabel}</span> set to this {currentObjectLabel.toLowerCase()}.
+            </p>
+          </div>
         ) : (
           <div className="p-3 grid grid-cols-2 gap-3">
             {displayRows.map((row) => {
@@ -411,7 +425,12 @@ export default function RelatedListWidget({ config, record }: WidgetProps) {
         />
 
         {displayRows.length === 0 ? (
-          <p className="p-6 text-xs text-brand-gray text-center">No related records</p>
+          <div className="p-6 text-center space-y-1">
+            <p className="text-xs text-brand-gray">No related {relatedObjectLabel.toLowerCase()} found</p>
+            <p className="text-[10px] text-gray-400">
+              No {relatedObjectLabel.toLowerCase()} have <span className="font-mono">{linkFieldLabel}</span> set to this {currentObjectLabel.toLowerCase()}.
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">

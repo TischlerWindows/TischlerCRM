@@ -29,6 +29,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
+import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -60,6 +61,7 @@ export default function CustomObjectRecordsPage() {
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [layoutError, setLayoutError] = useState<
     Extract<LayoutResolveResult, { kind: 'error' }> | null
   >(null);
@@ -85,9 +87,19 @@ export default function CustomObjectRecordsPage() {
     );
   }, [schema, slug]);
   const isLookupLoaded = useLookupPreloader(objectDef);
-  
+
   const pageLayouts = objectDef?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
+
+  useNewRecordFromQuery({
+    objectDef,
+    profileId: user?.profileId,
+    onOpen: (layoutId, prefill) => {
+      setPrefillData(prefill);
+      setSelectedLayoutId(layoutId);
+      setShowDynamicForm(true);
+    },
+  });
   const storageKey = `custom_records_${slug}`;
   const canCreate = objectDef ? canAccess(objectDef.apiName, 'create') : false;
   const canEdit = objectDef ? canAccess(objectDef.apiName, 'edit') : false;
@@ -902,10 +914,17 @@ export default function CustomObjectRecordsPage() {
       {showDynamicForm && selectedLayoutId && (
         <DynamicFormDialog
           open={showDynamicForm}
-          onOpenChange={setShowDynamicForm}
+          onOpenChange={(open) => {
+            setShowDynamicForm(open);
+            if (!open) {
+              setSelectedLayoutId(null);
+              setPrefillData({});
+            }
+          }}
           objectApiName={objectDef.apiName}
           layoutType="create"
           layoutId={selectedLayoutId}
+          recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
         />
       )}

@@ -301,10 +301,18 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Object not found' });
     }
 
-    // Build JSON path filter conditions for the data column (PostgreSQL)
-    const jsonFilters = filters.map(([field, value]) => ({
-      data: { path: [field], equals: value },
-    }));
+    // Build JSON path filter conditions for the data column (PostgreSQL).
+    // Records may store a field under either its prefixed apiName
+    // (`Contact__account`) or its short, unprefixed form (`account`) — see
+    // the normalization in the POST handler. Match either variant so the
+    // filter is symmetric with the read-side `resolveDataValue` helper.
+    const jsonFilters = filters.map(([field, value]) => {
+      const stripped = field.replace(/^[A-Za-z]+__/, '');
+      const variants = stripped !== field ? [field, stripped] : [field];
+      return {
+        OR: variants.map((k) => ({ data: { path: [k], equals: value } })),
+      };
+    });
 
     // When a custom orderBy is requested, fetch a larger batch for JS sorting
     const needsJsSort = orderByField !== null;
