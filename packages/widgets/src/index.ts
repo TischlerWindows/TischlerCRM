@@ -16,6 +16,7 @@ export const INTERNAL_WIDGET_IDS = [
   'related-list',
   'team-members-rollup',
   'team-member-associations',
+  'team-member-slot',
   'path',
   'installation-cost-grid',
   'summary',
