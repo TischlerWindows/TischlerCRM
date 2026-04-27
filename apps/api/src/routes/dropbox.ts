@@ -400,12 +400,24 @@ function fmtLeadDate(d: Date | string | null | undefined): string {
 async function resolveLeadContactDisplayName(leadData: Record<string, any>): Promise<string> {
   try {
     const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
-    // Find the contact lookup field (value should be a record UUID)
+    // Find the contact lookup field (value should be a record UUID).
+    // The field API name may be 'contact' OR 'contactName' depending on schema definition.
+    // Fallback: any value that looks like a Contact record ID (prefix '002', 15 chars).
     let contactId: string | undefined;
+    const CONTACT_LOOKUP_KEYS = new Set(['contact', 'contactname', 'contactid', 'primarycontact', 'primarycontactid']);
     for (const [k, v] of Object.entries(leadData)) {
-      if (sk(k) === 'contact' && typeof v === 'string' && v && !/^N\/A$/i.test(v.trim()) && v.length > 10) {
+      if (CONTACT_LOOKUP_KEYS.has(sk(k)) && typeof v === 'string' && v && !/^N\/A$/i.test(v.trim()) && v.length > 10) {
         contactId = v;
         break;
+      }
+    }
+    // ID-prefix fallback: if still not found, look for any 15-char value starting with '002' (Contact prefix)
+    if (!contactId) {
+      for (const [, v] of Object.entries(leadData)) {
+        if (typeof v === 'string' && v.length === 15 && v.startsWith('002')) {
+          contactId = v;
+          break;
+        }
       }
     }
     if (!contactId) return '';
