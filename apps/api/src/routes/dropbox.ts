@@ -238,8 +238,17 @@ async function resolveStoredFolder(
         fullPath: metadata.path_display,
       };
     } catch {
-      // Folder was deleted or ID is invalid
-      console.log(`[dropbox] Stored folder ID ${storedFolderId} for record ${recordId} no longer valid`);
+      // Folder was deleted or ID is invalid — clear the stale ID so that
+      // storeFolderIdOnRecord / backfillFolderId can write the new ID after
+      // the folder is recreated, rather than being blocked by the old value.
+      console.log(`[dropbox] Stored folder ID ${storedFolderId} for record ${recordId} no longer valid — clearing stale ID`);
+      try {
+        const staleRecord = await prisma.record.findFirst({ where: { id: recordId } });
+        if (staleRecord) {
+          const { _dropboxFolderId: _removed, ...restData } = staleRecord.data as Record<string, any>;
+          await prisma.record.update({ where: { id: recordId }, data: { data: restData } });
+        }
+      } catch { /* non-fatal */ }
       return { found: false };
     }
   } catch {
@@ -694,6 +703,16 @@ export async function tryRenameDropboxFolder(
   try {
     const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
     const isLinked = !!subfolder;
+
+    // ── Skip rename for requote Opportunities ──
+    // Requote folders live inside a parent OPP's 1. Estimation subpath and are
+    // not at the top level of Project Books. tryRenameDropboxFolder builds the
+    // path without that nesting, so it would incorrectly move the folder from
+    // 1. Estimation/ to the top of Project Books/. Skip entirely for requotes.
+    if (objectApiName === 'Opportunity') {
+      const _rnOppNum = (Object.entries(afterData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
+      if (Boolean(afterData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_rnOppNum)) return;
+    }
 
     // --- Get an access token ---
     let accessToken = await getAccessToken(userId);
@@ -2060,8 +2079,12 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
 
     // ── Search for an existing folder that may have been renamed in Dropbox ──
-    // Covers records created before folder ID tracking was added.
-    {
+    // Only for TOP-LEVEL objects (Property, Account, etc.) — not for linked records
+    // (Lead, Opportunity, WorkOrder, Service) which live inside Property subfolders.
+    // findExistingFolderInDropbox searches /TischlerCRM/{objectApiName} which is the
+    // wrong root for linked records; it could find a stale misplaced folder and lock
+    // in a wrong path, preventing proper subfolder regeneration.
+    if (!LINKED_RECORD_SUBFOLDER[objectApiName]) {
       const obj = await prisma.customObject.findFirst({
         where: { apiName: { equals: objectApiName, mode: 'insensitive' } },
       });
@@ -2071,20 +2094,13 @@ export async function dropboxRoutes(app: FastifyInstance) {
         });
         if (record) {
           const rData = record.data as Record<string, any>;
-          // Skip top-level folder search for requotes — they live inside a parent Opp's 1. Estimation,
-          // not at the root of /TischlerCRM/Opportunity. Searching there would either miss the real
-          // folder or lock in a previously-wrongly-placed folder.
-          const _rOppNum = (Object.entries(rData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
-          const _rIsReq = Boolean(rData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_rOppNum);
-          if (!_rIsReq) {
-            const renamedFolder = await findExistingFolderInDropbox(accessToken, objectApiName, recordId, rData);
-            if (renamedFolder) {
-              return reply.send({
-                created: false,
-                path: renamedFolder.fullPath,
-                folderName: renamedFolder.folderName,
-              });
-            }
+          const renamedFolder = await findExistingFolderInDropbox(accessToken, objectApiName, recordId, rData);
+          if (renamedFolder) {
+            return reply.send({
+              created: false,
+              path: renamedFolder.fullPath,
+              folderName: renamedFolder.folderName,
+            });
           }
         }
       }
