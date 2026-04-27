@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { preloadLookupRecords } from '@/lib/utils'
 import type { PanelField, TeamMemberSlotConfig } from '@/lib/schema'
 import { SlotInput } from './SlotInput'
 import { useTeamMemberSlot } from './useTeamMemberSlot'
@@ -47,6 +48,13 @@ export function TeamMemberSlotField({
     criterion: slotConfig.criterion,
   })
   const [showAdder, setShowAdder] = useState(false)
+
+  // Preload Contact + Account lookup caches so the bound row's resolveLookupDisplayName
+  // has data on first render rather than briefly showing the raw id.
+  useEffect(() => {
+    void preloadLookupRecords('Contact')
+    void preloadLookupRecords('Account')
+  }, [])
 
   const cardinality = slotConfig.cardinality ?? 'single'
   const mode = slotConfig.mode ?? 'paired'

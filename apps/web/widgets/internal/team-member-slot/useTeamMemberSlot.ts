@@ -7,6 +7,7 @@ import {
   usePendingTeamMemberPool,
   type PendingTeamMemberRow,
 } from '@/components/form/pending-team-member-pool'
+import { notifyTeamMembersChanged } from './teamMemberEvents'
 
 /** Plain field name on TeamMember for each parent object. */
 const OBJECT_TO_FIELD: Record<string, string> = {
@@ -247,6 +248,7 @@ export function useTeamMemberSlot({
         })
         await fetchRows()
         pool?.bumpVersion()
+        notifyTeamMembersChanged()
         return { id: String(created.id), isPending: false, data: dataOf(created) }
       }
 
@@ -298,6 +300,7 @@ export function useTeamMemberSlot({
       }
       await fetchRows()
       pool?.bumpVersion()
+      notifyTeamMembersChanged()
     },
     [pool, rows, fetchRows],
   )

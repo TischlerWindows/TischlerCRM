@@ -5,6 +5,7 @@ import { X } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
+import { resolveLookupDisplayName } from '@/lib/utils'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 
@@ -224,24 +225,35 @@ export function SlotInput({
 
   // ── Render bound row (already filled) ───────────────────────────────
   if (boundRow) {
-    const cName =
+    // Resolve names from the global lookup cache. If a denormalized contactName /
+    // accountName field is on the row use it; otherwise resolve the id via the
+    // standard helper (which handles the Contact composite-name field).
+    const contactIdValue = (boundRow.data.contact as string | undefined) ?? null
+    const accountIdValue = (boundRow.data.account as string | undefined) ?? null
+    const denormContact =
       (boundRow.data.contactName as string | undefined) ||
       (boundRow.data.TeamMember__contactName as string | undefined) ||
       ''
-    const aName =
+    const denormAccount =
       (boundRow.data.accountName as string | undefined) ||
       (boundRow.data.TeamMember__accountName as string | undefined) ||
       ''
+    const cName = denormContact || (contactIdValue ? resolveLookupDisplayName(contactIdValue, 'Contact') : '')
+    const aName = denormAccount || (accountIdValue ? resolveLookupDisplayName(accountIdValue, 'Account') : '')
+    // resolveLookupDisplayName returns '-' when the value is empty; treat that as no value.
+    const cDisplay = cName && cName !== '-' ? cName : ''
+    const aDisplay = aName && aName !== '-' ? aName : ''
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm">
-        <div className="flex-1 min-w-0 truncate">
-          {cName && <span className="font-medium text-gray-900">{cName}</span>}
-          {cName && aName && <span className="text-gray-400 mx-1">·</span>}
-          {aName && <span className="text-gray-700">{aName}</span>}
-          {!cName && !aName && (
-            <span className="text-gray-500 italic">
-              {boundRow.data.contact as string | undefined ?? boundRow.data.account as string | undefined ?? '—'}
-            </span>
+        <div className="flex-1 min-w-0">
+          {cDisplay && <div className="font-medium text-gray-900 truncate">{cDisplay}</div>}
+          {aDisplay && (
+            <div className={cDisplay ? 'text-xs text-gray-500 truncate' : 'font-medium text-gray-900 truncate'}>
+              {aDisplay}
+            </div>
+          )}
+          {!cDisplay && !aDisplay && (
+            <span className="text-gray-500 italic">—</span>
           )}
         </div>
         {onClear && !disabled && (
@@ -282,6 +294,7 @@ export function SlotInput({
           onBlur={() => setTimeout(() => setAccountActive(false), 150)}
           schemaObjects={schemaObjects}
           disabled={disabled}
+          hideNoneOption
         />
       )}
       {(mode === 'contact' || mode === 'paired') && (
@@ -297,6 +310,7 @@ export function SlotInput({
           onBlur={() => setTimeout(() => setContactActive(false), 150)}
           schemaObjects={schemaObjects}
           disabled={disabled}
+          hideNoneOption
         />
       )}
 
