@@ -585,7 +585,8 @@ interface Summary {
   woodType: string;
   finish: string;
   glassType: string;
-  muntinType: string;
+  sdl: string[];
+  tdl: string[];
   spacerBars: string;
   spacerBarColors: string;
   projectContains: string[];
@@ -944,7 +945,8 @@ export default function SummaryPage() {
       woodType: opts?.oppFields?.woodType || '',
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
-      muntinType: '',
+      sdl: [],
+      tdl: [],
       spacerBars: opts?.oppFields?.spacerBars || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
       projectContains: [],
@@ -1237,9 +1239,11 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Muntin Type', val(s.muntinType), col3W);
-    drawField(doc, 15 + col3W, y, 'Spacer Bars', val(s.spacerBars), col3W);
-    drawField(doc, 15 + col3W * 2, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
+    drawField(doc, 15, y, 'SDL', (s.sdl || []).join(', ') || '—', col3W);
+    drawField(doc, 15 + col3W, y, 'TDL', (s.tdl || []).join(', ') || '—', col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Spacer Bars', val(s.spacerBars), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
     y += 10;
     drawField(doc, 15, y, 'Project Contains', (s.projectContains || []).join(', ') || '—', pw2 - 30);
     y += 12;
@@ -2866,17 +2870,47 @@ export default function SummaryPage() {
                             ))}
                           </select>
                         </div>
+                      </div>
+
+                      {/* Row: SDL + TDL multiselects */}
+                      <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Muntin Type</label>
-                          <select
-                            value={editingSummary.muntinType || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, muntinType: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select muntin type...</option>
-                            <option value="SDL">SDL</option>
-                            <option value="TDL">TDL</option>
-                          </select>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
+                          <div className="border border-gray-300 rounded-lg overflow-hidden">
+                            {['22MM', '44MM', 'Custom Option'].map(opt => (
+                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                                <input
+                                  type="checkbox"
+                                  checked={(editingSummary.sdl || []).includes(opt)}
+                                  onChange={() => {
+                                    const cur = editingSummary.sdl || [];
+                                    setEditingSummary({ ...editingSummary, sdl: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">TDL</label>
+                          <div className="border border-gray-300 rounded-lg overflow-hidden">
+                            {['48MM', '70MM', '125MM', 'Custom Option'].map(opt => (
+                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                                <input
+                                  type="checkbox"
+                                  checked={(editingSummary.tdl || []).includes(opt)}
+                                  onChange={() => {
+                                    const cur = editingSummary.tdl || [];
+                                    setEditingSummary({ ...editingSummary, tdl: cur.includes(opt) ? cur.filter(v => v !== opt) : [...cur, opt] });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">{opt}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
