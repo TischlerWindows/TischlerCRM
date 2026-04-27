@@ -27,6 +27,7 @@ import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
 import { DateInput } from '@/components/date-input';
+import { useSchemaStore } from '@/lib/schema-store';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -628,6 +629,12 @@ export default function SummaryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Derive picklist options from the live Opportunity schema
+  const schema = useSchemaStore(s => s.schema);
+  const oppFields = schema?.objects?.find(o => o.apiName === 'Opportunity')?.fields ?? [];
+  const getOppPicklist = (apiName: string): string[] =>
+    oppFields.find(f => f.apiName === apiName)?.picklistValues ?? [];
+
   useEffect(() => {
     (async () => {
       // Load summaries from API
@@ -648,7 +655,25 @@ export default function SummaryPage() {
       const opportunityNumber = searchParams.get('opportunityNumber') || '';
       // Clear query params so refreshing doesn't re-create
       router.replace('/summary');
-      createNewSummary({ opportunityId, opportunityName, opportunityNumber });
+      // Fetch the opportunity record to pre-populate fields
+      (async () => {
+        let oppFields: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } = {};
+        try {
+          const rec = await recordsService.getRecord('Opportunity', opportunityId);
+          if (rec) {
+            const d: any = rec.data ?? rec;
+            const pick = (bare: string) => d[bare] || d[`Opportunity__${bare}`] || '';
+            oppFields = {
+              woodType: pick('woodType'),
+              finish: pick('finishSpecifications'),
+              glassType: pick('glassType'),
+              spacerBars: pick('spacerBars'),
+              spacerBarColors: pick('spacerBarColors'),
+            };
+          }
+        } catch { /* non-fatal */ }
+        createNewSummary({ opportunityId, opportunityName, opportunityNumber, oppFields });
+      })();
       return;
     }
     // Auto-open existing summary for editing (from Summary widget on record page)
@@ -742,14 +767,23 @@ export default function SummaryPage() {
 
   const handleOpportunitySelected = (record: any) => {
     setShowOpportunityPicker(false);
+    // Helper: try both bare key and prefixed key
+    const pick = (bare: string) => record[bare] || record[`Opportunity__${bare}`] || '';
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
       opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
+      oppFields: {
+        woodType: pick('woodType'),
+        finish: pick('finishSpecifications'),
+        glassType: pick('glassType'),
+        spacerBars: pick('spacerBars'),
+        spacerBarColors: pick('spacerBarColors'),
+      },
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarColors?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -865,12 +899,12 @@ export default function SummaryPage() {
       product: '',
       productType: '',
       productTypeOptions: [],
-      woodType: '',
-      finish: '',
-      glassType: '',
+      woodType: opts?.oppFields?.woodType || '',
+      finish: opts?.oppFields?.finish || '',
+      glassType: opts?.oppFields?.glassType || '',
       muntinType: '',
-      spacerBars: '',
-      spacerBarColors: '',
+      spacerBars: opts?.oppFields?.spacerBars || '',
+      spacerBarColors: opts?.oppFields?.spacerBarColors || '',
       projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
@@ -2738,10 +2772,9 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select wood type...</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            {getOppPicklist('Opportunity__woodType').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -2752,11 +2785,9 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select finish...</option>
-                            <option value="200">Same finish inside and outside (paint/paint or stain/stain) 200</option>
-                            <option value="510">Partial Split Finish (stain or painted exterior/clear or white dip interior) 510</option>
-                            <option value="610">Stain Exterior/Clear dip interior (Clear dip is considered &quot;no finish&quot;) 610</option>
-                            <option value="500">Split paint finish &amp; paint exterior Stain Interior 500</option>
-                            <option value="600">Split stain finish (Different stain colors inside and outside) 600</option>
+                            {getOppPicklist('Opportunity__finishSpecifications').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -2771,7 +2802,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select glass type...</option>
-                            {['1','2','2.1','3','4','5','6','7','7.1','7.2','8','9','10','11','12','13','14','15','17','18','22','22.1','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39','40'].map(v => (
+                            {getOppPicklist('Opportunity__glassType').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -2800,10 +2831,9 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select spacer bars...</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            {getOppPicklist('Opportunity__spacerBars').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
                           </select>
                         </div>
                         <div>
@@ -2814,10 +2844,9 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select spacer bar colors...</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
+                            {getOppPicklist('Opportunity__spacerBarColors').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
