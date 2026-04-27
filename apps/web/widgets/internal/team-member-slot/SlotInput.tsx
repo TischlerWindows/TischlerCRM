@@ -81,11 +81,6 @@ export function SlotInput({
   const [contactActive, setContactActive] = useState(false)
   const [accountResults, setAccountResults] = useState<Record<string, unknown>[]>([])
   const [contactResults, setContactResults] = useState<Record<string, unknown>[]>([])
-  const [skipAccount, setSkipAccount] = useState(
-    // Skip account picker in contact-only mode, or when editing a paired row that has a contact but no account.
-    // Account-only mode must NEVER skip — the account picker is its only input.
-    mode === 'contact' || (mode === 'paired' && !!boundRow?.data.contact && !boundRow?.data.account)
-  )
   const [pendingRole, setPendingRole] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -129,12 +124,31 @@ export function SlotInput({
     if (mode === 'account') return
     const t = setTimeout(async () => {
       try {
-        if (mode === 'paired' && accountId && !skipAccount) {
-          // Filter to account's contacts; let local query trim within
-          const data = await apiClient.get<Record<string, unknown>[]>(
-            `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId)}&limit=200`,
+        if (mode === 'paired' && accountId) {
+          // Filter to account's contacts. The Contact object's FK to Account is
+          // typically `account` (plain) but admins may have created the field via
+          // Object Manager which also produces an auto-generated `AccountId` form.
+          // Query both shapes and merge so we don't depend on a single field name.
+          const [byAccount, byAccountId] = await Promise.all([
+            apiClient
+              .get<Record<string, unknown>[]>(
+                `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId)}&limit=200`,
+              )
+              .catch(() => [] as Record<string, unknown>[]),
+            apiClient
+              .get<Record<string, unknown>[]>(
+                `/objects/Contact/records?filter[AccountId]=${encodeURIComponent(accountId)}&limit=200`,
+              )
+              .catch(() => [] as Record<string, unknown>[]),
+          ])
+          const merged = [
+            ...(Array.isArray(byAccount) ? byAccount : []),
+            ...(Array.isArray(byAccountId) ? byAccountId : []),
+          ]
+          const deduped = Array.from(
+            new Map(merged.map(r => [String((r as { id?: unknown }).id ?? ''), r])).values(),
           )
-          const arr = Array.isArray(data) ? flatten(data) : []
+          const arr = flatten(deduped)
           if (!contactQuery.trim()) {
             setContactResults(arr)
           } else {
@@ -162,7 +176,7 @@ export function SlotInput({
       }
     }, 250)
     return () => clearTimeout(t)
-  }, [contactQuery, contactActive, mode, accountId, skipAccount])
+  }, [contactQuery, contactActive, mode, accountId])
 
   const hasSelection = (mode === 'contact' && !!contactId) ||
     (mode === 'account' && !!accountId) ||
@@ -245,15 +259,19 @@ export function SlotInput({
   }
 
   // ── Render empty slot inputs ───────────────────────────────────────
+  // Both pickers are always visible in paired mode. The cascading is implicit:
+  // when an account is selected, the contact picker filters to that account's
+  // contacts; when no account is selected, the contact picker searches globally.
   return (
     <div className="space-y-2">
-      {(mode === 'account' || mode === 'paired') && !skipAccount && (
+      {(mode === 'account' || mode === 'paired') && (
         <LookupSearch
           fieldDef={accountFieldDef}
           value={accountId ?? ''}
           onChange={(val) => {
             setAccountId(val ? String(val) : null)
-            // Reset contact when account changes in paired mode
+            // Reset contact when account changes in paired mode so the next pick
+            // comes from the new account's filtered list.
             if (mode === 'paired') setContactId(null)
           }}
           records={accountResults}
@@ -266,42 +284,20 @@ export function SlotInput({
           disabled={disabled}
         />
       )}
-      {(mode === 'contact' || mode === 'paired') &&
-        (mode === 'contact' || skipAccount || accountId) && (
-          <LookupSearch
-            fieldDef={contactFieldDef}
-            value={contactId ?? ''}
-            onChange={(val) => setContactId(val ? String(val) : null)}
-            records={contactResults}
-            lookupQuery={contactQuery}
-            isActive={contactActive}
-            onQueryChange={setContactQuery}
-            onFocus={() => setContactActive(true)}
-            onBlur={() => setTimeout(() => setContactActive(false), 150)}
-            schemaObjects={schemaObjects}
-            disabled={disabled}
-          />
-        )}
-      {mode === 'paired' && !skipAccount && (
-        <button
-          type="button"
-          onClick={() => {
-            setSkipAccount(true)
-            setAccountId(null)
-          }}
-          className="text-xs text-gray-500 hover:text-gray-700 underline"
-        >
-          Pick contact without account
-        </button>
-      )}
-      {mode === 'paired' && skipAccount && (
-        <button
-          type="button"
-          onClick={() => setSkipAccount(false)}
-          className="text-xs text-gray-500 hover:text-gray-700 underline"
-        >
-          Pick an account too
-        </button>
+      {(mode === 'contact' || mode === 'paired') && (
+        <LookupSearch
+          fieldDef={contactFieldDef}
+          value={contactId ?? ''}
+          onChange={(val) => setContactId(val ? String(val) : null)}
+          records={contactResults}
+          lookupQuery={contactQuery}
+          isActive={contactActive}
+          onQueryChange={setContactQuery}
+          onFocus={() => setContactActive(true)}
+          onBlur={() => setTimeout(() => setContactActive(false), 150)}
+          schemaObjects={schemaObjects}
+          disabled={disabled}
+        />
       )}
 
       {isFlagNetNew && hasSelection && (
