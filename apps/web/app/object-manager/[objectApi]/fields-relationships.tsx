@@ -290,7 +290,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     if (t === 'Formula') {
       newField.formulaExpr = formData.formulaExpr;
     }
-    if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup') {
+    if (t === 'Picklist' || t === 'MultiPicklist' || t === 'PicklistText' || t === 'PicklistLookup' || t === 'DropdownWithCustom') {
       newField.picklistValues = [...formData.picklistValues];
       // Only save picklistColors if any color is set
       const colors = Object.fromEntries(

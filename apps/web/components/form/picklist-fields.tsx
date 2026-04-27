@@ -494,8 +494,6 @@ export function DropdownWithCustomInput({
               onClick={() => {
                 setShowCustom(true);
                 setOpen(false);
-                // Clear any previously-selected standard option so the text input starts empty
-                if (!showCustom) onChange('');
                 // Focus the text input on next tick
                 setTimeout(() => inputRef.current?.focus(), 50);
               }}
