@@ -386,7 +386,13 @@ function deriveOpportunityFolderName(data: Record<string, any>): string {
 
 // ── Derive Dropbox folder name from record data ───────────────────
 // Mirrors the frontend deriveDropboxFolderName logic in the widget wrapper.
-function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string, objectApiName?: string): string {
+function fmtLeadDate(d: Date | string | null | undefined): string {
+  const dt = d ? (d instanceof Date ? d : new Date(d)) : new Date();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(dt.getDate()).padStart(2,'0')} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+
+function deriveDropboxFolderName(recordData: Record<string, any>, recordId: string, objectApiName?: string, createdAt?: Date | string | null): string {
   // Find auto-number field.
   // When objectApiName is provided, prefer the record's OWN number (e.g. projectNumber for
   // a Project) over numbers inherited from linked entities (e.g. opportunityNumber,
@@ -453,7 +459,7 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
     }
   }
 
-  // Special case for Lead: format as "LEAD#### (Lead Name)" instead of address-based name
+  // Special case for Lead: format as "LD#### (Contact Name) DD Mon YYYY"
   if (objectApiName === 'Lead') {
     const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
     const contactNameKey = Object.keys(recordData).find(k => sk(k) === 'contactname');
@@ -462,9 +468,12 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
     const leadName = (contactNameKey ? (recordData[contactNameKey] as string) : '') ||
       [firstNameKey ? recordData[firstNameKey] : '', lastNameKey ? recordData[lastNameKey] : '']
         .filter(Boolean).join(' ').trim();
-    if (autoNumber && leadName) return `${autoNumber} (${leadName})`;
-    if (autoNumber) return autoNumber;
-    if (leadName) return leadName;
+    // Replace LEAD prefix with LD (e.g. LEAD0001 → LD0001)
+    const ldNumber = autoNumber ? autoNumber.replace(/^LEAD/i, 'LD') : '';
+    const dateStr = fmtLeadDate(createdAt);
+    if (ldNumber && leadName) return `${ldNumber} (${leadName}) ${dateStr}`;
+    if (ldNumber) return `${ldNumber} ${dateStr}`;
+    if (leadName) return `${leadName} ${dateStr}`;
     return recordId;
   }
 
@@ -699,14 +708,24 @@ export async function tryRenameDropboxFolder(
     // Need at least one property ID to work with
     if (!oldPropertyId && !newPropertyId) return;
 
+    // For Lead renames, fetch the record's createdAt so the date suffix stays consistent
+    let leadCreatedAt: Date | null = null;
+    if (objectApiName === 'Lead') {
+      const leadObj = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Lead', mode: 'insensitive' } } });
+      if (leadObj) {
+        const leadRec = await prisma.record.findFirst({ where: { id: recordId, objectId: leadObj.id }, select: { createdAt: true } });
+        if (leadRec) leadCreatedAt = leadRec.createdAt;
+      }
+    }
+
     let oldChildName: string;
     let newChildName: string;
     if (objectApiName === 'Opportunity') {
       oldChildName = deriveOpportunityFolderName(beforeData) || deriveDropboxFolderName(beforeData, recordId, objectApiName);
       newChildName = deriveOpportunityFolderName(afterData) || deriveDropboxFolderName(afterData, recordId, objectApiName);
     } else {
-      oldChildName = deriveDropboxFolderName(beforeData, recordId, objectApiName);
-      newChildName = deriveDropboxFolderName(afterData, recordId, objectApiName);
+      oldChildName = deriveDropboxFolderName(beforeData, recordId, objectApiName, leadCreatedAt);
+      newChildName = deriveDropboxFolderName(afterData, recordId, objectApiName, leadCreatedAt);
     }
 
     // Resolve Property folder paths
@@ -1162,7 +1181,7 @@ async function tryCopyLinkedRecordFiles(
         });
         if (leadRecord) {
           const leadData = leadRecord.data as Record<string, any>;
-          const leadFolderName = deriveDropboxFolderName(leadData, leadId);
+          const leadFolderName = deriveDropboxFolderName(leadData, leadId, 'Lead', leadRecord.createdAt);
           const safeLead = leadFolderName.replace(/[\\/:*?"<>|]/g, '_').trim();
           // Lead folder lives under: /TischlerCRM/Property/{prop}/Leads/{leadFolder}
           sourcePath = `${parentPropertyPath}/Leads/${safeLead}`;

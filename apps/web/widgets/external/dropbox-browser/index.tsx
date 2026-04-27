@@ -75,7 +75,7 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
     }
   }
 
-  // Special case for Lead: format as "LEAD#### (Lead Name)" instead of address-based name
+  // Special case for Lead: format as "LD#### (Contact Name) DD Mon YYYY"
   if (objectApiName?.toLowerCase() === 'lead') {
     const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
     const contactNameKey = Object.keys(record).find(k => sk(k) === 'contactname')
@@ -84,9 +84,16 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
     const leadName = (contactNameKey ? (record[contactNameKey] as string) : '') ||
       [firstNameKey ? record[firstNameKey] : '', lastNameKey ? record[lastNameKey] : '']
         .filter(Boolean).join(' ').trim()
-    if (autoNumber && leadName) return `${autoNumber} (${leadName})`
-    if (autoNumber) return autoNumber
-    if (leadName) return leadName
+    // Replace LEAD prefix with LD (e.g. LEAD0001 → LD0001)
+    const ldNumber = autoNumber ? autoNumber.replace(/^LEAD/i, 'LD') : ''
+    // Use record's createdAt if available, otherwise today
+    const rawDate = (record.createdAt || record.CreatedDate) as string | undefined
+    const dt = rawDate ? new Date(rawDate) : new Date()
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const dateStr = `${String(dt.getDate()).padStart(2,'0')} ${months[dt.getMonth()]} ${dt.getFullYear()}`
+    if (ldNumber && leadName) return `${ldNumber} (${leadName}) ${dateStr}`
+    if (ldNumber) return `${ldNumber} ${dateStr}`
+    if (leadName) return `${leadName} ${dateStr}`
     return id
   }
 
