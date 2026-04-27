@@ -1072,7 +1072,9 @@ export default function SummaryPage() {
       doc.text(label.toUpperCase(), x, y);
       doc.setFontSize(8.5);
       doc.setTextColor(30, 30, 30);
-      doc.text(val(value).substring(0, Math.floor(maxW / 1.8)), x, y + 4);
+      // Use splitTextToSize to wrap long values within maxW, render first 2 lines max
+      const lines: string[] = doc.splitTextToSize(val(value), maxW);
+      doc.text(lines.slice(0, 2), x, y + 4);
     };
 
     // Draws a table with auto column widths, header row, and data rows
@@ -1252,13 +1254,16 @@ export default function SummaryPage() {
     // ── Project Overview ──
     y = drawSectionTitle(doc, y, 'Project Overview');
     const col3W = (pw2 - 30) / 3;
+    const col2W = (pw2 - 30) / 2;
     drawField(doc, 15, y, 'Date', dateStr, col3W);
     drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Address', val(s.address), col3W);
-    drawField(doc, 15 + col3W, y, 'Salesman', val(s.salesman), col3W);
-    drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
+    // Address on its own full-width row so long addresses aren't truncated
+    drawField(doc, 15, y, 'Address', val(s.address), pw2 - 30);
+    y += 10;
+    drawField(doc, 15, y, 'Salesman', val(s.salesman), col2W);
+    drawField(doc, 15 + col2W, y, 'Estimator', val(s.estimator), col2W);
     y += 10;
     drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
     if (s.quoteType === 'requote') {
@@ -1267,24 +1272,33 @@ export default function SummaryPage() {
     y += 12;
 
     // ── Product Specifications ──
+    // Only render fields that have actual values — skip blank ones entirely
     y = drawSectionTitle(doc, y, 'Product Specifications');
-    drawField(doc, 15, y, 'Product', val(s.product || s.jobType), col3W);
-    drawField(doc, 15 + col3W, y, 'Product Type', val(s.productType), col3W);
-    drawField(doc, 15 + col3W * 2, y, 'Options', (s.productTypeOptions || []).join(', ') || '—', col3W);
-    y += 10;
-    drawField(doc, 15, y, 'Wood Type', val(s.woodType), col3W);
-    drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
-    drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
-    y += 10;
-    drawField(doc, 15, y, 'SDL', s.sdl === 'Custom Option' ? (s.sdlCustom || '—') : (s.sdl || '—'), col3W);
-    drawField(doc, 15 + col3W, y, 'TDL', s.tdl === 'Custom Option' ? (s.tdlCustom || '—') : (s.tdl || '—'), col3W);
-    drawField(doc, 15 + col3W * 2, y, 'Spacer Bars', val(s.spacerBars), col3W);
-    y += 10;
-    drawField(doc, 15, y, 'Spacer Bar Type', val(s.spacerBarType), col3W);
-    drawField(doc, 15 + col3W, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
-    y += 10;
-    drawField(doc, 15, y, 'Project Contains', (s.projectContains || []).join(', ') || '—', pw2 - 30);
-    y += 12;
+    const specFields: [string, string][] = [];
+    const addSpec = (label: string, value: string | undefined | null) => {
+      const v = (value || '').trim();
+      if (v) specFields.push([label, v]);
+    };
+    addSpec('Product', s.product || s.jobType);
+    addSpec('Product Type', s.productType);
+    if ((s.productTypeOptions || []).length > 0) addSpec('Options', s.productTypeOptions!.join(', '));
+    addSpec('Wood Type', s.woodType);
+    addSpec('Finish', s.finish);
+    addSpec('Glass Type', s.glassType);
+    addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
+    addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
+    addSpec('Spacer Bars', s.spacerBars);
+    addSpec('Spacer Bar Type', s.spacerBarType);
+    addSpec('Spacer Bar Colors', s.spacerBarColors);
+    if ((s.projectContains || []).length > 0) addSpec('Project Contains', s.projectContains!.join(', '));
+    for (let i = 0; i < specFields.length; i += 3) {
+      for (let j = 0; j < 3 && i + j < specFields.length; j++) {
+        const [label, value] = specFields[i + j];
+        drawField(doc, 15 + col3W * j, y, label, value, col3W);
+      }
+      y += 10;
+    }
+    y += 2;
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
