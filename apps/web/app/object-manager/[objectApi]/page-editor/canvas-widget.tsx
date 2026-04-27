@@ -20,6 +20,7 @@ import {
   Rows3,
   List,
   Users,
+  UserCheck,
   GitBranch,
   Table2,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const WIDGET_ICONS: Partial<Record<LayoutWidget['widgetType'], React.ElementType
   HeaderHighlights: Sparkles,
   TeamMembersRollup: Users,
   TeamMemberAssociations: Users,
+  TeamMemberSlot: UserCheck,
   ExternalWidget: Puzzle,
   Path: GitBranch,
   InstallationCostGrid: Table2,
@@ -51,6 +53,7 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   HeaderHighlights: 'Header Highlights',
   TeamMembersRollup: 'Team Members',
   TeamMemberAssociations: 'Team Member Associations',
+  TeamMemberSlot: 'Team Member Slot',
   Path: 'Path',
   InstallationCostGrid: 'Installation Cost Grid',
 };
@@ -81,6 +84,12 @@ function summarizeWidget(widget: LayoutWidget): string {
       return `Team Members${widget.config.rollupFromProperty ? ' (Rollup)' : ''}`;
     case 'TeamMemberAssociations':
       return 'Associations for Contact / Account';
+    case 'TeamMemberSlot': {
+      const c = widget.config.criterion;
+      const what = c?.kind === 'flag' ? c.flag : c?.kind === 'role' ? c.role : 'unconfigured';
+      const card = widget.config.cardinality === 'multi' ? 'Multi' : 'Single';
+      return `${what} (${card}, ${widget.config.mode})`;
+    }
     case 'ExternalWidget': {
       const manifest = getWidgetById(widget.config.externalWidgetId);
       return manifest?.description ?? widget.config.externalWidgetId;

@@ -60,6 +60,7 @@ const WIDGET_TYPES: ReadonlySet<string> = new Set<string>([
   'HeaderHighlights',
   'TeamMembersRollup',
   'TeamMemberAssociations',
+  'TeamMemberSlot',
   'ExternalWidget',
   'Path',
   'InstallationCostGrid',
