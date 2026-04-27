@@ -2864,7 +2864,7 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row 3: Glass Type + Muntin Type */}
+                      {/* Row: Glass Type + Spacer Bars */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
@@ -2875,6 +2875,49 @@ export default function SummaryPage() {
                           >
                             <option value="">Select glass type...</option>
                             {getOppPicklist('Opportunity__glassType').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
+                          <select
+                            value={editingSummary.spacerBars || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bars...</option>
+                            {getOppPicklist('Opportunity__spacerBars').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Row: Spacer Bar Type + Spacer Bar Colors */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Type</label>
+                          <select
+                            value={editingSummary.spacerBarType || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarType: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar type...</option>
+                            {getOppPicklist('Opportunity__spacer_bar_type').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
+                          <select
+                            value={editingSummary.spacerBarColors || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select spacer bar colors...</option>
+                            {getOppPicklist('Opportunity__spacerBarColors').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
@@ -2929,51 +2972,6 @@ export default function SummaryPage() {
                               className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
                             />
                           )}
-                        </div>
-                      </div>
-
-                      {/* Row 4: Spacer Bars + Spacer Bar Type + Spacer Bar Colors */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
-                          <select
-                            value={editingSummary.spacerBars || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bars...</option>
-                            {getOppPicklist('Opportunity__spacerBars').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Type</label>
-                          <select
-                            value={editingSummary.spacerBarType || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarType: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bar type...</option>
-                            {getOppPicklist('Opportunity__spacer_bar_type').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Colors</label>
-                          <select
-                            value={editingSummary.spacerBarColors || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBarColors: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bar colors...</option>
-                            {getOppPicklist('Opportunity__spacerBarColors').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
                         </div>
                       </div>
 
