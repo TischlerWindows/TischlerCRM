@@ -98,38 +98,69 @@ export function SlotInput({
     })
   }
 
-  // Debounced account search
+  // Build a lowercased searchable string from a flattened record. Handles the
+  // Contact CompositeText `name` object — the server-side `/records/search`
+  // endpoint can't find composite-name contacts because Object.values stringifies
+  // a nested object as "[object Object]". Doing this client-side fixes that.
+  function searchText(r: Record<string, unknown>): string {
+    const parts: string[] = []
+    const collect = (v: unknown) => {
+      if (v == null) return
+      if (typeof v === 'string') parts.push(v.toLowerCase())
+      else if (typeof v === 'object' && !Array.isArray(v)) {
+        for (const inner of Object.values(v as Record<string, unknown>)) collect(inner)
+      }
+    }
+    for (const v of Object.values(r)) collect(v)
+    return parts.join(' ')
+  }
+
+  // Account list — fetched once on first activation and filtered client-side.
+  // This avoids the server's /records/search endpoint missing matches when
+  // names are stored as composite objects, and shows results on focus.
+  const accountListRef = React.useRef<Record<string, unknown>[] | null>(null)
   useEffect(() => {
     if (!accountActive) return
     if (mode === 'contact') return
-    if (accountQuery.trim().length < 2) {
-      setAccountResults([])
-      return
-    }
-    const t = setTimeout(async () => {
+    let cancelled = false
+    const run = async () => {
       try {
-        const data = await apiClient.get<Record<string, unknown>[]>(
-          `/objects/Account/records/search?q=${encodeURIComponent(accountQuery.trim())}`,
-        )
-        setAccountResults(Array.isArray(data) ? flatten(data) : [])
+        if (!accountListRef.current) {
+          const data = await apiClient.get<Record<string, unknown>[]>(
+            `/objects/Account/records?limit=200`,
+          )
+          accountListRef.current = Array.isArray(data) ? flatten(data) : []
+        }
+        if (cancelled) return
+        const all = accountListRef.current
+        const q = accountQuery.trim().toLowerCase()
+        const filtered = q ? all.filter(r => searchText(r).includes(q)) : all
+        setAccountResults(filtered.slice(0, 50))
       } catch {
-        setAccountResults([])
+        if (!cancelled) setAccountResults([])
       }
-    }, 250)
-    return () => clearTimeout(t)
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
   }, [accountQuery, accountActive, mode])
 
-  // Contact search — global, OR filtered to current account.
+  // Global contact list — fetched once on first activation when no account
+  // filter is active. Client-side filtering using a composite-name-aware
+  // comparator finds Contacts whose name is stored as a CompositeText object
+  // (the server's /records/search misses those because it stringifies nested
+  // objects as "[object Object]").
+  const contactListRef = React.useRef<Record<string, unknown>[] | null>(null)
   useEffect(() => {
     if (!contactActive) return
     if (mode === 'account') return
-    const t = setTimeout(async () => {
+    let cancelled = false
+    const run = async () => {
       try {
+        // Paired + account selected: filter to that account's contacts (handles
+        // both `account` plain and auto-generated `AccountId` field names).
         if (mode === 'paired' && accountId) {
-          // Filter to account's contacts. The Contact object's FK to Account is
-          // typically `account` (plain) but admins may have created the field via
-          // Object Manager which also produces an auto-generated `AccountId` form.
-          // Query both shapes and merge so we don't depend on a single field name.
           const [byAccount, byAccountId] = await Promise.all([
             apiClient
               .get<Record<string, unknown>[]>(
@@ -150,33 +181,33 @@ export function SlotInput({
             new Map(merged.map(r => [String((r as { id?: unknown }).id ?? ''), r])).values(),
           )
           const arr = flatten(deduped)
-          if (!contactQuery.trim()) {
-            setContactResults(arr)
-          } else {
-            const q = contactQuery.trim().toLowerCase()
-            setContactResults(
-              arr.filter(r => {
-                const name = `${r.firstName ?? ''} ${r.lastName ?? r.name ?? ''}`.toLowerCase()
-                const email = String(r.email ?? '').toLowerCase()
-                return name.includes(q) || email.includes(q)
-              }),
-            )
-          }
-        } else {
-          if (contactQuery.trim().length < 2) {
-            setContactResults([])
-            return
-          }
-          const data = await apiClient.get<Record<string, unknown>[]>(
-            `/objects/Contact/records/search?q=${encodeURIComponent(contactQuery.trim())}`,
-          )
-          setContactResults(Array.isArray(data) ? flatten(data) : [])
+          if (cancelled) return
+          const q = contactQuery.trim().toLowerCase()
+          const filtered = q ? arr.filter(r => searchText(r).includes(q)) : arr
+          setContactResults(filtered.slice(0, 50))
+          return
         }
+
+        // Global contact list (contact-only mode, or paired with no account).
+        if (!contactListRef.current) {
+          const data = await apiClient.get<Record<string, unknown>[]>(
+            `/objects/Contact/records?limit=200`,
+          )
+          contactListRef.current = Array.isArray(data) ? flatten(data) : []
+        }
+        if (cancelled) return
+        const all = contactListRef.current
+        const q = contactQuery.trim().toLowerCase()
+        const filtered = q ? all.filter(r => searchText(r).includes(q)) : all
+        setContactResults(filtered.slice(0, 50))
       } catch {
-        setContactResults([])
+        if (!cancelled) setContactResults([])
       }
-    }, 250)
-    return () => clearTimeout(t)
+    }
+    void run()
+    return () => {
+      cancelled = true
+    }
   }, [contactQuery, contactActive, mode, accountId])
 
   const hasSelection = (mode === 'contact' && !!contactId) ||
