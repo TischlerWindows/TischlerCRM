@@ -95,6 +95,13 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     };
   }
 
+  if (data.type === 'palette-team-member-slot') {
+    return {
+      kind: 'palette-team-member-slot',
+      label: typeof data.label === 'string' ? data.label : 'Team Member Slot',
+    };
+  }
+
   if (activeId.startsWith('palette-field-') || activeId.startsWith('field-')) {
     const fieldApiName = activeId.replace(/^(?:palette-)?field-/, '');
     const label =

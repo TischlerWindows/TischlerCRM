@@ -60,11 +60,18 @@ function parseWidgetConfig(
 
 function normalizeField(rawField: unknown, fieldIndex: number): PanelField {
   const candidate = (rawField ?? {}) as Record<string, unknown>;
+  const kind = candidate.kind === 'teamMemberSlot' ? 'teamMemberSlot' : 'field';
+  const slotConfig =
+    kind === 'teamMemberSlot' && candidate.slotConfig && typeof candidate.slotConfig === 'object'
+      ? (candidate.slotConfig as PanelField['slotConfig'])
+      : undefined;
   return {
+    ...(kind === 'teamMemberSlot' ? { kind: 'teamMemberSlot' as const } : {}),
     fieldApiName:
       typeof candidate.fieldApiName === 'string'
         ? candidate.fieldApiName
         : `field-${fieldIndex + 1}`,
+    ...(slotConfig ? { slotConfig } : {}),
     colSpan: typeof candidate.colSpan === 'number' ? Math.max(1, candidate.colSpan) : 1,
     order: typeof candidate.order === 'number' ? candidate.order : fieldIndex,
     behavior: parseBehavior(candidate.behavior),
@@ -78,6 +85,9 @@ function normalizeField(rawField: unknown, fieldIndex: number): PanelField {
       candidate.valueStyle && typeof candidate.valueStyle === 'object'
         ? (candidate.valueStyle as PanelField['valueStyle'])
         : {},
+    ...(typeof candidate.hideOnNew === 'boolean' ? { hideOnNew: candidate.hideOnNew } : {}),
+    ...(typeof candidate.hideOnView === 'boolean' ? { hideOnView: candidate.hideOnView } : {}),
+    ...(typeof candidate.hideOnEdit === 'boolean' ? { hideOnEdit: candidate.hideOnEdit } : {}),
   };
 }
 

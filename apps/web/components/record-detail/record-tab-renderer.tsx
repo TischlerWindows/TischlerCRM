@@ -24,6 +24,7 @@ import {
 import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
+import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -272,6 +273,13 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
           const visibleFields = sortedFields.filter((f: any) => {
             if (f.behavior === 'hidden') return false;
             if (f.hideOnView || f.hideOnExisting) return false;
+            // Synthetic TeamMemberSlot fields don't have a FieldDef on the parent object;
+            // they pass through here so the renderer below can dispatch on kind.
+            if (f.kind === 'teamMemberSlot' && f.slotConfig) {
+              const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
+              if (fFx?.hidden) return false;
+              return true;
+            }
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
@@ -319,6 +327,22 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                   }}
                 >
                   {visibleFields.map((f: any) => {
+                    // Synthetic TeamMemberSlot fields render through their own cell.
+                    if (f.kind === 'teamMemberSlot' && f.slotConfig) {
+                      return (
+                        <div
+                          key={f.fieldApiName}
+                          style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                        >
+                          <TeamMemberSlotField
+                            parentObjectApiName={objectDef?.apiName ?? ''}
+                            parentRecordId={(record?.id as string | undefined) ?? null}
+                            slotConfig={f.slotConfig}
+                            panelField={f}
+                          />
+                        </div>
+                      );
+                    }
                     const fd = getFieldDef(f.fieldApiName, objectDef);
                     if (!fd) return null;
                     const raw = getRecordValue(f.fieldApiName, record, fd, formulaValues);
