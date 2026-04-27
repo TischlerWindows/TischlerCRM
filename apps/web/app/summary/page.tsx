@@ -781,7 +781,7 @@ export default function SummaryPage() {
     const textAddr = data?.propertyAddress || data?.['Opportunity__propertyAddress'] || '';
     if (textAddr) return textAddr;
 
-    const propertyId = data?.property || data?.['Opportunity__property'] || '';
+    const propertyId = data?.PropertyId || data?.property || data?.['Opportunity__property'] || data?.['Opportunity__PropertyId'] || '';
     if (!propertyId || typeof propertyId !== 'string') return '';
 
     try {
