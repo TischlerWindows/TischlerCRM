@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Target, 
@@ -33,6 +33,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
+import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -107,8 +108,6 @@ export default function OpportunitiesPage() {
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { schema } = useSchemaStore();
   const { user } = useAuth();
   const { canAccess, hasAppPermission } = usePermissions();
@@ -168,23 +167,15 @@ export default function OpportunitiesPage() {
 
 
   // Auto-open new record form when navigated from a related list with ?new=true
-  useEffect(() => {
-    if (searchParams.get('new') !== 'true' || !oppObject) return;
-    const result = resolveLayoutForUser(
-      oppObject,
-      { profileId: user?.profileId ?? null },
-    );
-    if (result.kind !== 'resolved') return;
-    // Extract prefill fields from URL (e.g., PropertyId=001EcZ28vn7mm0E)
-    const prefill: Record<string, any> = {}
-    searchParams.forEach((value, key) => {
-      if (key !== 'new') prefill[key] = value
-    })
-    setPrefillData(prefill)
-    setSelectedLayoutId(result.layout.id);
-    setShowDynamicForm(true)
-    router.replace(pathname, { scroll: false })
-  }, [searchParams, oppObject, user?.profileId, pathname, router])
+  useNewRecordFromQuery({
+    objectDef: oppObject,
+    profileId: user?.profileId,
+    onOpen: (layoutId, prefill) => {
+      setPrefillData(prefill);
+      setSelectedLayoutId(layoutId);
+      setShowDynamicForm(true);
+    },
+  });
 
   useEffect(() => {
     (async () => {

@@ -33,6 +33,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
+import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
@@ -96,6 +97,7 @@ export default function ServicePage() {
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [layoutError, setLayoutError] = useState<
     Extract<LayoutResolveResult, { kind: 'error' }> | null
   >(null);
@@ -129,6 +131,16 @@ export default function ServicePage() {
   const isLookupLoaded = useLookupPreloader(serviceObject);
   const pageLayouts = serviceObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
+
+  useNewRecordFromQuery({
+    objectDef: serviceObject,
+    profileId: user?.profileId,
+    onOpen: (layoutId, prefill) => {
+      setPrefillData(prefill);
+      setSelectedLayoutId(layoutId);
+      setShowDynamicForm(true);
+    },
+  });
 
   const AVAILABLE_COLUMNS = useMemo(() => {
     if (!serviceObject?.fields) {
@@ -845,11 +857,15 @@ export default function ServicePage() {
           open={showDynamicForm}
           onOpenChange={(open) => {
             setShowDynamicForm(open);
-            if (!open) setSelectedLayoutId(null);
+            if (!open) {
+              setSelectedLayoutId(null);
+              setPrefillData({});
+            }
           }}
           objectApiName="Service"
           layoutType="create"
           layoutId={selectedLayoutId}
+          recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
           title="New Service"
         />

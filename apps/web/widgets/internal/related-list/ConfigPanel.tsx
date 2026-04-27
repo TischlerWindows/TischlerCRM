@@ -204,9 +204,16 @@ export default function RelatedListConfigPanel({ config, onChange, objectOptions
             <select className={selectCls} value={(config.linkField as string) ?? ''}
               onChange={e => onChange({ ...config, linkField: e.target.value })}>
               <option value="">— Select field —</option>
-              {fields.map(f => <option key={f.apiName} value={f.apiName}>{f.label}</option>)}
+              {fields
+                .filter(f => f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser')
+                .map(f => <option key={f.apiName} value={f.apiName}>{f.label}</option>)}
             </select>
-            <p className="text-[10px] text-gray-400 mt-0.5">Field on the related object that references the current record</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">Lookup field on the related object that references the current record</p>
+            {fields.filter(f => f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser').length === 0 && (
+              <p className="text-[10px] text-amber-600 mt-1">
+                No lookup fields exist on this object. Add one in Object Manager so records can reference back to this record.
+              </p>
+            )}
           </div>
 
           {/* ── Sort ── */}

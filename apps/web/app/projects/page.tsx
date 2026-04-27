@@ -34,6 +34,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
+import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord, seedLookupCache } from '@/lib/utils';
@@ -135,6 +136,17 @@ export default function ProjectsPage() {
   const isLookupLoaded = useLookupPreloader(projectObject);
   const pageLayouts = projectObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
+
+  useNewRecordFromQuery({
+    objectDef: projectObject,
+    profileId: user?.profileId,
+    onOpen: (layoutId, prefill) => {
+      setPrefillData(prefill);
+      setPrefillLookupQueries(undefined);
+      setSelectedLayoutId(layoutId);
+      setShowDynamicForm(true);
+    },
+  });
 
   const AVAILABLE_COLUMNS = useMemo(() => {
     if (!projectObject?.fields) {

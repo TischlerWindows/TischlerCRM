@@ -33,6 +33,7 @@ import { useSchemaStore } from '@/lib/schema-store';
 import { useAuth } from '@/lib/auth-context';
 import { usePermissions } from '@/lib/permissions-context';
 import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-resolver';
+import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
 import AdvancedFilters, { FilterCondition } from '@/components/advanced-filters';
@@ -101,6 +102,7 @@ export default function ContactsPage() {
   const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
+  const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [layoutError, setLayoutError] = useState<
     Extract<LayoutResolveResult, { kind: 'error' }> | null
   >(null);
@@ -135,6 +137,16 @@ export default function ContactsPage() {
   const isLookupLoaded = useLookupPreloader(contactObject);
   const pageLayouts = contactObject?.pageLayouts || [];
   const hasPageLayout = pageLayouts.length > 0;
+
+  useNewRecordFromQuery({
+    objectDef: contactObject,
+    profileId: user?.profileId,
+    onOpen: (layoutId, prefill) => {
+      setPrefillData(prefill);
+      setSelectedLayoutId(layoutId);
+      setShowDynamicForm(true);
+    },
+  });
 
   // Dynamically generate available columns from schema
   const AVAILABLE_COLUMNS = useMemo(() => {
@@ -888,7 +900,7 @@ export default function ContactsPage() {
         objectLabel="Contact"
       />
       {hasPageLayout && selectedLayoutId && (
-        <DynamicFormDialog open={showDynamicForm} onOpenChange={(open) => { setShowDynamicForm(open); if (!open) setSelectedLayoutId(null); }} objectApiName="Contact" layoutType="create" layoutId={selectedLayoutId} onSubmit={handleDynamicFormSubmit} title="New Contact" />
+        <DynamicFormDialog open={showDynamicForm} onOpenChange={(open) => { setShowDynamicForm(open); if (!open) { setSelectedLayoutId(null); setPrefillData({}); } }} objectApiName="Contact" layoutType="create" layoutId={selectedLayoutId} recordData={prefillData} onSubmit={handleDynamicFormSubmit} title="New Contact" />
       )}
 
       {/* Column Filter Settings Dialog */}
