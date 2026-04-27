@@ -77,6 +77,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Picklist', label: 'Picklist', description: 'Allows users to select a value from a list you define.', category: 'Standard', icon: List },
   { value: 'MultiPicklist', label: 'Picklist (Multi-Select)', description: 'Allows users to select multiple values from a list you define.', category: 'Standard', icon: List },
   { value: 'PicklistText', label: 'Picklist with Text', description: 'A side-by-side combination of a picklist dropdown and a free-text input. Choose which side displays the dropdown.', category: 'Standard', icon: List },
+  { value: 'DropdownWithCustom', label: 'Dropdown with Custom', description: 'A dropdown with a built-in "Custom..." option. When selected, a text box appears so users can type any value instead. Useful for fields that have common values but occasionally need something non-standard.', category: 'Standard', icon: List },
   { value: 'Text', label: 'Text', description: 'Allows users to enter any combination of letters and numbers.', category: 'Standard', icon: FileText },
   { value: 'TextArea', label: 'Text Area', description: 'Allows users to enter up to 255 characters on separate lines.', category: 'Standard', icon: FileText },
   { value: 'LongTextArea', label: 'Text Area (Long)', description: 'Allows users to enter up to 131,072 characters on separate lines.', category: 'Standard', icon: FileText },
@@ -157,7 +158,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     setFormData({
       ...formData,
       type,
-      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' ? formData.picklistValues : [],
+      picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' ? formData.picklistValues : [],
       lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
       lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
       relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
@@ -801,7 +802,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     </div>
                   )}
 
-                  {(selectedType === 'Picklist' || selectedType === 'MultiPicklist') && (
+                  {(selectedType === 'Picklist' || selectedType === 'MultiPicklist' || selectedType === 'DropdownWithCustom') && (
                     <div>
                       <Label htmlFor="picklistValues">Picklist Values</Label>
                       <Textarea

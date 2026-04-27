@@ -9,7 +9,8 @@ export type FieldType =
   | "Text" | "TextArea" | "LongTextArea" | "RichTextArea" | "EncryptedText"
   | "Time" | "URL" | "Address" | "CompositeText" | "AutoUser" | "LookupUser"
   | "LocationSearch"
-  | "DropboxFiles";
+  | "DropboxFiles"
+  | "DropdownWithCustom";
 
 /**
  * Normalize field type strings from the database to canonical FieldType values.
@@ -50,6 +51,7 @@ export function normalizeFieldType(raw: string): FieldType {
     lookupuser: 'LookupUser',
     locationsearch: 'LocationSearch',
     dropboxfiles: 'DropboxFiles',
+    dropdownwithcustom: 'DropdownWithCustom',
   };
   return CANONICAL[raw.toLowerCase()] || (raw as FieldType);
 }
@@ -813,7 +815,8 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'URL', value: 'URL', type: 'URL' },
   { label: 'Address', value: 'Address', type: 'Address' },
   { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' },
-  { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' }
+  { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' },
+  { label: 'Dropdown with Custom', value: 'DropdownWithCustom', type: 'DropdownWithCustom' }
 ];
 
 // Helper to get field type categories
@@ -823,7 +826,7 @@ export const getFieldTypeCategory = (type: FieldType): string => {
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
-  if (["Picklist", "MultiPicklist", "PicklistText"].includes(type)) return "Selection";
+  if (["Picklist", "MultiPicklist", "PicklistText", "DropdownWithCustom"].includes(type)) return "Selection";
   if (["DropboxFiles"].includes(type)) return "Integration";
   return "Other";
 };
@@ -859,6 +862,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     URL: "link",
     Address: "map",
     DropboxFiles: "cloud",
+    DropdownWithCustom: "list",
   };
   return icons[type] || "circle";
 };

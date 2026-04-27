@@ -44,6 +44,7 @@ import {
   MultiPicklistInput,
   PicklistTextInput,
   PicklistTextDropdown,
+  DropdownWithCustomInput,
   filterPicklistValues,
 } from './picklist-fields';
 import {
@@ -76,6 +77,7 @@ export function getFieldIcon(type: FieldType) {
     MultiPicklist: List,
     MultiSelectPicklist: List,
     PicklistText: List,
+    DropdownWithCustom: List,
     Address: MapPin,
     Geolocation: MapPin,
     Lookup: LinkIcon,
@@ -266,6 +268,21 @@ export function FieldInput({
           value={value}
           onChange={(val) => onFieldChange(fieldDef.apiName, val)}
           disabled={isReadOnly}
+          formData={formData}
+          visibilityCtx={visibilityCtx}
+        />
+      );
+      break;
+
+    // ── DropdownWithCustom ────────────────────────────────────
+    case 'DropdownWithCustom':
+      inputElement = (
+        <DropdownWithCustomInput
+          fieldDef={fieldDef}
+          value={value}
+          onChange={(val) => onFieldChange(fieldDef.apiName, val)}
+          disabled={isReadOnly}
+          error={error}
           formData={formData}
           visibilityCtx={visibilityCtx}
         />
