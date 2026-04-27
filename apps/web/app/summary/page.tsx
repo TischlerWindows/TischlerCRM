@@ -2572,9 +2572,11 @@ export default function SummaryPage() {
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                            {editingSummary.date ? new Date(editingSummary.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </div>
+                          <DateInput
+                            value={editingSummary.date || ''}
+                            onChange={(v) => setEditingSummary({ ...editingSummary, date: v })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                          />
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                         <div>
@@ -2589,9 +2591,13 @@ export default function SummaryPage() {
                       {/* Row 2: Project Name */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
-                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                          {editingSummary.name || '—'}
-                        </div>
+                        <input
+                          type="text"
+                          value={editingSummary.name || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                          placeholder="Enter project name"
+                        />
                         <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Name on Page 1</p>
                       </div>
 
@@ -2654,16 +2660,24 @@ export default function SummaryPage() {
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Salesman</label>
-                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                            {editingSummary.salesman || '—'}
-                          </div>
+                          <input
+                            type="text"
+                            value={editingSummary.salesman || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, salesman: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter salesman"
+                          />
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Estimator</label>
-                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                            {editingSummary.estimator || '—'}
-                          </div>
+                          <input
+                            type="text"
+                            value={editingSummary.estimator || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, estimator: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter estimator"
+                          />
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                       </div>
