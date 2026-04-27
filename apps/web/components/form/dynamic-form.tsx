@@ -902,11 +902,13 @@ export default function DynamicForm({
     // Synthetic TeamMemberSlot fields render through their own component, not FieldInput.
     const lf = layoutField as unknown as { kind?: string; slotConfig?: import('@/lib/schema').TeamMemberSlotConfig };
     if (lf?.kind === 'teamMemberSlot' && lf.slotConfig) {
+      // formData mirrors the loaded record (or {} in create mode); use its id.
+      const parentRecordId = typeof formData?.id === 'string' ? formData.id : null;
       return (
         <TeamMemberSlotField
           key={fieldDef.apiName}
           parentObjectApiName={objectApiName}
-          parentRecordId={(record?.id as string | undefined) ?? null}
+          parentRecordId={parentRecordId}
           slotConfig={lf.slotConfig}
           panelField={layoutField as unknown as import('@/lib/schema').PanelField}
         />
