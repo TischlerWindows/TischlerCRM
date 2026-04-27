@@ -21,6 +21,12 @@ const DEFAULT_WIDGET_CONFIGS: Record<WidgetType, LayoutWidget['config']> = {
   HeaderHighlights: { type: 'HeaderHighlights', fieldApiNames: [] },
   TeamMembersRollup: { type: 'TeamMembersRollup' },
   TeamMemberAssociations: { type: 'TeamMemberAssociations' },
+  TeamMemberSlot: {
+    type: 'TeamMemberSlot',
+    criterion: { kind: 'flag', flag: 'primaryContact' },
+    cardinality: 'single',
+    mode: 'paired',
+  },
   ExternalWidget: { type: 'ExternalWidget', externalWidgetId: '', displayMode: 'full', config: {} },
   Path: { type: 'Path', pathId: '', showLabel: true, showGuidance: true, showKeyFields: true, compact: false },
   InstallationCostGrid: { type: 'InstallationCostGrid' },

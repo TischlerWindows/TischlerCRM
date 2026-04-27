@@ -17,6 +17,7 @@ import {
   Puzzle,
   Sparkles,
   StretchHorizontal,
+  UserCheck,
 } from 'lucide-react';
 import type { ElementType } from 'react';
 
@@ -31,6 +32,7 @@ const LUCIDE_ICON_MAP: Record<string, ElementType> = {
   Puzzle,
   Sparkles,
   StretchHorizontal,
+  UserCheck,
 };
 
 function getLucideIcon(name: string): ElementType {
@@ -50,6 +52,7 @@ const MANIFEST_ID_TO_WIDGET_TYPE: Record<string, WidgetType> = {
   'custom-component': 'CustomComponent',
   'team-members-rollup': 'TeamMembersRollup',
   'team-member-associations': 'TeamMemberAssociations',
+  'team-member-slot': 'TeamMemberSlot',
   'path': 'Path',
   'installation-cost-grid': 'InstallationCostGrid',
   'summary': 'Summary',
