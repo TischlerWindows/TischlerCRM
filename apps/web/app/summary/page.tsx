@@ -586,7 +586,9 @@ interface Summary {
   finish: string;
   glassType: string;
   sdl: string[];
+  sdlCustom: string;
   tdl: string[];
+  tdlCustom: string;
   spacerBars: string;
   spacerBarColors: string;
   projectContains: string[];
@@ -946,7 +948,9 @@ export default function SummaryPage() {
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
       sdl: [],
+      sdlCustom: '',
       tdl: [],
+      tdlCustom: '',
       spacerBars: opts?.oppFields?.spacerBars || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
       projectContains: [],
@@ -1239,8 +1243,14 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W, y, 'Finish', val(s.finish), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Glass Type', val(s.glassType), col3W);
     y += 10;
-    drawField(doc, 15, y, 'SDL', (s.sdl || []).join(', ') || '—', col3W);
-    drawField(doc, 15 + col3W, y, 'TDL', (s.tdl || []).join(', ') || '—', col3W);
+    drawField(doc, 15, y, 'SDL', [
+      ...(s.sdl || []).filter((v: string) => v !== 'custom'),
+      ...((s.sdl || []).includes('custom') && s.sdlCustom ? [s.sdlCustom] : []),
+    ].join(', ') || '—', col3W);
+    drawField(doc, 15 + col3W, y, 'TDL', [
+      ...(s.tdl || []).filter((v: string) => v !== 'custom'),
+      ...((s.tdl || []).includes('custom') && s.tdlCustom ? [s.tdlCustom] : []),
+    ].join(', ') || '—', col3W);
     drawField(doc, 15 + col3W * 2, y, 'Spacer Bars', val(s.spacerBars), col3W);
     y += 10;
     drawField(doc, 15, y, 'Spacer Bar Colors', val(s.spacerBarColors), col3W);
@@ -2877,8 +2887,8 @@ export default function SummaryPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
                           <div className="border border-gray-300 rounded-lg overflow-hidden">
-                            {['22MM', '44MM', 'Custom Option'].map(opt => (
-                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                            {['22MM', '44MM'].map(opt => (
+                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                                 <input
                                   type="checkbox"
                                   checked={(editingSummary.sdl || []).includes(opt)}
@@ -2891,13 +2901,41 @@ export default function SummaryPage() {
                                 <span className="text-sm text-gray-700">{opt}</span>
                               </label>
                             ))}
+                            {/* Custom Option row */}
+                            <div className="border-t border-gray-100">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(editingSummary.sdl || []).includes('custom')}
+                                  onChange={() => {
+                                    const cur = editingSummary.sdl || [];
+                                    const next = cur.includes('custom') ? cur.filter(v => v !== 'custom') : [...cur, 'custom'];
+                                    setEditingSummary({ ...editingSummary, sdl: next, sdlCustom: next.includes('custom') ? (editingSummary.sdlCustom || '') : '' });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">Custom Option</span>
+                              </label>
+                              {(editingSummary.sdl || []).includes('custom') && (
+                                <div className="px-3 pb-2">
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={editingSummary.sdlCustom || ''}
+                                    onChange={(e) => setEditingSummary({ ...editingSummary, sdlCustom: e.target.value })}
+                                    placeholder="Enter custom value..."
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">TDL</label>
                           <div className="border border-gray-300 rounded-lg overflow-hidden">
-                            {['48MM', '70MM', '125MM', 'Custom Option'].map(opt => (
-                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                            {['48MM', '70MM', '125MM'].map(opt => (
+                              <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                                 <input
                                   type="checkbox"
                                   checked={(editingSummary.tdl || []).includes(opt)}
@@ -2910,6 +2948,34 @@ export default function SummaryPage() {
                                 <span className="text-sm text-gray-700">{opt}</span>
                               </label>
                             ))}
+                            {/* Custom Option row */}
+                            <div className="border-t border-gray-100">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={(editingSummary.tdl || []).includes('custom')}
+                                  onChange={() => {
+                                    const cur = editingSummary.tdl || [];
+                                    const next = cur.includes('custom') ? cur.filter(v => v !== 'custom') : [...cur, 'custom'];
+                                    setEditingSummary({ ...editingSummary, tdl: next, tdlCustom: next.includes('custom') ? (editingSummary.tdlCustom || '') : '' });
+                                  }}
+                                  className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                />
+                                <span className="text-sm text-gray-700">Custom Option</span>
+                              </label>
+                              {(editingSummary.tdl || []).includes('custom') && (
+                                <div className="px-3 pb-2">
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={editingSummary.tdlCustom || ''}
+                                    onChange={(e) => setEditingSummary({ ...editingSummary, tdlCustom: e.target.value })}
+                                    placeholder="Enter custom value..."
+                                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
