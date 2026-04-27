@@ -816,7 +816,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Address', value: 'Address', type: 'Address' },
   { label: 'Lookup User', value: 'LookupUser', type: 'LookupUser' },
   { label: 'Dropbox Files', value: 'DropboxFiles', type: 'DropboxFiles' },
-  { label: 'Dropdown with Custom', value: 'DropdownWithCustom', type: 'DropdownWithCustom' }
+  { label: 'Picklist with Custom', value: 'DropdownWithCustom', type: 'DropdownWithCustom' }
 ];
 
 // Helper to get field type categories
