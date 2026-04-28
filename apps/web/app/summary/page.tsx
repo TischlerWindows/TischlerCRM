@@ -1258,11 +1258,17 @@ export default function SummaryPage() {
     // ── Project Overview ──
     y = drawSectionTitle(doc, y, 'Project Overview');
     const col3W = (pw2 - 30) / 3;
+    // Normalize flat addresses (old summaries) to two-line format: street,\ncity, state zip
+    const fmtAddr = (addr: string) => {
+      if (!addr || addr.includes('\n')) return addr;
+      const i = addr.indexOf(', ');
+      return i === -1 ? addr : addr.substring(0, i + 1) + '\n' + addr.substring(i + 2);
+    };
     drawField(doc, 15, y, 'Date', dateStr, col3W);
     drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Address', val(s.address), col3W);
+    drawField(doc, 15, y, 'Address', fmtAddr(val(s.address)), col3W);
     drawField(doc, 15 + col3W, y, 'Salesman', val(s.salesman), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
     y += 14;
