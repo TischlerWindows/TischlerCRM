@@ -126,6 +126,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     displayFields: [] as string[],
   });
 
+  let fields: FieldDef[] = schema?.objects.find((o) => o.apiName === objectApiName)?.fields ?? [];
+
   // Add hardcoded Name field for Contact objects
   if (objectApiName === 'Contact') {
     const nameField = {
@@ -165,7 +167,6 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
       maxLength: type === 'Text' || type === 'LongTextArea' || type === 'RichTextArea' ? formData.maxLength : 255,
       staticUrl: type === 'URL' ? formData.staticUrl : '',
-      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
       displayFields: type === 'LookupFields' ? formData.displayFields : [],
     });
     setShowTypeSelector(false);
@@ -199,6 +200,9 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       targetFields: {},
       displayFields: [],
     });
+  };
+
+  const handleEditField = (field: FieldDef) => {
     // Deep-clone the field so editingField is independent from the live
     // schema state — prevents shared references from leaking mutations.
     const cloned: FieldDef = {
