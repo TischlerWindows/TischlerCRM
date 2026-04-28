@@ -694,11 +694,15 @@ export default function SummaryPage() {
               spacerBarColors: pick('spacerBarColors'),
               product: pick('productSpecifications'),
               plansDated: pick('plansDated'),
-              contactReceivingQuote: pick('individual_receiving_the_quote'),
-              accountReceivingQuote: pick('account_receiving_the_quote'),
             };
-            const accountId = pick('account_receiving_the_quote');
-            const accFields = await resolveAccountFields(accountId);
+            const rawContact = pick('individual_receiving_the_quote');
+            const rawAccount = pick('account_receiving_the_quote');
+            const [contactName, accFields] = await Promise.all([
+              resolveContactName(rawContact),
+              resolveAccountFields(rawAccount),
+            ]);
+            oppFields.contactReceivingQuote = contactName;
+            oppFields.accountReceivingQuote = accFields.name;
             oppFields.accountShippingAddress = accFields.shippingAddress;
             oppFields.accountPrimaryPhone = accFields.primaryPhone;
             address = await resolveOppPropertyAddress(d);
@@ -847,11 +851,13 @@ export default function SummaryPage() {
     }
   };
 
-  const resolveAccountFields = async (accountId: string): Promise<{ shippingAddress: string; primaryPhone: string }> => {
-    if (!accountId || typeof accountId !== 'string') return { shippingAddress: '', primaryPhone: '' };
+  const resolveAccountFields = async (rawVal: any): Promise<{ name: string; shippingAddress: string; primaryPhone: string }> => {
+    const empty = { name: '', shippingAddress: '', primaryPhone: '' };
+    const accountId = rawVal && typeof rawVal === 'object' ? (rawVal.lookup || '') : (typeof rawVal === 'string' ? rawVal : '');
+    if (!accountId) return empty;
     try {
       const accRec = await recordsService.getRecord('Account', accountId);
-      if (!accRec) return { shippingAddress: '', primaryPhone: '' };
+      if (!accRec) return empty;
       const d: any = (accRec as any).data ?? accRec;
       const pick = (bare: string) => d[bare] || d[`Account__${bare}`] || '';
       const rawAddr = pick('shippingAddress');
@@ -863,9 +869,33 @@ export default function SummaryPage() {
         try { const obj = JSON.parse(rawAddr); const parts = [obj.street, obj.city, obj.state, obj.postalCode].filter(Boolean); shippingAddress = parts.join(', '); }
         catch { shippingAddress = rawAddr; }
       }
-      return { shippingAddress, primaryPhone: pick('primaryPhone') };
+      const name = pick('accountName') || pick('name') || '';
+      return { name: typeof name === 'string' ? name : '', shippingAddress, primaryPhone: pick('primaryPhone') || pick('phone') };
     } catch {
-      return { shippingAddress: '', primaryPhone: '' };
+      return empty;
+    }
+  };
+
+  const resolveContactName = async (rawVal: any): Promise<string> => {
+    const contactId = rawVal && typeof rawVal === 'object' ? (rawVal.lookup || '') : (typeof rawVal === 'string' ? rawVal : '');
+    if (!contactId) return '';
+    try {
+      const conRec = await recordsService.getRecord('Contact', contactId);
+      if (!conRec) return '';
+      const d: any = (conRec as any).data ?? conRec;
+      const pick = (bare: string) => d[bare] || d[`Contact__${bare}`] || '';
+      const rawName = pick('name');
+      if (rawName && typeof rawName === 'object') {
+        const first = rawName['Contact__name_firstName'] || rawName.firstName || '';
+        const last = rawName['Contact__name_lastName'] || rawName.lastName || '';
+        return [first, last].filter(Boolean).join(' ');
+      }
+      if (typeof rawName === 'string' && rawName) return rawName;
+      // fallback to firstName + lastName fields
+      const first = pick('firstName'); const last = pick('lastName');
+      return [first, last].filter(v => v && v !== 'N/A').join(' ');
+    } catch {
+      return '';
     }
   };
 
@@ -883,8 +913,12 @@ export default function SummaryPage() {
     };
     const glassResolved = resolvePicklist('Opportunity__glassType', pick('glassType'));
     const woodResolved = resolvePicklist('Opportunity__woodType', pick('woodType'));
-    const accountId = pick('account_receiving_the_quote');
-    const accFields = await resolveAccountFields(accountId);
+    const rawContact = pick('individual_receiving_the_quote');
+    const rawAccount = pick('account_receiving_the_quote');
+    const [contactName, accFields] = await Promise.all([
+      resolveContactName(rawContact),
+      resolveAccountFields(rawAccount),
+    ]);
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
@@ -901,8 +935,8 @@ export default function SummaryPage() {
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
         plansDated: pick('plansDated'),
-        contactReceivingQuote: pick('individual_receiving_the_quote'),
-        accountReceivingQuote: pick('account_receiving_the_quote'),
+        contactReceivingQuote: contactName,
+        accountReceivingQuote: accFields.name,
         accountShippingAddress: accFields.shippingAddress,
         accountPrimaryPhone: accFields.primaryPhone,
       },
