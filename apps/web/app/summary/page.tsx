@@ -1040,6 +1040,7 @@ export default function SummaryPage() {
     const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
     const val = (v: string | undefined | null) => v || '—';
     const dateStr = s.date ? new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+    const plansDatedStr = s.plansDated ? new Date(s.plansDated + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) : '—';
 
     // ── Load logo ──
     let logoDataUrl: string | null = null;
@@ -1302,7 +1303,7 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
     y += 14;
     drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
-    drawField(doc, 15 + col3W, y, 'Plans Dated', val(s.plansDated), col3W);
+    drawField(doc, 15 + col3W, y, 'Plans Dated', plansDatedStr, col3W);
     if (s.quoteType === 'requote') {
       y += 10;
       drawField(doc, 15, y, 'Description of Changes', val(s.requoteDescription), col3W * 3);
@@ -2820,12 +2821,10 @@ export default function SummaryPage() {
                       {/* Row 6: Plans Dated */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Plans Dated</label>
-                        <input
-                          type="text"
+                        <DateInput
                           value={editingSummary.plansDated || ''}
-                          onChange={(e) => setEditingSummary({ ...editingSummary, plansDated: e.target.value })}
+                          onChange={(v) => setEditingSummary({ ...editingSummary, plansDated: v })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
-                          placeholder="Enter plans dated"
                         />
                         <p className="text-xs text-gray-400 mt-1">Auto-filled from Opportunity</p>
                       </div>
