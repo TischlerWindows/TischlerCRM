@@ -605,6 +605,8 @@ interface Summary {
   shippingContainers: string;
   shippingCostPerContainer: string;
   shippingCraneCost: string;
+  taxAtFull: string;
+  taxAtDiscount: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -1102,6 +1104,8 @@ export default function SummaryPage() {
       shippingContainers: '',
       shippingCostPerContainer: '',
       shippingCraneCost: '',
+      taxAtFull: '',
+      taxAtDiscount: '',
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -1459,6 +1463,14 @@ export default function SummaryPage() {
       drawField(doc, 15 + col3W * 2, y, 'Crane Cost', deliveryCrane ? String(deliveryCrane) : '—', col3W);
       y += 10;
       drawField(doc, 15, y, 'Estimated Delivery Cost', `${deliveryTotal}k`, col3W * 2);
+      y += 12;
+    }
+
+    // ── Tax Cost ──
+    if (s.taxAtFull || s.taxAtDiscount) {
+      y = drawSectionTitle(doc, y, 'Tax Cost');
+      drawField(doc, 15, y, 'Use Tax @ Full', val(s.taxAtFull), col3W);
+      drawField(doc, 15 + col3W, y, 'Use Tax @ Discount', val(s.taxAtDiscount), col3W);
       y += 12;
     }
 
@@ -3342,6 +3354,37 @@ export default function SummaryPage() {
                           </div>
                         );
                       })()}
+                    </div>
+                  </div>
+
+                  {/* Tax Cost */}
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Tax Cost</h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Use Tax @ Full</label>
+                          <input
+                            type="text"
+                            value={editingSummary.taxAtFull || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, taxAtFull: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder=""
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Use Tax @ Discount</label>
+                          <input
+                            type="text"
+                            value={editingSummary.taxAtDiscount || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, taxAtDiscount: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder=""
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
