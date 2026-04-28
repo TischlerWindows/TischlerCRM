@@ -508,7 +508,18 @@ export interface ValueStyle {
   italic?: boolean;
 }
 
-export type PanelFieldKind = 'field' | 'teamMemberSlot';
+export type PanelFieldKind = 'field' | 'teamMemberSlot' | 'lookupFields';
+
+/**
+ * Config for a 'lookupFields' panel field.
+ * Displays selected fields from a related record, driven by another Lookup field on this layout.
+ */
+export interface LookupFieldsConfig {
+  /** apiName of the Lookup/PicklistLookup field on this object that drives the record selection */
+  sourceLookupApiName: string;
+  /** Which fields from the related record to display (bare apiNames without object prefix) */
+  displayFields: string[];
+}
 
 export interface PanelField {
   /**
@@ -529,6 +540,8 @@ export interface PanelField {
    * config is the source of truth; fieldApiName is derived from it for identity.
    */
   slotConfig?: TeamMemberSlotConfig;
+  /** Config for kind='lookupFields' fields. */
+  lookupFieldsConfig?: LookupFieldsConfig;
   labelOverride?: string;
   colSpan: number;
   order: number;

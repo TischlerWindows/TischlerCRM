@@ -59,6 +59,23 @@ export function buildTeamMemberSlotField(atIndex: number): PanelField {
   };
 }
 
+export function buildLookupFieldsField(atIndex: number): PanelField {
+  const uniqueId = `__lf:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return {
+    kind: 'lookupFields',
+    fieldApiName: uniqueId,
+    lookupFieldsConfig: {
+      sourceLookupApiName: '',
+      displayFields: [],
+    },
+    colSpan: 1,
+    order: atIndex,
+    behavior: 'none',
+    labelStyle: {},
+    valueStyle: {},
+  };
+}
+
 export function buildField(fieldApiName: string, atIndex: number): PanelField {
   return {
     fieldApiName,
@@ -133,7 +150,8 @@ export function dispatchDragEnd(
   if (
     active.kind === 'palette-field' ||
     active.kind === 'existing-field' ||
-    active.kind === 'palette-team-member-slot'
+    active.kind === 'palette-team-member-slot' ||
+    active.kind === 'palette-lookup-fields'
   ) {
     let targetPanelId: string | null = null;
     let targetIndex = 0;
@@ -157,6 +175,11 @@ export function dispatchDragEnd(
 
     if (active.kind === 'palette-team-member-slot') {
       addField(buildTeamMemberSlotField(targetIndex), targetPanelId, targetIndex);
+      return;
+    }
+
+    if (active.kind === 'palette-lookup-fields') {
+      addField(buildLookupFieldsField(targetIndex), targetPanelId, targetIndex);
       return;
     }
 

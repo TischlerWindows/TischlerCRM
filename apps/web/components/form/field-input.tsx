@@ -54,6 +54,88 @@ import {
   getLookupTargetApi,
 } from './lookup-search';
 
+// ── LookupFields display component ─────────────────────────────────
+
+function LookupFieldsDisplay({
+  config,
+  formData,
+  objectFields,
+  lookupRecordsCache,
+  schema,
+  labelOverride,
+}: {
+  config: import('@/lib/schema').LookupFieldsConfig;
+  formData: Record<string, any>;
+  objectFields: FieldDef[];
+  lookupRecordsCache: Record<string, any[]>;
+  schema: any;
+  labelOverride?: string;
+}) {
+  const { sourceLookupApiName, displayFields } = config;
+
+  // Find the source lookup field definition
+  const sourceDef = objectFields.find(f => f.apiName === sourceLookupApiName);
+  const targetApi = sourceDef ? getLookupTargetApi(sourceDef, objectFields, schema?.objects) : null;
+  const records: any[] = targetApi ? (lookupRecordsCache[targetApi] || []) : [];
+
+  // Get the ID stored in formData for the source lookup
+  const rawVal = formData[sourceLookupApiName];
+  const lookupId: string | null =
+    rawVal && typeof rawVal === 'object' ? (rawVal.lookup || null) : (typeof rawVal === 'string' ? rawVal : null);
+
+  // Find the related record
+  const relatedRecord = lookupId ? records.find(r => String(r.id) === lookupId) : null;
+
+  // Resolve object prefix to strip from field names when reading record
+  const targetObj = schema?.objects?.find((o: any) => o.apiName === targetApi);
+  const prefix = targetApi ? `${targetApi}__` : '';
+
+  const getFieldLabel = (fieldApiName: string): string => {
+    const field = targetObj?.fields?.find((f: any) => f.apiName === fieldApiName || f.apiName === `${prefix}${fieldApiName}`);
+    return field?.label || fieldApiName;
+  };
+
+  const getFieldValue = (fieldApiName: string): string => {
+    if (!relatedRecord) return '—';
+    const val = relatedRecord[fieldApiName] ?? relatedRecord[`${prefix}${fieldApiName}`];
+    if (val === undefined || val === null || val === '') return '—';
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
+  return (
+    <div className="space-y-0">
+      <div className="text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+        <LinkIcon className="h-4 w-4 text-gray-400" />
+        {labelOverride || (sourceDef?.label ? `Fields from ${sourceDef.label}` : 'Linked Fields')}
+      </div>
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {displayFields.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-gray-400 italic">No fields configured</div>
+        ) : (
+          displayFields.map((fieldApiName, i) => (
+            <div
+              key={fieldApiName}
+              className={cn(
+                'flex items-start px-3 py-2 gap-3',
+                i < displayFields.length - 1 && 'border-b border-gray-100',
+                i % 2 === 0 ? 'bg-gray-50/50' : 'bg-white',
+              )}
+            >
+              <span className="text-xs font-medium text-gray-500 min-w-[100px] pt-0.5">
+                {getFieldLabel(fieldApiName)}
+              </span>
+              <span className="text-sm text-gray-900">
+                {getFieldValue(fieldApiName)}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Field icon map ──────────────────────────────────────────────────
 
 export function getFieldIcon(type: FieldType) {
@@ -163,6 +245,20 @@ export function FieldInput({
     visibilityCtx,
   );
   if (formatFx?.hidden) return null;
+
+  // ── LookupFields: virtual display-only panel field ───────────
+  if ((layoutField as any)?.kind === 'lookupFields' && (layoutField as any)?.lookupFieldsConfig) {
+    return (
+      <LookupFieldsDisplay
+        config={(layoutField as any).lookupFieldsConfig}
+        formData={formData}
+        objectFields={objectFields}
+        lookupRecordsCache={lookupRecordsCache}
+        schema={schema}
+        labelOverride={(layoutField as any).labelOverride}
+      />
+    );
+  }
 
   const value = formData[fieldDef.apiName];
   const error = errors[fieldDef.apiName];

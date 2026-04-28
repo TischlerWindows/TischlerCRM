@@ -1,12 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutTab, LayoutSection, LayoutPanel, PanelField } from '../types';
 import type { TeamMemberSlotConfig } from '@/lib/schema';
 import { useEditorStore } from '../editor-store';
+import { useSchemaStore } from '@/lib/schema-store';
 import { ColorControl } from './shared';
 import TeamMemberSlotConfigPanel from '@/widgets/internal/team-member-slot/ConfigPanel';
 
@@ -23,11 +25,122 @@ interface FieldPropertiesProps {
 export function FieldProperties({ selection }: FieldPropertiesProps) {
   const updateField = useEditorStore((s) => s.updateField);
   const removeField = useEditorStore((s) => s.removeField);
+  const schema = useSchemaStore((s) => s.schema);
+
+  const routeParams = useParams();
+  const objectApi = typeof routeParams?.objectApi === 'string' ? routeParams.objectApi : undefined;
 
   const isSlot = selection.field.kind === 'teamMemberSlot' && !!selection.field.slotConfig;
+  const isLookupFields = selection.field.kind === 'lookupFields';
+
+  // Fields on the current object (for source-lookup selector)
+  const currentObjectFields = useMemo(() => {
+    if (!objectApi || !schema) return [];
+    return schema.objects.find((o) => o.apiName === objectApi)?.fields ?? [];
+  }, [objectApi, schema]);
+
+  // All lookup-type fields on the current object
+  const lookupTypeFields = useMemo(() => {
+    return currentObjectFields.filter((f) =>
+      f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser',
+    );
+  }, [currentObjectFields]);
+
+  const lookupConfig = selection.field.lookupFieldsConfig;
+
+  // Determine the target object api from the selected source lookup field
+  const targetObjectApi = useMemo(() => {
+    if (!lookupConfig?.sourceLookupApiName) return null;
+    const src = currentObjectFields.find((f) => f.apiName === lookupConfig.sourceLookupApiName);
+    return src?.lookupObject ?? (src as any)?.relationship?.targetObject ?? null;
+  }, [lookupConfig?.sourceLookupApiName, currentObjectFields]);
+
+  // Fields on the target object (for display-fields selector)
+  const targetObjectFields = useMemo(() => {
+    if (!targetObjectApi || !schema) return [];
+    return schema.objects.find((o) => o.apiName === targetObjectApi)?.fields ?? [];
+  }, [targetObjectApi, schema]);
 
   return (
     <>
+      {isLookupFields && (
+        <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+            Lookup Fields
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-gray-600">Source Lookup Field</Label>
+            <select
+              className="h-9 w-full rounded-md border border-gray-300 bg-white px-2 text-sm"
+              value={lookupConfig?.sourceLookupApiName ?? ''}
+              aria-label="Source lookup field"
+              onChange={(e) =>
+                updateField(selection.field.fieldApiName, selection.panel.id, {
+                  lookupFieldsConfig: {
+                    sourceLookupApiName: e.target.value,
+                    displayFields: [],
+                  },
+                })
+              }
+            >
+              <option value="">— Select lookup field —</option>
+              {lookupTypeFields.map((f) => (
+                <option key={f.apiName} value={f.apiName}>
+                  {f.label} ({f.apiName})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {targetObjectApi && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-gray-600">
+                Fields to Display
+                <span className="ml-1 text-gray-400">({targetObjectApi})</span>
+              </Label>
+              <div className="max-h-48 overflow-y-auto space-y-0.5 rounded-md border border-gray-200 bg-white p-2">
+                {targetObjectFields.map((f) => {
+                  const isChecked = lookupConfig?.displayFields?.includes(f.apiName) ?? false;
+                  return (
+                    <label
+                      key={f.apiName}
+                      className="flex items-center gap-2 cursor-pointer py-0.5 px-1 rounded hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const curr = lookupConfig?.displayFields ?? [];
+                          const next = e.target.checked
+                            ? [...curr, f.apiName]
+                            : curr.filter((n) => n !== f.apiName);
+                          updateField(selection.field.fieldApiName, selection.panel.id, {
+                            lookupFieldsConfig: {
+                              ...lookupConfig,
+                              sourceLookupApiName: lookupConfig?.sourceLookupApiName ?? '',
+                              displayFields: next,
+                            },
+                          });
+                        }}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-xs text-gray-700">{f.label}</span>
+                      <span className="shrink-0 text-[10px] text-gray-400">{f.apiName}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {lookupConfig?.sourceLookupApiName && !targetObjectApi && (
+            <p className="text-xs text-amber-700">
+              Could not resolve target object for this lookup field.
+            </p>
+          )}
+        </div>
+      )}
       {isSlot && selection.field.slotConfig && (
         <div className="space-y-2 rounded-md border border-purple-200 bg-purple-50/40 p-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">

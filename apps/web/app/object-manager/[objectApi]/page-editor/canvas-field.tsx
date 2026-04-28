@@ -54,6 +54,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
   });
 
   const isSlot = field.kind === 'teamMemberSlot' && !!field.slotConfig;
+  const isLookupFields = field.kind === 'lookupFields';
   const slotDisplayLabel = (() => {
     if (!isSlot || !field.slotConfig) return null;
     if (field.slotConfig.label) return field.slotConfig.label;
@@ -247,7 +248,13 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm" style={labelStyle}>
-            {isSlot ? (field.labelOverride || slotDisplayLabel || 'Team Member Slot') : field.fieldApiName}
+            {isSlot
+              ? (field.labelOverride || slotDisplayLabel || 'Team Member Slot')
+              : isLookupFields
+                ? (field.labelOverride || (field as any).lookupFieldsConfig?.sourceLookupApiName
+                    ? `Fields from: ${(field as any).lookupFieldsConfig?.sourceLookupApiName || '(unconfigured)'}`
+                    : 'Lookup Fields')
+                : field.fieldApiName}
           </div>
           <div className="mt-1 flex items-center gap-2">
             {isSlot ? (
@@ -256,6 +263,13 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
                 title="Team Member Slot — synthetic field"
               >
                 TM Slot
+              </span>
+            ) : isLookupFields ? (
+              <span
+                className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-blue-700"
+                title="Lookup Fields — displays fields from a linked record"
+              >
+                LF
               </span>
             ) : fieldType && (
               <span

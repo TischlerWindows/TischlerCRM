@@ -102,6 +102,13 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
     };
   }
 
+  if (data.type === 'palette-lookup-fields') {
+    return {
+      kind: 'palette-lookup-fields',
+      label: typeof data.label === 'string' ? data.label : 'Lookup Fields',
+    };
+  }
+
   if (activeId.startsWith('palette-field-') || activeId.startsWith('field-')) {
     const fieldApiName = activeId.replace(/^(?:palette-)?field-/, '');
     const label =
