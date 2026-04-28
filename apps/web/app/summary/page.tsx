@@ -2915,7 +2915,7 @@ export default function SummaryPage() {
                           <select
                             value={editingSummary.woodType === 'Custom Option' ? 'Custom Option' : (editingSummary.woodType || '')}
                             onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value, woodTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.woodTypeCustom })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white${editingSummary.woodType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select wood type...</option>
                             {getOppPicklist('Opportunity__woodType').map(v => (
@@ -2930,7 +2930,7 @@ export default function SummaryPage() {
                               value={editingSummary.woodTypeCustom || ''}
                               onChange={(e) => setEditingSummary({ ...editingSummary, woodTypeCustom: e.target.value })}
                               placeholder="Enter custom value..."
-                              className="mt-2 w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-1 focus:ring-blue-400 focus:outline-none italic text-blue-600"
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
                             />
                           )}
                         </div>
@@ -2955,7 +2955,7 @@ export default function SummaryPage() {
                         <select
                           value={editingSummary.glassType === 'Custom Option' ? 'Custom Option' : (editingSummary.glassType || '')}
                           onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.glassTypeCustom })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white${editingSummary.glassType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                         >
                           <option value="">Select glass type...</option>
                           {getOppPicklist('Opportunity__glassType').map(v => (
@@ -2970,7 +2970,7 @@ export default function SummaryPage() {
                             value={editingSummary.glassTypeCustom || ''}
                             onChange={(e) => setEditingSummary({ ...editingSummary, glassTypeCustom: e.target.value })}
                             placeholder="Enter custom value..."
-                            className="mt-2 w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-1 focus:ring-blue-400 focus:outline-none italic text-blue-600"
+                            className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
                           />
                         )}
                       </div>
@@ -3012,7 +3012,7 @@ export default function SummaryPage() {
                           <select
                             value={editingSummary.sdl === 'Custom Option' ? 'Custom Option' : (editingSummary.sdl || '')}
                             onChange={(e) => setEditingSummary({ ...editingSummary, sdl: e.target.value, sdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.sdlCustom })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white${editingSummary.sdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select SDL...</option>
                             <option>22MM</option>
@@ -3035,7 +3035,7 @@ export default function SummaryPage() {
                           <select
                             value={editingSummary.tdl === 'Custom Option' ? 'Custom Option' : (editingSummary.tdl || '')}
                             onChange={(e) => setEditingSummary({ ...editingSummary, tdl: e.target.value, tdlCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.tdlCustom })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white${editingSummary.tdl === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                           >
                             <option value="">Select TDL...</option>
                             <option>48MM</option>

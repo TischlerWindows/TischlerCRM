@@ -454,7 +454,7 @@ export function DropdownWithCustomInput({
             disabled && 'bg-gray-100 cursor-not-allowed opacity-70',
           )}
         >
-          <span className={cn('flex-1 min-w-0 text-sm truncate', !selectLabel && 'text-gray-500')}>
+          <span className={cn('flex-1 min-w-0 text-sm truncate', !selectLabel && 'text-gray-500', showCustom && 'italic text-blue-600')}>
             {selectLabel || <span className="text-gray-500">-- Select --</span>}
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-gray-400" />
