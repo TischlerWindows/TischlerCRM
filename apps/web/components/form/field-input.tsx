@@ -88,6 +88,9 @@ export function LookupFieldsDisplay({
   // Find the related record
   const relatedRecord = lookupId ? records.find(r => String(r.id) === lookupId) : null;
 
+  // eslint-disable-next-line no-console
+  console.debug('[LookupFieldsDisplay]', { sourceLookupApiName, rawVal, lookupId, targetApi, recordCount: records.length, relatedRecord: relatedRecord?.id ?? null, displayFields });
+
   // Resolve object prefix to strip from field names when reading record
   const targetObj = schema?.objects?.find((o: any) => o.apiName === targetApi);
   const prefix = targetApi ? `${targetApi}__` : '';
