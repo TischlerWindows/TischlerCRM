@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link2 } from 'lucide-react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { PageLayout, FieldDef, type LayoutSection, type PageField } from '@/lib/schema';
+import type { LookupFieldsConfig } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
 import { evaluateVisibility } from '@/lib/field-visibility';
 import {
@@ -25,6 +27,103 @@ import { LayoutWidgetsInline } from '@/components/layout-widgets-inline';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import { getFieldDef, getRecordValue, MemoizedFieldValue } from './field-value-renderer';
 import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
+import { useSchemaStore } from '@/lib/schema-store';
+import { recordsService } from '@/lib/records-service';
+import { cn } from '@/lib/utils';
+
+// ── LookupFieldsCell ──────────────────────────────────────────────────
+
+function LookupFieldsCell({
+  config,
+  record,
+  objectDef,
+  labelOverride,
+}: {
+  config: LookupFieldsConfig;
+  record: Record<string, any> | null;
+  objectDef: ObjectDef | undefined;
+  labelOverride?: string;
+}) {
+  const schema = useSchemaStore((s) => s.schema);
+  const { sourceLookupApiName, displayFields } = config;
+
+  // Resolve source field def to find target object
+  const srcFieldDef = objectDef?.fields.find((f) => f.apiName === sourceLookupApiName);
+  const targetObjectApi: string | undefined =
+    srcFieldDef?.lookupObject ??
+    (srcFieldDef as any)?.relationship?.targetObject;
+
+  // Get the lookup ID from the record
+  const rawVal = record?.[sourceLookupApiName] ?? record?.[sourceLookupApiName.replace(/^[A-Za-z]+__/, '')];
+  const lookupId: string | null =
+    rawVal && typeof rawVal === 'object'
+      ? (rawVal.lookup ?? null)
+      : typeof rawVal === 'string' ? rawVal : null;
+
+  const [relatedRecord, setRelatedRecord] = useState<Record<string, any> | null>(null);
+
+  useEffect(() => {
+    if (!targetObjectApi || !lookupId) {
+      setRelatedRecord(null);
+      return;
+    }
+    let cancelled = false;
+    recordsService.getRecord(targetObjectApi, lookupId)
+      .then((r) => { if (!cancelled) setRelatedRecord({ id: r.id, ...r.data }); })
+      .catch(() => { if (!cancelled) setRelatedRecord(null); });
+    return () => { cancelled = true; };
+  }, [targetObjectApi, lookupId]);
+
+  const targetObjDef = schema?.objects.find((o) => o.apiName === targetObjectApi);
+  const prefix = targetObjectApi ? `${targetObjectApi}__` : '';
+
+  const getFieldLabel = (apiName: string): string =>
+    targetObjDef?.fields.find((f) => f.apiName === apiName || f.apiName === `${prefix}${apiName}`)?.label ?? apiName;
+
+  const getFieldValue = (apiName: string): string => {
+    if (!relatedRecord) return '—';
+    const val = relatedRecord[apiName] ?? relatedRecord[`${prefix}${apiName}`];
+    if (val === undefined || val === null || val === '') return '—';
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  };
+
+  const label = labelOverride ?? (srcFieldDef?.label ? `Fields from ${srcFieldDef.label}` : 'Linked Fields');
+
+  return (
+    <div className="space-y-0">
+      <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+        <Link2 className="h-3 w-3 text-gray-400" aria-hidden />
+        {label}
+      </div>
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {!lookupId ? (
+          <div className="px-3 py-2 text-sm text-gray-400 italic">No linked record</div>
+        ) : displayFields.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-gray-400 italic">No fields configured</div>
+        ) : (
+          displayFields.map((fieldApiName, i) => (
+            <div
+              key={fieldApiName}
+              className={cn(
+                'flex items-start px-3 py-2 gap-3',
+                i < displayFields.length - 1 && 'border-b border-gray-100',
+                i % 2 === 0 ? 'bg-gray-50/50' : 'bg-white',
+              )}
+            >
+              <span className="text-xs font-medium text-gray-500 min-w-[100px] pt-0.5">
+                {getFieldLabel(fieldApiName)}
+              </span>
+              <span className="text-sm text-gray-900">
+                {getFieldValue(fieldApiName)}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -280,6 +379,10 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
               if (fFx?.hidden) return false;
               return true;
             }
+            // lookupFields: virtual display tile, no fieldDef on parent object
+            if (f.kind === 'lookupFields' && f.lookupFieldsConfig) {
+              return true;
+            }
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
@@ -340,6 +443,22 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                             slotConfig={f.slotConfig}
                             panelField={f}
                             readOnly
+                          />
+                        </div>
+                      );
+                    }
+                    // lookupFields: display fields from a linked record
+                    if (f.kind === 'lookupFields' && f.lookupFieldsConfig) {
+                      return (
+                        <div
+                          key={f.fieldApiName}
+                          style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                        >
+                          <LookupFieldsCell
+                            config={f.lookupFieldsConfig}
+                            record={record}
+                            objectDef={objectDef}
+                            labelOverride={f.labelOverride}
                           />
                         </div>
                       );

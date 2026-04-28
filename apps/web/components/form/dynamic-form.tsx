@@ -45,7 +45,7 @@ import {
 import { cn, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
 
 import { validateFields } from './form-validation';
-import { FieldInput, getFieldIcon } from './field-input';
+import { FieldInput, LookupFieldsDisplay, getFieldIcon } from './field-input';
 import { getRecordLabel, getLookupTargetApi } from './lookup-search';
 import { MissingRequiredModal } from './missing-required-modal';
 
@@ -332,6 +332,16 @@ export default function DynamicForm({
       tab.regions.forEach((region) => {
         region.panels.forEach((panel) => {
           panel.fields.forEach((field) => {
+            // lookupFields kind: resolve the source lookup field's target object
+            if ((field as any).kind === 'lookupFields' && (field as any).lookupFieldsConfig?.sourceLookupApiName) {
+              const srcApiName = (field as any).lookupFieldsConfig.sourceLookupApiName;
+              const srcField = object.fields.find((f) => f.apiName === srcApiName);
+              if (srcField) {
+                const t = srcField.lookupObject ?? (srcField as any).relationship?.targetObject;
+                if (t) targetApis.add(t);
+              }
+              return;
+            }
             const rawType =
               (field as any).type ||
               object.fields.find((f) => f.apiName === field.fieldApiName)?.type;
@@ -900,7 +910,21 @@ export default function DynamicForm({
     layoutField?: PageField,
   ) => {
     // Synthetic TeamMemberSlot fields render through their own component, not FieldInput.
-    const lf = layoutField as unknown as { kind?: string; slotConfig?: import('@/lib/schema').TeamMemberSlotConfig };
+    const lf = layoutField as unknown as { kind?: string; slotConfig?: import('@/lib/schema').TeamMemberSlotConfig; lookupFieldsConfig?: import('@/lib/schema').LookupFieldsConfig; labelOverride?: string };
+    // lookupFields: read-only display of fields from a linked record
+    if (lf?.kind === 'lookupFields' && lf.lookupFieldsConfig) {
+      return (
+        <LookupFieldsDisplay
+          key={fieldDef.apiName}
+          config={lf.lookupFieldsConfig}
+          formData={formData}
+          objectFields={object.fields}
+          lookupRecordsCache={lookupRecordsCache}
+          schema={schema}
+          labelOverride={lf.labelOverride}
+        />
+      );
+    }
     if (lf?.kind === 'teamMemberSlot' && lf.slotConfig) {
       // formData mirrors the loaded record (or {} in create mode); use its id.
       const parentRecordId = typeof formData?.id === 'string' ? formData.id : null;
@@ -959,6 +983,18 @@ export default function DynamicForm({
       if ((f as any).kind === 'teamMemberSlot' && (f as any).slotConfig) {
         gridFields.push({
           fieldDef: { apiName: f.fieldApiName, label: '', type: 'Text' } as FieldDef,
+          pageField: f as any,
+          column: (f as any).column ?? f.order % panel.columns,
+          order: f.order,
+          colSpan: f.colSpan ?? 1,
+          rowSpan: (f as any).rowSpan ?? 1,
+        });
+        continue;
+      }
+      // lookupFields kind: display-only virtual field, no fieldDef needed
+      if ((f as any).kind === 'lookupFields' && (f as any).lookupFieldsConfig) {
+        gridFields.push({
+          fieldDef: { apiName: f.fieldApiName, label: (f as any).labelOverride ?? 'Lookup Fields', type: 'Text' } as FieldDef,
           pageField: f as any,
           column: (f as any).column ?? f.order % panel.columns,
           order: f.order,

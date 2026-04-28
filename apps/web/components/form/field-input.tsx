@@ -56,7 +56,7 @@ import {
 
 // ── LookupFields display component ─────────────────────────────────
 
-function LookupFieldsDisplay({
+export function LookupFieldsDisplay({
   config,
   formData,
   objectFields,
