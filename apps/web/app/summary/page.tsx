@@ -808,7 +808,10 @@ export default function SummaryPage() {
           ? (() => { try { return JSON.parse(raw); } catch { return null; } })()
           : null;
       if (obj?.street || obj?.city) {
-        return [obj.street, obj.city, obj.state, obj.postalCode].filter(Boolean).join(', ');
+        const street = obj.street || '';
+        const cityLine = [obj.city, [obj.state, obj.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+        if (street && cityLine) return `${street},\n${cityLine}`;
+        return street || cityLine;
       }
       // Fall back to separate city/state/zip fields on the property record
       const city = d?.city || d?.['Property__city'] || '';
@@ -1072,9 +1075,10 @@ export default function SummaryPage() {
       doc.text(label.toUpperCase(), x, y);
       doc.setFontSize(8.5);
       doc.setTextColor(30, 30, 30);
-      // Use splitTextToSize to wrap long values within maxW, render first 2 lines max
-      const lines: string[] = doc.splitTextToSize(val(value), maxW);
-      doc.text(lines.slice(0, 2), x, y + 4);
+      // Split on explicit newlines first, then word-wrap each segment within maxW
+      const segments = val(value).split('\n');
+      const lines: string[] = segments.flatMap((seg: string) => doc.splitTextToSize(seg, maxW) as string[]);
+      doc.text(lines.slice(0, 3), x, y + 4);
     };
 
     // Draws a table with auto column widths, header row, and data rows
@@ -1259,7 +1263,7 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
     y += 10;
     drawField(doc, 15, y, 'Address', val(s.address), pw2 - 30);
-    y += 10;
+    y += 14;
     drawField(doc, 15, y, 'Salesman', val(s.salesman), col3W);
     drawField(doc, 15 + col3W, y, 'Estimator', val(s.estimator), col3W);
     y += 10;
