@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Link2 } from 'lucide-react';
+
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { PageLayout, FieldDef, type LayoutSection, type PageField } from '@/lib/schema';
 import type { LookupFieldsConfig } from '@/lib/schema';
@@ -97,39 +97,25 @@ function LookupFieldsCell({
     return String(val);
   };
 
-  const label = labelOverride ?? (srcFieldDef?.label ? `Fields from ${srcFieldDef.label}` : 'Linked Fields');
-
   return (
-    <div className="space-y-0">
-      <div className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-        <Link2 className="h-3 w-3 text-gray-400" aria-hidden />
-        {label}
-      </div>
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
-        {!lookupId ? (
-          <div className="px-3 py-2 text-sm text-gray-400 italic">No linked record</div>
-        ) : displayFields.length === 0 ? (
-          <div className="px-3 py-2 text-sm text-gray-400 italic">No fields configured</div>
-        ) : (
-          displayFields.map((fieldApiName, i) => (
-            <div
-              key={fieldApiName}
-              className={cn(
-                'flex items-start px-3 py-2 gap-3',
-                i < displayFields.length - 1 && 'border-b border-gray-100',
-                i % 2 === 0 ? 'bg-gray-50/50' : 'bg-white',
-              )}
-            >
-              <span className="text-xs font-medium text-gray-500 min-w-[100px] pt-0.5">
-                {getFieldLabel(fieldApiName)}
-              </span>
-              <span className="text-sm text-gray-900">
-                {getFieldValue(fieldApiName)}
-              </span>
+    <div className="flex flex-col gap-3">
+      {!lookupId || displayFields.length === 0 ? (
+        <div>
+          <div className="text-xs font-medium text-gray-500 mb-0.5">{label}</div>
+          <div className="text-sm text-gray-400">—</div>
+        </div>
+      ) : (
+        displayFields.map((fieldApiName) => (
+          <div key={fieldApiName}>
+            <div className="text-xs font-medium text-gray-500 mb-0.5">
+              {getFieldLabel(fieldApiName)}
             </div>
-          ))
-        )}
-      </div>
+            <div className="text-sm text-gray-900">
+              {getFieldValue(fieldApiName)}
+            </div>
+          </div>
+        ))
+      )}
     </div>
   );
 }
