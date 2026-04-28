@@ -1262,11 +1262,10 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Project Name', val(s.name), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Address', val(s.address), pw2 - 30);
+    drawField(doc, 15, y, 'Address', val(s.address), col3W);
+    drawField(doc, 15 + col3W, y, 'Salesman', val(s.salesman), col3W);
+    drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
     y += 14;
-    drawField(doc, 15, y, 'Salesman', val(s.salesman), col3W);
-    drawField(doc, 15 + col3W, y, 'Estimator', val(s.estimator), col3W);
-    y += 10;
     drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
     if (s.quoteType === 'requote') {
       drawField(doc, 15 + col3W, y, 'Description of Changes', val(s.requoteDescription), col3W * 2);
