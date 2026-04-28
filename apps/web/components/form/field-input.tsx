@@ -88,22 +88,23 @@ export function LookupFieldsDisplay({
   // Find the related record
   const relatedRecord = lookupId ? records.find(r => String(r.id) === lookupId) : null;
 
-  // eslint-disable-next-line no-console
-  console.log('[LookupFieldsDisplay]', { sourceLookupApiName, rawVal, lookupId, targetApi, recordCount: records.length, relatedRecord: relatedRecord?.id ?? null, displayFields });
-
   // Resolve object prefix to strip from field names when reading record
   const targetObj = schema?.objects?.find((o: any) => o.apiName === targetApi);
   const prefix = targetApi ? `${targetApi}__` : '';
 
   const getFieldLabel = (fieldApiName: string): string => {
-    const field = targetObj?.fields?.find((f: any) => f.apiName === fieldApiName || f.apiName === `${prefix}${fieldApiName}`);
-    return field?.label || fieldApiName;
+    const cleanApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+    const field = targetObj?.fields?.find((f: any) =>
+      f.apiName === fieldApiName || f.apiName === cleanApiName || f.apiName === `${prefix}${cleanApiName}`,
+    );
+    return field?.label || cleanApiName;
   };
 
   const getFieldValue = (fieldApiName: string): string => {
-    if (!relatedRecord) return '—';
-    const val = relatedRecord[fieldApiName] ?? relatedRecord[`${prefix}${fieldApiName}`];
-    if (val === undefined || val === null || val === '') return '—';
+    if (!relatedRecord) return '\u2014';
+    const cleanApiName = fieldApiName.replace(/^[A-Za-z]+__/, '');
+    const val = relatedRecord[fieldApiName] ?? relatedRecord[cleanApiName];
+    if (val === undefined || val === null || val === '') return '\u2014';
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
   };

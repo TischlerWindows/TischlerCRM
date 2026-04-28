@@ -60,9 +60,6 @@ function LookupFieldsCell({
       ? (rawVal.lookup != null ? String(rawVal.lookup) : null)
       : (rawVal !== undefined && rawVal !== null && rawVal !== '') ? String(rawVal) : null;
 
-  // eslint-disable-next-line no-console
-  console.log('[LookupFieldsCell]', { sourceLookupApiName, rawVal, lookupId, targetObjectApi, displayFields });
-
   const [relatedRecord, setRelatedRecord] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
@@ -71,17 +68,11 @@ function LookupFieldsCell({
       return;
     }
     let cancelled = false;
-    // eslint-disable-next-line no-console
-    console.log('[LookupFieldsCell] fetching', targetObjectApi, lookupId);
     recordsService.getRecord(targetObjectApi, lookupId)
       .then((r) => {
-        // eslint-disable-next-line no-console
-        console.log('[LookupFieldsCell] fetched record', r);
         if (!cancelled) setRelatedRecord(r ? { id: r.id, ...r.data } : null);
       })
-      .catch((err) => {
-        // eslint-disable-next-line no-console
-        console.log('[LookupFieldsCell] fetch error', err);
+      .catch(() => {
         if (!cancelled) setRelatedRecord(null);
       });
     return () => { cancelled = true; };
@@ -90,13 +81,18 @@ function LookupFieldsCell({
   const targetObjDef = schema?.objects.find((o) => o.apiName === targetObjectApi);
   const prefix = targetObjectApi ? `${targetObjectApi}__` : '';
 
-  const getFieldLabel = (apiName: string): string =>
-    targetObjDef?.fields.find((f) => f.apiName === apiName || f.apiName === `${prefix}${apiName}`)?.label ?? apiName;
+  const getFieldLabel = (apiName: string): string => {
+    const cleanApiName = apiName.replace(/^[A-Za-z]+__/, '');
+    return targetObjDef?.fields.find(
+      (f) => f.apiName === apiName || f.apiName === cleanApiName || f.apiName === `${prefix}${cleanApiName}`,
+    )?.label ?? cleanApiName;
+  };
 
   const getFieldValue = (apiName: string): string => {
-    if (!relatedRecord) return '—';
-    const val = relatedRecord[apiName] ?? relatedRecord[`${prefix}${apiName}`];
-    if (val === undefined || val === null || val === '') return '—';
+    if (!relatedRecord) return '\u2014';
+    const cleanApiName = apiName.replace(/^[A-Za-z]+__/, '');
+    const val = relatedRecord[apiName] ?? relatedRecord[cleanApiName];
+    if (val === undefined || val === null || val === '') return '\u2014';
     if (typeof val === 'object') return JSON.stringify(val);
     return String(val);
   };
