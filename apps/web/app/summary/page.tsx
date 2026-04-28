@@ -2930,7 +2930,7 @@ export default function SummaryPage() {
                               value={editingSummary.woodTypeCustom || ''}
                               onChange={(e) => setEditingSummary({ ...editingSummary, woodTypeCustom: e.target.value })}
                               placeholder="Enter custom value..."
-                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                              className="mt-2 w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-1 focus:ring-blue-400 focus:outline-none italic text-blue-600"
                             />
                           )}
                         </div>
@@ -2970,7 +2970,7 @@ export default function SummaryPage() {
                             value={editingSummary.glassTypeCustom || ''}
                             onChange={(e) => setEditingSummary({ ...editingSummary, glassTypeCustom: e.target.value })}
                             placeholder="Enter custom value..."
-                            className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            className="mt-2 w-full px-3 py-2 text-sm border border-blue-300 rounded-lg focus:ring-1 focus:ring-blue-400 focus:outline-none italic text-blue-600"
                           />
                         )}
                       </div>
