@@ -548,6 +548,10 @@ interface Summary {
   jobType: string;
   estimator: string;
   plansDated: string;
+  contactReceivingQuote: string;
+  accountReceivingQuote: string;
+  accountShippingAddress: string;
+  accountPrimaryPhone: string;
   date: string;
   address: string;
   quoteType: 'first' | 'requote' | '';
@@ -664,7 +668,7 @@ export default function SummaryPage() {
       router.replace('/summary');
       // Fetch the opportunity record to pre-populate fields
       (async () => {
-        let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string } = {};
+        let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; accountPrimaryPhone?: string } = {};
         let address = '';
         try {
           const rec = await recordsService.getRecord('Opportunity', opportunityId);
@@ -690,7 +694,13 @@ export default function SummaryPage() {
               spacerBarColors: pick('spacerBarColors'),
               product: pick('productSpecifications'),
               plansDated: pick('plansDated'),
+              contactReceivingQuote: pick('individual_receiving_the_quote'),
+              accountReceivingQuote: pick('account_receiving_the_quote'),
             };
+            const accountId = pick('account_receiving_the_quote');
+            const accFields = await resolveAccountFields(accountId);
+            oppFields.accountShippingAddress = accFields.shippingAddress;
+            oppFields.accountPrimaryPhone = accFields.primaryPhone;
             address = await resolveOppPropertyAddress(d);
           }
         } catch { /* non-fatal */ }
@@ -837,6 +847,28 @@ export default function SummaryPage() {
     }
   };
 
+  const resolveAccountFields = async (accountId: string): Promise<{ shippingAddress: string; primaryPhone: string }> => {
+    if (!accountId || typeof accountId !== 'string') return { shippingAddress: '', primaryPhone: '' };
+    try {
+      const accRec = await recordsService.getRecord('Account', accountId);
+      if (!accRec) return { shippingAddress: '', primaryPhone: '' };
+      const d: any = (accRec as any).data ?? accRec;
+      const pick = (bare: string) => d[bare] || d[`Account__${bare}`] || '';
+      const rawAddr = pick('shippingAddress');
+      let shippingAddress = '';
+      if (rawAddr && typeof rawAddr === 'object') {
+        const parts = [rawAddr.street, rawAddr.city, rawAddr.state, rawAddr.postalCode].filter(Boolean);
+        shippingAddress = parts.join(', ');
+      } else if (typeof rawAddr === 'string') {
+        try { const obj = JSON.parse(rawAddr); const parts = [obj.street, obj.city, obj.state, obj.postalCode].filter(Boolean); shippingAddress = parts.join(', '); }
+        catch { shippingAddress = rawAddr; }
+      }
+      return { shippingAddress, primaryPhone: pick('primaryPhone') };
+    } catch {
+      return { shippingAddress: '', primaryPhone: '' };
+    }
+  };
+
   const handleOpportunitySelected = async (record: any) => {
     setShowOpportunityPicker(false);
     // Helper: try both bare key and prefixed key
@@ -851,6 +883,8 @@ export default function SummaryPage() {
     };
     const glassResolved = resolvePicklist('Opportunity__glassType', pick('glassType'));
     const woodResolved = resolvePicklist('Opportunity__woodType', pick('woodType'));
+    const accountId = pick('account_receiving_the_quote');
+    const accFields = await resolveAccountFields(accountId);
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
@@ -867,11 +901,15 @@ export default function SummaryPage() {
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
         plansDated: pick('plansDated'),
+        contactReceivingQuote: pick('individual_receiving_the_quote'),
+        accountReceivingQuote: pick('account_receiving_the_quote'),
+        accountShippingAddress: accFields.shippingAddress,
+        accountPrimaryPhone: accFields.primaryPhone,
       },
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; accountPrimaryPhone?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -1001,6 +1039,10 @@ export default function SummaryPage() {
       spacerBarType: opts?.oppFields?.spacerBarType || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
       plansDated: opts?.oppFields?.plansDated || '',
+      contactReceivingQuote: opts?.oppFields?.contactReceivingQuote || '',
+      accountReceivingQuote: opts?.oppFields?.accountReceivingQuote || '',
+      accountShippingAddress: opts?.oppFields?.accountShippingAddress || '',
+      accountPrimaryPhone: opts?.oppFields?.accountPrimaryPhone || '',
       projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
@@ -1308,6 +1350,12 @@ export default function SummaryPage() {
       y += 10;
       drawField(doc, 15, y, 'Description of Changes', val(s.requoteDescription), col3W * 3);
     }
+    y += 10;
+    drawField(doc, 15, y, 'Contact Receiving Quote', val(s.contactReceivingQuote), col3W);
+    drawField(doc, 15 + col3W, y, 'Account', val(s.accountReceivingQuote), col3W);
+    y += 10;
+    drawField(doc, 15, y, 'Account Shipping Address', val(s.accountShippingAddress), col3W);
+    drawField(doc, 15 + col3W, y, 'Account Primary Phone', val(s.accountPrimaryPhone), col3W);
     y += 12;
 
     // ── Product Specifications ──
@@ -2827,6 +2875,58 @@ export default function SummaryPage() {
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
                         />
                         <p className="text-xs text-gray-400 mt-1">Auto-filled from Opportunity</p>
+                      </div>
+
+                      {/* Row 7: Contact + Account receiving the quote */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Receiving the Quote</label>
+                          <input
+                            type="text"
+                            value={editingSummary.contactReceivingQuote || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, contactReceivingQuote: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter contact"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Opportunity</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+                          <input
+                            type="text"
+                            value={editingSummary.accountReceivingQuote || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, accountReceivingQuote: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter account"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Opportunity</p>
+                        </div>
+                      </div>
+
+                      {/* Row 8: Account Shipping Address + Primary Phone */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Account Shipping Address</label>
+                          <input
+                            type="text"
+                            value={editingSummary.accountShippingAddress || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, accountShippingAddress: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter shipping address"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Account</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Account Primary Phone</label>
+                          <input
+                            type="text"
+                            value={editingSummary.accountPrimaryPhone || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, accountPrimaryPhone: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="Enter phone"
+                          />
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Account</p>
+                        </div>
                       </div>
                     </div>
                   </div>
