@@ -1294,7 +1294,6 @@ export default function SummaryPage() {
     addSpec('Glass Type', s.glassType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
-    addSpec('Spacer Bars', s.spacerBars);
     addSpec('Spacer Bar Type', s.spacerBarType);
     addSpec('Spacer Bar Colors', s.spacerBarColors);
     if ((s.projectContains || []).length > 0) addSpec('Project Contains', s.projectContains!.join(', '));
@@ -2914,34 +2913,19 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row: Glass Type + Spacer Bars */}
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
-                          <select
-                            value={editingSummary.glassType || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select glass type...</option>
-                            {getOppPicklist('Opportunity__glassType').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bars</label>
-                          <select
-                            value={editingSummary.spacerBars || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, spacerBars: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                          >
-                            <option value="">Select spacer bars...</option>
-                            {getOppPicklist('Opportunity__spacerBars').map(v => (
-                              <option key={v} value={v}>{v}</option>
-                            ))}
-                          </select>
-                        </div>
+                      {/* Row: Glass Type */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                        <select
+                          value={editingSummary.glassType || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                        >
+                          <option value="">Select glass type...</option>
+                          {getOppPicklist('Opportunity__glassType').map(v => (
+                            <option key={v} value={v}>{v}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
