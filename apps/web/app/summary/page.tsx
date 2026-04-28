@@ -602,6 +602,9 @@ interface Summary {
   spacerBarType: string;
   spacerBarColors: string;
   projectContains: string[];
+  shippingContainers: string;
+  shippingCostPerContainer: string;
+  shippingCraneCost: string;
   createdBy: string;
   createdAt: string;
   lastModifiedBy: string;
@@ -1096,6 +1099,9 @@ export default function SummaryPage() {
       contactEmail: opts?.oppFields?.contactEmail || '',
       contactCellPhone: opts?.oppFields?.contactCellPhone || '',
       projectContains: [],
+      shippingContainers: '',
+      shippingCostPerContainer: '',
+      shippingCraneCost: '',
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
       lastModifiedBy: 'Development User',
@@ -1440,6 +1446,21 @@ export default function SummaryPage() {
       y += 10;
     }
     y += 2;
+
+    // ── Delivery Cost ──
+    const deliveryContainers = parseFloat(s.shippingContainers) || 0;
+    const deliveryCost = parseFloat(s.shippingCostPerContainer) || 0;
+    const deliveryCrane = parseFloat(s.shippingCraneCost) || 0;
+    if (deliveryContainers || deliveryCost || deliveryCrane) {
+      y = drawSectionTitle(doc, y, 'Delivery Cost');
+      const deliveryTotal = deliveryContainers * deliveryCost + deliveryCrane;
+      drawField(doc, 15, y, '# of Containers', deliveryContainers ? String(deliveryContainers) : '—', col3W);
+      drawField(doc, 15 + col3W, y, 'Cost (per container)', deliveryCost ? String(deliveryCost) : '—', col3W);
+      drawField(doc, 15 + col3W * 2, y, 'Crane Cost', deliveryCrane ? String(deliveryCrane) : '—', col3W);
+      y += 10;
+      drawField(doc, 15, y, 'Estimated Delivery Cost', `${deliveryTotal}k`, col3W * 2);
+      y += 12;
+    }
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
@@ -2811,11 +2832,9 @@ export default function SummaryPage() {
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                          <DateInput
-                            value={editingSummary.date || ''}
-                            onChange={(v) => setEditingSummary({ ...editingSummary, date: v })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
-                          />
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.date ? new Date(editingSummary.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                          </div>
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                         <div>
@@ -2830,13 +2849,9 @@ export default function SummaryPage() {
                       {/* Row 2: Project Name */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Project Name</label>
-                        <input
-                          type="text"
-                          value={editingSummary.name || ''}
-                          onChange={(e) => setEditingSummary({ ...editingSummary, name: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
-                          placeholder="Enter project name"
-                        />
+                        <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                          {editingSummary.name || '—'}
+                        </div>
                         <p className="text-xs text-gray-400 mt-1">Auto-filled from Job Name on Page 1</p>
                       </div>
 
@@ -2899,24 +2914,16 @@ export default function SummaryPage() {
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Salesman</label>
-                          <input
-                            type="text"
-                            value={editingSummary.salesman || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, salesman: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
-                            placeholder="Enter salesman"
-                          />
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.salesman || '—'}
+                          </div>
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Estimator</label>
-                          <input
-                            type="text"
-                            value={editingSummary.estimator || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, estimator: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
-                            placeholder="Enter estimator"
-                          />
+                          <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
+                            {editingSummary.estimator || '—'}
+                          </div>
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
                       </div>
@@ -3278,6 +3285,63 @@ export default function SummaryPage() {
                           })}
                         </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Delivery Cost */}
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                      <h3 className="text-lg font-semibold text-gray-900">Delivery Cost</h3>
+                    </div>
+                    <div className="p-6">
+                      <div className="grid grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1"># of Containers</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editingSummary.shippingContainers || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, shippingContainers: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Cost (per container)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editingSummary.shippingCostPerContainer || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, shippingCostPerContainer: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Crane Cost</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editingSummary.shippingCraneCost || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, shippingCraneCost: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                            placeholder="0"
+                          />
+                        </div>
+                      </div>
+                      {(() => {
+                        const containers = parseFloat(editingSummary.shippingContainers) || 0;
+                        const cost = parseFloat(editingSummary.shippingCostPerContainer) || 0;
+                        const crane = parseFloat(editingSummary.shippingCraneCost) || 0;
+                        const total = containers * cost + crane;
+                        if (!containers && !cost && !crane) return null;
+                        return (
+                          <div className="mt-4 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-700">Estimated Delivery Cost:</span>
+                            <span className="text-lg font-semibold text-gray-900">{total}k</span>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
