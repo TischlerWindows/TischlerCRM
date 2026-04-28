@@ -824,7 +824,7 @@ export default function SummaryPage() {
       if (obj?.street || obj?.city) {
         const street = obj.street || '';
         const cityLine = [obj.city, [obj.state, obj.postalCode].filter(Boolean).join(' ')].filter(Boolean).join(', ');
-        if (street && cityLine) return `${street},\n${cityLine}`;
+        if (street && cityLine) return `${street}, \n${cityLine}`;
         return street || cityLine;
       }
       // Fall back to separate city/state/zip fields on the property record
@@ -1292,7 +1292,7 @@ export default function SummaryPage() {
     const fmtAddr = (addr: string) => {
       if (!addr || addr.includes('\n')) return addr;
       const i = addr.indexOf(', ');
-      return i === -1 ? addr : addr.substring(0, i + 1) + '\n' + addr.substring(i + 2);
+      return i === -1 ? addr : addr.substring(0, i + 2) + '\n' + addr.substring(i + 2);
     };
     drawField(doc, 15, y, 'Date', dateStr, col3W);
     drawField(doc, 15 + col3W, y, 'Opportunity #', val(s.opportunityNumber), col3W);
