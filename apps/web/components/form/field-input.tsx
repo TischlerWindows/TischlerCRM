@@ -81,7 +81,9 @@ export function LookupFieldsDisplay({
   // Get the ID stored in formData for the source lookup
   const rawVal = formData[sourceLookupApiName];
   const lookupId: string | null =
-    rawVal && typeof rawVal === 'object' ? (rawVal.lookup || null) : (typeof rawVal === 'string' ? rawVal : null);
+    rawVal && typeof rawVal === 'object'
+      ? (rawVal.lookup ? String(rawVal.lookup) : null)
+      : (rawVal !== undefined && rawVal !== null && rawVal !== '') ? String(rawVal) : null;
 
   // Find the related record
   const relatedRecord = lookupId ? records.find(r => String(r.id) === lookupId) : null;

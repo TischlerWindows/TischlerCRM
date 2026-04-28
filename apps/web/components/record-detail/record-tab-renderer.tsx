@@ -57,8 +57,8 @@ function LookupFieldsCell({
   const rawVal = record?.[sourceLookupApiName] ?? record?.[sourceLookupApiName.replace(/^[A-Za-z]+__/, '')];
   const lookupId: string | null =
     rawVal && typeof rawVal === 'object'
-      ? (rawVal.lookup ?? null)
-      : typeof rawVal === 'string' ? rawVal : null;
+      ? (rawVal.lookup != null ? String(rawVal.lookup) : null)
+      : (rawVal !== undefined && rawVal !== null && rawVal !== '') ? String(rawVal) : null;
 
   const [relatedRecord, setRelatedRecord] = useState<Record<string, any> | null>(null);
 
