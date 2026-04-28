@@ -38,11 +38,13 @@ function LookupFieldsCell({
   record,
   objectDef,
   labelOverride,
+  labelStyle,
 }: {
   config: LookupFieldsConfig;
   record: Record<string, any> | null;
   objectDef: ObjectDef | undefined;
   labelOverride?: string;
+  labelStyle?: React.CSSProperties;
 }) {
   const schema = useSchemaStore((s) => s.schema);
   const { sourceLookupApiName, displayFields } = config;
@@ -101,7 +103,7 @@ function LookupFieldsCell({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-xs font-medium text-gray-500 mb-0.5">
+      <div className="text-xs font-medium text-gray-500 mb-0.5" style={labelStyle}>
         {label}
       </div>
       {!lookupId || displayFields.length === 0 ? (
@@ -476,6 +478,12 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                             record={record}
                             objectDef={objectDef}
                             labelOverride={f.labelOverride ?? fd.label}
+                            labelStyle={{
+                              ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
+                              fontWeight: f.labelStyle?.bold ? 700 : undefined,
+                              fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
+                              textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                            }}
                           />
                         </div>
                       );
