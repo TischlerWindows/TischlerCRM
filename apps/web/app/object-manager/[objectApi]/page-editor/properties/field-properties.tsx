@@ -62,7 +62,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
   // All lookup-type fields on the current object
   const lookupTypeFields = useMemo(() => {
     return currentObjectFields.filter((f) =>
-      f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser',
+      f.type === 'Lookup' || f.type === 'ExternalLookup' || f.type === 'LookupUser' || f.type === 'PicklistLookup',
     );
   }, [currentObjectFields]);
 
