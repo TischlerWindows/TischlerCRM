@@ -303,15 +303,17 @@ export function DropboxFileBrowser({
   };
 
   const getDropboxWebUrl = (entryPath?: string) => {
+    const encodePath = (rawPath: string) =>
+      rawPath.split('/').map((seg) => (seg ? encodeURIComponent(seg) : '')).join('/');
     if (entryPath) {
       // Entry path is the full Dropbox path like /TischlerCRM/opportunities/abc123/file.pdf
       const folderPath = entryPath.substring(0, entryPath.lastIndexOf('/'));
-      return `https://www.dropbox.com/home${folderPath}`;
+      return `https://www.dropbox.com/home${encodePath(folderPath)}`;
     }
     const pathName = effectiveFolderName.current || folderName || recordId;
     const basePath = `/TischlerCRM/${objectApiName}/${pathName}`;
     const full = currentPath.length > 0 ? `${basePath}/${currentPath.join('/')}` : basePath;
-    return `https://www.dropbox.com/home${full}`;
+    return `https://www.dropbox.com/home${encodePath(full)}`;
   };
 
   const handleBreadcrumb = (index: number) => {
