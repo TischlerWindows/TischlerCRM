@@ -585,6 +585,8 @@ interface Summary {
   woodType: string;
   finish: string;
   glassType: string;
+  glassTypeCustom: string;
+  woodTypeCustom: string;
   sdl: string;
   sdlCustom: string;
   tdl: string;
@@ -661,17 +663,27 @@ export default function SummaryPage() {
       router.replace('/summary');
       // Fetch the opportunity record to pre-populate fields
       (async () => {
-        let oppFields: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string } = {};
+        let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string } = {};
         let address = '';
         try {
           const rec = await recordsService.getRecord('Opportunity', opportunityId);
           if (rec) {
             const d: any = (rec as any).data ?? rec;
             const pick = (bare: string) => d[bare] || d[`Opportunity__${bare}`] || '';
+            const resolvePicklistLocal = (apiName: string, value: string) => {
+              if (!value) return { val: '', custom: '' };
+              const options = getOppPicklist(apiName);
+              if (!options.length || options.includes(value)) return { val: value, custom: '' };
+              return { val: 'Custom Option', custom: value };
+            };
+            const glassR = resolvePicklistLocal('Opportunity__glassType', pick('glassType'));
+            const woodR = resolvePicklistLocal('Opportunity__woodType', pick('woodType'));
             oppFields = {
-              woodType: pick('woodType'),
+              woodType: woodR.val,
+              woodTypeCustom: woodR.custom,
               finish: pick('finishSpecifications'),
-              glassType: pick('glassType'),
+              glassType: glassR.val,
+              glassTypeCustom: glassR.custom,
               spacerBars: pick('spacerBars'),
               spacerBarType: pick('spacer_bar_type'),
               spacerBarColors: pick('spacerBarColors'),
@@ -828,15 +840,26 @@ export default function SummaryPage() {
     // Helper: try both bare key and prefixed key
     const pick = (bare: string) => record[bare] || record[`Opportunity__${bare}`] || '';
     const address = await resolveOppPropertyAddress(record);
+    // Detect custom values: if picked value isn't in the picklist, treat as custom
+    const resolvePicklist = (apiName: string, value: string): { val: string; custom: string } => {
+      if (!value) return { val: '', custom: '' };
+      const options = getOppPicklist(apiName);
+      if (!options.length || options.includes(value)) return { val: value, custom: '' };
+      return { val: 'Custom Option', custom: value };
+    };
+    const glassResolved = resolvePicklist('Opportunity__glassType', pick('glassType'));
+    const woodResolved = resolvePicklist('Opportunity__woodType', pick('woodType'));
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
       opportunityNumber: record.opportunityNumber || record.Opportunity__opportunityNumber || '',
       address,
       oppFields: {
-        woodType: pick('woodType'),
+        woodType: woodResolved.val,
+        woodTypeCustom: woodResolved.custom,
         finish: pick('finishSpecifications'),
-        glassType: pick('glassType'),
+        glassType: glassResolved.val,
+        glassTypeCustom: glassResolved.custom,
         spacerBars: pick('spacerBars'),
         spacerBarType: pick('spacer_bar_type'),
         spacerBarColors: pick('spacerBarColors'),
@@ -845,7 +868,7 @@ export default function SummaryPage() {
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; finish?: string; glassType?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -963,8 +986,10 @@ export default function SummaryPage() {
       productTypeOptions: [],
       product: opts?.oppFields?.product || '',
       woodType: opts?.oppFields?.woodType || '',
+      woodTypeCustom: opts?.oppFields?.woodTypeCustom || '',
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
+      glassTypeCustom: opts?.oppFields?.glassTypeCustom || '',
       sdl: '',
       sdlCustom: '',
       tdl: '',
@@ -1289,9 +1314,9 @@ export default function SummaryPage() {
     addSpec('Product', s.product || s.jobType);
     addSpec('Product Type', s.productType);
     if ((s.productTypeOptions || []).length > 0) addSpec('Options', s.productTypeOptions!.join(', '));
-    addSpec('Wood Type', s.woodType);
+    addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
     addSpec('Finish', s.finish);
-    addSpec('Glass Type', s.glassType);
+    addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Spacer Bar Type', s.spacerBarType);
@@ -2888,15 +2913,26 @@ export default function SummaryPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
                           <select
-                            value={editingSummary.woodType || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value })}
+                            value={editingSummary.woodType === 'Custom Option' ? 'Custom Option' : (editingSummary.woodType || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, woodType: e.target.value, woodTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.woodTypeCustom })}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                           >
                             <option value="">Select wood type...</option>
                             {getOppPicklist('Opportunity__woodType').map(v => (
                               <option key={v} value={v}>{v}</option>
                             ))}
+                            <option value="Custom Option">Custom Option</option>
                           </select>
+                          {editingSummary.woodType === 'Custom Option' && (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingSummary.woodTypeCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, woodTypeCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Finish</label>
@@ -2917,15 +2953,26 @@ export default function SummaryPage() {
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
                         <select
-                          value={editingSummary.glassType || ''}
-                          onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value })}
+                          value={editingSummary.glassType === 'Custom Option' ? 'Custom Option' : (editingSummary.glassType || '')}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.glassTypeCustom })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
                         >
                           <option value="">Select glass type...</option>
                           {getOppPicklist('Opportunity__glassType').map(v => (
                             <option key={v} value={v}>{v}</option>
                           ))}
+                          <option value="Custom Option">Custom Option</option>
                         </select>
+                        {editingSummary.glassType === 'Custom Option' && (
+                          <input
+                            type="text"
+                            autoFocus
+                            value={editingSummary.glassTypeCustom || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, glassTypeCustom: e.target.value })}
+                            placeholder="Enter custom value..."
+                            className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                          />
+                        )}
                       </div>
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
