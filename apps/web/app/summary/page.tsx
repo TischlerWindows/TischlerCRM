@@ -547,6 +547,7 @@ interface Summary {
   linkedOpportunityId?: string;
   jobType: string;
   estimator: string;
+  plansDated: string;
   date: string;
   address: string;
   quoteType: 'first' | 'requote' | '';
@@ -688,6 +689,7 @@ export default function SummaryPage() {
               spacerBarType: pick('spacer_bar_type'),
               spacerBarColors: pick('spacerBarColors'),
               product: pick('productSpecifications'),
+              plansDated: pick('plansDated'),
             };
             address = await resolveOppPropertyAddress(d);
           }
@@ -864,11 +866,12 @@ export default function SummaryPage() {
         spacerBarType: pick('spacer_bar_type'),
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
+        plansDated: pick('plansDated'),
       },
     });
   };
 
-  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string } }) => {
+  const createNewSummary = (opts?: { opportunityId?: string; opportunityName?: string; opportunityNumber?: string; address?: string; oppFields?: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string } }) => {
     const newSummary: Summary = {
       id: Date.now().toString(),
       name: opts?.opportunityName || '',
@@ -997,6 +1000,7 @@ export default function SummaryPage() {
       spacerBars: opts?.oppFields?.spacerBars || '',
       spacerBarType: opts?.oppFields?.spacerBarType || '',
       spacerBarColors: opts?.oppFields?.spacerBarColors || '',
+      plansDated: opts?.oppFields?.plansDated || '',
       projectContains: [],
       createdBy: 'Development User',
       createdAt: new Date().toISOString(),
@@ -1298,8 +1302,10 @@ export default function SummaryPage() {
     drawField(doc, 15 + col3W * 2, y, 'Estimator', val(s.estimator), col3W);
     y += 14;
     drawField(doc, 15, y, 'Quote Type', s.quoteType === 'first' ? 'First Quote' : s.quoteType === 'requote' ? 'Requote' : '—', col3W);
+    drawField(doc, 15 + col3W, y, 'Plans Dated', val(s.plansDated), col3W);
     if (s.quoteType === 'requote') {
-      drawField(doc, 15 + col3W, y, 'Description of Changes', val(s.requoteDescription), col3W * 2);
+      y += 10;
+      drawField(doc, 15, y, 'Description of Changes', val(s.requoteDescription), col3W * 3);
     }
     y += 12;
 
@@ -2809,6 +2815,19 @@ export default function SummaryPage() {
                           />
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
+                      </div>
+
+                      {/* Row 6: Plans Dated */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Plans Dated</label>
+                        <input
+                          type="text"
+                          value={editingSummary.plansDated || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, plansDated: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
+                          placeholder="Enter plans dated"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Auto-filled from Opportunity</p>
                       </div>
                     </div>
                   </div>
