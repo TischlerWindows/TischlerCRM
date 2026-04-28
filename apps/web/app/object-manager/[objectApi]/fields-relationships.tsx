@@ -63,6 +63,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'ExternalLookup', label: 'External Lookup Relationship', description: 'Creates a relationship that links this object to an external object whose data is stored outside the Salesforce org.', category: 'Relationship', icon: ExternalLink },
   { value: 'LookupUser', label: 'Lookup User', description: 'Creates a field that looks up and references a user in the system. Users can search for and select a user from the user list.', category: 'Relationship', icon: User },
   { value: 'PicklistLookup', label: 'Picklist with Lookup', description: 'A side-by-side combination of a picklist dropdown and a lookup search field. Choose which side displays the dropdown.', category: 'Relationship', icon: List },
+  { value: 'LookupFields', label: 'Lookup Fields Display', description: 'A read-only display field that shows selected fields from a related record. The related record is determined by a Lookup field you specify in the page layout editor.', category: 'Relationship', icon: LinkIcon },
   
   // Standard
   { value: 'Checkbox', label: 'Checkbox', description: 'Allows users to select a True (checked) or False (unchecked) value.', category: 'Standard', icon: CheckSquare },
@@ -122,10 +123,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     lookupField: '',
     staticUrl: '',
     targetFields: {} as Record<string, string>,
+    displayFields: [] as string[],
   });
-
-  const object = schema?.objects.find(o => o.apiName === objectApiName);
-  let fields = object?.fields || [];
 
   // Add hardcoded Name field for Contact objects
   if (objectApiName === 'Contact') {
@@ -159,13 +158,15 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       ...formData,
       type,
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' ? formData.picklistValues : [],
-      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
+      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
       lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
       relationshipName: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.relationshipName : '',
       formulaExpr: type === 'Formula' ? formData.formulaExpr : '',
       displayFormat: type === 'AutoNumber' ? formData.displayFormat : '',
       maxLength: type === 'Text' || type === 'LongTextArea' || type === 'RichTextArea' ? formData.maxLength : 255,
       staticUrl: type === 'URL' ? formData.staticUrl : '',
+      lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
+      displayFields: type === 'LookupFields' ? formData.displayFields : [],
     });
     setShowTypeSelector(false);
   };
@@ -196,10 +197,8 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       lookupField: '',
       staticUrl: '',
       targetFields: {},
+      displayFields: [],
     });
-  };
-
-  const handleEditField = (field: FieldDef) => {
     // Deep-clone the field so editingField is independent from the live
     // schema state — prevents shared references from leaking mutations.
     const cloned: FieldDef = {
@@ -230,6 +229,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       lookupField: cloned.lookupField || '',
       staticUrl: cloned.staticUrl || '',
       targetFields: cloned.targetFields ? { ...cloned.targetFields } : {},
+      displayFields: (cloned as any).displayFields ? [...(cloned as any).displayFields] : [],
     });
     setShowCreateDialog(true);
   };
@@ -313,6 +313,10 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     }
     if (t === 'URL' && formData.staticUrl) {
       newField.staticUrl = formData.staticUrl;
+    }
+    if (t === 'LookupFields') {
+      newField.lookupObject = formData.lookupObject;
+      (newField as any).displayFields = [...formData.displayFields];
     }
     if (t === 'LocationSearch') {
       const tf = formData.targetFields;
@@ -1107,6 +1111,63 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                         If provided, this field will display as a static hyperlink instead of a fillable input.
                         The link will be the same for every record.
                       </p>
+                    </div>
+                  )}
+
+                  {selectedType === 'LookupFields' && (
+                    <div className="space-y-4">
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                        <p className="font-semibold mb-1">Lookup Fields Display</p>
+                        <p>This read-only field displays selected fields from a related record. In the page layout editor, link it to a Lookup field on the same layout to determine which record to read from.</p>
+                      </div>
+                      <div>
+                        <Label htmlFor="lfObject">Related Object</Label>
+                        <select
+                          id="lfObject"
+                          value={formData.lookupObject}
+                          onChange={(e) => setFormData({ ...formData, lookupObject: e.target.value, displayFields: [] })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 focus:border-transparent text-sm"
+                        >
+                          <option value="">-- Select Object --</option>
+                          {schema?.objects
+                            .sort((a, b) => a.label.localeCompare(b.label))
+                            .map(o => (
+                              <option key={o.apiName} value={o.apiName}>{o.label}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Which object does this field read from?</p>
+                      </div>
+                      {formData.lookupObject && (() => {
+                        const targetObjDef = schema?.objects.find(o => o.apiName === formData.lookupObject);
+                        return (
+                          <div>
+                            <Label>Fields to Display</Label>
+                            <p className="text-xs text-gray-500 mb-2">Select which fields from {targetObjDef?.label ?? formData.lookupObject} to show on the record page.</p>
+                            <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                              {(targetObjDef?.fields ?? []).map(f => {
+                                const checked = formData.displayFields.includes(f.apiName);
+                                return (
+                                  <label key={f.apiName} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        const next = e.target.checked
+                                          ? [...formData.displayFields, f.apiName]
+                                          : formData.displayFields.filter(n => n !== f.apiName);
+                                        setFormData({ ...formData, displayFields: next });
+                                      }}
+                                      className="h-4 w-4 text-brand-navy border-gray-300 rounded"
+                                    />
+                                    <span className="flex-1 text-sm text-gray-700">{f.label}</span>
+                                    <code className="text-xs text-gray-400">{f.apiName}</code>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

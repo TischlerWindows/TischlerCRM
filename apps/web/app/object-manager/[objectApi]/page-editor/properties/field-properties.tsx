@@ -31,7 +31,27 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
   const objectApi = typeof routeParams?.objectApi === 'string' ? routeParams.objectApi : undefined;
 
   const isSlot = selection.field.kind === 'teamMemberSlot' && !!selection.field.slotConfig;
-  const isLookupFields = selection.field.kind === 'lookupFields';
+  const isLookupFieldsVirtual = selection.field.kind === 'lookupFields';
+
+  // Real LookupFields FieldType (not the legacy virtual kind)
+  const fieldDefType = useMemo(() => {
+    if (!objectApi || !schema) return undefined;
+    return schema.objects
+      .find((o) => o.apiName === objectApi)
+      ?.fields.find((f) => f.apiName === selection.field.fieldApiName)?.type;
+  }, [objectApi, schema, selection.field.fieldApiName]);
+
+  const isRealLookupFieldsType = fieldDefType === 'LookupFields';
+  const isLookupFields = isLookupFieldsVirtual || isRealLookupFieldsType;
+
+  // displayFields from the FieldDef (only relevant for real type)
+  const fieldDefDisplayFields = useMemo<string[]>(() => {
+    if (!objectApi || !schema) return [];
+    const fd = schema.objects
+      .find((o) => o.apiName === objectApi)
+      ?.fields.find((f) => f.apiName === selection.field.fieldApiName);
+    return (fd as any)?.displayFields ?? [];
+  }, [objectApi, schema, selection.field.fieldApiName]);
 
   // Fields on the current object (for source-lookup selector)
   const currentObjectFields = useMemo(() => {
@@ -93,7 +113,8 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
             </select>
           </div>
 
-          {targetObjectApi && (
+          {/* For virtual kind: editable display-fields checklist */}
+          {isLookupFieldsVirtual && targetObjectApi && (
             <div className="space-y-1.5">
               <Label className="text-xs text-gray-600">
                 Fields to Display
@@ -130,6 +151,27 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
                     </label>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* For real FieldType: show read-only summary of configured displayFields */}
+          {isRealLookupFieldsType && fieldDefDisplayFields.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs text-gray-600">Fields Displayed</Label>
+              <div className="rounded-md border border-gray-200 bg-white p-2 text-xs text-gray-600">
+                <p className="mb-1 text-[10px] text-gray-400">Configured in Object Manager</p>
+                <ul className="space-y-0.5">
+                  {fieldDefDisplayFields.map((apiName) => {
+                    const tf = targetObjectFields.find((f) => f.apiName === apiName);
+                    return (
+                      <li key={apiName} className="truncate">
+                        {tf ? tf.label : apiName}
+                        <span className="ml-1 text-[10px] text-gray-400">({apiName})</span>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             </div>
           )}

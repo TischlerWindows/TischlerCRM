@@ -3,7 +3,7 @@
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
-import { GripVertical, LayoutGrid, Link2, Search, Trash2, UserCheck } from 'lucide-react';
+import { GripVertical, LayoutGrid, Search, Trash2, UserCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { FieldDef } from '@/lib/schema';
@@ -82,31 +82,6 @@ function TeamMemberSlotTile() {
       <GripVertical className="h-3.5 w-3.5 shrink-0 text-purple-400" aria-hidden />
       <span className="min-w-0 flex-1 truncate font-medium text-purple-800">Team Member Slot</span>
       <UserCheck className="h-3.5 w-3.5 shrink-0 text-purple-500" aria-hidden />
-    </button>
-  );
-}
-
-function LookupFieldsTile() {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: 'palette-lookup-fields',
-    data: {
-      type: 'palette-lookup-fields',
-      label: 'Lookup Fields',
-    },
-  });
-  const style: CSSProperties = { opacity: isDragging ? 0 : 1 };
-  return (
-    <button
-      ref={setNodeRef}
-      type="button"
-      style={style}
-      {...listeners}
-      {...attributes}
-      className="flex w-full items-center gap-2 rounded-md border border-dashed border-blue-300 bg-blue-50/30 px-2 py-1.5 text-left text-xs transition-colors hover:border-blue-400 hover:bg-blue-50 active:cursor-grabbing"
-    >
-      <GripVertical className="h-3.5 w-3.5 shrink-0 text-blue-400" aria-hidden />
-      <span className="min-w-0 flex-1 truncate font-medium text-blue-800">Lookup Fields</span>
-      <Link2 className="h-3.5 w-3.5 shrink-0 text-blue-500" aria-hidden />
     </button>
   );
 }
@@ -301,16 +276,6 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
           </div>
           <div className="space-y-1">
             <TeamMemberSlotTile />
-          </div>
-        </section>
-
-        {/* Lookup Fields synthetic tile */}
-        <section className="space-y-1.5">
-          <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-            Linked Record Fields
-          </div>
-          <div className="space-y-1">
-            <LookupFieldsTile />
           </div>
         </section>
 

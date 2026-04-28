@@ -385,6 +385,8 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             }
             const fd = getFieldDef(f.fieldApiName, objectDef);
             if (!fd) return false;
+            // LookupFields field type: always pass through
+            if (fd.type === 'LookupFields') return true;
             if (!evaluateVisibility(fd.visibleIf, layoutVisibilityData)) return false;
             const fFx = getFormattingEffectsForField(pageLayout, f.fieldApiName, layoutVisibilityData);
             if (fFx?.hidden) return false;
@@ -464,8 +466,23 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                       );
                     }
                     const fd = getFieldDef(f.fieldApiName, objectDef);
-                    if (!fd) return null;
-                    const raw = getRecordValue(f.fieldApiName, record, fd, formulaValues);
+                    if (!fd) return null;                    // LookupFields field type: source lookup in layout's lookupFieldsConfig
+                    if (fd.type === 'LookupFields') {
+                      const sourceLookupApiName: string = f.lookupFieldsConfig?.sourceLookupApiName ?? '';
+                      return (
+                        <div
+                          key={f.fieldApiName}
+                          style={{ gridColumn: `span ${Math.min(f.colSpan ?? 1, panel.columns)}` }}
+                        >
+                          <LookupFieldsCell
+                            config={{ sourceLookupApiName, displayFields: (fd as any).displayFields ?? [] }}
+                            record={record}
+                            objectDef={objectDef}
+                            labelOverride={f.labelOverride ?? fd.label}
+                          />
+                        </div>
+                      );
+                    }                    const raw = getRecordValue(f.fieldApiName, record, fd, formulaValues);
                     const labelStyle: React.CSSProperties = {
                       ...(f.labelStyle?.color ? { color: f.labelStyle.color } : {}),
                       fontWeight: f.labelStyle?.bold ? 700 : undefined,

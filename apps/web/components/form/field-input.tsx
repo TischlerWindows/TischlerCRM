@@ -991,6 +991,26 @@ export function FieldInput({
 
     // ── Default (Text and any unrecognized type) ─────────────
     default:
+      // LookupFields type: use fieldDef.displayFields + layout-level sourceLookupApiName
+      if (fieldDef.type === 'LookupFields') {
+        const sourceLookupApiName: string =
+          (layoutField as any)?.lookupFieldsConfig?.sourceLookupApiName ?? '';
+        const config: import('@/lib/schema').LookupFieldsConfig = {
+          sourceLookupApiName,
+          displayFields: (fieldDef as any).displayFields ?? [],
+        };
+        return (
+          <LookupFieldsDisplay
+            key={fieldDef.apiName}
+            config={config}
+            formData={formData}
+            objectFields={objectFields}
+            lookupRecordsCache={lookupRecordsCache}
+            schema={schema}
+            labelOverride={(layoutField as any)?.labelOverride ?? fieldDef.label}
+          />
+        );
+      }
       inputElement = <Input {...commonProps} type="text" />;
   }
 

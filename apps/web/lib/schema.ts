@@ -2,7 +2,7 @@
 
 export type FieldType =
   | "AutoNumber" | "Formula" | "RollupSummary"
-  | "Lookup" | "ExternalLookup"
+  | "Lookup" | "ExternalLookup" | "LookupFields"
   | "Checkbox" | "Currency" | "Date" | "DateTime" | "Email"
   | "Geolocation" | "Number" | "Percent" | "Phone"
   | "Picklist" | "MultiPicklist" | "MultiSelectPicklist" | "PicklistText" | "PicklistLookup"
@@ -24,6 +24,7 @@ export function normalizeFieldType(raw: string): FieldType {
     rollupsummary: 'RollupSummary',
     lookup: 'Lookup',
     externallookup: 'ExternalLookup',
+    lookupfields: 'LookupFields',
     checkbox: 'Checkbox',
     currency: 'Currency',
     date: 'Date',
@@ -83,6 +84,8 @@ export interface FieldDef {
   lookupObject?: string;       // target object for lookup fields
   lookupField?: string;        // which field on the target object to display
   relationshipName?: string;   // name to display for relationship
+  /** For LookupFields type: which fields from the related object to display (bare apiNames) */
+  displayFields?: string[];
   dependentValues?: { [controllingValue: string]: string[] }; // dependent picklist values
   relationship?: {
     targetObject: string;
@@ -876,6 +879,7 @@ export const FIELD_TYPES: FieldOption[] = [
   { label: 'Roll-Up Summary', value: 'RollupSummary', type: 'RollupSummary' },
   { label: 'Lookup Relationship', value: 'Lookup', type: 'Lookup' },
   { label: 'External Lookup', value: 'ExternalLookup', type: 'ExternalLookup' },
+  { label: 'Lookup Fields Display', value: 'LookupFields', type: 'LookupFields' },
   { label: 'Checkbox', value: 'Checkbox', type: 'Checkbox' },
   { label: 'Currency', value: 'Currency', type: 'Currency' },
   { label: 'Date', value: 'Date', type: 'Date' },
@@ -905,7 +909,7 @@ export const FIELD_TYPES: FieldOption[] = [
 // Helper to get field type categories
 export const getFieldTypeCategory = (type: FieldType): string => {
   if (["AutoNumber", "Formula", "RollupSummary"].includes(type)) return "Advanced";
-  if (["Lookup", "ExternalLookup", "LookupUser", "PicklistLookup"].includes(type)) return "Relationship";
+  if (["Lookup", "ExternalLookup", "LookupFields", "LookupUser", "PicklistLookup"].includes(type)) return "Relationship";
   if (["Text", "TextArea", "LongTextArea", "RichTextArea", "EncryptedText"].includes(type)) return "Text";
   if (["Number", "Currency", "Percent"].includes(type)) return "Number";
   if (["Date", "DateTime", "Time"].includes(type)) return "Date/Time";
@@ -922,6 +926,7 @@ export const getFieldTypeIcon = (type: FieldType): string => {
     RollupSummary: "sigma",
     Lookup: "link",
     ExternalLookup: "external-link",
+    LookupFields: "link-2",
     LookupUser: "user",
     Checkbox: "check-square",
     Currency: "dollar-sign",

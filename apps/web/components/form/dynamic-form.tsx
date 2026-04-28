@@ -332,7 +332,18 @@ export default function DynamicForm({
       tab.regions.forEach((region) => {
         region.panels.forEach((panel) => {
           panel.fields.forEach((field) => {
-            // lookupFields kind: resolve the source lookup field's target object
+            // LookupFields field type: use fieldDef.lookupObject as the target
+            const rawType =
+              (field as any).type ||
+              object.fields.find((f) => f.apiName === field.fieldApiName)?.type;
+            const fieldType = rawType ? normalizeFieldType(rawType) : undefined;
+            if (fieldType === 'LookupFields') {
+              const fd = object.fields.find((f) => f.apiName === field.fieldApiName);
+              const t = (fd as any)?.lookupObject;
+              if (t) targetApis.add(t);
+              return;
+            }
+            // lookupFields kind (legacy virtual): resolve the source lookup field's target object
             if ((field as any).kind === 'lookupFields' && (field as any).lookupFieldsConfig?.sourceLookupApiName) {
               const srcApiName = (field as any).lookupFieldsConfig.sourceLookupApiName;
               const srcField = object.fields.find((f) => f.apiName === srcApiName);
@@ -342,10 +353,6 @@ export default function DynamicForm({
               }
               return;
             }
-            const rawType =
-              (field as any).type ||
-              object.fields.find((f) => f.apiName === field.fieldApiName)?.type;
-            const fieldType = rawType ? normalizeFieldType(rawType) : undefined;
             if (fieldType === 'LookupUser') {
               hasLookupUser = true;
             } else if (
