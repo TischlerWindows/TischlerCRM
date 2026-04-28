@@ -109,15 +109,16 @@ export function LookupFieldsDisplay({
     return String(val);
   };
 
+  const groupLabel = labelOverride || (sourceDef?.label ? sourceDef.label : 'Linked Fields');
+
   return (
     <div className="flex flex-col gap-3">
+      <div className="text-xs font-medium text-gray-500 mb-0.5 flex items-center gap-1">
+        <LinkIcon className="h-3 w-3 text-gray-400 shrink-0" aria-hidden />
+        {groupLabel}
+      </div>
       {displayFields.length === 0 ? (
-        <div>
-          <div className="text-xs font-medium text-gray-500 mb-0.5">
-            {labelOverride || (sourceDef?.label ? `Fields from ${sourceDef.label}` : 'Linked Fields')}
-          </div>
-          <div className="text-sm text-gray-400">—</div>
-        </div>
+        <div className="text-sm text-gray-400">—</div>
       ) : (
         displayFields.map((fieldApiName) => (
           <div key={fieldApiName}>

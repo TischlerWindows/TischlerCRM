@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 import { PageLayout, FieldDef, type LayoutSection, type PageField } from '@/lib/schema';
 import type { LookupFieldsConfig } from '@/lib/schema';
 import type { ObjectDef } from '@/lib/schema';
@@ -99,11 +99,12 @@ function LookupFieldsCell({
 
   return (
     <div className="flex flex-col gap-3">
+      <div className="text-xs font-medium text-gray-500 mb-0.5 flex items-center gap-1">
+        <Link2 className="h-3 w-3 text-gray-400 shrink-0" aria-hidden />
+        {label}
+      </div>
       {!lookupId || displayFields.length === 0 ? (
-        <div>
-          <div className="text-xs font-medium text-gray-500 mb-0.5">{label}</div>
-          <div className="text-sm text-gray-400">—</div>
-        </div>
+        <div className="text-sm text-gray-400">—</div>
       ) : (
         displayFields.map((fieldApiName) => (
           <div key={fieldApiName}>
