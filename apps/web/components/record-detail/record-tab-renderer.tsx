@@ -61,7 +61,7 @@ function LookupFieldsCell({
       : (rawVal !== undefined && rawVal !== null && rawVal !== '') ? String(rawVal) : null;
 
   // eslint-disable-next-line no-console
-  console.debug('[LookupFieldsCell]', { sourceLookupApiName, rawVal, lookupId, targetObjectApi, displayFields });
+  console.log('[LookupFieldsCell]', { sourceLookupApiName, rawVal, lookupId, targetObjectApi, displayFields });
 
   const [relatedRecord, setRelatedRecord] = useState<Record<string, any> | null>(null);
 
@@ -72,16 +72,16 @@ function LookupFieldsCell({
     }
     let cancelled = false;
     // eslint-disable-next-line no-console
-    console.debug('[LookupFieldsCell] fetching', targetObjectApi, lookupId);
+    console.log('[LookupFieldsCell] fetching', targetObjectApi, lookupId);
     recordsService.getRecord(targetObjectApi, lookupId)
       .then((r) => {
         // eslint-disable-next-line no-console
-        console.debug('[LookupFieldsCell] fetched record', r);
+        console.log('[LookupFieldsCell] fetched record', r);
         if (!cancelled) setRelatedRecord(r ? { id: r.id, ...r.data } : null);
       })
       .catch((err) => {
         // eslint-disable-next-line no-console
-        console.debug('[LookupFieldsCell] fetch error', err);
+        console.log('[LookupFieldsCell] fetch error', err);
         if (!cancelled) setRelatedRecord(null);
       });
     return () => { cancelled = true; };
