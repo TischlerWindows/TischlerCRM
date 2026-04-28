@@ -2663,7 +2663,7 @@ export default function SummaryPage() {
             <div className="border-b border-gray-200 px-6 print:hidden">
               <nav className="flex gap-4">
                 <button
-                  onClick={() => setActivePage(1)}
+                  onClick={() => { setActivePage(1); window.scrollTo(0, 0); }}
                   className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                     activePage === 1
                       ? 'border-brand-navy text-brand-navy'
@@ -2673,7 +2673,7 @@ export default function SummaryPage() {
                   Page 1 — Data Entry
                 </button>
                 <button
-                  onClick={() => setActivePage(2)}
+                  onClick={() => { setActivePage(2); window.scrollTo(0, 0); }}
                   className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                     activePage === 2
                       ? 'border-brand-navy text-brand-navy'
@@ -4153,7 +4153,7 @@ export default function SummaryPage() {
               <div className="flex items-center gap-3">
                 {activePage === 1 && (
                   <button
-                    onClick={() => setActivePage(2)}
+                    onClick={() => { setActivePage(2); window.scrollTo(0, 0); }}
                     className="px-6 py-2 text-sm border border-brand-navy text-brand-navy rounded-lg hover:bg-brand-navy/5 transition-colors"
                   >
                     Next: Page 2 →
@@ -4161,7 +4161,7 @@ export default function SummaryPage() {
                 )}
                 {activePage === 2 && (
                   <button
-                    onClick={() => setActivePage(1)}
+                    onClick={() => { setActivePage(1); window.scrollTo(0, 0); }}
                     className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     ← Back to Page 1
