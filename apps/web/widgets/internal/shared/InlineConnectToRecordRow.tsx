@@ -101,6 +101,19 @@ function flatten(arr: Record<string, unknown>[]): Record<string, unknown>[] {
   })
 }
 
+/** Fields the user-facing record search should match against. Each parent
+ *  object type contributes its primary identifier (number) plus optional
+ *  human-readable fields. Audit metadata is intentionally excluded so typing
+ *  a user's name doesn't surface every record they touched. */
+const SEARCHABLE_KEYS = new Set([
+  'name', 'title', 'label',
+  'propertyNumber', 'opportunityNumber', 'projectNumber',
+  'workOrderNumber', 'installationNumber', 'leadNumber', 'quoteNumber',
+  'opportunityName', 'projectName',
+  'contactName', 'firstName', 'lastName',
+  'address',
+])
+
 function searchText(r: Record<string, unknown>): string {
   const parts: string[] = []
   const collect = (v: unknown) => {
@@ -110,7 +123,10 @@ function searchText(r: Record<string, unknown>): string {
       for (const inner of Object.values(v as Record<string, unknown>)) collect(inner)
     }
   }
-  for (const v of Object.values(r)) collect(v)
+  for (const k of Object.keys(r)) {
+    const bare = k.replace(/^[A-Za-z]+__/, '')
+    if (SEARCHABLE_KEYS.has(bare)) collect(r[k])
+  }
   return parts.join(' ')
 }
 
@@ -211,6 +227,7 @@ export function InlineConnectToRecordRow({
   const [keyboardIndex, setKeyboardIndex] = useState(0)
 
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   // ── Per-type record lists (cached on first activation) ───────────────
   const listsRef = useRef<Partial<Record<ParentObjectApiName, Record<string, unknown>[]>>>({})
@@ -245,9 +262,17 @@ export function InlineConnectToRecordRow({
     if (last && roleValues.includes(last)) setRole(last)
   }, [parentType, role, roleValues])
 
-  // Autofocus the search input on mount.
+  // Autofocus the search input on mount, and scroll the row into the middle
+  // of the viewport so the dropdown (which opens below the input) doesn't
+  // render off-screen on a long page.
+  //
+  // Nested rAF: the smooth-scroll needs at least one committed paint before
+  // we shift keyboard focus, otherwise focus visually jumps in some browsers.
   useEffect(() => {
-    requestAnimationFrame(() => searchInputRef.current?.focus())
+    requestAnimationFrame(() => {
+      rootRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      requestAnimationFrame(() => searchInputRef.current?.focus())
+    })
   }, [])
 
   // Reset selection when the user changes the parent type tab. Don't yank
@@ -362,6 +387,7 @@ export function InlineConnectToRecordRow({
 
   return (
     <div
+      ref={rootRef}
       onKeyDown={onRootKeyDown}
       role="group"
       aria-label="Connect to a record"
@@ -537,16 +563,18 @@ function FlagToggle({
   onChange: (v: boolean) => void
   disabled?: boolean
 }) {
+  // Mirrors InlineAddConnectionRow's FlagToggle — darker border + brand-dark
+  // text + subtle shadow so unpressed state reads as a button.
   return (
     <button
       type="button"
       aria-pressed={pressed}
       onClick={() => onChange(!pressed)}
       disabled={disabled}
-      className={`px-2 h-7 rounded text-[10px] font-medium border transition-colors disabled:opacity-50 ${
+      className={`px-2 h-7 rounded text-[10px] font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-brand-navy/30 focus-visible:outline-none disabled:opacity-50 ${
         pressed
-          ? 'bg-brand-navy border-brand-navy text-white'
-          : 'bg-white dark:bg-brand-dark border-gray-300 dark:border-gray-700 text-brand-gray hover:border-brand-navy hover:text-brand-navy'
+          ? 'bg-brand-navy border-brand-navy text-white shadow-sm'
+          : 'bg-white dark:bg-brand-dark border-gray-400 dark:border-gray-600 text-brand-dark dark:text-gray-100 shadow-sm hover:border-brand-navy hover:text-brand-navy'
       }`}
     >
       {label}

@@ -13,6 +13,7 @@ import { apiClient } from '@/lib/api-client'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineConnectToRecordRow } from '../shared/InlineConnectToRecordRow'
+import { getRecordName } from '../shared/recordName'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -175,53 +176,9 @@ function resolvePropertyId(raw: Record<string, unknown>, childObjectApiName: str
   return ''
 }
 
-/** Best-effort display name from any record shape */
-function getRecordName(raw: Record<string, unknown>): string {
-  const d = (raw.data && typeof raw.data === 'object')
-    ? raw.data as Record<string, unknown>
-    : raw
-
-  // First/last name pairs
-  for (const key of Object.keys(d)) {
-    if (key.endsWith('__firstName') || key === 'firstName') {
-      const val = d[key]
-      if (val && String(val).trim()) {
-        const prefix = key.replace(/__firstName$/, '')
-        const lastName = d[`${prefix}__lastName`] ?? d.lastName
-        if (lastName) return `${String(val)} ${String(lastName)}`
-        return String(val)
-      }
-    }
-  }
-
-  // Fields ending in 'name' (opportunityName, projectName, etc.)
-  for (const key of Object.keys(d)) {
-    const lower = key.toLowerCase()
-    if (
-      (lower.endsWith('name') || lower.endsWith('__name')) &&
-      !lower.includes('firstname') && !lower.includes('lastname')
-    ) {
-      const val = d[key]
-      if (val && typeof val === 'string' && val.trim()) return val
-    }
-  }
-
-  if (d.name && typeof d.name === 'string' && d.name.trim()) return d.name
-  if (d.title && typeof d.title === 'string' && d.title.trim()) return d.title as string
-
-  // Auto-number fields: propertyNumber, opportunityNumber, projectNumber, etc.
-  // These are the primary identifiers in the CRM and the only meaningful label for
-  // objects like Property that have no separate "name" field.
-  for (const key of Object.keys(d)) {
-    const bare = key.replace(/^[A-Za-z]+__/, '').toLowerCase()
-    if (bare.endsWith('number') && !bare.includes('phone') && !bare.includes('mobile')) {
-      const val = d[key]
-      if (val && typeof val === 'string' && val.trim()) return val
-    }
-  }
-
-  return 'Unnamed'
-}
+// `getRecordName` lives in shared/recordName.ts so it stays in sync with the
+// rollup widget's resolution policy (composite-name "N/A" filter, address
+// fallback, etc.). See that file for the priority order.
 
 // ── Skeleton ───────────────────────────────────────────────────────────
 

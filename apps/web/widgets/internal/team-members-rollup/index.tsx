@@ -12,6 +12,7 @@ import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { InlineAddConnectionRow, type InlineAddConnectionPayload } from '../shared/InlineAddConnectionRow'
+import { getRecordName } from '../shared/recordName'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
 import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
 import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
@@ -194,59 +195,8 @@ function getLookupName(rec: TeamMemberRecord, field: string): string {
   return ''
 }
 
-function getRecordName(raw: Record<string, unknown>): string {
-  const d = (raw.data && typeof raw.data === 'object') ? raw.data as Record<string, unknown> : raw
-
-  // 0. Composite `name` object (Contact's CompositeText name field).
-  // Shape: { salutation, firstName, lastName } possibly with prefixed keys
-  // like Contact__name_firstName. Resolve to "Sal First Last".
-  for (const key of Object.keys(d)) {
-    const lower = key.toLowerCase()
-    const isNameKey = lower === 'name' || lower.endsWith('__name')
-    if (isNameKey && d[key] && typeof d[key] === 'object' && !Array.isArray(d[key])) {
-      const nameObj = d[key] as Record<string, unknown>
-      const findVal = (suffix: string) => {
-        const k = Object.keys(nameObj).find(kk => kk.toLowerCase().endsWith(suffix))
-        return k ? nameObj[k] : undefined
-      }
-      const sal = nameObj.salutation ?? findVal('salutation')
-      const fn = nameObj.firstName ?? findVal('firstname')
-      const ln = nameObj.lastName ?? findVal('lastname')
-      const parts = [sal, fn, ln].filter(v => v && String(v).trim()).map(v => String(v).trim())
-      if (parts.length > 0) return parts.join(' ')
-    }
-  }
-
-  // 1. Check for Contact-style first+last name fields (prefixed or plain)
-  for (const key of Object.keys(d)) {
-    if (key.endsWith('__firstName') || key === 'firstName') {
-      const val = d[key]
-      if (val && String(val).trim()) {
-        const prefix = key.replace(/__firstName$/, '')
-        const lastName = d[`${prefix}__lastName`] || d.lastName
-        if (lastName) return `${String(val)} ${String(lastName)}`
-        return String(val)
-      }
-    }
-  }
-
-  // 2. Check for prefixed name fields (e.g. Account__accountName, Account__name, Contact__name)
-  for (const key of Object.keys(d)) {
-    const lower = key.toLowerCase()
-    if ((lower.endsWith('name') || lower.endsWith('__name')) && !lower.includes('firstname') && !lower.includes('lastname')) {
-      const val = d[key]
-      if (val && typeof val === 'string' && val.trim()) return val
-    }
-  }
-
-  // 3. Plain fields
-  if (d.firstName && d.lastName) return `${String(d.firstName)} ${String(d.lastName)}`
-  if (d.name && typeof d.name === 'string' && d.name.trim()) return d.name
-  if (d.title && typeof d.title === 'string' && d.title.trim()) return d.title as string
-  if (d.label && typeof d.label === 'string' && (d.label as string).trim()) return d.label as string
-
-  return 'Unnamed'
-}
+// `getRecordName` lives in shared/recordName.ts so the Associations widget and
+// the inline-add components share one resolution policy.
 
 /** Batch-resolve a set of record IDs into display names and full record data */
 async function resolveRecords(objectApiName: string, ids: string[]): Promise<{ names: NameMap; records: RecordMap }> {
@@ -670,11 +620,16 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
       if (role) roleSet.add(role)
 
-      // Determine "via" source — which parent record this member belongs to
+      // Determine "via" source — which parent record this member belongs to.
+      // Skip the self-referential entry: when the member is directly attached
+      // to the SAME record this widget is rendering on, we don't want to label
+      // it as inherited "via" itself. "via" should only surface true parents
+      // walked from a child rollup.
       const viaSources: ViaSource[] = []
       for (const [objType, fieldKey] of Object.entries(OBJECT_TO_FIELD)) {
         const parentId = getLookupId(member, fieldKey)
-        if (parentId) {
+        const isSelfReference = parentId === recordId && objType === objectApiName
+        if (parentId && !isSelfReference) {
           const resolvedName = parentNames.get(parentId)
           const embeddedName = getLookupName(member, fieldKey)
           viaSources.push({
@@ -768,7 +723,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       mergedAccounts: Array.from(accountMap.values()),
       allRoles: Array.from(roleSet).sort(),
     }
-  }, [allMembers, currentField, recordId, contactNames, accountNames, parentNames, contactRecords, accountRecords])
+  }, [allMembers, currentField, recordId, objectApiName, contactNames, accountNames, parentNames, contactRecords, accountRecords])
 
   // ── 5e: Search, Filter & Sort ──
   const filteredContacts = useMemo(() => {
