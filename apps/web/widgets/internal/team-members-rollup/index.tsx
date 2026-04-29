@@ -892,7 +892,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           <Users className="w-4 h-4 text-brand-gray" />
           <h3 className="text-xs font-semibold text-brand-dark flex-1">{widgetLabel}</h3>
           <span className="text-[11px] text-brand-gray tabular-nums">
-            {totalCount} member{totalCount !== 1 ? 's' : ''}
+            {totalCount} connection{totalCount !== 1 ? 's' : ''}
           </span>
           {!isCreateMode && (
             <button
@@ -1089,8 +1089,8 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 function ModalOverlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
         {children}
       </div>
     </>
@@ -1572,6 +1572,7 @@ function AddTeamMemberModal({
       role,
       primaryContact,
       contractHolder,
+      quoteRecipient: false,
     }
 
     // In pending mode, don't POST — just queue the data
@@ -1624,6 +1625,7 @@ function AddTeamMemberModal({
           role: accountRole,
           primaryContact: accountPrimary,
           contractHolder: accountContractHolder,
+          quoteRecipient: false,
         })
       }
       const contactNameMap = new Map<string, string>()
@@ -1639,6 +1641,7 @@ function AddTeamMemberModal({
           role: contactRoles[contactId] || 'Other',
           primaryContact: false,
           contractHolder: false,
+          quoteRecipient: false,
         })
       }
       return
@@ -1659,6 +1662,7 @@ function AddTeamMemberModal({
             role: accountRole,
             primaryContact: accountPrimary,
             contractHolder: accountContractHolder,
+            quoteRecipient: false,
           },
         })
       }
@@ -1682,6 +1686,7 @@ function AddTeamMemberModal({
               role: contactRoles[contactId] || 'Other',
               primaryContact: false,
               contractHolder: false,
+              quoteRecipient: false,
             },
           })
         } catch {
@@ -2162,6 +2167,7 @@ function CopyTeamModal({
         const role = getStr(member, 'role')
         const isPrimary = getField(member, 'primaryContact') === true
         const isContractHolder = getField(member, 'contractHolder') === true
+        const isQuoteRecipient = getField(member, 'quoteRecipient') === true
 
         // Simple dedup: skip if same contact is already added in this batch
         const dedupKey = `${contactId}|${accountId}`
@@ -2176,6 +2182,7 @@ function CopyTeamModal({
           role: role || 'Other',
           primaryContact: isPrimary,
           contractHolder: isContractHolder,
+          quoteRecipient: isQuoteRecipient,
         }
         if (contactId) payload.contact = contactId
         if (accountId) payload.account = accountId

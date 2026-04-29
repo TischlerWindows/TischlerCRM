@@ -890,8 +890,8 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       {/* ── Delete Confirmation ── */}
       {deleteTarget && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-overlay bg-black/20 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
+          <div className="fixed inset-0 z-modal flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
               <p className="text-sm font-semibold text-brand-dark">Remove connection?</p>
               <p className="text-xs text-brand-gray">

@@ -20,15 +20,19 @@ export interface ConnectionFlags {
 }
 
 interface ConnectionBadgesProps {
-  /** The Role (job function) — appears as a filled navy pill. Empty string hides it. */
+  /** Single Role (job function) — convenience prop for callers that show one TM row. */
   role?: string
-  /** Multiple roles — used by merged-row callers (e.g. Rollup tiles that aggregate multiple TM rows). */
+  /**
+   * Multiple roles — used by merged-row callers (e.g. Rollup tiles aggregating
+   * multiple TM rows for the same person). When this is non-empty it takes
+   * precedence over `role`; an empty array falls through to `role`.
+   */
   roles?: string[]
   /** Per-record flags — appear as outlined semantic-color pills. */
   flags?: ConnectionFlags
   /** Indirect-rollup sources. Shown as small "↳ via {Name}" chips. */
   viaSources?: ViaSource[]
-  /** When > 0, only this many via-sources are shown inline; the rest collapse to "+N more". */
+  /** Cap inline via-sources before collapsing the rest into "+N more". Default 2. */
   maxVisibleVia?: number
   /** Optional className for the outer wrapper. */
   className?: string
@@ -38,7 +42,7 @@ interface ConnectionBadgesProps {
 
 function RoleBadge({ role }: { role: string }) {
   return (
-    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/30 dark:text-brand-navy-light">
+    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/30 dark:text-blue-200">
       {role}
     </span>
   )
