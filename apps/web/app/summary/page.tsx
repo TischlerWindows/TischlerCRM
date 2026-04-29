@@ -645,6 +645,7 @@ export default function SummaryPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
+  const [showAddOns, setShowAddOns] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
   const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
   // Opportunity picker state
@@ -4005,6 +4006,15 @@ export default function SummaryPage() {
                       />
                       Type 4
                     </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showAddOns}
+                        onChange={(e) => setShowAddOns(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                      />
+                      Add-ons
+                    </label>
                     <button
                       onClick={handleAddRow}
                       className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
@@ -4020,10 +4030,10 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
@@ -4054,14 +4064,14 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -4167,30 +4177,14 @@ export default function SummaryPage() {
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.magneticContactUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.magneticContactPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.finalFinishUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.finalFinishPosition} />
-                          </td>
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
@@ -4238,6 +4232,14 @@ export default function SummaryPage() {
                       />
                       Type 4
                     </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showAddOns}
+                        onChange={(e) => setShowAddOns(e.target.checked)}
+                      />
+                      Add-ons
+                    </label>
                     <button
                       onClick={handleAddDoorRow}
                       className="inline-flex items-center px-3 py-1.5 text-sm bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
@@ -4253,10 +4255,10 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
@@ -4287,14 +4289,14 @@ export default function SummaryPage() {
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>
-                        <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -4400,30 +4402,14 @@ export default function SummaryPage() {
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.magneticContactUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.magneticContactPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.finalFinishUnit} />
-                          </td>
-                          <td className="px-0.5 py-1 align-top">
-                            <ReadOnlyCellInput value={row.finalFinishPosition} />
-                          </td>
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
+                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
