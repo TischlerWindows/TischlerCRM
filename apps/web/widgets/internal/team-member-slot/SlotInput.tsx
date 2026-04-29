@@ -158,23 +158,29 @@ export function SlotInput({
   // objects as "[object Object]").
   const contactListRef = React.useRef<Record<string, unknown>[] | null>(null)
   useEffect(() => {
-    if (!contactActive) return
     if (mode === 'account') return
+    // Paired + account-picked path renders a static list (ContactPickList) and
+    // must fetch eagerly when accountId changes, NOT when the input is active
+    // (there's no input — the list shows directly). Other paths (global
+    // contact search via LookupSearch) still gate on contactActive so we
+    // don't load the global list until the user opens the dropdown.
+    const isPairedAccountList = mode === 'paired' && !!accountId
+    if (!isPairedAccountList && !contactActive) return
     let cancelled = false
     const run = async () => {
       try {
         // Paired + account selected: filter to that account's contacts (handles
         // both `account` plain and auto-generated `AccountId` field names).
-        if (mode === 'paired' && accountId) {
+        if (isPairedAccountList) {
           const [byAccount, byAccountId] = await Promise.all([
             apiClient
               .get<Record<string, unknown>[]>(
-                `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId)}&limit=200`,
+                `/objects/Contact/records?filter[account]=${encodeURIComponent(accountId!)}&limit=200`,
               )
               .catch(() => [] as Record<string, unknown>[]),
             apiClient
               .get<Record<string, unknown>[]>(
-                `/objects/Contact/records?filter[AccountId]=${encodeURIComponent(accountId)}&limit=200`,
+                `/objects/Contact/records?filter[AccountId]=${encodeURIComponent(accountId!)}&limit=200`,
               )
               .catch(() => [] as Record<string, unknown>[]),
           ])
