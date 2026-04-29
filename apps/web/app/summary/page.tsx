@@ -3071,11 +3071,11 @@ export default function SummaryPage() {
 
                         const getOptionsForType = (t: string): string[] => {
                           const lo = t.toLowerCase();
-                          if (lo.includes('hung')) return ['59 mm Sash', '66 mm Sash', '72 mm Sash', 'Concealed Balance', 'Weight and Chain Balance'];
+                          if (lo.includes('hung')) return ['59 mm Sash', '66 mm Sash', '72 mm Sash'];
                           if (lo.includes('inswing')) return ['Concealed Corrosion Resistant'];
                           if (lo.includes('outswing')) return ['Corrosion Resistant Rough Hardware', 'Hinge Finials'];
                           if (lo.includes('swing')) return ['Siegenia Rough Hardware', 'KFV Rough Hardware', 'Hinge Finials', 'Bronze Threshold'];
-                          if (lo.includes('lift') || lo.includes('roll')) return ['Standard Hardware', 'Stainless Steel Hardware'];
+                          if (lo.includes('lift') || lo.includes('roll') || lo.includes('l&r') || lo.includes('l & r')) return ['Standard Hardware', 'Stainless Steel Hardware'];
                           return ['72mm Sash Thickness', '90mm Sash Thickness'];
                         };
 
