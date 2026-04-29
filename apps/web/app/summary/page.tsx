@@ -613,6 +613,7 @@ interface Summary {
   shippingContainers: string;
   shippingCostPerContainer: string;
   shippingCraneCost: string;
+  deliveryNotes: string;
   taxAtFull: string;
   taxAtDiscount: string;
   createdBy: string;
@@ -1116,6 +1117,7 @@ export default function SummaryPage() {
       shippingContainers: '',
       shippingCostPerContainer: '',
       shippingCraneCost: '',
+      deliveryNotes: '',
       taxAtFull: '',
       taxAtDiscount: '',
       createdBy: 'Development User',
@@ -1472,7 +1474,7 @@ export default function SummaryPage() {
       const deliveryTotal = deliveryContainers * deliveryCost + deliveryCrane;
       drawField(doc, 15, y, '# of Containers', deliveryContainers ? String(deliveryContainers) : '—', col3W);
       drawField(doc, 15 + col3W, y, 'Cost (per container)', deliveryCost ? String(deliveryCost) : '—', col3W);
-      drawField(doc, 15 + col3W * 2, y, 'Crane Cost', deliveryCrane ? String(deliveryCrane) : '—', col3W);
+      drawField(doc, 15 + col3W * 2, y, 'Additional Premium for Containers/Crane Cost', deliveryCrane ? String(deliveryCrane) : '—', col3W);
       y += 10;
       drawField(doc, 15, y, 'Estimated Delivery Cost', `${deliveryTotal}k`, col3W * 2);
       y += 12;
@@ -3342,7 +3344,7 @@ export default function SummaryPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Crane Cost</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Additional Premium for Containers/Crane Cost</label>
                           <input
                             type="number"
                             min="0"
@@ -3366,6 +3368,16 @@ export default function SummaryPage() {
                           </div>
                         );
                       })()}
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Delivery Notes</label>
+                        <textarea
+                          rows={3}
+                          value={editingSummary.deliveryNotes || ''}
+                          onChange={(e) => setEditingSummary({ ...editingSummary, deliveryNotes: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm resize-none"
+                          placeholder="Any special delivery instructions or notes..."
+                        />
+                      </div>
                     </div>
                   </div>
 
