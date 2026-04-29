@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, UserCircle, Mail, Phone } from 'lucide-react'
+import { X, UserCircle, Mail, Phone, Building2 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
@@ -9,6 +9,7 @@ import { resolveLookupDisplayName } from '@/lib/utils'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 import { getRecordName } from '../shared/recordName'
+import { InlineCreateContact, InlineCreateAccount } from '../shared/InlineCreate'
 
 type Mode = 'contact' | 'account' | 'paired'
 
@@ -329,30 +330,56 @@ export function SlotInput({
     mode === 'contact' || (mode === 'paired' && (!!accountId || noAccountMode))
   return (
     <div className="space-y-2">
-      {(mode === 'account' || mode === 'paired') && (
-        <LookupSearch
-          fieldDef={accountFieldDef}
-          value={accountId ?? ''}
-          onChange={(val) => {
-            setAccountId(val ? String(val) : null)
-            // Reset contact when account changes in paired mode so the next
-            // pick comes from the new account's filtered list. Also clear the
-            // "skip account" opt-out — the user just chose an account, so
-            // they're back on the primary path.
-            if (mode === 'paired') {
-              setContactId(null)
-              setNoAccountMode(false)
-            }
+      {(mode === 'account' || mode === 'paired') && !accountId && (
+        <>
+          <LookupSearch
+            fieldDef={accountFieldDef}
+            value={accountId ?? ''}
+            onChange={(val) => {
+              setAccountId(val ? String(val) : null)
+              // Reset contact when account changes in paired mode so the next
+              // pick comes from the new account's filtered list. Also clear the
+              // "skip account" opt-out — the user just chose an account, so
+              // they're back on the primary path.
+              if (mode === 'paired') {
+                setContactId(null)
+                setNoAccountMode(false)
+              }
+            }}
+            records={accountResults}
+            lookupQuery={accountQuery}
+            isActive={accountActive}
+            onQueryChange={setAccountQuery}
+            onFocus={() => setAccountActive(true)}
+            onBlur={() => setTimeout(() => setAccountActive(false), 150)}
+            schemaObjects={schemaObjects}
+            disabled={disabled}
+            hideNoneOption
+          />
+          <InlineCreateAccount
+            disabled={disabled}
+            onCreated={(id) => {
+              setAccountId(id)
+              if (mode === 'paired') {
+                setContactId(null)
+                setNoAccountMode(false)
+              }
+            }}
+          />
+        </>
+      )}
+
+      {/* Show the picked Account as a confirm-pill so the user knows what they
+       *  chose. X clears just the account so the user can re-pick without
+       *  abandoning the whole flow. */}
+      {(mode === 'account' || mode === 'paired') && accountId && (
+        <SelectedAccountPill
+          accountId={accountId}
+          onClear={() => {
+            setAccountId(null)
+            if (mode === 'paired') setContactId(null)
           }}
-          records={accountResults}
-          lookupQuery={accountQuery}
-          isActive={accountActive}
-          onQueryChange={setAccountQuery}
-          onFocus={() => setAccountActive(true)}
-          onBlur={() => setTimeout(() => setAccountActive(false), 150)}
-          schemaObjects={schemaObjects}
           disabled={disabled}
-          hideNoneOption
         />
       )}
 
@@ -387,11 +414,20 @@ export function SlotInput({
        *  clickable list (not a search). The account narrows the choices to a
        *  small set; an additional autocomplete is friction. */}
       {showContactPicker && mode === 'paired' && accountId && !contactId && (
-        <ContactPickList
-          contacts={contactResults}
-          onPick={(id) => setContactId(id)}
-          disabled={disabled}
-        />
+        <>
+          <ContactPickList
+            contacts={contactResults}
+            onPick={(id) => setContactId(id)}
+            disabled={disabled}
+          />
+          {/* Inline-create: new contact is auto-linked to the picked Account. */}
+          <InlineCreateContact
+            accountId={accountId}
+            triggerLabel="New contact for this organization"
+            disabled={disabled}
+            onCreated={(id) => setContactId(id)}
+          />
+        </>
       )}
 
       {/* Paired-mode contact selected: show a confirm-pill with X to clear. */}
@@ -404,20 +440,35 @@ export function SlotInput({
       )}
 
       {/* Contact-only mode OR paired+noAccountMode: search globally. */}
-      {showContactPicker && (mode === 'contact' || (mode === 'paired' && noAccountMode)) && (
-        <LookupSearch
-          fieldDef={contactFieldDef}
-          value={contactId ?? ''}
-          onChange={(val) => setContactId(val ? String(val) : null)}
-          records={contactResults}
-          lookupQuery={contactQuery}
-          isActive={contactActive}
-          onQueryChange={setContactQuery}
-          onFocus={() => setContactActive(true)}
-          onBlur={() => setTimeout(() => setContactActive(false), 150)}
-          schemaObjects={schemaObjects}
+      {showContactPicker && (mode === 'contact' || (mode === 'paired' && noAccountMode)) && !contactId && (
+        <>
+          <LookupSearch
+            fieldDef={contactFieldDef}
+            value={contactId ?? ''}
+            onChange={(val) => setContactId(val ? String(val) : null)}
+            records={contactResults}
+            lookupQuery={contactQuery}
+            isActive={contactActive}
+            onQueryChange={setContactQuery}
+            onFocus={() => setContactActive(true)}
+            onBlur={() => setTimeout(() => setContactActive(false), 150)}
+            schemaObjects={schemaObjects}
+            disabled={disabled}
+            hideNoneOption
+          />
+          <InlineCreateContact
+            disabled={disabled}
+            onCreated={(id) => setContactId(id)}
+          />
+        </>
+      )}
+
+      {/* Contact-only mode (no paired list path) confirm-pill once selected. */}
+      {showContactPicker && (mode === 'contact' || (mode === 'paired' && noAccountMode)) && contactId && (
+        <SelectedContactPill
+          contactId={contactId}
+          onClear={() => setContactId(null)}
           disabled={disabled}
-          hideNoneOption
         />
       )}
 
@@ -581,6 +632,37 @@ function SelectedContactPill({
           onClick={onClear}
           className="text-gray-400 hover:text-red-500 transition-colors"
           title="Clear contact"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Sibling of SelectedContactPill for the Account picker — mirrors the
+ *  visual treatment so the user sees a consistent "you picked: …" state. */
+function SelectedAccountPill({
+  accountId,
+  onClear,
+  disabled,
+}: {
+  accountId: string
+  onClear: () => void
+  disabled?: boolean
+}) {
+  const name = resolveLookupDisplayName(accountId, 'Account')
+  const display = name && name !== '-' ? name : accountId
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm">
+      <Building2 className="w-4 h-4 text-brand-gray shrink-0" aria-hidden />
+      <div className="flex-1 min-w-0 font-medium text-gray-900 truncate">{display}</div>
+      {!disabled && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-gray-400 hover:text-red-500 transition-colors"
+          title="Clear organization"
         >
           <X className="w-4 h-4" />
         </button>
