@@ -346,6 +346,10 @@ export function InlineCreateContact({
   const salutations = { values: ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'], loaded: true }
   const contactTypes = usePicklistValues('Contact', 'contactType')
   const titles = usePicklistValues('Contact', 'title')
+  // `Contact__status` is REQUIRED on the live schema, even though the
+  // simplified Contact has very few user-visible fields. Pull the picklist
+  // so the create payload uses whatever default the admin has configured.
+  const contactStatuses = usePicklistValues('Contact', 'status')
 
   function reset() {
     setSalutation('')
@@ -409,19 +413,28 @@ export function InlineCreateContact({
     setSaving(true)
     setError(null)
     try {
-      // The Contact schema's standalone firstName/lastName/salutation fields
-      // were collapsed into the composite Contact__name field. The form
-      // serializes a composite as an object whose inner keys are the
-      // sub-field apiNames (Contact__name_firstName, etc.). The API's
-      // bare-name normalizer maps `Contact__name → name`, so we emit the
-      // composite under `name`.
-      const composite: Record<string, string> = {
+      // The Contact schema's standalone firstName/lastName fields were
+      // collapsed into the composite Contact__name. The composite stores its
+      // sub-fields under prefixed inner keys (Contact__name_firstName, etc.)
+      // and the API's required-field validator (apps/api/src/routes/records.ts
+      // lines 622-641) checks for sub-fields via top-level keys matching the
+      // pattern `<Object>__*_<requiredApiName>`. So we emit each composite
+      // sub-field BOTH:
+      //   1. At top level — so the validator finds them, and
+      //   2. Wrapped under `name: { ... }` — so the stored record has a
+      //      properly-shaped composite that getRecordName resolves nicely.
+      // Status is REQUIRED on the schema; default to the first picklist value
+      // (commonly "Active") so the form respects admin-configured values.
+      const compositeInner: Record<string, string> = {
         Contact__name_firstName: firstName.trim(),
         Contact__name_lastName: lastName.trim(),
       }
-      if (salutation) composite.Contact__name_salutation = salutation
+      if (salutation) compositeInner.Contact__name_salutation = salutation
+      const statusDefault = contactStatuses.values[0] ?? 'Active'
       const payload: Record<string, unknown> = {
-        name: composite,
+        ...compositeInner,
+        name: compositeInner,
+        status: statusDefault,
         primaryEmail: email.trim(),
         primaryPhone: phone.trim(),
       }
