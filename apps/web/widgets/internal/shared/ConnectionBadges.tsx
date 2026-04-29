@@ -42,7 +42,10 @@ interface ConnectionBadgesProps {
 
 function RoleBadge({ role }: { role: string }) {
   return (
-    <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/30 dark:text-blue-200">
+    <span
+      aria-label={`Role: ${role}`}
+      className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/30 dark:text-blue-200"
+    >
       {role}
     </span>
   )
@@ -50,9 +53,13 @@ function RoleBadge({ role }: { role: string }) {
 
 function FlagBadge({
   label,
+  fullLabel,
   tone,
 }: {
   label: string
+  /** Spelled-out label for screen readers — e.g. "Quote Recipient" while the
+   *  pill shows just "Quote". Avoids stripped-down labels reading ambiguously. */
+  fullLabel: string
   tone: 'green' | 'orange' | 'purple'
 }) {
   const cls =
@@ -62,22 +69,30 @@ function FlagBadge({
         ? 'border-orange-300 bg-orange-50 text-orange-700 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
         : 'border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}>
+    <span
+      aria-label={fullLabel}
+      title={fullLabel}
+      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}
+    >
       {label}
     </span>
   )
 }
 
 function ViaBadge({ source }: { source: ViaSource }) {
+  const a11yLabel = `via ${source.objectApiName}: ${source.recordName}`
   const inner = (
-    <span className="inline-flex items-center gap-0.5 text-[11px] text-brand-gray hover:text-brand-navy">
-      <CornerDownRight className="w-3 h-3 shrink-0" />
+    <span
+      aria-label={source.href ? undefined : a11yLabel}
+      className="inline-flex items-center gap-0.5 text-[11px] text-brand-gray hover:text-brand-navy"
+    >
+      <CornerDownRight className="w-3 h-3 shrink-0" aria-hidden />
       <span className="truncate">via {source.recordName}</span>
     </span>
   )
   if (source.href) {
     return (
-      <Link href={source.href} className="hover:underline">
+      <Link href={source.href} aria-label={a11yLabel} className="hover:underline">
         {inner}
       </Link>
     )
@@ -128,9 +143,9 @@ export function ConnectionBadges({
         <span aria-hidden className="inline-block h-3 border-l border-gray-200 dark:border-gray-700 mx-0.5" />
       )}
 
-      {flags.primary && <FlagBadge label="Primary" tone="green" />}
-      {flags.contractHolder && <FlagBadge label="Contract Holder" tone="orange" />}
-      {flags.quoteRecipient && <FlagBadge label="Quote Recipient" tone="purple" />}
+      {flags.primary && <FlagBadge label="Primary" fullLabel="Primary contact" tone="green" />}
+      {flags.contractHolder && <FlagBadge label="Contract Holder" fullLabel="Contract holder" tone="orange" />}
+      {flags.quoteRecipient && <FlagBadge label="Quote Recipient" fullLabel="Quote recipient" tone="purple" />}
 
       {hasVia && (
         <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 ml-1">

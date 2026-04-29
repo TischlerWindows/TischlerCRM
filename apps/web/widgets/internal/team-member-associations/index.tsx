@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import {
   Network, Edit2, Trash2, Check, X, Home, CornerDownRight,
@@ -616,8 +616,22 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [collapseInitialised, setCollapseInitialised] = useState(false)
 
-  // Connect-to-record inline-add row visibility
+  // Connect-to-record inline-add row visibility + focus management for it.
   const [showConnectRow, setShowConnectRow] = useState(false)
+  const connectButtonRef = useRef<HTMLButtonElement | null>(null)
+  const restoreConnectFocusRef = useRef(false)
+
+  useEffect(() => {
+    if (!showConnectRow && restoreConnectFocusRef.current) {
+      restoreConnectFocusRef.current = false
+      requestAnimationFrame(() => connectButtonRef.current?.focus())
+    }
+  }, [showConnectRow])
+
+  // After a delete completes the deleted row's button is gone. Restore focus
+  // to the "+ Connect to record" button so the user has a sensible anchor
+  // (covers both populated and now-empty list cases).
+  const restoreFocusAfterDeleteRef = useRef(false)
 
   // ── 3-phase data fetch ──
   const fetchAssociations = useCallback(async () => {
@@ -836,6 +850,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     try {
       await apiClient.delete(`/objects/TeamMember/records/${memberId}`)
       setDeleteTarget(null)
+      restoreFocusAfterDeleteRef.current = true
       await fetchAssociations()
     } catch {
       // ignore
@@ -843,6 +858,15 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
       setDeletingId(null)
     }
   }
+
+  // After a delete finishes (the refetch resolves and propertyGroups updates),
+  // pop focus to the connect-to-record button so the user keeps a tab anchor.
+  useEffect(() => {
+    if (!restoreFocusAfterDeleteRef.current) return
+    if (loading) return
+    restoreFocusAfterDeleteRef.current = false
+    requestAnimationFrame(() => connectButtonRef.current?.focus())
+  }, [loading, propertyGroups, flatTiles])
 
   // ── Shared edit props passed down to every row ──
   const editHandlers: EditHandlers = {
@@ -957,10 +981,11 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           {showsConnectButton && !showConnectRow && (
             <button
               type="button"
+              ref={connectButtonRef}
               onClick={() => setShowConnectRow(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 focus-visible:ring-2 focus-visible:ring-brand-navy/30 focus-visible:outline-none transition-colors"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3 h-3" aria-hidden />
               Connect to record
             </button>
           )}
@@ -968,7 +993,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
 
         {/* ── Inline-add: connect this person to a new record ── */}
         {showConnectRow && showsConnectButton && (
-          <div className="px-3 py-2.5 border-b border-gray-100 bg-surface-alt">
+          <div className="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 bg-surface-alt dark:bg-brand-dark">
             <InlineConnectToRecordRow
               // Cast is safe: the surrounding `showsConnectButton` guard
               // requires `isSupported`, which restricts to SUPPORTED_OBJECTS.
@@ -976,26 +1001,30 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
               personRecordId={recordId!}
               personName={personName}
               onAdded={async () => {
+                restoreConnectFocusRef.current = true
                 setShowConnectRow(false)
                 await fetchAssociations()
               }}
-              onCancel={() => setShowConnectRow(false)}
+              onCancel={() => {
+                restoreConnectFocusRef.current = true
+                setShowConnectRow(false)
+              }}
             />
           </div>
         )}
 
         {/* ── Search bar ── */}
         {showSearchBar && (
-          <div className="px-4 py-2 border-b border-gray-50 flex items-center gap-2">
+          <div className="px-4 py-2 border-b border-gray-50 dark:border-gray-800 flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" aria-hidden />
               <input
                 type="text"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by property, role, or record name…"
                 aria-label="Filter connections"
-                className="w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 py-1.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition"
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 pl-8 pr-3 py-1.5 text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy transition"
               />
             </div>
             {filteredView.hidden > 0 && (

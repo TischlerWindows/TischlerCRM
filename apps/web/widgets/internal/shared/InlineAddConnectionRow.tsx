@@ -205,6 +205,10 @@ export function InlineAddConnectionRow({
 
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const collapsedButtonRef = useRef<HTMLButtonElement | null>(null)
+  // Set when we transition expanded → collapsed via cancel/save so the next
+  // render restores focus to the dashed-chip trigger (rapid-add ergonomics).
+  const restoreFocusOnCollapseRef = useRef(false)
 
   // ── Cached lookup lists ───────────────────────────────────────────────
   // Refs persist across renders; the `listsTick` state forces a re-render
@@ -425,6 +429,7 @@ export function InlineAddConnectionRow({
   }
 
   function handleCancel() {
+    restoreFocusOnCollapseRef.current = true
     setExpanded(false)
     setDropdownOpen(false)
     setSelected(null)
@@ -435,6 +440,25 @@ export function InlineAddConnectionRow({
     setQuoteRecipient(false)
     setAutoLinkAccept(true)
     setError(null)
+  }
+
+  // Restore focus to the dashed-chip trigger when the row collapses (after
+  // Cancel, or after the user is finished adding and closes via Esc twice
+  // in the future). Mount-time renders skip this since the ref starts false.
+  useEffect(() => {
+    if (!expanded && restoreFocusOnCollapseRef.current) {
+      restoreFocusOnCollapseRef.current = false
+      requestAnimationFrame(() => collapsedButtonRef.current?.focus())
+    }
+  }, [expanded])
+
+  // Cmd/Ctrl + Enter saves from anywhere inside the expanded row, even when
+  // focus is on a flag toggle or the role select.
+  function onRootKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canSave) {
+      e.preventDefault()
+      void handleSave()
+    }
   }
 
   // ── Keyboard handling on the search input ─────────────────────────────
@@ -471,13 +495,13 @@ export function InlineAddConnectionRow({
     return (
       <button
         type="button"
-        ref={rootRef as unknown as React.RefObject<HTMLButtonElement>}
+        ref={collapsedButtonRef}
         onClick={() => !disabled && setExpanded(true)}
         disabled={disabled}
-        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-gray-300 dark:border-gray-700 text-xs text-brand-gray hover:border-brand-navy hover:text-brand-navy dark:hover:border-brand-navy-light dark:hover:text-brand-navy-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-gray-300 dark:border-gray-700 text-xs text-brand-gray hover:border-brand-navy hover:text-brand-navy dark:hover:border-brand-navy-light dark:hover:text-brand-navy-light focus-visible:border-brand-navy focus-visible:ring-2 focus-visible:ring-brand-navy/20 focus-visible:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         aria-label="Add a connection"
       >
-        <Plus className="w-3.5 h-3.5" />
+        <Plus className="w-3.5 h-3.5" aria-hidden />
         Add a connection…
       </button>
     )
@@ -489,6 +513,9 @@ export function InlineAddConnectionRow({
   return (
     <div
       ref={rootRef}
+      onKeyDown={onRootKeyDown}
+      role="group"
+      aria-label="Add a connection"
       className="rounded-md border border-brand-navy/30 dark:border-brand-navy-light/40 bg-surface-alt dark:bg-brand-dark p-2.5 space-y-2 animate-in"
     >
       {/* Implicit-parent chip */}
@@ -618,7 +645,7 @@ export function InlineAddConnectionRow({
             value={role}
             onChange={e => setRole(e.target.value)}
             disabled={disabled || saving}
-            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy appearance-none"
+            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy focus-visible:ring-2 focus-visible:ring-brand-navy/20 appearance-none"
           >
             <option value="">Role…</option>
             {roleValues.map(r => (
@@ -637,7 +664,8 @@ export function InlineAddConnectionRow({
         <button
           type="button"
           onClick={handleCancel}
-          className="px-2.5 py-1 rounded text-[11px] text-brand-gray hover:text-brand-dark"
+          title="Esc"
+          className="px-2.5 py-1 rounded text-[11px] text-brand-gray hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand-navy/20 focus-visible:outline-none"
           disabled={saving}
         >
           Cancel
@@ -646,7 +674,8 @@ export function InlineAddConnectionRow({
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className="px-2.5 py-1 rounded bg-brand-navy text-white text-[11px] font-medium hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Press Cmd/Ctrl + Enter to add"
+          className="px-2.5 py-1 rounded bg-brand-navy text-white text-[11px] font-medium hover:bg-brand-navy/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Adding…' : 'Add'}
         </button>
