@@ -321,6 +321,15 @@ export function InlineConnectToRecordRow({
     }
   }
 
+  // Cmd/Ctrl + Enter saves from anywhere inside the row, even when focus is
+  // on a tab, flag toggle, or the role select.
+  function onRootKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canSave) {
+      e.preventDefault()
+      void handleSave()
+    }
+  }
+
   // ── Keyboard nav on the search input ─────────────────────────────────
   function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
@@ -352,7 +361,12 @@ export function InlineConnectToRecordRow({
   const PersonIcon = personObjectApiName === 'Contact' ? UserCircle : Building2
 
   return (
-    <div className="rounded-md border border-brand-navy/30 dark:border-brand-navy-light/40 bg-white dark:bg-brand-dark p-2.5 space-y-2 animate-in">
+    <div
+      onKeyDown={onRootKeyDown}
+      role="group"
+      aria-label="Connect to a record"
+      className="rounded-md border border-brand-navy/30 dark:border-brand-navy-light/40 bg-white dark:bg-brand-dark p-2.5 space-y-2 animate-in"
+    >
       {/* Implicit-person chip */}
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand-navy/10 text-brand-navy dark:bg-brand-navy/30 dark:text-blue-200 text-[11px] font-medium">
@@ -469,7 +483,7 @@ export function InlineConnectToRecordRow({
             value={role}
             onChange={e => setRole(e.target.value)}
             disabled={saving}
-            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy appearance-none"
+            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy focus-visible:ring-2 focus-visible:ring-brand-navy/20 appearance-none"
           >
             <option value="">Role…</option>
             {roleValues.map(r => (
@@ -488,7 +502,8 @@ export function InlineConnectToRecordRow({
         <button
           type="button"
           onClick={onCancel}
-          className="px-2.5 py-1 rounded text-[11px] text-brand-gray hover:text-brand-dark"
+          title="Esc"
+          className="px-2.5 py-1 rounded text-[11px] text-brand-gray hover:text-brand-dark focus-visible:ring-2 focus-visible:ring-brand-navy/20 focus-visible:outline-none"
           disabled={saving}
         >
           Cancel
@@ -497,7 +512,8 @@ export function InlineConnectToRecordRow({
           type="button"
           onClick={() => void handleSave()}
           disabled={!canSave}
-          className="px-2.5 py-1 rounded bg-brand-navy text-white text-[11px] font-medium hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Press Cmd/Ctrl + Enter to connect"
+          className="px-2.5 py-1 rounded bg-brand-navy text-white text-[11px] font-medium hover:bg-brand-navy/90 focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Connecting…' : 'Connect'}
         </button>
