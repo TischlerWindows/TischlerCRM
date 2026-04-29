@@ -84,6 +84,16 @@ function flatten(arr: Record<string, unknown>[]): Record<string, unknown>[] {
   })
 }
 
+/** Fields the user-facing search should match against. Audit metadata
+ *  (createdBy, modifiedBy, etc.) is intentionally excluded so typing the
+ *  current user's name doesn't surface every record they touched. The
+ *  composite Contact `name` object is matched recursively because its inner
+ *  fields (firstName/lastName) are the actual display tokens. */
+const SEARCHABLE_KEYS = new Set([
+  'firstName', 'lastName', 'name', 'email', 'phone', 'mobile',
+  'accountName', 'accountNumber', 'contactName', 'title',
+])
+
 /** Composite-name-aware lowercased searchable string for a flattened record.
  *  The /records/search endpoint stringifies CompositeText (Contact name) as
  *  "[object Object]" and misses matches; doing this client-side fixes that. */
@@ -96,30 +106,45 @@ function searchText(r: Record<string, unknown>): string {
       for (const inner of Object.values(v as Record<string, unknown>)) collect(inner)
     }
   }
-  for (const v of Object.values(r)) collect(v)
+  for (const k of Object.keys(r)) {
+    const bare = k.replace(/^[A-Za-z]+__/, '')
+    if (SEARCHABLE_KEYS.has(bare)) collect(r[k])
+  }
   return parts.join(' ')
+}
+
+/** Treat these tokens as "no value" — legacy contacts have composite-name fields
+ *  pre-filled with the literal "N/A" and we want to fall through to the flat
+ *  firstName/lastName fields when that happens. */
+const PLACEHOLDER_NAME_TOKENS = new Set(['n/a', 'na', '-', '—'])
+
+function isMeaningfulNamePart(v: unknown): v is string {
+  if (typeof v !== 'string') return false
+  const t = v.trim()
+  if (!t) return false
+  return !PLACEHOLDER_NAME_TOKENS.has(t.toLowerCase())
 }
 
 function getDisplayName(r: Record<string, unknown>, kind: EntityKind): string {
   if (kind === 'account') {
     const candidates = ['accountName', 'name', 'accountNumber']
     for (const k of candidates) {
-      const v = r[k]
-      if (typeof v === 'string' && v.trim()) return v
+      if (isMeaningfulNamePart(r[k])) return (r[k] as string).trim()
     }
     return 'Unnamed Account'
   }
-  // Contact: composite name first, then first/last, then email
+  // Contact: composite name first (filtering placeholder tokens), then
+  // flat first/last, then email.
   const nameObj = r.name
   if (nameObj && typeof nameObj === 'object') {
     const obj = nameObj as Record<string, unknown>
-    const parts = [obj.salutation, obj.firstName, obj.lastName].filter(
-      (v): v is string => typeof v === 'string' && v.trim().length > 0,
-    )
+    const parts = [obj.salutation, obj.firstName, obj.lastName]
+      .filter(isMeaningfulNamePart)
+      .map(v => v.trim())
     if (parts.length > 0) return parts.join(' ')
   }
-  const fn = typeof r.firstName === 'string' ? r.firstName.trim() : ''
-  const ln = typeof r.lastName === 'string' ? r.lastName.trim() : ''
+  const fn = isMeaningfulNamePart(r.firstName) ? r.firstName.trim() : ''
+  const ln = isMeaningfulNamePart(r.lastName) ? r.lastName.trim() : ''
   const composed = [fn, ln].filter(Boolean).join(' ').trim()
   if (composed) return composed
   if (typeof r.email === 'string' && r.email) return r.email
@@ -258,10 +283,20 @@ export function InlineAddConnectionRow({
     if (last && roleValues.includes(last)) setRole(last)
   }, [expanded, role, parentObjectApiName, roleValues])
 
-  // Focus the input when we expand.
+  // Focus the input when we expand. Also scroll the row into the middle of
+  // the viewport so the dropdown (which opens BELOW the input) doesn't render
+  // off-screen when the dashed chip happens to sit at the bottom of the
+  // visible area (common case: empty list + click chip).
+  //
+  // Nest the focus call in a second rAF so the smooth-scroll has at least one
+  // committed paint before we move keyboard focus — otherwise some browsers
+  // visually jump focus before the scroll animation starts.
   useEffect(() => {
     if (expanded) {
-      requestAnimationFrame(() => searchInputRef.current?.focus())
+      requestAnimationFrame(() => {
+        rootRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        requestAnimationFrame(() => searchInputRef.current?.focus())
+      })
     }
   }, [expanded])
 
@@ -749,16 +784,19 @@ function FlagToggle({
   onChange: (v: boolean) => void
   disabled?: boolean
 }) {
+  // Unpressed state uses a subtle shadow + darker border + brand-dark text so
+  // the toggle reads as a clickable affordance against the bg-surface-alt
+  // container (white-on-near-white was unreadable in earlier QA).
   return (
     <button
       type="button"
       aria-pressed={pressed}
       onClick={() => onChange(!pressed)}
       disabled={disabled}
-      className={`px-2 h-7 rounded text-[10px] font-medium border transition-colors disabled:opacity-50 ${
+      className={`px-2 h-7 rounded text-[10px] font-medium border transition-colors focus-visible:ring-2 focus-visible:ring-brand-navy/30 focus-visible:outline-none disabled:opacity-50 ${
         pressed
-          ? 'bg-brand-navy border-brand-navy text-white'
-          : 'bg-white dark:bg-brand-dark border-gray-300 dark:border-gray-700 text-brand-gray hover:border-brand-navy hover:text-brand-navy'
+          ? 'bg-brand-navy border-brand-navy text-white shadow-sm'
+          : 'bg-white dark:bg-brand-dark border-gray-400 dark:border-gray-600 text-brand-dark dark:text-gray-100 shadow-sm hover:border-brand-navy hover:text-brand-navy'
       }`}
     >
       {label}
