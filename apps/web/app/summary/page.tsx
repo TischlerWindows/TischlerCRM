@@ -3523,7 +3523,8 @@ export default function SummaryPage() {
                               {expandedQtRows['euroWindows'] && (() => {
                                 const grouped = Object.entries(
                                   nonHungRows.reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
-                                    const t = (row as any).type || '—';
+                                    const parts = [(row as any).type, (row as any).type2, (row as any).type3, (row as any).type4].filter(Boolean);
+                                    const t = parts.length ? parts.join(' w/ ') : '—';
                                     if (!acc[t]) acc[t] = {qty:0,fields:0,sqFt:0,net:0};
                                     acc[t].qty += parseFloat((row as any).qty) || 0;
                                     acc[t].fields += parseFloat((row as any).fieldsTotal) || 0;
@@ -3579,7 +3580,8 @@ export default function SummaryPage() {
                               {expandedQtRows['doubleHung'] && (() => {
                                 const grouped = Object.entries(
                                   hungRows.reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
-                                    const t = (row as any).type || '—';
+                                    const parts = [(row as any).type, (row as any).type2, (row as any).type3, (row as any).type4].filter(Boolean);
+                                    const t = parts.length ? parts.join(' w/ ') : '—';
                                     if (!acc[t]) acc[t] = {qty:0,fields:0,sqFt:0,net:0};
                                     acc[t].qty += parseFloat((row as any).qty) || 0;
                                     acc[t].fields += parseFloat((row as any).fieldsTotal) || 0;
@@ -3635,7 +3637,8 @@ export default function SummaryPage() {
                               {expandedQtRows['euroDoors'] && (() => {
                                 const grouped = Object.entries(
                                   (editingSummary.doorRows || []).reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
-                                    const t = (row as any).type || '—';
+                                    const parts = [(row as any).type, (row as any).type2, (row as any).type3, (row as any).type4].filter(Boolean);
+                                    const t = parts.length ? parts.join(' w/ ') : '—';
                                     if (!acc[t]) acc[t] = {qty:0,fields:0,sqFt:0,net:0};
                                     acc[t].qty += parseFloat((row as any).qty) || 0;
                                     acc[t].fields += parseFloat((row as any).fieldsTotal) || 0;
