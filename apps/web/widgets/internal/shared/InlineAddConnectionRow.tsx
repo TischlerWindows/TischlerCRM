@@ -13,6 +13,7 @@ import {
   rememberRoleForObject,
 } from '@/lib/connection-recents'
 import { getRecordName } from './recordName'
+import { InlineCreateContact, InlineCreateAccount } from './InlineCreate'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -607,6 +608,30 @@ export function InlineAddConnectionRow({
                   )}
                 </>
               )}
+              {/* Inline-create footer — closes the loop so the user never
+               *  has to leave the connection flow when the person or org
+               *  isn't already in the system. */}
+              <div className="border-t border-gray-100 dark:border-gray-700 px-3 py-1.5 flex items-center gap-3">
+                <InlineCreateContact
+                  disabled={disabled || saving}
+                  onCreated={(id, name) => {
+                    rememberContact(id)
+                    setSelected({ kind: 'contact', id, name })
+                    setQuery('')
+                    setDropdownOpen(false)
+                  }}
+                />
+                <span className="text-[11px] text-brand-gray">·</span>
+                <InlineCreateAccount
+                  disabled={disabled || saving}
+                  onCreated={(id, name) => {
+                    rememberAccount(id)
+                    setSelected({ kind: 'account', id, name })
+                    setQuery('')
+                    setDropdownOpen(false)
+                  }}
+                />
+              </div>
             </div>
           )}
         </div>
