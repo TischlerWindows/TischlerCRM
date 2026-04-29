@@ -645,7 +645,10 @@ export default function SummaryPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [showType3, setShowType3] = useState(false);
   const [showType4, setShowType4] = useState(false);
-  const [showAddOns, setShowAddOns] = useState(false);
+  const [showMagneticContact, setShowMagneticContact] = useState(false);
+  const [showShadeBoxesNoTrim, setShowShadeBoxesNoTrim] = useState(false);
+  const [showShadeBoxesWithTrim, setShowShadeBoxesWithTrim] = useState(false);
+  const [showFinalFinish, setShowFinalFinish] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
   const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
   // Opportunity picker state
@@ -4009,11 +4012,38 @@ export default function SummaryPage() {
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
-                        checked={showAddOns}
-                        onChange={(e) => setShowAddOns(e.target.checked)}
+                        checked={showMagneticContact}
+                        onChange={(e) => setShowMagneticContact(e.target.checked)}
                         className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
                       />
-                      Add-ons
+                      Mag. Contact
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showShadeBoxesNoTrim}
+                        onChange={(e) => setShowShadeBoxesNoTrim(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                      />
+                      No Trim
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showShadeBoxesWithTrim}
+                        onChange={(e) => setShowShadeBoxesWithTrim(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                      />
+                      With Trim
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showFinalFinish}
+                        onChange={(e) => setShowFinalFinish(e.target.checked)}
+                        className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                      />
+                      Final Finish
                     </label>
                     <button
                       onClick={handleAddRow}
@@ -4030,48 +4060,48 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>TuS-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Arch-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Width (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Height (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Width (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Height (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 2</th>
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 3</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 4</th>}
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Special Remarks</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Height (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'75px'}}>Width (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'75px'}}>Height (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Sq Feet (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Sq Feet (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Operable Sashes (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Operable Sashes (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 2</th>
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>}
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 3</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 4</th>}
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Special Remarks</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -4177,14 +4207,14 @@ export default function SummaryPage() {
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
+                          {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
+                          {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
+                          {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
+                          {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
+                          {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
+                          {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
@@ -4235,10 +4265,34 @@ export default function SummaryPage() {
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
-                        checked={showAddOns}
-                        onChange={(e) => setShowAddOns(e.target.checked)}
+                        checked={showMagneticContact}
+                        onChange={(e) => setShowMagneticContact(e.target.checked)}
                       />
-                      Add-ons
+                      Mag. Contact
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showShadeBoxesNoTrim}
+                        onChange={(e) => setShowShadeBoxesNoTrim(e.target.checked)}
+                      />
+                      No Trim
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showShadeBoxesWithTrim}
+                        onChange={(e) => setShowShadeBoxesWithTrim(e.target.checked)}
+                      />
+                      With Trim
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={showFinalFinish}
+                        onChange={(e) => setShowFinalFinish(e.target.checked)}
+                      />
+                      Final Finish
                     </label>
                     <button
                       onClick={handleAddDoorRow}
@@ -4255,48 +4309,48 @@ export default function SummaryPage() {
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Magnetic Contact</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with No Trim</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Shade Boxes with Trim</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-gray-700 bg-gray-100 border border-gray-300" colSpan={2}>Final Finish</th>}
                         <th className="px-0.5 py-1"></th>
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>TuS-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Arch-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Width (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Height (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Width (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Height (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 2</th>
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 3</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 4</th>}
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Special Remarks</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
-                        {showAddOns && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Height (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'75px'}}>Width (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'75px'}}>Height (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Sq Feet (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Sq Feet (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Operable Sashes (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Operable Sashes (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 2</th>
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>}
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 3</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Type 4</th>}
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'200px'}}>Special Remarks</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>Fields (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}># Site Mullions (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'75px'}}>NET € (Total)</th>
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showMagneticContact && <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showShadeBoxesNoTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-r border-orange-300" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showShadeBoxesWithTrim && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-[#b8bfe8]" style={{minWidth:'100px'}}>Per Position</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-l border-blue-300" style={{minWidth:'100px'}}>Per Unit</th>}
+                        {showFinalFinish && <th className="px-0.5 py-1 text-center text-xs font-semibold text-brand-navy bg-[#f0f1fa] border-r border-blue-300" style={{minWidth:'100px'}}>Per Position</th>}
                         <th className="px-0.5 py-1"></th>
                         <th className="px-0.5 py-1 text-center text-xs font-medium text-gray-700 bg-gray-50 border-l-2 border-gray-400" style={{minWidth:'80px'}}></th>
                       </tr>
@@ -4402,14 +4456,14 @@ export default function SummaryPage() {
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
                           </td>
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
-                          {showAddOns && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactUnit} /></td>}
+                          {showMagneticContact && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.magneticContactPosition} /></td>}
+                          {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimUnit} /></td>}
+                          {showShadeBoxesNoTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesNoSideTrimPosition} /></td>}
+                          {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimUnit} /></td>}
+                          {showShadeBoxesWithTrim && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.shadeBoxesWithSideTrimPosition} /></td>}
+                          {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishUnit} /></td>}
+                          {showFinalFinish && <td className="px-0.5 py-1 align-top"><ReadOnlyCellInput value={row.finalFinishPosition} /></td>}
                           <td className="px-0.5 py-1"></td>
                           <td className="px-0.5 py-1">
                             <div className="flex gap-1 justify-end mr-2">
