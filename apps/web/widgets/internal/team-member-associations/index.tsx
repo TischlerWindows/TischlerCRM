@@ -6,6 +6,7 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
+import { ConnectionBadges } from '../shared/ConnectionBadges'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface AssociationRow {
   role: string
   isPrimary: boolean
   isContractHolder: boolean
+  isQuoteRecipient: boolean
 }
 
 interface PropertyGroup {
@@ -232,47 +234,21 @@ function ObjectBadge({ objectApiName }: { objectApiName: string }) {
   )
 }
 
-// ── Role + flag badges ─────────────────────────────────────────────────
-
-function AssocBadges({ role, isPrimary, isContractHolder }: {
-  role: string
-  isPrimary: boolean
-  isContractHolder: boolean
-}) {
-  return (
-    <div className="flex flex-wrap gap-1 mt-0.5">
-      {role && (
-        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy">
-          {role}
-        </span>
-      )}
-      {isPrimary && (
-        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
-          Primary
-        </span>
-      )}
-      {isContractHolder && (
-        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
-          Contract Holder
-        </span>
-      )}
-    </div>
-  )
-}
-
 // ── Inline edit form ───────────────────────────────────────────────────
 
 function InlineEditForm({
-  role, isPrimary, isContractHolder, saving,
-  onRole, onPrimary, onContractHolder, onSave, onCancel,
+  role, isPrimary, isContractHolder, isQuoteRecipient, saving,
+  onRole, onPrimary, onContractHolder, onQuoteRecipient, onSave, onCancel,
 }: {
   role: string
   isPrimary: boolean
   isContractHolder: boolean
+  isQuoteRecipient: boolean
   saving: boolean
   onRole: (v: string) => void
   onPrimary: (v: boolean) => void
   onContractHolder: (v: boolean) => void
+  onQuoteRecipient: (v: boolean) => void
   onSave: () => void
   onCancel: () => void
 }) {
@@ -286,7 +262,7 @@ function InlineEditForm({
         <option value="">-- Select Role --</option>
         {ROLE_PICKLIST.map(r => <option key={r} value={r}>{r}</option>)}
       </select>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
         <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
           <input type="checkbox" checked={isPrimary} onChange={e => onPrimary(e.target.checked)} className="rounded border-gray-300" />
           Primary
@@ -294,6 +270,10 @@ function InlineEditForm({
         <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
           <input type="checkbox" checked={isContractHolder} onChange={e => onContractHolder(e.target.checked)} className="rounded border-gray-300" />
           Contract Holder
+        </label>
+        <label className="flex items-center gap-1 text-[10px] text-brand-dark cursor-pointer">
+          <input type="checkbox" checked={isQuoteRecipient} onChange={e => onQuoteRecipient(e.target.checked)} className="rounded border-gray-300" />
+          Quote Recipient
         </label>
       </div>
       <div className="flex gap-1.5">
@@ -330,6 +310,7 @@ interface AssocRowProps {
   editRole: string
   editPrimary: boolean
   editContractHolder: boolean
+  editQuoteRecipient: boolean
   saving: boolean
   onStartEdit: (assoc: AssociationRow) => void
   onSaveEdit: () => void
@@ -337,13 +318,14 @@ interface AssocRowProps {
   onEditRole: (v: string) => void
   onEditPrimary: (v: boolean) => void
   onEditContractHolder: (v: boolean) => void
+  onEditQuoteRecipient: (v: boolean) => void
   onDelete: (memberId: string) => void
 }
 
 function AssocRow({
   assoc, isChild, fieldValues,
-  editingId, editRole, editPrimary, editContractHolder, saving,
-  onStartEdit, onSaveEdit, onCancelEdit, onEditRole, onEditPrimary, onEditContractHolder,
+  editingId, editRole, editPrimary, editContractHolder, editQuoteRecipient, saving,
+  onStartEdit, onSaveEdit, onCancelEdit, onEditRole, onEditPrimary, onEditContractHolder, onEditQuoteRecipient,
   onDelete,
 }: AssocRowProps) {
   const isEditing = editingId === assoc.memberId
@@ -384,18 +366,23 @@ function AssocRow({
               role={editRole}
               isPrimary={editPrimary}
               isContractHolder={editContractHolder}
+              isQuoteRecipient={editQuoteRecipient}
               saving={saving}
               onRole={onEditRole}
               onPrimary={onEditPrimary}
               onContractHolder={onEditContractHolder}
+              onQuoteRecipient={onEditQuoteRecipient}
               onSave={onSaveEdit}
               onCancel={onCancelEdit}
             />
           ) : (
-            <AssocBadges
+            <ConnectionBadges
               role={assoc.role}
-              isPrimary={assoc.isPrimary}
-              isContractHolder={assoc.isContractHolder}
+              flags={{
+                primary: assoc.isPrimary,
+                contractHolder: assoc.isContractHolder,
+                quoteRecipient: assoc.isQuoteRecipient,
+              }}
             />
           )}
         </div>
@@ -428,9 +415,9 @@ function AssocRow({
 // ── Property group tile ────────────────────────────────────────────────
 
 type EditHandlers = Pick<AssocRowProps,
-  'editingId' | 'editRole' | 'editPrimary' | 'editContractHolder' | 'saving' |
+  'editingId' | 'editRole' | 'editPrimary' | 'editContractHolder' | 'editQuoteRecipient' | 'saving' |
   'onStartEdit' | 'onSaveEdit' | 'onCancelEdit' |
-  'onEditRole' | 'onEditPrimary' | 'onEditContractHolder' | 'onDelete'
+  'onEditRole' | 'onEditPrimary' | 'onEditContractHolder' | 'onEditQuoteRecipient' | 'onDelete'
 >
 
 function PropertyGroupTile({
@@ -508,18 +495,23 @@ function FlatTile({
               role={edit.editRole}
               isPrimary={edit.editPrimary}
               isContractHolder={edit.editContractHolder}
+              isQuoteRecipient={edit.editQuoteRecipient}
               saving={edit.saving}
               onRole={edit.onEditRole}
               onPrimary={edit.onEditPrimary}
               onContractHolder={edit.onEditContractHolder}
+              onQuoteRecipient={edit.onEditQuoteRecipient}
               onSave={edit.onSaveEdit}
               onCancel={edit.onCancelEdit}
             />
           ) : (
-            <AssocBadges
+            <ConnectionBadges
               role={assoc.role}
-              isPrimary={assoc.isPrimary}
-              isContractHolder={assoc.isContractHolder}
+              flags={{
+                primary: assoc.isPrimary,
+                contractHolder: assoc.isContractHolder,
+                quoteRecipient: assoc.isQuoteRecipient,
+              }}
             />
           )}
         </div>
@@ -570,6 +562,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   const [editRole, setEditRole] = useState('')
   const [editPrimary, setEditPrimary] = useState(false)
   const [editContractHolder, setEditContractHolder] = useState(false)
+  const [editQuoteRecipient, setEditQuoteRecipient] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // Delete state
@@ -708,6 +701,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           role: getStr(raw, 'role'),
           isPrimary: getBool(raw, 'primaryContact'),
           isContractHolder: getBool(raw, 'contractHolder'),
+          isQuoteRecipient: getBool(raw, 'quoteRecipient'),
         }
       }
 
@@ -728,6 +722,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           role: getStr(raw, 'role'),
           isPrimary: getBool(raw, 'primaryContact'),
           isContractHolder: getBool(raw, 'contractHolder'),
+          isQuoteRecipient: getBool(raw, 'quoteRecipient'),
         }
 
         if (propertyId) {
@@ -761,6 +756,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     setEditRole(assoc.role)
     setEditPrimary(assoc.isPrimary)
     setEditContractHolder(assoc.isContractHolder)
+    setEditQuoteRecipient(assoc.isQuoteRecipient)
   }
 
   const saveEdit = async () => {
@@ -768,7 +764,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     setSaving(true)
     try {
       await apiClient.put(`/objects/TeamMember/records/${editingId}`, {
-        data: { role: editRole, primaryContact: editPrimary, contractHolder: editContractHolder },
+        data: {
+          role: editRole,
+          primaryContact: editPrimary,
+          contractHolder: editContractHolder,
+          quoteRecipient: editQuoteRecipient,
+        },
       })
       setEditingId(null)
       await fetchAssociations()
@@ -799,6 +800,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     editRole,
     editPrimary,
     editContractHolder,
+    editQuoteRecipient,
     saving,
     onStartEdit: startEdit,
     onSaveEdit: saveEdit,
@@ -806,6 +808,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     onEditRole: setEditRole,
     onEditPrimary: setEditPrimary,
     onEditContractHolder: setEditContractHolder,
+    onEditQuoteRecipient: setEditQuoteRecipient,
     onDelete: setDeleteTarget,
   }
 
@@ -817,7 +820,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   if (!isSupported) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 p-6 text-xs text-brand-gray text-center">
-        Team Member Associations is not available for {object.label}.
+        Connections is not available for {object.label}.
       </div>
     )
   }
@@ -832,7 +835,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     )
   }
 
-  const widgetLabel = label || 'Team Member Associations'
+  const widgetLabel = label || 'Connections'
 
   return (
     <>
@@ -842,7 +845,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           <Network className="w-4 h-4 text-brand-gray" />
           <h3 className="text-xs font-semibold text-brand-dark flex-1">{widgetLabel}</h3>
           <span className="text-[11px] text-brand-gray tabular-nums">
-            {totalCount} association{totalCount !== 1 ? 's' : ''}
+            {totalCount} connection{totalCount !== 1 ? 's' : ''}
           </span>
         </div>
 
@@ -850,7 +853,7 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
         {totalCount === 0 ? (
           <div className="p-8 text-center">
             <Network className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-            <p className="text-xs text-brand-gray">No associated records found</p>
+            <p className="text-xs text-brand-gray">{object.label || 'This record'} isn&apos;t connected to any records yet.</p>
           </div>
         ) : (
           <div className="p-3 space-y-2">
@@ -890,9 +893,9 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" onClick={() => setDeleteTarget(null)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
-              <p className="text-sm font-semibold text-brand-dark">Remove association?</p>
+              <p className="text-sm font-semibold text-brand-dark">Remove connection?</p>
               <p className="text-xs text-brand-gray">
-                This removes the team member assignment from the related record. The record itself is not affected.
+                This removes the connection from the related record. The record itself is not affected.
               </p>
               <div className="flex gap-2 justify-end">
                 <button

@@ -10,6 +10,7 @@ import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
+import { ConnectionBadges } from '../shared/ConnectionBadges'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
 import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
 import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
@@ -42,6 +43,7 @@ interface MergedContact {
   viaSources: ViaSource[]
   isPrimary: boolean
   isContractHolder: boolean
+  isQuoteRecipient: boolean
   /** TeamMember record IDs belonging to the current record (editable/deletable) */
   ownedMemberIds: string[]
   /** All TeamMember record IDs for this contact (for dedup) */
@@ -56,6 +58,7 @@ interface MergedAccount {
   viaSources: ViaSource[]
   isPrimary: boolean
   isContractHolder: boolean
+  isQuoteRecipient: boolean
   ownedMemberIds: string[]
   allMemberIds: string[]
 }
@@ -379,6 +382,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   const [editRole, setEditRole] = useState('')
   const [editPrimary, setEditPrimary] = useState(false)
   const [editContractHolder, setEditContractHolder] = useState(false)
+  const [editQuoteRecipient, setEditQuoteRecipient] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // ── Pending widget support (create mode) ──
@@ -660,6 +664,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       const role = getStr(member, 'role')
       const isPrimary = getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true'
       const isContractHolder = getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true'
+      const isQuoteRecipient = getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true'
       const memberId = String(member.id)
 
       if (role) roleSet.add(role)
@@ -695,6 +700,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           }
           if (isPrimary) existing.isPrimary = true
           if (isContractHolder) existing.isContractHolder = true
+          if (isQuoteRecipient) existing.isQuoteRecipient = true
           if (isOwned && !existing.ownedMemberIds.includes(memberId)) existing.ownedMemberIds.push(memberId)
           if (!existing.allMemberIds.includes(memberId)) existing.allMemberIds.push(memberId)
           if (!existing.accountId && accountId) {
@@ -712,6 +718,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             viaSources,
             isPrimary,
             isContractHolder,
+            isQuoteRecipient,
             ownedMemberIds: isOwned ? [memberId] : [],
             allMemberIds: [memberId],
           })
@@ -735,6 +742,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           }
           if (isPrimary) existing.isPrimary = true
           if (isContractHolder) existing.isContractHolder = true
+          if (isQuoteRecipient) existing.isQuoteRecipient = true
           if (isOwned && !existing.ownedMemberIds.includes(memberId)) existing.ownedMemberIds.push(memberId)
           if (!existing.allMemberIds.includes(memberId)) existing.allMemberIds.push(memberId)
         } else {
@@ -746,6 +754,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             viaSources,
             isPrimary,
             isContractHolder,
+            isQuoteRecipient,
             ownedMemberIds: isOwned ? [memberId] : [],
             allMemberIds: [memberId],
           })
@@ -798,6 +807,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     setEditRole(getStr(member, 'role'))
     setEditPrimary(getField(member, 'primaryContact') === true || getField(member, 'primaryContact') === 'true')
     setEditContractHolder(getField(member, 'contractHolder') === true || getField(member, 'contractHolder') === 'true')
+    setEditQuoteRecipient(getField(member, 'quoteRecipient') === true || getField(member, 'quoteRecipient') === 'true')
   }
 
   const saveEdit = async () => {
@@ -810,6 +820,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
           role: editRole,
           primaryContact: editPrimary,
           contractHolder: editContractHolder,
+          quoteRecipient: editQuoteRecipient,
         },
       })
       setEditingId(null)
@@ -855,7 +866,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   if (!isSupported) {
     return (
       <div className="rounded-xl border border-dashed border-gray-200 p-6 text-xs text-brand-gray text-center">
-        Team Members is not available for {object.label}.
+        Connections is not available for {object.label}.
       </div>
     )
   }
@@ -871,7 +882,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     )
   }
 
-  const widgetLabel = (label as string) || 'Team Members'
+  const widgetLabel = (label as string) || 'Connections'
 
   return (
     <>
@@ -966,6 +977,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       editRole={editRole}
                       editPrimary={editPrimary}
                       editContractHolder={editContractHolder}
+                      editQuoteRecipient={editQuoteRecipient}
                       saving={saving}
                       onStartEdit={startEdit}
                       onSaveEdit={saveEdit}
@@ -973,6 +985,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       onSetEditRole={setEditRole}
                       onSetEditPrimary={setEditPrimary}
                       onSetEditContractHolder={setEditContractHolder}
+                      onSetEditQuoteRecipient={setEditQuoteRecipient}
                       onDelete={setDeleteTarget}
                     />
                   ))}
@@ -999,6 +1012,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       editRole={editRole}
                       editPrimary={editPrimary}
                       editContractHolder={editContractHolder}
+                      editQuoteRecipient={editQuoteRecipient}
                       saving={saving}
                       onStartEdit={startEdit}
                       onSaveEdit={saveEdit}
@@ -1006,6 +1020,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
                       onSetEditRole={setEditRole}
                       onSetEditPrimary={setEditPrimary}
                       onSetEditContractHolder={setEditContractHolder}
+                      onSetEditQuoteRecipient={setEditQuoteRecipient}
                       onDelete={setDeleteTarget}
                     />
                   ))}
@@ -1090,6 +1105,7 @@ interface TileEditProps {
   editRole: string
   editPrimary: boolean
   editContractHolder: boolean
+  editQuoteRecipient: boolean
   saving: boolean
   onStartEdit: (id: string) => void
   onSaveEdit: () => void
@@ -1097,6 +1113,7 @@ interface TileEditProps {
   onSetEditRole: (v: string) => void
   onSetEditPrimary: (v: boolean) => void
   onSetEditContractHolder: (v: boolean) => void
+  onSetEditQuoteRecipient: (v: boolean) => void
   onDelete: (id: string) => void
 }
 
@@ -1107,6 +1124,7 @@ function ContactTile({
   editRole,
   editPrimary,
   editContractHolder,
+  editQuoteRecipient,
   saving,
   onStartEdit,
   onSaveEdit,
@@ -1114,6 +1132,7 @@ function ContactTile({
   onSetEditRole,
   onSetEditPrimary,
   onSetEditContractHolder,
+  onSetEditQuoteRecipient,
   onDelete,
 }: { contact: MergedContact } & TileEditProps) {
   const isEditing = contact.ownedMemberIds.some(id => id === editingId)
@@ -1163,40 +1182,20 @@ function ContactTile({
         )}
       </div>
 
-      {/* Badges */}
-      <div className="flex flex-wrap gap-1 mt-1.5">
-        {contact.roles.map(role => (
-          <span key={role} className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy">
-            {role}
-          </span>
-        ))}
-        {contact.isPrimary && (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
-            Primary
-          </span>
-        )}
-        {contact.isContractHolder && (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
-            Contract Holder
-          </span>
-        )}
-      </div>
-
-      {/* Via sources */}
-      {contact.viaSources.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-gray-400">via:</span>
-          {contact.viaSources.map((vs, i) => (
-            <Link
-              key={`${vs.objectApiName}-${vs.recordId}`}
-              href={recordUrl(vs.objectApiName, vs.recordId)}
-              className="text-[10px] text-brand-navy hover:underline"
-            >
-              {vs.recordName}{i < contact.viaSources.length - 1 ? ',' : ''}
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Role + flag + via badges */}
+      <ConnectionBadges
+        roles={contact.roles}
+        flags={{
+          primary: contact.isPrimary,
+          contractHolder: contact.isContractHolder,
+          quoteRecipient: contact.isQuoteRecipient,
+        }}
+        viaSources={contact.viaSources.map(vs => ({
+          ...vs,
+          href: recordUrl(vs.objectApiName, vs.recordId),
+        }))}
+        className="mt-1.5"
+      />
 
       {/* Inline edit form */}
       {isEditing && (
@@ -1214,7 +1213,7 @@ function ContactTile({
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1">
             <label className="flex items-center gap-1.5 text-[10px] text-brand-dark cursor-pointer">
               <input
                 type="checkbox"
@@ -1232,6 +1231,15 @@ function ContactTile({
                 className="rounded border-gray-300"
               />
               Contract Holder
+            </label>
+            <label className="flex items-center gap-1.5 text-[10px] text-brand-dark cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editQuoteRecipient}
+                onChange={e => onSetEditQuoteRecipient(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Quote Recipient
             </label>
           </div>
           <div className="flex gap-2 justify-end">
@@ -1266,6 +1274,7 @@ function AccountTile({
   editRole,
   editPrimary,
   editContractHolder,
+  editQuoteRecipient,
   saving,
   onStartEdit,
   onSaveEdit,
@@ -1273,6 +1282,7 @@ function AccountTile({
   onSetEditRole,
   onSetEditPrimary,
   onSetEditContractHolder,
+  onSetEditQuoteRecipient,
   onDelete,
 }: { account: MergedAccount } & TileEditProps) {
   const isEditing = account.ownedMemberIds.some(id => id === editingId)
@@ -1314,40 +1324,20 @@ function AccountTile({
         )}
       </div>
 
-      {/* Badges */}
-      <div className="flex flex-wrap gap-1 mt-1.5">
-        {account.roles.map(role => (
-          <span key={role} className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand-navy/10 text-brand-navy">
-            {role}
-          </span>
-        ))}
-        {account.isPrimary && (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
-            Primary
-          </span>
-        )}
-        {account.isContractHolder && (
-          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700">
-            Contract Holder
-          </span>
-        )}
-      </div>
-
-      {/* Via sources */}
-      {account.viaSources.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1">
-          <span className="text-[10px] text-gray-400">via:</span>
-          {account.viaSources.map((vs, i) => (
-            <Link
-              key={`${vs.objectApiName}-${vs.recordId}`}
-              href={recordUrl(vs.objectApiName, vs.recordId)}
-              className="text-[10px] text-brand-navy hover:underline"
-            >
-              {vs.recordName}{i < account.viaSources.length - 1 ? ',' : ''}
-            </Link>
-          ))}
-        </div>
-      )}
+      {/* Role + flag + via badges */}
+      <ConnectionBadges
+        roles={account.roles}
+        flags={{
+          primary: account.isPrimary,
+          contractHolder: account.isContractHolder,
+          quoteRecipient: account.isQuoteRecipient,
+        }}
+        viaSources={account.viaSources.map(vs => ({
+          ...vs,
+          href: recordUrl(vs.objectApiName, vs.recordId),
+        }))}
+        className="mt-1.5"
+      />
 
       {/* Inline edit form */}
       {isEditing && (
@@ -1365,7 +1355,7 @@ function AccountTile({
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center flex-wrap gap-x-4 gap-y-1">
             <label className="flex items-center gap-1.5 text-[10px] text-brand-dark cursor-pointer">
               <input
                 type="checkbox"
@@ -1383,6 +1373,15 @@ function AccountTile({
                 className="rounded border-gray-300"
               />
               Contract Holder
+            </label>
+            <label className="flex items-center gap-1.5 text-[10px] text-brand-dark cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editQuoteRecipient}
+                onChange={e => onSetEditQuoteRecipient(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Quote Recipient
             </label>
           </div>
           <div className="flex gap-2 justify-end">
