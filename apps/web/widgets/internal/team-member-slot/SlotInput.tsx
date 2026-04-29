@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, UserCircle, Mail, Phone } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
 import { resolveLookupDisplayName } from '@/lib/utils'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
+import { getRecordName } from '../shared/recordName'
 
 type Mode = 'contact' | 'account' | 'paired'
 
@@ -376,7 +377,28 @@ export function SlotInput({
         </button>
       )}
 
-      {showContactPicker && (
+      {/* Paired mode + Account picked: render the account's contacts as a
+       *  clickable list (not a search). The account narrows the choices to a
+       *  small set; an additional autocomplete is friction. */}
+      {showContactPicker && mode === 'paired' && accountId && !contactId && (
+        <ContactPickList
+          contacts={contactResults}
+          onPick={(id) => setContactId(id)}
+          disabled={disabled}
+        />
+      )}
+
+      {/* Paired-mode contact selected: show a confirm-pill with X to clear. */}
+      {showContactPicker && mode === 'paired' && accountId && contactId && (
+        <SelectedContactPill
+          contactId={contactId}
+          onClear={() => setContactId(null)}
+          disabled={disabled}
+        />
+      )}
+
+      {/* Contact-only mode OR paired+noAccountMode: search globally. */}
+      {showContactPicker && (mode === 'contact' || (mode === 'paired' && noAccountMode)) && (
         <LookupSearch
           fieldDef={contactFieldDef}
           value={contactId ?? ''}
@@ -444,6 +466,118 @@ export function SlotInput({
             Cancel
           </button>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Contact-list helpers (paired-mode after-account-picked) ───────────
+
+function getContactSubtext(r: Record<string, unknown>): { email?: string; phone?: string } {
+  const findStr = (suffix: string) => {
+    for (const k of Object.keys(r)) {
+      if (k.toLowerCase().endsWith(suffix.toLowerCase())) {
+        const v = r[k]
+        if (typeof v === 'string' && v.trim()) return v.trim()
+      }
+    }
+    return undefined
+  }
+  return {
+    email: findStr('email'),
+    phone: findStr('primaryPhone') ?? findStr('phone'),
+  }
+}
+
+/** Renders the account's contacts as a clickable list. After the user picks
+ *  an Account in paired mode, additional autocomplete is friction — the set
+ *  is small and known; just show the rows and let the user click. */
+function ContactPickList({
+  contacts,
+  onPick,
+  disabled,
+}: {
+  contacts: Record<string, unknown>[]
+  onPick: (id: string) => void
+  disabled?: boolean
+}) {
+  if (contacts.length === 0) {
+    return (
+      <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+        This organization has no contacts yet.
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-md border border-gray-200 bg-white max-h-56 overflow-y-auto divide-y divide-gray-100">
+      {contacts.map(c => {
+        const id = String(c.id)
+        const name = getRecordName(c) || 'Unnamed Contact'
+        const { email, phone } = getContactSubtext(c)
+        return (
+          <button
+            key={id}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(id)}
+            className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-brand-navy/5 focus-visible:bg-brand-navy/10 focus-visible:outline-none disabled:opacity-50"
+          >
+            <UserCircle className="w-3.5 h-3.5 text-brand-gray shrink-0 mt-0.5" aria-hidden />
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-brand-dark truncate">{name}</div>
+              {(email || phone) && (
+                <div className="flex items-center gap-2 text-[10px] text-brand-gray mt-0.5">
+                  {email && (
+                    <span className="inline-flex items-center gap-0.5 truncate">
+                      <Mail className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                      <span className="truncate">{email}</span>
+                    </span>
+                  )}
+                  {phone && (
+                    <span className="inline-flex items-center gap-0.5 truncate">
+                      <Phone className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                      <span className="truncate">{phone}</span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Pill rendered after the user picks a contact from ContactPickList. The X
+ *  button clears the selection so the user can pick a different one without
+ *  cancelling the whole flow. */
+function SelectedContactPill({
+  contactId,
+  onClear,
+  disabled,
+}: {
+  contactId: string
+  onClear: () => void
+  disabled?: boolean
+}) {
+  // Resolve the display name via the global lookup cache; if the cache hasn't
+  // loaded yet, render the raw id for a beat — better than empty.
+  const name = resolveLookupDisplayName(contactId, 'Contact')
+  const display = name && name !== '-' ? name : contactId
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 bg-gray-50 text-sm">
+      <UserCircle className="w-4 h-4 text-brand-gray shrink-0" aria-hidden />
+      <div className="flex-1 min-w-0 font-medium text-gray-900 truncate">{display}</div>
+      {!disabled && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="text-gray-400 hover:text-red-500 transition-colors"
+          title="Clear contact"
+        >
+          <X className="w-4 h-4" />
+        </button>
       )}
     </div>
   )

@@ -12,6 +12,7 @@ import {
   getLastRoleForObject,
   rememberRoleForObject,
 } from '@/lib/connection-recents'
+import { getRecordName } from './recordName'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -84,18 +85,22 @@ function flatten(arr: Record<string, unknown>[]): Record<string, unknown>[] {
   })
 }
 
-/** Fields the user-facing search should match against. Audit metadata
- *  (createdBy, modifiedBy, etc.) is intentionally excluded so typing the
- *  current user's name doesn't surface every record they touched. The
- *  composite Contact `name` object is matched recursively because its inner
- *  fields (firstName/lastName) are the actual display tokens. */
-const SEARCHABLE_KEYS = new Set([
-  'firstName', 'lastName', 'name', 'email', 'phone', 'mobile',
-  'accountName', 'accountNumber', 'contactName', 'title',
-])
+/** Fragments that, when found anywhere in a key (after stripping the object
+ *  prefix), mark that field as something the user-facing search should match.
+ *  Audit metadata (createdBy, modifiedBy, etc.) is intentionally excluded so
+ *  typing the current user's name doesn't surface every record they touched.
+ *
+ *  Substring matching (vs exact key allow-list) is required because the
+ *  Contact CompositeText `name` object stores its inner fields with the
+ *  prefixed keys `Contact__name_firstName` / `Contact__name_lastName`, etc.
+ *  Those don't reduce to a simple `firstName` after the outer prefix strip. */
+const SEARCHABLE_KEY_FRAGMENTS = [
+  'firstname', 'lastname', 'name', 'email', 'phone', 'mobile',
+  'accountname', 'accountnumber', 'contactname', 'title',
+]
 
 /** Composite-name-aware lowercased searchable string for a flattened record.
- *  The /records/search endpoint stringifies CompositeText (Contact name) as
+ *  The /records/search endpoint stringifies CompositeText as
  *  "[object Object]" and misses matches; doing this client-side fixes that. */
 function searchText(r: Record<string, unknown>): string {
   const parts: string[] = []
@@ -107,48 +112,23 @@ function searchText(r: Record<string, unknown>): string {
     }
   }
   for (const k of Object.keys(r)) {
-    const bare = k.replace(/^[A-Za-z]+__/, '')
-    if (SEARCHABLE_KEYS.has(bare)) collect(r[k])
+    const lower = k.toLowerCase()
+    if (SEARCHABLE_KEY_FRAGMENTS.some(frag => lower.includes(frag))) {
+      collect(r[k])
+    }
   }
   return parts.join(' ')
 }
 
-/** Treat these tokens as "no value" — legacy contacts have composite-name fields
- *  pre-filled with the literal "N/A" and we want to fall through to the flat
- *  firstName/lastName fields when that happens. */
-const PLACEHOLDER_NAME_TOKENS = new Set(['n/a', 'na', '-', '—'])
-
-function isMeaningfulNamePart(v: unknown): v is string {
-  if (typeof v !== 'string') return false
-  const t = v.trim()
-  if (!t) return false
-  return !PLACEHOLDER_NAME_TOKENS.has(t.toLowerCase())
-}
-
+/** Display label for a Contact or Account result. Delegates to the shared
+ *  `getRecordName` resolver so we handle prefixed composite-name keys
+ *  (`Contact__name_firstName` / `Contact__name_lastName`) the same way the
+ *  rollup widget's bound rows do. Returns a kind-specific fallback when
+ *  resolution lands on the generic "Unnamed". */
 function getDisplayName(r: Record<string, unknown>, kind: EntityKind): string {
-  if (kind === 'account') {
-    const candidates = ['accountName', 'name', 'accountNumber']
-    for (const k of candidates) {
-      if (isMeaningfulNamePart(r[k])) return (r[k] as string).trim()
-    }
-    return 'Unnamed Account'
-  }
-  // Contact: composite name first (filtering placeholder tokens), then
-  // flat first/last, then email.
-  const nameObj = r.name
-  if (nameObj && typeof nameObj === 'object') {
-    const obj = nameObj as Record<string, unknown>
-    const parts = [obj.salutation, obj.firstName, obj.lastName]
-      .filter(isMeaningfulNamePart)
-      .map(v => v.trim())
-    if (parts.length > 0) return parts.join(' ')
-  }
-  const fn = isMeaningfulNamePart(r.firstName) ? r.firstName.trim() : ''
-  const ln = isMeaningfulNamePart(r.lastName) ? r.lastName.trim() : ''
-  const composed = [fn, ln].filter(Boolean).join(' ').trim()
-  if (composed) return composed
-  if (typeof r.email === 'string' && r.email) return r.email
-  return 'Unnamed Contact'
+  const name = getRecordName(r)
+  if (name && name !== 'Unnamed') return name
+  return kind === 'account' ? 'Unnamed Organization' : 'Unnamed Contact'
 }
 
 function getSubtext(r: Record<string, unknown>, kind: EntityKind): string {
