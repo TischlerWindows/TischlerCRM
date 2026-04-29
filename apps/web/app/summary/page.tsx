@@ -1148,6 +1148,8 @@ export default function SummaryPage() {
   const handlePrintPDF = async (mode: 'download' | 'preview' = 'download') => {
     if (!editingSummary) return;
     const s = editingSummary;
+    // Open preview window NOW, before any awaits, so the popup isn't blocked
+    const previewWindow = mode === 'preview' ? window.open('', '_blank') : null;
     const { jsPDF } = await import('jspdf');
 
     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
@@ -1444,8 +1446,9 @@ export default function SummaryPage() {
       if (v) specFields.push([label, v]);
     };
     addSpec('Product', s.product || s.jobType);
-    Object.entries((s.productTypeOptions as Record<string, string[]>) || {}).forEach(([typeName, opts]) => {
-      if (opts && opts.length > 0) addSpec(typeName, opts.join(', '));
+    const ptoForPdf = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
+    Object.entries(ptoForPdf).forEach(([typeName, opts]) => {
+      if (Array.isArray(opts) && opts.length > 0) addSpec(typeName, opts.join(', '));
     });
     addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
     addSpec('Finish', s.finish);
@@ -1477,6 +1480,10 @@ export default function SummaryPage() {
       y += 10;
       drawField(doc, 15, y, 'Estimated Delivery Cost', `${deliveryTotal}k`, col3W * 2);
       y += 12;
+      if (s.deliveryNotes && s.deliveryNotes.trim()) {
+        drawField(doc, 15, y, 'Delivery Notes', s.deliveryNotes.trim(), col3W * 3);
+        y += 12;
+      }
     }
 
     // ── Tax Cost ──
@@ -1549,7 +1556,11 @@ export default function SummaryPage() {
     if (mode === 'preview') {
       const blob = doc.output('blob');
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      if (previewWindow) {
+        previewWindow.location.href = url;
+      } else {
+        window.open(url, '_blank');
+      }
     } else {
       doc.save(`Quote_Summary_${(s.name || 'Untitled').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
     }
