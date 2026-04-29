@@ -413,18 +413,22 @@ export function InlineCreateContact({
     setSaving(true)
     setError(null)
     try {
-      // The Contact schema's standalone firstName/lastName fields were
-      // collapsed into the composite Contact__name. The composite stores its
-      // sub-fields under prefixed inner keys (Contact__name_firstName, etc.)
-      // and the API's required-field validator (apps/api/src/routes/records.ts
-      // lines 622-641) checks for sub-fields via top-level keys matching the
-      // pattern `<Object>__*_<requiredApiName>`. So we emit each composite
-      // sub-field BOTH:
-      //   1. At top level — so the validator finds them, and
-      //   2. Wrapped under `name: { ... }` — so the stored record has a
-      //      properly-shaped composite that getRecordName resolves nicely.
-      // Status is REQUIRED on the schema; default to the first picklist value
-      // (commonly "Active") so the form respects admin-configured values.
+      // The API's required-field validator (apps/api/src/routes/records.ts:
+      // 622-641) has FIVE lookup patterns. The most reliable one for any
+      // remaining required Contact__firstName / Contact__lastName fields is
+      // pattern #2: bare-name match (`nd['firstName']`). Pattern #5 (composite
+      // sub-field) only works when the schema field is bare-named — for
+      // prefixed fields like `Contact__firstName` it fails because it looks
+      // for keys ending with `_Contact__firstName`, not `_firstName`.
+      //
+      // To be robust against either shape (firstName might be a standalone
+      // required field OR live only inside the Contact__name composite),
+      // emit:
+      //   • bare `firstName` / `lastName` (satisfies validator pattern #2)
+      //   • the composite `name: { ... }` (so the stored record reads
+      //     correctly via getRecordName on display)
+      // The composite uses prefixed inner keys per the existing edit-form
+      // submit shape (apps/web/components/form/field-input.tsx:768-778).
       const compositeInner: Record<string, string> = {
         Contact__name_firstName: firstName.trim(),
         Contact__name_lastName: lastName.trim(),
@@ -432,12 +436,14 @@ export function InlineCreateContact({
       if (salutation) compositeInner.Contact__name_salutation = salutation
       const statusDefault = contactStatuses.values[0] ?? 'Active'
       const payload: Record<string, unknown> = {
-        ...compositeInner,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         name: compositeInner,
         status: statusDefault,
         primaryEmail: email.trim(),
         primaryPhone: phone.trim(),
       }
+      if (salutation) payload.salutation = salutation
       if (contactType) payload.contactType = contactType
       if (title) payload.title = title
       if (accountId) payload.account = accountId
