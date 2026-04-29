@@ -3076,7 +3076,7 @@ export default function SummaryPage() {
                           if (lo.includes('outswing')) return ['Corrosion Resistant Rough Hardware', 'Hinge Finials'];
                           if (lo.includes('swing')) return ['Siegenia Rough Hardware', 'KFV Rough Hardware', 'Hinge Finials', 'Bronze Threshold'];
                           if (lo.includes('lift') || lo.includes('roll')) return ['Standard Hardware', 'Stainless Steel Hardware'];
-                          return ['72mm', '90mm'];
+                          return ['72mm Sash Thickness', '90mm Sash Thickness'];
                         };
 
                         const pto = (editingSummary.productTypeOptions || {}) as Record<string, string[]>;
