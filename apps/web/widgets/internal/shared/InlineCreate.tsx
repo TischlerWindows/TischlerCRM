@@ -339,7 +339,11 @@ export function InlineCreateContact({
   const [overrideDuplicates, setOverrideDuplicates] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const salutations = usePicklistValues('Contact', 'salutation')
+  // Salutation is a sub-field of the composite Contact__name and isn't
+  // exposed as a standalone schema field. Hardcoded values match the
+  // existing dynamic-form's CompositeText render
+  // (apps/web/components/form/field-input.tsx).
+  const salutations = { values: ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.'], loaded: true }
   const contactTypes = usePicklistValues('Contact', 'contactType')
   const titles = usePicklistValues('Contact', 'title')
 
@@ -405,13 +409,22 @@ export function InlineCreateContact({
     setSaving(true)
     setError(null)
     try {
+      // The Contact schema's standalone firstName/lastName/salutation fields
+      // were collapsed into the composite Contact__name field. The form
+      // serializes a composite as an object whose inner keys are the
+      // sub-field apiNames (Contact__name_firstName, etc.). The API's
+      // bare-name normalizer maps `Contact__name → name`, so we emit the
+      // composite under `name`.
+      const composite: Record<string, string> = {
+        Contact__name_firstName: firstName.trim(),
+        Contact__name_lastName: lastName.trim(),
+      }
+      if (salutation) composite.Contact__name_salutation = salutation
       const payload: Record<string, unknown> = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        name: composite,
         primaryEmail: email.trim(),
         primaryPhone: phone.trim(),
       }
-      if (salutation) payload.salutation = salutation
       if (contactType) payload.contactType = contactType
       if (title) payload.title = title
       if (accountId) payload.account = accountId
@@ -636,7 +649,14 @@ export function InlineCreateAccount({
   const [overrideDuplicates, setOverrideDuplicates] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const accountTypes = usePicklistValues('Account', 'type')
+  // Schema field is `Account__accountType`, not `Account__type`. The
+  // `usePicklistValues` helper does suffix-match so passing 'accountType'
+  // is correct.
+  const accountTypes = usePicklistValues('Account', 'accountType')
+  // `Account__status` is a required Picklist. Pull the configured values
+  // so the create payload uses whatever the admin has named the default
+  // (commonly "Active" but the picklist could be customized).
+  const accountStatuses = usePicklistValues('Account', 'status')
 
   // When the form opens fresh, pre-select the first picklist value if there's
   // only one — saves the user a click.
@@ -713,10 +733,19 @@ export function InlineCreateAccount({
     setSaving(true)
     setError(null)
     try {
+      // Field names match the live Account schema:
+      //   Account__accountName  → bare `accountName` (REQUIRED)
+      //   Account__accountType  → bare `accountType`
+      //   Account__status       → bare `status` (REQUIRED — default to first
+      //                          configured picklist value, fall back to
+      //                          'Active' if the schema isn't loaded yet)
+      //   Account__primaryEmail / Account__primaryPhone / Account__website
+      const statusDefault = accountStatuses.values[0] ?? 'Active'
       const payload: Record<string, unknown> = {
         accountName: accountName.trim(),
+        status: statusDefault,
       }
-      if (accountType) payload.type = accountType
+      if (accountType) payload.accountType = accountType
       if (email.trim()) payload.primaryEmail = email.trim()
       if (phone.trim()) payload.primaryPhone = phone.trim()
       if (website.trim()) payload.website = website.trim()
