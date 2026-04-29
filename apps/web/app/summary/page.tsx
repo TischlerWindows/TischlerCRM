@@ -595,8 +595,7 @@ interface Summary {
     installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
   };
   product: string;
-  productType: string;
-  productTypeOptions: string[];
+  productTypeOptions: Record<string, string[]>;
   woodType: string;
   finish: string;
   glassType: string;
@@ -1091,8 +1090,7 @@ export default function SummaryPage() {
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
       },
       product: '',
-      productType: '',
-      productTypeOptions: [],
+      productTypeOptions: {},
       product: opts?.oppFields?.product || '',
       woodType: opts?.oppFields?.woodType || '',
       woodTypeCustom: opts?.oppFields?.woodTypeCustom || '',
@@ -1446,8 +1444,9 @@ export default function SummaryPage() {
       if (v) specFields.push([label, v]);
     };
     addSpec('Product', s.product || s.jobType);
-    addSpec('Product Type', s.productType);
-    if ((s.productTypeOptions || []).length > 0) addSpec('Options', s.productTypeOptions!.join(', '));
+    Object.entries((s.productTypeOptions as Record<string, string[]>) || {}).forEach(([typeName, opts]) => {
+      if (opts && opts.length > 0) addSpec(typeName, opts.join(', '));
+    });
     addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
     addSpec('Finish', s.finish);
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
@@ -3062,78 +3061,63 @@ export default function SummaryPage() {
                         />
                       </div>
 
-                      {/* Row 2: Product Type + Dependent Options */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Product Type</label>
-                        <select
-                          value={editingSummary.productType || ''}
-                          onChange={(e) => setEditingSummary({ ...editingSummary, productType: e.target.value, productTypeOptions: [] })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
-                        >
-                          <option value="">Select product type...</option>
-                          <option value="Double Hung Windows">Double Hung Windows</option>
-                          <option value="Inswing Windows">Inswing Windows</option>
-                          <option value="Flush Outswing Windows">Flush Outswing Windows</option>
-                          <option value="Swing Doors">Swing Doors</option>
-                          <option value="Lift Rolling Door">Lift Rolling Door</option>
-                        </select>
-                      </div>
+                      {/* Row 2: Product Types derived from Page 1 rows */}
+                      {(() => {
+                        const allRows = [...(editingSummary.rows || []), ...(editingSummary.doorRows || [])];
+                        const typeFields = ['type', 'type2', 'type3', 'type4'] as const;
+                        const uniqueTypes = Array.from(new Set(
+                          allRows.flatMap(r => typeFields.map(f => (r as any)[f]).filter(Boolean))
+                        )) as string[];
 
-                      {editingSummary.productType && (() => {
-                        const optionsMap: Record<string, string[]> = {
-                          'Double Hung Windows': [
-                            '59 mm Sash',
-                            '66 mm Sash',
-                            '72 mm Sash',
-                            'Concealed Balance',
-                            'Weight and Chain Balance',
-                          ],
-                          'Inswing Windows': [
-                            'Concealed Corrosion Resistant',
-                          ],
-                          'Flush Outswing Windows': [
-                            'Corrosion Resistant Rough Hardware',
-                            'Hinge Finials',
-                          ],
-                          'Swing Doors': [
-                            'Siegenia Rough Hardware',
-                            'KFV Rough Hardware',
-                            'Hinge Finials',
-                            'Bronze Threshold',
-                          ],
-                          'Lift Rolling Door': [
-                            'Standard Hardware',
-                            'Stainless Steel Hardware',
-                          ],
+                        const getOptionsForType = (t: string): string[] => {
+                          const lo = t.toLowerCase();
+                          if (lo.includes('hung')) return ['59 mm Sash', '66 mm Sash', '72 mm Sash', 'Concealed Balance', 'Weight and Chain Balance'];
+                          if (lo.includes('inswing')) return ['Concealed Corrosion Resistant'];
+                          if (lo.includes('outswing')) return ['Corrosion Resistant Rough Hardware', 'Hinge Finials'];
+                          if (lo.includes('swing')) return ['Siegenia Rough Hardware', 'KFV Rough Hardware', 'Hinge Finials', 'Bronze Threshold'];
+                          if (lo.includes('lift') || lo.includes('roll')) return ['Standard Hardware', 'Stainless Steel Hardware'];
+                          return ['72mm', '90mm'];
                         };
-                        const options = optionsMap[editingSummary.productType] || [];
-                        const selected = editingSummary.productTypeOptions || [];
 
-                        const toggle = (opt: string) => {
-                          const next = selected.includes(opt)
-                            ? selected.filter(o => o !== opt)
-                            : [...selected, opt];
-                          setEditingSummary({ ...editingSummary, productTypeOptions: next });
+                        const pto = (editingSummary.productTypeOptions || {}) as Record<string, string[]>;
+
+                        const toggleOpt = (typeKey: string, opt: string) => {
+                          const current = pto[typeKey] || [];
+                          const next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
+                          setEditingSummary({ ...editingSummary, productTypeOptions: { ...pto, [typeKey]: next } });
                         };
+
+                        if (uniqueTypes.length === 0) {
+                          return (
+                            <p className="text-sm text-gray-400 italic">No product types found — add rows to the Windows/Doors tables on Page 1.</p>
+                          );
+                        }
 
                         return (
-                          <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              {editingSummary.productType} Options
-                            </label>
-                            <div className="space-y-2">
-                              {options.map(opt => (
-                                <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={selected.includes(opt)}
-                                    onChange={() => toggle(opt)}
-                                    className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
-                                  />
-                                  <span className="text-sm text-gray-700">{opt}</span>
-                                </label>
-                              ))}
-                            </div>
+                          <div className="space-y-3">
+                            <label className="block text-sm font-medium text-gray-700">Product Type Options</label>
+                            {uniqueTypes.map(typeName => {
+                              const opts = getOptionsForType(typeName);
+                              const selected = pto[typeName] || [];
+                              return (
+                                <div key={typeName} className="flex items-start gap-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                  <div className="min-w-[200px] text-sm font-medium text-gray-800 pt-0.5">{typeName}</div>
+                                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                                    {opts.map(opt => (
+                                      <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={selected.includes(opt)}
+                                          onChange={() => toggleOpt(typeName, opt)}
+                                          className="w-4 h-4 text-brand-navy border-gray-300 rounded focus:ring-brand-navy/40"
+                                        />
+                                        <span className="text-sm text-gray-700">{opt}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })()}
