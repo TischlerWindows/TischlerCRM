@@ -1,12 +1,18 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { Network, Edit2, Trash2, Check, X, Home, CornerDownRight } from 'lucide-react'
+import {
+  Network, Edit2, Trash2, Check, X, Home, CornerDownRight,
+  ChevronDown, ChevronRight, Search, Plus,
+  Target, Briefcase, Wrench, Truck, Megaphone,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMemberAssociationsConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay, getFieldValue } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
+import { InlineConnectToRecordRow } from '../shared/InlineConnectToRecordRow'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -46,6 +52,10 @@ const CHILD_FIELD_MAP: Array<{ objectApiName: string; fieldName: string; label: 
   { objectApiName: 'Project',      fieldName: 'project',      label: 'Project' },
   { objectApiName: 'WorkOrder',    fieldName: 'workOrder',    label: 'Work Order' },
   { objectApiName: 'Installation', fieldName: 'installation', label: 'Installation' },
+  // Lead-attached connections render under the "Other" section since Leads have
+  // no parent Property — but they still need to be resolved by this map so
+  // fetchAssociations doesn't silently drop them.
+  { objectApiName: 'Lead',         fieldName: 'lead',         label: 'Lead' },
 ]
 
 const OBJECT_LABELS: Record<string, string> = {
@@ -54,6 +64,7 @@ const OBJECT_LABELS: Record<string, string> = {
   Project:      'Project',
   WorkOrder:    'Work Order',
   Installation: 'Installation',
+  Lead:         'Lead',
 }
 
 const BADGE_COLORS: Record<string, string> = {
@@ -61,6 +72,17 @@ const BADGE_COLORS: Record<string, string> = {
   Project:      'bg-teal-100 text-teal-700',
   WorkOrder:    'bg-amber-100 text-amber-700',
   Installation: 'bg-orange-100 text-orange-700',
+  Lead:         'bg-pink-100 text-pink-700',
+  Property:     'bg-purple-100 text-purple-700',
+}
+
+const OBJECT_ICONS: Record<string, LucideIcon> = {
+  Property:     Home,
+  Opportunity:  Target,
+  Project:      Briefcase,
+  WorkOrder:    Wrench,
+  Installation: Truck,
+  Lead:         Megaphone,
 }
 
 const ROLE_PICKLIST = [
@@ -227,8 +249,10 @@ function Skeleton() {
 
 function ObjectBadge({ objectApiName }: { objectApiName: string }) {
   const cls = BADGE_COLORS[objectApiName] ?? 'bg-gray-100 text-gray-600'
+  const Icon = OBJECT_ICONS[objectApiName]
   return (
-    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
+      {Icon && <Icon className="w-2.5 h-2.5" aria-hidden />}
       {OBJECT_LABELS[objectApiName] ?? objectApiName}
     </span>
   )
@@ -423,15 +447,27 @@ type EditHandlers = Pick<AssocRowProps,
 function PropertyGroupTile({
   group,
   displayFields,
+  collapsed,
+  onToggleCollapsed,
   ...edit
-}: { group: PropertyGroup; displayFields: DisplayFieldsConfig } & EditHandlers) {
+}: { group: PropertyGroup; displayFields: DisplayFieldsConfig; collapsed: boolean; onToggleCollapsed: () => void } & EditHandlers) {
   const propertyFields = displayFields.Property ?? []
+  const childCount = (group.direct ? 1 : 0) + group.children.length
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 hover:bg-white hover:shadow-sm p-3 transition-all space-y-2">
       {/* Property header */}
       <div className="flex items-center gap-1.5">
-        <Home className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" />
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand group' : 'Collapse group'}
+          className="text-gray-400 hover:text-brand-navy shrink-0"
+        >
+          {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+        <Home className="w-3.5 h-3.5 text-purple-500 shrink-0 mt-0.5" aria-hidden />
         <div className="flex-1 min-w-0">
           <Link
             href={recordUrl('Property', group.propertyId)}
@@ -441,15 +477,18 @@ function PropertyGroupTile({
           </Link>
           <FieldDisplay data={group.propertyData} fields={propertyFields} />
         </div>
+        {collapsed && (
+          <span className="text-[10px] text-brand-gray tabular-nums shrink-0">
+            {childCount} connection{childCount !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
-      {/* Direct property-level association */}
-      {group.direct && (
+      {!collapsed && group.direct && (
         <AssocRow assoc={group.direct} isChild={false} fieldValues={[]} {...edit} />
       )}
 
-      {/* Child associations (Opp, Project, etc.) */}
-      {group.children.map(child => (
+      {!collapsed && group.children.map(child => (
         <AssocRow
           key={child.memberId}
           assoc={child}
@@ -568,6 +607,17 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Search / filter
+  const [search, setSearch] = useState('')
+
+  // Collapse state (per-property). Initialised lazily once we know how many
+  // groups we have — when > 10, default-collapse.
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const [collapseInitialised, setCollapseInitialised] = useState(false)
+
+  // Connect-to-record inline-add row visibility
+  const [showConnectRow, setShowConnectRow] = useState(false)
 
   // ── 3-phase data fetch ──
   const fetchAssociations = useCallback(async () => {
@@ -816,6 +866,57 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
     propertyGroups.reduce((n, g) => n + (g.direct ? 1 : 0) + g.children.length, 0) +
     flatTiles.length
 
+  // ── Filtered view (search query) ──
+  const filteredView = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return { groups: propertyGroups, flatTiles, hidden: 0 }
+    const matchRow = (row: AssociationRow) =>
+      row.parentRecordName.toLowerCase().includes(q) ||
+      row.role.toLowerCase().includes(q)
+    const groups: PropertyGroup[] = []
+    let hidden = 0
+    for (const g of propertyGroups) {
+      const propMatches = g.propertyName.toLowerCase().includes(q)
+      const directMatches = g.direct ? matchRow(g.direct) : false
+      const children = g.children.filter(matchRow)
+      if (propMatches) {
+        // Whole group surfaces with all its rows
+        groups.push(g)
+      } else if (directMatches || children.length > 0) {
+        groups.push({
+          ...g,
+          direct: directMatches ? g.direct : null,
+          children,
+        })
+      } else {
+        hidden += (g.direct ? 1 : 0) + g.children.length
+      }
+    }
+    const filteredFlat = flatTiles.filter(matchRow)
+    hidden += flatTiles.length - filteredFlat.length
+    return { groups, flatTiles: filteredFlat, hidden }
+  }, [propertyGroups, flatTiles, search])
+
+  // Default-collapse heuristic: once results are loaded and the user hasn't
+  // toggled anything yet, collapse all groups when there are > 10 of them.
+  useEffect(() => {
+    if (collapseInitialised) return
+    if (propertyGroups.length === 0) return
+    if (propertyGroups.length > 10) {
+      setCollapsedIds(new Set(propertyGroups.map(g => g.propertyId)))
+    }
+    setCollapseInitialised(true)
+  }, [propertyGroups, collapseInitialised])
+
+  const toggleCollapsed = useCallback((propertyId: string) => {
+    setCollapsedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(propertyId)) next.delete(propertyId)
+      else next.add(propertyId)
+      return next
+    })
+  }, [])
+
   // ── Unsupported object ──
   if (!isSupported) {
     return (
@@ -836,6 +937,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   }
 
   const widgetLabel = label || 'Connections'
+  const showSearchBar = totalCount > 5
+  const showsConnectButton = recordId && isSupported
+
+  // Friendly name of the current Contact/Account profile we're on. Used in the
+  // implicit-person chip on the connect-to-record inline row.
+  const personName = record ? getRecordName(record as Record<string, unknown>) : ''
 
   return (
     <>
@@ -847,7 +954,57 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
           <span className="text-[11px] text-brand-gray tabular-nums">
             {totalCount} connection{totalCount !== 1 ? 's' : ''}
           </span>
+          {showsConnectButton && !showConnectRow && (
+            <button
+              type="button"
+              onClick={() => setShowConnectRow(true)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Connect to record
+            </button>
+          )}
         </div>
+
+        {/* ── Inline-add: connect this person to a new record ── */}
+        {showConnectRow && showsConnectButton && (
+          <div className="px-3 py-2.5 border-b border-gray-100 bg-surface-alt">
+            <InlineConnectToRecordRow
+              // Cast is safe: the surrounding `showsConnectButton` guard
+              // requires `isSupported`, which restricts to SUPPORTED_OBJECTS.
+              personObjectApiName={objectApiName as 'Contact' | 'Account'}
+              personRecordId={recordId!}
+              personName={personName}
+              onAdded={async () => {
+                setShowConnectRow(false)
+                await fetchAssociations()
+              }}
+              onCancel={() => setShowConnectRow(false)}
+            />
+          </div>
+        )}
+
+        {/* ── Search bar ── */}
+        {showSearchBar && (
+          <div className="px-4 py-2 border-b border-gray-50 flex items-center gap-2">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by property, role, or record name…"
+                aria-label="Filter connections"
+                className="w-full rounded-lg border border-gray-200 bg-gray-50 pl-8 pr-3 py-1.5 text-xs text-brand-dark outline-none focus:border-brand-navy transition"
+              />
+            </div>
+            {filteredView.hidden > 0 && (
+              <span className="text-[11px] text-brand-gray tabular-nums shrink-0">
+                {filteredView.hidden} hidden
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── Body ── */}
         {totalCount === 0 ? (
@@ -855,25 +1012,39 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
             <Network className="w-8 h-8 text-gray-200 mx-auto mb-2" />
             <p className="text-xs text-brand-gray">{object.label || 'This record'} isn&apos;t connected to any records yet.</p>
           </div>
+        ) : filteredView.groups.length === 0 && filteredView.flatTiles.length === 0 ? (
+          <div className="p-8 text-center">
+            <Search className="w-7 h-7 text-gray-200 mx-auto mb-2" />
+            <p className="text-xs text-brand-gray">No connections match &ldquo;{search}&rdquo;.</p>
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="mt-2 text-[11px] font-medium text-brand-navy hover:underline"
+            >
+              Clear search
+            </button>
+          </div>
         ) : (
           <div className="p-3 space-y-2">
-            {propertyGroups.map(group => (
+            {filteredView.groups.map(group => (
               <PropertyGroupTile
                 key={group.propertyId}
                 group={group}
                 displayFields={displayFields}
+                collapsed={collapsedIds.has(group.propertyId)}
+                onToggleCollapsed={() => toggleCollapsed(group.propertyId)}
                 {...editHandlers}
               />
             ))}
 
-            {flatTiles.length > 0 && (
+            {filteredView.flatTiles.length > 0 && (
               <>
-                {propertyGroups.length > 0 && (
+                {filteredView.groups.length > 0 && (
                   <p className="text-[10px] font-semibold text-brand-gray uppercase tracking-wide px-1 pt-1">
                     Other
                   </p>
                 )}
-                {flatTiles.map(assoc => (
+                {filteredView.flatTiles.map(assoc => (
                   <FlatTile
                     key={assoc.memberId}
                     assoc={assoc}
