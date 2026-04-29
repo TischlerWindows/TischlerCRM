@@ -1433,7 +1433,7 @@ export default function SummaryPage() {
     drawField(doc, 15, y, 'Account Shipping Address', fmtAddr(val(s.accountShippingAddress)), col3W);
     drawField(doc, 15 + col3W, y, 'Contact Primary Phone', val(s.contactPrimaryPhone), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Contact Email', val(s.contactEmail), col3W);
-    y += 10;
+    y += 14;
     drawField(doc, 15, y, 'Contact Cell', val(s.contactCellPhone), col3W);
     y += 12;
 
@@ -1459,7 +1459,7 @@ export default function SummaryPage() {
         const [label, value] = specFields[i + j];
         drawField(doc, 15 + col3W * j, y, label, value, col3W);
       }
-      y += 10;
+      y += 12;
     }
     y += 2;
 
