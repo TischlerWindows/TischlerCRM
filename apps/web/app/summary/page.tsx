@@ -1430,7 +1430,7 @@ export default function SummaryPage() {
     drawField(doc, 15, y, 'Contact Receiving Quote', val(s.contactReceivingQuote), col3W);
     drawField(doc, 15 + col3W, y, 'Account', val(s.accountReceivingQuote), col3W);
     y += 10;
-    drawField(doc, 15, y, 'Account Shipping Address', val(s.accountShippingAddress), col3W);
+    drawField(doc, 15, y, 'Account Shipping Address', fmtAddr(val(s.accountShippingAddress)), col3W);
     drawField(doc, 15 + col3W, y, 'Contact Primary Phone', val(s.contactPrimaryPhone), col3W);
     drawField(doc, 15 + col3W * 2, y, 'Contact Email', val(s.contactEmail), col3W);
     y += 10;
@@ -1446,10 +1446,6 @@ export default function SummaryPage() {
       if (v) specFields.push([label, v]);
     };
     addSpec('Product', s.product || s.jobType);
-    const ptoForPdf = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
-    Object.entries(ptoForPdf).forEach(([typeName, opts]) => {
-      if (Array.isArray(opts) && opts.length > 0) addSpec(typeName, opts.join(', '));
-    });
     addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
     addSpec('Finish', s.finish);
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
@@ -1466,6 +1462,18 @@ export default function SummaryPage() {
       y += 10;
     }
     y += 2;
+
+    // ── Product Type Options ──
+    const ptoForPdf = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
+    const ptoEntries = Object.entries(ptoForPdf).filter(([, opts]) => Array.isArray(opts) && opts.length > 0);
+    if (ptoEntries.length > 0) {
+      y = drawSectionTitle(doc, y, 'Product Type Options');
+      const ptoColW = [60, pw2 - 30 - 60];
+      const ptoHeaders = ['Product Type', 'Selected Options'];
+      const ptoRows = ptoEntries.map(([typeName, opts]) => [typeName, (opts as string[]).join(', ')]);
+      y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0 });
+      y += 4;
+    }
 
     // ── Delivery Cost ──
     const deliveryContainers = parseFloat(s.shippingContainers) || 0;
