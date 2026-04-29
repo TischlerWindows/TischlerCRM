@@ -3071,7 +3071,7 @@ export default function SummaryPage() {
 
                         const getOptionsForType = (t: string): string[] => {
                           const lo = t.toLowerCase();
-                          if (lo.includes('hung')) return ['59 mm Sash', '66 mm Sash', '72 mm Sash'];
+                          if (lo.includes('hung')) return ['59 mm Sash Thickness', '66 mm Sash Thickness', '72 mm Sash Thickness'];
                           if (lo.includes('inswing')) return ['Concealed Corrosion Resistant'];
                           if (lo.includes('outswing')) return ['Corrosion Resistant Rough Hardware', 'Hinge Finials'];
                           if (lo.includes('swing')) return ['Siegenia Rough Hardware', 'KFV Rough Hardware', 'Hinge Finials', 'Bronze Threshold'];
