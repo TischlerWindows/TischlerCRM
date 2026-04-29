@@ -444,7 +444,9 @@ export function InlineConnectToRecordRow({
             disabled={saving}
           />
           {dropdownOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-dropdown max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-brand-dark shadow-lg">
+            // In-flow positioning: the dropdown pushes the role/flags/buttons
+            // row down instead of overlaying it.
+            <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-brand-dark shadow-sm">
               {results.length === 0 ? (
                 <div className="px-3 py-2 text-[11px] text-brand-gray">
                   {loadingType === parentType

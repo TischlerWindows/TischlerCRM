@@ -186,7 +186,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
       {isSlot && selection.field.slotConfig && (
         <div className="space-y-2 rounded-md border border-purple-200 bg-purple-50/40 p-3">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-purple-700">
-            Team Member Slot
+            Connection Slot
           </div>
           <TeamMemberSlotConfigPanel
             config={selection.field.slotConfig as unknown as Record<string, unknown>}

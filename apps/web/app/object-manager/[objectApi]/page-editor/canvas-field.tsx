@@ -249,7 +249,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm" style={labelStyle}>
             {isSlot
-              ? (field.labelOverride || slotDisplayLabel || 'Team Member Slot')
+              ? (field.labelOverride || slotDisplayLabel || 'Connection Slot')
               : isLookupFields
                 ? (field.labelOverride || (field as any).lookupFieldsConfig?.sourceLookupApiName
                     ? `Fields from: ${(field as any).lookupFieldsConfig?.sourceLookupApiName || '(unconfigured)'}`
@@ -260,9 +260,9 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
             {isSlot ? (
               <span
                 className="rounded-full bg-purple-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-purple-700"
-                title="Team Member Slot — synthetic field"
+                title="Connection Slot — synthetic field"
               >
-                TM Slot
+                Connection
               </span>
             ) : isLookupFields ? (
               <span

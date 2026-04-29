@@ -50,10 +50,10 @@ function tmTransitionKey(tf: PathTransitionField): string {
 function tmTransitionLabel(tf: PathTransitionField): string {
   if (tf.kind === 'teamMemberFlag') {
     const opt = TM_FLAG_OPTIONS.find(o => o.value === tf.flag);
-    return opt?.label ?? 'Team Member';
+    return opt?.label ?? 'Connection';
   }
   if (tf.kind === 'teamMemberRole' && tf.role) return tf.role;
-  return 'Team Member';
+  return 'Connection';
 }
 
 export default function Paths({ objectApiName }: PathsProps) {
@@ -744,7 +744,7 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
                       {tmAdderStageId === stage.id ? (
                         <div className="mt-2 rounded-md border border-dashed border-purple-300 bg-purple-50/30 p-2 space-y-2">
                           <div>
-                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Team Member Flags</p>
+                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Connection Flags</p>
                             <div className="flex flex-wrap gap-1">
                               {TM_FLAG_OPTIONS
                                 .filter(o => !(stage.transitionFields || []).some(tf => tf.kind === 'teamMemberFlag' && tf.flag === o.value))
@@ -761,7 +761,7 @@ function PathEditor({ path, onChange, onSave, onCancel, isNew, objectFields }: P
                             </div>
                           </div>
                           <div>
-                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Team Member Roles</p>
+                            <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">Connection Roles</p>
                             <div className="flex flex-wrap gap-1">
                               {tmRoleValues
                                 .filter(r => !(stage.transitionFields || []).some(tf => tf.kind === 'teamMemberRole' && tf.role === r))

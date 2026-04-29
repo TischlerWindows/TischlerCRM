@@ -376,7 +376,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
         }
       },
       getPendingSummary: () =>
-        `${privatePendingRef.current.length} team member(s)`,
+        `${privatePendingRef.current.length} connection(s)`,
     })
 
     return () => {
@@ -554,7 +554,7 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
       })
       evictOldestIfNeeded()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load team members')
+      setError(e instanceof Error ? e.message : 'Failed to load connections')
     } finally {
       setLoading(false)
     }
@@ -1607,7 +1607,7 @@ function AddTeamMemberModal({
       })
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add team member')
+      setError(e instanceof Error ? e.message : 'Failed to add connection')
     } finally {
       setSaving(false)
     }
@@ -1710,7 +1710,7 @@ function AddTeamMemberModal({
 
       onSaved()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add team members')
+      setError(e instanceof Error ? e.message : 'Failed to add connections')
     } finally {
       setSaving(false)
     }
@@ -1748,10 +1748,10 @@ function AddTeamMemberModal({
             </button>
           )}
           <h3 className="text-sm font-semibold text-brand-dark flex-1">
-            {step === 'choose' && 'Add Team Member'}
+            {step === 'choose' && 'Add Connection'}
             {step === 'contact-search' && 'Search Contacts'}
             {step === 'contact-create' && 'Create New Contact'}
-            {step === 'contact-form' && 'Add Contact as Team Member'}
+            {step === 'contact-form' && 'Add Contact as Connection'}
             {step === 'account-search' && 'Search Accounts'}
             {step === 'account-contacts' && 'Select Account Contacts'}
           </h3>
@@ -1995,13 +1995,13 @@ function AddTeamMemberModal({
                 <Building2 className="w-4 h-4 text-brand-navy shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-brand-dark">{getRecordName(selectedAccount)}</div>
-                  <div className="text-[10px] text-brand-gray">Add the account as a team member and/or select individual contacts</div>
+                  <div className="text-[10px] text-brand-gray">Add the organization as a connection and/or select individual contacts</div>
                 </div>
               </div>
 
-              {/* Add Account as Team Member */}
+              {/* Add Account as Connection */}
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
-                <h4 className="text-[11px] font-semibold text-brand-dark">Add Account as Team Member</h4>
+                <h4 className="text-[11px] font-semibold text-brand-dark">Add Organization as Connection</h4>
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
                     <label className="block text-[10px] text-brand-gray mb-0.5">Account Role</label>
@@ -2298,12 +2298,12 @@ function CopyTeamModal({
               {selectedSource && (
                 <div>
                   <p className="text-[11px] font-semibold text-brand-dark mb-1">
-                    Team Members to Copy ({previewMembers.length})
+                    Connections to Copy ({previewMembers.length})
                   </p>
                   {loadingPreview ? (
                     <div className="py-3 text-center text-xs text-brand-gray animate-pulse">Loading preview...</div>
                   ) : previewMembers.length === 0 ? (
-                    <p className="text-xs text-brand-gray py-2">No team members found on this record</p>
+                    <p className="text-xs text-brand-gray py-2">No connections found on this record</p>
                   ) : (
                     <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-50">
                       {previewMembers.map(m => (

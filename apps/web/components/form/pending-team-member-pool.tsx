@@ -140,7 +140,7 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
           })
         }
       },
-      getPendingSummary: () => `${rowsRef.current.length} team member(s)`,
+      getPendingSummary: () => `${rowsRef.current.length} connection(s)`,
     })
 
     return () => pendingCtx.unregisterWidget(widgetId)

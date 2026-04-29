@@ -160,7 +160,7 @@ export function useTeamMemberSlot({
       }
       setSavedRows(data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load team members')
+      setError(e instanceof Error ? e.message : 'Failed to load connections')
       setSavedRows([])
     } finally {
       setLoading(false)
@@ -216,7 +216,7 @@ export function useTeamMemberSlot({
             pool.updateRow(existing.id, { [flagName]: true })
             return { id: existing.id, isPending: true, data: { ...existing.data, [flagName]: true } }
           }
-          if (!role) throw new Error('Role is required when adding a new team member to a flag-bound slot.')
+          if (!role) throw new Error('Role is required when adding a new connection to a flag-bound slot.')
           const data: Record<string, unknown> = {
             role,
             [flagName]: true,
@@ -256,7 +256,7 @@ export function useTeamMemberSlot({
         }
 
         // Create new
-        if (!role) throw new Error('Role is required when adding a new team member to a flag-bound slot.')
+        if (!role) throw new Error('Role is required when adding a new connection to a flag-bound slot.')
         const payload: Record<string, unknown> = {
           role,
           [flagName]: true,

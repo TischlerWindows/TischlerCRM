@@ -85,6 +85,10 @@ export function SlotInput({
   const [pendingRole, setPendingRole] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Paired-mode: user explicitly opts out of an Account so the Contact picker
+  // searches all contacts globally. Stays false otherwise so the Account picker
+  // is the only entry point and the Contact picker is gated behind a selection.
+  const [noAccountMode, setNoAccountMode] = useState(false)
 
   // The /records and /records/search API endpoints return raw rows of shape
   // { id, data: {...}, createdBy: {...} } — but LookupSearch (and the lookup
@@ -210,9 +214,17 @@ export function SlotInput({
     }
   }, [contactQuery, contactActive, mode, accountId])
 
+  // In paired mode, require BOTH a Contact and an Account before save can fire,
+  // unless the user has opted out of the Account by clicking "Skip account &
+  // search all contacts" — in that case Contact alone is sufficient. This
+  // prevents the half-saved state where only a contact was attached.
   const hasSelection = (mode === 'contact' && !!contactId) ||
     (mode === 'account' && !!accountId) ||
-    (mode === 'paired' && (!!contactId || !!accountId))
+    (mode === 'paired' && (
+      noAccountMode
+        ? !!contactId
+        : (!!contactId && !!accountId)
+    ))
 
   const isFlagNetNew = criterion.kind === 'flag' && !boundRow
 
@@ -302,9 +314,12 @@ export function SlotInput({
   }
 
   // ── Render empty slot inputs ───────────────────────────────────────
-  // Both pickers are always visible in paired mode. The cascading is implicit:
-  // when an account is selected, the contact picker filters to that account's
-  // contacts; when no account is selected, the contact picker searches globally.
+  // Paired-mode flow: Account first, then Contact. The Contact picker is
+  // hidden until an Account is picked (or the user explicitly opts out via
+  // the "Skip account & search all contacts" link). This prevents the
+  // half-saved state where a Contact is attached without its Organization.
+  const showContactPicker =
+    mode === 'contact' || (mode === 'paired' && (!!accountId || noAccountMode))
   return (
     <div className="space-y-2">
       {(mode === 'account' || mode === 'paired') && (
@@ -313,9 +328,14 @@ export function SlotInput({
           value={accountId ?? ''}
           onChange={(val) => {
             setAccountId(val ? String(val) : null)
-            // Reset contact when account changes in paired mode so the next pick
-            // comes from the new account's filtered list.
-            if (mode === 'paired') setContactId(null)
+            // Reset contact when account changes in paired mode so the next
+            // pick comes from the new account's filtered list. Also clear the
+            // "skip account" opt-out — the user just chose an account, so
+            // they're back on the primary path.
+            if (mode === 'paired') {
+              setContactId(null)
+              setNoAccountMode(false)
+            }
           }}
           records={accountResults}
           lookupQuery={accountQuery}
@@ -328,7 +348,35 @@ export function SlotInput({
           hideNoneOption
         />
       )}
-      {(mode === 'contact' || mode === 'paired') && (
+
+      {/* Opt-out link: lets the user skip Account and search Contacts globally. */}
+      {mode === 'paired' && !accountId && !noAccountMode && (
+        <button
+          type="button"
+          onClick={() => setNoAccountMode(true)}
+          disabled={disabled}
+          className="text-[11px] text-brand-navy hover:text-brand-navy/80 underline-offset-2 hover:underline"
+        >
+          Skip organization &amp; search all contacts
+        </button>
+      )}
+
+      {/* "Reset" link: when in opt-out mode, let the user restore the Account picker flow. */}
+      {mode === 'paired' && noAccountMode && !accountId && (
+        <button
+          type="button"
+          onClick={() => {
+            setNoAccountMode(false)
+            setContactId(null)
+          }}
+          disabled={disabled}
+          className="text-[11px] text-brand-gray hover:text-brand-dark underline-offset-2 hover:underline"
+        >
+          ← Pick an organization first instead
+        </button>
+      )}
+
+      {showContactPicker && (
         <LookupSearch
           fieldDef={contactFieldDef}
           value={contactId ?? ''}
@@ -387,6 +435,7 @@ export function SlotInput({
               setAccountQuery('')
               setContactQuery('')
               setPendingRole('')
+              setNoAccountMode(false)
               setError(null)
             }}
             disabled={saving}

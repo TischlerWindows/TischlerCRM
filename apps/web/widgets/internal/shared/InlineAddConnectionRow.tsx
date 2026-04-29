@@ -587,7 +587,11 @@ export function InlineAddConnectionRow({
             disabled={disabled || saving}
           />
           {dropdownOpen && (
-            <div className="absolute left-0 right-0 top-full mt-1 z-dropdown max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-brand-dark shadow-lg">
+            // Render in-flow (not absolute) so the results push the Role +
+            // Flag toggles row DOWN instead of overlaying it. Earlier QA
+            // showed the absolute-positioned dropdown clipping over the
+            // role select, hiding part of the result list.
+            <div className="mt-1 max-h-72 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-brand-dark shadow-sm">
               {results.flat.length === 0 ? (
                 <div className="px-3 py-2 text-[11px] text-brand-gray">
                   {query ? 'No matches.' : 'Start typing to search…'}

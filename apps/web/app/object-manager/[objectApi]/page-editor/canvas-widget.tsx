@@ -51,9 +51,9 @@ const WIDGET_LABELS: Partial<Record<LayoutWidget['widgetType'], string>> = {
   CustomComponent: 'Custom Component',
   Spacer: 'Spacer',
   HeaderHighlights: 'Header Highlights',
-  TeamMembersRollup: 'Team Members',
-  TeamMemberAssociations: 'Team Member Associations',
-  TeamMemberSlot: 'Team Member Slot',
+  TeamMembersRollup: 'Connections (record-side)',
+  TeamMemberAssociations: 'Connections (person-side)',
+  TeamMemberSlot: 'Connection Slot',
   Path: 'Path',
   InstallationCostGrid: 'Installation Cost Grid',
 };
@@ -81,7 +81,7 @@ function summarizeWidget(widget: LayoutWidget): string {
       return extraCount > 0 ? `${preview.join(', ')} +${extraCount}` : preview.join(', ');
     }
     case 'TeamMembersRollup':
-      return `Team Members${widget.config.rollupFromProperty ? ' (Rollup)' : ''}`;
+      return `Connections${widget.config.rollupFromProperty ? ' (incl. children)' : ''}`;
     case 'TeamMemberAssociations':
       return 'Associations for Contact / Account';
     case 'TeamMemberSlot': {
