@@ -11,6 +11,7 @@ import type { TeamMembersRollupConfig } from '@/lib/schema'
 import { apiClient } from '@/lib/api-client'
 import { FieldDisplay } from '../shared/FieldDisplay'
 import { ConnectionBadges } from '../shared/ConnectionBadges'
+import { InlineAddConnectionRow, type InlineAddConnectionPayload } from '../shared/InlineAddConnectionRow'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
 import { usePendingTeamMemberPool } from '@/components/form/pending-team-member-pool'
 import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from '../team-member-slot/teamMemberEvents'
@@ -838,6 +839,48 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
     setEditingId(null)
   }
 
+  // ── Inline-add handler ──
+  // Routes a new connection from InlineAddConnectionRow either to the
+  // pending-pool (create mode) or directly to the API (edit mode), then
+  // invalidates the module-level cache and broadcasts so other widgets
+  // (e.g. Slot pickers) re-sync.
+  const handleInlineAdd = useCallback(
+    async (payload: InlineAddConnectionPayload) => {
+      const data: Record<string, unknown> = {
+        role: payload.role,
+        primaryContact: payload.primaryContact,
+        contractHolder: payload.contractHolder,
+        quoteRecipient: payload.quoteRecipient,
+      }
+      if (payload.contactId) data.contact = payload.contactId
+      if (payload.contactName) data.contactName = payload.contactName
+      if (payload.accountId) data.account = payload.accountId
+      if (payload.accountName) data.accountName = payload.accountName
+
+      if (isCreateMode) {
+        addPendingMember(data)
+        return
+      }
+
+      const parentField = OBJECT_TO_FIELD[objectApiName]
+      if (!parentField || !recordId) {
+        throw new Error('No parent record to attach connection to.')
+      }
+
+      // POST first; only invalidate the cache on success so a failure leaves
+      // the previously-cached data visible rather than triggering a skeleton
+      // re-fetch over a row that wasn't actually added.
+      await apiClient.post('/objects/TeamMember/records', {
+        data: { [parentField]: recordId, ...data },
+      })
+      if (_cacheKey) teamMembersCache.delete(_cacheKey)
+      await fetchTeamMembers()
+      tmPool?.bumpVersion()
+      notifyTeamMembersChanged()
+    },
+    [isCreateMode, addPendingMember, objectApiName, recordId, _cacheKey, fetchTeamMembers, tmPool],
+  )
+
   // ── 5i: Delete handler ──
   const handleDelete = async (memberId: string) => {
     // In create mode, remove from pending list instead of API
@@ -884,6 +927,11 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
   const widgetLabel = (label as string) || 'Connections'
 
+  // Friendly record name for the inline-add chip — e.g. "PRJ-1234" or address.
+  const parentRecordName = record ? getRecordName(record as Record<string, unknown>) : undefined
+  const parentObjectLabel = object.label || objectApiName
+
+
   return (
     <>
       <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
@@ -905,14 +953,6 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
               Copy
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-navy text-white text-[11px] font-semibold hover:bg-brand-navy/90 transition-colors"
-          >
-            <Plus className="w-3 h-3" />
-            Add
-          </button>
         </div>
 
         {/* ── Search & Filter bar ── */}
@@ -945,16 +985,21 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
 
         {/* ── Body: Two-column grid ── */}
         {totalCount === 0 ? (
-          <div className="p-8 text-center">
-            <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-            <p className="text-xs text-brand-gray">No team members found</p>
-            <button
-              type="button"
-              onClick={() => setShowAddModal(true)}
-              className="mt-2 text-[11px] font-semibold text-brand-navy hover:underline"
-            >
-              Add a team member
-            </button>
+          <div className="p-4 space-y-3">
+            <div className="text-center py-6">
+              <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+              <p className="text-xs text-brand-gray">
+                No one&apos;s connected to this {parentObjectLabel.toLowerCase()} yet.
+              </p>
+            </div>
+            <InlineAddConnectionRow
+              parentObjectApiName={objectApiName}
+              parentObjectLabel={parentObjectLabel}
+              parentRecordName={parentRecordName}
+              pendingMode={isCreateMode}
+              onAdd={handleInlineAdd}
+              onAdvanced={() => setShowAddModal(true)}
+            />
           </div>
         ) : (
           <div className="p-3 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1029,14 +1074,28 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
             </div>
           </div>
         )}
+
+        {/* ── Inline-add row (always available when populated) ── */}
+        {totalCount > 0 && (
+          <div className="p-3 border-t border-gray-100">
+            <InlineAddConnectionRow
+              parentObjectApiName={objectApiName}
+              parentObjectLabel={parentObjectLabel}
+              parentRecordName={parentRecordName}
+              pendingMode={isCreateMode}
+              onAdd={handleInlineAdd}
+              onAdvanced={() => setShowAddModal(true)}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Delete Confirmation ── */}
       {deleteTarget && (
         <ModalOverlay onClose={() => setDeleteTarget(null)}>
           <div className="w-full max-w-sm rounded-xl border border-gray-200 bg-white shadow-xl p-5 space-y-4">
-            <p className="text-sm font-semibold text-brand-dark">Remove team member?</p>
-            <p className="text-xs text-brand-gray">This will remove the team member assignment. The contact/account record itself is not affected.</p>
+            <p className="text-sm font-semibold text-brand-dark">Remove connection?</p>
+            <p className="text-xs text-brand-gray">This removes the connection from this record. The contact/account itself is not affected.</p>
             <div className="flex gap-2 justify-end">
               <button
                 type="button"
