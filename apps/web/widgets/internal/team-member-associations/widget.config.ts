@@ -1,7 +1,7 @@
 export const config = {
   id: 'team-member-associations',
-  name: 'Team Member Associations',
-  description: 'Shows all records this contact or account is associated with as a team member',
+  name: 'Connections',
+  description: 'Records this contact or organization is connected to',
   icon: 'Network',
   category: 'internal' as const,
   integration: null,
