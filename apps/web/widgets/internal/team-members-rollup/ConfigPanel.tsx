@@ -84,14 +84,14 @@ export default function TeamMembersRollupConfigPanel({ config, onChange }: Confi
       {/* ── Data Source ── */}
       <div className="space-y-3">
         <Toggle
-          label="Show all team members from Property tree"
+          label="Show all connections from Property tree"
           checked={rollupFromProperty}
           onChange={v => update({ rollupFromProperty: v })}
         />
         <p className="text-[10px] text-gray-400 mt-0.5">
           {rollupFromProperty
-            ? 'Fetches team members from the current record and the full Property hierarchy'
-            : 'Fetches only the current record\u2019s team members'}
+            ? 'Fetches connections from the current record and the full Property hierarchy'
+            : 'Fetches only the current record\u2019s connections'}
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export default function TeamMembersRollupConfigPanel({ config, onChange }: Confi
           type="text"
           className={inputCls}
           value={label}
-          placeholder="Team Members"
+          placeholder="Connections"
           onChange={e => update({ label: e.target.value })}
         />
         <p className="text-[10px] text-gray-400 mt-0.5">Override the header title shown on the widget</p>

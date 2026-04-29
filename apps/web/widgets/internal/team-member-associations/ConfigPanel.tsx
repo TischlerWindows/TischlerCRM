@@ -72,7 +72,7 @@ export default function TeamMemberAssociationsConfigPanel({ config, onChange }: 
           type="text"
           className={inputCls}
           value={label}
-          placeholder="Team Member Associations"
+          placeholder="Connections"
           onChange={e => onChange({ ...typed, label: e.target.value })}
         />
         <p className="text-[10px] text-gray-400 mt-0.5">Override the header title shown on the widget</p>

@@ -29,11 +29,11 @@ function tfLabel(tf: PathTransitionField): string {
       case 'primaryContact': return 'Primary Contact'
       case 'contractHolder': return 'Contract Holder'
       case 'quoteRecipient': return 'Quote Recipient'
-      default: return 'Team Member'
+      default: return 'Connection'
     }
   }
   if (tf.kind === 'teamMemberRole' && tf.role) return tf.role
-  return 'Team Member'
+  return 'Connection'
 }
 
 /**

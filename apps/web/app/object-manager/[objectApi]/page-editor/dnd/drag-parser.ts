@@ -98,7 +98,7 @@ export function parseActiveDrag(active: Active, layout: EditorState['layout']): 
   if (data.type === 'palette-team-member-slot') {
     return {
       kind: 'palette-team-member-slot',
-      label: typeof data.label === 'string' ? data.label : 'Team Member Slot',
+      label: typeof data.label === 'string' ? data.label : 'Connection Slot',
     };
   }
 
