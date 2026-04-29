@@ -4030,30 +4030,30 @@ export default function SummaryPage() {
                       <tr>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Arch-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'100px'}}>Width (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'100px'}}>Height (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'110px'}}>Width (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'110px'}}>Height (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'90px'}}>Sq Feet (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'90px'}}>Sq Feet (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Operable Sashes (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Operable Sashes (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Width (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Height (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Width (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Height (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 2</th>
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>}
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
                         {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 3</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
                         {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 4</th>}
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Special Remarks</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Fields (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Fields (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}># Site Mullions (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'110px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'110px'}}>NET € (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>
@@ -4263,30 +4263,30 @@ export default function SummaryPage() {
                       <tr>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Arch-Position</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'100px'}}>Width (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'100px'}}>Height (MM)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'110px'}}>Width (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'110px'}}>Height (Ft &amp; In)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'90px'}}>Sq Feet (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'90px'}}>Sq Feet (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Operable Sashes (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Operable Sashes (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Width (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'60px'}}>Height (MM)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Width (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'65px'}}>Height (Ft &amp; In)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'55px'}}>Sq Feet (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Operable Sashes (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 2</th>
-                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>}
+                        {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
                         {showType3 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 3</th>}
-                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'60px'}}>Qty</th>}
+                        {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'50px'}}>Qty</th>}
                         {showType4 && <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Type 4</th>}
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'160px'}}>Special Remarks</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Fields (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}>Fields (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}># Site Mullions (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'90px'}}># Site Mullions (Total)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'110px'}}>NET € (Each)</th>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'110px'}}>NET € (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}>Fields (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'55px'}}># Site Mullions (Total)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Each)</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'65px'}}>NET € (Total)</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-l border-green-300" style={{minWidth:'100px'}}>Per Unit</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-green-600 bg-green-50 border-r border-green-300" style={{minWidth:'100px'}}>Per Position</th>
                         <th className="px-0.5 py-1 text-center text-xs font-semibold text-orange-600 bg-orange-50 border-l border-orange-300" style={{minWidth:'100px'}}>Per Unit</th>
