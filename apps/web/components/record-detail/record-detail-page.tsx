@@ -254,6 +254,11 @@ export default function RecordDetailPage({
     );
     if (numberKey) return record[numberKey];
     if (record.name && typeof record.name === 'string') return record.name;
+    // CompositeText name (e.g. Contact's Salutation/First/Last) — the subtitle
+    // resolver already handles this; reuse its output as the title when the
+    // record has no number.
+    const subtitle = getRecordSubtitle();
+    if (subtitle) return subtitle;
     return `Untitled ${objectDef?.label ?? 'Record'}`;
   };
 
