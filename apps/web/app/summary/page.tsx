@@ -1464,13 +1464,20 @@ export default function SummaryPage() {
     y += 2;
 
     // ── Product Type Options ──
-    const ptoForPdf = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
-    const ptoEntries = Object.entries(ptoForPdf).filter(([, opts]) => Array.isArray(opts) && opts.length > 0);
-    if (ptoEntries.length > 0) {
+    const ptoSaved = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
+    const allTypeFields = ['type', 'type2', 'type3', 'type4'] as const;
+    const allRows = [...(s.rows || []), ...(s.doorRows || [])];
+    const uniqueTypesForPdf = Array.from(new Set(
+      allRows.flatMap((r: any) => allTypeFields.map(f => r[f]).filter(Boolean))
+    )) as string[];
+    if (uniqueTypesForPdf.length > 0) {
       y = drawSectionTitle(doc, y, 'Product Type Options');
       const ptoColW = [60, pw2 - 30 - 60];
       const ptoHeaders = ['Product Type', 'Selected Options'];
-      const ptoRows = ptoEntries.map(([typeName, opts]) => [typeName, (opts as string[]).join(', ')]);
+      const ptoRows = uniqueTypesForPdf.map(typeName => {
+        const selected = ptoSaved[typeName];
+        return [typeName, (Array.isArray(selected) && selected.length > 0) ? selected.join(', ') : '—'];
+      });
       y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0 });
       y += 4;
     }
