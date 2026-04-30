@@ -631,9 +631,13 @@ export async function recordRoutes(app: FastifyInstance) {
       // 4. CamelCase: DB field 'name' → check 'accountName'
       const camelKey = `${camelPrefix}${f.apiName.charAt(0).toUpperCase()}${f.apiName.slice(1)}`;
       const camelCased = nd[camelKey];
-      // 5. Composite sub-field patterns like "Contact__name_firstName"
+      // 5. Composite sub-field patterns like "Contact__name_firstName".
+      // Match against the unprefixed key so legacy fields whose own apiName
+      // already begins with "Object__" (e.g. "Contact__firstName") still
+      // match composite subfields like "Contact__name_firstName".
+      const compositeSuffix = `_${unprefixedKey}`;
       const compositeMatch = Object.keys(nd).some(
-        (k) => k.endsWith(`_${f.apiName}`) && k.startsWith(`${apiName}__`) && nd[k] !== undefined && nd[k] !== null
+        (k) => k.endsWith(compositeSuffix) && k.startsWith(`${apiName}__`) && nd[k] !== undefined && nd[k] !== null
       );
 
       const hasValue = (v: any) => v !== undefined && v !== null;
