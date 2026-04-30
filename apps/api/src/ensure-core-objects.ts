@@ -75,7 +75,7 @@ const CORE_OBJECTS = [
     fields: [
       { apiName: 'leadNumber', label: 'Lead Number', type: 'Text', unique: true },
       { apiName: 'firstName', label: 'First Name', type: 'Text' },
-      { apiName: 'lastName', label: 'Last Name', type: 'Text', required: true },
+      { apiName: 'lastName', label: 'Last Name', type: 'Text' },
       { apiName: 'company', label: 'Company', type: 'Text' },
       { apiName: 'email', label: 'Email', type: 'Email' },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
@@ -412,11 +412,11 @@ export async function ensureCoreObjects(): Promise<void> {
     `[ensure-core-objects] Done — ${created} created, ${existed} already existed (${CORE_OBJECTS.length} total)`
   );
 
-  // Fix: ensure Contact firstName/lastName are NOT required in the DB.
-  // The web schema uses a CompositeText "Name" field instead of separate
-  // firstName/lastName fields, so requiring them blocks record creation.
-  // Covers both bare names (firstName) and prefixed names (Contact__firstName).
+  // Fix: ensure name/identity fields that users may have deleted are NOT required.
+  // These fields are re-created on startup (ensureFields), so they must never block
+  // record creation. Covers both prefixed (Contact__firstName) and bare (firstName) forms.
   try {
+    // Un-require Contact firstName/lastName
     const contactObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
     });
@@ -430,8 +430,22 @@ export async function ensureCoreObjects(): Promise<void> {
         data: { required: false },
       });
     }
+    // Un-require Lead lastName
+    const leadObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
+    });
+    if (leadObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: leadObj.id,
+          apiName: { in: ['firstName', 'lastName'] },
+          required: true,
+        },
+        data: { required: false },
+      });
+    }
   } catch (err) {
-    console.warn('[ensure-core-objects] Could not fix Contact name field requirements:', err);
+    console.warn('[ensure-core-objects] Could not fix name field requirements:', err);
   }
 
   // Fix: ensure auto-generated number fields are NOT required in the DB.
