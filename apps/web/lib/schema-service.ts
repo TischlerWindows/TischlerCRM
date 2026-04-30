@@ -2236,7 +2236,6 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Contact__firstName',
           label: 'First Name',
           type: 'Text',
-          required: true,
           maxLength: 100
         },
         {
@@ -2252,7 +2251,6 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Contact__lastName',
           label: 'Last Name',
           type: 'Text',
-          required: true,
           maxLength: 100
         },
         {

@@ -415,6 +415,7 @@ export async function ensureCoreObjects(): Promise<void> {
   // Fix: ensure Contact firstName/lastName are NOT required in the DB.
   // The web schema uses a CompositeText "Name" field instead of separate
   // firstName/lastName fields, so requiring them blocks record creation.
+  // Covers both bare names (firstName) and prefixed names (Contact__firstName).
   try {
     const contactObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
@@ -423,7 +424,7 @@ export async function ensureCoreObjects(): Promise<void> {
       await prisma.customField.updateMany({
         where: {
           objectId: contactObj.id,
-          apiName: { in: ['firstName', 'lastName'] },
+          apiName: { in: ['firstName', 'lastName', 'Contact__firstName', 'Contact__lastName'] },
           required: true,
         },
         data: { required: false },
