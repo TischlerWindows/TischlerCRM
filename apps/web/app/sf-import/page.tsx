@@ -2,6 +2,7 @@
 
 import { useState, useRef, useMemo, useCallback } from 'react';
 import Papa from 'papaparse';
+import JSZip from 'jszip';
 import {
   Upload, FileSpreadsheet, ArrowRight, ArrowLeft, Check, AlertCircle,
   CheckCircle, Loader2, Download, Link2, ChevronDown, ChevronRight, X,
@@ -269,6 +270,32 @@ export default function SalesforceImportPage() {
       const newEntries: FileEntry[] = [];
 
       for (const file of fileArray) {
+        if (file.name.endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+          if (file.size > 50 * 1024 * 1024) {
+            newErrors.push(`${file.name}: File too large (max 50MB).`);
+            continue;
+          }
+          try {
+            const zip = await JSZip.loadAsync(file);
+            const csvEntries = Object.entries(zip.files).filter(
+              ([name, entry]) => !entry.dir && name.endsWith('.csv'),
+            );
+            if (csvEntries.length === 0) {
+              newErrors.push(`${file.name}: No CSV files found inside zip.`);
+              continue;
+            }
+            for (const [name, zipEntry] of csvEntries) {
+              const blob = await zipEntry.async('blob');
+              const csvFile = new File([blob], name.split('/').pop()!, { type: 'text/csv' });
+              const result = await parseFile(csvFile);
+              if (typeof result === 'string') newErrors.push(result);
+              else newEntries.push(result);
+            }
+          } catch {
+            newErrors.push(`${file.name}: Failed to read zip file.`);
+          }
+          continue;
+        }
         if (!file.name.endsWith('.csv') && !file.type.includes('csv') && !file.type.includes('text')) {
           newErrors.push(`${file.name}: Not a CSV file.`);
           continue;
@@ -533,12 +560,12 @@ export default function SalesforceImportPage() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                <p className="font-medium text-gray-700 mb-1">Drop CSV files here or click to browse</p>
-                <p className="text-sm text-gray-400">Multiple files accepted · Max 50MB each · Max 5,000 rows per file</p>
+                <p className="font-medium text-gray-700 mb-1">Drop CSV or ZIP files here or click to browse</p>
+                <p className="text-sm text-gray-400">Multiple files accepted · ZIP archives auto-extracted · Max 50MB each · Max 5,000 rows per file</p>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.zip,text/csv,application/zip"
                   multiple
                   className="hidden"
                   onChange={(e) => handleFilesSelected(e.target.files)}
@@ -574,7 +601,7 @@ export default function SalesforceImportPage() {
                 >
                   <Upload className="w-4 h-4" /> Add more files
                 </button>
-                <input ref={fileInputRef} type="file" accept=".csv,text/csv" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
+                <input ref={fileInputRef} type="file" accept=".csv,.zip,text/csv,application/zip" multiple className="hidden" onChange={(e) => handleFilesSelected(e.target.files)} />
                 <button
                   onClick={() => setStep('map')}
                   disabled={!allFilesHaveObjects}
