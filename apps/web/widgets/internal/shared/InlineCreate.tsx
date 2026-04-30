@@ -496,24 +496,29 @@ export function InlineCreateContact({
         </button>
       </div>
 
-      <div className="grid grid-cols-12 gap-1.5">
-        {salutations.values.length > 0 && (
-          <div className="col-span-3">
-            <FieldLabel>Sal.</FieldLabel>
-            <select
-              value={salutation}
-              onChange={e => setSalutation(e.target.value)}
-              disabled={saving || checking}
-              className={`${inputCls} w-full appearance-none`}
-            >
-              <option value="">—</option>
-              {salutations.values.map(v => (
-                <option key={v} value={v}>{v}</option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className={salutations.values.length > 0 ? 'col-span-4' : 'col-span-6'}>
+      {/* Salutation gets its own row so the First/Last grid is always 50/50 —
+       *  otherwise in narrow contexts (Slot widget columns) the select's intrinsic
+       *  min-width pushes the row past the container and the Last input gets
+       *  squeezed to ~0px wide and becomes effectively unclickable.
+       *  The `min-w-0` on each grid item lets them shrink below content size. */}
+      {salutations.values.length > 0 && (
+        <div className="w-1/3 min-w-[80px]">
+          <FieldLabel>Salutation</FieldLabel>
+          <select
+            value={salutation}
+            onChange={e => setSalutation(e.target.value)}
+            disabled={saving || checking}
+            className={`${inputCls} w-full appearance-none`}
+          >
+            <option value="">—</option>
+            {salutations.values.map(v => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-1.5">
+        <div className="min-w-0">
           <FieldLabel required>First</FieldLabel>
           <input
             value={firstName}
@@ -524,7 +529,7 @@ export function InlineCreateContact({
             className={`${inputCls} w-full`}
           />
         </div>
-        <div className={salutations.values.length > 0 ? 'col-span-5' : 'col-span-6'}>
+        <div className="min-w-0">
           <FieldLabel required>Last</FieldLabel>
           <input
             value={lastName}
@@ -538,7 +543,7 @@ export function InlineCreateContact({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        <div>
+        <div className="min-w-0">
           <FieldLabel required>Primary Email</FieldLabel>
           <input
             value={email}
@@ -550,7 +555,7 @@ export function InlineCreateContact({
             className={`${inputCls} w-full`}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <FieldLabel required>Primary Phone</FieldLabel>
           <input
             value={phone}
@@ -566,7 +571,7 @@ export function InlineCreateContact({
 
       <div className="grid grid-cols-2 gap-1.5">
         {contactTypes.values.length > 0 && (
-          <div>
+          <div className="min-w-0">
             <FieldLabel>Contact Type</FieldLabel>
             <select
               value={contactType}
@@ -582,7 +587,7 @@ export function InlineCreateContact({
           </div>
         )}
         {titles.values.length > 0 && (
-          <div>
+          <div className="min-w-0">
             <FieldLabel>Title</FieldLabel>
             <select
               value={title}
@@ -847,7 +852,7 @@ export function InlineCreateAccount({
       )}
 
       <div className="grid grid-cols-2 gap-1.5">
-        <div>
+        <div className="min-w-0">
           <FieldLabel>Primary Email</FieldLabel>
           <input
             value={email}
@@ -859,7 +864,7 @@ export function InlineCreateAccount({
             className={`${inputCls} w-full`}
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <FieldLabel>Primary Phone</FieldLabel>
           <input
             value={phone}
