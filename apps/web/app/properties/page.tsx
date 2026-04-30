@@ -502,23 +502,30 @@ export default function PropertiesPage() {
     try {
       // Create record via API
       const createdRecord = await recordsService.createRecord('Property', { data: recordData, pageLayoutId: layoutId || selectedLayoutId || undefined });
-      
+
       if (!createdRecord) {
         throw new Error('Failed to create record - null response');
       }
-      
-      // Close the form and reset state
-      setShowDynamicForm(false);
-      
-      // Refresh the list
+
+      // Refresh the list. Navigation + dialog-close happen in `onCreated` (see
+      // the DynamicFormDialog wiring below) — that callback fires AFTER the
+      // form has flushed any pending widget data (team-member-slot rows) via
+      // saveAllPending(parentRecordId). Returning the new id here is what
+      // tells DynamicForm.submitForm there's a parent to attach pending rows
+      // to. Closing the dialog inside this submit handler would unmount the
+      // form before the flush completes — see Bug #1 in PR description.
       await fetchProperties();
-      
-      // Redirect to the newly created property's detail page
-      router.push(`/properties/${createdRecord.id}`);
+
+      return String(createdRecord.id);
     } catch (error) {
       console.error('Failed to create property:', error);
       throw error;
     }
+  };
+
+  const handleDynamicFormCreated = (recordId: string) => {
+    setShowDynamicForm(false);
+    router.push(`/properties/${recordId}`);
   };
 
   const handleDeleteProperty = async (id: string) => {
@@ -948,6 +955,7 @@ export default function PropertiesPage() {
           layoutId={selectedLayoutId}
           recordData={prefillData}
           onSubmit={handleDynamicFormSubmit}
+          onCreated={handleDynamicFormCreated}
           title="New Property"
         />
       )}

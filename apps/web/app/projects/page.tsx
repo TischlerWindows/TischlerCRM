@@ -454,14 +454,22 @@ export default function ProjectsPage() {
 
       const updatedProjects = [newProject, ...projects];
       setProjects(updatedProjects);
-      
-      setShowDynamicForm(false);
-      setSelectedLayoutId(null);
-      router.push(`/projects/${result.id}`);
+
+      // Navigation + dialog-close happen in `onCreated` (see DynamicFormDialog
+      // wiring) — that callback fires AFTER the form has flushed any pending
+      // widget data (team-member-slot rows). Returning the new id tells
+      // DynamicForm.submitForm there's a parent to attach those rows to.
+      return String(result.id);
     } catch (error) {
       console.error('Failed to create project:', error);
       throw error;
     }
+  };
+
+  const handleDynamicFormCreated = (recordId: string) => {
+    setShowDynamicForm(false);
+    setSelectedLayoutId(null);
+    router.push(`/projects/${recordId}`);
   };
 
   const openOppPicker = useCallback(async () => {
@@ -992,7 +1000,17 @@ export default function ProjectsPage() {
           recordData={prefillData}
           initialLookupQueries={prefillLookupQueries}
           onSubmit={handleDynamicFormSubmit}
-          title={prefillData && Object.keys(prefillData).length > 0 ? 'New Project from Opportunity' : 'New Project'}
+          onCreated={handleDynamicFormCreated}
+          title={(() => {
+            const keys = prefillData ? Object.keys(prefillData) : [];
+            // Inspect prefill keys to detect the source (case-insensitive,
+            // accepts both URL-param style "PropertyId" and field-apiName
+            // style "Project__property" / "property").
+            const has = (frag: string) => keys.some(k => k.toLowerCase().includes(frag));
+            if (has('opportunity')) return 'New Project from Opportunity';
+            if (has('property')) return 'New Project from Property';
+            return 'New Project';
+          })()}
         />
       )}
 

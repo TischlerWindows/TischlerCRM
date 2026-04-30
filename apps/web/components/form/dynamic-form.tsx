@@ -1568,7 +1568,7 @@ export default function DynamicForm({
         {isWizardMode && !showReview && (
           <div className="flex items-center justify-between p-6 border-t bg-gray-50">
             <div className="text-sm text-gray-500">
-              Step {currentStep + 1} of {wizardSections.length}
+              Step {currentStep + 1} of {wizardSections.length + 1}
             </div>
             <div className="flex gap-3">
               {onCancel && currentStep === 0 && (

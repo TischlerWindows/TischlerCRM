@@ -861,12 +861,14 @@ export default function TeamMembersRollupWidget({ config, record, object }: Widg
   }
 
   // ── 5a: Supported object check (after all hooks) ──
+  // The rollup widget is for parent objects with TeamMember children
+  // (Property, Opportunity, Project, WorkOrder, Installation, Lead). When
+  // an admin has accidentally placed it on a Contact/Account layout, we
+  // render nothing rather than show a confusing dashed-border banner —
+  // those layouts already have the team-member-associations widget for the
+  // same purpose.
   if (!isSupported) {
-    return (
-      <div className="rounded-xl border border-dashed border-gray-200 p-6 text-xs text-brand-gray text-center">
-        Connections is not available for {object.label}.
-      </div>
-    )
+    return null
   }
 
   // ── Loading / Error ──
