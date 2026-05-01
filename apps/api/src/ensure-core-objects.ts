@@ -424,7 +424,7 @@ export async function ensureCoreObjects(): Promise<void> {
       await prisma.customField.updateMany({
         where: {
           objectId: contactObj.id,
-          apiName: { in: ['firstName', 'lastName', 'Contact__firstName', 'Contact__lastName'] },
+          apiName: { in: ['firstName', 'lastName', 'Contact__firstName', 'Contact__lastName', 'status', 'Contact__status'] },
           required: true,
         },
         data: { required: false },

@@ -1391,6 +1391,20 @@ export async function recordRoutes(app: FastifyInstance) {
           }
         }
 
+        // Apply defaultValues for any field that is missing from the row data.
+        // This covers system-managed fields like `status` (default: 'Active') that
+        // are not present in CSV exports from external systems.
+        for (const field of object.fields) {
+          if (field.defaultValue == null) continue;
+          const bare = field.apiName.replace(/^[A-Za-z]+__/, '');
+          const prefixed = `${apiName}__${field.apiName}`;
+          const hasVal = (v: any) => v !== undefined && v !== null;
+          if (!hasVal(normalizedData[field.apiName]) && !hasVal(normalizedData[bare]) && !hasVal(normalizedData[prefixed])) {
+            normalizedData[field.apiName] = field.defaultValue;
+            normalizedData[bare] = field.defaultValue;
+          }
+        }
+
         // Validate required fields
         const camelPrefix = apiName.charAt(0).toLowerCase() + apiName.slice(1);
         const missing = requiredFields.filter(f => {
