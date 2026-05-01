@@ -30,8 +30,29 @@ export interface PendingWidgetContextValue {
   unregisterWidget: (widgetId: string) => void
   /** Returns true if any registered widget has pending data */
   hasPendingData: () => boolean
+  /**
+   * Snapshot every widget that currently has pending data — used by the
+   * parent form's submit handler BEFORE awaiting the parent POST. While the
+   * parent POST awaits, the form may re-render and useEffect cleanups in
+   * pending widgets (e.g. PendingTeamMemberPoolProvider) can fire and
+   * unregister the widget before we ever get to flush its rows. Capturing
+   * the registration objects synchronously up-front lets the form save
+   * them after the await regardless of what happened to the registrations
+   * map in between — the closures still point at live React refs for the
+   * underlying row state.
+   */
+  snapshotPendingWidgets: () => PendingWidgetRegistration[]
   /** Save all pending widget data — called after parent record is created */
   saveAllPending: (parentRecordId: string) => Promise<PendingWidgetSaveResult>
+  /**
+   * Save a previously-captured snapshot of widgets. Useful when the parent
+   * snapshot-ed widgets BEFORE its own awaited POST and wants to flush them
+   * after, immune to any mid-await unregistration.
+   */
+  saveSnapshot: (
+    widgets: PendingWidgetRegistration[],
+    parentRecordId: string,
+  ) => Promise<PendingWidgetSaveResult>
 }
 
 // ── Context ──────────────────────────────────────────────────────────────
@@ -71,20 +92,47 @@ export function usePendingWidgetManager(
     return false
   }, [])
 
-  const saveAllPending = useCallback(async (parentRecordId: string): Promise<PendingWidgetSaveResult> => {
-    const errors: string[] = []
+  const snapshotPendingWidgets = useCallback((): PendingWidgetRegistration[] => {
+    const out: PendingWidgetRegistration[] = []
     for (const reg of registrationsRef.current.values()) {
-      if (!reg.hasPendingData()) continue
-      try {
-        await reg.savePendingData(parentRecordId)
-      } catch (err) {
-        const message = err instanceof Error ? err.message : `Failed to save ${reg.getPendingSummary()}`
-        errors.push(message)
-        console.error(`[PendingWidgetContext] Failed to save pending data for widget "${reg.widgetId}":`, err)
-      }
+      if (reg.hasPendingData()) out.push(reg)
     }
-    return { success: errors.length === 0, errors }
+    return out
   }, [])
+
+  const saveSnapshot = useCallback(
+    async (
+      widgets: PendingWidgetRegistration[],
+      parentRecordId: string,
+    ): Promise<PendingWidgetSaveResult> => {
+      const errors: string[] = []
+      for (const reg of widgets) {
+        // hasPendingData re-check: if the widget already flushed (e.g. user
+        // raced two save paths) we shouldn't re-POST.
+        if (!reg.hasPendingData()) continue
+        try {
+          await reg.savePendingData(parentRecordId)
+        } catch (err) {
+          const message =
+            err instanceof Error ? err.message : `Failed to save ${reg.getPendingSummary()}`
+          errors.push(message)
+          console.error(
+            `[PendingWidgetContext] Failed to save pending data for widget "${reg.widgetId}":`,
+            err,
+          )
+        }
+      }
+      return { success: errors.length === 0, errors }
+    },
+    [],
+  )
+
+  const saveAllPending = useCallback(
+    async (parentRecordId: string): Promise<PendingWidgetSaveResult> => {
+      return saveSnapshot(Array.from(registrationsRef.current.values()), parentRecordId)
+    },
+    [saveSnapshot],
+  )
 
   const contextValue = useMemo<PendingWidgetContextValue>(
     () => ({
@@ -93,12 +141,23 @@ export function usePendingWidgetManager(
       registerWidget,
       unregisterWidget,
       hasPendingData,
+      snapshotPendingWidgets,
       saveAllPending,
+      saveSnapshot,
     }),
-    [isCreateMode, parentObjectApiName, registerWidget, unregisterWidget, hasPendingData, saveAllPending],
+    [
+      isCreateMode,
+      parentObjectApiName,
+      registerWidget,
+      unregisterWidget,
+      hasPendingData,
+      snapshotPendingWidgets,
+      saveAllPending,
+      saveSnapshot,
+    ],
   )
 
-  return { contextValue, hasPendingData, saveAllPending }
+  return { contextValue, hasPendingData, snapshotPendingWidgets, saveAllPending, saveSnapshot }
 }
 
 // ── Provider (wraps children with the context) ──────────────────────────
