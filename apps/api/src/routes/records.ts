@@ -1362,13 +1362,18 @@ export async function recordRoutes(app: FastifyInstance) {
     for (let i = 0; i < rows.length; i++) {
       try {
         const rawData = rows[i]!;
-        // Capture the original SF id before normalisation (used for idMap)
-        const originalSfId = sfIdField ? (rawData[sfIdField] ?? rawData['Id'] ?? rawData['id']) : (rawData['Id'] ?? rawData['id']);
+        // Capture the original SF id before normalisation (used for idMap).
+        // The frontend strips the SF Id column from the mapped record and instead
+        // injects it as __sfId so it is always available regardless of column name.
+        const originalSfId =
+          rawData['__sfId'] ??
+          (sfIdField ? (rawData[sfIdField] ?? rawData['Id'] ?? rawData['id']) : (rawData['Id'] ?? rawData['id']));
         const sfIdValue = originalSfId ? String(originalSfId) : null;
 
-        // Normalize keys
+        // Normalize keys, excluding the internal __sfId sentinel
         const normalizedData: Record<string, any> = {};
         for (const [key, value] of Object.entries(rawData)) {
+          if (key === '__sfId') continue; // internal sentinel — never stored
           if (value === '' || value === null || value === undefined) continue; // skip empty
           normalizedData[key] = value;
           const stripped = key.replace(/^[A-Za-z]+__/, '');
