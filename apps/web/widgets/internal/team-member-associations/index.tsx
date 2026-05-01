@@ -899,12 +899,12 @@ export default function TeamMemberAssociationsWidget({ config, record, object }:
   }, [])
 
   // ── Unsupported object ──
+  // Render nothing when placed on an object the widget doesn't support —
+  // matches team-members-rollup's behavior to avoid showing a confusing
+  // "not available" banner to end users when admins place the widget on
+  // a layout where it can't render meaningful data.
   if (!isSupported) {
-    return (
-      <div className="rounded-xl border border-dashed border-gray-200 p-6 text-xs text-brand-gray text-center">
-        Connections is not available for {object.label}.
-      </div>
-    )
+    return null
   }
 
   if (loading && propertyGroups.length === 0 && flatTiles.length === 0) return <Skeleton />

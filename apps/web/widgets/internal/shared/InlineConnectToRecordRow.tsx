@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
-  X, ChevronDown, UserCircle, Building2,
+  X, UserCircle, Building2,
   Home, Target, Briefcase, Wrench, Truck, Megaphone,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -12,6 +12,7 @@ import {
   rememberRoleForObject,
   getLastRoleForObject,
 } from '@/lib/connection-recents'
+import { RolePicker } from './RolePicker'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -506,20 +507,12 @@ export function InlineConnectToRecordRow({
 
       {/* Role + flag toggles */}
       <div className="flex items-center flex-wrap gap-2">
-        <div className="relative">
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            disabled={saving}
-            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy focus-visible:ring-2 focus-visible:ring-brand-navy/20 appearance-none"
-          >
-            <option value="">Role…</option>
-            {roleValues.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-3 h-3 text-brand-gray absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
+        <RolePicker
+          value={role}
+          onChange={setRole}
+          roleValues={roleValues}
+          disabled={saving}
+        />
 
         <FlagToggle label="Primary" pressed={primary} onChange={setPrimary} disabled={saving} />
         <FlagToggle label="Contract" pressed={contractHolder} onChange={setContractHolder} disabled={saving} />

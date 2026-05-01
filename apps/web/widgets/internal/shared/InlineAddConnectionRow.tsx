@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Plus, X, UserCircle, Building2, ChevronDown } from 'lucide-react'
+import { Plus, X, UserCircle, Building2 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/lib/connection-recents'
 import { getRecordName } from './recordName'
 import { InlineCreateContact, InlineCreateAccount } from './InlineCreate'
+import { RolePicker } from './RolePicker'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -682,22 +683,14 @@ export function InlineAddConnectionRow({
         </div>
       )}
 
-      {/* Role + flag toggles */}
+      {/* Role quick-picks + flag toggles */}
       <div className="flex items-center flex-wrap gap-2">
-        <div className="relative">
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            disabled={disabled || saving}
-            className="h-8 pl-2 pr-7 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-brand-dark text-xs text-brand-dark dark:text-gray-100 outline-none focus:border-brand-navy focus-visible:ring-2 focus-visible:ring-brand-navy/20 appearance-none"
-          >
-            <option value="">Role…</option>
-            {roleValues.map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-          <ChevronDown className="w-3 h-3 text-brand-gray absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
+        <RolePicker
+          value={role}
+          onChange={setRole}
+          roleValues={roleValues}
+          disabled={disabled || saving}
+        />
 
         <FlagToggle label="Primary" pressed={primary} onChange={setPrimary} disabled={disabled || saving} />
         <FlagToggle label="Contract" pressed={contractHolder} onChange={setContractHolder} disabled={disabled || saving} />
