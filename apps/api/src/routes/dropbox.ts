@@ -530,6 +530,43 @@ function deriveDropboxFolderName(recordData: Record<string, any>, recordId: stri
     }
   }
 
+  // Special case for Contact: format as "FirstName LastName (CT####)"
+  if (objectApiName === 'Contact') {
+    // Helper: strip prefix like "Contact__name_" and normalise to lowercase
+    const stripSubPrefix = (k: string) => k.replace(/^[A-Za-z]+__[A-Za-z]+_/, '').toLowerCase();
+    const stripObjPrefix = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase();
+    const getNamePart = (obj: Record<string, any>, field: string): string => {
+      for (const [k, v] of Object.entries(obj)) {
+        if (
+          (stripSubPrefix(k) === field || stripObjPrefix(k) === field) &&
+          typeof v === 'string' && v && !/^n\/a$/i.test(v.trim())
+        ) return v;
+      }
+      return '';
+    };
+
+    // The CompositeText name field may be stored as a nested object under a key
+    // ending in '__name' (e.g. Contact__name), or its sub-fields may be flat keys.
+    const nameKey = Object.keys(recordData).find(
+      (k) => k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name'),
+    );
+    const nameObj =
+      nameKey && recordData[nameKey] && typeof recordData[nameKey] === 'object'
+        ? (recordData[nameKey] as Record<string, any>)
+        : null;
+
+    const firstName =
+      getNamePart(recordData, 'firstname') || (nameObj ? getNamePart(nameObj, 'firstname') : '');
+    const lastName =
+      getNamePart(recordData, 'lastname') || (nameObj ? getNamePart(nameObj, 'lastname') : '');
+
+    const personName = [firstName, lastName].filter(Boolean).join(' ').trim();
+    if (personName && autoNumber) return `${personName} (${autoNumber})`;
+    if (personName) return personName;
+    if (autoNumber) return autoNumber;
+    return recordId;
+  }
+
   // Special case for Lead: format as "Lead#### (Contact Name) M-D-YY"
   // Note: contact name resolution from the DB is done async by callers;
   // this sync path uses whatever pre-resolved name was injected into recordData._resolvedContactName.

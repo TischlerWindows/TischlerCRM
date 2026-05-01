@@ -75,6 +75,41 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
     }
   }
 
+  // Special case for Contact: format as "FirstName LastName (CT####)"
+  if (objectApiName?.toLowerCase() === 'contact') {
+    const stripSubPrefix = (k: string) => k.replace(/^[A-Za-z]+__[A-Za-z]+_/, '').toLowerCase()
+    const stripObjPrefix = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
+    const getNamePart = (obj: Record<string, unknown>, field: string): string => {
+      for (const [k, v] of Object.entries(obj)) {
+        if (
+          (stripSubPrefix(k) === field || stripObjPrefix(k) === field) &&
+          typeof v === 'string' && v && !/^n\/a$/i.test(v.trim())
+        ) return v
+      }
+      return ''
+    }
+
+    // CompositeText name may be a nested object under a key ending in '__name'
+    const nameKey = Object.keys(record).find(
+      (k) => k.toLowerCase() === 'name' || k.toLowerCase().endsWith('__name'),
+    )
+    const nameObj =
+      nameKey && record[nameKey] && typeof record[nameKey] === 'object'
+        ? (record[nameKey] as Record<string, unknown>)
+        : null
+
+    const firstName =
+      getNamePart(record, 'firstname') || (nameObj ? getNamePart(nameObj, 'firstname') : '')
+    const lastName =
+      getNamePart(record, 'lastname') || (nameObj ? getNamePart(nameObj, 'lastname') : '')
+
+    const personName = [firstName, lastName].filter(Boolean).join(' ').trim()
+    if (personName && autoNumber) return `${personName} (${autoNumber})`
+    if (personName) return personName
+    if (autoNumber) return autoNumber
+    return id
+  }
+
   // Special case for Lead: format as "Lead#### (Contact Name) M-D-YY"
   if (objectApiName?.toLowerCase() === 'lead') {
     // Reformat number: LEAD0001 → Lead0001
