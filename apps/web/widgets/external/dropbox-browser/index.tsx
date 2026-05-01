@@ -104,8 +104,21 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
       getNamePart(record, 'lastname') || (nameObj ? getNamePart(nameObj, 'lastname') : '')
 
     const personName = [firstName, lastName].filter(Boolean).join(' ').trim()
-    if (autoNumber && personName) return `${autoNumber} (${personName})`
-    if (autoNumber) return autoNumber
+
+    // Directly resolve the contact number — prefer the generic autoNumber already
+    // computed above, but also do a targeted scan for 'contactnumber' keys in case
+    // the generic path came up empty (e.g. the key wasn't found before disambiguation).
+    let contactNum = autoNumber
+    if (!contactNum) {
+      const sk = (k: string) => k.replace(/^[A-Za-z]+__/, '').toLowerCase()
+      const cnKey = Object.keys(record).find(
+        (k) => sk(k) === 'contactnumber' && typeof record[k] === 'string' && record[k],
+      )
+      if (cnKey) contactNum = record[cnKey] as string
+    }
+
+    if (contactNum && personName) return `${contactNum} (${personName})`
+    if (contactNum) return contactNum
     if (personName) return personName
     return id
   }
