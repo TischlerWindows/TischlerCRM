@@ -125,6 +125,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     staticUrl: '',
     targetFields: {} as Record<string, string>,
     displayFields: [] as string[],
+    subFields: [] as Array<{ apiName: string; label: string; type: string }>,
   });
 
   let fields: FieldDef[] = schema?.objects.find((o) => o.apiName === objectApiName)?.fields ?? [];
@@ -160,6 +161,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
     setFormData({
       ...formData,
       type,
+      subFields: type === 'CompositeText' ? formData.subFields : [],
       picklistValues: type === 'Picklist' || type === 'MultiSelectPicklist' || type === 'PicklistText' || type === 'PicklistLookup' || type === 'DropdownWithCustom' ? formData.picklistValues : [],
       lookupObject: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup' || type === 'LookupFields') ? formData.lookupObject : (type === 'LookupUser' ? 'User' : ''),
       lookupField: (type === 'Lookup' || type === 'ExternalLookup' || type === 'PicklistLookup') ? formData.lookupField : '',
@@ -200,6 +202,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       staticUrl: '',
       targetFields: {},
       displayFields: [],
+      subFields: [],
     });
   };
 
@@ -235,6 +238,7 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       staticUrl: cloned.staticUrl || '',
       targetFields: cloned.targetFields ? { ...cloned.targetFields } : {},
       displayFields: (cloned as any).displayFields ? [...(cloned as any).displayFields] : [],
+      subFields: cloned.subFields ? cloned.subFields.map(sf => ({ ...sf })) : [],
     });
     setShowCreateDialog(true);
   };
@@ -331,6 +335,9 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
       if (Object.keys(cleaned).length > 0) {
         newField.targetFields = cleaned as FieldDef['targetFields'];
       }
+    }
+    if (t === 'CompositeText') {
+      (newField as any).subFields = formData.subFields.filter(sf => sf.label.trim() && sf.apiName.trim());
     }
 
     if (editingField) {
@@ -1230,7 +1237,77 @@ export default function FieldsRelationships({ objectApiName }: FieldsRelationshi
                     );
                   })()}
 
-                  {selectedType !== 'Formula' && selectedType !== 'RollupSummary' && selectedType !== 'AutoNumber' && selectedType !== 'LocationSearch' && (
+                  {selectedType === 'CompositeText' && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Sub-Fields</h4>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Define the individual fields that make up this compound field. Each sub-field is stored and imported separately.
+                      </p>
+                      <div className="space-y-2">
+                        {formData.subFields.map((sf, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <Input
+                              value={sf.label}
+                              onChange={(e) => {
+                                const label = e.target.value;
+                                const apiName = sf.apiName || `${formData.apiName}_${label.replace(/\s+/g, '_').toLowerCase()}`;
+                                const updated = formData.subFields.map((s, i) =>
+                                  i === idx ? { ...s, label, apiName: s.apiName || apiName } : s
+                                );
+                                setFormData({ ...formData, subFields: updated });
+                              }}
+                              placeholder="Label (e.g. First Name)"
+                              className="flex-1"
+                            />
+                            <Input
+                              value={sf.apiName}
+                              onChange={(e) => {
+                                const updated = formData.subFields.map((s, i) =>
+                                  i === idx ? { ...s, apiName: e.target.value } : s
+                                );
+                                setFormData({ ...formData, subFields: updated });
+                              }}
+                              placeholder="API Name"
+                              className="flex-1 font-mono text-xs"
+                            />
+                            <select
+                              value={sf.type}
+                              onChange={(e) => {
+                                const updated = formData.subFields.map((s, i) =>
+                                  i === idx ? { ...s, type: e.target.value } : s
+                                );
+                                setFormData({ ...formData, subFields: updated });
+                              }}
+                              className="px-2 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-navy/40"
+                            >
+                              <option value="Text">Text</option>
+                              <option value="Picklist">Picklist</option>
+                              <option value="Number">Number</option>
+                              <option value="Date">Date</option>
+                              <option value="Email">Email</option>
+                              <option value="Phone">Phone</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setFormData({ ...formData, subFields: formData.subFields.filter((_, i) => i !== idx) })}
+                              className="text-red-400 hover:text-red-600 px-1"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, subFields: [...formData.subFields, { label: '', apiName: '', type: 'Text' }] })}
+                        className="mt-2 text-sm text-brand-navy hover:text-brand-dark font-medium flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Sub-Field
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedType !== 'Formula' && selectedType !== 'RollupSummary' && selectedType !== 'AutoNumber' && selectedType !== 'LocationSearch' && selectedType !== 'CompositeText' && (
                     <div>
                       <Label htmlFor="defaultValue">Default Value</Label>
                       <Input
