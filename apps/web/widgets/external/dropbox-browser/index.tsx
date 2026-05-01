@@ -104,9 +104,9 @@ function deriveDropboxFolderName(record: Record<string, unknown>, objectApiName?
       getNamePart(record, 'lastname') || (nameObj ? getNamePart(nameObj, 'lastname') : '')
 
     const personName = [firstName, lastName].filter(Boolean).join(' ').trim()
-    if (personName && autoNumber) return `${personName} (${autoNumber})`
-    if (personName) return personName
+    if (autoNumber && personName) return `${autoNumber} (${personName})`
     if (autoNumber) return autoNumber
+    if (personName) return personName
     return id
   }
 
