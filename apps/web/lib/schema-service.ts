@@ -2624,7 +2624,7 @@ class LocalStorageSchemaService implements SchemaService {
           apiName: 'Account__accountType',
           label: 'Account Type',
           type: 'Picklist',
-          picklistValues: ['General Contractor', 'Sub-Contractor', 'Property Management', 'Developer', 'Consultant', 'Supplier', 'Government', 'Non-Profit', 'Other']
+          picklistValues: ['Customer', 'Homeowner', 'Architect Firm', 'General Contractor', 'Sub-Contractor', 'Property Management', 'Developer', 'Consultant', 'Supplier', 'Government', 'Non-Profit', 'Other']
         },
         {
           id: generateId(),

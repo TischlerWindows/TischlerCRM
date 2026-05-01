@@ -25,7 +25,7 @@
  *     create button activates.
  */
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, AlertTriangle, UserCircle, Building2, X } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
@@ -338,6 +338,18 @@ export function InlineCreateContact({
   const [duplicates, setDuplicates] = useState<DuplicateMatch[] | null>(null)
   const [overrideDuplicates, setOverrideDuplicates] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Linked-account state: defaults to the `accountId` prop (slot context),
+  // but the user can clear it (creating a standalone contact) or pick a
+  // different existing account via the inline picker. Tracking the chosen
+  // account in component state — instead of using the prop directly — is
+  // what lets the user override.
+  const [linkedAccountId, setLinkedAccountId] = useState<string | null>(accountId ?? null)
+  // Reset to the prop whenever the surrounding slot context changes, but only
+  // before the form is opened — once the user is editing, their override wins
+  // until they cancel/save.
+  useEffect(() => {
+    if (!open) setLinkedAccountId(accountId ?? null)
+  }, [accountId, open])
 
   // Salutation is a sub-field of the composite Contact__name and isn't
   // exposed as a standalone schema field. Hardcoded values match the
@@ -362,6 +374,7 @@ export function InlineCreateContact({
     setError(null)
     setDuplicates(null)
     setOverrideDuplicates(false)
+    setLinkedAccountId(accountId ?? null)
   }
 
   function handleCancel() {
@@ -372,10 +385,19 @@ export function InlineCreateContact({
   function validate(): string | null {
     if (!firstName.trim()) return 'First name is required.'
     if (!lastName.trim()) return 'Last name is required.'
-    if (!email.trim()) return 'Email is required — every contact needs one.'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Email looks invalid.'
-    if (!phone.trim()) return 'Phone is required — every contact needs one.'
-    if (normalizePhone(phone).length < 7) return 'Phone looks too short.'
+    // Match the parent New Organization rule: email OR phone — at least
+    // one way to reach the contact. Previously both were `*` required, which
+    // contradicted the org-level rule and forced QA testers / sales users
+    // through extra friction.
+    if (!email.trim() && !phone.trim()) {
+      return 'Email or phone is required — at least one way to reach them.'
+    }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return 'Email looks invalid.'
+    }
+    if (phone.trim() && normalizePhone(phone).length < 7) {
+      return 'Phone looks too short.'
+    }
     return null
   }
 
@@ -440,9 +462,12 @@ export function InlineCreateContact({
         lastName: lastName.trim(),
         name: compositeInner,
         status: statusDefault,
-        primaryEmail: email.trim(),
-        primaryPhone: phone.trim(),
       }
+      // Email and phone are now individually optional (one of the two is
+      // required at validation time). Only send the field when the user
+      // filled it so we don't store empty strings.
+      if (email.trim()) payload.primaryEmail = email.trim()
+      if (phone.trim()) payload.primaryPhone = phone.trim()
       if (salutation) payload.salutation = salutation
       if (contactType) payload.contactType = contactType
       if (title) payload.title = title
@@ -450,9 +475,11 @@ export function InlineCreateContact({
       // ID-suffix convention), not `account`. Send both so the create works
       // whether the live schema has been migrated or not — the API just stores
       // whatever keys are in `data`, and the read path looks up `AccountId`.
-      if (accountId) {
-        payload.AccountId = accountId
-        payload.account = accountId
+      // The id comes from `linkedAccountId` state (default: prop) so users can
+      // override the slot's implicit org or clear it entirely.
+      if (linkedAccountId) {
+        payload.AccountId = linkedAccountId
+        payload.account = linkedAccountId
       }
       const created = await apiClient.post<Record<string, unknown>>(
         '/objects/Contact/records',
@@ -549,9 +576,18 @@ export function InlineCreateContact({
         </div>
       </div>
 
+      <div className="min-w-0">
+        <FieldLabel>Account</FieldLabel>
+        <AccountInlinePicker
+          value={linkedAccountId}
+          onChange={setLinkedAccountId}
+          disabled={saving || checking}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-1.5">
         <div className="min-w-0">
-          <FieldLabel required>Primary Email</FieldLabel>
+          <FieldLabel>Primary Email</FieldLabel>
           <input
             value={email}
             onChange={e => setEmail(e.target.value)}
@@ -563,7 +599,7 @@ export function InlineCreateContact({
           />
         </div>
         <div className="min-w-0">
-          <FieldLabel required>Primary Phone</FieldLabel>
+          <FieldLabel>Primary Phone</FieldLabel>
           <input
             value={phone}
             onChange={e => setPhone(e.target.value)}
@@ -575,6 +611,9 @@ export function InlineCreateContact({
           />
         </div>
       </div>
+      <p className="text-[10px] text-brand-gray -mt-1.5">
+        Email or phone required <span className="text-red-500">*</span> — at least one way to reach them.
+      </p>
 
       <div className="grid grid-cols-2 gap-1.5">
         {contactTypes.values.length > 0 && (
@@ -651,6 +690,139 @@ export function InlineCreateContact({
           Cancel
         </button>
       </div>
+    </div>
+  )
+}
+
+// ── AccountInlinePicker ────────────────────────────────────────────────
+
+/**
+ * Compact inline account picker used by InlineCreateContact so the user can
+ * link the new contact to a different (or no) Account, even when the form
+ * was opened from a slot that pre-selected one. Two visual states:
+ *
+ * - **Selected** — chip-style display of the chosen account name + an "X"
+ *   to clear (back to no-account-selected).
+ * - **Empty** — search input with a dropdown of matching accounts; cached
+ *   to a 200-record fetch on first focus, then filtered client-side.
+ */
+function AccountInlinePicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | null
+  onChange: (id: string | null) => void
+  disabled?: boolean
+}) {
+  const [resolvedName, setResolvedName] = useState('')
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const accountsRef = useRef<Record<string, unknown>[] | null>(null)
+  const [tick, setTick] = useState(0)
+
+  // Resolve display name for a pre-selected (prop-supplied) accountId so
+  // the chip renders something more useful than the raw id while we wait
+  // for the cache to populate.
+  useEffect(() => {
+    if (!value) {
+      setResolvedName('')
+      return
+    }
+    let cancelled = false
+    apiClient
+      .get<Record<string, unknown>>(`/objects/Account/records/${value}`)
+      .then(rec => {
+        if (cancelled) return
+        const inner = rec && typeof rec === 'object' && 'data' in rec && rec.data && typeof rec.data === 'object'
+          ? (rec.data as Record<string, unknown>)
+          : (rec as Record<string, unknown>)
+        const flat = { id: (rec as { id?: unknown }).id, ...inner } as Record<string, unknown>
+        setResolvedName(getRecordName(flat))
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedName('')
+      })
+    return () => { cancelled = true }
+  }, [value])
+
+  async function ensureList() {
+    if (accountsRef.current) return
+    try {
+      const data = await apiClient.get<Record<string, unknown>[]>(
+        '/objects/Account/records?limit=200',
+      )
+      accountsRef.current = Array.isArray(data) ? flatten(data) : []
+    } catch {
+      accountsRef.current = []
+    }
+    setTick(t => t + 1)
+  }
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-1.5 px-2 h-8 bg-brand-navy/5 border border-brand-navy/20 dark:border-brand-navy/40 rounded">
+        <Building2 className="w-3.5 h-3.5 text-brand-navy shrink-0" aria-hidden />
+        <span className="text-xs text-brand-dark dark:text-gray-100 truncate flex-1">
+          {resolvedName || 'Loading…'}
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          disabled={disabled}
+          aria-label="Clear account"
+          className="text-brand-gray hover:text-red-500 disabled:opacity-50"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    )
+  }
+
+  const matches = (() => {
+    const list = accountsRef.current ?? []
+    if (!query.trim()) return list.slice(0, 8)
+    const needle = query.trim().toLowerCase()
+    return list.filter(r => getRecordName(r).toLowerCase().includes(needle)).slice(0, 8)
+  })()
+
+  return (
+    <div className="relative">
+      <input
+        value={query}
+        onChange={e => { setQuery(e.target.value); void ensureList(); setOpen(true) }}
+        onFocus={() => { void ensureList(); setOpen(true) }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        disabled={disabled}
+        placeholder="Search account or leave blank"
+        aria-label="Account"
+        className={`${inputCls} w-full`}
+      />
+      {open && matches.length > 0 && (
+        <div
+          // tick is read so eslint sees the dep; the list is sourced from
+          // accountsRef which is mutated after the fetch completes
+          data-tick={tick}
+          className="absolute top-full left-0 right-0 mt-0.5 bg-white dark:bg-brand-dark border border-gray-200 dark:border-gray-700 rounded shadow-lg z-10 max-h-48 overflow-auto"
+        >
+          {matches.map(m => (
+            <button
+              key={String(m.id)}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                onChange(String(m.id))
+                setQuery('')
+                setOpen(false)
+              }}
+              className="w-full flex items-center gap-1.5 text-left px-2 py-1.5 text-xs text-brand-dark dark:text-gray-100 hover:bg-brand-navy/5"
+            >
+              <Building2 className="w-3 h-3 text-brand-gray shrink-0" aria-hidden />
+              <span className="truncate">{getRecordName(m)}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -87,6 +87,28 @@ export function SlotInput({
   const [pendingRole, setPendingRole] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Pre-fill pendingRole on flag-bound slots so the user doesn't have to
+  // pick a role on every save. The slot's flag (e.g. "primaryContact") IS
+  // its purpose; the underlying TeamMember.role field is required by schema
+  // but is conceptually orthogonal to the flag. Default to the most common
+  // role for each flag — user can still change it via the dropdown.
+  // Role-bound slots already infer their role from the criterion at fillSlot
+  // time and don't show this dropdown at all.
+  useEffect(() => {
+    if (criterion.kind !== 'flag') return
+    if (pendingRole) return
+    if (roleValues.length === 0) return
+    const flagDefault: Record<string, string> = {
+      primaryContact: 'Homeowner',
+      contractHolder: 'Property Manager',
+      quoteRecipient: 'Other',
+    }
+    const pick = flagDefault[criterion.flag]
+    if (pick && roleValues.includes(pick)) {
+      setPendingRole(pick)
+    }
+  }, [criterion, roleValues, pendingRole])
   // Paired-mode: user explicitly opts out of an Account so the Contact picker
   // searches all contacts globally. Stays false otherwise so the Account picker
   // is the only entry point and the Contact picker is gated behind a selection.
