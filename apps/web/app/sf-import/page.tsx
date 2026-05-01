@@ -242,16 +242,18 @@ export default function SalesforceImportPage() {
               ? crmObjects.find((o) => o.apiName === detectedObject)
               : undefined;
 
-            const columnMapping = objectDef
+            const rawMapping = objectDef
               ? autoMap(headers, objectDef, detectedObject!)
               : {};
+            // SF Id column is used as a cross-reference key, not imported as a field
+            if (sfIdColumn) delete rawMapping[sfIdColumn];
 
             resolve({
               file,
               headers,
               rows,
               detectedObject,
-              columnMapping,
+              columnMapping: rawMapping,
               sfIdColumn,
             });
           },
@@ -333,7 +335,9 @@ export default function SalesforceImportPage() {
       entry.detectedObject = objectApiName;
       const objectDef = crmObjects.find((o) => o.apiName === objectApiName);
       if (objectDef) {
-        entry.columnMapping = autoMap(entry.headers, objectDef, objectApiName);
+        const mapping = autoMap(entry.headers, objectDef, objectApiName);
+        if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
+        entry.columnMapping = mapping;
       }
       updated[idx] = entry;
       return updated;
@@ -343,7 +347,12 @@ export default function SalesforceImportPage() {
   const updateSfIdColumn = (idx: number, col: string) => {
     setFiles((prev) => {
       const updated = [...prev];
-      updated[idx] = { ...updated[idx]!, sfIdColumn: col };
+      const entry = { ...updated[idx]! };
+      // Clear mapping for old and new SF Id column — neither should import as a field
+      const mapping = { ...entry.columnMapping };
+      if (entry.sfIdColumn) delete mapping[entry.sfIdColumn];
+      delete mapping[col];
+      updated[idx] = { ...entry, sfIdColumn: col, columnMapping: mapping };
       return updated;
     });
   };
