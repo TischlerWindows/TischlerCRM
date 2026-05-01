@@ -29,6 +29,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, AlertTriangle, UserCircle, Building2, X } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
+import { upsertLookupCacheRecord } from '@/lib/utils'
 import { getRecordName } from './recordName'
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -487,6 +488,12 @@ export function InlineCreateContact({
       )
       const id = String((created as { id?: unknown }).id ?? '')
       if (!id) throw new Error('Server did not return a contact id.')
+      // Seed the global lookup cache with the new record so every read-side
+      // renderer (SlotInput pills, team-member-slot bound rows, lookup
+      // search dropdowns, etc.) finds it on the next render — otherwise
+      // resolveLookupDisplayName falls back to the raw id and the user sees
+      // "002BCfb…" until the periodic 30s cache refresh fires.
+      upsertLookupCacheRecord('Contact', { id, ...payload })
       const display = `${firstName.trim()} ${lastName.trim()}`.trim()
       onCreated(id, display || email.trim())
       reset()
@@ -958,6 +965,10 @@ export function InlineCreateAccount({
       )
       const id = String((created as { id?: unknown }).id ?? '')
       if (!id) throw new Error('Server did not return an account id.')
+      // Seed the global lookup cache so the parent slot's account pill (and
+      // any team-member-slot bound row that names this account) renders the
+      // accountName instead of the raw id on the next render.
+      upsertLookupCacheRecord('Account', { id, ...payload })
       onCreated(id, accountName.trim())
       reset()
       setOpen(false)

@@ -78,6 +78,10 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
   const addRow = useCallback((data: Record<string, unknown>) => {
     const id = `pending-tm-${Date.now()}-${Math.random().toString(36).slice(2)}`
     setRows(prev => [...prev, { id, data }])
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[PendingTeamMemberPool] addRow', { id, data })
+    }
     return id
   }, [])
 
@@ -131,6 +135,15 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
         const parentField = OBJECT_TO_FIELD[parentObjectApiName]
         if (!parentField) throw new Error(`No TeamMember FK field for ${parentObjectApiName}`)
 
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('[PendingTeamMemberPool] savePendingData start', {
+            parentObjectApiName,
+            parentField,
+            parentRecordId,
+            rowCount: rowsRef.current.length,
+          })
+        }
         for (const row of rowsRef.current) {
           await apiClient.post('/objects/TeamMember/records', {
             data: {
@@ -138,6 +151,10 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
               [parentField]: parentRecordId,
             },
           })
+        }
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('[PendingTeamMemberPool] savePendingData done')
         }
       },
       getPendingSummary: () => `${rowsRef.current.length} connection(s)`,

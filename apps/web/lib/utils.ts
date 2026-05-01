@@ -27,6 +27,24 @@ export function seedLookupCache(objectType: string, records: any[]): void {
   lookupCache[objectType] = records;
 }
 
+/**
+ * Upsert a single record into the global lookup cache. Used after inline-create
+ * so resolveLookupDisplayName finds the new record on the very next render
+ * instead of returning the raw id while the background fetch completes.
+ */
+export function upsertLookupCacheRecord(objectType: string, record: any): void {
+  if (!record || !record.id) return;
+  const existing = lookupCache[objectType] ?? [];
+  const idx = existing.findIndex((r: any) => String(r.id) === String(record.id));
+  if (idx >= 0) {
+    const next = existing.slice();
+    next[idx] = { ...existing[idx], ...record };
+    lookupCache[objectType] = next;
+  } else {
+    lookupCache[objectType] = [...existing, record];
+  }
+}
+
 async function getLookupRecords(objectType: string): Promise<any[]> {
   // Clear cache periodically
   if (Date.now() - lastCacheClear > CACHE_TTL) {
