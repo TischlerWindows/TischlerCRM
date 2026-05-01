@@ -3131,7 +3131,7 @@ export default function SummaryPage() {
                           }
                           // Lift and Roll
                           if (lo.includes('lift') || lo.includes('roll')) {
-                            return ['Standard RH', 'SS RH'];
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
                           }
                           return ['72mm Thick Sash', '90mm Thick Sash'];
                         };
