@@ -2086,6 +2086,56 @@ export async function dropboxRoutes(app: FastifyInstance) {
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
+    // ── For Contact records missing a contactNumber (e.g. SF imports), generate one now ──
+    // This ensures the Dropbox folder gets a unique name even when multiple contacts
+    // share the same full name, avoiding 409 conflicts and un-numbered folder names.
+    if (objectApiName === 'Contact') {
+      try {
+        const contactObj = await prisma.customObject.findFirst({
+          where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
+        });
+        if (contactObj) {
+          const contactRecord = await prisma.record.findFirst({
+            where: { id: recordId, objectId: contactObj.id },
+          });
+          if (contactRecord) {
+            const cData = contactRecord.data as Record<string, any>;
+            // Check if contactNumber is absent at both bare and prefixed keys
+            const hasContactNumber = Object.entries(cData).some(([k, v]) => {
+              const bare = k.replace(/^[A-Za-z]+__/, '').toLowerCase();
+              return bare === 'contactnumber' && typeof v === 'string' && v;
+            });
+            if (!hasContactNumber) {
+              // Generate the next contact number: find max across all Contact records
+              const allContactRecs = await prisma.record.findMany({
+                where: { objectId: contactObj.id, deletedAt: null },
+                select: { data: true },
+              });
+              let maxNum = 0;
+              const cnRegex = /^C-?(\d+)$/i;
+              for (const rec of allContactRecs) {
+                const rd = rec.data as Record<string, any> | null;
+                if (!rd) continue;
+                for (const [k, v] of Object.entries(rd)) {
+                  if (k.replace(/^[A-Za-z]+__/, '').toLowerCase() === 'contactnumber' && typeof v === 'string') {
+                    const m = v.match(cnRegex);
+                    if (m) { const n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+                  }
+                }
+              }
+              const newContactNumber = `C${String(maxNum + 1).padStart(3, '0')}`;
+              const updatedData = { ...cData, contactNumber: newContactNumber };
+              await prisma.record.update({ where: { id: recordId }, data: { data: updatedData } });
+              // Re-derive folderName with the newly assigned contact number
+              folderName = deriveDropboxFolderName(updatedData, recordId, 'Contact', contactRecord.createdAt);
+            }
+          }
+        }
+      } catch (err: any) {
+        app.log.warn({ err }, '[dropbox] Failed to backfill contactNumber for Contact record');
+      }
+    }
+
     // ── Check if this record already has a tracked Dropbox folder ID ──
     // This prevents duplicate folder creation when a folder was renamed in Dropbox.
     const storedFolder = await resolveStoredFolder(accessToken, recordId);
