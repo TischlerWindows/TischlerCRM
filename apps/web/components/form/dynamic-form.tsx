@@ -11,6 +11,7 @@ import {
   LayoutPanel,
   LayoutSection,
   normalizeFieldType,
+  isSystemField,
 } from '@/lib/schema';
 import { isLegacyLayout, migrateLegacyLayout } from '@/lib/layout-migration';
 import { resolveLayoutForUser } from '@/lib/layout-resolver';
@@ -78,6 +79,32 @@ export interface DynamicFormProps {
    * Only relevant for create forms that use widgets.
    */
   onCreated?: (recordId: string) => void;
+}
+
+/**
+ * Returns true if a panel contains only auto-generated / read-only fields and
+ * has no widgets — i.e. there's nothing for the user to interact with.
+ *
+ * Used to auto-skip pointless steps in the create wizard. Account/Contact
+ * layouts ship with a "System Information" panel containing just Created By
+ * and Last Modified By; on a brand-new record those values are nil and the
+ * fields are non-editable, so the wizard step has zero purpose. This helper
+ * lets us treat such panels as if the admin had set `hideOnNew: true`.
+ */
+function isPanelAllSystemFields(
+  panel: LayoutPanel,
+  schemaObject: ObjectDef | undefined,
+): boolean {
+  if (panel.widgets && panel.widgets.length > 0) return false
+  if (!panel.fields || panel.fields.length === 0) return false
+  return panel.fields.every((pf) => {
+    if (isSystemField(pf.fieldApiName)) return true
+    const f = schemaObject?.fields.find((sf) => sf.apiName === pf.fieldApiName)
+    if (!f) return false
+    if (f.type === 'AutoNumber' || f.type === 'Formula') return true
+    if ((f as { readOnly?: boolean }).readOnly) return true
+    return false
+  })
 }
 
 /** Returns true if an element should be hidden based on record lifecycle state.
@@ -628,7 +655,15 @@ export default function DynamicForm({
               !panelFx?.hidden &&
               !panel.hidden &&
               !isHiddenByLifecycle(panel as any, layoutType) &&
-              evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx)
+              evaluateVisibility((panel as any).visibleIf, formData, visibilityCtx) &&
+              // Auto-skip wizard steps that contain only auto-generated /
+              // read-only system fields (e.g. the default "System Information"
+              // panel with just Created By + Last Modified By). On a brand-new
+              // record those have no value and the user can't edit them, so
+              // showing the step just adds a wasted click. Detail/edit views
+              // continue to render the panel (this filter only runs in create
+              // mode via the `layoutType === 'create'` guard above the IIFE).
+              !isPanelAllSystemFields(panel, object)
             );
           });
         visiblePanels.forEach((panel, idx) => {
