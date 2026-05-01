@@ -3129,6 +3129,10 @@ export default function SummaryPage() {
                           if (lo.includes('outswing') || lo.includes('awning')) {
                             return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
                           }
+                          // Lift and Roll
+                          if (lo.includes('lift') || lo.includes('roll')) {
+                            return ['Standard RH', 'SS RH'];
+                          }
                           return ['72mm Thick Sash', '90mm Thick Sash'];
                         };
 
