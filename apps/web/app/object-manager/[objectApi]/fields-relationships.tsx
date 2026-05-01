@@ -87,6 +87,7 @@ const FIELD_TYPES: FieldTypeOption[] = [
   { value: 'Time', label: 'Time', description: 'Allows users to enter a local time. For example, "2:40 PM", "14:40", "14:40:00", and "14:40:50.600" are all valid times for this field.', category: 'Standard', icon: Clock },
   { value: 'URL', label: 'URL', description: 'Allows users to enter any valid website address. When users click on the field, the URL will open in a separate browser window.', category: 'Standard', icon: Globe },
   { value: 'Address', label: 'Address', description: 'Allows users to enter a street, city, state/province, zip/postal code, and country, or to search for an address with an external tool. When a user selects an address using the tool, the street, city, state/province, zip/postal code, and country are populated.', category: 'Standard', icon: MapPin },
+  { value: 'CompositeText', label: 'Composite Text', description: 'A compound name field made up of multiple sub-fields (e.g. Salutation, First Name, Last Name). Each sub-field is captured individually and displayed together.', category: 'Standard', icon: FileText },
 
   // Integration
   { value: 'LocationSearch', label: 'Location Search (Google Maps)', description: 'Google Places address autocomplete with map preview. Place on any page layout to auto-fill address fields when a location is selected. Requires the Google Maps integration to be configured.', category: 'Integration', icon: MapPin },
