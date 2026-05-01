@@ -2082,7 +2082,7 @@ export async function dropboxRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: 'Unauthorized' });
 
     const { objectApiName, recordId } = req.params as { objectApiName: string; recordId: string };
-    const { folderName } = req.body as { folderName?: string };
+    let { folderName } = req.body as { folderName?: string };
     const accessToken = await getAccessToken(user.sub);
     if (!accessToken) return reply.code(401).send({ error: 'Dropbox not connected' });
 
@@ -2339,6 +2339,25 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
 
     // ── Default: create top-level folder (Property, Account, Contact, etc.) ──
+
+    // For Contact, always derive the folder name server-side from the DB record
+    // so it uses the CompositeText name sub-fields correctly, regardless of what
+    // the frontend passed (which may be a stale/incomplete value on regeneration).
+    if (objectApiName === 'Contact') {
+      try {
+        const contactObj = await prisma.customObject.findFirst({
+          where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
+        });
+        const contactRecord = contactObj
+          ? await prisma.record.findFirst({ where: { id: recordId, objectId: contactObj.id } })
+          : null;
+        if (contactRecord) {
+          const derived = deriveDropboxFolderName(contactRecord.data as Record<string, any>, recordId, 'Contact');
+          if (derived && derived !== recordId) folderName = derived;
+        }
+      } catch { /* non-fatal — fall through to frontend-supplied name */ }
+    }
+
     const folderPath = buildFolderPath(objectApiName, recordId, folderName);
 
     let created = false;
