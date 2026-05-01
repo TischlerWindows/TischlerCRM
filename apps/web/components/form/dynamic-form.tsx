@@ -1545,7 +1545,17 @@ export default function DynamicForm({
                     const lifecycleFields = panelItem.fields.filter(
                       (f) => !isHiddenByLifecycle(f as any, layoutType),
                     );
-                    const columnArrays: FieldDef[][] = [];
+                    // Keep both the PanelField (so virtual fields like
+                    // teamMemberSlot survive the iteration) AND the resolved
+                    // FieldDef (for normal fields). Slot fields are virtual —
+                    // getFieldDef returns undefined for them — and previously
+                    // got dropped here, leaving the Review step blank for
+                    // Primary Contact / Architect / Contract Holder rows.
+                    type ReviewEntry = {
+                      panelField: any;
+                      fieldDef: FieldDef | undefined;
+                    };
+                    const columnArrays: ReviewEntry[][] = [];
                     for (let ci = 0; ci < panelItem.columns; ci++) {
                       columnArrays[ci] = lifecycleFields
                         .filter(
@@ -1554,8 +1564,17 @@ export default function DynamicForm({
                               f.order % panelItem.columns) === ci,
                         )
                         .sort((a, b) => a.order - b.order)
-                        .map((f) => getFieldDef(f.fieldApiName, f as any))
-                        .filter((f): f is FieldDef => f !== undefined);
+                        .map((f) => ({
+                          panelField: f,
+                          fieldDef: getFieldDef(f.fieldApiName, f as any),
+                        }))
+                        // Drop entries that are neither a recognised slot
+                        // widget nor a resolvable FieldDef.
+                        .filter(
+                          (e) =>
+                            e.fieldDef !== undefined ||
+                            (e.panelField as any)?.kind === 'teamMemberSlot',
+                        );
                     }
 
                     return (
@@ -1586,12 +1605,47 @@ export default function DynamicForm({
                                 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
                             )}
                           >
-                            {columnArrays.map((columnFields, colIndex) => (
+                            {columnArrays.map((columnEntries, colIndex) => (
                               <div
                                 key={`review-col-${colIndex}`}
                                 className="flex flex-col gap-3"
                               >
-                                {columnFields.map((fieldDef) => {
+                                {columnEntries.map((entry, idx) => {
+                                  // Slot fields: render the slot widget in
+                                  // read-only mode so the user sees the
+                                  // pending team-member rows on the Review
+                                  // step (otherwise the People & Orgs panel
+                                  // appears empty even though they filled
+                                  // every field — the QA-noted P1 bug).
+                                  const pf: any = entry.panelField;
+                                  if (pf?.kind === 'teamMemberSlot' && pf?.slotConfig) {
+                                    const isVisible = evaluateVisibility(
+                                      pf.visibleIf,
+                                      formData,
+                                      visibilityCtx,
+                                    );
+                                    if (!isVisible) return null;
+                                    const parentRecordId =
+                                      typeof formData?.id === 'string'
+                                        ? formData.id
+                                        : null;
+                                    return (
+                                      <div
+                                        key={pf.id ?? `slot-${colIndex}-${idx}`}
+                                        className="py-1"
+                                      >
+                                        <TeamMemberSlotField
+                                          parentObjectApiName={objectApiName}
+                                          parentRecordId={parentRecordId}
+                                          slotConfig={pf.slotConfig}
+                                          panelField={pf}
+                                          readOnly
+                                        />
+                                      </div>
+                                    );
+                                  }
+                                  const fieldDef = entry.fieldDef;
+                                  if (!fieldDef) return null;
                                   const isVisible = evaluateVisibility(
                                     fieldDef.visibleIf,
                                     formData,
