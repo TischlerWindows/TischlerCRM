@@ -2090,6 +2090,24 @@ export async function dropboxRoutes(app: FastifyInstance) {
     // This prevents duplicate folder creation when a folder was renamed in Dropbox.
     const storedFolder = await resolveStoredFolder(accessToken, recordId);
     if (storedFolder?.found) {
+      // For Contact/Lead folders, verify the stored name matches the expected derived name.
+      // If not (e.g. folder was created with just a number or name before the fix), rename it now.
+      // folderName from the request body is the expected name derived by the frontend.
+      if (objectApiName === 'Contact' && folderName && folderName !== storedFolder.folderName) {
+        try {
+          const safeExpected = folderName.replace(/[\\\/:*?"<>|]/g, '_').trim();
+          const newPath = storedFolder.fullPath.replace(/\/[^\/]+$/, `/${safeExpected}`);
+          try {
+            await dropboxApi(accessToken, '/files/move_v2', {
+              from_path: storedFolder.fullPath,
+              to_path: newPath,
+              autorename: false,
+              allow_ownership_transfer: false,
+            });
+            return reply.send({ created: false, path: newPath, folderName });
+          } catch { /* rename failed — return existing name */ }
+        } catch { /* non-fatal */ }
+      }
       // For Lead folders, verify the stored name matches the expected derived name.
       // If not (e.g. contact name was unresolvable when created), rename it now.
       if (objectApiName === 'Lead') {
@@ -2146,6 +2164,20 @@ export async function dropboxRoutes(app: FastifyInstance) {
           const rData = record.data as Record<string, any>;
           const renamedFolder = await findExistingFolderInDropbox(accessToken, objectApiName, recordId, rData);
           if (renamedFolder) {
+            // For Contact, rename the found folder if the expected name differs
+            if (objectApiName === 'Contact' && folderName && folderName !== renamedFolder.folderName) {
+              try {
+                const safeExpected = folderName.replace(/[\\\/:*?"<>|]/g, '_').trim();
+                const newPath = renamedFolder.fullPath.replace(/\/[^\/]+$/, `/${safeExpected}`);
+                await dropboxApi(accessToken, '/files/move_v2', {
+                  from_path: renamedFolder.fullPath,
+                  to_path: newPath,
+                  autorename: false,
+                  allow_ownership_transfer: false,
+                });
+                return reply.send({ created: false, path: newPath, folderName });
+              } catch { /* rename failed — return found name */ }
+            }
             return reply.send({
               created: false,
               path: renamedFolder.fullPath,
@@ -2339,25 +2371,6 @@ export async function dropboxRoutes(app: FastifyInstance) {
     }
 
     // ── Default: create top-level folder (Property, Account, Contact, etc.) ──
-
-    // For Contact, always derive the folder name server-side from the DB record
-    // so it uses the CompositeText name sub-fields correctly, regardless of what
-    // the frontend passed (which may be a stale/incomplete value on regeneration).
-    if (objectApiName === 'Contact') {
-      try {
-        const contactObj = await prisma.customObject.findFirst({
-          where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
-        });
-        const contactRecord = contactObj
-          ? await prisma.record.findFirst({ where: { id: recordId, objectId: contactObj.id } })
-          : null;
-        if (contactRecord) {
-          const derived = deriveDropboxFolderName(contactRecord.data as Record<string, any>, recordId, 'Contact');
-          if (derived && derived !== recordId) folderName = derived;
-        }
-      } catch { /* non-fatal — fall through to frontend-supplied name */ }
-    }
-
     const folderPath = buildFolderPath(objectApiName, recordId, folderName);
 
     let created = false;
