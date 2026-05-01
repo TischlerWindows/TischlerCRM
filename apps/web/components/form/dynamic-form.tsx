@@ -769,45 +769,47 @@ export default function DynamicForm({
       setSubmitError(null);
       setIsSubmitting(true);
       try {
-        // Sanity check before submit — if widgets registered pending data but
-        // the manager reports none at submit time, something is mis-wired
-        // (most often the parent provider unmounted between fill and save).
-        // Surface this so the next QA run has a visible signal instead of a
-        // silent failure where the parent record saves but related rows don't.
-        const preSubmitHasPending = pendingCtx?.hasPendingData() ?? false;
-        if (process.env.NODE_ENV !== 'production') {
-          // eslint-disable-next-line no-console
-          console.log('[DynamicForm] submit — preSubmitHasPending:', preSubmitHasPending);
-        }
+        // Snapshot pending widgets BEFORE awaiting the parent POST.
+        //
+        // Why: during the awaited POST the form may re-render (e.g. the
+        // parent page calls fetchProperties() which setProperties()s and
+        // cascades a re-render through the form), which can change the
+        // memoized PendingWidget context value's identity. Pending widgets
+        // (PendingTeamMemberPoolProvider) include `pendingCtx` in their
+        // useEffect deps; a context-value identity change fires their
+        // cleanup, which unregisters the widget BEFORE we get a chance to
+        // flush its rows. Snapshotting up-front means we hold direct
+        // references to each registration's savePendingData closure, which
+        // still reads from live React refs for the row state — even after
+        // the registration map has been emptied.
+        //
+        // Round-3 QA on the deployed app saw exactly this: console showed
+        // "Pending widget data was present pre-submit but missing
+        // post-submit" while zero TeamMember POSTs fired. The snapshot
+        // pattern below fixes that.
+        const pendingSnapshot = pendingCtx?.snapshotPendingWidgets() ?? [];
         const result = await onSubmit(completeData, layoutId);
-        // If onSubmit returned a record ID (create mode) and there are
-        // pending widget saves (e.g. team members), save them now.
         const recordId = typeof result === 'string' ? result : undefined;
-        if (recordId && pendingCtx?.hasPendingData()) {
-          const { errors: pendingErrors } = await pendingCtx.saveAllPending(recordId);
+        if (recordId && pendingSnapshot.length > 0 && pendingCtx) {
+          const { errors: pendingErrors } = await pendingCtx.saveSnapshot(
+            pendingSnapshot,
+            recordId,
+          );
           if (pendingErrors.length > 0) {
-            console.warn('[DynamicForm] Some pending widget data failed to save:', pendingErrors);
-            // Surface the failure to the user — previously this was a silent
-            // console.warn, which let "record saved but team-member rows
-            // dropped" go unnoticed during QA. The record is already created
-            // so we can't roll back; the user needs to know to add the
-            // missing rows manually on the detail page.
+            console.warn(
+              '[DynamicForm] Some pending widget data failed to save:',
+              pendingErrors,
+            );
+            // Surface the failure so the user knows to manually add the
+            // missing rows on the detail page rather than silently losing
+            // them (the record is already created — no rollback).
             const summary = pendingErrors.slice(0, 3).join('; ');
-            const more = pendingErrors.length > 3 ? ` (+${pendingErrors.length - 3} more)` : '';
+            const more =
+              pendingErrors.length > 3 ? ` (+${pendingErrors.length - 3} more)` : '';
             setSubmitError(
               `Record was saved, but some related data could not be attached: ${summary}${more}. Please add it on the detail page.`,
             );
           }
-        } else if (recordId && preSubmitHasPending) {
-          // Pending data existed BEFORE submit but disappeared by the time we
-          // checked again — the pool's parent provider likely unmounted. Flag
-          // it so we can root-cause instead of silently dropping the rows.
-          console.warn(
-            '[DynamicForm] Pending widget data was present pre-submit but missing post-submit; related rows may have been dropped.',
-          );
-          setSubmitError(
-            'Record was saved, but related data (team members, etc.) was lost in transit. Please add it on the detail page and report this so we can fix the underlying issue.',
-          );
         }
         // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
         if (recordId && onCreated) {
