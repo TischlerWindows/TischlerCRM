@@ -740,10 +740,37 @@ export function FieldInput({
     // ── CompositeText ────────────────────────────────────────
     case 'CompositeText': {
       const compositeValue = value || {};
+      // When the composite field itself is required, the name-style
+      // sub-fields (First / Last) are also required in practice — the
+      // existing validator rejects empty submits via the parent. Reflect
+      // that with a red asterisk on those sub-fields' labels so users see
+      // the requirement at a glance instead of finding out at submit time.
+      const subFieldIsRequired = (apiName: string): boolean => {
+        if (!fieldDef.required) return false;
+        const lower = apiName.toLowerCase();
+        // Salutation is optional even on a required Name composite.
+        if (lower.endsWith('salutation')) return false;
+        return (
+          lower.endsWith('firstname') ||
+          lower.endsWith('lastname') ||
+          lower.endsWith('first') ||
+          lower.endsWith('last') ||
+          lower.endsWith('middle') ||
+          lower.endsWith('middlename')
+        );
+      };
       inputElement = (
         <div className="space-y-3 border border-gray-300 rounded-lg p-3">
+          {/* UX-3: helper text belongs at the TOP of the composite group so
+           * it associates with the parent label ("Name"), not the last
+           * sub-input. Suppressed at the outer wrapper for composite fields
+           * to avoid double-rendering. */}
+          {fieldDef.helpText && (
+            <p className="text-xs text-gray-500">{fieldDef.helpText}</p>
+          )}
           {fieldDef.subFields &&
             fieldDef.subFields.map((subField) => {
+              const subRequired = subFieldIsRequired(subField.apiName);
               if (subField.type === 'Picklist') {
                 return (
                   <div
@@ -752,6 +779,9 @@ export function FieldInput({
                   >
                     <label className="text-sm font-medium text-gray-700">
                       {subField.label}
+                      {subRequired && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                     </label>
                     <select
                       value={compositeValue[subField.apiName] || ''}
@@ -787,6 +817,9 @@ export function FieldInput({
                   >
                     <label className="text-sm font-medium text-gray-700">
                       {subField.label}
+                      {subRequired && (
+                        <span className="text-red-500 ml-1">*</span>
+                      )}
                     </label>
                     <Input
                       type="text"
@@ -1042,7 +1075,10 @@ export function FieldInput({
         inputElement
       )}
       {error && <span className="text-xs text-red-500" role="alert">{error}</span>}
-      {!error && fieldDef.helpText && (
+      {/* CompositeText renders its own helpText inside the bordered group
+       * (UX-3), so suppress the outer one to avoid double-display under the
+       * last sub-input. */}
+      {!error && fieldDef.helpText && fieldDef.type !== 'CompositeText' && (
         <span className="text-xs text-gray-500">{fieldDef.helpText}</span>
       )}
     </div>

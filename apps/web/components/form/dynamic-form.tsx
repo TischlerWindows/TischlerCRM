@@ -43,7 +43,12 @@ import {
   Check,
   Layout,
 } from 'lucide-react';
-import { cn, resolveLookupDisplayName, getLookupCachedRecord } from '@/lib/utils';
+import {
+  cn,
+  resolveLookupDisplayName,
+  getLookupCachedRecord,
+  upsertLookupCacheRecord,
+} from '@/lib/utils';
 
 import { validateFields } from './form-validation';
 import { FieldInput, LookupFieldsDisplay, getFieldIcon } from './field-input';
@@ -764,6 +769,16 @@ export default function DynamicForm({
       setSubmitError(null);
       setIsSubmitting(true);
       try {
+        // Sanity check before submit — if widgets registered pending data but
+        // the manager reports none at submit time, something is mis-wired
+        // (most often the parent provider unmounted between fill and save).
+        // Surface this so the next QA run has a visible signal instead of a
+        // silent failure where the parent record saves but related rows don't.
+        const preSubmitHasPending = pendingCtx?.hasPendingData() ?? false;
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('[DynamicForm] submit — preSubmitHasPending:', preSubmitHasPending);
+        }
         const result = await onSubmit(completeData, layoutId);
         // If onSubmit returned a record ID (create mode) and there are
         // pending widget saves (e.g. team members), save them now.
@@ -772,8 +787,27 @@ export default function DynamicForm({
           const { errors: pendingErrors } = await pendingCtx.saveAllPending(recordId);
           if (pendingErrors.length > 0) {
             console.warn('[DynamicForm] Some pending widget data failed to save:', pendingErrors);
-            // Don't block the flow — record is created; user can add related data later
+            // Surface the failure to the user — previously this was a silent
+            // console.warn, which let "record saved but team-member rows
+            // dropped" go unnoticed during QA. The record is already created
+            // so we can't roll back; the user needs to know to add the
+            // missing rows manually on the detail page.
+            const summary = pendingErrors.slice(0, 3).join('; ');
+            const more = pendingErrors.length > 3 ? ` (+${pendingErrors.length - 3} more)` : '';
+            setSubmitError(
+              `Record was saved, but some related data could not be attached: ${summary}${more}. Please add it on the detail page.`,
+            );
           }
+        } else if (recordId && preSubmitHasPending) {
+          // Pending data existed BEFORE submit but disappeared by the time we
+          // checked again — the pool's parent provider likely unmounted. Flag
+          // it so we can root-cause instead of silently dropping the rows.
+          console.warn(
+            '[DynamicForm] Pending widget data was present pre-submit but missing post-submit; related rows may have been dropped.',
+          );
+          setSubmitError(
+            'Record was saved, but related data (team members, etc.) was lost in transit. Please add it on the detail page and report this so we can fix the underlying issue.',
+          );
         }
         // Call onCreated for post-save navigation (avoids navigating before pending saves finish)
         if (recordId && onCreated) {
@@ -1511,7 +1545,17 @@ export default function DynamicForm({
                     const lifecycleFields = panelItem.fields.filter(
                       (f) => !isHiddenByLifecycle(f as any, layoutType),
                     );
-                    const columnArrays: FieldDef[][] = [];
+                    // Keep both the PanelField (so virtual fields like
+                    // teamMemberSlot survive the iteration) AND the resolved
+                    // FieldDef (for normal fields). Slot fields are virtual —
+                    // getFieldDef returns undefined for them — and previously
+                    // got dropped here, leaving the Review step blank for
+                    // Primary Contact / Architect / Contract Holder rows.
+                    type ReviewEntry = {
+                      panelField: any;
+                      fieldDef: FieldDef | undefined;
+                    };
+                    const columnArrays: ReviewEntry[][] = [];
                     for (let ci = 0; ci < panelItem.columns; ci++) {
                       columnArrays[ci] = lifecycleFields
                         .filter(
@@ -1520,8 +1564,17 @@ export default function DynamicForm({
                               f.order % panelItem.columns) === ci,
                         )
                         .sort((a, b) => a.order - b.order)
-                        .map((f) => getFieldDef(f.fieldApiName, f as any))
-                        .filter((f): f is FieldDef => f !== undefined);
+                        .map((f) => ({
+                          panelField: f,
+                          fieldDef: getFieldDef(f.fieldApiName, f as any),
+                        }))
+                        // Drop entries that are neither a recognised slot
+                        // widget nor a resolvable FieldDef.
+                        .filter(
+                          (e) =>
+                            e.fieldDef !== undefined ||
+                            (e.panelField as any)?.kind === 'teamMemberSlot',
+                        );
                     }
 
                     return (
@@ -1552,12 +1605,47 @@ export default function DynamicForm({
                                 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4',
                             )}
                           >
-                            {columnArrays.map((columnFields, colIndex) => (
+                            {columnArrays.map((columnEntries, colIndex) => (
                               <div
                                 key={`review-col-${colIndex}`}
                                 className="flex flex-col gap-3"
                               >
-                                {columnFields.map((fieldDef) => {
+                                {columnEntries.map((entry, idx) => {
+                                  // Slot fields: render the slot widget in
+                                  // read-only mode so the user sees the
+                                  // pending team-member rows on the Review
+                                  // step (otherwise the People & Orgs panel
+                                  // appears empty even though they filled
+                                  // every field — the QA-noted P1 bug).
+                                  const pf: any = entry.panelField;
+                                  if (pf?.kind === 'teamMemberSlot' && pf?.slotConfig) {
+                                    const isVisible = evaluateVisibility(
+                                      pf.visibleIf,
+                                      formData,
+                                      visibilityCtx,
+                                    );
+                                    if (!isVisible) return null;
+                                    const parentRecordId =
+                                      typeof formData?.id === 'string'
+                                        ? formData.id
+                                        : null;
+                                    return (
+                                      <div
+                                        key={pf.id ?? `slot-${colIndex}-${idx}`}
+                                        className="py-1"
+                                      >
+                                        <TeamMemberSlotField
+                                          parentObjectApiName={objectApiName}
+                                          parentRecordId={parentRecordId}
+                                          slotConfig={pf.slotConfig}
+                                          panelField={pf}
+                                          readOnly
+                                        />
+                                      </div>
+                                    );
+                                  }
+                                  const fieldDef = entry.fieldDef;
+                                  if (!fieldDef) return null;
                                   const isVisible = evaluateVisibility(
                                     fieldDef.visibleIf,
                                     formData,
@@ -1831,6 +1919,7 @@ export default function DynamicForm({
                       }));
 
                       if (inlineCreateTarget) {
+                        const newRecord = { id: created.id, ...flat };
                         setLookupRecordsCache((prev) => {
                           const existing =
                             prev[inlineCreateTarget!] || [];
@@ -1838,10 +1927,15 @@ export default function DynamicForm({
                             ...prev,
                             [inlineCreateTarget!]: [
                               ...existing,
-                              { id: created.id, ...flat },
+                              newRecord,
                             ],
                           };
                         });
+                        // Seed the global lookup cache so resolveLookupDisplayName
+                        // (used by SlotInput pills, team-member-slot bound rows,
+                        // and other read-side renderers) finds the new record on
+                        // the next render — otherwise it falls back to the raw id.
+                        upsertLookupCacheRecord(inlineCreateTarget, newRecord);
                       }
                     }
                   } catch (err) {
