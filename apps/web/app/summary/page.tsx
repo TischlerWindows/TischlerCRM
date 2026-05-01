@@ -3097,12 +3097,39 @@ export default function SummaryPage() {
 
                         const getOptionsForType = (t: string): string[] => {
                           const lo = t.toLowerCase();
-                          if (lo.includes('hung')) return ['59 mm Sash Thickness', '66 mm Sash Thickness', '72 mm Sash Thickness'];
-                          if (lo.includes('inswing')) return ['Concealed Corrosion Resistant'];
-                          if (lo.includes('outswing')) return ['Corrosion Resistant Rough Hardware', 'Hinge Finials'];
-                          if (lo.includes('swing')) return ['Siegenia Rough Hardware', 'KFV Rough Hardware', 'Hinge Finials', 'Bronze Threshold'];
-                          if (lo.includes('lift') || lo.includes('roll') || lo.includes('l&r') || lo.includes('l & r')) return ['Standard Hardware', 'Stainless Steel Hardware'];
-                          return ['72mm Sash Thickness', '90mm Sash Thickness'];
+                          // Offset Simulated DH (must check before generic 'simulated dh')
+                          if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
+                            return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+                          }
+                          // Simulated DH & French Simulated DH
+                          if (lo.includes('simulated dh') || lo.includes('simulated double hung')) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+                          }
+                          // Single / Double / Triple Hung
+                          if (lo.includes('single hung') || lo.includes('double hung') || lo.includes('triple hung')) {
+                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Vent Locks'];
+                          }
+                          // Direct Glaze
+                          if (lo.includes('direct glaze')) {
+                            return ['72mm Thick Sash', '90mm Thick Sash'];
+                          }
+                          // Fixed with Sash
+                          if (lo.includes('fixed with sash')) {
+                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash'];
+                          }
+                          // Tilt-in
+                          if (lo.includes('tilt-in') || lo.includes('tilt in')) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+                          }
+                          // Inswing (incl. Turn & Tilt, French Inswing)
+                          if (lo.includes('inswing')) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+                          }
+                          // Outswing & French Outswing, Awning
+                          if (lo.includes('outswing') || lo.includes('awning')) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+                          }
+                          return ['72mm Thick Sash', '90mm Thick Sash'];
                         };
 
                         const pto = (editingSummary.productTypeOptions || {}) as Record<string, string[]>;
