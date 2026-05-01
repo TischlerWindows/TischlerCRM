@@ -136,18 +136,55 @@ function autoMap(
   objectDef: ObjectDef,
   objectApiName: string,
 ): Record<string, string> {
+  // Regular flat fields (exclude CompositeText parents — they are handled via sub-fields)
   const fields = objectDef.fields
-    .filter((f) => !f.readOnly && f.apiName !== 'Id')
+    .filter((f) => !f.readOnly && f.apiName !== 'Id' && (f as any).type !== 'CompositeText')
     .map((f) => ({
       apiName: f.apiName.replace(`${objectApiName}__`, ''),
       label: f.label,
-      type: f.type,
+      type: (f as any).type,
     }));
 
+  // Sub-field entries from CompositeText fields (e.g. Salutation / FirstName / LastName of Name).
+  // apiName format: "parentBare::subFieldApiName" (e.g. "name::Contact__name_firstName")
+  type SubEntry = { apiName: string; bareApiName: string; bareLabel: string };
+  const subEntries: SubEntry[] = [];
+  for (const f of objectDef.fields) {
+    if ((f as any).type !== 'CompositeText') continue;
+    const subFields: Array<{ apiName: string; label: string }> = (f as any).subFields ?? [];
+    if (!subFields.length) continue;
+    const parentBare = f.apiName.replace(`${objectApiName}__`, '');
+    for (const sf of subFields) {
+      // "Contact__name_firstName" → bare suffix "firstName"
+      const sfParts = sf.apiName.split('_');
+      const sfBare = sfParts[sfParts.length - 1] ?? sf.apiName;
+      subEntries.push({
+        apiName: `${parentBare}::${sf.apiName}`,
+        bareApiName: sfBare,
+        bareLabel: sf.label,
+      });
+    }
+  }
+
   const mapping: Record<string, string> = {};
+  const usedApiNames = new Set<string>();
 
   for (const header of headers) {
     const key = header.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // First: try to match against CompositeText sub-fields (exact on bare apiName or label)
+    const sfMatch = subEntries.find(
+      (sf) =>
+        sf.bareApiName.toLowerCase() === key ||
+        sf.bareLabel.toLowerCase().replace(/[^a-z0-9]/g, '') === key,
+    );
+    if (sfMatch && !usedApiNames.has(sfMatch.apiName)) {
+      mapping[header] = sfMatch.apiName;
+      usedApiNames.add(sfMatch.apiName);
+      continue;
+    }
+
+    // Then: standard flat-field matching
     let match: (typeof fields)[0] | undefined;
 
     // Exact field name
@@ -175,11 +212,9 @@ function autoMap(
       );
     }
 
-    if (match) {
-      const alreadyUsed = Object.values(mapping).includes(match.apiName);
-      if (!alreadyUsed) {
-        mapping[header] = match.apiName;
-      }
+    if (match && !usedApiNames.has(match.apiName)) {
+      mapping[header] = match.apiName;
+      usedApiNames.add(match.apiName);
     }
   }
 
@@ -411,6 +446,15 @@ export default function SalesforceImportPage() {
           const val = row[csvCol];
           if (val === undefined || val === null || val === '') continue;
 
+          // CompoundName sub-field: "name::Contact__name_firstName" — merge into parent object
+          if (targetField.includes('::')) {
+            const sepIdx = targetField.indexOf('::');
+            const parentField = targetField.slice(0, sepIdx);
+            const subFieldKey = targetField.slice(sepIdx + 2);
+            mapped[parentField] = { ...(mapped[parentField] ?? {}), [subFieldKey]: val };
+            continue;
+          }
+
           // Check if this mapped field is a lookup and if the value is a known SF id
           const lookedUpObject = lookupFields[targetField];
           if (lookedUpObject && globalIdMap[val]) {
@@ -491,13 +535,25 @@ export default function SalesforceImportPage() {
 
   const activeTargetFields = useMemo(() => {
     if (!activeObjectDef || !activeEntry) return [];
-    return activeObjectDef.fields
-      .filter((f) => !f.readOnly && f.apiName !== 'Id')
-      .map((f) => ({
-        apiName: f.apiName.replace(`${activeEntry.detectedObject}__`, ''),
-        label: f.label,
-        type: f.type,
-      }));
+    const result: { apiName: string; label: string; type: string }[] = [];
+    for (const f of activeObjectDef.fields) {
+      if (f.readOnly || f.apiName === 'Id') continue;
+      const parentApiName = f.apiName.replace(`${activeEntry.detectedObject}__`, '');
+      const subFields: Array<{ apiName: string; label: string; type: string }> = (f as any).subFields ?? [];
+      if ((f as any).type === 'CompositeText' && subFields.length > 0) {
+        // Expand compound name into its sub-field options
+        for (const sf of subFields) {
+          result.push({
+            apiName: `${parentApiName}::${sf.apiName}`,
+            label: `${f.label} › ${sf.label}`,
+            type: sf.type,
+          });
+        }
+      } else {
+        result.push({ apiName: parentApiName, label: f.label, type: (f as any).type });
+      }
+    }
+    return result;
   }, [activeObjectDef, activeEntry]);
 
   const downloadErrorReport = (result: ObjectResult) => {
@@ -785,11 +841,17 @@ export default function SalesforceImportPage() {
                                 >
                                   <option value="">— Skip —</option>
                                   <option value="__skip__">— Skip —</option>
-                                  {activeTargetFields.map((f) => (
-                                    <option key={f.apiName} value={f.apiName}>
-                                      {f.label} ({f.apiName})
-                                    </option>
-                                  ))}
+                                  {activeTargetFields.map((f) => {
+                                    // For sub-fields (apiName contains '::'), show the bare suffix as the hint
+                                    const displayHint = f.apiName.includes('::')
+                                      ? f.apiName.split('_').pop() ?? f.apiName
+                                      : f.apiName;
+                                    return (
+                                      <option key={f.apiName} value={f.apiName}>
+                                        {f.label} ({displayHint})
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                                 {isLookup && !isSfIdCol && (
                                   <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
