@@ -329,6 +329,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
               fontWeight: panel.style?.headerBold ? 700 : undefined,
               fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
               textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+              fontSize: panel.style?.headerFontSize ? `${panel.style.headerFontSize}px` : undefined,
             };
 
             return (
@@ -400,6 +401,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
             fontWeight: panel.style?.headerBold ? 700 : undefined,
             fontStyle: panel.style?.headerItalic ? 'italic' : undefined,
             textTransform: panel.style?.headerUppercase ? 'uppercase' : undefined,
+            fontSize: panel.style?.headerFontSize ? `${panel.style.headerFontSize}px` : undefined,
           };
           const bodyStyle: React.CSSProperties = {
             ...(panel.style?.bodyBackground ? { backgroundColor: panel.style.bodyBackground } : {}),
@@ -483,6 +485,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                               fontWeight: f.labelStyle?.bold ? 700 : undefined,
                               fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
                               textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                              fontSize: f.labelStyle?.fontSize ? `${f.labelStyle.fontSize}px` : undefined,
                             }}
                           />
                         </div>
@@ -493,12 +496,14 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                       fontWeight: f.labelStyle?.bold ? 700 : undefined,
                       fontStyle: f.labelStyle?.italic ? 'italic' : undefined,
                       textTransform: f.labelStyle?.uppercase ? 'uppercase' : undefined,
+                      fontSize: f.labelStyle?.fontSize ? `${f.labelStyle.fontSize}px` : undefined,
                     };
                     const valueStyle: React.CSSProperties = {
                       ...(f.valueStyle?.color ? { color: f.valueStyle.color } : {}),
                       ...(f.valueStyle?.background ? { backgroundColor: f.valueStyle.background, padding: '2px 6px', borderRadius: 4 } : {}),
                       fontWeight: f.valueStyle?.bold ? 700 : undefined,
                       fontStyle: f.valueStyle?.italic ? 'italic' : undefined,
+                      fontSize: f.valueStyle?.fontSize ? `${f.valueStyle.fontSize}px` : undefined,
                     };
                     const displayLabel = f.labelOverride || fd.label;
                     return (

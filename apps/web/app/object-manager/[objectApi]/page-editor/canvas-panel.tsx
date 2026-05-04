@@ -109,6 +109,7 @@ export function CanvasPanel({ panel, regionId }: CanvasPanelProps) {
     fontWeight: panel.style.headerBold ? 700 : undefined,
     fontStyle: panel.style.headerItalic ? 'italic' : undefined,
     textTransform: panel.style.headerUppercase ? 'uppercase' : undefined,
+    fontSize: panel.style.headerFontSize ? `${panel.style.headerFontSize}px` : undefined,
   };
 
   const bodyStyle: React.CSSProperties = {

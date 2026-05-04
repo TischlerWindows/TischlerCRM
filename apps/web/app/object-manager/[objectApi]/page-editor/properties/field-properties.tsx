@@ -9,7 +9,7 @@ import type { LayoutTab, LayoutSection, LayoutPanel, PanelField } from '../types
 import type { TeamMemberSlotConfig } from '@/lib/schema';
 import { useEditorStore } from '../editor-store';
 import { useSchemaStore } from '@/lib/schema-store';
-import { ColorControl } from './shared';
+import { ColorControl, FontSizeCombobox } from './shared';
 import TeamMemberSlotConfigPanel from '@/widgets/internal/team-member-slot/ConfigPanel';
 
 interface FieldPropertiesProps {
@@ -247,7 +247,17 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
 
       <div className="space-y-2">
         <Label className="text-xs text-gray-600">Label style</Label>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1">
+          <FontSizeCombobox
+            value={selection.field.labelStyle.fontSize}
+            defaultValue={12}
+            onChange={(value) =>
+              updateField(selection.field.fieldApiName, selection.panel.id, {
+                labelStyle: { ...selection.field.labelStyle, fontSize: value },
+              })
+            }
+          />
+          <div className="w-px h-5.5 bg-gray-200 mx-0.5" />
           <Button
             type="button"
             size="sm"
@@ -321,7 +331,17 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
 
       <div className="space-y-2">
         <Label className="text-xs text-gray-600">Value style</Label>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1">
+          <FontSizeCombobox
+            value={selection.field.valueStyle.fontSize}
+            defaultValue={14}
+            onChange={(value) =>
+              updateField(selection.field.fieldApiName, selection.panel.id, {
+                valueStyle: { ...selection.field.valueStyle, fontSize: value },
+              })
+            }
+          />
+          <div className="w-px h-5.5 bg-gray-200 mx-0.5" />
           <Button
             type="button"
             size="sm"
