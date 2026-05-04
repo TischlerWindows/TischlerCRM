@@ -64,6 +64,29 @@ export function EditorToolbar({
   const rolesPopoverRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Banner dismissal: per-layout persistence keyed on the note text so that
+  // a new note (different message) shows again even after the previous was dismissed.
+  const dismissalKey = layout.id ? `pageEditor:dismissedNote:${layout.id}` : null;
+  const [dismissedNoteText, setDismissedNoteText] = useState<string | null>(null);
+  useEffect(() => {
+    if (!dismissalKey) return;
+    try {
+      setDismissedNoteText(localStorage.getItem(dismissalKey));
+    } catch {
+      setDismissedNoteText(null);
+    }
+  }, [dismissalKey]);
+  const isNoteDismissed = !!layoutAssignmentNote && dismissedNoteText === layoutAssignmentNote;
+  const dismissNote = useCallback((note: string) => {
+    if (!dismissalKey) return;
+    try {
+      localStorage.setItem(dismissalKey, note);
+    } catch {
+      /* ignore quota errors */
+    }
+    setDismissedNoteText(note);
+  }, [dismissalKey]);
+
   useEffect(() => {
     if (!isEditingName) setDraftName(layout.name);
   }, [layout.name, isEditingName]);
@@ -485,10 +508,16 @@ export function EditorToolbar({
             onClick={onSave}
             size="sm"
             disabled={!isDirty}
-            className="bg-brand-navy text-white hover:bg-brand-navy/90 disabled:opacity-60"
+            variant={isDirty ? 'default' : 'outline'}
+            className={
+              isDirty
+                ? 'bg-brand-navy text-white hover:bg-brand-navy/90'
+                : 'text-gray-500'
+            }
+            title={isDirty ? 'Save changes' : 'No unsaved changes'}
           >
             <Save className="mr-1.5 h-4 w-4" />
-            Save
+            {isDirty ? 'Save' : 'Saved'}
           </Button>
           <Button variant="outline" size="sm" type="button" onClick={onOpenRules}>
             <Wand2 className="mr-1.5 h-4 w-4" />
@@ -501,10 +530,19 @@ export function EditorToolbar({
           </Button>
         </div>
       </div>
-      {layoutAssignmentNote && (
+      {layoutAssignmentNote && !isNoteDismissed && (
         <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-1.5">
           <span className="text-amber-500">ⓘ</span>
-          {layoutAssignmentNote}
+          <span className="flex-1">{layoutAssignmentNote}</span>
+          <button
+            type="button"
+            onClick={() => dismissNote(layoutAssignmentNote)}
+            className="rounded p-0.5 text-amber-600 hover:bg-amber-100 hover:text-amber-900"
+            aria-label="Dismiss this notice"
+            title="Dismiss"
+          >
+            <X className="h-3 w-3" />
+          </button>
         </div>
       )}
 

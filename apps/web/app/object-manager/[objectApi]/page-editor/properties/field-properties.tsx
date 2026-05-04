@@ -246,7 +246,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
       />
 
       <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Label style</Label>
+        <Label className="text-xs text-gray-600">Label text</Label>
         <div className="flex items-center gap-1">
           <FontSizeCombobox
             value={selection.field.labelStyle.fontSize}
@@ -330,7 +330,7 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
       />
 
       <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Value style</Label>
+        <Label className="text-xs text-gray-600">Value text</Label>
         <div className="flex items-center gap-1">
           <FontSizeCombobox
             value={selection.field.valueStyle.fontSize}

@@ -85,7 +85,7 @@ export function PanelProperties({ selection }: PanelPropertiesProps) {
       />
 
       <div className="space-y-2">
-        <Label className="text-xs text-gray-600">Header text style</Label>
+        <Label className="text-xs text-gray-600">Header text</Label>
         <div className="flex items-center gap-1">
           <FontSizeCombobox
             value={selection.panel.style.headerFontSize}
