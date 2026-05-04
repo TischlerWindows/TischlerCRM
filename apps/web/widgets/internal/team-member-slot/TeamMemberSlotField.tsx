@@ -69,12 +69,24 @@ function DisplayFieldRows({
 
   const objectDef = schema?.objects.find((o) => o.apiName === objectApiName)
 
+  // Records are stored with field values as bare keys (the API strips
+  // "ObjectName__" prefixes on write). However, some legacy records and
+  // some endpoints may still surface prefixed keys, so check both.
+  const readField = (apiName: string): unknown => {
+    const bare = apiName.replace(/^[A-Za-z]+__/, '')
+    return (
+      record[apiName] ??
+      record[bare] ??
+      record[`${objectApiName}__${bare}`]
+    )
+  }
+
   return (
     <div className="mt-1 grid gap-x-2 gap-y-0.5 text-xs text-gray-500" style={{ gridTemplateColumns: 'auto 1fr' }}>
       {fields.map((apiName) => {
         const fieldDef = objectDef?.fields.find((f) => f.apiName === apiName)
         const label = fieldDef?.label ?? apiName
-        const value = record[apiName]
+        const value = readField(apiName)
         const display = value == null || value === '' ? '—' : String(value)
         return (
           <React.Fragment key={apiName}>

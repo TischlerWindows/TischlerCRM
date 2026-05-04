@@ -41,6 +41,20 @@ function getLookupId(row: Record<string, unknown>, plainKey: string): string | n
   return null
 }
 
+/**
+ * The records API (`GET /objects/:apiName/records/:id`) returns the Prisma row
+ * with the field values nested under `data`. Unwrap so callers can read fields
+ * directly by apiName (e.g. `record.primaryEmail` instead of `record.data.primaryEmail`).
+ * Some other endpoints return a flat shape, so fall back to the raw object when
+ * `data` isn't present — same pattern used by `getRecordName` in shared/recordName.ts.
+ */
+function unwrapRecordData(raw: Record<string, unknown>): Record<string, unknown> {
+  if (raw && typeof raw.data === 'object' && raw.data !== null && !Array.isArray(raw.data)) {
+    return raw.data as Record<string, unknown>
+  }
+  return raw
+}
+
 export function useDisplayFields({
   rows,
   displayFields,
@@ -86,9 +100,10 @@ export function useDisplayFields({
                   entry.Contact = cacheRef.current[contactId]
                 } else {
                   try {
-                    const record = await apiClient.get<Record<string, unknown>>(
+                    const raw = await apiClient.get<Record<string, unknown>>(
                       `/objects/Contact/records/${contactId}`,
                     )
+                    const record = unwrapRecordData(raw)
                     cacheRef.current[contactId] = record
                     entry.Contact = record
                   } catch {
@@ -105,9 +120,10 @@ export function useDisplayFields({
                   entry.Account = cacheRef.current[accountId]
                 } else {
                   try {
-                    const record = await apiClient.get<Record<string, unknown>>(
+                    const raw = await apiClient.get<Record<string, unknown>>(
                       `/objects/Account/records/${accountId}`,
                     )
+                    const record = unwrapRecordData(raw)
                     cacheRef.current[accountId] = record
                     entry.Account = record
                   } catch {
