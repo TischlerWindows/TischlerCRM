@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand';
 import type { PageLayout } from '../types';
-import type { LayoutSlice } from './layout-slice';
+import { isLayoutEqualToBaseline, type LayoutSlice } from './layout-slice';
 import type { SelectionSlice } from './selection-slice';
 
 // ── History slice interface ──────────────────────────────────────────────────
@@ -44,26 +44,26 @@ export const createHistorySlice: StateCreator<
   },
 
   undo: () => {
-    const { undoStack, redoStack, layout } = get();
+    const { undoStack, redoStack, layout, savedBaseline } = get();
     if (undoStack.length === 0) return;
     const prev = undoStack[undoStack.length - 1];
     set({
       layout: prev,
       undoStack: undoStack.slice(0, -1),
       redoStack: [...redoStack, structuredClone(layout)],
-      isDirty: true,
+      isDirty: !isLayoutEqualToBaseline(prev, savedBaseline),
     });
   },
 
   redo: () => {
-    const { undoStack, redoStack, layout } = get();
+    const { undoStack, redoStack, layout, savedBaseline } = get();
     if (redoStack.length === 0) return;
     const next = redoStack[redoStack.length - 1];
     set({
       layout: next,
       redoStack: redoStack.slice(0, -1),
       undoStack: [...undoStack, structuredClone(layout)].slice(-30),
-      isDirty: true,
+      isDirty: !isLayoutEqualToBaseline(next, savedBaseline),
     });
   },
 });

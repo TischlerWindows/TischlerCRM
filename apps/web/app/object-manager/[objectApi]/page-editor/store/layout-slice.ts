@@ -75,10 +75,28 @@ export const DEFAULT_LAYOUT: PageLayout = {
   formattingRules: [],
 };
 
+// ── Dirty-state helpers ──────────────────────────────────────────────────────
+
+/**
+ * Compare the current layout against its saved baseline. Used by undo/redo to
+ * clear `isDirty` when the user undoes back to the state that was last loaded
+ * or saved. JSON.stringify is fine here — layouts are small and our state
+ * shape is plain JSON (no Date/Map/etc).
+ */
+export function isLayoutEqualToBaseline(
+  layout: PageLayout,
+  baseline: PageLayout | null,
+): boolean {
+  if (!baseline) return false;
+  return JSON.stringify(layout) === JSON.stringify(baseline);
+}
+
 // ── Layout slice interface ───────────────────────────────────────────────────
 
 export interface LayoutSlice {
   layout: PageLayout;
+  /** Snapshot of the layout at last load/save. Used to clear `isDirty` after a full undo. */
+  savedBaseline: PageLayout | null;
   isDirty: boolean;
   activeTabId: string;
 
@@ -129,16 +147,18 @@ export interface LayoutSlice {
 // ── Layout slice creator ─────────────────────────────────────────────────────
 
 export const createLayoutSlice: StateCreator<
-  LayoutSlice & HistorySlice,
+  LayoutSlice & HistorySlice & SelectionSlice,
   [],
   [],
   LayoutSlice
 > = (set, get) => ({
   layout: structuredClone(DEFAULT_LAYOUT),
+  savedBaseline: structuredClone(DEFAULT_LAYOUT),
   isDirty: false,
   activeTabId: 'tab-1',
 
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) =>
+    set((s) => (s.activeTabId === tabId ? s : { activeTabId: tabId, selectedElement: null })),
 
   // ── Layout metadata ────────────────────────────────────────────────────────
 
@@ -727,6 +747,7 @@ export const createLayoutSlice: StateCreator<
 
     set({
       layout: sanitized,
+      savedBaseline: structuredClone(sanitized),
       selectedElement: null,
       isDirty: false,
       undoStack: [],
@@ -738,6 +759,7 @@ export const createLayoutSlice: StateCreator<
   reset: () => {
     set({
       layout: structuredClone(DEFAULT_LAYOUT),
+      savedBaseline: structuredClone(DEFAULT_LAYOUT),
       selectedElement: null,
       isDirty: false,
       undoStack: [],

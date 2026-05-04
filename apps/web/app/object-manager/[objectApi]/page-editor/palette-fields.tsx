@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
-import { useDraggable, useDroppable, useDndMonitor } from '@dnd-kit/core';
+import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { GripVertical, LayoutGrid, Search, Trash2, UserCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -163,8 +163,13 @@ function DraggableFieldChip({
 
 export function PaletteFields({ availableFields }: PaletteFieldsProps) {
   const [search, setSearch] = useState('');
-  const [isDraggingExistingField, setIsDraggingExistingField] = useState(false);
   const layout = useEditorStore((s) => s.layout);
+
+  // Derive drag-active state directly from the DnD context so it can't drift
+  // out of sync with dnd-kit's actual lifecycle (e.g. if a callback misses a fire).
+  const { active } = useDndContext();
+  const isDraggingExistingField =
+    (active?.data.current as { type?: unknown } | undefined)?.type === 'field';
 
   // Remove-field drop zone — covers the entire sidebar, but disabled unless an existing
   // canvas field is being dragged (prevents accidental removes from palette-field drags).
@@ -172,15 +177,6 @@ export function PaletteFields({ availableFields }: PaletteFieldsProps) {
     id: 'palette-field-remove',
     data: { type: 'palette-remove' },
     disabled: !isDraggingExistingField,
-  });
-
-  useDndMonitor({
-    onDragStart: (e) => {
-      const d = (e.active.data.current ?? {}) as Record<string, unknown>;
-      setIsDraggingExistingField(d.type === 'field');
-    },
-    onDragEnd: () => setIsDraggingExistingField(false),
-    onDragCancel: () => setIsDraggingExistingField(false),
   });
 
   const placedApiNames = useMemo(() => {
