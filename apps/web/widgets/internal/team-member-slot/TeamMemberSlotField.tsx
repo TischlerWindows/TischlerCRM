@@ -2,14 +2,39 @@
 
 import React, { useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import Link from 'next/link'
 import { preloadLookupRecords, resolveLookupDisplayName } from '@/lib/utils'
 import type { PanelField, TeamMemberSlotConfig } from '@/lib/schema'
+import { recordUrl } from '@/lib/record-url'
+import { useSchemaStore } from '@/lib/schema-store'
 import { SlotInput } from './SlotInput'
 import { useTeamMemberSlot, type TeamMemberRow } from './useTeamMemberSlot'
+import { useDisplayFields } from './useDisplayFields'
 
-function resolveRowDisplay(row: TeamMemberRow): { contact: string; account: string } {
-  const contactId = (row.data.contact as string | undefined) ?? null
-  const accountId = (row.data.account as string | undefined) ?? null
+function extractId(row: Record<string, unknown>, plainKey: string): string | null {
+  const variants = [
+    plainKey,
+    `${plainKey.charAt(0).toUpperCase()}${plainKey.slice(1)}Id`,
+    `TeamMember__${plainKey}`,
+  ]
+  for (const v of variants) {
+    const raw = row[v]
+    if (typeof raw === 'string' && raw) return raw
+    if (raw && typeof raw === 'object' && 'id' in raw && typeof (raw as { id: unknown }).id === 'string') {
+      return (raw as { id: string }).id
+    }
+  }
+  return null
+}
+
+function resolveRowDisplay(row: TeamMemberRow): {
+  contact: string
+  account: string
+  contactId: string | null
+  accountId: string | null
+} {
+  const contactId = extractId(row.data, 'contact')
+  const accountId = extractId(row.data, 'account')
   const denormContact =
     (row.data.contactName as string | undefined) ||
     (row.data.TeamMember__contactName as string | undefined) ||
@@ -25,7 +50,41 @@ function resolveRowDisplay(row: TeamMemberRow): { contact: string; account: stri
   return {
     contact: contact && contact !== '-' ? contact : '',
     account: account && account !== '-' ? account : '',
+    contactId,
+    accountId,
   }
+}
+
+function DisplayFieldRows({
+  fields,
+  record,
+  objectApiName,
+}: {
+  fields: string[]
+  record: Record<string, unknown> | undefined
+  objectApiName: string
+}) {
+  const schema = useSchemaStore((s) => s.schema)
+  if (!record || fields.length === 0) return null
+
+  const objectDef = schema?.objects.find((o) => o.apiName === objectApiName)
+
+  return (
+    <div className="mt-1 grid gap-x-2 gap-y-0.5 text-xs text-gray-500" style={{ gridTemplateColumns: 'auto 1fr' }}>
+      {fields.map((apiName) => {
+        const fieldDef = objectDef?.fields.find((f) => f.apiName === apiName)
+        const label = fieldDef?.label ?? apiName
+        const value = record[apiName]
+        const display = value == null || value === '' ? '—' : String(value)
+        return (
+          <React.Fragment key={apiName}>
+            <span className="text-gray-400 font-medium truncate">{label}</span>
+            <span className="truncate">{display}</span>
+          </React.Fragment>
+        )
+      })}
+    </div>
+  )
 }
 
 interface TeamMemberSlotFieldProps {
@@ -76,6 +135,11 @@ export function TeamMemberSlotField({
     parentRecordId,
     criterion: slotConfig.criterion,
   })
+  const { fieldMap } = useDisplayFields({
+    rows,
+    displayFields: slotConfig.displayFields,
+    enabled: !!readOnly,
+  })
   const [showAdder, setShowAdder] = useState(false)
 
   // Preload Contact + Account lookup caches so the bound row's resolveLookupDisplayName
@@ -102,23 +166,54 @@ export function TeamMemberSlotField({
       return <div className="h-9 rounded-md bg-gray-100 animate-pulse" />
     }
     if (readOnly) {
-      // Plain-text rendering — no inputs, no clear/add buttons. Edits happen in
-      // Edit mode like every other field, so accidental clicks can't delete data.
       if (rows.length === 0) {
         return <div className="text-sm text-gray-400">—</div>
       }
+
+      const contactDisplayFields = slotConfig.displayFields?.Contact ?? []
+      const accountDisplayFields = slotConfig.displayFields?.Account ?? []
+
       return (
-        <div className="text-sm text-gray-900 space-y-0.5">
-          {rows.map(row => {
-            const { contact, account } = resolveRowDisplay(row)
+        <div className="text-sm text-gray-900 space-y-2">
+          {rows.map((row) => {
+            const { contact, account, contactId, accountId } = resolveRowDisplay(row)
             if (!contact && !account) {
               return <div key={row.id} className="text-gray-400 italic">—</div>
             }
+            const rowFields = fieldMap[row.id]
             return (
               <div key={row.id}>
-                {contact && <span className="font-medium">{contact}</span>}
-                {contact && account && <span className="text-gray-400 mx-1">·</span>}
-                {account && <span className="text-gray-700">{account}</span>}
+                <div>
+                  {contact && contactId ? (
+                    <Link href={recordUrl('Contact', contactId)} className="font-medium text-blue-600 underline hover:text-blue-800">
+                      {contact}
+                    </Link>
+                  ) : contact ? (
+                    <span className="font-medium">{contact}</span>
+                  ) : null}
+                  {contact && account && <span className="text-gray-400 mx-1">&middot;</span>}
+                  {account && accountId ? (
+                    <Link href={recordUrl('Account', accountId)} className="text-blue-600 underline hover:text-blue-800">
+                      {account}
+                    </Link>
+                  ) : account ? (
+                    <span className="text-gray-700">{account}</span>
+                  ) : null}
+                </div>
+                {contactDisplayFields.length > 0 && (
+                  <DisplayFieldRows
+                    fields={contactDisplayFields}
+                    record={rowFields?.Contact}
+                    objectApiName="Contact"
+                  />
+                )}
+                {accountDisplayFields.length > 0 && (
+                  <DisplayFieldRows
+                    fields={accountDisplayFields}
+                    record={rowFields?.Account}
+                    objectApiName="Account"
+                  />
+                )}
               </div>
             )
           })}

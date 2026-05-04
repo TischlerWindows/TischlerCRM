@@ -2,15 +2,32 @@
 
 import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import { GripVertical, X as XIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutTab, LayoutSection, LayoutPanel, PanelField } from '../types';
-import type { TeamMemberSlotConfig } from '@/lib/schema';
+import type { TeamMemberSlotConfig, FieldDef } from '@/lib/schema';
 import { useEditorStore } from '../editor-store';
 import { useSchemaStore } from '@/lib/schema-store';
 import { ColorControl, FontSizeCombobox } from './shared';
 import TeamMemberSlotConfigPanel from '@/widgets/internal/team-member-slot/ConfigPanel';
+import {
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface FieldPropertiesProps {
   selection: {
@@ -20,6 +37,148 @@ interface FieldPropertiesProps {
     panel: LayoutPanel;
     field: PanelField;
   };
+}
+
+function SortableFieldItem({
+  apiName,
+  label,
+  onRemove,
+}: {
+  apiName: string
+  label: string
+  onRemove: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: apiName,
+  })
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-1 rounded border border-gray-200 bg-white px-2 py-1.5 text-xs"
+    >
+      <button
+        type="button"
+        className="cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing"
+        aria-label={`Reorder ${label}`}
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="h-3.5 w-3.5" />
+      </button>
+      <span className="min-w-0 flex-1 truncate text-gray-700">{label}</span>
+      <button
+        type="button"
+        className="text-gray-300 hover:text-gray-500"
+        aria-label={`Remove ${label}`}
+        onClick={onRemove}
+      >
+        <XIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
+
+function DisplayFieldsSection({
+  title,
+  objectApiName,
+  selectedFields,
+  onChange,
+}: {
+  title: string
+  objectApiName: string
+  selectedFields: string[]
+  onChange: (fields: string[]) => void
+}) {
+  const schema = useSchemaStore((s) => s.schema)
+
+  const availableFields: FieldDef[] = useMemo(() => {
+    if (!schema) return []
+    const obj = schema.objects.find((o) => o.apiName === objectApiName)
+    if (!obj) return []
+    const SYSTEM_FIELDS = new Set(['id', 'createdAt', 'updatedAt', 'createdBy', 'modifiedBy', 'ownerId'])
+    const EXCLUDED_TYPES = new Set(['Lookup', 'ExternalLookup', 'LookupFields', 'LookupUser', 'PicklistLookup', 'AutoNumber', 'Formula', 'RollupSummary', 'AutoUser'])
+    return obj.fields.filter(
+      (f) => !SYSTEM_FIELDS.has(f.apiName) && !EXCLUDED_TYPES.has(f.type),
+    )
+  }, [schema, objectApiName])
+
+  const unselectedFields = useMemo(
+    () => availableFields.filter((f) => !selectedFields.includes(f.apiName)),
+    [availableFields, selectedFields],
+  )
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = selectedFields.indexOf(String(active.id))
+    const newIndex = selectedFields.indexOf(String(over.id))
+    if (oldIndex < 0 || newIndex < 0) return
+    onChange(arrayMove(selectedFields, oldIndex, newIndex))
+  }
+
+  const handleAdd = (apiName: string) => {
+    onChange([...selectedFields, apiName])
+  }
+
+  const handleRemove = (apiName: string) => {
+    onChange(selectedFields.filter((f) => f !== apiName))
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[11px] font-semibold uppercase text-gray-400">{title}</div>
+      {selectedFields.length > 0 ? (
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext items={selectedFields} strategy={verticalListSortingStrategy}>
+            <div className="space-y-1">
+              {selectedFields.map((apiName) => {
+                const def = availableFields.find((f) => f.apiName === apiName)
+                return (
+                  <SortableFieldItem
+                    key={apiName}
+                    apiName={apiName}
+                    label={def?.label ?? apiName}
+                    onRemove={() => handleRemove(apiName)}
+                  />
+                )
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+      ) : (
+        <div className="rounded border border-dashed border-gray-200 px-3 py-2 text-center text-[11px] text-gray-400">
+          No fields selected
+        </div>
+      )}
+      {unselectedFields.length > 0 && (
+        <select
+          className="w-full rounded border border-dashed border-gray-300 bg-transparent px-2 py-1.5 text-[11px] text-gray-500"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) handleAdd(e.target.value)
+          }}
+        >
+          <option value="">+ Add {objectApiName.toLowerCase()} field</option>
+          {unselectedFields.map((f) => (
+            <option key={f.apiName} value={f.apiName}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      )}
+    </div>
+  )
 }
 
 export function FieldProperties({ selection }: FieldPropertiesProps) {
@@ -201,6 +360,53 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
           />
         </div>
       )}
+      {isSlot && selection.field.slotConfig && (() => {
+        const slotMode = (selection.field.slotConfig as TeamMemberSlotConfig).mode ?? 'paired'
+        const currentDisplayFields = (selection.field.slotConfig as TeamMemberSlotConfig).displayFields ?? {}
+        const showContact = slotMode === 'contact' || slotMode === 'paired'
+        const showAccount = slotMode === 'account' || slotMode === 'paired'
+
+        const updateDisplayFields = (patch: { Contact?: string[]; Account?: string[] }) => {
+          const next = { ...currentDisplayFields, ...patch }
+          updateField(selection.field.fieldApiName, selection.panel.id, {
+            slotConfig: {
+              ...(selection.field.slotConfig as TeamMemberSlotConfig),
+              displayFields: next,
+            } as unknown as TeamMemberSlotConfig,
+          })
+        }
+
+        return (
+          <div className="space-y-3 pt-2">
+            {showContact && (
+              <DisplayFieldsSection
+                title="Display Fields — Contact"
+                objectApiName="Contact"
+                selectedFields={currentDisplayFields.Contact ?? []}
+                onChange={(fields) => updateDisplayFields({ Contact: fields })}
+              />
+            )}
+            {showAccount && (
+              <DisplayFieldsSection
+                title="Display Fields — Account"
+                objectApiName="Account"
+                selectedFields={currentDisplayFields.Account ?? []}
+                onChange={(fields) => updateDisplayFields({ Account: fields })}
+              />
+            )}
+            {slotMode === 'account' && (
+              <div className="rounded bg-gray-50 px-2 py-1.5 text-center text-[11px] text-gray-400">
+                Contact fields not available in account-only mode
+              </div>
+            )}
+            {slotMode === 'contact' && (
+              <div className="rounded bg-gray-50 px-2 py-1.5 text-center text-[11px] text-gray-400">
+                Account fields not available in contact-only mode
+              </div>
+            )}
+          </div>
+        )
+      })()}
       <div className="space-y-1.5">
         <Label className="text-xs text-gray-600">Label Override</Label>
         <Input

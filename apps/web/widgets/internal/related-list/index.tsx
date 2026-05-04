@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api-client'
 import { useSchemaStore } from '@/lib/schema-store'
 import { formatFieldValue } from '@/lib/utils'
 import type { FieldDef } from '@/lib/schema'
+import { DEDICATED_ROUTES, recordUrl } from '@/lib/record-url'
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -19,26 +20,7 @@ interface FilterRule { field: string; operator: FilterOperator; value: string }
 
 type SortDir = 'asc' | 'desc'
 
-// ── Routing helper (mirrors universal-search.tsx) ─────────────────────
-
-const DEDICATED_ROUTES: Record<string, string> = {
-  Property: '/properties',
-  Account: '/accounts',
-  Contact: '/contacts',
-  Lead: '/leads',
-  Opportunity: '/opportunities',
-  Project: '/projects',
-  Product: '/products',
-  Installation: '/installations',
-  Quote: '/quotes',
-  Service: '/service',
-}
-
-function recordUrl(objectApiName: string, recordId: string, fromPath?: string) {
-  const prefix = DEDICATED_ROUTES[objectApiName]
-  const base = prefix ? `${prefix}/${recordId}` : `/objects/${objectApiName}/${recordId}`
-  return fromPath ? `${base}?from=${encodeURIComponent(fromPath)}` : base
-}
+// ── Routing helper ─────────────────────────────────────────────────────
 
 function newRecordUrl(objectApiName: string, linkField: string, linkValue: string) {
   const prefix = DEDICATED_ROUTES[objectApiName]
