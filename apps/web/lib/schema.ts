@@ -501,6 +501,7 @@ export interface PanelStyle {
   headerItalic?: boolean;
   headerUppercase?: boolean;
   bodyBackground?: string;
+  headerFontSize?: number;
 }
 
 export interface LabelStyle {
@@ -508,6 +509,7 @@ export interface LabelStyle {
   bold?: boolean;
   italic?: boolean;
   uppercase?: boolean;
+  fontSize?: number;
 }
 
 export interface ValueStyle {
@@ -515,6 +517,7 @@ export interface ValueStyle {
   background?: string;
   bold?: boolean;
   italic?: boolean;
+  fontSize?: number;
 }
 
 export type PanelFieldKind = 'field' | 'teamMemberSlot' | 'lookupFields';

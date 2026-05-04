@@ -124,6 +124,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
       ...(field.labelStyle.bold ? { fontWeight: 700 } : {}),
       ...(field.labelStyle.italic ? { fontStyle: 'italic' } : {}),
       ...(field.labelStyle.uppercase ? { textTransform: 'uppercase' } : {}),
+      ...(field.labelStyle.fontSize ? { fontSize: `${field.labelStyle.fontSize}px` } : {}),
     }),
     [field.labelStyle],
   );
@@ -134,6 +135,7 @@ export function CanvasFieldCard({ field, panelId, panelColumns }: CanvasFieldCar
       ...(field.valueStyle.background ? { backgroundColor: field.valueStyle.background } : {}),
       ...(field.valueStyle.bold ? { fontWeight: 700 } : {}),
       ...(field.valueStyle.italic ? { fontStyle: 'italic' } : {}),
+      ...(field.valueStyle.fontSize ? { fontSize: `${field.valueStyle.fontSize}px` } : {}),
     }),
     [field.valueStyle],
   );

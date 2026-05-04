@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
@@ -29,6 +29,7 @@ export const SWATCH_COLORS = [
 
 export const REGION_WIDTH_OPTIONS = [3, 4, 6, 8, 9, 12] as const;
 export const PANEL_COLUMN_OPTIONS = [1, 2, 3, 4] as const;
+export const FONT_SIZE_PRESETS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 32] as const;
 
 /* ---------- types ---------- */
 
@@ -126,6 +127,108 @@ export function ColorControl({ label, value, onChange }: ColorControlProps) {
           aria-label={`${label} hex value`}
         />
       </div>
+    </div>
+  );
+}
+
+interface FontSizeComboboxProps {
+  value: number | undefined;
+  defaultValue: number;
+  onChange: (value: number | undefined) => void;
+}
+
+export function FontSizeCombobox({ value, defaultValue, onChange }: FontSizeComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const displayed = value ?? defaultValue;
+
+  useEffect(() => {
+    setDraft(String(displayed));
+  }, [displayed]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const commit = (raw: string) => {
+    const parsed = parseNumber(raw, defaultValue);
+    const clamped = clamp(parsed, 8, 32);
+    if (clamped === defaultValue) {
+      onChange(undefined);
+    } else {
+      onChange(clamped);
+    }
+    setDraft(String(clamped));
+  };
+
+  return (
+    <div ref={containerRef} className="relative flex-shrink-0">
+      <div className="flex items-center">
+        <input
+          type="text"
+          className="h-8 w-[52px] rounded-l-md border border-gray-300 px-2 text-sm text-center focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/30"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => commit(draft)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commit(draft);
+              setOpen(false);
+              (e.target as HTMLInputElement).blur();
+            } else if (e.key === 'Escape') {
+              setDraft(String(displayed));
+              setOpen(false);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          aria-label="Font size"
+        />
+        <button
+          type="button"
+          className="h-8 w-5 flex items-center justify-center rounded-r-md border border-l-0 border-gray-300 bg-white hover:bg-gray-50"
+          onClick={() => setOpen((prev) => !prev)}
+          tabIndex={-1}
+          aria-label="Toggle font size presets"
+        >
+          <ChevronDown className="h-3 w-3 text-gray-500" />
+        </button>
+      </div>
+      {open && (
+        <div className="absolute top-[33px] left-0 z-50 w-[72px] max-h-[200px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
+          {FONT_SIZE_PRESETS.map((size) => (
+            <button
+              key={size}
+              type="button"
+              className={`flex w-full items-center justify-between px-2 py-1 text-sm hover:bg-gray-100 ${
+                size === displayed ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-800'
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                if (size === defaultValue) {
+                  onChange(undefined);
+                } else {
+                  onChange(size);
+                }
+                setDraft(String(size));
+                setOpen(false);
+              }}
+            >
+              {size}
+              {size === displayed && <Check className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

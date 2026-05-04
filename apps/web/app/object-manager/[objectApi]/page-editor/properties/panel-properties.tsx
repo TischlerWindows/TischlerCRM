@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LayoutTab, LayoutSection, LayoutPanel } from '../types';
 import { useEditorStore } from '../editor-store';
-import { ColorControl, PANEL_COLUMN_OPTIONS, createId, withCopyLabel } from './shared';
+import { ColorControl, FontSizeCombobox, PANEL_COLUMN_OPTIONS, createId, withCopyLabel } from './shared';
 
 interface PanelPropertiesProps {
   selection: {
@@ -86,7 +86,17 @@ export function PanelProperties({ selection }: PanelPropertiesProps) {
 
       <div className="space-y-2">
         <Label className="text-xs text-gray-600">Header text style</Label>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-1">
+          <FontSizeCombobox
+            value={selection.panel.style.headerFontSize}
+            defaultValue={14}
+            onChange={(value) =>
+              updatePanel(selection.panel.id, {
+                style: { ...selection.panel.style, headerFontSize: value },
+              })
+            }
+          />
+          <div className="w-px h-5.5 bg-gray-200 mx-0.5" />
           <Button
             type="button"
             size="sm"
