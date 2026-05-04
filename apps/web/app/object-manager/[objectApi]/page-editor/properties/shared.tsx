@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, RotateCcw } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FieldVisibilityRuleEditor } from '@/components/field-visibility-rule-editor';
@@ -85,20 +85,38 @@ export function validColorForNativeInput(value: string | undefined): string {
 interface ColorControlProps {
   label: string;
   value?: string;
-  onChange: (value: string) => void;
+  onChange: (value: string | undefined) => void;
 }
 
 export function ColorControl({ label, value, onChange }: ColorControlProps) {
+  const isSet = !!value;
   return (
-    <div className="space-y-2">
-      <Label className="text-xs text-gray-600">{label}</Label>
-      <div className="grid grid-cols-7 gap-1">
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs text-gray-600">{label}</Label>
+        {isSet && (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            className="inline-flex items-center gap-1 text-[10px] text-gray-500 hover:text-brand-navy"
+            title="Reset to default"
+            aria-label={`Reset ${label} to default`}
+          >
+            <RotateCcw className="h-2.5 w-2.5" />
+            Reset
+          </button>
+        )}
+      </div>
+      <div
+        className="grid gap-0.5"
+        style={{ gridTemplateColumns: `repeat(${SWATCH_COLORS.length}, minmax(0, 1fr))` }}
+      >
         {SWATCH_COLORS.map((swatch) => (
           <button
             key={swatch}
             type="button"
             onClick={() => onChange(swatch)}
-            className={`h-5 rounded border ${
+            className={`h-4 rounded-sm border ${
               value?.toLowerCase() === swatch
                 ? 'border-brand-navy ring-1 ring-brand-navy/40'
                 : 'border-gray-300'
@@ -108,10 +126,10 @@ export function ColorControl({ label, value, onChange }: ColorControlProps) {
           />
         ))}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <input
           type="color"
-          className="h-8 w-10 rounded border border-gray-300 bg-white p-1"
+          className="h-7 w-8 shrink-0 rounded border border-gray-300 bg-white p-0.5"
           value={validColorForNativeInput(value)}
           onChange={(e) => onChange(e.target.value)}
           aria-label={`${label} color picker`}
@@ -120,10 +138,10 @@ export function ColorControl({ label, value, onChange }: ColorControlProps) {
           value={value ?? ''}
           onChange={(e) => {
             const next = e.target.value.trim();
-            onChange(next ? normalizeHex(next) : '');
+            onChange(next ? normalizeHex(next) : undefined);
           }}
           placeholder="#ffffff"
-          className="h-8 text-xs"
+          className="h-7 text-xs"
           aria-label={`${label} hex value`}
         />
       </div>
@@ -170,6 +188,8 @@ export function FontSizeCombobox({ value, defaultValue, onChange }: FontSizeComb
     setDraft(String(clamped));
   };
 
+  const isOverridden = value !== undefined;
+
   return (
     <div ref={containerRef} className="relative flex-shrink-0">
       <div className="flex items-center">
@@ -195,13 +215,31 @@ export function FontSizeCombobox({ value, defaultValue, onChange }: FontSizeComb
         />
         <button
           type="button"
-          className="h-8 w-5 flex items-center justify-center rounded-r-md border border-l-0 border-gray-300 bg-white hover:bg-gray-50"
+          className={`h-8 w-5 flex items-center justify-center border border-l-0 border-gray-300 bg-white hover:bg-gray-50 ${
+            isOverridden ? '' : 'rounded-r-md'
+          }`}
           onClick={() => setOpen((prev) => !prev)}
           tabIndex={-1}
           aria-label="Toggle font size presets"
         >
           <ChevronDown className="h-3 w-3 text-gray-500" />
         </button>
+        {isOverridden && (
+          <button
+            type="button"
+            className="h-8 w-6 flex items-center justify-center rounded-r-md border border-l-0 border-gray-300 bg-white hover:bg-gray-50 text-gray-500 hover:text-brand-navy"
+            onClick={() => {
+              onChange(undefined);
+              setDraft(String(defaultValue));
+              setOpen(false);
+            }}
+            tabIndex={-1}
+            title={`Reset to default (${defaultValue})`}
+            aria-label="Reset font size to default"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </button>
+        )}
       </div>
       {open && (
         <div className="absolute top-[33px] left-0 z-50 w-[72px] max-h-[200px] overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
