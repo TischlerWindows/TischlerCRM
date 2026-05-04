@@ -394,12 +394,12 @@ export function FieldProperties({ selection }: FieldPropertiesProps) {
                 onChange={(fields) => updateDisplayFields({ Account: fields })}
               />
             )}
-            {!showContact && slotMode === 'account' && (
+            {slotMode === 'account' && (
               <div className="rounded bg-gray-50 px-2 py-1.5 text-center text-[11px] text-gray-400">
                 Contact fields not available in account-only mode
               </div>
             )}
-            {!showAccount && slotMode === 'contact' && (
+            {slotMode === 'contact' && (
               <div className="rounded bg-gray-50 px-2 py-1.5 text-center text-[11px] text-gray-400">
                 Account fields not available in contact-only mode
               </div>

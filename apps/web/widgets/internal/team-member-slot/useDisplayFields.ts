@@ -64,57 +64,60 @@ export function useDisplayFields({
 
     async function fetchAll() {
       setLoading(true)
-      const result: DisplayFieldMap = {}
+      try {
+        const result: DisplayFieldMap = {}
 
-      await Promise.all(
-        rows.map(async (row) => {
-          const entry: DisplayFieldValues = {}
+        await Promise.all(
+          rows.map(async (row) => {
+            const entry: DisplayFieldValues = {}
 
-          if (hasContactFields) {
-            const contactId = getLookupId(row.data, 'contact')
-            if (contactId) {
-              if (cacheRef.current[contactId]) {
-                entry.Contact = cacheRef.current[contactId]
-              } else {
-                try {
-                  const record = await apiClient.get<Record<string, unknown>>(
-                    `/objects/Contact/records/${contactId}`,
-                  )
-                  cacheRef.current[contactId] = record
-                  entry.Contact = record
-                } catch {
-                  /* record may have been deleted */
+            if (hasContactFields) {
+              const contactId = getLookupId(row.data, 'contact')
+              if (contactId) {
+                if (cacheRef.current[contactId]) {
+                  entry.Contact = cacheRef.current[contactId]
+                } else {
+                  try {
+                    const record = await apiClient.get<Record<string, unknown>>(
+                      `/objects/Contact/records/${contactId}`,
+                    )
+                    cacheRef.current[contactId] = record
+                    entry.Contact = record
+                  } catch {
+                    /* record may have been deleted */
+                  }
                 }
               }
             }
-          }
 
-          if (hasAccountFields) {
-            const accountId = getLookupId(row.data, 'account')
-            if (accountId) {
-              if (cacheRef.current[accountId]) {
-                entry.Account = cacheRef.current[accountId]
-              } else {
-                try {
-                  const record = await apiClient.get<Record<string, unknown>>(
-                    `/objects/Account/records/${accountId}`,
-                  )
-                  cacheRef.current[accountId] = record
-                  entry.Account = record
-                } catch {
-                  /* record may have been deleted */
+            if (hasAccountFields) {
+              const accountId = getLookupId(row.data, 'account')
+              if (accountId) {
+                if (cacheRef.current[accountId]) {
+                  entry.Account = cacheRef.current[accountId]
+                } else {
+                  try {
+                    const record = await apiClient.get<Record<string, unknown>>(
+                      `/objects/Account/records/${accountId}`,
+                    )
+                    cacheRef.current[accountId] = record
+                    entry.Account = record
+                  } catch {
+                    /* record may have been deleted */
+                  }
                 }
               }
             }
-          }
 
-          result[row.id] = entry
-        }),
-      )
+            result[row.id] = entry
+          }),
+        )
 
-      if (!cancelled) {
-        setFieldMap(result)
-        setLoading(false)
+        if (!cancelled) {
+          setFieldMap(result)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -122,7 +125,7 @@ export function useDisplayFields({
     return () => {
       cancelled = true
     }
-  }, [rows, displayFields, enabled, hasAnyFields, hasContactFields, hasAccountFields])
+  }, [rows, displayFields, enabled, hasAnyFields])
 
   return { fieldMap, loading }
 }

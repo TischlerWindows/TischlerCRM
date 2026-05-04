@@ -11,20 +11,30 @@ import { SlotInput } from './SlotInput'
 import { useTeamMemberSlot, type TeamMemberRow } from './useTeamMemberSlot'
 import { useDisplayFields } from './useDisplayFields'
 
+function extractId(row: Record<string, unknown>, plainKey: string): string | null {
+  const variants = [
+    plainKey,
+    `${plainKey.charAt(0).toUpperCase()}${plainKey.slice(1)}Id`,
+    `TeamMember__${plainKey}`,
+  ]
+  for (const v of variants) {
+    const raw = row[v]
+    if (typeof raw === 'string' && raw) return raw
+    if (raw && typeof raw === 'object' && 'id' in raw && typeof (raw as { id: unknown }).id === 'string') {
+      return (raw as { id: string }).id
+    }
+  }
+  return null
+}
+
 function resolveRowDisplay(row: TeamMemberRow): {
   contact: string
   account: string
   contactId: string | null
   accountId: string | null
 } {
-  const contactId = (row.data.contact as string | undefined)
-    ?? (row.data.ContactId as string | undefined)
-    ?? (row.data.TeamMember__contact as string | undefined)
-    ?? null
-  const accountId = (row.data.account as string | undefined)
-    ?? (row.data.AccountId as string | undefined)
-    ?? (row.data.TeamMember__account as string | undefined)
-    ?? null
+  const contactId = extractId(row.data, 'contact')
+  const accountId = extractId(row.data, 'account')
   const denormContact =
     (row.data.contactName as string | undefined) ||
     (row.data.TeamMember__contactName as string | undefined) ||
