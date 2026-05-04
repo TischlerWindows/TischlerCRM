@@ -818,6 +818,10 @@ function AccountInlinePicker({
               type="button"
               onMouseDown={(e) => {
                 e.preventDefault()
+                // Seed the global cache so the slot's bound-row pill (and
+                // any downstream display) resolves the picked account's
+                // name instead of falling back to the raw id.
+                upsertLookupCacheRecord('Account', m)
                 onChange(String(m.id))
                 setQuery('')
                 setOpen(false)
