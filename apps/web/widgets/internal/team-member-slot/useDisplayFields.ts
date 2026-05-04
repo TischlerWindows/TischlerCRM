@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { apiClient } from '@/lib/api-client'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 
@@ -50,9 +50,17 @@ export function useDisplayFields({
   const [loading, setLoading] = useState(false)
   const cacheRef = useRef<Record<string, Record<string, unknown>>>({})
 
-  const hasContactFields = (displayFields?.Contact?.length ?? 0) > 0
-  const hasAccountFields = (displayFields?.Account?.length ?? 0) > 0
+  const contactFields = displayFields?.Contact
+  const accountFields = displayFields?.Account
+  const hasContactFields = (contactFields?.length ?? 0) > 0
+  const hasAccountFields = (accountFields?.length ?? 0) > 0
   const hasAnyFields = hasContactFields || hasAccountFields
+
+  const rowKey = useMemo(() => rows.map((r) => r.id).join(','), [rows])
+  const fieldKey = useMemo(
+    () => JSON.stringify({ c: contactFields, a: accountFields }),
+    [contactFields, accountFields],
+  )
 
   useEffect(() => {
     if (!enabled || !hasAnyFields || rows.length === 0) {
@@ -125,7 +133,7 @@ export function useDisplayFields({
     return () => {
       cancelled = true
     }
-  }, [rows, displayFields, enabled, hasAnyFields])
+  }, [rowKey, fieldKey, enabled, hasAnyFields])
 
   return { fieldMap, loading }
 }
