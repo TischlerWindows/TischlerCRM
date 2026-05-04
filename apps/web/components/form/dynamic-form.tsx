@@ -596,7 +596,17 @@ export default function DynamicForm({
       }
     }
     setMissingRequiredLabels(missing);
-    return Object.keys(newErrors).length === 0;
+    // Also block save when any widget reports an incomplete in-progress pick
+    // (e.g. team-member slot with contact selected but no role yet). The
+    // pool only ever holds complete rows (snapshot semantics), so this is
+    // the only signal we have for "the user is mid-pick somewhere."
+    const slotsIncomplete = pendingCtx?.hasIncompleteWidgets() ?? false;
+    if (slotsIncomplete) {
+      setSubmitError(
+        'Pick a role for the contact you selected before saving (look for a slot with a missing role).',
+      );
+    }
+    return Object.keys(newErrors).length === 0 && !slotsIncomplete;
   };
 
   const runSectionValidation = (panel: LayoutPanel): boolean => {
@@ -611,7 +621,19 @@ export default function DynamicForm({
     }>;
     const newErrors = validateFields(pairs, formData);
     setErrors((prev) => ({ ...prev, ...newErrors }));
-    return Object.keys(newErrors).length === 0;
+    // Block Next when any slot in the section (or anywhere in the form,
+    // since slots register globally) has an in-progress pick missing its
+    // role. We don't try to scope to "only slots in this panel" — having
+    // a half-pick anywhere is reason enough to gate.
+    const slotsIncomplete = pendingCtx?.hasIncompleteWidgets() ?? false;
+    if (slotsIncomplete) {
+      setSubmitError(
+        'Pick a role for the contact you selected before continuing.',
+      );
+    } else {
+      setSubmitError(null);
+    }
+    return Object.keys(newErrors).length === 0 && !slotsIncomplete;
   };
 
   // ── Wizard sections ───────────────────────────────────────────

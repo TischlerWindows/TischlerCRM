@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { apiClient } from '@/lib/api-client'
 import { usePendingWidget } from './pending-widget-context'
+import type { TeamMemberFlag } from '@/lib/schema'
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export interface PendingTeamMemberPoolValue {
   /** Sets a boolean flag on a single row (by id) or unsets it on every row when value=false and id=null. */
   setFlag: (
     id: string | null,
-    flag: 'primaryContact' | 'contractHolder' | 'quoteRecipient',
+    flag: TeamMemberFlag,
     value: boolean,
   ) => void
   /** Increments to signal listeners that the pool changed (e.g., for read-side caches). */
@@ -109,7 +110,7 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
   const setFlag = useCallback(
     (
       id: string | null,
-      flag: 'primaryContact' | 'contractHolder' | 'quoteRecipient',
+      flag: TeamMemberFlag,
       value: boolean,
     ) => {
       setRows(prev =>
@@ -122,6 +123,10 @@ export function PendingTeamMemberPoolProvider({ children }: ProviderProps) {
     },
     [],
   )
+
+  // (Incomplete-slot registry lives on the outer PendingWidget context so the
+  // DynamicForm — which sits one level above this provider — can read it
+  // during wizard validation.)
 
   // Register once with the surrounding pending-widget context so the pool flushes on save.
   useEffect(() => {
