@@ -5,7 +5,7 @@ import { X, UserCircle, Mail, Phone, Building2 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
-import { resolveLookupDisplayName } from '@/lib/utils'
+import { resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 import { getRecordName } from '../shared/recordName'
@@ -439,7 +439,14 @@ export function SlotInput({
         <>
           <ContactPickList
             contacts={contactResults}
-            onPick={(id) => setContactId(id)}
+            onPick={(id) => {
+              // Seed the global lookup cache with the picked record so the
+              // Review step's read-only slot widget (and the bound-row pill
+              // here) renders the contact's name instead of the raw id.
+              const picked = contactResults.find(r => String(r.id) === id)
+              if (picked) upsertLookupCacheRecord('Contact', picked)
+              setContactId(id)
+            }}
             disabled={disabled}
           />
           {/* Inline-create: new contact is auto-linked to the picked Account. */}

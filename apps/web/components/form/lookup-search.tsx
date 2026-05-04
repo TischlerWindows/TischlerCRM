@@ -3,7 +3,7 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
 import { FieldDef, ObjectDef } from '@/lib/schema';
-import { cn, resolveLookupDisplayName } from '@/lib/utils';
+import { cn, resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils';
 import LocationMapPreview from '@/components/location-map-preview';
 
 // ── getRecordLabel ───────────────────────────────────────────────────
@@ -428,6 +428,18 @@ export function LookupSearch({
                   key={record.id}
                   type="button"
                   onClick={() => {
+                    // Seed the global lookup cache with the picked record so
+                    // resolveLookupDisplayName (used by the wizard Review
+                    // step's read-only slot widgets, the team-member-slot
+                    // bound row pills, and anywhere else) finds the record
+                    // on the very next render. Without this seed, the user
+                    // sees the raw id flash on Review until the cache's
+                    // background fetch completes (or until a 30s TTL
+                    // expires) — surfaced by QA round 4 as the only loose
+                    // end after the P0 snapshot fix landed.
+                    if (targetApi) {
+                      upsertLookupCacheRecord(targetApi, record);
+                    }
                     onChange(record.id);
                     onQueryChange(displayLabel);
                   }}
