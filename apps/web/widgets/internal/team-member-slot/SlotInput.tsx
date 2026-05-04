@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { X, UserCircle, Mail, Phone, Building2 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
 import { resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils'
+import { usePendingWidget } from '@/components/form/pending-widget-context'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 import { getRecordName } from '../shared/recordName'
@@ -88,27 +89,12 @@ export function SlotInput({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Pre-fill pendingRole on flag-bound slots so the user doesn't have to
-  // pick a role on every save. The slot's flag (e.g. "primaryContact") IS
-  // its purpose; the underlying TeamMember.role field is required by schema
-  // but is conceptually orthogonal to the flag. Default to the most common
-  // role for each flag — user can still change it via the dropdown.
-  // Role-bound slots already infer their role from the criterion at fillSlot
-  // time and don't show this dropdown at all.
-  useEffect(() => {
-    if (criterion.kind !== 'flag') return
-    if (pendingRole) return
-    if (roleValues.length === 0) return
-    const flagDefault: Record<string, string> = {
-      primaryContact: 'Homeowner',
-      contractHolder: 'Property Manager',
-      quoteRecipient: 'Other',
-    }
-    const pick = flagDefault[criterion.flag]
-    if (pick && roleValues.includes(pick)) {
-      setPendingRole(pick)
-    }
-  }, [criterion, roleValues, pendingRole])
+  // No default role. Earlier versions guessed a "most common" role per flag
+  // (Homeowner / Property Manager / Other) but QA found users routinely
+  // shipped records with the wrong default still in place — there was no
+  // signal that they had to choose. Forcing an explicit pick is the trade
+  // we made: the role dropdown starts on "Select a role…" and the wizard
+  // blocks Next until something is chosen for any slot with a contact set.
   // Paired-mode: user explicitly opts out of an Account so the Contact picker
   // searches all contacts globally. Stays false otherwise so the Account picker
   // is the only entry point and the Contact picker is gated behind a selection.
@@ -244,10 +230,11 @@ export function SlotInput({
     }
   }, [contactQuery, contactActive, mode, accountId])
 
-  // In paired mode, require BOTH a Contact and an Account before save can fire,
-  // unless the user has opted out of the Account by clicking "Skip account &
-  // search all contacts" — in that case Contact alone is sufficient. This
-  // prevents the half-saved state where only a contact was attached.
+  // In paired mode, require BOTH a Contact and an Account before commit can
+  // fire, unless the user has opted out of the Account by clicking "Skip
+  // organization & search all contacts" — in that case Contact alone is
+  // sufficient. This prevents the half-bound state where only a contact
+  // would be attached.
   const hasSelection = (mode === 'contact' && !!contactId) ||
     (mode === 'account' && !!accountId) ||
     (mode === 'paired' && (
@@ -258,26 +245,94 @@ export function SlotInput({
 
   const isFlagNetNew = criterion.kind === 'flag' && !boundRow
 
-  const canSave = hasSelection && !saving && (!isFlagNetNew || !!pendingRole)
+  // Auto-commit replaces the legacy "Save" button. The slot now behaves like
+  // a regular lookup field: the moment the user has picked everything the
+  // slot needs (contact + role for flag-bound slots, contact for role-bound
+  // slots, etc.) the row is committed via onFill. The bound-pill UI takes
+  // over on the next render — at that point local state is cleared so the
+  // X-to-clear truly resets the slot rather than re-showing the pre-bound
+  // selection.
+  //
+  // QA round 5 driver: the explicit Save click was the lone "regular lookup"
+  // exception in the wizard and routinely tripped users; keeping it as a
+  // gate also encouraged shipping the wrong default role since users
+  // skipped the role dropdown on their way to the Save button.
+  const lastCommitKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (boundRow) return
+    if (saving) return
+    if (!hasSelection) return
+    if (isFlagNetNew && !pendingRole) return // role required, not yet picked
 
-  async function handleSave() {
-    if (!canSave) return
+    const key = JSON.stringify({
+      c: mode === 'account' ? null : contactId,
+      a: mode === 'contact' ? null : accountId,
+      r: isFlagNetNew ? pendingRole : null,
+    })
+    if (lastCommitKeyRef.current === key) return
+    lastCommitKeyRef.current = key
+
+    let cancelled = false
     setSaving(true)
     setError(null)
-    try {
-      await onFill({
-        contactId: mode === 'account' ? null : contactId,
-        accountId: mode === 'contact' ? null : accountId,
-        role: isFlagNetNew ? pendingRole : undefined,
-      })
-      // Reset inline state after successful save (slot re-binds via boundRow update)
-      setPendingRole('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save')
-    } finally {
-      setSaving(false)
+    ;(async () => {
+      try {
+        await onFill({
+          contactId: mode === 'account' ? null : contactId,
+          accountId: mode === 'contact' ? null : accountId,
+          role: isFlagNetNew ? pendingRole : undefined,
+        })
+        if (!cancelled) {
+          // Success — clear local state. The boundRow becomes the source of
+          // truth on the next render, so showing pre-bound state with the
+          // same values would be confusing AND would let the X-to-clear
+          // leave the user with the same pill staring back at them.
+          setAccountId(null)
+          setContactId(null)
+          setAccountQuery('')
+          setContactQuery('')
+          setPendingRole('')
+          setNoAccountMode(false)
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to save')
+          lastCommitKeyRef.current = null // allow the user to retry the same selection
+        }
+      } finally {
+        if (!cancelled) setSaving(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
     }
-  }
+  }, [
+    boundRow,
+    saving,
+    hasSelection,
+    isFlagNetNew,
+    pendingRole,
+    mode,
+    contactId,
+    accountId,
+    onFill,
+  ])
+
+  // Register this slot's "incomplete pick" status with the surrounding
+  // PendingWidget context so the wizard can block Next while the user has
+  // a contact selected but hasn't picked a role yet. Only relevant for
+  // flag-bound slots in create mode; role-bound slots derive their role
+  // from the criterion and have nothing to gate on. The detail page (no
+  // PendingWidget context) gracefully no-ops.
+  const pendingCtx = usePendingWidget()
+  const widgetIdRef = useRef<string>(`slot-${Math.random().toString(36).slice(2)}`)
+  useEffect(() => {
+    if (!pendingCtx) return
+    if (boundRow) return
+    const isIncomplete = () => hasSelection && isFlagNetNew && !pendingRole
+    return pendingCtx.registerIncompleteCheck(widgetIdRef.current, isIncomplete)
+  }, [pendingCtx, boundRow, hasSelection, isFlagNetNew, pendingRole])
 
   // FieldDef shapes for LookupSearch — minimal, just enough to drive the picker.
   const accountFieldDef: FieldDef = {
@@ -525,33 +580,13 @@ export function SlotInput({
 
       {error && <p className="text-xs text-red-600">{error}</p>}
 
-      {hasSelection && (
-        <div className="flex gap-2 pt-1">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="px-3 py-1.5 text-xs font-medium rounded-md bg-brand-navy text-white hover:bg-brand-navy/90 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving…' : placeholder ? placeholder : 'Save'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAccountId(null)
-              setContactId(null)
-              setAccountQuery('')
-              setContactQuery('')
-              setPendingRole('')
-              setNoAccountMode(false)
-              setError(null)
-            }}
-            disabled={saving}
-            className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
-          >
-            Cancel
-          </button>
-        </div>
+      {/* Saving indicator — replaces the legacy Save button. The auto-commit
+       *  effect above fires onFill the moment the slot has everything it
+       *  needs. While the request is in flight, surface that so the user
+       *  knows their pick is being saved (matters most in edit mode where
+       *  fillSlot makes a real API call). */}
+      {saving && (
+        <p className="text-[11px] text-gray-500 italic pt-0.5">Saving…</p>
       )}
     </div>
   )

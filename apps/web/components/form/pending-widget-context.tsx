@@ -28,6 +28,19 @@ export interface PendingWidgetContextValue {
   registerWidget: (registration: PendingWidgetRegistration) => void
   /** Unregister a widget (called on unmount) */
   unregisterWidget: (widgetId: string) => void
+  /**
+   * Register an "is in incomplete state" predicate from a widget. The
+   * wizard's section/full validation polls every registered predicate; if
+   * any returns true, the wizard refuses to advance and surfaces an error.
+   * Use case: TeamMemberSlot fields where the user has picked a contact
+   * but not yet picked a role. The pool only ever holds complete rows
+   * (PR #92's snapshot semantics), so the in-progress state has to be
+   * reported separately for the wizard to gate Next.
+   * Returns an unregister function for cleanup.
+   */
+  registerIncompleteCheck: (widgetId: string, isIncomplete: () => boolean) => () => void
+  /** True if any registered widget reports an incomplete selection right now. */
+  hasIncompleteWidgets: () => boolean
   /** Returns true if any registered widget has pending data */
   hasPendingData: () => boolean
   /**
@@ -92,6 +105,33 @@ export function usePendingWidgetManager(
     return false
   }, [])
 
+  // Incomplete-widgets registry. Lives on this outer context (not the inner
+  // TeamMember pool) so the DynamicForm — which sits above the inner pool —
+  // can poll it during wizard validation. Each consumer registers a
+  // predicate; hasIncompleteWidgets() returns true if any predicate fires.
+  const incompleteChecksRef = useRef<Map<string, () => boolean>>(new Map())
+
+  const registerIncompleteCheck = useCallback(
+    (widgetId: string, isIncomplete: () => boolean) => {
+      incompleteChecksRef.current.set(widgetId, isIncomplete)
+      return () => {
+        incompleteChecksRef.current.delete(widgetId)
+      }
+    },
+    [],
+  )
+
+  const hasIncompleteWidgets = useCallback((): boolean => {
+    for (const fn of incompleteChecksRef.current.values()) {
+      try {
+        if (fn()) return true
+      } catch {
+        // A misbehaving widget's check shouldn't crash the wizard.
+      }
+    }
+    return false
+  }, [])
+
   const snapshotPendingWidgets = useCallback((): PendingWidgetRegistration[] => {
     const out: PendingWidgetRegistration[] = []
     for (const reg of registrationsRef.current.values()) {
@@ -140,6 +180,8 @@ export function usePendingWidgetManager(
       parentObjectApiName,
       registerWidget,
       unregisterWidget,
+      registerIncompleteCheck,
+      hasIncompleteWidgets,
       hasPendingData,
       snapshotPendingWidgets,
       saveAllPending,
@@ -150,6 +192,8 @@ export function usePendingWidgetManager(
       parentObjectApiName,
       registerWidget,
       unregisterWidget,
+      registerIncompleteCheck,
+      hasIncompleteWidgets,
       hasPendingData,
       snapshotPendingWidgets,
       saveAllPending,
@@ -157,7 +201,14 @@ export function usePendingWidgetManager(
     ],
   )
 
-  return { contextValue, hasPendingData, snapshotPendingWidgets, saveAllPending, saveSnapshot }
+  return {
+    contextValue,
+    hasPendingData,
+    hasIncompleteWidgets,
+    snapshotPendingWidgets,
+    saveAllPending,
+    saveSnapshot,
+  }
 }
 
 // ── Provider (wraps children with the context) ──────────────────────────

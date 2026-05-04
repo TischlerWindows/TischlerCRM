@@ -330,7 +330,13 @@ export interface TeamMemberAssociationsConfig {
   };
 }
 
-export type TeamMemberFlag = 'primaryContact' | 'contractHolder' | 'quoteRecipient';
+export type TeamMemberFlag =
+  | 'primaryContact'
+  | 'contact2'
+  | 'contact3'
+  | 'contact4'
+  | 'contractHolder'
+  | 'quoteRecipient';
 
 export type TeamMemberSlotCriterion =
   | { kind: 'flag'; flag: TeamMemberFlag }

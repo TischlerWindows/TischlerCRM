@@ -2,14 +2,23 @@
 
 import { useMemo } from 'react'
 import type { ConfigPanelProps } from '@/lib/widgets/types'
-import type { TeamMemberSlotConfig, TeamMemberSlotCriterion } from '@/lib/schema'
+import type { TeamMemberFlag, TeamMemberSlotConfig, TeamMemberSlotCriterion } from '@/lib/schema'
 import { useSchemaStore } from '@/lib/schema-store'
 
-const FLAGS: Array<{ value: 'primaryContact' | 'contractHolder' | 'quoteRecipient'; label: string }> = [
+const FLAGS: Array<{ value: TeamMemberFlag; label: string }> = [
+  // Order intentionally reads as a position sequence (Contact 1 → 4) so admins
+  // building a layout for a property with multiple stakeholders see them in
+  // the natural order. Contract Holder / Quote Recipient stay below as
+  // role-flavored flags, not part of the contact-position sequence.
   { value: 'primaryContact', label: 'Primary Contact' },
+  { value: 'contact2', label: 'Contact 2' },
+  { value: 'contact3', label: 'Contact 3' },
+  { value: 'contact4', label: 'Contact 4' },
   { value: 'contractHolder', label: 'Contract Holder' },
   { value: 'quoteRecipient', label: 'Quote Recipient' },
 ]
+
+const FLAG_VALUES: ReadonlySet<TeamMemberFlag> = new Set(FLAGS.map(f => f.value))
 
 const ROLE_FALLBACK = [
   'Homeowner',
@@ -30,8 +39,8 @@ function encodeCriterion(c: TeamMemberSlotCriterion): string {
 
 function decodeCriterion(s: string): TeamMemberSlotCriterion | null {
   if (s.startsWith('flag:')) {
-    const flag = s.slice(5)
-    if (flag === 'primaryContact' || flag === 'contractHolder' || flag === 'quoteRecipient') {
+    const flag = s.slice(5) as TeamMemberFlag
+    if (FLAG_VALUES.has(flag)) {
       return { kind: 'flag', flag }
     }
     return null
@@ -160,16 +169,14 @@ export default function TeamMemberSlotConfigPanel({ config, onChange }: ConfigPa
 
       <div className="border-t border-gray-100" />
 
-      {/* Placeholder */}
-      <div>
-        <label className="block text-[11px] font-semibold text-brand-dark mb-1">Save button label (optional)</label>
-        <input
-          type="text"
-          className={inputCls}
-          value={typed.placeholder ?? ''}
-          placeholder="Save"
-          onChange={e => update({ placeholder: e.target.value })}
-        />
+      {/* Auto-commit note (replaces the legacy Save button label input).
+       *  The slot now commits on selection — no Save button to label. The
+       *  underlying `placeholder` config is preserved on existing layouts
+       *  for backwards compatibility but is no longer surfaced in the UI. */}
+      <div className="rounded-md border border-gray-100 bg-gray-50 px-3 py-2 text-[10px] text-gray-500 leading-snug">
+        Slots auto-commit on selection. Once the user picks a contact (and
+        a role, for flag-bound slots) the row binds without an explicit
+        Save click.
       </div>
     </div>
   )
