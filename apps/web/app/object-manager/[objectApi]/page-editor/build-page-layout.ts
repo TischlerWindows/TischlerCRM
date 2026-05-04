@@ -36,6 +36,13 @@ export function buildPageLayout(layout: PageLayout): PageLayout {
  */
 export function initEditorFromLayout(
   layout: PageLayout,
-): Pick<EditorState, 'layout' | 'isDirty' | 'selectedElement' | 'undoStack' | 'redoStack'> {
-  return { layout, isDirty: false, selectedElement: null, undoStack: [], redoStack: [] };
+): Pick<EditorState, 'layout' | 'savedBaseline' | 'isDirty' | 'selectedElement' | 'undoStack' | 'redoStack'> {
+  return {
+    layout,
+    savedBaseline: structuredClone(layout),
+    isDirty: false,
+    selectedElement: null,
+    undoStack: [],
+    redoStack: [],
+  };
 }
