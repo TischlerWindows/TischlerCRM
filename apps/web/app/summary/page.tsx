@@ -714,13 +714,13 @@ export default function SummaryPage() {
               product: pick('productSpecifications'),
               plansDated: pick('plansDated'),
             };
-            const { architectDesignerContact, quoteRecipientAccount } = await resolveTeamMemberFields(opportunityId);
-            oppFields.contactReceivingQuote = architectDesignerContact.name;
-            oppFields.accountReceivingQuote = quoteRecipientAccount.name;
-            oppFields.accountShippingAddress = quoteRecipientAccount.shippingAddress;
-            oppFields.contactPrimaryPhone = architectDesignerContact.primaryPhone;
-            oppFields.contactEmail = architectDesignerContact.email;
-            oppFields.contactCellPhone = architectDesignerContact.cellPhone;
+            const { quoteRecipientContact, architectDesignerAccount } = await resolveTeamMemberFields(opportunityId);
+            oppFields.contactReceivingQuote = quoteRecipientContact.name;
+            oppFields.accountReceivingQuote = architectDesignerAccount.name;
+            oppFields.accountShippingAddress = architectDesignerAccount.shippingAddress;
+            oppFields.contactPrimaryPhone = quoteRecipientContact.primaryPhone;
+            oppFields.contactEmail = quoteRecipientContact.email;
+            oppFields.contactCellPhone = quoteRecipientContact.cellPhone;
             address = await resolveOppPropertyAddress(d);
           }
         } catch { /* non-fatal */ }
@@ -930,51 +930,63 @@ export default function SummaryPage() {
   const resolveTeamMemberFields = async (
     opportunityId: string,
   ): Promise<{
-    architectDesignerContact: { name: string; primaryPhone: string; email: string; cellPhone: string };
-    quoteRecipientAccount: { name: string; shippingAddress: string; primaryPhone: string };
+    quoteRecipientContact: { name: string; primaryPhone: string; email: string; cellPhone: string };
+    architectDesignerAccount: { name: string; shippingAddress: string; primaryPhone: string };
   }> => {
     const emptyContact = { name: '', primaryPhone: '', email: '', cellPhone: '' };
     const emptyAccount = { name: '', shippingAddress: '', primaryPhone: '' };
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const res = await fetch(
-        `${API_BASE}/objects/TeamMember/records?filter[opportunity]=${encodeURIComponent(opportunityId)}&limit=200`,
-        { credentials: 'include' },
-      );
-      const members = res.ok ? await res.json() : [];
-      const rows: any[] = Array.isArray(members) ? members : ((members as any)?.records ?? []);
+      // Try both field keys that may store the opportunity reference
+      const [res1, res2] = await Promise.all([
+        fetch(`${API_BASE}/objects/TeamMember/records?filter[opportunity]=${encodeURIComponent(opportunityId)}&limit=200`, { credentials: 'include' }),
+        fetch(`${API_BASE}/objects/TeamMember/records?filter[OpportunityId]=${encodeURIComponent(opportunityId)}&limit=200`, { credentials: 'include' }),
+      ]);
+      const [batch1, batch2] = await Promise.all([
+        res1.ok ? res1.json() : [],
+        res2.ok ? res2.json() : [],
+      ]);
+      const all1: any[] = Array.isArray(batch1) ? batch1 : ((batch1 as any)?.records ?? []);
+      const all2: any[] = Array.isArray(batch2) ? batch2 : ((batch2 as any)?.records ?? []);
+      // Deduplicate by id
+      const seen = new Set<string>();
+      const rows: any[] = [];
+      for (const r of [...all1, ...all2]) {
+        const rid = String(r.id ?? '');
+        if (rid && !seen.has(rid)) { seen.add(rid); rows.push(r); }
+      }
 
       const getField = (row: any, bare: string) => {
         const d = row.data ?? row;
         return d[bare] || d[`TeamMember__${bare}`] || '';
       };
 
-      // Find Quote Recipient (quoteRecipient checkbox = true)
+      // Find Quote Recipient (quoteRecipient checkbox = true) → contact
       const qrRow = rows.find(r => {
         const val = getField(r, 'quoteRecipient');
         return val === true || val === 'true' || val === 1;
       });
 
-      // Find Architect / Designer (role matches)
+      // Find Architect / Designer (role matches) → account
       const adRow = rows.find(r => {
         const role = (getField(r, 'role') || '').toLowerCase();
         return role.includes('architect') || role.includes('designer');
       });
 
-      // Resolve Architect/Designer contact
-      const adContactId = adRow ? (getField(adRow, 'contact') || '') : '';
-      const adContactFields = adContactId ? await resolveContactName(adContactId) : emptyContact;
+      // Quote Recipient → contact name/phone
+      const qrContactId = qrRow ? (getField(qrRow, 'contact') || '') : '';
+      const qrContactFields = qrContactId ? await resolveContactName(qrContactId) : emptyContact;
 
-      // Resolve Quote Recipient account
-      const qrAccountId = qrRow ? (getField(qrRow, 'account') || '') : '';
-      const qrAccountFields = qrAccountId ? await resolveAccountFields(qrAccountId) : emptyAccount;
+      // Architect / Designer → account name/address
+      const adAccountId = adRow ? (getField(adRow, 'account') || '') : '';
+      const adAccountFields = adAccountId ? await resolveAccountFields(adAccountId) : emptyAccount;
 
       return {
-        architectDesignerContact: adContactFields,
-        quoteRecipientAccount: qrAccountFields,
+        quoteRecipientContact: qrContactFields,
+        architectDesignerAccount: adAccountFields,
       };
     } catch {
-      return { architectDesignerContact: emptyContact, quoteRecipientAccount: emptyAccount };
+      return { quoteRecipientContact: emptyContact, architectDesignerAccount: emptyAccount };
     }
   };
 
@@ -993,7 +1005,7 @@ export default function SummaryPage() {
     const glassResolved = resolvePicklist('Opportunity__glassType', pick('glassType'));
     const woodResolved = resolvePicklist('Opportunity__woodType', pick('woodType'));
     const oppId = record.id as string;
-    const { architectDesignerContact, quoteRecipientAccount } = await resolveTeamMemberFields(oppId);
+    const { quoteRecipientContact, architectDesignerAccount } = await resolveTeamMemberFields(oppId);
     createNewSummary({
       opportunityId: record.id,
       opportunityName: record.opportunityName || record.Opportunity__opportunityName || '',
@@ -1010,12 +1022,12 @@ export default function SummaryPage() {
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
         plansDated: pick('plansDated'),
-        contactReceivingQuote: architectDesignerContact.name,
-        accountReceivingQuote: quoteRecipientAccount.name,
-        accountShippingAddress: quoteRecipientAccount.shippingAddress,
-        contactPrimaryPhone: architectDesignerContact.primaryPhone,
-        contactEmail: architectDesignerContact.email,
-        contactCellPhone: architectDesignerContact.cellPhone,
+        contactReceivingQuote: quoteRecipientContact.name,
+        accountReceivingQuote: architectDesignerAccount.name,
+        accountShippingAddress: architectDesignerAccount.shippingAddress,
+        contactPrimaryPhone: quoteRecipientContact.primaryPhone,
+        contactEmail: quoteRecipientContact.email,
+        contactCellPhone: quoteRecipientContact.cellPhone,
       },
     });
   };
@@ -1471,7 +1483,7 @@ export default function SummaryPage() {
       drawField(doc, 15, y, 'Description of Changes', val(s.requoteDescription), col3W * 3);
     }
     y += 10;
-    drawField(doc, 15, y, 'Architect / Designer', val(s.contactReceivingQuote), col3W);
+    drawField(doc, 15, y, 'Contact Receiving Quote', val(s.contactReceivingQuote), col3W);
     drawField(doc, 15 + col3W, y, 'Account', val(s.accountReceivingQuote), col3W);
     y += 10;
     drawField(doc, 15, y, 'Account Shipping Address', fmtAddr(val(s.accountShippingAddress)), col3W);
@@ -3037,7 +3049,7 @@ export default function SummaryPage() {
                       {/* Row 7: Contact + Account receiving the quote */}
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Architect / Designer</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Contact Receiving the Quote</label>
                           <input
                             type="text"
                             value={editingSummary.contactReceivingQuote || ''}
@@ -3045,7 +3057,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
                             placeholder="Enter contact"
                           />
-                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Architect / Designer connection</p>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Quote Recipient connection</p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
