@@ -19,7 +19,8 @@ import {
   X,
   Eye,
   Save,
-  Printer
+  Printer,
+  MapPin
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
@@ -549,6 +550,18 @@ interface DoorRow {
   finalFinishPosition: string;
 }
 
+interface SummarySubLocation {
+  id: string;
+  label: string;
+  rows: SummaryRow[];
+  doorRows: DoorRow[];
+  quoteTotals: {
+    euroWindows: { full: string; pct: string; final: string; finalAdj: string };
+    doubleHung: { full: string; pct: string; final: string; finalAdj: string };
+    euroDoors: { full: string; pct: string; final: string; finalAdj: string };
+  };
+}
+
 interface Summary {
   id: string;
   name: string;
@@ -570,6 +583,8 @@ interface Summary {
   requoteDescription: string;
   rows: SummaryRow[];
   doorRows: DoorRow[];
+  hasMultipleLocations?: boolean;
+  subLocations?: SummarySubLocation[];
   shadeBoxesNoSideTrim: {
     totalPerUnit: string;
     totalPerPosition: string;
@@ -652,6 +667,7 @@ export default function SummaryPage() {
   const [showShadeBoxesWithTrim, setShowShadeBoxesWithTrim] = useState(false);
   const [showFinalFinish, setShowFinalFinish] = useState(false);
   const [activePage, setActivePage] = useState<1 | 2>(1);
+  const [activeLocationId, setActiveLocationId] = useState<string>('');
   const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
@@ -1715,6 +1731,49 @@ export default function SummaryPage() {
     }
   };
 
+  const defaultQuoteTotals = () => ({
+    euroWindows: { full: '', pct: '', final: '', finalAdj: '' },
+    doubleHung: { full: '', pct: '', final: '', finalAdj: '' },
+    euroDoors: { full: '', pct: '', final: '', finalAdj: '' },
+  });
+
+  const getActiveLocId = (s: Summary) =>
+    s.hasMultipleLocations && s.subLocations?.length
+      ? (activeLocationId || s.subLocations[0]!.id)
+      : '';
+
+  const getActiveRows = (s: Summary): SummaryRow[] => {
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      const locId = getActiveLocId(s);
+      return s.subLocations.find(l => l.id === locId)?.rows ?? [];
+    }
+    return s.rows;
+  };
+
+  const getActiveDoorRows = (s: Summary): DoorRow[] => {
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      const locId = getActiveLocId(s);
+      return s.subLocations.find(l => l.id === locId)?.doorRows ?? [];
+    }
+    return s.doorRows;
+  };
+
+  const mutateRows = (s: Summary, fn: (rows: SummaryRow[]) => SummaryRow[]): Summary => {
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      const locId = getActiveLocId(s);
+      return { ...s, subLocations: s.subLocations.map(l => l.id === locId ? { ...l, rows: fn(l.rows) } : l) };
+    }
+    return { ...s, rows: fn(s.rows) };
+  };
+
+  const mutateDoorRows = (s: Summary, fn: (rows: DoorRow[]) => DoorRow[]): Summary => {
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      const locId = getActiveLocId(s);
+      return { ...s, subLocations: s.subLocations.map(l => l.id === locId ? { ...l, doorRows: fn(l.doorRows) } : l) };
+    }
+    return { ...s, doorRows: fn(s.doorRows) };
+  };
+
   const handleAddRow = () => {
     if (!editingSummary) return;
     
@@ -1756,10 +1815,7 @@ export default function SummaryPage() {
       finalFinishPosition: ''
     };
     
-    setEditingSummary({
-      ...editingSummary,
-      rows: [...editingSummary.rows, newRow]
-    });
+    setEditingSummary(mutateRows(editingSummary, rows => [...rows, newRow]));
   };
 
   const handleAddRowBelow = (rowId: string) => {
@@ -1803,31 +1859,24 @@ export default function SummaryPage() {
       finalFinishPosition: ''
     };
     
-    const rowIndex = editingSummary.rows.findIndex(r => r.id === rowId);
-    const newRows = [...editingSummary.rows];
-    newRows.splice(rowIndex + 1, 0, newRow);
-    
-    setEditingSummary({
-      ...editingSummary,
-      rows: newRows
-    });
+    setEditingSummary(mutateRows(editingSummary, rows => {
+      const idx = rows.findIndex(r => r.id === rowId);
+      const next = [...rows];
+      next.splice(idx + 1, 0, newRow);
+      return next;
+    }));
   };
 
   const handleDeleteRow = (rowId: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary({
-      ...editingSummary,
-      rows: editingSummary.rows.filter(r => r.id !== rowId)
-    });
+    setEditingSummary(mutateRows(editingSummary, rows => rows.filter(r => r.id !== rowId)));
   };
 
   const updateRow = (rowId: string, field: keyof SummaryRow, value: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary({
-      ...editingSummary,
-      rows: editingSummary.rows.map(r => {
+    setEditingSummary(mutateRows(editingSummary, rows => rows.map(r => {
         if (r.id !== rowId) return r;
         
         const updatedRow = { ...r, [field]: value };
@@ -2038,8 +2087,7 @@ export default function SummaryPage() {
         }
         
         return updatedRow;
-      })
-    });
+      })));
   };
 
   // Doors handlers
@@ -2084,10 +2132,7 @@ export default function SummaryPage() {
       finalFinishPosition: ''
     };
     
-    setEditingSummary({
-      ...editingSummary,
-      doorRows: [...editingSummary.doorRows, newRow]
-    });
+    setEditingSummary(mutateDoorRows(editingSummary, rows => [...rows, newRow]));
   };
 
   const handleAddDoorRowBelow = (rowId: string) => {
@@ -2131,31 +2176,24 @@ export default function SummaryPage() {
       finalFinishPosition: ''
     };
     
-    const rowIndex = editingSummary.doorRows.findIndex(r => r.id === rowId);
-    const newRows = [...editingSummary.doorRows];
-    newRows.splice(rowIndex + 1, 0, newRow);
-    
-    setEditingSummary({
-      ...editingSummary,
-      doorRows: newRows
-    });
+    setEditingSummary(mutateDoorRows(editingSummary, rows => {
+      const idx = rows.findIndex(r => r.id === rowId);
+      const next = [...rows];
+      next.splice(idx + 1, 0, newRow);
+      return next;
+    }));
   };
 
   const handleDeleteDoorRow = (rowId: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary({
-      ...editingSummary,
-      doorRows: editingSummary.doorRows.filter(r => r.id !== rowId)
-    });
+    setEditingSummary(mutateDoorRows(editingSummary, rows => rows.filter(r => r.id !== rowId)));
   };
 
   const updateDoorRow = (rowId: string, field: keyof DoorRow, value: string) => {
     if (!editingSummary) return;
     
-    setEditingSummary({
-      ...editingSummary,
-      doorRows: editingSummary.doorRows.map(r => {
+    setEditingSummary(mutateDoorRows(editingSummary, rows => rows.map(r => {
         if (r.id !== rowId) return r;
         
         const updatedRow = { ...r, [field]: value };
@@ -2364,8 +2402,7 @@ export default function SummaryPage() {
         }
         
         return updatedRow;
-      })
-    });
+      })));
   };
   
   if (loading) {
@@ -3560,8 +3597,16 @@ export default function SummaryPage() {
                     const sumField = (rows: (SummaryRow | DoorRow)[], field: string) =>
                       rows.reduce((acc, row) => acc + (parseFloat((row as any)[field]) || 0), 0);
 
-                    const hungRows = editingSummary.rows.filter(r => r.type?.toLowerCase().includes('hung'));
-                    const nonHungRows = editingSummary.rows.filter(r => !r.type?.toLowerCase().includes('hung'));
+                    // When multi-location, aggregate all locations; otherwise use top-level rows
+                    const allWindowRows: SummaryRow[] = editingSummary.hasMultipleLocations
+                      ? (editingSummary.subLocations ?? []).flatMap(l => l.rows)
+                      : editingSummary.rows;
+                    const allDoorRowsP2: DoorRow[] = editingSummary.hasMultipleLocations
+                      ? (editingSummary.subLocations ?? []).flatMap(l => l.doorRows)
+                      : editingSummary.doorRows;
+
+                    const hungRows = allWindowRows.filter(r => r.type?.toLowerCase().includes('hung'));
+                    const nonHungRows = allWindowRows.filter(r => !r.type?.toLowerCase().includes('hung'));
 
                     const euroWindowQty = sumField(nonHungRows, 'qty');
                     const euroWindowFields = sumField(nonHungRows, 'fieldsTotal');
@@ -3573,10 +3618,10 @@ export default function SummaryPage() {
                     const doubleHungSqFt = sumField(hungRows, 'sqFeetTotal');
                     const doubleHungNet = sumField(hungRows, 'netEuroTotal');
 
-                    const doorQty = sumField(editingSummary.doorRows, 'qty');
-                    const doorFields = sumField(editingSummary.doorRows, 'fieldsTotal');
-                    const doorSqFt = sumField(editingSummary.doorRows, 'sqFeetTotal');
-                    const doorNet = sumField(editingSummary.doorRows, 'netEuroTotal');
+                    const doorQty = sumField(allDoorRowsP2, 'qty');
+                    const doorFields = sumField(allDoorRowsP2, 'fieldsTotal');
+                    const doorSqFt = sumField(allDoorRowsP2, 'sqFeetTotal');
+                    const doorNet = sumField(allDoorRowsP2, 'netEuroTotal');
 
                     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
@@ -3598,22 +3643,173 @@ export default function SummaryPage() {
                       return { full, disc, final: final_, finalAdj };
                     };
 
-                    const ewCalc = calcRow(euroWindowNet, qtot?.euroWindows);
-                    const dhCalc = calcRow(doubleHungNet, qtot?.doubleHung);
-                    const edCalc = calcRow(doorNet, qtot?.euroDoors);
+                    // When multi-location, aggregate quoteTotals across all subLocations for grand total calcs
+                    const aggQt = editingSummary.hasMultipleLocations
+                      ? (() => {
+                          const locs = editingSummary.subLocations ?? [];
+                          const sumCat = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: 'full'|'pct'|'final'|'finalAdj') =>
+                            locs.reduce((a, l) => a + (p((l.quoteTotals as any)?.[cat]?.[f])), 0).toString();
+                          return {
+                            euroWindows: { full: sumCat('euroWindows','full'), pct: sumCat('euroWindows','pct'), final: sumCat('euroWindows','final'), finalAdj: sumCat('euroWindows','finalAdj') },
+                            doubleHung:  { full: sumCat('doubleHung','full'),  pct: sumCat('doubleHung','pct'),  final: sumCat('doubleHung','final'),  finalAdj: sumCat('doubleHung','finalAdj')  },
+                            euroDoors:   { full: sumCat('euroDoors','full'),   pct: sumCat('euroDoors','pct'),   final: sumCat('euroDoors','final'),   finalAdj: sumCat('euroDoors','finalAdj')   },
+                          };
+                        })()
+                      : qtot;
+
+                    const ewCalc = calcRow(euroWindowNet, aggQt?.euroWindows);
+                    const dhCalc = calcRow(doubleHungNet, aggQt?.doubleHung);
+                    const edCalc = calcRow(doorNet, aggQt?.euroDoors);
                     const gtNet = euroWindowNet + doubleHungNet + doorNet;
                     const gtCalc = {
-                      full:     gtNet ? (p(qtot?.euroWindows?.full)     + p(qtot?.doubleHung?.full)     + p(qtot?.euroDoors?.full))     / gtNet : 0,
-                      disc:     gtNet ? (p(qtot?.euroWindows?.pct)      + p(qtot?.doubleHung?.pct)      + p(qtot?.euroDoors?.pct))      / gtNet : 0,
-                      final:    gtNet ? (p(qtot?.euroWindows?.final)    + p(qtot?.doubleHung?.final)    + p(qtot?.euroDoors?.final))    / gtNet : 0,
-                      finalAdj: gtNet ? (p(qtot?.euroWindows?.finalAdj) + p(qtot?.doubleHung?.finalAdj) + p(qtot?.euroDoors?.finalAdj)) / gtNet : 0,
+                      full:     gtNet ? (p(aggQt?.euroWindows?.full)     + p(aggQt?.doubleHung?.full)     + p(aggQt?.euroDoors?.full))     / gtNet : 0,
+                      disc:     gtNet ? (p(aggQt?.euroWindows?.pct)      + p(aggQt?.doubleHung?.pct)      + p(aggQt?.euroDoors?.pct))      / gtNet : 0,
+                      final:    gtNet ? (p(aggQt?.euroWindows?.final)    + p(aggQt?.doubleHung?.final)    + p(aggQt?.euroDoors?.final))    / gtNet : 0,
+                      finalAdj: gtNet ? (p(aggQt?.euroWindows?.finalAdj) + p(aggQt?.doubleHung?.finalAdj) + p(aggQt?.euroDoors?.finalAdj)) / gtNet : 0,
+                    };
+
+                    // Helper to render a single location's quote totals table
+                    const renderQuoteTotalsTable = (
+                      locLabel: string | null,
+                      locWindowRows: SummaryRow[],
+                      locDoorRows: DoorRow[],
+                      locQtot: Summary['quoteTotals'],
+                      onQtotChange: ((qt: Summary['quoteTotals']) => void) | null
+                    ) => {
+                      const locHung = locWindowRows.filter(r => r.type?.toLowerCase().includes('hung'));
+                      const locNonHung = locWindowRows.filter(r => !r.type?.toLowerCase().includes('hung'));
+                      const ewQ = sumField(locNonHung, 'qty'), ewF = sumField(locNonHung, 'fieldsTotal');
+                      const ewSq = sumField(locNonHung, 'sqFeetTotal'), ewN = sumField(locNonHung, 'netEuroTotal');
+                      const dhQ = sumField(locHung, 'qty'), dhF = sumField(locHung, 'fieldsTotal');
+                      const dhSq = sumField(locHung, 'sqFeetTotal'), dhN = sumField(locHung, 'netEuroTotal');
+                      const dQ = sumField(locDoorRows, 'qty'), dF = sumField(locDoorRows, 'fieldsTotal');
+                      const dSq = sumField(locDoorRows, 'sqFeetTotal'), dN = sumField(locDoorRows, 'netEuroTotal');
+                      const totQ = ewQ+dhQ+dQ, totF = ewF+dhF+dF, totSq = ewSq+dhSq+dSq, totN = ewN+dhN+dN;
+                      const lEwCalc = calcRow(ewN, locQtot?.euroWindows);
+                      const lDhCalc = calcRow(dhN, locQtot?.doubleHung);
+                      const lEdCalc = calcRow(dN, locQtot?.euroDoors);
+                      const lGtNet = ewN+dhN+dN;
+                      const lGtCalc = {
+                        full:     lGtNet ? (p(locQtot?.euroWindows?.full)+p(locQtot?.doubleHung?.full)+p(locQtot?.euroDoors?.full))/lGtNet : 0,
+                        disc:     lGtNet ? (p(locQtot?.euroWindows?.pct)+p(locQtot?.doubleHung?.pct)+p(locQtot?.euroDoors?.pct))/lGtNet : 0,
+                        final:    lGtNet ? (p(locQtot?.euroWindows?.final)+p(locQtot?.doubleHung?.final)+p(locQtot?.euroDoors?.final))/lGtNet : 0,
+                        finalAdj: lGtNet ? (p(locQtot?.euroWindows?.finalAdj)+p(locQtot?.doubleHung?.finalAdj)+p(locQtot?.euroDoors?.finalAdj))/lGtNet : 0,
+                      };
+                      const editable = onQtotChange !== null;
+                      const setLocQt = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: string, val: string) => {
+                        if (!onQtotChange) return;
+                        const base = locQtot ?? defaultQuoteTotals();
+                        onQtotChange({ ...base, [cat]: { ...(base as any)[cat], [f]: val } });
+                      };
+                      const inputCell = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: string) => editable
+                        ? <td className="px-1 py-1"><input type="text" value={(locQtot as any)?.[cat]?.[f] || ''} onChange={e => setLocQt(cat, f, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
+                        : <td className="px-4 py-3 text-right text-gray-400">—</td>;
+                      return (
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
+                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg flex items-center gap-3">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {locLabel ? `Quote Totals — Location ${locLabel}` : 'Quote Totals'}
+                            </h3>
+                            {!locLabel && <p className="text-sm text-gray-500">Aggregated from the data entry sheet</p>}
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+                              <colgroup>
+                                <col style={{ width: '11%' }} /><col style={{ width: '5%' }} /><col style={{ width: '7%' }} />
+                                <col style={{ width: '7%' }} /><col style={{ width: '9%' }} /><col style={{ width: '8%' }} />
+                                <col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '9%' }} />
+                                <col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '7%' }} />
+                              </colgroup>
+                              <thead>
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL W/ ADJ.</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
+                                  <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">Final W/ Adj</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100">
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 font-medium text-gray-900">Euro Windows</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewQ)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewF)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(ewSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{ewN ? `€${fmt(ewN)}` : '—'}</td>
+                                  {inputCell('euroWindows','full')}{inputCell('euroWindows','pct')}{inputCell('euroWindows','final')}{inputCell('euroWindows','finalAdj')}
+                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEwCalc.full ? `€${fmt(lEwCalc.full)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEwCalc.disc ? `€${fmt(lEwCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{lEwCalc.final ? fmt(lEwCalc.final) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{lEwCalc.finalAdj ? fmt(lEwCalc.finalAdj) : '—'}</td>
+                                </tr>
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhQ)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhF)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(dhSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `€${fmt(dhN)}` : '—'}</td>
+                                  {inputCell('doubleHung','full')}{inputCell('doubleHung','pct')}{inputCell('doubleHung','final')}{inputCell('doubleHung','finalAdj')}
+                                  <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? `€${fmt(lDhCalc.full)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{lDhCalc.disc ? `€${fmt(lDhCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-400 bg-green-50/30">{lDhCalc.final ? fmt(lDhCalc.final) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-400 bg-purple-50/30">{lDhCalc.finalAdj ? fmt(lDhCalc.finalAdj) : '—'}</td>
+                                </tr>
+                                <tr className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 font-medium text-gray-900">Euro Doors</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(dSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dN ? `€${fmt(dN)}` : '—'}</td>
+                                  {inputCell('euroDoors','full')}{inputCell('euroDoors','pct')}{inputCell('euroDoors','final')}{inputCell('euroDoors','finalAdj')}
+                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEdCalc.full ? `€${fmt(lEdCalc.full)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEdCalc.disc ? `€${fmt(lEdCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{lEdCalc.final ? fmt(lEdCalc.final) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{lEdCalc.finalAdj ? fmt(lEdCalc.finalAdj) : '—'}</td>
+                                </tr>
+                                <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                  <td className="px-4 py-3 text-gray-900">Total</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totQ)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totF)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{fmt(totSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmt(totN)}` : '—'}</td>
+                                  {(['full','pct','final','finalAdj'] as const).map(f => {
+                                    const s = (p((locQtot?.euroWindows as any)?.[f])||0)+(p((locQtot?.doubleHung as any)?.[f])||0)+(p((locQtot?.euroDoors as any)?.[f])||0);
+                                    return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? fmt(s) : '—'}</td>;
+                                  })}
+                                  <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{lGtCalc.full ? `€${fmt(lGtCalc.full)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{lGtCalc.disc ? `€${fmt(lGtCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{lGtCalc.final ? fmt(lGtCalc.final) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{lGtCalc.finalAdj ? fmt(lGtCalc.finalAdj) : '—'}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
                     };
 
                     return (
                       <>
+                      {/* Per-location tables when multi-location */}
+                      {editingSummary.hasMultipleLocations && (editingSummary.subLocations ?? []).map(loc => renderQuoteTotalsTable(
+                        loc.label,
+                        loc.rows,
+                        loc.doorRows,
+                        loc.quoteTotals,
+                        (qt) => setEditingSummary({ ...editingSummary, subLocations: editingSummary.subLocations!.map(l => l.id === loc.id ? { ...l, quoteTotals: qt } : l) })
+                      ))}
+                      {/* Grand total (or the only table in single-location mode) */}
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
-                          <h3 className="text-lg font-semibold text-gray-900">Quote Totals</h3>
+                          <h3 className="text-lg font-semibold text-gray-900">{editingSummary.hasMultipleLocations ? 'Grand Total — All Locations' : 'Quote Totals'}</h3>
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
@@ -3832,9 +4028,14 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
-                                  const qt = editingSummary.quoteTotals;
-                                  const sum = (parseFloat((qt?.euroWindows as any)?.[f] || '0') || 0) + (parseFloat((qt?.doubleHung as any)?.[f] || '0') || 0) + (parseFloat((qt?.euroDoors as any)?.[f] || '0') || 0);
-                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sum ? fmt(sum) : '—'}</td>;
+                                  // When multi-location, sum across all subLocations; otherwise use top-level quoteTotals
+                                  const sumQt = editingSummary.hasMultipleLocations
+                                    ? (editingSummary.subLocations ?? []).reduce((acc, l) => {
+                                        const qt = l.quoteTotals;
+                                        return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
+                                      }, 0)
+                                    : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
+                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? fmt(sumQt) : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
@@ -4144,8 +4345,95 @@ export default function SummaryPage() {
                 </div>
               </div>
 
+              {/* Multiple Locations Toggle + Sub-tabs */}
+              <div className="flex flex-wrap items-center gap-3 mt-4 print:hidden">
+                <button
+                  onClick={() => {
+                    if (!editingSummary.hasMultipleLocations) {
+                      const firstLoc: SummarySubLocation = {
+                        id: Date.now().toString(),
+                        label: '1a',
+                        rows: editingSummary.rows,
+                        doorRows: editingSummary.doorRows,
+                        quoteTotals: editingSummary.quoteTotals ?? defaultQuoteTotals(),
+                      };
+                      setEditingSummary({ ...editingSummary, hasMultipleLocations: true, subLocations: [firstLoc], rows: [], doorRows: [] });
+                      setActiveLocationId(firstLoc.id);
+                    } else {
+                      const allRows = (editingSummary.subLocations ?? []).flatMap(l => l.rows);
+                      const allDoorRows = (editingSummary.subLocations ?? []).flatMap(l => l.doorRows);
+                      setEditingSummary({ ...editingSummary, hasMultipleLocations: false, subLocations: [], rows: allRows, doorRows: allDoorRows });
+                      setActiveLocationId('');
+                    }
+                  }}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                    editingSummary.hasMultipleLocations
+                      ? 'bg-brand-navy text-white border-brand-navy'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <MapPin className="w-4 h-4" />
+                  Job Has Multiple Locations
+                </button>
+              </div>
+
+              {editingSummary.hasMultipleLocations && editingSummary.subLocations && (
+                <div className="flex flex-wrap items-center gap-2 mt-3 print:hidden">
+                  <span className="text-xs font-medium text-gray-500">Location:</span>
+                  {editingSummary.subLocations.map(loc => {
+                    const isActive = (activeLocationId || editingSummary.subLocations![0]!.id) === loc.id;
+                    return (
+                      <div key={loc.id} className="flex items-center">
+                        <button
+                          onClick={() => setActiveLocationId(loc.id)}
+                          className={`px-3 py-1.5 text-sm font-medium border transition-colors ${
+                            editingSummary.subLocations!.length > 1 ? 'rounded-l-lg' : 'rounded-lg'
+                          } ${isActive ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                        >
+                          {loc.label}
+                        </button>
+                        {editingSummary.subLocations!.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const remaining = editingSummary.subLocations!.filter(l => l.id !== loc.id);
+                              setEditingSummary({ ...editingSummary, subLocations: remaining });
+                              if (isActive) setActiveLocationId(remaining[0]?.id ?? '');
+                            }}
+                            className={`px-1.5 py-1.5 text-xs border-y border-r rounded-r-lg transition-colors ${
+                              isActive
+                                ? 'bg-brand-navy text-white border-brand-navy hover:bg-red-600 hover:border-red-600'
+                                : 'bg-white text-gray-400 border-gray-300 hover:bg-red-50 hover:text-red-600'
+                            }`}
+                          >×</button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => {
+                      const labels = ['1a','1b','1c','1d','1e','1f','1g','1h','1i','1j'];
+                      const used = editingSummary.subLocations!.map(l => l.label);
+                      const nextLabel = labels.find(l => !used.includes(l)) ?? `loc${editingSummary.subLocations!.length + 1}`;
+                      const newLoc: SummarySubLocation = {
+                        id: Date.now().toString(),
+                        label: nextLabel,
+                        rows: [],
+                        doorRows: [],
+                        quoteTotals: defaultQuoteTotals(),
+                      };
+                      setEditingSummary({ ...editingSummary, subLocations: [...editingSummary.subLocations!, newLoc] });
+                      setActiveLocationId(newLoc.id);
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-brand-navy border border-brand-navy rounded-lg hover:bg-brand-navy/5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Location
+                  </button>
+                </div>
+              )}
+
               {/* Main Table */}
-              <div className="border rounded-lg overflow-hidden print-section">
+              <div className="border rounded-lg overflow-hidden print-section mt-4">
                 <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900">Windows</h3>
                   <div className="flex items-center gap-4 print:hidden">
@@ -4265,7 +4553,7 @@ export default function SummaryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {editingSummary.rows.map((row) => (
+                      {getActiveRows(editingSummary).map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
                           <td className="px-0.5 py-1 align-top">
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateRow(row.id, 'tusPosition', v)} />
@@ -4514,7 +4802,7 @@ export default function SummaryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {editingSummary.doorRows.map((row) => (
+                      {getActiveDoorRows(editingSummary).map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
                           <td className="px-0.5 py-1 align-top">
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateDoorRow(row.id, 'tusPosition', v)} />
