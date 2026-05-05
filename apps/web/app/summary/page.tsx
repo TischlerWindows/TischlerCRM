@@ -1702,25 +1702,18 @@ export default function SummaryPage() {
       const tFields = grandEwFields + grandDhFields + grandDFields;
       const tSqFt = grandEwSqFt + grandDhSqFt + grandDSqFt;
       const tNet = grandEwNet + grandDhNet + grandDNet;
-      const fmtGrand = (v: number) => v > 0 ? fmt(v) : '—';
+      // Use top-level s.quoteTotals for Grand Total financial cols — this is what the Grand Total UI table writes to
+      const gtQt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+      function gtQtSum(f: string) { return pv((gtQt.euroWindows as any)?.[f]) + pv((gtQt.doubleHung as any)?.[f]) + pv((gtQt.euroDoors as any)?.[f]); }
       const grandRows = [
-        qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, {
-          full: fmtGrand(grandQt.euroWindows.full), pct: fmtGrand(grandQt.euroWindows.pct),
-          final: fmtGrand(grandQt.euroWindows.final), finalAdj: fmtGrand(grandQt.euroWindows.finalAdj),
-        }),
-        qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, {
-          full: fmtGrand(grandQt.doubleHung.full), pct: fmtGrand(grandQt.doubleHung.pct),
-          final: fmtGrand(grandQt.doubleHung.final), finalAdj: fmtGrand(grandQt.doubleHung.finalAdj),
-        }),
-        qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet, {
-          full: fmtGrand(grandQt.euroDoors.full), pct: fmtGrand(grandQt.euroDoors.pct),
-          final: fmtGrand(grandQt.euroDoors.final), finalAdj: fmtGrand(grandQt.euroDoors.finalAdj),
-        }),
+        qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows),
+        qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),
+        qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),
         qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
-          full: fmtGrand(grandQt.euroWindows.full + grandQt.doubleHung.full + grandQt.euroDoors.full),
-          pct:  fmtGrand(grandQt.euroWindows.pct  + grandQt.doubleHung.pct  + grandQt.euroDoors.pct),
-          final: fmtGrand(grandQt.euroWindows.final + grandQt.doubleHung.final + grandQt.euroDoors.final),
-          finalAdj: fmtGrand(grandQt.euroWindows.finalAdj + grandQt.doubleHung.finalAdj + grandQt.euroDoors.finalAdj),
+          full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
+          pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
+          final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
+          finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
         }),
       ];
       y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
@@ -4087,7 +4080,7 @@ export default function SummaryPage() {
                               </tr>
                               {expandedQtRows['euroDoors'] && (() => {
                                 const grouped = Object.entries(
-                                  (editingSummary.doorRows || []).reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
+                                  allDoorRowsP2.reduce((acc: Record<string, {qty:number,fields:number,sqFt:number,net:number}>, row) => {
                                     const parts = [(row as any).type, (row as any).type2, (row as any).type3, (row as any).type4].filter(Boolean);
                                     const t = parts.length ? parts.join(' w/ ') : '—';
                                     if (!acc[t]) acc[t] = {qty:0,fields:0,sqFt:0,net:0};
