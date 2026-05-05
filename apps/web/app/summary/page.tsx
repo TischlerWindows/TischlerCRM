@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
@@ -1179,11 +1180,41 @@ export default function SummaryPage() {
     setShowNewSummary(true);
   };
 
+  // ── Build product log items from a summary's rows/doorRows ──
+  const buildProductLogItems = (s: Summary) => {
+    const pv = (x: string | undefined) => parseFloat(x || '0') || 0;
+    const groupRows = (rows: (SummaryRow | DoorRow)[], category: string) => {
+      const acc: Record<string, { qty: number; fields: number; sqFeet: number; netEuro: number }> = {};
+      for (const row of rows) {
+        const r = row as any;
+        const parts = [r.type, r.type2, r.type3, r.type4].filter(Boolean);
+        const t = parts.length ? parts.join(' w/ ') : '—';
+        if (!acc[t]) acc[t] = { qty: 0, fields: 0, sqFeet: 0, netEuro: 0 };
+        acc[t].qty += pv(r.qty);
+        acc[t].fields += pv(r.fieldsTotal);
+        acc[t].sqFeet += pv(r.sqFeetTotal);
+        acc[t].netEuro += pv(r.netEuroTotal);
+      }
+      return Object.entries(acc)
+        .filter(([, v]) => v.qty > 0 || v.netEuro > 0)
+        .map(([productType, v]) => ({ category, productType, ...v }));
+    };
+    const hungRows = (s.rows || []).filter(r => r.type?.toLowerCase().includes('hung'));
+    const nonHungRows = (s.rows || []).filter(r => !r.type?.toLowerCase().includes('hung'));
+    return [
+      ...groupRows(nonHungRows, 'Euro Windows'),
+      ...groupRows(hungRows, 'Double Hung'),
+      ...groupRows(s.doorRows || [], 'Euro Doors'),
+    ];
+  };
+
   const handleDeleteSummary = (id: string) => {
     if (confirm('Are you sure you want to delete this summary?')) {
       const updatedSummaries = summaries.filter(s => s.id !== id);
       setSummaries(updatedSummaries);
       setSetting('summaries', updatedSummaries);
+      // Remove product log entries for this summary
+      apiClient.delete(`/product-log/${id}`).catch(() => {});
     }
   };
 
@@ -1666,6 +1697,16 @@ export default function SummaryPage() {
     
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
+    // Sync product log
+    const logItems = buildProductLogItems(editingSummary);
+    apiClient.post('/product-log/sync', {
+      summaryId: editingSummary.id,
+      summaryName: editingSummary.name || '',
+      opportunityNumber: editingSummary.opportunityNumber || '',
+      linkedOpportunityId: editingSummary.linkedOpportunityId || null,
+      date: editingSummary.date || undefined,
+      items: logItems,
+    }).catch(() => {});
     const oppId = editingSummary.linkedOpportunityId;
     setShowNewSummary(false);
     setEditingSummary(null);
@@ -2580,6 +2621,15 @@ export default function SummaryPage() {
                 <Star className="w-4 h-4" />
                 All Favorites
               </button>
+            </nav>
+          </div>
+          <div>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Logs</h3>
+            <nav className="space-y-1">
+              <Link href="/product-log" className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-gray-700 hover:bg-gray-100">
+                <Package className="w-4 h-4" />
+                Product Log
+              </Link>
             </nav>
           </div>
         </div>

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getSetting, setSetting } from '@/lib/preferences'
+import { apiClient } from '@/lib/api-client'
 import type { WidgetProps } from '@/lib/widgets/types'
 
 interface Summary {
@@ -110,6 +111,7 @@ export default function SummaryWidget({ record, object }: WidgetProps) {
     setAllSummaries(updated)
     setSummaries(updated.filter((s) => s.linkedOpportunityId === recordId))
     await setSetting('summaries', updated)
+    apiClient.delete(`/product-log/${summaryId}`).catch(() => {})
   }
 
   const handleToggleFavorite = async (summaryId: string) => {

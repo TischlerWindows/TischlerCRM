@@ -1,0 +1,181 @@
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { Search, Package, AlertCircle } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
+
+interface ProductLogEntry {
+  id: string;
+  summaryId: string;
+  summaryName: string;
+  opportunityNumber: string;
+  linkedOpportunityId: string | null;
+  date: string | null;
+  category: string;
+  productType: string;
+  qty: number;
+  fields: number;
+  sqFeet: number;
+  netEuro: number;
+  createdAt: string;
+}
+
+const CATEGORIES = ['All', 'Euro Windows', 'Double Hung', 'Euro Doors'];
+
+export default function ProductLogPage() {
+  const [entries, setEntries] = useState<ProductLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+
+  useEffect(() => {
+    apiClient.get<ProductLogEntry[]>('/product-log')
+      .then(data => setEntries(data))
+      .catch(() => setError('Failed to load product log.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return entries.filter(e => {
+      if (categoryFilter !== 'All' && e.category !== categoryFilter) return false;
+      if (q && ![e.summaryName, e.opportunityNumber, e.productType].some(v => v.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [entries, search, categoryFilter]);
+
+  // Totals
+  const totals = useMemo(() => ({
+    qty: filtered.reduce((s, e) => s + e.qty, 0),
+    fields: filtered.reduce((s, e) => s + e.fields, 0),
+    sqFeet: filtered.reduce((s, e) => s + e.sqFeet, 0),
+    netEuro: filtered.reduce((s, e) => s + e.netEuro, 0),
+  }), [filtered]);
+
+  const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtInt = (v: number) => v.toLocaleString('en-US');
+
+  return (
+    <div className="p-6 max-w-screen-xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-brand-navy/10 rounded-lg">
+          <Package className="w-6 h-6 text-brand-navy" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Product Log</h1>
+          <p className="text-sm text-gray-500">All products logged from saved summary sheets</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search job, opportunity, product…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 w-72"
+          />
+        </div>
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                categoryFilter === cat
+                  ? 'bg-brand-navy text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <div className="ml-auto text-sm text-gray-500 self-center">
+          {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-2 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16 text-gray-400 text-sm">
+            {entries.length === 0
+              ? 'No products logged yet. Save a summary sheet to start logging.'
+              : 'No entries match the current filters.'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Job Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Opp #</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Product Type</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Ft</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(entry => (
+                  <tr key={entry.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{entry.summaryName}</td>
+                    <td className="px-4 py-3 text-gray-600">{entry.opportunityNumber}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {entry.date
+                        ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        entry.category === 'Euro Windows' ? 'bg-blue-50 text-blue-700' :
+                        entry.category === 'Double Hung' ? 'bg-purple-50 text-purple-700' :
+                        'bg-green-50 text-green-700'
+                      }`}>
+                        {entry.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">{entry.productType}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{fmtInt(entry.qty)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{fmtInt(entry.fields)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{fmt(entry.sqFeet)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{entry.netEuro ? `€${fmt(entry.netEuro)}` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+              {/* Totals row */}
+              <tfoot>
+                <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
+                  <td className="px-4 py-3 text-gray-800" colSpan={5}>Totals ({filtered.length} lines)</td>
+                  <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.qty)}</td>
+                  <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
+                  <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
+                  <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

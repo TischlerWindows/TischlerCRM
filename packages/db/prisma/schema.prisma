@@ -879,3 +879,28 @@ model NotificationTypeSetting {
   @@unique([orgId, notificationKind])
   @@index([orgId])
 }
+
+// ============================================
+// Product Log (tracks products per summary)
+// ============================================
+
+model ProductLog {
+  id                  String   @id
+  summaryId           String
+  summaryName         String
+  opportunityNumber   String
+  linkedOpportunityId String?
+  date                String?
+  category            String   // "Euro Windows" | "Double Hung" | "Euro Doors"
+  productType         String   // e.g. "Fixed with Sash"
+  qty                 Float
+  fields              Float
+  sqFeet              Float
+  netEuro             Float
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([summaryId])
+  @@index([linkedOpportunityId])
+  @@index([createdAt])
+}
