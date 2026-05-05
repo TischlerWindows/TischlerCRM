@@ -1392,6 +1392,10 @@ export default function SummaryPage() {
         if (y + rh > maxY) {
           doc.addPage();
           drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+          // Restore row font after header changes it
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(50, 50, 50);
           y = 28;
         }
 
