@@ -1636,31 +1636,6 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const pdfHungRows = allPdfWindowRows.filter((r: SummaryRow) => r.type?.toLowerCase().includes('hung'));
-    const pdfNonHungRows = allPdfWindowRows.filter((r: SummaryRow) => !r.type?.toLowerCase().includes('hung'));
-    const ewQty = sumField(pdfNonHungRows, 'qty'), ewFields = sumField(pdfNonHungRows, 'fieldsTotal');
-    const ewSqFt = sumField(pdfNonHungRows, 'sqFeetTotal'), ewNet = sumField(pdfNonHungRows, 'netEuroTotal');
-    const dhQty = sumField(pdfHungRows, 'qty'), dhFields = sumField(pdfHungRows, 'fieldsTotal');
-    const dhSqFt = sumField(pdfHungRows, 'sqFeetTotal'), dhNet = sumField(pdfHungRows, 'netEuroTotal');
-    const dQty = sumField(allPdfDoorRows, 'qty'), dFields = sumField(allPdfDoorRows, 'fieldsTotal');
-    const dSqFt = sumField(allPdfDoorRows, 'sqFeetTotal'), dNet = sumField(allPdfDoorRows, 'netEuroTotal');
-    const tQty = ewQty + dhQty + dQty, tFields = ewFields + dhFields + dFields, tSqFt = ewSqFt + dhSqFt + dSqFt, tNet = ewNet + dhNet + dNet;
-    // Aggregate quoteTotals across subLocations when multi-location
-    const qt = (() => {
-      if (s.hasMultipleLocations && s.subLocations?.length) {
-        const locs = s.subLocations;
-        const aggField = (cat: string, field: string) => {
-          const vals = locs.map(l => pv((l.quoteTotals as any)?.[cat]?.[field])).filter(v => v > 0);
-          return vals.length ? String(vals.reduce((a, b) => a + b, 0)) : '';
-        };
-        return {
-          euroWindows: { full: aggField('euroWindows','full'), pct: aggField('euroWindows','pct'), final: aggField('euroWindows','final'), finalAdj: aggField('euroWindows','finalAdj') },
-          doubleHung:  { full: aggField('doubleHung','full'),  pct: aggField('doubleHung','pct'),  final: aggField('doubleHung','final'),  finalAdj: aggField('doubleHung','finalAdj')  },
-          euroDoors:   { full: aggField('euroDoors','full'),   pct: aggField('euroDoors','pct'),   final: aggField('euroDoors','final'),   finalAdj: aggField('euroDoors','finalAdj')   },
-        };
-      }
-      return s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
-    })();
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
     const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
@@ -1668,18 +1643,102 @@ export default function SummaryPage() {
       net ? '\u20AC' + fmt(net) : '—',
       cat?.full || '—', cat?.pct || '—', cat?.final || '—', cat?.finalAdj || '—',
     ];
-    const qtRows = [
-      qtRow('Euro Windows', ewQty, ewFields, ewSqFt, ewNet, qt.euroWindows),
-      qtRow('Double Hung', dhQty, dhFields, dhSqFt, dhNet, qt.doubleHung),
-      qtRow('Euro Doors', dQty, dFields, dSqFt, dNet, qt.euroDoors),
-      qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+
+    // Tracks grand totals for aggregation across locations
+    let grandEwQty = 0, grandEwFields = 0, grandEwSqFt = 0, grandEwNet = 0;
+    let grandDhQty = 0, grandDhFields = 0, grandDhSqFt = 0, grandDhNet = 0;
+    let grandDQty  = 0, grandDFields  = 0, grandDSqFt  = 0, grandDNet  = 0;
+    const grandQt = {
+      euroWindows: { full: 0, pct: 0, final: 0, finalAdj: 0 },
+      doubleHung:  { full: 0, pct: 0, final: 0, finalAdj: 0 },
+      euroDoors:   { full: 0, pct: 0, final: 0, finalAdj: 0 },
+    };
+
+    const renderQtTable = (locWinRows: SummaryRow[], locDoorRows: DoorRow[], locQt: any) => {
+      const hungR   = locWinRows.filter((r) => r.type?.toLowerCase().includes('hung'));
+      const nonHungR = locWinRows.filter((r) => !r.type?.toLowerCase().includes('hung'));
+      const ewQ = sumField(nonHungR, 'qty'),  ewF = sumField(nonHungR, 'fieldsTotal');
+      const ewS = sumField(nonHungR, 'sqFeetTotal'), ewN = sumField(nonHungR, 'netEuroTotal');
+      const dhQ = sumField(hungR, 'qty'),     dhF = sumField(hungR, 'fieldsTotal');
+      const dhS = sumField(hungR, 'sqFeetTotal'),  dhN = sumField(hungR, 'netEuroTotal');
+      const dQ  = sumField(locDoorRows, 'qty'), dF = sumField(locDoorRows, 'fieldsTotal');
+      const dS  = sumField(locDoorRows, 'sqFeetTotal'), dN = sumField(locDoorRows, 'netEuroTotal');
+      // accumulate into grand totals
+      grandEwQty += ewQ; grandEwFields += ewF; grandEwSqFt += ewS; grandEwNet += ewN;
+      grandDhQty += dhQ; grandDhFields += dhF; grandDhSqFt += dhS; grandDhNet += dhN;
+      grandDQty  += dQ;  grandDFields  += dF;  grandDSqFt  += dS;  grandDNet  += dN;
+      for (const cat of ['euroWindows', 'doubleHung', 'euroDoors'] as const) {
+        for (const f of ['full', 'pct', 'final', 'finalAdj'] as const) {
+          (grandQt[cat] as any)[f] += pv((locQt as any)?.[cat]?.[f]);
+        }
+      }
+      const rows = [
+        qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows),
+        qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),
+        qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),
+      ];
+      y = drawTable(doc, y, qtHeaders, qtColW, rows, { rightAlignFrom: 1, boldCol: 0 });
+      y += 3;
+    };
+
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      for (const loc of s.subLocations) {
+        // Sub-heading for location name
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...navy);
+        doc.text(loc.label || 'Unnamed Location', 15, y);
+        y += 4;
+        renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
+      }
+      // Grand Total table
+      y += 2;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...navy);
+      doc.text('Grand Total \u2014 All Locations', 15, y);
+      y += 4;
+      const tQty = grandEwQty + grandDhQty + grandDQty;
+      const tFields = grandEwFields + grandDhFields + grandDFields;
+      const tSqFt = grandEwSqFt + grandDhSqFt + grandDSqFt;
+      const tNet = grandEwNet + grandDhNet + grandDNet;
+      const fmtGrand = (v: number) => v > 0 ? fmt(v) : '—';
+      const grandRows = [
+        qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, {
+          full: fmtGrand(grandQt.euroWindows.full), pct: fmtGrand(grandQt.euroWindows.pct),
+          final: fmtGrand(grandQt.euroWindows.final), finalAdj: fmtGrand(grandQt.euroWindows.finalAdj),
+        }),
+        qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, {
+          full: fmtGrand(grandQt.doubleHung.full), pct: fmtGrand(grandQt.doubleHung.pct),
+          final: fmtGrand(grandQt.doubleHung.final), finalAdj: fmtGrand(grandQt.doubleHung.finalAdj),
+        }),
+        qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet, {
+          full: fmtGrand(grandQt.euroDoors.full), pct: fmtGrand(grandQt.euroDoors.pct),
+          final: fmtGrand(grandQt.euroDoors.final), finalAdj: fmtGrand(grandQt.euroDoors.finalAdj),
+        }),
+        qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+          full: fmtGrand(grandQt.euroWindows.full + grandQt.doubleHung.full + grandQt.euroDoors.full),
+          pct:  fmtGrand(grandQt.euroWindows.pct  + grandQt.doubleHung.pct  + grandQt.euroDoors.pct),
+          final: fmtGrand(grandQt.euroWindows.final + grandQt.doubleHung.final + grandQt.euroDoors.final),
+          finalAdj: fmtGrand(grandQt.euroWindows.finalAdj + grandQt.doubleHung.finalAdj + grandQt.euroDoors.finalAdj),
+        }),
+      ];
+      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+    } else {
+      const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+      renderQtTable(s.rows, s.doorRows, qt);
+      // Grand Total row
+      const tQty = grandEwQty + grandDhQty + grandDQty;
+      const tFields = grandEwFields + grandDhFields + grandDFields;
+      const tSqFt = grandEwSqFt + grandDhSqFt + grandDSqFt;
+      const tNet = grandEwNet + grandDhNet + grandDNet;
+      function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
+      const grandTotalRow = qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
-      }),
-    ];
-    // Local qtSum for this scope
-    function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
-    y = drawTable(doc, y, qtHeaders, qtColW, qtRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+      });
+      y = drawTable(doc, y, qtHeaders, qtColW, [grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+    }
     y += 6;
 
     // ── Add-On Items ──
