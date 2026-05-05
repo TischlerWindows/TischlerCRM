@@ -167,7 +167,7 @@ export default function ProductLogPage() {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Ft</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET â‚¬</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -199,14 +199,12 @@ export default function ProductLogPage() {
                             </span>
                           ))}
                         </div>
-                      ) : (
-                        <span className="text-gray-400 text-xs">â€”</span>
-                      )}
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-right text-gray-700">{fmtInt(entry.qty)}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{fmtInt(entry.fields)}</td>
                     <td className="px-4 py-3 text-right text-gray-700">{fmt(entry.sqFeet)}</td>
-                    <td className="px-4 py-3 text-right text-gray-700">{entry.netEuro ? `â‚¬${fmt(entry.netEuro)}` : 'â€”'}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">{entry.netEuro ? `€${fmt(entry.netEuro)}` : ''}</td>
                   </tr>
                 ))}
               </tbody>
@@ -216,7 +214,7 @@ export default function ProductLogPage() {
                   <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.qty)}</td>
                   <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
                   <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
-                  <td className="px-4 py-3 text-right text-gray-800">â‚¬{fmt(totals.netEuro)}</td>
+                  <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
                 </tr>
               </tfoot>
             </table>
