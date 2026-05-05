@@ -1472,25 +1472,45 @@ export default function SummaryPage() {
       ];
     };
 
-    // Windows
-    const winRows = filterRows(s.rows);
-    if (winRows.length > 0) {
-      y = drawSectionTitle(doc, y, 'Windows');
-      const winDataRows = winRows.map(buildDtRow);
-      winDataRows.push(buildTotalRow(winRows));
-      y = drawTable(doc, y, dtHeaders, dtColW, winDataRows, { rightAlignFrom: 2, highlightLast: true });
-      y += 4;
-    }
+    // Helper: render windows + doors for a given set of rows
+    const drawLocationData = (locWinRows: any[], locDoorRows: any[]) => {
+      const fWinRows = filterRows(locWinRows);
+      if (fWinRows.length > 0) {
+        y = drawSectionTitle(doc, y, 'Windows');
+        const wr = fWinRows.map(buildDtRow);
+        wr.push(buildTotalRow(fWinRows));
+        y = drawTable(doc, y, dtHeaders, dtColW, wr, { rightAlignFrom: 2, highlightLast: true });
+        y += 4;
+      }
+      const fDoorRows = filterRows(locDoorRows);
+      if (fDoorRows.length > 0) {
+        const maxY2 = doc.internal.pageSize.getHeight() - 20;
+        if (y + 20 > maxY2) { doc.addPage(); drawHeader(doc, 'Quote Summary — Data Entry (cont.)'); y = 28; }
+        y = drawSectionTitle(doc, y, 'Doors');
+        const dr = fDoorRows.map(buildDtRow);
+        dr.push(buildTotalRow(fDoorRows));
+        y = drawTable(doc, y, dtHeaders, dtColW, dr, { rightAlignFrom: 2, highlightLast: true });
+      }
+    };
 
-    // Doors
-    const doorRows = filterRows(s.doorRows);
-    if (doorRows.length > 0) {
-      const maxY = doc.internal.pageSize.getHeight() - 20;
-      if (y + 20 > maxY) { doc.addPage(); drawHeader(doc, 'Quote Summary — Data Entry (cont.)'); y = 28; }
-      y = drawSectionTitle(doc, y, 'Doors');
-      const doorDataRows = doorRows.map(buildDtRow);
-      doorDataRows.push(buildTotalRow(doorRows));
-      y = drawTable(doc, y, dtHeaders, dtColW, doorDataRows, { rightAlignFrom: 2, highlightLast: true });
+    if (s.hasMultipleLocations && s.subLocations?.length) {
+      for (let li = 0; li < s.subLocations.length; li++) {
+        const loc = s.subLocations[li];
+        if (!loc) continue;
+        if (li > 0) {
+          doc.addPage('a4', 'landscape');
+          drawHeader(doc, 'Quote Summary — Data Entry');
+          y = 28;
+          for (let i = 0; i < infoFields.length; i++) {
+            drawField(doc, 15 + i * infoColW, y, infoFields[i][0], infoFields[i][1], infoColW);
+          }
+          y += 11;
+        }
+        y = drawSectionTitle(doc, y, loc.label || `Location ${li + 1}`);
+        drawLocationData(loc.rows, loc.doorRows);
+      }
+    } else {
+      drawLocationData(s.rows, s.doorRows);
     }
 
     // ════════════════════════════════════════════════
@@ -1565,7 +1585,13 @@ export default function SummaryPage() {
     // ── Product Type Options ──
     const ptoSaved = Array.isArray(s.productTypeOptions) ? {} : ((s.productTypeOptions as Record<string, string[]>) || {});
     const allTypeFields = ['type', 'type2', 'type3', 'type4'] as const;
-    const allRows = [...(s.rows || []), ...(s.doorRows || [])];
+    const allPdfWindowRows: SummaryRow[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap(l => l.rows)
+      : (s.rows || []);
+    const allPdfDoorRows: DoorRow[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap(l => l.doorRows)
+      : (s.doorRows || []);
+    const allRows = [...allPdfWindowRows, ...allPdfDoorRows];
     const uniqueTypesForPdf = Array.from(new Set(
       allRows.flatMap((r: any) => allTypeFields.map(f => r[f]).filter(Boolean))
     )) as string[];
@@ -1610,16 +1636,31 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const pdfHungRows = s.rows.filter((r: SummaryRow) => r.type?.toLowerCase().includes('hung'));
-    const pdfNonHungRows = s.rows.filter((r: SummaryRow) => !r.type?.toLowerCase().includes('hung'));
+    const pdfHungRows = allPdfWindowRows.filter((r: SummaryRow) => r.type?.toLowerCase().includes('hung'));
+    const pdfNonHungRows = allPdfWindowRows.filter((r: SummaryRow) => !r.type?.toLowerCase().includes('hung'));
     const ewQty = sumField(pdfNonHungRows, 'qty'), ewFields = sumField(pdfNonHungRows, 'fieldsTotal');
     const ewSqFt = sumField(pdfNonHungRows, 'sqFeetTotal'), ewNet = sumField(pdfNonHungRows, 'netEuroTotal');
     const dhQty = sumField(pdfHungRows, 'qty'), dhFields = sumField(pdfHungRows, 'fieldsTotal');
     const dhSqFt = sumField(pdfHungRows, 'sqFeetTotal'), dhNet = sumField(pdfHungRows, 'netEuroTotal');
-    const dQty = sumField(s.doorRows, 'qty'), dFields = sumField(s.doorRows, 'fieldsTotal');
-    const dSqFt = sumField(s.doorRows, 'sqFeetTotal'), dNet = sumField(s.doorRows, 'netEuroTotal');
+    const dQty = sumField(allPdfDoorRows, 'qty'), dFields = sumField(allPdfDoorRows, 'fieldsTotal');
+    const dSqFt = sumField(allPdfDoorRows, 'sqFeetTotal'), dNet = sumField(allPdfDoorRows, 'netEuroTotal');
     const tQty = ewQty + dhQty + dQty, tFields = ewFields + dhFields + dFields, tSqFt = ewSqFt + dhSqFt + dSqFt, tNet = ewNet + dhNet + dNet;
-    const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    // Aggregate quoteTotals across subLocations when multi-location
+    const qt = (() => {
+      if (s.hasMultipleLocations && s.subLocations?.length) {
+        const locs = s.subLocations;
+        const aggField = (cat: string, field: string) => {
+          const vals = locs.map(l => pv((l.quoteTotals as any)?.[cat]?.[field])).filter(v => v > 0);
+          return vals.length ? String(vals.reduce((a, b) => a + b, 0)) : '';
+        };
+        return {
+          euroWindows: { full: aggField('euroWindows','full'), pct: aggField('euroWindows','pct'), final: aggField('euroWindows','final'), finalAdj: aggField('euroWindows','finalAdj') },
+          doubleHung:  { full: aggField('doubleHung','full'),  pct: aggField('doubleHung','pct'),  final: aggField('doubleHung','final'),  finalAdj: aggField('doubleHung','finalAdj')  },
+          euroDoors:   { full: aggField('euroDoors','full'),   pct: aggField('euroDoors','pct'),   final: aggField('euroDoors','final'),   finalAdj: aggField('euroDoors','finalAdj')   },
+        };
+      }
+      return s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
+    })();
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
     const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
@@ -4352,7 +4393,7 @@ export default function SummaryPage() {
                     if (!editingSummary.hasMultipleLocations) {
                       const firstLoc: SummarySubLocation = {
                         id: Date.now().toString(),
-                        label: '1a',
+                        label: '',
                         rows: editingSummary.rows,
                         doorRows: editingSummary.doorRows,
                         quoteTotals: editingSummary.quoteTotals ?? defaultQuoteTotals(),
@@ -4384,14 +4425,24 @@ export default function SummaryPage() {
                     const isActive = (activeLocationId || editingSummary.subLocations![0]!.id) === loc.id;
                     return (
                       <div key={loc.id} className="flex items-center">
-                        <button
-                          onClick={() => setActiveLocationId(loc.id)}
-                          className={`px-3 py-1.5 text-sm font-medium border transition-colors ${
+                        <input
+                          value={loc.label}
+                          onChange={(e) => setEditingSummary({
+                            ...editingSummary,
+                            subLocations: editingSummary.subLocations!.map(l =>
+                              l.id === loc.id ? { ...l, label: e.target.value } : l
+                            ),
+                          })}
+                          onFocus={() => setActiveLocationId(loc.id)}
+                          placeholder="Location name"
+                          className={`px-3 py-1.5 text-sm font-medium border transition-colors w-36 ${
                             editingSummary.subLocations!.length > 1 ? 'rounded-l-lg' : 'rounded-lg'
-                          } ${isActive ? 'bg-brand-navy text-white border-brand-navy' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
-                        >
-                          {loc.label}
-                        </button>
+                          } ${
+                            isActive
+                              ? 'bg-brand-navy text-white border-brand-navy placeholder-white/50 outline-none'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 outline-none focus:border-brand-navy'
+                          }`}
+                        />
                         {editingSummary.subLocations!.length > 1 && (
                           <button
                             onClick={() => {
@@ -4411,9 +4462,7 @@ export default function SummaryPage() {
                   })}
                   <button
                     onClick={() => {
-                      const labels = ['1a','1b','1c','1d','1e','1f','1g','1h','1i','1j'];
-                      const used = editingSummary.subLocations!.map(l => l.label);
-                      const nextLabel = labels.find(l => !used.includes(l)) ?? `loc${editingSummary.subLocations!.length + 1}`;
+                      const nextLabel = '';
                       const newLoc: SummarySubLocation = {
                         id: Date.now().toString(),
                         label: nextLabel,
