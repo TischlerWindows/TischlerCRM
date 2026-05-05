@@ -1341,7 +1341,7 @@ export default function SummaryPage() {
       const totalW = colWidths.reduce((a, b) => a + b, 0);
       const headerH = 6;
 
-      // Pre-scan all rows with text wrapping to determine uniform row height
+      // Pre-scan all rows: split text per cell, compute per-row height
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       const rowLineData: string[][][] = rows.map((row) =>
@@ -1350,15 +1350,15 @@ export default function SummaryPage() {
           return lines;
         })
       );
-      const maxLines = rowLineData.reduce((m, row) => {
-        const rowMax = row.reduce((rm, lines) => Math.max(rm, lines.length), 1);
-        return Math.max(m, rowMax);
-      }, 1);
-      const rh = baseRh * maxLines; // equal height for all rows
+      // Each row gets its own height = max lines in any cell of that row * baseRh
+      const rowHeights: number[] = rowLineData.map((row) => {
+        const maxL = row.reduce((m, lines) => Math.max(m, lines.length), 1);
+        return baseRh * maxL;
+      });
 
       // fitOnPage: if the whole table won't fit on remaining page, start a new page first
       if (opts?.fitOnPage) {
-        const tableH = headerH + rows.length * rh;
+        const tableH = headerH + rowHeights.reduce((a, b) => a + b, 0);
         if (y + tableH > maxY) {
           doc.addPage();
           drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
@@ -1385,6 +1385,7 @@ export default function SummaryPage() {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       for (let ri = 0; ri < rows.length; ri++) {
+        const rh = rowHeights[ri] ?? baseRh;
         if (y + rh > maxY) {
           doc.addPage();
           drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
