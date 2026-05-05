@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { Search, Package, AlertCircle } from 'lucide-react';
+import { Search, Package } from 'lucide-react';
+import { getSetting } from '@/lib/preferences';
 import { apiClient } from '@/lib/api-client';
 
 interface ProductLogEntry {
-  id: string;
   summaryId: string;
   summaryName: string;
   opportunityNumber: string;
@@ -17,22 +17,64 @@ interface ProductLogEntry {
   fields: number;
   sqFeet: number;
   netEuro: number;
-  createdAt: string;
 }
 
 const CATEGORIES = ['All', 'Euro Windows', 'Double Hung', 'Euro Doors'];
 
+function buildItems(summaries: any[]): ProductLogEntry[] {
+  const pv = (x: string | undefined) => parseFloat(x || '0') || 0;
+  const entries: ProductLogEntry[] = [];
+  for (const s of summaries) {
+    const rows: any[] = s.rows || [];
+    const doorRows: any[] = s.doorRows || [];
+    const hungRows = rows.filter((r: any) => r.type?.toLowerCase().includes('hung'));
+    const nonHungRows = rows.filter((r: any) => !r.type?.toLowerCase().includes('hung'));
+    const groups: [string, any[]][] = [
+      ['Euro Windows', nonHungRows],
+      ['Double Hung', hungRows],
+      ['Euro Doors', doorRows],
+    ];
+    for (const [category, catRows] of groups) {
+      const acc: Record<string, { qty: number; fields: number; sqFeet: number; netEuro: number }> = {};
+      for (const row of catRows) {
+        const parts = [row.type, row.type2, row.type3, row.type4].filter(Boolean);
+        const t = parts.length ? parts.join(' w/ ') : '—';
+        if (!acc[t]) acc[t] = { qty: 0, fields: 0, sqFeet: 0, netEuro: 0 };
+        acc[t].qty += pv(row.qty);
+        acc[t].fields += pv(row.fieldsTotal);
+        acc[t].sqFeet += pv(row.sqFeetTotal);
+        acc[t].netEuro += pv(row.netEuroTotal);
+      }
+      for (const [productType, vals] of Object.entries(acc)) {
+        if (vals.qty > 0 || vals.netEuro > 0) {
+          entries.push({
+            summaryId: s.id,
+            summaryName: s.name || 'Untitled',
+            opportunityNumber: s.opportunityNumber || '',
+            linkedOpportunityId: s.linkedOpportunityId || null,
+            date: s.date || null,
+            category,
+            productType,
+            ...vals,
+          });
+        }
+      }
+    }
+  }
+  return entries;
+}
+
 export default function ProductLogPage() {
   const [entries, setEntries] = useState<ProductLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
 
   useEffect(() => {
-    apiClient.get<ProductLogEntry[]>('/product-log')
-      .then(data => setEntries(data))
-      .catch(() => setError('Failed to load product log.'))
+    // Compute directly from the summaries settings — no dependency on the product-log API
+    getSetting<any[]>('summaries')
+      .then(summaries => setEntries(buildItems(summaries ?? [])))
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -102,12 +144,6 @@ export default function ProductLogPage() {
       </div>
 
       {/* Error */}
-      {error && (
-        <div className="flex items-center gap-2 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {error}
-        </div>
-      )}
 
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
