@@ -1341,12 +1341,15 @@ export default function SummaryPage() {
       const totalW = colWidths.reduce((a, b) => a + b, 0);
       const headerH = 6;
 
-      // Pre-scan all rows: split text per cell, compute per-row height
+      // Pre-scan all rows: split text per cell, preserving \n line breaks then wrapping
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6);
       const rowLineData: string[][][] = rows.map((row) =>
         row.map((cell, i) => {
-          const lines: string[] = doc.splitTextToSize(cell || '', (colWidths[i] || 10) - 3);
+          const segments = (cell || '').split('\n');
+          const lines: string[] = segments.flatMap((seg) =>
+            doc.splitTextToSize(seg, (colWidths[i] || 10) - 3)
+          );
           return lines;
         })
       );
@@ -1471,7 +1474,7 @@ export default function SummaryPage() {
       'Type', 'Remarks',
       'Fields Tot', 'Site Mull', '\u20AC/Unit', 'NET \u20AC Tot',
     ];
-    const dtColW = [14, 14, 9, 13, 13, 16, 16, 14, 14, 14, 14, 30, 28, 14, 14, 14, 14];
+    const dtColW = [12, 40, 9, 12, 12, 12, 11, 12, 12, 11, 11, 30, 18, 13, 13, 14, 14];
     const buildDtRow = (r: any): string[] => [
       r.tusPosition, r.archPosition, r.qty, r.widthMM, r.heightMM,
       r.widthFtIn, r.heightFtIn, r.sqFeetEach, r.sqFeetTotal,
