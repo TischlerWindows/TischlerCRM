@@ -341,6 +341,15 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
   onChange: (value: string) => void;
   onEnterKey?: () => void;
 }) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize on mount and whenever value changes (covers initial load from saved data)
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }, [value]);
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -441,6 +450,7 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
 
   return (
     <textarea
+      ref={textareaRef}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
@@ -448,11 +458,6 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
       rows={1}
       className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy resize-none overflow-hidden"
       style={{ height: 'auto', minHeight: '24px' }}
-      onInput={(e) => {
-        const target = e.target as HTMLTextAreaElement;
-        target.style.height = 'auto';
-        target.style.height = target.scrollHeight + 'px';
-      }}
     />
   );
 };
