@@ -1332,17 +1332,41 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean }
     ) => {
       const x0 = 15;
       let y = startY;
-      const rh = 4.5; // row height
-      const w = doc.internal.pageSize.getWidth();
+      const baseRh = 4.5; // base row height per line
       const maxY = doc.internal.pageSize.getHeight() - 14;
       const totalW = colWidths.reduce((a, b) => a + b, 0);
+      const headerH = 6;
+
+      // Pre-scan all rows with text wrapping to determine uniform row height
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6);
+      const rowLineData: string[][][] = rows.map((row) =>
+        row.map((cell, i) => {
+          const lines: string[] = doc.splitTextToSize(cell || '', (colWidths[i] || 10) - 3);
+          return lines;
+        })
+      );
+      const maxLines = rowLineData.reduce((m, row) => {
+        const rowMax = row.reduce((rm, lines) => Math.max(rm, lines.length), 1);
+        return Math.max(m, rowMax);
+      }, 1);
+      const rh = baseRh * maxLines; // equal height for all rows
+
+      // fitOnPage: if the whole table won't fit on remaining page, start a new page first
+      if (opts?.fitOnPage) {
+        const tableH = headerH + rows.length * rh;
+        if (y + tableH > maxY) {
+          doc.addPage();
+          drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+          y = 28;
+        }
+      }
 
       // Header row background
-      const headerH = 6;
       doc.setFillColor(...headerBg);
       doc.rect(x0, y, totalW, headerH, 'F');
       doc.setFont('helvetica', 'bold');
@@ -1351,9 +1375,9 @@ export default function SummaryPage() {
       let cx = x0;
       for (let i = 0; i < headers.length; i++) {
         const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
-        const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
+        const tx = align === 'right' ? cx + (colWidths[i] ?? 0) - 1.5 : cx + 1.5;
         doc.text(headers[i], tx, y + 4, { align });
-        cx += colWidths[i];
+        cx += colWidths[i] ?? 0;
       }
       y += headerH;
 
@@ -1383,15 +1407,17 @@ export default function SummaryPage() {
 
         doc.setTextColor(50, 50, 50);
         cx = x0;
-        for (let i = 0; i < rows[ri].length; i++) {
+        for (let i = 0; i < (rowLineData[ri]?.length ?? 0); i++) {
           const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
           if (isBoldCol) doc.setFont('helvetica', 'bold');
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
-          const tx = align === 'right' ? cx + colWidths[i] - 1.5 : cx + 1.5;
-          const cellText = (rows[ri][i] || '').substring(0, Math.floor(colWidths[i] / 1.5));
-          doc.text(cellText, tx, y + 3, { align });
+          const tx = align === 'right' ? cx + (colWidths[i] ?? 0) - 1.5 : cx + 1.5;
+          const lines = rowLineData[ri]?.[i] ?? [];
+          lines.forEach((line: string, li: number) => {
+            doc.text(line, tx, y + 3 + li * baseRh, { align });
+          });
           if (isBoldCol) doc.setFont('helvetica', 'normal');
-          cx += colWidths[i];
+          cx += colWidths[i] ?? 0;
         }
         if (isLast) doc.setFont('helvetica', 'normal');
         y += rh;
@@ -1603,7 +1629,7 @@ export default function SummaryPage() {
         const selected = ptoSaved[typeName];
         return [typeName, (Array.isArray(selected) && selected.length > 0) ? selected.join(', ') : '—'];
       });
-      y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0 });
+      y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0, fitOnPage: true });
       y += 4;
     }
 
@@ -1677,7 +1703,7 @@ export default function SummaryPage() {
         qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),
         qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),
       ];
-      y = drawTable(doc, y, qtHeaders, qtColW, rows, { rightAlignFrom: 1, boldCol: 0 });
+      y = drawTable(doc, y, qtHeaders, qtColW, rows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true });
       y += 3;
     };
 
@@ -1716,7 +1742,7 @@ export default function SummaryPage() {
           finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
         }),
       ];
-      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
     } else {
       const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
       renderQtTable(s.rows, s.doorRows, qt);
@@ -1730,7 +1756,7 @@ export default function SummaryPage() {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
       });
-      y = drawTable(doc, y, qtHeaders, qtColW, [grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true });
+      y = drawTable(doc, y, qtHeaders, qtColW, [grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
     }
     y += 6;
 
@@ -1751,7 +1777,7 @@ export default function SummaryPage() {
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0 });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
