@@ -1717,7 +1717,16 @@ export default function SummaryPage() {
 
     if (s.hasMultipleLocations && s.subLocations?.length) {
       for (const loc of s.subLocations) {
-        // Sub-heading for location name
+        // Sub-heading for location name — keep heading + table together
+        const locTableH = 6 + 3 * 4.5 + 8; // header + 3 rows + heading estimate
+        if (y + locTableH > doc.internal.pageSize.getHeight() - 14) {
+          doc.addPage();
+          drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(50, 50, 50);
+          y = 28;
+        }
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(...navy);
@@ -1725,8 +1734,17 @@ export default function SummaryPage() {
         y += 4;
         renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
       }
-      // Grand Total table
+      // Grand Total table — ensure heading + table stay together
       y += 2;
+      const gtTableH = 6 + 4 * 4.5 + 8; // heading + header + 4 data rows
+      if (y + gtTableH > doc.internal.pageSize.getHeight() - 14) {
+        doc.addPage();
+        drawHeader(doc, 'Quote Summary — Data Entry (cont.)');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6);
+        doc.setTextColor(50, 50, 50);
+        y = 28;
+      }
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(...navy);
