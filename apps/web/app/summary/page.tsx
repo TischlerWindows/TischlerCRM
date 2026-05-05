@@ -26,6 +26,7 @@ import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
+import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
 
@@ -936,15 +937,10 @@ export default function SummaryPage() {
     const emptyContact = { name: '', primaryPhone: '', email: '', cellPhone: '' };
     const emptyAccount = { name: '', shippingAddress: '', primaryPhone: '' };
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       // Try both field keys that may store the opportunity reference
-      const [res1, res2] = await Promise.all([
-        fetch(`${API_BASE}/objects/TeamMember/records?filter[opportunity]=${encodeURIComponent(opportunityId)}&limit=200`, { credentials: 'include' }),
-        fetch(`${API_BASE}/objects/TeamMember/records?filter[OpportunityId]=${encodeURIComponent(opportunityId)}&limit=200`, { credentials: 'include' }),
-      ]);
       const [batch1, batch2] = await Promise.all([
-        res1.ok ? res1.json() : [],
-        res2.ok ? res2.json() : [],
+        apiClient.get<any[]>(`/objects/TeamMember/records?filter[opportunity]=${encodeURIComponent(opportunityId)}&limit=200`).catch(() => []),
+        apiClient.get<any[]>(`/objects/TeamMember/records?filter[OpportunityId]=${encodeURIComponent(opportunityId)}&limit=200`).catch(() => []),
       ]);
       const all1: any[] = Array.isArray(batch1) ? batch1 : ((batch1 as any)?.records ?? []);
       const all2: any[] = Array.isArray(batch2) ? batch2 : ((batch2 as any)?.records ?? []);
