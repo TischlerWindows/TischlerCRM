@@ -446,15 +446,15 @@ export default function SalesforceImportPage() {
           const val = row[csvCol];
           if (val === undefined || val === null || val === '') continue;
 
-          // CompoundName sub-field: "name::Contact__name_firstName" — merge into prefixed parent
-          // Store under the full prefixed key (e.g. "Contact__name") so flattenRecord and
-          // the edit form both find it via data[field.apiName].
+          // CompositeText sub-field: "name::Contact__name_firstName" — store each sub-field flat.
+          // dynamic-form and getRecordValue both reconstruct the composite from individual
+          // sub-field keys (e.g. data["Contact__name_firstName"]), mirroring how the edit
+          // form saves them.  Store under the full prefixed sub-field apiName so both
+          // prefixed (data[sf.apiName]) and stripped (data["name_firstName"]) lookups work.
           if (targetField.includes('::')) {
             const sepIdx = targetField.indexOf('::');
-            const parentField = targetField.slice(0, sepIdx);
-            const subFieldKey = targetField.slice(sepIdx + 2);
-            const prefixedParent = `${objectApiName}__${parentField}`;
-            mapped[prefixedParent] = { ...(mapped[prefixedParent] ?? {}), [subFieldKey]: val };
+            const subFieldKey = targetField.slice(sepIdx + 2); // e.g. "Contact__name_firstName"
+            mapped[subFieldKey] = val;
             continue;
           }
 
