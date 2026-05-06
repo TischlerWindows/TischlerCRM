@@ -7,6 +7,7 @@ import { LookupSearch } from '@/components/form/lookup-search'
 import { useSchemaStore } from '@/lib/schema-store'
 import { resolveLookupDisplayName, upsertLookupCacheRecord } from '@/lib/utils'
 import { usePendingWidget } from '@/components/form/pending-widget-context'
+import { useToast } from '@/components/toast'
 import type { FieldDef, TeamMemberSlotCriterion } from '@/lib/schema'
 import type { TeamMemberRow } from './useTeamMemberSlot'
 import { getRecordName } from '../shared/recordName'
@@ -61,6 +62,7 @@ export function SlotInput({
   placeholder,
   disabled,
 }: SlotInputProps) {
+  const { showToast } = useToast()
   const schema = useSchemaStore(s => s.schema)
   const schemaObjects = schema?.objects
 
@@ -283,10 +285,7 @@ export function SlotInput({
           role: isFlagNetNew ? pendingRole : undefined,
         })
         if (!cancelled) {
-          // Success — clear local state. The boundRow becomes the source of
-          // truth on the next render, so showing pre-bound state with the
-          // same values would be confusing AND would let the X-to-clear
-          // leave the user with the same pill staring back at them.
+          showToast('Connection saved', 'success')
           setAccountId(null)
           setContactId(null)
           setAccountQuery('')
@@ -296,8 +295,10 @@ export function SlotInput({
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to save')
-          lastCommitKeyRef.current = null // allow the user to retry the same selection
+          const message = e instanceof Error ? e.message : 'Failed to save connection'
+          setError(message)
+          showToast(message, 'error')
+          lastCommitKeyRef.current = null
         }
       } finally {
         if (!cancelled) setSaving(false)
@@ -578,7 +579,21 @@ export function SlotInput({
         </div>
       )}
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <div className="flex items-center gap-2">
+          <p className="text-xs text-red-600">{error}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null)
+              lastCommitKeyRef.current = null
+            }}
+            className="text-xs text-brand-navy hover:underline font-medium shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Saving indicator — replaces the legacy Save button. The auto-commit
        *  effect above fires onFill the moment the slot has everything it

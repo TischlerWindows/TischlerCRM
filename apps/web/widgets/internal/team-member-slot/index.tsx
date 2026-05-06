@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { WidgetProps } from '@/lib/widgets/types'
 import type { TeamMemberSlotConfig } from '@/lib/schema'
+import { useToast } from '@/components/toast'
 import { SlotInput } from './SlotInput'
 import { useTeamMemberSlot } from './useTeamMemberSlot'
 
@@ -23,6 +24,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
   const slotConfig = config as unknown as TeamMemberSlotConfig
   const recordId = (record.id as string | undefined) ?? null
 
+  const { showToast } = useToast()
   const { rows, loading, error, fillSlot, clearRow } = useTeamMemberSlot({
     parentObjectApiName: object.apiName,
     parentRecordId: recordId,
@@ -52,7 +54,14 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
             criterion={slotConfig.criterion}
             boundRow={bound}
             onFill={async () => { /* no-op while bound; clear first to replace */ }}
-            onClear={async () => { await clearRow(bound.id) }}
+            onClear={async () => {
+              try {
+                await clearRow(bound.id)
+                showToast('Connection removed', 'success')
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
+              }
+            }}
             placeholder={slotConfig.placeholder}
           />
         ) : (
@@ -80,7 +89,14 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
             criterion={slotConfig.criterion}
             boundRow={row}
             onFill={async () => { /* no-op while bound; clear and re-add to replace */ }}
-            onClear={async () => { await clearRow(row.id) }}
+            onClear={async () => {
+              try {
+                await clearRow(row.id)
+                showToast('Connection removed', 'success')
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
+              }
+            }}
           />
         ))}
         {showAdder ? (

@@ -111,12 +111,13 @@ export function RecordActions({
       if (updated) {
         onRecordUpdated(updated, recordsService.flattenRecord(updated));
       }
+      setShowEditForm(false);
+      showToast('Record updated', 'success');
     } catch (err) {
       console.error('Failed to update record:', err);
-      // Optimistic update
-      onRecordUpdated(rawRecord!, { ...record, ...data });
+      const message = err instanceof Error ? err.message : 'Failed to save changes. Please try again.';
+      showToast(message, 'error');
     }
-    setShowEditForm(false);
   };
 
   const handleDelete = () => {
