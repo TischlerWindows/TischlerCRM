@@ -447,39 +447,35 @@ export default function SalesforceImportPage() {
           if (val === undefined || val === null || val === '') continue;
 
           // CompositeText sub-field: "name::Contact__name_firstName"
-          // Store the flat sub-field key (needed by the edit form and getRecordValue fallback)
-          // AND accumulate into the prefixed parent composite object (needed so the
-          // API's required-field validation finds data[field.apiName] = e.g. "Contact__name").
+          // Store keys the same way the edit form does so the detail page and
+          // required-field validation can find them by the exact prefixed apiName.
           if (targetField.includes('::')) {
             const sepIdx = targetField.indexOf('::');
             const parentField = targetField.slice(0, sepIdx); // "name"
             const subFieldKey = targetField.slice(sepIdx + 2); // "Contact__name_firstName"
             const prefixedParent = `${objectApiName}__${parentField}`; // "Contact__name"
-            // Flat key — edit form reads data[sf.apiName]
+            // Flat sub-field key — edit form reads data[sf.apiName]
             mapped[subFieldKey] = val;
-            // Parent composite — required validation reads data[field.apiName]
+            // Parent composite object — required-field validation reads data[field.apiName]
             mapped[prefixedParent] = { ...(mapped[prefixedParent] ?? {}), [subFieldKey]: val };
-            // Bare suffix key (e.g. "firstName", "lastName", "salutation") so that
-            // standalone fields like Contact__firstName resolve on the detail page.
-            // "Contact__name_firstName".split("_").filter(Boolean).pop() → "firstName"
-            const bareSuffix = subFieldKey.split('_').filter(Boolean).pop();
-            if (bareSuffix && bareSuffix !== subFieldKey) {
-              mapped[bareSuffix] = val;
+            // Standalone prefixed key — mirrors what the form stores for the individual
+            // field (e.g. Contact__firstName) so the detail page finds it directly.
+            // "Contact__name_firstName" → bare suffix = "firstName" → "Contact__firstName"
+            const subFieldBare = subFieldKey.slice(subFieldKey.lastIndexOf('_') + 1);
+            const standaloneKey = `${objectApiName}__${subFieldBare}`;
+            if (standaloneKey !== subFieldKey) {
+              mapped[standaloneKey] = val;
             }
             continue;
           }
 
-          // Check if this mapped field is a lookup and if the value is a known SF id
-          const lookedUpObject = lookupFields[targetField];
-          if (lookedUpObject && globalIdMap[val]) {
-            // Substitute with CRM id
-            mapped[targetField] = globalIdMap[val];
-          } else {
-            // For unresolved lookups: store the raw value so the field isn't blank.
-            // If it's already a CRM UUID it will resolve on the detail page; otherwise
-            // the raw string (SF UUID or name) is preserved rather than lost.
-            mapped[targetField] = val;
-          }
+          // Regular field: store under the FULL prefixed key (e.g. Opportunity__stageName)
+          // to match exactly what the form stores in the DB. The API normaliser will also
+          // create the stripped alias so both prefixed and bare lookups resolve correctly.
+          const resolvedVal = (lookupFields[targetField] && globalIdMap[val])
+            ? globalIdMap[val]  // resolved SF id → CRM UUID
+            : val;              // raw value (CRM UUID, text, etc.)
+          mapped[`${objectApiName}__${targetField}`] = resolvedVal;
         }
         return mapped;
       });
