@@ -3520,7 +3520,13 @@ export default function SummaryPage() {
 
                       {/* Row 2: Product Types derived from Page 1 rows */}
                       {(() => {
-                        const allRows = [...(editingSummary.rows || []), ...(editingSummary.doorRows || [])];
+                        const winRows = editingSummary.hasMultipleLocations && editingSummary.subLocations?.length
+                          ? editingSummary.subLocations.flatMap(loc => loc.rows || [])
+                          : (editingSummary.rows || []);
+                        const doorRows = editingSummary.hasMultipleLocations && editingSummary.subLocations?.length
+                          ? editingSummary.subLocations.flatMap(loc => loc.doorRows || [])
+                          : (editingSummary.doorRows || []);
+                        const allRows = [...winRows, ...doorRows];
                         const typeFields = ['type', 'type2', 'type3', 'type4'] as const;
                         const uniqueTypes = Array.from(new Set(
                           allRows.flatMap(r => typeFields.map(f => (r as any)[f]).filter(Boolean))
