@@ -301,7 +301,7 @@ export function SlotInput({
           lastCommitKeyRef.current = null
         }
       } finally {
-        if (!cancelled) setSaving(false)
+        setSaving(false)
       }
     })()
 
