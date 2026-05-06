@@ -396,8 +396,11 @@ export default function LeadsPage() {
       try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
     
-    // Check if this is a lookup field and resolve the display name
-    const lookupObjectType = inferLookupObjectType(columnId);
+    // Check if this is a lookup field and resolve the display name (schema-first, then name heuristic)
+    const schemaLookupField = leadObject?.fields?.find(f => f.apiName === `Lead__${columnId}` || f.apiName === columnId);
+    const lookupObjectType = inferLookupObjectType(columnId) ||
+      (schemaLookupField?.type === 'LookupUser' ? 'User' : null) ||
+      ((schemaLookupField?.type === 'Lookup' || schemaLookupField?.type === 'ExternalLookup') ? schemaLookupField.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }

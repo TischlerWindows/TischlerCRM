@@ -203,7 +203,9 @@ export default function TasksPage() {
       try { value = JSON.parse(value); } catch { /* not JSON */ }
     }
 
-    const lookupObjectType = inferLookupObjectType(columnId);
+    const lookupObjectType = inferLookupObjectType(columnId) ||
+      (schemaField?.type === 'LookupUser' ? 'User' : null) ||
+      ((schemaField?.type === 'Lookup' || schemaField?.type === 'ExternalLookup') ? schemaField.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }

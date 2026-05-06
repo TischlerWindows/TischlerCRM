@@ -315,7 +315,9 @@ export default function ProjectsPage() {
     
     // Check if this is a lookup field and resolve the display name
     const schemaFieldForLookup = projectObject?.fields?.find(f => f.apiName === `Project__${columnId}` || f.apiName === columnId);
-    const lookupObjectType = inferLookupObjectType(columnId) || (schemaFieldForLookup?.type === 'Lookup' ? schemaFieldForLookup.lookupObject ?? null : null);
+    const lookupObjectType = inferLookupObjectType(columnId) ||
+      (schemaFieldForLookup?.type === 'LookupUser' ? 'User' : null) ||
+      ((schemaFieldForLookup?.type === 'Lookup' || schemaFieldForLookup?.type === 'ExternalLookup') ? schemaFieldForLookup.lookupObject ?? null : null);
     if (lookupObjectType && typeof value === 'string') {
       return resolveLookupDisplayName(value, lookupObjectType);
     }
