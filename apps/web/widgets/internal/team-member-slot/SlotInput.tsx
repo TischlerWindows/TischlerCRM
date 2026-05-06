@@ -27,6 +27,8 @@ interface SlotInputProps {
   /** Optional placeholder copy for the lookup. */
   placeholder?: string
   disabled?: boolean
+  /** Roles already assigned to someone on this record — shown disabled in the role picklist. */
+  occupiedRoles?: Map<string, string>
 }
 
 const ROLE_FALLBACK = [
@@ -61,6 +63,7 @@ export function SlotInput({
   onClear,
   placeholder,
   disabled,
+  occupiedRoles,
 }: SlotInputProps) {
   const { showToast } = useToast()
   const schema = useSchemaStore(s => s.schema)
@@ -564,9 +567,14 @@ export function SlotInput({
             disabled={disabled}
           >
             <option value="">Select role…</option>
-            {roleValues.map(v => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {roleValues.map(v => {
+              const occupant = occupiedRoles?.get(v)
+              return (
+                <option key={v} value={v} disabled={!!occupant}>
+                  {occupant ? `${v} (assigned to ${occupant})` : v}
+                </option>
+              )
+            })}
           </select>
           <p className="text-[11px] text-gray-500 mt-1">
             This person isn&apos;t on this record yet — pick their role.

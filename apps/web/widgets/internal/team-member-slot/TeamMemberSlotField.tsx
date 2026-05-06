@@ -144,7 +144,7 @@ export function TeamMemberSlotField({
   readOnly,
 }: TeamMemberSlotFieldProps) {
   const { showToast } = useToast()
-  const { rows, loading, fillSlot, clearRow, error } = useTeamMemberSlot({
+  const { rows, loading, fillSlot, clearRow, error, occupiedRoles } = useTeamMemberSlot({
     parentObjectApiName,
     parentRecordId,
     criterion: slotConfig.criterion,
@@ -251,6 +251,7 @@ export function TeamMemberSlotField({
             }
           }}
           placeholder={slotConfig.placeholder}
+          occupiedRoles={occupiedRoles}
         />
       ) : (
         <SlotInput
@@ -258,6 +259,7 @@ export function TeamMemberSlotField({
           criterion={slotConfig.criterion}
           onFill={async (input) => { await fillSlot(input) }}
           placeholder={slotConfig.placeholder}
+          occupiedRoles={occupiedRoles}
         />
       )
     }
@@ -280,6 +282,7 @@ export function TeamMemberSlotField({
                 showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
               }
             }}
+            occupiedRoles={occupiedRoles}
           />
         ))}
         {showAdder ? (
@@ -292,6 +295,7 @@ export function TeamMemberSlotField({
                 setShowAdder(false)
               }}
               placeholder={slotConfig.placeholder ?? 'Add'}
+              occupiedRoles={occupiedRoles}
             />
             <button
               type="button"
