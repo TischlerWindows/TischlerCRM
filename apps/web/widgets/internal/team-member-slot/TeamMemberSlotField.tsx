@@ -7,6 +7,7 @@ import { preloadLookupRecords, resolveLookupDisplayName } from '@/lib/utils'
 import type { PanelField, TeamMemberSlotConfig } from '@/lib/schema'
 import { recordUrl } from '@/lib/record-url'
 import { useSchemaStore } from '@/lib/schema-store'
+import { useToast } from '@/components/toast'
 import { SlotInput } from './SlotInput'
 import { useTeamMemberSlot, type TeamMemberRow } from './useTeamMemberSlot'
 import { useDisplayFields } from './useDisplayFields'
@@ -142,6 +143,7 @@ export function TeamMemberSlotField({
   panelField,
   readOnly,
 }: TeamMemberSlotFieldProps) {
+  const { showToast } = useToast()
   const { rows, loading, fillSlot, clearRow, error } = useTeamMemberSlot({
     parentObjectApiName,
     parentRecordId,
@@ -240,7 +242,14 @@ export function TeamMemberSlotField({
           criterion={slotConfig.criterion}
           boundRow={bound}
           onFill={async () => { /* clear first to replace */ }}
-          onClear={async () => { await clearRow(bound.id) }}
+          onClear={async () => {
+            try {
+              await clearRow(bound.id)
+              showToast('Connection removed', 'success')
+            } catch (e) {
+              showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
+            }
+          }}
           placeholder={slotConfig.placeholder}
         />
       ) : (
@@ -263,7 +272,14 @@ export function TeamMemberSlotField({
             criterion={slotConfig.criterion}
             boundRow={row}
             onFill={async () => { /* no-op while bound */ }}
-            onClear={async () => { await clearRow(row.id) }}
+            onClear={async () => {
+              try {
+                await clearRow(row.id)
+                showToast('Connection removed', 'success')
+              } catch (e) {
+                showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
+              }
+            }}
           />
         ))}
         {showAdder ? (

@@ -54,6 +54,7 @@ import { validateFields } from './form-validation';
 import { FieldInput, LookupFieldsDisplay, getFieldIcon } from './field-input';
 import { getRecordLabel, getLookupTargetApi } from './lookup-search';
 import { MissingRequiredModal } from './missing-required-modal';
+import { useToast } from '@/components/toast';
 
 // ── DynamicFormProps ─────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ export default function DynamicForm({
   onCreated,
 }: DynamicFormProps) {
   const { schema } = useSchemaStore();
+  const { showToast } = useToast();
   const [formData, setFormData] = useState<Record<string, any>>(() => {
     // Initialize form data from recordData.
     // Records may store data with UNPREFIXED keys (e.g. "address") because
@@ -841,6 +843,7 @@ export default function DynamicForm({
         const msg =
           error instanceof Error ? error.message : 'Failed to save record';
         setSubmitError(msg);
+        showToast(msg, 'error');
       } finally {
         setIsSubmitting(false);
       }
@@ -1706,7 +1709,7 @@ export default function DynamicForm({
 
         {/* Error banner */}
         {submitError && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+          <div className="mx-6 mt-4 p-3 bg-red-50 border-2 border-red-300 rounded-md text-sm text-red-700 font-medium shadow-sm">
             {submitError}
           </div>
         )}

@@ -76,6 +76,40 @@ function isNotFoundError(err: unknown): boolean {
   return /Record not found|status:\s*404|\b404\b/i.test(msg)
 }
 
+/**
+ * Fetches all TeamMember rows for a parent record directly from the API.
+ * Returns the raw array — does NOT set React state.
+ * Used by fillSlot to get fresh data and avoid race conditions with stale savedRows.
+ */
+async function fetchFreshRows(
+  parentObjectApiName: string,
+  parentRecordId: string,
+): Promise<Record<string, unknown>[]> {
+  const parentField = OBJECT_TO_FIELD[parentObjectApiName]
+  if (!parentField) return []
+  let data: Record<string, unknown>[] = []
+  try {
+    data = await apiClient.get<Record<string, unknown>[]>(
+      `/objects/TeamMember/records?filter[${parentField}]=${encodeURIComponent(parentRecordId)}&limit=500`,
+    )
+    if (!Array.isArray(data)) data = []
+  } catch {
+    data = []
+  }
+  if (data.length === 0) {
+    const lookupKey = OBJECT_TO_LOOKUP_FIELD[parentObjectApiName]
+    if (lookupKey) {
+      try {
+        const alt = await apiClient.get<Record<string, unknown>[]>(
+          `/objects/TeamMember/records?filter[${lookupKey}]=${encodeURIComponent(parentRecordId)}&limit=500`,
+        )
+        if (Array.isArray(alt)) data = alt
+      } catch { /* ignore */ }
+    }
+  }
+  return data
+}
+
 interface UseTeamMemberSlotOptions {
   parentObjectApiName: string
   parentRecordId: string | null
@@ -126,38 +160,10 @@ export function useTeamMemberSlot({
       setSavedRows([])
       return
     }
-    const parentField = OBJECT_TO_FIELD[parentObjectApiName]
-    if (!parentField) {
-      setSavedRows([])
-      return
-    }
     setLoading(true)
     setError(null)
     try {
-      // Try plain field first; many records reference parent via plain key.
-      let data: Record<string, unknown>[] = []
-      try {
-        data = await apiClient.get<Record<string, unknown>[]>(
-          `/objects/TeamMember/records?filter[${parentField}]=${encodeURIComponent(parentRecordId)}&limit=500`,
-        )
-        if (!Array.isArray(data)) data = []
-      } catch {
-        data = []
-      }
-      // Fall back to the auto-generated lookup field if no rows came back.
-      if (data.length === 0) {
-        const lookupKey = OBJECT_TO_LOOKUP_FIELD[parentObjectApiName]
-        if (lookupKey) {
-          try {
-            const alt = await apiClient.get<Record<string, unknown>[]>(
-              `/objects/TeamMember/records?filter[${lookupKey}]=${encodeURIComponent(parentRecordId)}&limit=500`,
-            )
-            if (Array.isArray(alt)) data = alt
-          } catch {
-            /* ignore */
-          }
-        }
-      }
+      const data = await fetchFreshRows(parentObjectApiName, parentRecordId)
       setSavedRows(data)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load connections')
@@ -227,8 +233,12 @@ export function useTeamMemberSlot({
           return { id, isPending: true, data }
         }
 
-        // Saved-mode: look for an existing TM row on this parent record matching contact+account
-        const existingSaved = savedRows.find(r => {
+        // Saved-mode: fetch fresh rows from the API to avoid the race condition where
+        // another slot just created a row that our local savedRows hasn't picked up yet.
+        const freshRows = parentRecordId
+          ? await fetchFreshRows(parentObjectApiName, parentRecordId)
+          : []
+        const existingSaved = freshRows.find(r => {
           const d = dataOf(r)
           const c = getLookupId(d, 'contact')
           const a = getLookupId(d, 'account')
