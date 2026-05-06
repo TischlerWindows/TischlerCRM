@@ -17,9 +17,12 @@ interface ProductLogDetail {
   spacerBarColors: string;
   sdl: string;
   tdl: string;
+  widthFtIn: string;
+  heightFtIn: string;
   qty: number;
   fields: number;
   sqFeet: number;
+  netEuroEach: number;
   netEuro: number;
 }
 
@@ -79,9 +82,12 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
           opportunityNumber: s.opportunityNumber || '',
           date: s.date || null,
           product, woodType, finish, glassType, spacerBarType, spacerBarColors, sdl, tdl,
+          widthFtIn: row.widthFtIn || '',
+          heightFtIn: row.heightFtIn || '',
           qty,
           fields: pv(row.fieldsTotal),
           sqFeet: pv(row.sqFeetTotal),
+          netEuroEach: pv(row.netEuroEach),
           netEuro,
         };
 
@@ -123,18 +129,19 @@ export default function ProductsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
+    const tokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
     return groups.filter(g => {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-      if (q) {
-        const inGroup = g.productType.toLowerCase().includes(q);
-        const inDetails = g.details.some(d =>
-          [d.summaryName, d.opportunityNumber, d.product, d.woodType, d.finish, d.glassType, d.spacerBarType, d.sdl, d.tdl]
-            .some(v => v.toLowerCase().includes(q))
-        );
-        if (!inGroup && !inDetails) return false;
-      }
-      return true;
+      if (tokens.length === 0) return true;
+      // ALL tokens must appear in productType
+      const typeStr = g.productType.toLowerCase();
+      if (tokens.every(t => typeStr.includes(t))) return true;
+      // OR all tokens appear in a detail's job/spec fields (excluding d.product which is summary-level and shared)
+      return g.details.some(d => {
+        const combined = [d.summaryName, d.opportunityNumber, d.woodType, d.finish, d.glassType, d.spacerBarType, d.spacerBarColors, d.sdl, d.tdl]
+          .join(' ').toLowerCase();
+        return tokens.every(t => combined.includes(t));
+      });
     });
   }, [groups, search, categoryFilter]);
 
@@ -274,6 +281,13 @@ export default function ProductsPage() {
                                       {d.opportunityNumber && <span>{d.opportunityNumber}</span>}
                                       {d.date && <span>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                                     </div>
+                                    {(d.widthFtIn || d.heightFtIn) && (
+                                      <div className="text-xs text-gray-600 mt-1">
+                                        {d.widthFtIn && <span>W: {d.widthFtIn}</span>}
+                                        {d.widthFtIn && d.heightFtIn && <span className="mx-1 text-gray-300">·</span>}
+                                        {d.heightFtIn && <span>H: {d.heightFtIn}</span>}
+                                      </div>
+                                    )}
                                   </div>
 
                                   {/* Spec grid */}
@@ -311,6 +325,12 @@ export default function ProductsPage() {
                                       <div>
                                         <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sq Ft</div>
                                         <div className="text-sm font-medium text-gray-800">{fmt(d.sqFeet)}</div>
+                                      </div>
+                                    )}
+                                    {d.netEuroEach > 0 && (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">€ Each</div>
+                                        <div className="text-sm font-medium text-gray-700">€{fmt(d.netEuroEach)}</div>
                                       </div>
                                     )}
                                     {d.netEuro > 0 && (
