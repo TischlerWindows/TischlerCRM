@@ -133,13 +133,13 @@ export default function ProductsPage() {
     return groups.filter(g => {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
       if (!q) return true;
+      // Match product type name (the grouped type)
       if (g.productType.toLowerCase().includes(q)) return true;
-      // Search detail job/spec fields as a single phrase (d.product excluded — it's summary-level and shared across all rows)
-      return g.details.some(d => {
-        const combined = [d.summaryName, d.opportunityNumber, d.woodType, d.finish, d.glassType, d.spacerBarType, d.spacerBarColors, d.sdl, d.tdl]
-          .join(' ').toLowerCase();
-        return combined.includes(q);
-      });
+      // Also allow searching by job name / opportunity number only
+      return g.details.some(d =>
+        d.summaryName.toLowerCase().includes(q) ||
+        d.opportunityNumber.toLowerCase().includes(q)
+      );
     });
   }, [groups, search, categoryFilter]);
 
