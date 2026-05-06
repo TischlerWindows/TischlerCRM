@@ -1334,12 +1334,18 @@ export default function SummaryPage() {
         .filter(([, v]) => v.qty > 0 || v.netEuro > 0)
         .map(([productType, v]) => ({ category, productType, ...v }));
     };
-    const hungRows = (s.rows || []).filter(r => r.type?.toLowerCase().includes('hung'));
-    const nonHungRows = (s.rows || []).filter(r => !r.type?.toLowerCase().includes('hung'));
+    const allWinRows: SummaryRow[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap(loc => loc.rows || [])
+      : (s.rows || []);
+    const allDoorRows: DoorRow[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap(loc => loc.doorRows || [])
+      : (s.doorRows || []);
+    const hungRows = allWinRows.filter(r => r.type?.toLowerCase().includes('hung'));
+    const nonHungRows = allWinRows.filter(r => !r.type?.toLowerCase().includes('hung'));
     return [
       ...groupRows(nonHungRows, 'Euro Windows'),
       ...groupRows(hungRows, 'Double Hung'),
-      ...groupRows(s.doorRows || [], 'Euro Doors'),
+      ...groupRows(allDoorRows, 'Euro Doors'),
     ];
   };
 

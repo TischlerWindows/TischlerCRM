@@ -26,20 +26,25 @@ function buildItems(summaries: any[]): ProductLogEntry[] {
   const entries: ProductLogEntry[] = [];
   for (const s of summaries) {
     const pto: Record<string, string[]> = (Array.isArray(s.productTypeOptions) ? {} : s.productTypeOptions) || {};
-    const rows: any[] = s.rows || [];
-    const doorRows: any[] = s.doorRows || [];
-    const hungRows = rows.filter((r: any) => r.type?.toLowerCase().includes('hung'));
-    const nonHungRows = rows.filter((r: any) => !r.type?.toLowerCase().includes('hung'));
+    // For multi-location summaries, aggregate rows from all subLocations
+    const allRows: any[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap((loc: any) => loc.rows || [])
+      : (s.rows || []);
+    const allDoorRows: any[] = s.hasMultipleLocations && s.subLocations?.length
+      ? s.subLocations.flatMap((loc: any) => loc.doorRows || [])
+      : (s.doorRows || []);
+    const hungRows = allRows.filter((r: any) => r.type?.toLowerCase().includes('hung'));
+    const nonHungRows = allRows.filter((r: any) => !r.type?.toLowerCase().includes('hung'));
     const groups: [string, any[]][] = [
       ['Euro Windows', nonHungRows],
       ['Double Hung', hungRows],
-      ['Euro Doors', doorRows],
+      ['Euro Doors', allDoorRows],
     ];
     for (const [category, catRows] of groups) {
       const acc: Record<string, { qty: number; fields: number; sqFeet: number; netEuro: number }> = {};
       for (const row of catRows) {
         const parts = [row.type, row.type2, row.type3, row.type4].filter(Boolean);
-        const t = parts.length ? parts.join(' w/ ') : 'â€”';
+        const t = parts.length ? parts.join(' w/ ') : '—';
         if (!acc[t]) acc[t] = { qty: 0, fields: 0, sqFeet: 0, netEuro: 0 };
         acc[t].qty += pv(row.qty);
         acc[t].fields += pv(row.fieldsTotal);
