@@ -446,12 +446,15 @@ export default function SalesforceImportPage() {
           const val = row[csvCol];
           if (val === undefined || val === null || val === '') continue;
 
-          // CompoundName sub-field: "name::Contact__name_firstName" — merge into parent object
+          // CompoundName sub-field: "name::Contact__name_firstName" — merge into prefixed parent
+          // Store under the full prefixed key (e.g. "Contact__name") so flattenRecord and
+          // the edit form both find it via data[field.apiName].
           if (targetField.includes('::')) {
             const sepIdx = targetField.indexOf('::');
             const parentField = targetField.slice(0, sepIdx);
             const subFieldKey = targetField.slice(sepIdx + 2);
-            mapped[parentField] = { ...(mapped[parentField] ?? {}), [subFieldKey]: val };
+            const prefixedParent = `${objectApiName}__${parentField}`;
+            mapped[prefixedParent] = { ...(mapped[prefixedParent] ?? {}), [subFieldKey]: val };
             continue;
           }
 
