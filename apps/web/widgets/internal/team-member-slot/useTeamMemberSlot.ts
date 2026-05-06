@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
+import { resolveLookupDisplayName } from '@/lib/utils'
 import type { TeamMemberSlotCriterion, TeamMemberFlag } from '@/lib/schema'
 import {
   usePendingTeamMemberPool,
@@ -114,6 +115,8 @@ interface UseTeamMemberSlotOptions {
   parentObjectApiName: string
   parentRecordId: string | null
   criterion: TeamMemberSlotCriterion
+  /** Roles whose slots are single-cardinality — only these get blocked in the role picklist. */
+  singleCardinalityRoles?: Set<string>
 }
 
 export interface UseTeamMemberSlotResult {
@@ -146,6 +149,7 @@ export function useTeamMemberSlot({
   parentObjectApiName,
   parentRecordId,
   criterion,
+  singleCardinalityRoles,
 }: UseTeamMemberSlotOptions): UseTeamMemberSlotResult {
   const pool = usePendingTeamMemberPool()
   const [savedRows, setSavedRows] = useState<Record<string, unknown>[]>([])
@@ -200,29 +204,34 @@ export function useTeamMemberSlot({
 
   const rows = [...matchingSaved, ...matchingPending]
 
-  // Build a map of role → occupant name across ALL rows on the parent
-  // (not just rows matching this slot's criterion). Flag-bound slots use
-  // this to disable roles that are already assigned via a role-bound slot.
+  // Build a map of role → occupant name for single-cardinality roles that
+  // are already filled. Flag-bound slots use this to disable those roles in
+  // the role picklist, pushing the user to edit the dedicated slot instead.
   const occupiedRoles = useMemo(() => {
     const map = new Map<string, string>()
+    const allowed = singleCardinalityRoles
     for (const r of savedRows) {
       const d = dataOf(r)
       const role = d.role as string | undefined
       if (!role) continue
+      if (allowed && !allowed.has(role)) continue
       const contactId = getLookupId(d, 'contact')
-      const name = (d.contactName as string) || (d.TeamMember__contactName as string) || contactId || 'someone'
+      const resolved = contactId ? resolveLookupDisplayName(contactId, 'Contact') : null
+      const name = (resolved && resolved !== '-' ? resolved : null)
+        || (d.contactName as string) || (d.TeamMember__contactName as string) || 'someone'
       map.set(role, name)
     }
     if (pool) {
       for (const r of pool.rows) {
         const role = r.data.role as string | undefined
         if (!role) continue
-        const name = (r.data.contactName as string) || (r.data.contact as string) || 'someone'
+        if (allowed && !allowed.has(role)) continue
+        const name = (r.data.contactName as string) || 'someone'
         if (!map.has(role)) map.set(role, name)
       }
     }
     return map
-  }, [savedRows, pool])
+  }, [savedRows, pool, singleCardinalityRoles])
 
   // ── Write ───────────────────────────────────────────────────────────
   const fillSlot = useCallback(

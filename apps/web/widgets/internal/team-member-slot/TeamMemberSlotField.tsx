@@ -116,6 +116,8 @@ interface TeamMemberSlotFieldProps {
    * Edit mode like regular fields.
    */
   readOnly?: boolean
+  /** Roles from single-cardinality role-bound sibling slots — only these are blocked when occupied. */
+  singleCardinalityRoles?: Set<string>
 }
 
 function defaultLabel(config: TeamMemberSlotConfig): string {
@@ -142,12 +144,14 @@ export function TeamMemberSlotField({
   slotConfig,
   panelField,
   readOnly,
+  singleCardinalityRoles,
 }: TeamMemberSlotFieldProps) {
   const { showToast } = useToast()
   const { rows, loading, fillSlot, clearRow, error, occupiedRoles } = useTeamMemberSlot({
     parentObjectApiName,
     parentRecordId,
     criterion: slotConfig.criterion,
+    singleCardinalityRoles,
   })
   const { fieldMap } = useDisplayFields({
     rows,
