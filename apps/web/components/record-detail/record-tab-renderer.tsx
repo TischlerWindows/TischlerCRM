@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { PageLayout, FieldDef, type LayoutSection, type PageField } from '@/lib/schema';
@@ -274,6 +274,24 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
     return !regionFx?.hidden;
   });
 
+  // Collect roles from single-cardinality role-bound TM slots across the
+  // entire tab so flag-bound slots can disable those roles in their picklist.
+  const singleCardinalityRoles = useMemo(() => {
+    const set = new Set<string>()
+    for (const region of regions) {
+      for (const panel of (region.panels ?? []) as any[]) {
+        for (const f of (panel.fields ?? []) as any[]) {
+          if (f.kind !== 'teamMemberSlot' || !f.slotConfig) continue
+          const sc = f.slotConfig as import('@/lib/schema').TeamMemberSlotConfig
+          if (sc.criterion.kind === 'role' && (sc.cardinality ?? 'single') === 'single') {
+            set.add(sc.criterion.role)
+          }
+        }
+      }
+    }
+    return set
+  }, [regions])
+
   const bands = groupIntoColumnTracks(
     visibleRegions,
     (r) => ({
@@ -446,6 +464,7 @@ function renderNewModelTab(props: InternalRendererProps): React.ReactNode {
                             slotConfig={f.slotConfig}
                             panelField={f}
                             readOnly
+                            singleCardinalityRoles={singleCardinalityRoles}
                           />
                         </div>
                       );

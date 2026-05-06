@@ -331,6 +331,25 @@ export default function DynamicForm({
     return resolved;
   }, [object, layoutId, layoutType, layoutOverride, authUser?.profileId]);
 
+  const singleCardinalityRoles = useMemo(() => {
+    const set = new Set<string>()
+    if (!layout) return set
+    for (const tab of layout.tabs) {
+      for (const section of (tab as any).regions ?? (tab as any).sections ?? []) {
+        for (const panel of (section.panels ?? []) as any[]) {
+          for (const f of (panel.fields ?? []) as any[]) {
+            if (f.kind !== 'teamMemberSlot' || !f.slotConfig) continue
+            const sc = f.slotConfig as import('@/lib/schema').TeamMemberSlotConfig
+            if (sc.criterion.kind === 'role' && (sc.cardinality ?? 'single') === 'single') {
+              set.add(sc.criterion.role)
+            }
+          }
+        }
+      }
+    }
+    return set
+  }, [layout])
+
   useEffect(() => {
     if (layout && layout.tabs.length > 0 && !activeTab) {
       const firstVisible = layout.tabs.find((t) => !isHiddenByLifecycle(t as any, layoutType));
@@ -1038,6 +1057,7 @@ export default function DynamicForm({
           parentRecordId={parentRecordId}
           slotConfig={lf.slotConfig}
           panelField={layoutField as unknown as import('@/lib/schema').PanelField}
+          singleCardinalityRoles={singleCardinalityRoles}
         />
       );
     }
@@ -1667,6 +1687,7 @@ export default function DynamicForm({
                                           slotConfig={pf.slotConfig}
                                           panelField={pf}
                                           readOnly
+                                          singleCardinalityRoles={singleCardinalityRoles}
                                         />
                                       </div>
                                     );
