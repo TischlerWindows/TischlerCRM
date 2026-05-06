@@ -30,7 +30,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Contacts',
     description: 'People and contacts',
     fields: [
-      { apiName: 'firstName', label: 'First Name', type: 'Text' },
+      { apiName: 'firstName', label: 'First Name', type: 'Text', required: true },
       { apiName: 'lastName', label: 'Last Name', type: 'Text' },
       { apiName: 'email', label: 'Email', type: 'Email' },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
@@ -46,7 +46,7 @@ const CORE_OBJECTS = [
     fields: [
       { apiName: 'accountNumber', label: 'Account Number', type: 'Text', unique: true },
       { apiName: 'name', label: 'Account Name', type: 'Text' },
-      { apiName: 'type', label: 'Type', type: 'Picklist', picklistValues: ['Customer', 'Prospect', 'Partner', 'Vendor'] },
+      { apiName: 'type', label: 'Type', type: 'Picklist', required: true, picklistValues: ['Customer', 'Prospect', 'Partner', 'Vendor'] },
       { apiName: 'email', label: 'Email', type: 'Email' },
       { apiName: 'phone', label: 'Phone', type: 'Phone' },
       { apiName: 'website', label: 'Website', type: 'URL' },
@@ -95,7 +95,7 @@ const CORE_OBJECTS = [
       { apiName: 'amount', label: 'Amount', type: 'Currency' },
       { apiName: 'closeDate', label: 'Close Date', type: 'Date' },
       { apiName: 'stage', label: 'Stage', type: 'Picklist', picklistValues: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'], defaultValue: 'Prospecting' },
-      { apiName: 'probability', label: 'Probability (%)', type: 'Percent' },
+      { apiName: 'probability', label: 'Probability (%)', type: 'Percent', min: 0, max: 100 },
       { apiName: 'property', label: 'Property', type: 'Lookup' },
       { apiName: 'lead', label: 'Lead', type: 'Lookup' },
     ],

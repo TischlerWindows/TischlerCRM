@@ -598,6 +598,30 @@ export async function recordRoutes(app: FastifyInstance) {
           if (normalizedData[pf] === true || normalizedData[pf] === 'true') { mergedData[pf] = true; mergedData[flag] = true; }
         }
 
+        // Enforce single-cardinality: unset primaryContact on sibling TMs
+        if (mergedData.primaryContact === true) {
+          const siblings = await prisma.record.findMany({
+            where: {
+              objectId: object.id,
+              deletedAt: null,
+              id: { not: existingDuplicate.id },
+              OR: [
+                { data: { path: [parentField], equals: parentValue } },
+                { data: { path: [`TeamMember__${parentField}`], equals: parentValue } },
+              ],
+            },
+          });
+          for (const sib of siblings) {
+            const sibData = (sib.data as Record<string, any>) || {};
+            if (sibData.primaryContact === true || sibData.TeamMember__primaryContact === true) {
+              await prisma.record.update({
+                where: { id: sib.id },
+                data: { data: { ...sibData, primaryContact: false, TeamMember__primaryContact: false }, modifiedById: userId },
+              });
+            }
+          }
+        }
+
         const updated = await prisma.record.update({
           where: { id: existingDuplicate.id },
           data: { data: mergedData, modifiedById: userId },
@@ -702,6 +726,41 @@ export async function recordRoutes(app: FastifyInstance) {
         },
       },
     });
+
+    // Enforce single-cardinality: unset primaryContact on sibling TMs (new create)
+    if (apiName === 'TeamMember') {
+      const isPrimary = normalizedData.primaryContact === true || normalizedData.primaryContact === 'true'
+        || normalizedData.TeamMember__primaryContact === true || normalizedData.TeamMember__primaryContact === 'true';
+      if (isPrimary) {
+        const parentFields = ['property', 'opportunity', 'project', 'workOrder', 'installation'];
+        for (const pf of parentFields) {
+          const pv = normalizedData[pf] || normalizedData[`TeamMember__${pf}`];
+          if (pv) {
+            const siblings = await prisma.record.findMany({
+              where: {
+                objectId: object.id,
+                deletedAt: null,
+                id: { not: record.id },
+                OR: [
+                  { data: { path: [pf], equals: String(pv) } },
+                  { data: { path: [`TeamMember__${pf}`], equals: String(pv) } },
+                ],
+              },
+            });
+            for (const sib of siblings) {
+              const sibData = (sib.data as Record<string, any>) || {};
+              if (sibData.primaryContact === true || sibData.TeamMember__primaryContact === true) {
+                await prisma.record.update({
+                  where: { id: sib.id },
+                  data: { data: { ...sibData, primaryContact: false, TeamMember__primaryContact: false }, modifiedById: userId },
+                });
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
 
     // Audit: log record creation
     const recordName = normalizedData.name || normalizedData[`${apiName}__name`]

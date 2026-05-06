@@ -373,8 +373,9 @@ export default function ContactsPage() {
   const filteredContacts = useMemo(() => {
     // First apply search filter
     let result = contacts.filter(contact => {
-      const searchLower = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || Object.values(contact).some(value => {
+      const trimmed = searchTerm.trim();
+      const searchLower = trimmed.toLowerCase();
+      const matchesSearch = !trimmed || Object.values(contact).some(value => {
         if (value === null || value === undefined) return false;
         if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
         if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);

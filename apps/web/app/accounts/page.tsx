@@ -274,8 +274,9 @@ export default function AccountsPage() {
   };
 
   const filteredAccounts = accounts.filter(account => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || Object.values(account).some(value => {
+    const trimmed = searchTerm.trim();
+    const searchLower = trimmed.toLowerCase();
+    const matchesSearch = !trimmed || Object.values(account).some(value => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
       if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);

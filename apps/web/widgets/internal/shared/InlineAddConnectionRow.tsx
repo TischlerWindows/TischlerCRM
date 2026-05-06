@@ -257,13 +257,9 @@ export function InlineAddConnectionRow({
     void ensureLists()
   }, [expanded, ensureLists])
 
-  // Pre-fill role from last-used preference.
-  useEffect(() => {
-    if (!expanded) return
-    if (role) return
-    const last = getLastRoleForObject(parentObjectApiName)
-    if (last && roleValues.includes(last)) setRole(last)
-  }, [expanded, role, parentObjectApiName, roleValues])
+  // NOTE: Role pre-fill from localStorage removed — QA found it silently
+  // overwrites existing team-member roles when the upsert-merge fires,
+  // because the user doesn't realise a role is already selected.
 
   // Focus the input when we expand. Also scroll the row into the middle of
   // the viewport so the dropdown (which opens BELOW the input) doesn't render

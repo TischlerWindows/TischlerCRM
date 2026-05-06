@@ -330,8 +330,9 @@ export default function OpportunitiesPage() {
     // Hide requote records from the main list
     if ((opp as any)._isRequote) return false;
 
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || Object.values(opp).some(value => {
+    const trimmed = searchTerm.trim();
+    const searchLower = trimmed.toLowerCase();
+    const matchesSearch = !trimmed || Object.values(opp).some(value => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
       if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);

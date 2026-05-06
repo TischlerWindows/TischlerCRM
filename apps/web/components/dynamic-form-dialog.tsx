@@ -41,10 +41,12 @@ export default function DynamicFormDialog({
 }: DynamicFormDialogProps) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const formTouchedRef = useRef(false);
+  const [formKey, setFormKey] = useState(0);
 
   const handleSubmit = async (data: Record<string, any>, layoutId?: string) => {
     formTouchedRef.current = false;
     const result = await onSubmit(data, layoutId);
+    setFormKey(k => k + 1);
     return result;
   };
 
@@ -71,6 +73,7 @@ export default function DynamicFormDialog({
   const confirmExit = () => {
     setShowExitConfirm(false);
     formTouchedRef.current = false;
+    setFormKey(k => k + 1);
     onOpenChange(false);
   };
 
@@ -113,6 +116,7 @@ export default function DynamicFormDialog({
             }}
           >
             <DynamicForm
+              key={formKey}
               objectApiName={objectApiName}
               layoutType={layoutType}
               layoutId={layoutId}
