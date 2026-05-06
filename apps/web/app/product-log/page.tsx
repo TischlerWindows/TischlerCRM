@@ -71,6 +71,7 @@ export default function ProductLogPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [productTypeFilter, setProductTypeFilter] = useState('All');
 
   useEffect(() => {
     getSetting<any[]>('summaries')
@@ -79,14 +80,20 @@ export default function ProductLogPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const productTypes = useMemo(() => {
+    const pts = Array.from(new Set(entries.map(e => e.productType))).sort();
+    return ['All', ...pts];
+  }, [entries]);
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return entries.filter(e => {
       if (categoryFilter !== 'All' && e.category !== categoryFilter) return false;
+      if (productTypeFilter !== 'All' && e.productType !== productTypeFilter) return false;
       if (q && ![e.summaryName, e.opportunityNumber, e.productType, ...e.typeOptions].some(v => v.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [entries, search, categoryFilter]);
+  }, [entries, search, categoryFilter, productTypeFilter]);
 
   const totals = useMemo(() => ({
     qty: filtered.reduce((s, e) => s + e.qty, 0),
@@ -117,7 +124,7 @@ export default function ProductLogPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search job, opportunity, product, optionâ€¦"
+            placeholder="Search job, opportunity, product, option…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 w-80"
@@ -138,6 +145,15 @@ export default function ProductLogPage() {
             </button>
           ))}
         </div>
+        <select
+          value={productTypeFilter}
+          onChange={e => setProductTypeFilter(e.target.value)}
+          className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 bg-white focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40"
+        >
+          {productTypes.map(pt => (
+            <option key={pt} value={pt}>{pt === 'All' ? 'All Product Types' : pt}</option>
+          ))}
+        </select>
         <div className="ml-auto text-sm text-gray-500 self-center">
           {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
         </div>
@@ -146,7 +162,7 @@ export default function ProductLogPage() {
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         {loading ? (
-          <div className="text-center py-16 text-gray-400 text-sm">Loadingâ€¦</div>
+          <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-sm">
             {entries.length === 0
@@ -178,7 +194,7 @@ export default function ProductLogPage() {
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                       {entry.date
                         ? new Date(entry.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        : 'â€”'}
+                        : '—'}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
