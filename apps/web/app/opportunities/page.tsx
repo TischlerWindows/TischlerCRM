@@ -36,7 +36,7 @@ import { resolveLayoutForUser, type LayoutResolveResult } from '@/lib/layout-res
 import { useNewRecordFromQuery } from '@/lib/use-new-record-from-query';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord } from '@/lib/utils';
+import { cn, formatFieldValue, resolveLookupDisplayName, inferLookupObjectType, evaluateFormulaForRecord, preloadLookupRecords } from '@/lib/utils';
 import { useLookupPreloader } from '@/lib/use-lookup-preloader';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { recordsService } from '@/lib/records-service';
@@ -124,7 +124,9 @@ export default function OpportunitiesPage() {
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
-  
+  const [tmMap, setTmMap] = useState<Record<string, { quoteRecipient?: string; architectDesigner?: string }>>({});
+  const [tmTick, setTmTick] = useState(0);
+
   // Check if Opportunity object exists with page layouts
   const oppObject = schema?.objects.find(obj => obj.apiName === 'Opportunity');
   const lookupTick = useLookupPreloader(oppObject);
@@ -135,34 +137,55 @@ export default function OpportunitiesPage() {
 
   // Dynamically generate available columns from schema
   const AVAILABLE_COLUMNS = useMemo(() => {
-    if (!oppObject?.fields) {
-      return [
-        { id: 'opportunityNumber', label: 'Opp #', defaultVisible: true },
-        { id: 'opportunityName', label: 'Opportunity Name', defaultVisible: true },
-        { id: 'accountName', label: 'Account', defaultVisible: true },
-        { id: 'stage', label: 'Stage', defaultVisible: true },
-        { id: 'value', label: 'Value', defaultVisible: true },
-        { id: 'probability', label: 'Probability', defaultVisible: true },
-        { id: 'closeDate', label: 'Close Date', defaultVisible: true },
-        { id: 'assignedTo', label: 'Assigned To', defaultVisible: true },
-        { id: 'createdBy', label: 'Created By', defaultVisible: false },
-        { id: 'createdAt', label: 'Created Date', defaultVisible: false },
-        { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
-        { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false }
-      ];
+    const regularCols = !oppObject?.fields
+      ? [
+          { id: 'opportunityNumber', label: 'Opp #', defaultVisible: true },
+          { id: 'opportunityName', label: 'Opportunity Name', defaultVisible: true },
+          { id: 'accountName', label: 'Account', defaultVisible: true },
+          { id: 'stage', label: 'Stage', defaultVisible: true },
+          { id: 'value', label: 'Value', defaultVisible: true },
+          { id: 'probability', label: 'Probability', defaultVisible: true },
+          { id: 'closeDate', label: 'Close Date', defaultVisible: true },
+          { id: 'assignedTo', label: 'Assigned To', defaultVisible: true },
+          { id: 'createdBy', label: 'Created By', defaultVisible: false },
+          { id: 'createdAt', label: 'Created Date', defaultVisible: false },
+          { id: 'lastModifiedBy', label: 'Last Modified By', defaultVisible: false },
+          { id: 'lastModifiedAt', label: 'Modified Date', defaultVisible: false },
+        ]
+      : oppObject.fields.map((field, index) => {
+          const cleanApiName = field.apiName.replace('Opportunity__', '');
+          const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
+          return { id: cleanApiName, label: field.label, defaultVisible: !isSystemField && index < 10 };
+        });
+
+    // Also expose TeamMemberSlot (Connection) fields from page layouts
+    const tmSlotCols: Array<{ id: string; label: string; defaultVisible: boolean }> = [];
+    const seenSlots = new Set<string>();
+    for (const layout of oppObject?.pageLayouts ?? []) {
+      for (const tab of (layout as any).tabs ?? []) {
+        for (const region of tab.regions ?? []) {
+          for (const panel of region.panels ?? []) {
+            for (const field of panel.fields ?? []) {
+              if (field.kind === 'teamMemberSlot' && field.slotConfig && !seenSlots.has(field.fieldApiName)) {
+                seenSlots.add(field.fieldApiName);
+                const crit = field.slotConfig.criterion;
+                const label = field.labelOverride || (
+                  crit.kind === 'flag'
+                    ? (crit.flag === 'quoteRecipient' ? 'Quote Recipient'
+                      : crit.flag === 'contractHolder' ? 'Contract Holder'
+                      : crit.flag === 'primaryContact' ? 'Primary Contact'
+                      : String(crit.flag))
+                    : String(crit.role)
+                );
+                tmSlotCols.push({ id: field.fieldApiName, label, defaultVisible: false });
+              }
+            }
+          }
+        }
+      }
     }
 
-    return oppObject.fields.map((field, index) => {
-      const cleanApiName = field.apiName.replace('Opportunity__', '');
-      const isSystemField = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(field.apiName);
-      const defaultVisible = !isSystemField && index < 10;
-      
-      return {
-        id: cleanApiName,
-        label: field.label,
-        defaultVisible
-      };
-    });
+    return [...regularCols, ...tmSlotCols];
   }, [oppObject]);
 
 
@@ -218,6 +241,34 @@ export default function OpportunitiesPage() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Build a per-opportunity map of TeamMemberSlot data (Quote Recipient, Architect/Designer, etc.)
+  useEffect(() => {
+    recordsService.getRecords('TeamMember').then(records => {
+      const map: Record<string, { quoteRecipient?: string; architectDesigner?: string }> = {};
+      for (const r of records) {
+        const d: Record<string, any> = r.data ?? {};
+        const getF = (k: string): any => d[k] ?? d[`TeamMember__${k}`] ?? '';
+        const oppId = String(getF('opportunity') || '');
+        if (!oppId) continue;
+        if (!map[oppId]) map[oppId] = {};
+        const isQR = getF('quoteRecipient') === true || getF('quoteRecipient') === 'true' || getF('quoteRecipient') === 1;
+        if (isQR && !map[oppId].quoteRecipient) {
+          const cId = String(getF('contact') || '');
+          if (cId) map[oppId].quoteRecipient = cId;
+        }
+        const role = String(getF('role') || '').toLowerCase();
+        if ((role.includes('architect') || role.includes('designer')) && !map[oppId].architectDesigner) {
+          const aId = String(getF('account') || '');
+          if (aId) map[oppId].architectDesigner = aId;
+        }
+      }
+      setTmMap(map);
+      Promise.all([preloadLookupRecords('Contact'), preloadLookupRecords('Account')])
+        .then(() => setTmTick(t => t + 1))
+        .catch(() => {});
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -372,6 +423,24 @@ export default function OpportunitiesPage() {
 
   const formatColumnValue = (opp: Opportunity, columnId: string) => {
     void lookupTick; // re-render after lookup cache loads
+    void tmTick;     // re-render after TeamMember cache loads
+
+    // TeamMemberSlot synthetic fields (Connection)
+    if (columnId.startsWith('__tm:')) {
+      const tm = tmMap[(opp as any).id || ''];
+      if (!tm) return '-';
+      if (columnId === '__tm:flag:quoteRecipient') {
+        return tm.quoteRecipient ? resolveLookupDisplayName(tm.quoteRecipient, 'Contact') : '-';
+      }
+      if (columnId.startsWith('__tm:role:')) {
+        const role = columnId.replace('__tm:role:', '').toLowerCase();
+        if (role.includes('architect') || role.includes('designer')) {
+          return tm.architectDesigner ? resolveLookupDisplayName(tm.architectDesigner, 'Account') : '-';
+        }
+      }
+      return '-';
+    }
+
     let value = (opp as any)[columnId];
 
     // Formula fields: evaluate expression instead of showing raw value
