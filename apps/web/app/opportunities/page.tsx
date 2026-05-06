@@ -245,35 +245,53 @@ export default function OpportunitiesPage() {
   }, []);
 
   // Build a per-opportunity map of TeamMemberSlot data for ALL slot types.
-  // Keyed: oppId -> { [fieldApiName]: { contact?, account? } }
+  // Keyed: oppId -> { [layout fieldApiName]: { contact?, account? } }
+  // The layout stores slot IDs as "__tm:slot:{timestamp}-{id}", so we must
+  // match TeamMember records against each slot's criterion and use the layout
+  // fieldApiName as the key (not a criterion-derived key).
   useEffect(() => {
+    if (!oppObject) return;
+    // Collect all slot definitions from the layout, keyed by their fieldApiName
+    const slotDefs: Array<{ fieldApiName: string; criterion: { kind: string; flag?: string; role?: string }; mode: string }> = [];
+    const seen = new Set<string>();
+    for (const layout of (oppObject as any).pageLayouts ?? []) {
+      for (const tab of layout.tabs ?? []) {
+        for (const region of tab.regions ?? []) {
+          for (const panel of region.panels ?? []) {
+            for (const field of panel.fields ?? []) {
+              if (field.kind === 'teamMemberSlot' && field.slotConfig && !seen.has(field.fieldApiName)) {
+                seen.add(field.fieldApiName);
+                slotDefs.push({ fieldApiName: field.fieldApiName, criterion: field.slotConfig.criterion, mode: field.slotConfig.mode });
+              }
+            }
+          }
+        }
+      }
+    }
+    if (slotDefs.length === 0) return;
+
     recordsService.getRecords('TeamMember').then(records => {
       const map: Record<string, Record<string, { contact?: string; account?: string }>> = {};
-      const flags = ['quoteRecipient', 'contractHolder', 'primaryContact', 'contact2', 'contact3', 'contact4'];
       for (const r of records) {
         const d: Record<string, any> = r.data ?? {};
         const getF = (k: string): any => d[k] ?? d[`TeamMember__${k}`] ?? '';
         const oppId = String(getF('opportunity') || '');
         if (!oppId) continue;
         if (!map[oppId]) map[oppId] = {};
-        const cId = String(getF('contact') || '');
-        const aId = String(getF('account') || '');
-        // Capture each flag that is set
-        for (const flag of flags) {
-          const isSet = getF(flag) === true || getF(flag) === 'true' || getF(flag) === 1;
-          if (isSet) {
-            const key = `__tm:flag:${flag}`;
-            if (!map[oppId][key]) {
-              map[oppId][key] = { contact: cId || undefined, account: aId || undefined };
-            }
+        const cId = String(getF('contact') || '') || undefined;
+        const aId = String(getF('account') || '') || undefined;
+        for (const slot of slotDefs) {
+          if (map[oppId][slot.fieldApiName]) continue; // first match wins
+          const crit = slot.criterion;
+          let matches = false;
+          if (crit.kind === 'flag' && crit.flag) {
+            const v = getF(crit.flag);
+            matches = v === true || v === 'true' || v === 1;
+          } else if (crit.kind === 'role' && crit.role) {
+            matches = String(getF('role') || '') === crit.role;
           }
-        }
-        // Capture the role if present
-        const role = String(getF('role') || '');
-        if (role) {
-          const key = `__tm:role:${role}`;
-          if (!map[oppId][key]) {
-            map[oppId][key] = { contact: cId || undefined, account: aId || undefined };
+          if (matches) {
+            map[oppId][slot.fieldApiName] = { contact: cId, account: aId };
           }
         }
       }
@@ -282,7 +300,7 @@ export default function OpportunitiesPage() {
         .then(() => setTmTick(t => t + 1))
         .catch(() => {});
     }).catch(() => {});
-  }, []);
+  }, [oppObject]);
 
   useEffect(() => {
     (async () => {
