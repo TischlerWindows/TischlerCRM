@@ -2954,7 +2954,7 @@ export default function SummaryPage() {
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Logs</h3>
             <nav className="space-y-1">
-              <Link href="/product-log" className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-gray-700 hover:bg-gray-100">
+              <Link href="/products" className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors text-gray-700 hover:bg-gray-100">
                 <Package className="w-4 h-4" />
                 Product Log
               </Link>
