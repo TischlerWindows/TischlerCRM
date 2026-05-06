@@ -284,26 +284,64 @@ export function useTeamMemberSlot({
         return { id: String(created.id), isPending: false, data: dataOf(created) }
       }
 
-      // Role-bound: always create a new row (multiple rows per person allowed).
+      // Role-bound: check if this contact/account already exists on the record.
+      // If so, PUT to update the role instead of creating a duplicate row.
       const roleValue = cur.role
       const payload: Record<string, unknown> = { role: roleValue }
       if (contactId) payload.contact = contactId
       if (accountId) payload.account = accountId
 
       if (isCreateMode && pool) {
+        const existing = pool.findByContactAccount(contactId, accountId)
+        if (existing) {
+          pool.updateRow(existing.id, { role: roleValue })
+          return { id: existing.id, isPending: true, data: { ...existing.data, role: roleValue } }
+        }
         const id = pool.addRow(payload)
         return { id, isPending: true, data: payload }
       }
 
       if (parentRecordId && parentField) payload[parentField] = parentRecordId
+
+      // Fetch fresh rows to avoid race conditions with stale local state
+      const freshRows = parentRecordId
+        ? await fetchFreshRows(parentObjectApiName, parentRecordId)
+        : []
+      const existingRow = freshRows.find(r => {
+        const d = dataOf(r)
+        const c = getLookupId(d, 'contact')
+        const a = getLookupId(d, 'account')
+        return c === (contactId ?? null) && a === (accountId ?? null)
+      })
+
+      if (existingRow) {
+        try {
+          await apiClient.put(`/objects/TeamMember/records/${String(existingRow.id)}`, {
+            data: { role: roleValue },
+          })
+          await fetchRows()
+          pool?.bumpVersion()
+          notifyTeamMembersChanged()
+          return {
+            id: String(existingRow.id),
+            isPending: false,
+            data: { ...dataOf(existingRow), role: roleValue },
+          }
+        } catch (err) {
+          if (!isNotFoundError(err)) throw err
+          await fetchRows()
+        }
+      }
+
       const created = await apiClient.post<Record<string, unknown>>('/objects/TeamMember/records', {
         data: payload,
       })
       await fetchRows()
       pool?.bumpVersion()
+      notifyTeamMembersChanged()
       return { id: String(created.id), isPending: false, data: dataOf(created) }
     },
-    [isCreateMode, pool, parentObjectApiName, parentRecordId, savedRows, fetchRows],
+    [isCreateMode, pool, parentObjectApiName, parentRecordId, fetchRows],
   )
 
   const clearRow = useCallback(

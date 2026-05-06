@@ -533,79 +533,92 @@ export async function recordRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: 'Exactly one parent is required. Set one of: property, opportunity, project, workOrder, installation.' });
       }
 
-      // Duplicate prevention
+      // Duplicate detection → upsert: when the same contact/account already
+      // exists on this parent, merge role + flags into the existing row
+      // instead of rejecting with 409. This lets a person hold both a role
+      // (e.g. General Contractor) and flags (e.g. Quote Recipient).
       const parentField = setParents[0];
       const parentValue = getTeamMemberField(normalizedData, parentField)!;
+
+      const dupMatchesParent = (dupData: Record<string, any>) => {
+        const p = dupData[parentField] || dupData[`TeamMember__${parentField}`];
+        return !!p && String(p) === parentValue;
+      };
+
+      let existingDuplicate: { id: string; data: any } | null = null;
+
       if (contactVal) {
-        // Check duplicates based on contact + parent
-        const duplicate = await prisma.record.findFirst({
-          where: {
-            objectId: object.id,
-            deletedAt: null,
-            data: { path: ['contact'], equals: contactVal },
-          },
+        const dup = await prisma.record.findFirst({
+          where: { objectId: object.id, deletedAt: null, data: { path: ['contact'], equals: contactVal } },
         });
-        if (duplicate) {
-          const dupData = duplicate.data as Record<string, any> | null;
-          if (dupData) {
-            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-            if (dupParent && String(dupParent) === parentValue) {
-              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
-            }
-          }
+        if (dup?.data && dupMatchesParent(dup.data as Record<string, any>)) {
+          existingDuplicate = dup;
         }
-        // Also check with prefixed contact key
-        const duplicates = await prisma.record.findMany({
-          where: {
-            objectId: object.id,
-            deletedAt: null,
-            data: { path: [`TeamMember__contact`], equals: contactVal },
-          },
-        });
-        for (const dup of duplicates) {
-          const dupData = dup.data as Record<string, any> | null;
-          if (dupData) {
-            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-            if (dupParent && String(dupParent) === parentValue) {
-              return reply.code(409).send({ error: 'This contact is already a team member on this record.' });
-            }
+        if (!existingDuplicate) {
+          const dups = await prisma.record.findMany({
+            where: { objectId: object.id, deletedAt: null, data: { path: ['TeamMember__contact'], equals: contactVal } },
+          });
+          for (const d of dups) {
+            if (d.data && dupMatchesParent(d.data as Record<string, any>)) { existingDuplicate = d; break; }
           }
         }
       } else if (accountVal) {
-        // Check duplicates based on account + parent (account-only team member)
-        const duplicate = await prisma.record.findFirst({
-          where: {
-            objectId: object.id,
-            deletedAt: null,
-            data: { path: ['account'], equals: accountVal },
-          },
+        const dup = await prisma.record.findFirst({
+          where: { objectId: object.id, deletedAt: null, data: { path: ['account'], equals: accountVal } },
         });
-        if (duplicate) {
-          const dupData = duplicate.data as Record<string, any> | null;
-          if (dupData) {
-            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-            if (dupParent && String(dupParent) === parentValue) {
-              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
-            }
+        if (dup?.data && dupMatchesParent(dup.data as Record<string, any>)) {
+          existingDuplicate = dup;
+        }
+        if (!existingDuplicate) {
+          const dups = await prisma.record.findMany({
+            where: { objectId: object.id, deletedAt: null, data: { path: ['TeamMember__account'], equals: accountVal } },
+          });
+          for (const d of dups) {
+            if (d.data && dupMatchesParent(d.data as Record<string, any>)) { existingDuplicate = d; break; }
           }
         }
-        // Also check with prefixed account key
-        const duplicates = await prisma.record.findMany({
-          where: {
-            objectId: object.id,
-            deletedAt: null,
-            data: { path: [`TeamMember__account`], equals: accountVal },
+      }
+
+      if (existingDuplicate) {
+        const existingData = (existingDuplicate.data as Record<string, any>) || {};
+        const mergedData = { ...existingData };
+
+        // Merge role (new value wins)
+        const newRole = normalizedData.role || normalizedData.TeamMember__role;
+        if (newRole) {
+          mergedData.role = newRole;
+          mergedData.TeamMember__role = newRole;
+        }
+
+        // Merge flags additively — only set to true, never unset
+        const tmFlags = ['primaryContact', 'contact2', 'contact3', 'contact4', 'contractHolder', 'quoteRecipient'];
+        for (const flag of tmFlags) {
+          if (normalizedData[flag] === true || normalizedData[flag] === 'true') mergedData[flag] = true;
+          const pf = `TeamMember__${flag}`;
+          if (normalizedData[pf] === true || normalizedData[pf] === 'true') { mergedData[pf] = true; mergedData[flag] = true; }
+        }
+
+        const updated = await prisma.record.update({
+          where: { id: existingDuplicate.id },
+          data: { data: mergedData, modifiedById: userId },
+          include: {
+            createdBy: { select: { id: true, name: true, email: true } },
+            modifiedBy: { select: { id: true, name: true, email: true } },
           },
         });
-        for (const dup of duplicates) {
-          const dupData = dup.data as Record<string, any> | null;
-          if (dupData) {
-            const dupParent = dupData[parentField] || dupData[`TeamMember__${parentField}`];
-            if (dupParent && String(dupParent) === parentValue) {
-              return reply.code(409).send({ error: 'This account is already a team member on this record.' });
-            }
-          }
-        }
+
+        logAudit({
+          actorId: userId,
+          action: 'UPDATE',
+          objectType: apiName,
+          objectId: updated.id,
+          objectName: existingData.teamMemberNumber || existingData.TeamMember__teamMemberNumber || updated.id,
+          before: existingData,
+          after: mergedData,
+          ipAddress: extractIp(req),
+        });
+
+        return reply.code(200).send(updated);
       }
     }
 
