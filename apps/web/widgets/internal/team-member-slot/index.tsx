@@ -25,7 +25,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
   const recordId = (record.id as string | undefined) ?? null
 
   const { showToast } = useToast()
-  const { rows, loading, error, fillSlot, clearRow } = useTeamMemberSlot({
+  const { rows, loading, error, fillSlot, clearRow, occupiedRoles } = useTeamMemberSlot({
     parentObjectApiName: object.apiName,
     parentRecordId: recordId,
     criterion: slotConfig.criterion,
@@ -63,6 +63,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
               }
             }}
             placeholder={slotConfig.placeholder}
+            occupiedRoles={occupiedRoles}
           />
         ) : (
           <SlotInput
@@ -70,6 +71,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
             criterion={slotConfig.criterion}
             onFill={async (input) => { await fillSlot(input) }}
             placeholder={slotConfig.placeholder}
+            occupiedRoles={occupiedRoles}
           />
         )}
       </div>
@@ -97,6 +99,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
                 showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
               }
             }}
+            occupiedRoles={occupiedRoles}
           />
         ))}
         {showAdder ? (
@@ -109,6 +112,7 @@ export default function TeamMemberSlotWidget({ config, record, object }: WidgetP
                 setShowAdder(false)
               }}
               placeholder={slotConfig.placeholder ?? 'Add'}
+              occupiedRoles={occupiedRoles}
             />
             <button
               type="button"

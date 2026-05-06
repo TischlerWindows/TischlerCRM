@@ -27,6 +27,8 @@ interface SlotInputProps {
   /** Optional placeholder copy for the lookup. */
   placeholder?: string
   disabled?: boolean
+  /** Roles already assigned to someone on this record — shown disabled in the role picklist. */
+  occupiedRoles?: Map<string, string>
 }
 
 const ROLE_FALLBACK = [
@@ -61,6 +63,7 @@ export function SlotInput({
   onClear,
   placeholder,
   disabled,
+  occupiedRoles,
 }: SlotInputProps) {
   const { showToast } = useToast()
   const schema = useSchemaStore(s => s.schema)
@@ -259,6 +262,11 @@ export function SlotInput({
   // exception in the wizard and routinely tripped users; keeping it as a
   // gate also encouraged shipping the wrong default role since users
   // skipped the role dropdown on their way to the Save button.
+  // Ref for onFill so the auto-commit effect doesn't re-run (and cancel
+  // in-flight saves) when the parent re-renders with a new inline arrow.
+  const onFillRef = useRef(onFill)
+  onFillRef.current = onFill
+
   const lastCommitKeyRef = useRef<string | null>(null)
   useEffect(() => {
     if (boundRow) return
@@ -274,40 +282,31 @@ export function SlotInput({
     if (lastCommitKeyRef.current === key) return
     lastCommitKeyRef.current = key
 
-    let cancelled = false
     setSaving(true)
     setError(null)
     ;(async () => {
       try {
-        await onFill({
+        await onFillRef.current({
           contactId: mode === 'account' ? null : contactId,
           accountId: mode === 'contact' ? null : accountId,
           role: isFlagNetNew ? pendingRole : undefined,
         })
-        if (!cancelled) {
-          showToast('Connection saved', 'success')
-          setAccountId(null)
-          setContactId(null)
-          setAccountQuery('')
-          setContactQuery('')
-          setPendingRole('')
-          setNoAccountMode(false)
-        }
+        showToast('Connection saved', 'success')
+        setAccountId(null)
+        setContactId(null)
+        setAccountQuery('')
+        setContactQuery('')
+        setPendingRole('')
+        setNoAccountMode(false)
       } catch (e) {
-        if (!cancelled) {
-          const message = e instanceof Error ? e.message : 'Failed to save connection'
-          setError(message)
-          showToast(message, 'error')
-          lastCommitKeyRef.current = null
-        }
+        const message = e instanceof Error ? e.message : 'Failed to save connection'
+        setError(message)
+        showToast(message, 'error')
+        lastCommitKeyRef.current = null
       } finally {
         setSaving(false)
       }
     })()
-
-    return () => {
-      cancelled = true
-    }
   }, [
     boundRow,
     saving,
@@ -317,7 +316,6 @@ export function SlotInput({
     mode,
     contactId,
     accountId,
-    onFill,
   ])
 
   // Register this slot's "incomplete pick" status with the surrounding
@@ -569,9 +567,14 @@ export function SlotInput({
             disabled={disabled}
           >
             <option value="">Select role…</option>
-            {roleValues.map(v => (
-              <option key={v} value={v}>{v}</option>
-            ))}
+            {roleValues.map(v => {
+              const occupant = occupiedRoles?.get(v)
+              return (
+                <option key={v} value={v} disabled={!!occupant}>
+                  {occupant ? `${v} (assigned to ${occupant})` : v}
+                </option>
+              )
+            })}
           </select>
           <p className="text-[11px] text-gray-500 mt-1">
             This person isn&apos;t on this record yet — pick their role.

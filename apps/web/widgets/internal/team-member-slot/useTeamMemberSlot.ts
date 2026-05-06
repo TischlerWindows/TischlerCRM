@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { apiClient } from '@/lib/api-client'
 import type { TeamMemberSlotCriterion, TeamMemberFlag } from '@/lib/schema'
 import {
@@ -138,6 +138,8 @@ export interface UseTeamMemberSlotResult {
    */
   clearRow: (rowId: string) => Promise<void>
   refresh: () => Promise<void>
+  /** Map of role → occupant display name for single-cardinality role slots already filled. */
+  occupiedRoles: Map<string, string>
 }
 
 export function useTeamMemberSlot({
@@ -197,6 +199,30 @@ export function useTeamMemberSlot({
     : []
 
   const rows = [...matchingSaved, ...matchingPending]
+
+  // Build a map of role → occupant name across ALL rows on the parent
+  // (not just rows matching this slot's criterion). Flag-bound slots use
+  // this to disable roles that are already assigned via a role-bound slot.
+  const occupiedRoles = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const r of savedRows) {
+      const d = dataOf(r)
+      const role = d.role as string | undefined
+      if (!role) continue
+      const contactId = getLookupId(d, 'contact')
+      const name = (d.contactName as string) || (d.TeamMember__contactName as string) || contactId || 'someone'
+      map.set(role, name)
+    }
+    if (pool) {
+      for (const r of pool.rows) {
+        const role = r.data.role as string | undefined
+        if (!role) continue
+        const name = (r.data.contactName as string) || (r.data.contact as string) || 'someone'
+        if (!map.has(role)) map.set(role, name)
+      }
+    }
+    return map
+  }, [savedRows, pool])
 
   // ── Write ───────────────────────────────────────────────────────────
   const fillSlot = useCallback(
@@ -386,5 +412,6 @@ export function useTeamMemberSlot({
     fillSlot,
     clearRow,
     refresh: fetchRows,
+    occupiedRoles,
   }
 }
