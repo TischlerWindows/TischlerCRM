@@ -157,7 +157,7 @@ export default function ProductsPage() {
   const fmtInt = (v: number) => v.toLocaleString('en-US');
 
   return (
-    <div className="p-6 max-w-screen-xl mx-auto">
+    <div className="p-6">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-brand-navy/10 rounded-lg">
@@ -210,120 +210,138 @@ export default function ProductsPage() {
               : 'No entries match the current filters.'}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 w-8"></th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Product Type</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Qty</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Fields</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Sq Ft</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total NET €</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Jobs</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((group) => {
-                  const key = `${group.category}|||${group.productType}`;
-                  const isExpanded = expandedKeys.has(key);
-                  return (
-                    <>
-                      <tr
-                        key={key}
-                        className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer select-none"
-                        onClick={() => toggleExpand(key)}
-                      >
-                        <td className="px-4 py-3 text-gray-400">
-                          {isExpanded
-                            ? <ChevronDown className="w-4 h-4" />
-                            : <ChevronRight className="w-4 h-4" />}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{group.productType}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            group.category === 'Euro Windows' ? 'bg-blue-50 text-blue-700' :
-                            group.category === 'Double Hung' ? 'bg-purple-50 text-purple-700' :
-                            'bg-green-50 text-green-700'
-                          }`}>
-                            {group.category}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalQty)}</td>
-                        <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalFields)}</td>
-                        <td className="px-4 py-3 text-right text-gray-700">{fmt(group.totalSqFeet)}</td>
-                        <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `€${fmt(group.totalNetEuro)}` : ''}</td>
-                        <td className="px-4 py-3 text-center text-gray-500 text-xs">{group.details.length}</td>
-                      </tr>
-                      {isExpanded && (
-                        <tr key={`${key}--expanded`}>
-                          <td colSpan={8} className="p-0 bg-gray-50">
-                            <div className="border-t border-b border-gray-200 overflow-x-auto">
-                              <table className="w-full text-xs">
-                                <thead>
-                                  <tr className="bg-gray-100 border-b border-gray-200">
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Job Name</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Opp #</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Product</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Wood Type</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Finish</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Glass Type</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Spacer Bar Type</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Spacer Bar Colors</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">SDL</th>
-                                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">TDL</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Fields</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sq Ft</th>
-                                    <th className="px-3 py-2 text-right font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">NET €</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200">
-                                  {group.details.map((d, i) => (
-                                    <tr key={`${d.summaryId}-${i}`} className="hover:bg-white">
-                                      <td className="px-3 py-2 font-medium text-gray-800">{d.summaryName}</td>
-                                      <td className="px-3 py-2 text-gray-600">{d.opportunityNumber}</td>
-                                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">
-                                        {d.date ? new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                                      </td>
-                                      <td className="px-3 py-2 text-gray-700">{d.product}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.woodType}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.finish}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.glassType}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.spacerBarType}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.spacerBarColors}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.sdl}</td>
-                                      <td className="px-3 py-2 text-gray-700">{d.tdl}</td>
-                                      <td className="px-3 py-2 text-right text-gray-700">{fmtInt(d.qty)}</td>
-                                      <td className="px-3 py-2 text-right text-gray-700">{fmtInt(d.fields)}</td>
-                                      <td className="px-3 py-2 text-right text-gray-700">{fmt(d.sqFeet)}</td>
-                                      <td className="px-3 py-2 text-right text-gray-700">{d.netEuro ? `€${fmt(d.netEuro)}` : ''}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-4 py-3 w-8"></th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Product Type</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Qty</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Fields</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Sq Ft</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total NET €</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Jobs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((group) => {
+                const key = `${group.category}|||${group.productType}`;
+                const isExpanded = expandedKeys.has(key);
+                return (
+                  <>
+                    <tr
+                      key={key}
+                      className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer select-none"
+                      onClick={() => toggleExpand(key)}
+                    >
+                      <td className="px-4 py-3 text-gray-400">
+                        {isExpanded
+                          ? <ChevronDown className="w-4 h-4" />
+                          : <ChevronRight className="w-4 h-4" />}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">{group.productType}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                          group.category === 'Euro Windows' ? 'bg-blue-50 text-blue-700' :
+                          group.category === 'Double Hung' ? 'bg-purple-50 text-purple-700' :
+                          'bg-green-50 text-green-700'
+                        }`}>
+                          {group.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalQty)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalFields)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{fmt(group.totalSqFeet)}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `€${fmt(group.totalNetEuro)}` : ''}</td>
+                      <td className="px-4 py-3 text-center text-gray-500 text-xs">{group.details.length}</td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr key={`${key}--expanded`}>
+                        <td colSpan={8} className="p-0">
+                          <div className="bg-[#f8f9fb] border-t border-b border-gray-200 px-6 py-4">
+                            <div className="grid grid-cols-1 gap-3">
+                              {group.details.map((d, i) => (
+                                <div
+                                  key={`${d.summaryId}-${i}`}
+                                  className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-2"
+                                >
+                                  {/* Job info */}
+                                  <div className="min-w-[160px]">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Job</div>
+                                    <div className="text-sm font-medium text-gray-900">{d.summaryName}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5 flex gap-2">
+                                      {d.opportunityNumber && <span>{d.opportunityNumber}</span>}
+                                      {d.date && <span>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                                    </div>
+                                  </div>
+
+                                  {/* Spec pills */}
+                                  <div className="flex flex-wrap gap-2 flex-1">
+                                    {[
+                                      ['Product', d.product],
+                                      ['Wood', d.woodType],
+                                      ['Finish', d.finish],
+                                      ['Glass', d.glassType],
+                                      ['Spacer Bar', d.spacerBarType],
+                                      ['Spacer Colors', d.spacerBarColors],
+                                      ['SDL', d.sdl],
+                                      ['TDL', d.tdl],
+                                    ].filter(([, v]) => v).map(([label, val]) => (
+                                      <div key={label} className="flex items-baseline gap-1">
+                                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{label}</span>
+                                        <span className="text-xs text-gray-700">{val}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Numbers */}
+                                  <div className="flex gap-5 text-right shrink-0">
+                                    <div>
+                                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Qty</div>
+                                      <div className="text-sm font-medium text-gray-800">{fmtInt(d.qty)}</div>
+                                    </div>
+                                    {d.fields > 0 && (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Fields</div>
+                                        <div className="text-sm font-medium text-gray-800">{fmtInt(d.fields)}</div>
+                                      </div>
+                                    )}
+                                    {d.sqFeet > 0 && (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sq Ft</div>
+                                        <div className="text-sm font-medium text-gray-800">{fmt(d.sqFeet)}</div>
+                                      </div>
+                                    )}
+                                    {d.netEuro > 0 && (
+                                      <div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">NET €</div>
+                                        <div className="text-sm font-semibold text-brand-navy">€{fmt(d.netEuro)}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
-                  <td colSpan={3} className="px-4 py-3 text-gray-800">Totals ({filtered.length} types)</td>
-                  <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.qty)}</td>
-                  <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
-                  <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
-                  <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 border-t-2 border-gray-300 font-semibold">
+                <td colSpan={3} className="px-4 py-3 text-gray-800">Totals ({filtered.length} types)</td>
+                <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.qty)}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
+                <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
+                <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
         )}
       </div>
     </div>
