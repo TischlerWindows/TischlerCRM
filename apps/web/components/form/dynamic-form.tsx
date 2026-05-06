@@ -912,7 +912,12 @@ export default function DynamicForm({
       case 'ExternalLookup':
       case 'LookupUser': {
         const lookupLabel = lookupQueries[fieldDef.apiName];
-        return lookupLabel || String(val);
+        if (lookupLabel) return lookupLabel;
+        if (fieldDef.lookupObject) {
+          const cached = resolveLookupDisplayName(String(val), fieldDef.lookupObject);
+          if (cached && cached !== '-' && cached !== String(val)) return cached;
+        }
+        return String(val);
       }
       case 'CompositeText': {
         if (typeof val === 'object' && val !== null) {

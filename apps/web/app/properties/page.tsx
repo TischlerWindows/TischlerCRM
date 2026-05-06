@@ -293,8 +293,9 @@ export default function PropertiesPage() {
   };
 
   const filteredProperties = properties.filter(property => {
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || Object.values(property).some(value => {
+    const trimmed = searchTerm.trim();
+    const searchLower = trimmed.toLowerCase();
+    const matchesSearch = !trimmed || Object.values(property).some(value => {
       if (value === null || value === undefined) return false;
       if (typeof value === 'string') return value.toLowerCase().includes(searchLower);
       if (typeof value === 'object') return formatFieldValue(value, undefined).toLowerCase().includes(searchLower);

@@ -94,13 +94,16 @@ export function validateFields(
           break;
         case 'URL':
           try {
-            new URL(value);
+            const parsed = new URL(value);
+            if (!/^https?:$/.test(parsed.protocol)) {
+              errors[panelField.fieldApiName] = 'URL must use http or https';
+            }
           } catch {
             errors[panelField.fieldApiName] = 'Invalid URL format';
           }
           break;
         case 'Phone':
-          if (!/^[\d\s\-\+\(\)]+$/.test(value)) {
+          if (!/^[\d\s\-\+\(\)\.]+$/.test(value)) {
             errors[panelField.fieldApiName] = 'Invalid phone format';
           }
           break;
