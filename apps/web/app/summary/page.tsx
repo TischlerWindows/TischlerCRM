@@ -151,6 +151,7 @@ const DOOR_TYPES = [
   'Inswing DD',
   'Outswing DD',
   'Fixed with Sash',
+  'Direct Glaze',
   'Inswing House Door',
   'Outswing House Door',
   'Inswing French House Door',
@@ -3534,6 +3535,37 @@ export default function SummaryPage() {
 
                         const getOptionsForType = (t: string): string[] => {
                           const lo = t.toLowerCase();
+
+                          // ── Door-specific types (checked before generic window inswing/outswing) ──
+
+                          // Pivot Door (Pivot, Outswing Pivot, Convert Pivot to Inswing)
+                          if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
+                            return ['Maco Instinct Motorized Locks'];
+                          }
+                          // Inswing Folding Door (different name from 'Inswing Folding Window')
+                          if (lo === 'inswing folding') {
+                            return ['Threshold #6', '#6C', 'ADA'];
+                          }
+                          // Outswing Folding Door (different name from 'Outswing Folding Window')
+                          if (lo === 'outswing folding') {
+                            return ['Threshold #8', 'ADA'];
+                          }
+                          // L&R Door
+                          if (lo === 'l&r d') {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+                          }
+                          // Inswing door types: GD, DD, House Door (and French variants)
+                          // Distinguished from window Inswing by presence of 'gd', 'dd', or 'house door'
+                          if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', '#6C', 'ADA'];
+                          }
+                          // Outswing door types: GD, DD, House Door (and French variants)
+                          if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #7', '#8', 'ADA'];
+                          }
+
+                          // ── Window types ──
+
                           // Offset Simulated DH (must check before generic 'simulated dh')
                           if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
                             return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
@@ -3546,27 +3578,27 @@ export default function SummaryPage() {
                           if (lo.includes('single hung') || lo.includes('double hung') || lo.includes('triple hung')) {
                             return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Vent Locks'];
                           }
-                          // Direct Glaze
+                          // Direct Glaze (window + door — door adds Threshold to match)
                           if (lo.includes('direct glaze')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash'];
+                            return ['72mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
                           }
-                          // Fixed with Sash
+                          // Fixed with Sash (window + door — door adds Threshold to match)
                           if (lo.includes('fixed with sash')) {
-                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash'];
+                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
                           }
                           // Tilt-in
                           if (lo.includes('tilt-in') || lo.includes('tilt in')) {
                             return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
                           }
-                          // Inswing (incl. Turn & Tilt, French Inswing)
+                          // Inswing window (incl. Turn & Tilt, French Inswing)
                           if (lo.includes('inswing')) {
                             return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
                           }
-                          // Outswing & French Outswing, Awning
+                          // Outswing window, Awning
                           if (lo.includes('outswing') || lo.includes('awning')) {
                             return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
                           }
-                          // Lift and Roll
+                          // Lift and Roll Window
                           if (lo.includes('lift') || lo.includes('roll')) {
                             return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
                           }
