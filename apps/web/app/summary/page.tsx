@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, createContext, useContext } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -163,6 +163,20 @@ const DOOR_TYPES = [
   'Outswing Pivot'
 ];
 
+// ── Cell navigation context for Excel-like keyboard selection ──
+interface CellNavCtx {
+  activeCellId: string | null;
+  editingCellId: string | null;
+  setActive: (id: string | null) => void;
+  setEditing: (id: string | null) => void;
+}
+const CellNavContext = createContext<CellNavCtx>({
+  activeCellId: null,
+  editingCellId: null,
+  setActive: () => {},
+  setEditing: () => {},
+});
+
 // Searchable dropdown cell component for Type columns
 const CellDropdown = ({ rowId, field, value, onChange, options }: { 
   rowId: string; 
@@ -171,6 +185,11 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
   onChange: (value: string) => void;
   options: string[];
 }) => {
+  const { activeCellId, editingCellId, setActive, setEditing } = useContext(CellNavContext);
+  const cellId = `${rowId}:${field}`;
+  const isActive = activeCellId === cellId;
+  const isEditing = editingCellId === cellId;
+
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -193,11 +212,22 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
   };
 
   useEffect(() => {
-    adjustHeight(textareaRef.current);
-  }, [value]);
+    if (isEditing && textareaRef.current) {
+      adjustHeight(textareaRef.current);
+    }
+  }, [value, isEditing]);
+
+  // Open dropdown when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+      setSearchTerm('');
+    }
+  }, [isEditing]);
 
   useEffect(() => {
-    // Reset highlighted index when filtered options change, or set to 0 when dropdown opens
     if (isOpen && filteredOptions.length > 0) {
       setHighlightedIndex(0);
     } else {
@@ -206,7 +236,6 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
   }, [searchTerm, isOpen]);
 
   useEffect(() => {
-    // Scroll highlighted item into view
     if (highlightedIndex >= 0 && dropdownRef.current) {
       const highlightedElement = dropdownRef.current.children[highlightedIndex] as HTMLElement;
       if (highlightedElement) {
@@ -227,41 +256,41 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
     setSearchTerm('');
     setIsOpen(false);
     setHighlightedIndex(-1);
+    setEditing(null);
     setTimeout(() => adjustHeight(textareaRef.current), 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // If dropdown is not open, allow normal navigation
     if (!isOpen || filteredOptions.length === 0) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        // Navigate to next cell
-        const currentCell = e.currentTarget.closest('td');
-        if (!currentCell) return;
-        
-        const currentRow = currentCell.closest('tr');
-        if (!currentRow) return;
-        
-        const cellsInRow = Array.from(currentRow.querySelectorAll('td'));
-        const currentIndex = cellsInRow.indexOf(currentCell as HTMLTableCellElement);
-        
-        // Look for next editable cell in current row
-        for (let i = currentIndex + 1; i < cellsInRow.length; i++) {
-          const textarea = cellsInRow[i].querySelector('textarea');
-          if (textarea) {
-            textarea.focus();
-            return;
+        const td = e.currentTarget.closest('td');
+        const tr = td?.closest('tr');
+        const tbody = tr?.closest('tbody');
+        setEditing(null);
+        if (td && tr && tbody) {
+          const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
+          const cells = Array.from(tr.querySelectorAll(':scope > td'));
+          const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
+          const colIdx = cells.indexOf(td as HTMLTableCellElement);
+          for (let c = colIdx + 1; c < cells.length; c++) {
+            const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+            if (cId) { setActive(cId); setEditing(cId); return; }
+          }
+          if (rowIdx + 1 < rows.length) {
+            const nextCells = Array.from((rows[rowIdx + 1] as Element).querySelectorAll(':scope > td'));
+            for (const tc of nextCells) {
+              const cId = (tc as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+              if (cId) { setActive(cId); setEditing(cId); return; }
+            }
           }
         }
-        
-        // No more editable cells in current row, move to next row
-        const nextRow = currentRow.nextElementSibling as HTMLTableRowElement;
-        if (nextRow) {
-          const firstEditableCell = nextRow.querySelector('textarea') as HTMLTextAreaElement;
-          if (firstEditableCell) {
-            firstEditableCell.focus();
-          }
-        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setEditing(null);
+        return;
       }
       return;
     }
@@ -289,6 +318,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
         e.preventDefault();
         setIsOpen(false);
         setHighlightedIndex(-1);
+        setEditing(null);
         break;
     }
   };
@@ -297,19 +327,39 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
     setTimeout(() => {
       setIsOpen(false);
       setHighlightedIndex(-1);
+      setEditing(null);
     }, 200);
   };
+
+  // When not editing: show a styled display div
+  if (!isEditing) {
+    return (
+      <div
+        data-cell-id={cellId}
+        className={cn(
+          "w-full px-1 py-0.5 text-xs rounded min-h-[20px] cursor-default whitespace-pre-wrap break-words",
+          isActive ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+        )}
+        onClick={() => setActive(cellId)}
+        onDoubleClick={() => { setActive(cellId); setEditing(cellId); }}
+      >
+        {value || <span className="text-gray-300 select-none">&nbsp;</span>}
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
       <textarea
         ref={textareaRef}
+        data-cell-id={cellId}
         value={searchTerm || value}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         onFocus={() => setIsOpen(true)}
         onBlur={handleBlur}
-        className="w-full px-1 py-0.5 text-xs border-0 bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none overflow-hidden"
+        autoFocus
+        className="w-full px-1 py-0.5 text-xs border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white resize-none overflow-hidden"
         style={{ minHeight: '20px' }}
         rows={1}
         placeholder="Type to search..."
@@ -341,122 +391,127 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
   onChange: (value: string) => void;
   onEnterKey?: () => void;
 }) => {
+  const { activeCellId, editingCellId, setActive, setEditing } = useContext(CellNavContext);
+  const cellId = `${rowId}:${field}`;
+  const isActive = activeCellId === cellId;
+  const isEditing = editingCellId === cellId;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize on mount and whenever value changes (covers initial load from saved data)
+  // Auto-resize when in edit mode
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
-  }, [value]);
+    if (isEditing) {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    }
+  }, [value, isEditing]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setEditing(null);
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      
-      // If onEnterKey callback provided, call it and return
+
       if (onEnterKey) {
-        // Capture the current element before async operation
-        const currentElement = e.currentTarget;
+        const tbody = e.currentTarget.closest('tbody');
+        setEditing(null);
         onEnterKey();
-        // Focus first cell of new row after a short delay
         setTimeout(() => {
-          const currentRow = currentElement.closest('tr');
-          if (!currentRow) return;
-          
-          const tbody = currentRow.closest('tbody');
-          if (!tbody) return;
-          
-          // Get the last row (newly added)
-          const rows = Array.from(tbody.querySelectorAll('tr'));
-          const lastRow = rows[rows.length - 1];
-          if (lastRow) {
-            const firstEditableCell = lastRow.querySelector('textarea') as HTMLTextAreaElement;
-            if (firstEditableCell) {
-              firstEditableCell.focus();
+          if (tbody) {
+            const lastRow = tbody.querySelector(':scope > tr:last-child');
+            if (lastRow) {
+              const firstCellId = lastRow.querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+              if (firstCellId) { setActive(firstCellId); setEditing(firstCellId); }
             }
           }
         }, 50);
         return;
       }
-      
-      // Find current cell
-      const currentCell = e.currentTarget.closest('td');
-      if (!currentCell) return;
-      
-      const currentRow = currentCell.closest('tr');
-      if (!currentRow) return;
-      
-      // Get all cells in current row
-      const cellsInRow = Array.from(currentRow.querySelectorAll('td'));
-      const currentIndex = cellsInRow.indexOf(currentCell as HTMLTableCellElement);
-      
-      // Look for next editable cell in current row
-      for (let i = currentIndex + 1; i < cellsInRow.length; i++) {
-        const textarea = cellsInRow[i].querySelector('textarea');
-        if (textarea) {
-          textarea.focus();
-          return;
+
+      const td = e.currentTarget.closest('td');
+      const tr = td?.closest('tr');
+      const tbody = tr?.closest('tbody');
+      if (td && tr && tbody) {
+        const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
+        const cells = Array.from(tr.querySelectorAll(':scope > td'));
+        const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
+        const colIdx = cells.indexOf(td as HTMLTableCellElement);
+        setEditing(null);
+        for (let c = colIdx + 1; c < cells.length; c++) {
+          const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+          if (cId) { setActive(cId); setEditing(cId); return; }
+        }
+        if (rowIdx + 1 < rows.length) {
+          const nextCells = Array.from((rows[rowIdx + 1] as Element).querySelectorAll(':scope > td'));
+          for (const tc of nextCells) {
+            const cId = (tc as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+            if (cId) { setActive(cId); setEditing(cId); return; }
+          }
         }
       }
-      
-      // No more editable cells in current row, move to next row
-      const nextRow = currentRow.nextElementSibling as HTMLTableRowElement;
-      if (nextRow) {
-        const firstEditableCell = nextRow.querySelector('textarea') as HTMLTextAreaElement;
-        if (firstEditableCell) {
-          firstEditableCell.focus();
-        }
-      }
+      return;
     }
-    
+
     // Move to previous cell on Backspace when current cell is empty
     if (e.key === 'Backspace' && value === '') {
       e.preventDefault();
-      
-      // Find current cell
-      const currentCell = e.currentTarget.closest('td');
-      if (!currentCell) return;
-      
-      const currentRow = currentCell.closest('tr');
-      if (!currentRow) return;
-      
-      // Get all cells in current row
-      const cellsInRow = Array.from(currentRow.querySelectorAll('td'));
-      const currentIndex = cellsInRow.indexOf(currentCell as HTMLTableCellElement);
-      
-      // Look for previous editable cell in current row
-      for (let i = currentIndex - 1; i >= 0; i--) {
-        const textarea = cellsInRow[i].querySelector('textarea');
-        if (textarea) {
-          textarea.focus();
-          return;
+      const td = e.currentTarget.closest('td');
+      const tr = td?.closest('tr');
+      const tbody = tr?.closest('tbody');
+      if (td && tr && tbody) {
+        const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
+        const cells = Array.from(tr.querySelectorAll(':scope > td'));
+        const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
+        const colIdx = cells.indexOf(td as HTMLTableCellElement);
+        setEditing(null);
+        for (let c = colIdx - 1; c >= 0; c--) {
+          const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+          if (cId) { setActive(cId); setEditing(cId); return; }
         }
-      }
-      
-      // No more editable cells in current row, move to previous row
-      const prevRow = currentRow.previousElementSibling as HTMLTableRowElement;
-      if (prevRow) {
-        // Find all textareas in previous row
-        const textareas = prevRow.querySelectorAll('textarea');
-        if (textareas.length > 0) {
-          // Focus the last editable cell
-          const lastEditableCell = textareas[textareas.length - 1] as HTMLTextAreaElement;
-          lastEditableCell.focus();
+        if (rowIdx > 0) {
+          const prevCells = Array.from((rows[rowIdx - 1] as Element).querySelectorAll(':scope > td'));
+          for (let c = prevCells.length - 1; c >= 0; c--) {
+            const cId = (prevCells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+            if (cId) { setActive(cId); setEditing(cId); return; }
+          }
         }
       }
     }
   };
 
+  if (!isEditing) {
+    return (
+      <div
+        data-cell-id={cellId}
+        className={cn(
+          "w-full px-1 py-0.5 text-xs rounded min-h-[24px] cursor-default whitespace-pre-wrap break-words",
+          isActive ? "ring-2 ring-blue-500 bg-blue-50" : "border border-gray-300 bg-white"
+        )}
+        onClick={() => setActive(cellId)}
+        onDoubleClick={() => { setActive(cellId); setEditing(cellId); }}
+      >
+        {value || '\u00A0'}
+      </div>
+    );
+  }
+
   return (
     <textarea
       ref={textareaRef}
+      data-cell-id={cellId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={handleKeyDown}
+      onBlur={() => setEditing(null)}
+      autoFocus
       maxLength={400}
       rows={1}
-      className="w-full px-1 py-0.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy resize-none overflow-hidden"
+      className="w-full px-1 py-0.5 text-xs border border-blue-500 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none overflow-hidden bg-white"
       style={{ height: 'auto', minHeight: '24px' }}
     />
   );
@@ -674,6 +729,9 @@ export default function SummaryPage() {
   const [activePage, setActivePage] = useState<1 | 2>(1);
   const [activeLocationId, setActiveLocationId] = useState<string>('');
   const [expandedQtRows, setExpandedQtRows] = useState<Record<string, boolean>>({});
+  // Excel-like cell selection state
+  const [activeCellId, setActiveCellId] = useState<string | null>(null);
+  const [editingCellId, setEditingCellId] = useState<string | null>(null);
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -687,6 +745,62 @@ export default function SummaryPage() {
   const oppFields = schema?.objects?.find(o => o.apiName === 'Opportunity')?.fields ?? [];
   const getOppPicklist = (apiName: string): string[] =>
     oppFields.find(f => f.apiName === apiName)?.picklistValues ?? [];
+
+  // Arrow-key navigation when a cell is selected but not in edit mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activeCellId || editingCellId) return;
+      const dir = e.key === 'ArrowUp' ? 'up' : e.key === 'ArrowDown' ? 'down'
+        : e.key === 'ArrowLeft' ? 'left' : e.key === 'ArrowRight' ? 'right' : null;
+      if (dir) {
+        e.preventDefault();
+        const el = document.querySelector(`[data-cell-id="${activeCellId}"]`);
+        if (!el) return;
+        const td = el.closest('td');
+        const tr = td?.closest('tr');
+        const tbody = tr?.closest('tbody');
+        if (!td || !tr || !tbody) return;
+        const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
+        const cells = Array.from(tr.querySelectorAll(':scope > td'));
+        const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
+        const colIdx = cells.indexOf(td as HTMLTableCellElement);
+        if (dir === 'right') {
+          for (let c = colIdx + 1; c < cells.length; c++) {
+            const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+            if (cId) { setActiveCellId(cId); return; }
+          }
+        } else if (dir === 'left') {
+          for (let c = colIdx - 1; c >= 0; c--) {
+            const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+            if (cId) { setActiveCellId(cId); return; }
+          }
+        } else if (dir === 'down') {
+          for (let r = rowIdx + 1; r < rows.length; r++) {
+            const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
+            if (colIdx < targetCells.length) {
+              const cId = (targetCells[colIdx] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+              if (cId) { setActiveCellId(cId); return; }
+            }
+          }
+        } else if (dir === 'up') {
+          for (let r = rowIdx - 1; r >= 0; r--) {
+            const targetCells = Array.from((rows[r] as Element).querySelectorAll(':scope > td'));
+            if (colIdx < targetCells.length) {
+              const cId = (targetCells[colIdx] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+              if (cId) { setActiveCellId(cId); return; }
+            }
+          }
+        }
+      } else if (e.key === 'Enter' || e.key === 'F2') {
+        e.preventDefault();
+        setEditingCellId(activeCellId);
+      } else if (e.key === 'Escape') {
+        setActiveCellId(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [activeCellId, editingCellId]);
 
   useEffect(() => {
     (async () => {
@@ -1512,7 +1626,7 @@ export default function SummaryPage() {
     };
 
     // Helper: render windows + doors for a given set of rows
-    const drawLocationData = (locWinRows: any[], locDoorRows: any[]) => {
+    const drawLocationData = (locWinRows: any[], locDoorRows: any[]): { fWinRows: any[]; fDoorRows: any[] } => {
       const fWinRows = filterRows(locWinRows);
       if (fWinRows.length > 0) {
         y = drawSectionTitle(doc, y, 'Windows');
@@ -1530,9 +1644,19 @@ export default function SummaryPage() {
         dr.push(buildTotalRow(fDoorRows));
         y = drawTable(doc, y, dtHeaders, dtColW, dr, { rightAlignFrom: 2, highlightLast: true });
       }
+      // Combined Windows + Doors total (shown whenever both tables have data)
+      if (fWinRows.length > 0 && fDoorRows.length > 0) {
+        y += 2;
+        const combinedRow = buildTotalRow([...fWinRows, ...fDoorRows]);
+        combinedRow[0] = 'W + D Total';
+        y = drawTable(doc, y, dtHeaders, dtColW, [combinedRow], { rightAlignFrom: 2, highlightLast: true });
+      }
+      return { fWinRows, fDoorRows };
     };
 
     if (s.hasMultipleLocations && s.subLocations?.length) {
+      const allWinRows: any[] = [];
+      const allDoorRows: any[] = [];
       for (let li = 0; li < s.subLocations.length; li++) {
         const loc = s.subLocations[li];
         if (!loc) continue;
@@ -1546,7 +1670,18 @@ export default function SummaryPage() {
           y += 11;
         }
         y = drawSectionTitle(doc, y, loc.label || `Location ${li + 1}`);
-        drawLocationData(loc.rows, loc.doorRows);
+        const { fWinRows, fDoorRows } = drawLocationData(loc.rows, loc.doorRows);
+        allWinRows.push(...fWinRows);
+        allDoorRows.push(...fDoorRows);
+      }
+      // Grand total after last location
+      const grandRows = [...allWinRows, ...allDoorRows];
+      if (grandRows.length > 0) {
+        y += 6;
+        y = drawSectionTitle(doc, y, 'Grand Total — All Locations');
+        const grandRow = buildTotalRow(grandRows);
+        grandRow[0] = 'Grand Total';
+        y = drawTable(doc, y, dtHeaders, dtColW, [grandRow], { rightAlignFrom: 2, highlightLast: true });
       }
     } else {
       drawLocationData(s.rows, s.doorRows);
@@ -3085,6 +3220,7 @@ export default function SummaryPage() {
 
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
+      <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[95vh] flex flex-col">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center print:hidden">
@@ -5140,6 +5276,7 @@ export default function SummaryPage() {
             </div>
         </div>
       </div>
+      </CellNavContext.Provider>
     )}
     </>
   );
