@@ -135,11 +135,14 @@ export default function ProductsPage() {
       if (!q) return true;
       // Match product type name (the grouped type)
       if (g.productType.toLowerCase().includes(q)) return true;
-      // Also allow searching by job name / opportunity number only
-      return g.details.some(d =>
-        d.summaryName.toLowerCase().includes(q) ||
-        d.opportunityNumber.toLowerCase().includes(q)
-      );
+      // Match any detail where job identity OR spec fields contain the phrase.
+      // Spec fields are checked per-detail so "28" matches details with glassType
+      // "28 DC Standard..." but not details with "29 DC..." from a different summary.
+      return g.details.some(d => {
+        const identity = `${d.summaryName} ${d.opportunityNumber}`.toLowerCase();
+        const specs = `${d.glassType} ${d.woodType} ${d.finish} ${d.spacerBarType} ${d.spacerBarColors} ${d.sdl} ${d.tdl}`.toLowerCase();
+        return identity.includes(q) || specs.includes(q);
+      });
     });
   }, [groups, search, categoryFilter]);
 
