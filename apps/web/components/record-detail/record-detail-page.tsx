@@ -172,7 +172,12 @@ export default function RecordDetailPage({
         const raw = await recordsService.getRecord(objectApiName, params?.id as string);
         if (raw) {
           setRawRecord(raw);
-          setRecord(recordsService.flattenRecord(raw));
+          const flat = recordsService.flattenRecord(raw);
+          console.log(`[RecordDetail] raw.data keys:`, Object.keys((raw as any).data ?? {}));
+          console.log(`[RecordDetail] raw.data:`, (raw as any).data);
+          console.log(`[RecordDetail] flattened keys:`, Object.keys(flat));
+          console.log(`[RecordDetail] flattened record:`, flat);
+          setRecord(flat);
         } else {
           setRecord(null);
         }

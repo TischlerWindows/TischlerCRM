@@ -124,7 +124,8 @@ export default function OpportunitiesPage() {
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [columnSearchTerm, setColumnSearchTerm] = useState('');
   const [draggedColumnIndex, setDraggedColumnIndex] = useState<number | null>(null);
-  const [tmMap, setTmMap] = useState<Record<string, { quoteRecipient?: string; architectDesigner?: string }>>({});
+  // Maps oppId -> { [fieldApiName]: { contact?: string; account?: string } }
+  const [tmMap, setTmMap] = useState<Record<string, Record<string, { contact?: string; account?: string }>>>({});
   const [tmTick, setTmTick] = useState(0);
 
   // Check if Opportunity object exists with page layouts
@@ -177,7 +178,7 @@ export default function OpportunitiesPage() {
                       : String(crit.flag))
                     : String(crit.role)
                 );
-                tmSlotCols.push({ id: field.fieldApiName, label, defaultVisible: false });
+                tmSlotCols.push({ id: field.fieldApiName, label, defaultVisible: false, mode: field.slotConfig.mode });
               }
             }
           }
@@ -243,25 +244,37 @@ export default function OpportunitiesPage() {
     }
   }, []);
 
-  // Build a per-opportunity map of TeamMemberSlot data (Quote Recipient, Architect/Designer, etc.)
+  // Build a per-opportunity map of TeamMemberSlot data for ALL slot types.
+  // Keyed: oppId -> { [fieldApiName]: { contact?, account? } }
   useEffect(() => {
     recordsService.getRecords('TeamMember').then(records => {
-      const map: Record<string, { quoteRecipient?: string; architectDesigner?: string }> = {};
+      const map: Record<string, Record<string, { contact?: string; account?: string }>> = {};
+      const flags = ['quoteRecipient', 'contractHolder', 'primaryContact', 'contact2', 'contact3', 'contact4'];
       for (const r of records) {
         const d: Record<string, any> = r.data ?? {};
         const getF = (k: string): any => d[k] ?? d[`TeamMember__${k}`] ?? '';
         const oppId = String(getF('opportunity') || '');
         if (!oppId) continue;
         if (!map[oppId]) map[oppId] = {};
-        const isQR = getF('quoteRecipient') === true || getF('quoteRecipient') === 'true' || getF('quoteRecipient') === 1;
-        if (isQR && !map[oppId].quoteRecipient) {
-          const cId = String(getF('contact') || '');
-          if (cId) map[oppId].quoteRecipient = cId;
+        const cId = String(getF('contact') || '');
+        const aId = String(getF('account') || '');
+        // Capture each flag that is set
+        for (const flag of flags) {
+          const isSet = getF(flag) === true || getF(flag) === 'true' || getF(flag) === 1;
+          if (isSet) {
+            const key = `__tm:flag:${flag}`;
+            if (!map[oppId][key]) {
+              map[oppId][key] = { contact: cId || undefined, account: aId || undefined };
+            }
+          }
         }
-        const role = String(getF('role') || '').toLowerCase();
-        if ((role.includes('architect') || role.includes('designer')) && !map[oppId].architectDesigner) {
-          const aId = String(getF('account') || '');
-          if (aId) map[oppId].architectDesigner = aId;
+        // Capture the role if present
+        const role = String(getF('role') || '');
+        if (role) {
+          const key = `__tm:role:${role}`;
+          if (!map[oppId][key]) {
+            map[oppId][key] = { contact: cId || undefined, account: aId || undefined };
+          }
         }
       }
       setTmMap(map);
@@ -429,16 +442,22 @@ export default function OpportunitiesPage() {
     if (columnId.startsWith('__tm:')) {
       const tm = tmMap[(opp as any).id || ''];
       if (!tm) return '-';
-      if (columnId === '__tm:flag:quoteRecipient') {
-        return tm.quoteRecipient ? resolveLookupDisplayName(tm.quoteRecipient, 'Contact') : '-';
+      const slotEntry = tm[columnId];
+      if (!slotEntry) return '-';
+      // Use the slot mode from AVAILABLE_COLUMNS to pick contact vs account
+      const col = AVAILABLE_COLUMNS.find(c => c.id === columnId) as any;
+      const mode: string = col?.mode ?? 'contact';
+      if (mode === 'account') {
+        return slotEntry.account ? resolveLookupDisplayName(slotEntry.account, 'Account') : '-';
       }
-      if (columnId.startsWith('__tm:role:')) {
-        const role = columnId.replace('__tm:role:', '').toLowerCase();
-        if (role.includes('architect') || role.includes('designer')) {
-          return tm.architectDesigner ? resolveLookupDisplayName(tm.architectDesigner, 'Account') : '-';
-        }
+      if (mode === 'paired') {
+        // paired: prefer account label, fall back to contact
+        if (slotEntry.account) return resolveLookupDisplayName(slotEntry.account, 'Account');
+        if (slotEntry.contact) return resolveLookupDisplayName(slotEntry.contact, 'Contact');
+        return '-';
       }
-      return '-';
+      // default: contact mode
+      return slotEntry.contact ? resolveLookupDisplayName(slotEntry.contact, 'Contact') : '-';
     }
 
     let value = (opp as any)[columnId];
