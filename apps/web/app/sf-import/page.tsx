@@ -446,15 +446,19 @@ export default function SalesforceImportPage() {
           const val = row[csvCol];
           if (val === undefined || val === null || val === '') continue;
 
-          // CompositeText sub-field: "name::Contact__name_firstName" — store each sub-field flat.
-          // dynamic-form and getRecordValue both reconstruct the composite from individual
-          // sub-field keys (e.g. data["Contact__name_firstName"]), mirroring how the edit
-          // form saves them.  Store under the full prefixed sub-field apiName so both
-          // prefixed (data[sf.apiName]) and stripped (data["name_firstName"]) lookups work.
+          // CompositeText sub-field: "name::Contact__name_firstName"
+          // Store the flat sub-field key (needed by the edit form and getRecordValue fallback)
+          // AND accumulate into the prefixed parent composite object (needed so the
+          // API's required-field validation finds data[field.apiName] = e.g. "Contact__name").
           if (targetField.includes('::')) {
             const sepIdx = targetField.indexOf('::');
-            const subFieldKey = targetField.slice(sepIdx + 2); // e.g. "Contact__name_firstName"
+            const parentField = targetField.slice(0, sepIdx); // "name"
+            const subFieldKey = targetField.slice(sepIdx + 2); // "Contact__name_firstName"
+            const prefixedParent = `${objectApiName}__${parentField}`; // "Contact__name"
+            // Flat key — edit form reads data[sf.apiName]
             mapped[subFieldKey] = val;
+            // Parent composite — required validation reads data[field.apiName]
+            mapped[prefixedParent] = { ...(mapped[prefixedParent] ?? {}), [subFieldKey]: val };
             continue;
           }
 
@@ -463,10 +467,10 @@ export default function SalesforceImportPage() {
           if (lookedUpObject && globalIdMap[val]) {
             // Substitute with CRM id
             mapped[targetField] = globalIdMap[val];
-          } else if (lookedUpObject && val) {
-            // Unresolved lookup — skip as agreed
-            // (don't add the field at all)
           } else {
+            // For unresolved lookups: store the raw value so the field isn't blank.
+            // If it's already a CRM UUID it will resolve on the detail page; otherwise
+            // the raw string (SF UUID or name) is preserved rather than lost.
             mapped[targetField] = val;
           }
         }
