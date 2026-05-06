@@ -507,6 +507,103 @@ export async function ensureCoreObjects(): Promise<void> {
     console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
   }
 
+  // Fix: ensure Opportunity 'probability' field has min=0, max=100 constraints.
+  try {
+    const oppObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
+    });
+    if (oppObj) {
+      await prisma.customField.updateMany({
+        where: {
+          objectId: oppObj.id,
+          apiName: 'probability',
+          max: null,
+        },
+        data: { min: 0, max: 100 },
+      });
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Opportunity probability constraints:', err);
+  }
+
+  // Fix: patch orgSchema JSON to add min/max on Opportunity probability field,
+  // and fix "Associated Opportunies" → "Associated Opportunities" typo in
+  // Property layout Associations tab headings.
+  try {
+    const schemaSetting = await prisma.setting.findUnique({ where: { key: 'orgSchema' } });
+    if (schemaSetting?.value) {
+      const orgSchema = schemaSetting.value as any;
+      let changed = false;
+
+      for (const obj of orgSchema.objects || []) {
+        // Patch probability min/max
+        if (obj.apiName === 'Opportunity') {
+          for (const field of obj.fields || []) {
+            if (field.apiName === 'Opportunity__probability' || field.apiName === 'probability') {
+              if (field.min === undefined || field.max === undefined) {
+                field.min = 0;
+                field.max = 100;
+                changed = true;
+              }
+            }
+          }
+        }
+
+        // Fix "Opportunies" typo in any layout tab/section labels
+        for (const layout of obj.pageLayouts || []) {
+          for (const tab of layout.tabs || []) {
+            for (const region of tab.regions || []) {
+              for (const panel of region.panels || []) {
+                if (typeof panel.label === 'string' && panel.label.includes('Opportunies')) {
+                  panel.label = panel.label.replace(/Opportunies/g, 'Opportunities');
+                  changed = true;
+                }
+              }
+            }
+            // Also check tab label
+            if (typeof tab.label === 'string' && tab.label.includes('Opportunies')) {
+              tab.label = tab.label.replace(/Opportunies/g, 'Opportunities');
+              changed = true;
+            }
+          }
+          // Fix Related List widget on Property that queries Account instead of Opportunity.
+          // Widgets can be on regions, panels, or tabs.
+          const fixWidgets = (widgets: any[]) => {
+            for (const widget of widgets) {
+              if (
+                obj.apiName === 'Property' &&
+                widget.widgetType === 'RelatedList' &&
+                widget.config?.objectApiName === 'Account' &&
+                widget.config?.linkField === 'property'
+              ) {
+                widget.config.objectApiName = 'Opportunity';
+                changed = true;
+              }
+            }
+          };
+          for (const tab of layout.tabs || []) {
+            fixWidgets(tab.widgets || []);
+            for (const region of tab.regions || []) {
+              fixWidgets(region.widgets || []);
+              for (const panel of region.panels || []) {
+                fixWidgets(panel.widgets || []);
+              }
+            }
+          }
+        }
+      }
+
+      if (changed) {
+        await prisma.setting.update({
+          where: { key: 'orgSchema' },
+          data: { value: orgSchema },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not patch orgSchema:', err);
+  }
+
   // Also sync any user-created objects from the schema settings to the DB.
   // The schema (stored in the Setting table under 'orgSchema') may contain
   // objects that were created in the UI but whose apiClient.createObject call
@@ -610,6 +707,10 @@ interface FieldDef {
   unique?: boolean;
   picklistValues?: string[];
   defaultValue?: string;
+  min?: number;
+  max?: number;
+  minLength?: number;
+  maxLength?: number;
 }
 
 async function ensureFields(objectId: string, fields: FieldDef[], userId: string): Promise<void> {
@@ -630,6 +731,10 @@ async function ensureFields(objectId: string, fields: FieldDef[], userId: string
         unique: fieldDef.unique || false,
         picklistValues: fieldDef.picklistValues ? JSON.stringify(fieldDef.picklistValues) : null,
         defaultValue: fieldDef.defaultValue || null,
+        min: fieldDef.min ?? null,
+        max: fieldDef.max ?? null,
+        minLength: fieldDef.minLength ?? null,
+        maxLength: fieldDef.maxLength ?? null,
         createdById: userId,
         modifiedById: userId,
       },

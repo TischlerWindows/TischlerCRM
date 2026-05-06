@@ -3050,7 +3050,9 @@ class LocalStorageSchemaService implements SchemaService {
           label: 'Probability (%)',
           type: 'Percent',
           precision: 3,
-          scale: 0
+          scale: 0,
+          min: 0,
+          max: 100
         },
         {
           id: generateId(),

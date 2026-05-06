@@ -62,6 +62,18 @@ export function validateFields(
         if (!value.picklist && !value.lookup) empty = true;
       }
 
+      // CompositeText: treat all-blank sub-fields as empty
+      if (
+        fieldDef.type === 'CompositeText' &&
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        const parts = Object.values(value).filter(
+          (v) => typeof v === 'string' && v.trim() !== ''
+        );
+        if (parts.length === 0) empty = true;
+      }
+
       // Address: treat all-empty address as empty
       if (
         fieldDef.type === 'Address' &&

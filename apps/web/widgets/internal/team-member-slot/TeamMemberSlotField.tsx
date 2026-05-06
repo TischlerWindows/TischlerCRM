@@ -83,7 +83,7 @@ function DisplayFieldRows({
   }
 
   return (
-    <div className="mt-1 grid gap-x-2 gap-y-0.5 text-xs text-gray-500" style={{ gridTemplateColumns: 'auto 1fr' }}>
+    <div className="mt-1 grid gap-x-3 gap-y-0.5 text-xs text-gray-500" style={{ gridTemplateColumns: 'auto 1fr' }}>
       {fields.map((apiName) => {
         const fieldDef = objectDef?.fields.find((f) => f.apiName === apiName)
         const label = fieldDef?.label ?? apiName
@@ -91,7 +91,7 @@ function DisplayFieldRows({
         const display = value == null || value === '' ? '—' : String(value)
         return (
           <React.Fragment key={apiName}>
-            <span className="text-gray-400 font-medium truncate">{label}</span>
+            <span className="text-gray-400 font-medium truncate">{label}:</span>
             <span className="truncate">{display}</span>
           </React.Fragment>
         )

@@ -247,6 +247,11 @@ export function useTeamMemberSlot({
       const cur = criterionRef.current
       const parentField = OBJECT_TO_FIELD[parentObjectApiName]
 
+      // Resolve display names from the lookup cache so pending pool rows
+      // show contact/account names instead of raw IDs in the review step.
+      const contactName = contactId ? resolveLookupDisplayName(contactId, 'Contact') : null
+      const accountName = accountId ? resolveLookupDisplayName(accountId, 'Account') : null
+
       // Flag-bound: try to set the flag on an existing row that matches contact/account.
       if (cur.kind === 'flag') {
         const flagName: TeamMemberFlag = cur.flag
@@ -264,6 +269,8 @@ export function useTeamMemberSlot({
           }
           if (contactId) data.contact = contactId
           if (accountId) data.account = accountId
+          if (contactName && contactName !== '-') data.contactName = contactName
+          if (accountName && accountName !== '-') data.accountName = accountName
           const id = pool.addRow(data)
           return { id, isPending: true, data }
         }
@@ -325,6 +332,8 @@ export function useTeamMemberSlot({
       const payload: Record<string, unknown> = { role: roleValue }
       if (contactId) payload.contact = contactId
       if (accountId) payload.account = accountId
+      if (contactName && contactName !== '-') payload.contactName = contactName
+      if (accountName && accountName !== '-') payload.accountName = accountName
 
       if (isCreateMode && pool) {
         const existing = pool.findByContactAccount(contactId, accountId)
