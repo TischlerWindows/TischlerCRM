@@ -276,21 +276,21 @@ export default function ProductsPage() {
                                     </div>
                                   </div>
 
-                                  {/* Spec pills */}
-                                  <div className="flex flex-wrap gap-2 flex-1">
+                                  {/* Spec grid */}
+                                  <div className="flex-1 grid grid-cols-4 gap-x-6 gap-y-3">
                                     {[
                                       ['Product', d.product],
-                                      ['Wood', d.woodType],
+                                      ['Wood Type', d.woodType],
                                       ['Finish', d.finish],
-                                      ['Glass', d.glassType],
+                                      ['Glass Type', d.glassType],
                                       ['Spacer Bar', d.spacerBarType],
                                       ['Spacer Colors', d.spacerBarColors],
                                       ['SDL', d.sdl],
                                       ['TDL', d.tdl],
                                     ].filter(([, v]) => v).map(([label, val]) => (
-                                      <div key={label} className="flex items-baseline gap-1">
-                                        <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">{label}</span>
-                                        <span className="text-xs text-gray-700">{val}</span>
+                                      <div key={label}>
+                                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>
+                                        <div className="text-sm text-gray-800">{val}</div>
                                       </div>
                                     ))}
                                   </div>
