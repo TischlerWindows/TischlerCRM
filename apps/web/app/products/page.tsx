@@ -129,18 +129,16 @@ export default function ProductsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const tokens = search.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    const q = search.toLowerCase().trim();
     return groups.filter(g => {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-      if (tokens.length === 0) return true;
-      // ALL tokens must appear in productType
-      const typeStr = g.productType.toLowerCase();
-      if (tokens.every(t => typeStr.includes(t))) return true;
-      // OR all tokens appear in a detail's job/spec fields (excluding d.product which is summary-level and shared)
+      if (!q) return true;
+      if (g.productType.toLowerCase().includes(q)) return true;
+      // Search detail job/spec fields as a single phrase (d.product excluded — it's summary-level and shared across all rows)
       return g.details.some(d => {
         const combined = [d.summaryName, d.opportunityNumber, d.woodType, d.finish, d.glassType, d.spacerBarType, d.spacerBarColors, d.sdl, d.tdl]
           .join(' ').toLowerCase();
-        return tokens.every(t => combined.includes(t));
+        return combined.includes(q);
       });
     });
   }, [groups, search, categoryFilter]);
