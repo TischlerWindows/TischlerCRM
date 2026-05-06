@@ -674,10 +674,10 @@ export async function recordRoutes(app: FastifyInstance) {
       // match composite subfields like "Contact__name_firstName".
       const compositeSuffix = `_${unprefixedKey}`;
       const compositeMatch = Object.keys(nd).some(
-        (k) => k.endsWith(compositeSuffix) && k.startsWith(`${apiName}__`) && nd[k] !== undefined && nd[k] !== null
+        (k) => k.endsWith(compositeSuffix) && k.startsWith(`${apiName}__`) && nd[k] !== undefined && nd[k] !== null && String(nd[k]).trim() !== ''
       );
 
-      const hasValue = (v: any) => v !== undefined && v !== null;
+      const hasValue = (v: any) => v !== undefined && v !== null && String(v).trim() !== '';
       return !hasValue(direct) && !hasValue(unprefixed) && !hasValue(objectPrefixed) && !hasValue(camelCased) && !compositeMatch;
     });
 
@@ -1491,7 +1491,7 @@ export async function recordRoutes(app: FastifyInstance) {
           const objectPrefixed = nd[`${apiName}__${f.apiName}`];
           const camelKey = `${camelPrefix}${f.apiName.charAt(0).toUpperCase()}${f.apiName.slice(1)}`;
           const camelCased = nd[camelKey];
-          const hasValue = (v: any) => v !== undefined && v !== null;
+          const hasValue = (v: any) => v !== undefined && v !== null && String(v).trim() !== '';
           return !hasValue(direct) && !hasValue(unprefixed) && !hasValue(objectPrefixed) && !hasValue(camelCased);
         });
 
