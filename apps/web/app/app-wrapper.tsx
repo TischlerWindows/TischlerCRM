@@ -120,6 +120,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
     pathname?.startsWith('/support') ||
     pathname?.startsWith('/notifications') ||
     pathname?.startsWith('/sf-import') ||
+    pathname?.startsWith('/product-log') ||
     pathname?.includes('demo');
 
   const shouldShowHeadbar = !pathname?.startsWith('/object-manager') && !pathname?.startsWith('/login') && !pathname?.startsWith('/signup');
