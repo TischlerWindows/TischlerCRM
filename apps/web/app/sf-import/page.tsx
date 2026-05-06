@@ -459,6 +459,13 @@ export default function SalesforceImportPage() {
             mapped[subFieldKey] = val;
             // Parent composite — required validation reads data[field.apiName]
             mapped[prefixedParent] = { ...(mapped[prefixedParent] ?? {}), [subFieldKey]: val };
+            // Bare suffix key (e.g. "firstName", "lastName", "salutation") so that
+            // standalone fields like Contact__firstName resolve on the detail page.
+            // "Contact__name_firstName".split("_").filter(Boolean).pop() → "firstName"
+            const bareSuffix = subFieldKey.split('_').filter(Boolean).pop();
+            if (bareSuffix && bareSuffix !== subFieldKey) {
+              mapped[bareSuffix] = val;
+            }
             continue;
           }
 
