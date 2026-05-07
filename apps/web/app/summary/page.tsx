@@ -1997,14 +1997,14 @@ export default function SummaryPage() {
       const maTotFull   = gtQtSum('full');
       const maTotPct    = gtQtSum('pct');
       const maTotFinalV = gtQtSum('final');
-      const maGtFull  = maTotFull  ? fmt(maTotFull)  : null;
-      const maGtPct   = maTotPct   ? fmt(maTotPct)   : null;
-      const maGtFinal = maTotFinalV ? fmt(maTotFinalV) : null;
+      const maGtFull  = maTotFull   + pv(gta?.full);
+      const maGtPct   = maTotPct    + pv(gta?.pct);
+      const maGtFinal = maTotFinalV + pv(gta?.final);
       const maHidden  = maTotFull * 0.56;
       const maFields: [string, string][] = [
-        ['Full by Sq Foot',    maTotSqFt ? fmt(maTotFull  / maTotSqFt) : '—'],
-        ['%_ by Sq Foot',      maTotSqFt ? fmt(maTotPct   / maTotSqFt) : '—'],
-        ['Final by Sq Foot',   maTotSqFt ? fmt(maTotFinalV / maTotSqFt) : '—'],
+        ['Full by Sq Foot',    maTotSqFt ? fmt(maGtFull  / maTotSqFt) : '—'],
+        ['%_ by Sq Foot',      maTotSqFt ? fmt(maGtPct   / maTotSqFt) : '—'],
+        ['Final by Sq Foot',   maTotSqFt ? fmt(maGtFinal / maTotSqFt) : '—'],
         ['Hidden Cost',        maHidden  ? fmt(maHidden)               : '—'],
         ['Full Contribution',  fmt(maTotFull  - maHidden)],
         ['%_ Contribution',   fmt(maTotPct   - maHidden)],
@@ -2048,9 +2048,9 @@ export default function SummaryPage() {
       const caTotFull   = qtSum('full');
       const caTotPct    = qtSum('pct');
       const caTotFinalV = qtSum('final');
-      const caGtFull  = caTotFull;
-      const caGtPct   = caTotPct;
-      const caGtFinal = caTotFinalV;
+      const caGtFull  = caTotFull   + pv(gta?.full);
+      const caGtPct   = caTotPct    + pv(gta?.pct);
+      const caGtFinal = caTotFinalV + pv(gta?.final);
       const caHidden   = caTotFull * 0.56;
       const caFields: [string, string][] = [
         ['Full by Sq Foot',    caTotSqFt ? fmt(caGtFull  / caTotSqFt) : '—'],
@@ -4025,15 +4025,19 @@ export default function SummaryPage() {
                       const q = editingSummary.quoteTotals;
                       return p2((q?.euroWindows as any)?.[f]) + p2((q?.doubleHung as any)?.[f]) + p2((q?.euroDoors as any)?.[f]);
                     };
+                    const gta2 = editingSummary.grandTotalAdjustment;
                     const totFull  = qtotSum('full');
                     const totPct   = qtotSum('pct');
                     const totFinal = qtotSum('final');
+                    const gtFull  = totFull  + p2(gta2?.full);
+                    const gtPct   = totPct   + p2(gta2?.pct);
+                    const gtFinal = totFinal + p2(gta2?.final);
                     const hiddenCost = totFull * 0.56;
                     const fmtV = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const rows = [
-                      { label: 'Full by Sq Foot',    value: totSqFt ? fmtV(totFull  / totSqFt) : '—' },
-                      { label: '%_ by Sq Foot',      value: totSqFt ? fmtV(totPct   / totSqFt) : '—' },
-                      { label: 'Final by Sq Foot',   value: totSqFt ? fmtV(totFinal / totSqFt) : '—' },
+                      { label: 'Full by Sq Foot',    value: totSqFt ? fmtV(gtFull  / totSqFt) : '—' },
+                      { label: '%_ by Sq Foot',      value: totSqFt ? fmtV(gtPct   / totSqFt) : '—' },
+                      { label: 'Final by Sq Foot',   value: totSqFt ? fmtV(gtFinal / totSqFt) : '—' },
                       { label: 'Hidden Cost',        value: fmtV(hiddenCost) },
                       { label: 'Full Contribution',  value: fmtV(totFull  - hiddenCost) },
                       { label: '%_ Contribution',    value: fmtV(totPct   - hiddenCost) },
