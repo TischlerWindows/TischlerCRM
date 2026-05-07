@@ -4037,7 +4037,6 @@ export default function SummaryPage() {
                       { label: '%_ Contribution',    value: fmtV(totPct   - hiddenCost) },
                       { label: 'Final Contribution', value: fmtV(totFinal - hiddenCost) },
                     ];
-                    if (!totFull && !totPct && !totFinal) return null;
                     return (
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
