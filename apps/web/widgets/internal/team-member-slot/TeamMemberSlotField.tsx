@@ -1,16 +1,31 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 import { preloadLookupRecords, resolveLookupDisplayName } from '@/lib/utils'
-import type { PanelField, TeamMemberSlotConfig } from '@/lib/schema'
+import type { PanelField, TeamMemberSlotConfig, TeamMemberSlotCriterion } from '@/lib/schema'
 import { recordUrl } from '@/lib/record-url'
 import { useSchemaStore } from '@/lib/schema-store'
 import { useToast } from '@/components/toast'
+import { apiClient } from '@/lib/api-client'
 import { SlotInput } from './SlotInput'
-import { useTeamMemberSlot, type TeamMemberRow } from './useTeamMemberSlot'
+import {
+  useTeamMemberSlot,
+  type TeamMemberRow,
+  fetchFreshRows,
+  rowMatches,
+  dataOf,
+  OBJECT_TO_FIELD,
+} from './useTeamMemberSlot'
+import { notifyTeamMembersChanged } from './teamMemberEvents'
 import { useDisplayFields } from './useDisplayFields'
+
+/** Imperative handle exposed when `staged={true}` so the parent form can apply or discard changes. */
+export interface TeamMemberSlotHandle {
+  /** Apply all buffered staged changes to the backend. Call on form Save. */
+  applyChanges: () => Promise<void>
+}
 
 function extractId(row: Record<string, unknown>, plainKey: string): string | null {
   const variants = [
@@ -116,6 +131,12 @@ interface TeamMemberSlotFieldProps {
    * Edit mode like regular fields.
    */
   readOnly?: boolean
+  /**
+   * When true, changes are buffered locally and NOT sent to the API until
+   * `applyChanges()` is called on the forwarded ref. Use inside edit-mode
+   * dialogs so "Discard" abandons changes without side-effects.
+   */
+  staged?: boolean
   /** Roles from single-cardinality role-bound sibling slots — only these are blocked when occupied. */
   singleCardinalityRoles?: Set<string>
 }
@@ -138,21 +159,121 @@ function defaultLabel(config: TeamMemberSlotConfig): string {
  * and labelStyle so admins can tune it via the same properties sidebar that
  * styles other fields.
  */
-export function TeamMemberSlotField({
+export const TeamMemberSlotField = React.forwardRef<TeamMemberSlotHandle, TeamMemberSlotFieldProps>(
+function TeamMemberSlotField({
   parentObjectApiName,
   parentRecordId,
   slotConfig,
   panelField,
   readOnly,
+  staged,
   singleCardinalityRoles,
-}: TeamMemberSlotFieldProps) {
+}: TeamMemberSlotFieldProps, ref) {
   const { showToast } = useToast()
-  const { rows, loading, fillSlot, clearRow, error, occupiedRoles } = useTeamMemberSlot({
+
+  // ── STAGED MODE ─────────────────────────────────────────────────────
+  // Buffer all changes locally; no API calls until applyChanges() is invoked.
+  const [stagedRows, setStagedRows] = useState<TeamMemberRow[]>([])
+  const [stagedLoading, setStagedLoading] = useState(false)
+  const initialRowsRef = useRef<TeamMemberRow[]>([])
+
+  useEffect(() => {
+    if (!staged || !parentRecordId) {
+      setStagedRows([])
+      return
+    }
+    setStagedLoading(true)
+    fetchFreshRows(parentObjectApiName, parentRecordId)
+      .then(rawRows => {
+        const matched = rawRows
+          .filter(r => rowMatches(dataOf(r), slotConfig.criterion))
+          .map(r => ({ id: String(r.id), isPending: false, data: dataOf(r) } as TeamMemberRow))
+        initialRowsRef.current = matched
+        setStagedRows(matched)
+      })
+      .catch(err => console.error('[staged slot] fetch failed:', err))
+      .finally(() => setStagedLoading(false))
+  // Re-run only when the key identifiers change, not on criterion object identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged, parentRecordId, parentObjectApiName])
+
+  const stagedFillSlot = useCallback(async (input: {
+    contactId?: string | null
+    accountId?: string | null
+    role?: string
+  }) => {
+    const cur: TeamMemberSlotCriterion = slotConfig.criterion
+    const tempId = `staged-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const contactName = input.contactId ? resolveLookupDisplayName(input.contactId, 'Contact') : null
+    const accountName = input.accountId ? resolveLookupDisplayName(input.accountId, 'Account') : null
+    const data: Record<string, unknown> = {}
+    if (input.contactId) data.contact = input.contactId
+    if (input.accountId) data.account = input.accountId
+    if (contactName && contactName !== '-') data.contactName = contactName
+    if (accountName && accountName !== '-') data.accountName = accountName
+    if (cur.kind === 'flag') {
+      data[cur.flag] = true
+      if (input.role) data.role = input.role
+      setStagedRows(prev => [
+        // Remove any rows that had this flag set (initial or previously staged)
+        ...prev.filter(r => !r.data[cur.flag]),
+        { id: tempId, isPending: true, data },
+      ])
+    } else {
+      data.role = cur.role
+      setStagedRows(prev => [...prev, { id: tempId, isPending: true, data }])
+    }
+    return { id: tempId, isPending: true, data } as TeamMemberRow
+  }, [slotConfig.criterion])
+
+  const stagedClearRow = useCallback(async (rowId: string) => {
+    setStagedRows(prev => prev.filter(r => r.id !== rowId))
+  }, [])
+
+  const applyChanges = useCallback(async () => {
+    const initialRows = initialRowsRef.current
+    const cur: TeamMemberSlotCriterion = slotConfig.criterion
+    const parentField = OBJECT_TO_FIELD[parentObjectApiName]
+    // Rows that were cleared (present in initial, absent from staged)
+    const stagedRealIds = new Set(stagedRows.filter(r => !r.isPending).map(r => r.id))
+    const clearedRows = initialRows.filter(r => !stagedRealIds.has(r.id))
+    for (const row of clearedRows) {
+      try {
+        if (cur.kind === 'flag') {
+          await apiClient.put(`/objects/TeamMember/records/${row.id}`, { data: { [cur.flag]: false } })
+        } else {
+          await apiClient.delete(`/objects/TeamMember/records/${row.id}`)
+        }
+      } catch { /* ignore not-found */ }
+    }
+    // Rows that were added (isPending: true in staged)
+    const addedRows = stagedRows.filter(r => r.isPending)
+    for (const row of addedRows) {
+      const payload: Record<string, unknown> = { ...row.data }
+      if (parentRecordId && parentField) payload[parentField] = parentRecordId
+      await apiClient.post('/objects/TeamMember/records', { data: payload })
+    }
+    if (clearedRows.length > 0 || addedRows.length > 0) {
+      notifyTeamMembersChanged()
+    }
+  }, [stagedRows, slotConfig.criterion, parentObjectApiName, parentRecordId])
+
+  useImperativeHandle(ref, () => ({ applyChanges }), [applyChanges])
+
+  // ── LIVE MODE ────────────────────────────────────────────────────────
+  // When staged=true we pass null so the hook skips live fetching/mutations.
+  const { rows: liveRows, loading: liveLoading, fillSlot, clearRow, error, occupiedRoles } = useTeamMemberSlot({
     parentObjectApiName,
-    parentRecordId,
+    parentRecordId: staged ? null : parentRecordId,
     criterion: slotConfig.criterion,
     singleCardinalityRoles,
   })
+
+  const rows = staged ? stagedRows : liveRows
+  const loading = staged ? stagedLoading : liveLoading
+  const activeFillSlot = staged ? stagedFillSlot : fillSlot
+  const activeClearRow = staged ? stagedClearRow : clearRow
+
   const { fieldMap } = useDisplayFields({
     rows,
     displayFields: slotConfig.displayFields,
@@ -248,7 +369,7 @@ export function TeamMemberSlotField({
           onFill={async () => { /* clear first to replace */ }}
           onClear={async () => {
             try {
-              await clearRow(bound.id)
+              await activeClearRow(bound.id)
               showToast('Connection removed', 'success')
             } catch (e) {
               showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
@@ -261,7 +382,7 @@ export function TeamMemberSlotField({
         <SlotInput
           mode={mode}
           criterion={slotConfig.criterion}
-          onFill={async (input) => { await fillSlot(input) }}
+          onFill={async (input) => { await activeFillSlot(input) }}
           placeholder={slotConfig.placeholder}
           occupiedRoles={occupiedRoles}
         />
@@ -280,7 +401,7 @@ export function TeamMemberSlotField({
             onFill={async () => { /* no-op while bound */ }}
             onClear={async () => {
               try {
-                await clearRow(row.id)
+                await activeClearRow(row.id)
                 showToast('Connection removed', 'success')
               } catch (e) {
                 showToast(e instanceof Error ? e.message : 'Failed to remove connection', 'error')
@@ -295,7 +416,7 @@ export function TeamMemberSlotField({
               mode={mode}
               criterion={slotConfig.criterion}
               onFill={async (input) => {
-                await fillSlot(input)
+                await activeFillSlot(input)
                 setShowAdder(false)
               }}
               placeholder={slotConfig.placeholder ?? 'Add'}
@@ -334,3 +455,4 @@ export function TeamMemberSlotField({
     </div>
   )
 }
+)

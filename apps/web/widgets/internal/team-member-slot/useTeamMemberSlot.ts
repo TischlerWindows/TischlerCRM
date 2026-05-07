@@ -11,7 +11,7 @@ import {
 import { notifyTeamMembersChanged, subscribeTeamMembersChanged } from './teamMemberEvents'
 
 /** Plain field name on TeamMember for each parent object. */
-const OBJECT_TO_FIELD: Record<string, string> = {
+export const OBJECT_TO_FIELD: Record<string, string> = {
   Property: 'property',
   Opportunity: 'opportunity',
   Project: 'project',
@@ -54,14 +54,14 @@ function getLookupId(row: Record<string, unknown>, plainKey: string): string | n
 }
 
 /** Normalizes a TM record to its bare data fields. */
-function dataOf(rec: Record<string, unknown>): Record<string, unknown> {
+export function dataOf(rec: Record<string, unknown>): Record<string, unknown> {
   const inner = rec.data
   if (inner && typeof inner === 'object') return inner as Record<string, unknown>
   return rec
 }
 
 /** Returns true if a row matches the slot's criterion. */
-function rowMatches(data: Record<string, unknown>, criterion: TeamMemberSlotCriterion): boolean {
+export function rowMatches(data: Record<string, unknown>, criterion: TeamMemberSlotCriterion): boolean {
   if (criterion.kind === 'flag') {
     // The API may return Checkbox fields as either a boolean true or the string "true"; the
     // team-members-rollup widget has matched both since the TeamMember object was introduced.
@@ -82,7 +82,7 @@ function isNotFoundError(err: unknown): boolean {
  * Returns the raw array — does NOT set React state.
  * Used by fillSlot to get fresh data and avoid race conditions with stale savedRows.
  */
-async function fetchFreshRows(
+export async function fetchFreshRows(
   parentObjectApiName: string,
   parentRecordId: string,
 ): Promise<Record<string, unknown>[]> {

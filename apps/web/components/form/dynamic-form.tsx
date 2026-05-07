@@ -34,7 +34,7 @@ import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/lib/auth-context';
 import { PendingWidgetProvider, usePendingWidgetManager } from './pending-widget-context';
 import { PendingTeamMemberPoolProvider } from './pending-team-member-pool';
-import { TeamMemberSlotField } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
+import { TeamMemberSlotField, type TeamMemberSlotHandle } from '@/widgets/internal/team-member-slot/TeamMemberSlotField';
 import { getWidgetSupportsCreate } from '@/lib/widgets/registry-loader';
 import {
   ChevronDown,
@@ -237,6 +237,10 @@ export default function DynamicForm({
   });
   // Review mode: show read-only summary before final save (create mode only)
   const [showReview, setShowReview] = useState(false);
+
+  // Ref map for staged TeamMemberSlot fields (edit mode only).
+  // Each entry is a stable React ref keyed by fieldApiName.
+  const slotRefsRef = React.useRef<Map<string, React.RefObject<TeamMemberSlotHandle>>>(new Map());
 
   // Pending widget manager — manages widget registrations for create mode
   const isCreateMode = layoutType === 'create';
@@ -832,6 +836,12 @@ export default function DynamicForm({
         // pattern below fixes that.
         const pendingSnapshot = pendingCtx?.snapshotPendingWidgets() ?? [];
         const result = await onSubmit(completeData, layoutId);
+        // Edit mode: apply staged TeamMemberSlot changes now that the main record saved.
+        if (layoutType === 'edit') {
+          for (const slotRef of slotRefsRef.current.values()) {
+            await slotRef.current?.applyChanges();
+          }
+        }
         const recordId = typeof result === 'string' ? result : undefined;
         if (recordId && pendingSnapshot.length > 0 && pendingCtx) {
           const { errors: pendingErrors } = await pendingCtx.saveSnapshot(
@@ -1055,6 +1065,25 @@ export default function DynamicForm({
     if (lf?.kind === 'teamMemberSlot' && lf.slotConfig) {
       // formData mirrors the loaded record (or {} in create mode); use its id.
       const parentRecordId = typeof formData?.id === 'string' ? formData.id : null;
+      if (layoutType === 'edit') {
+        // Staged mode: buffer changes locally, apply only on form Save.
+        if (!slotRefsRef.current.has(fieldDef.apiName)) {
+          slotRefsRef.current.set(fieldDef.apiName, React.createRef<TeamMemberSlotHandle>());
+        }
+        const slotRef = slotRefsRef.current.get(fieldDef.apiName)!;
+        return (
+          <TeamMemberSlotField
+            key={fieldDef.apiName}
+            ref={slotRef}
+            parentObjectApiName={objectApiName}
+            parentRecordId={parentRecordId}
+            slotConfig={lf.slotConfig}
+            panelField={layoutField as unknown as import('@/lib/schema').PanelField}
+            singleCardinalityRoles={singleCardinalityRoles}
+            staged
+          />
+        );
+      }
       return (
         <TeamMemberSlotField
           key={fieldDef.apiName}
@@ -1063,7 +1092,6 @@ export default function DynamicForm({
           slotConfig={lf.slotConfig}
           panelField={layoutField as unknown as import('@/lib/schema').PanelField}
           singleCardinalityRoles={singleCardinalityRoles}
-          readOnly={layoutType === 'edit'}
         />
       );
     }

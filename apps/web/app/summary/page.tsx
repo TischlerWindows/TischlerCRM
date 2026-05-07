@@ -164,6 +164,59 @@ const DOOR_TYPES = [
   'Outswing Pivot'
 ];
 
+/** Returns the valid option set for a given product type string.
+ *  Used in both the PDF renderer (to filter stale saved options) and
+ *  the editor checkbox UI. */
+function getOptionsForType(t: string): string[] {
+  const lo = t.toLowerCase();
+  if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
+    return ['Maco Instinct Motorized Locks'];
+  }
+  if (lo === 'inswing folding') {
+    return ['Threshold #6', '#6C', 'ADA'];
+  }
+  if (lo === 'outswing folding') {
+    return ['Threshold #8', 'ADA'];
+  }
+  if (lo === 'l&r d') {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  }
+  if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', '#6C', 'ADA'];
+  }
+  if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #7', '#8', 'ADA'];
+  }
+  if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
+    return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('simulated dh') || lo.includes('simulated double hung')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('single hung') || lo.includes('double hung') || lo.includes('triple hung')) {
+    return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Vent Locks'];
+  }
+  if (lo.includes('direct glaze')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
+  }
+  if (lo.includes('fixed with sash')) {
+    return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
+  }
+  if (lo.includes('tilt-in') || lo.includes('tilt in')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('inswing')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('outswing') || lo.includes('awning')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
+  }
+  if (lo.includes('lift') || lo.includes('roll')) {
+    return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
+  }
+  return ['72mm Thick Sash', '90mm Thick Sash'];
+}
+
 // ── Cell navigation context for Excel-like keyboard selection ──
 interface CellNavCtx {
   activeCellId: string | null;
@@ -1781,8 +1834,10 @@ export default function SummaryPage() {
       const ptoColW = [60, pw2 - 30 - 60];
       const ptoHeaders = ['Product Type', 'Selected Options'];
       const ptoRows = uniqueTypesForPdf.map(typeName => {
-        const selected = ptoSaved[typeName];
-        return [typeName, (Array.isArray(selected) && selected.length > 0) ? selected.join(', ') : '—'];
+        const validOpts = new Set(getOptionsForType(typeName));
+        const saved = ptoSaved[typeName];
+        const selected = Array.isArray(saved) ? saved.filter((o: string) => validOpts.has(o)) : [];
+        return [typeName, selected.length > 0 ? selected.join(', ') : '—'];
       });
       y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0, fitOnPage: true });
       y += 4;
@@ -3533,83 +3588,14 @@ export default function SummaryPage() {
                           allRows.flatMap(r => typeFields.map(f => (r as any)[f]).filter(Boolean))
                         )) as string[];
 
-                        const getOptionsForType = (t: string): string[] => {
-                          const lo = t.toLowerCase();
-
-                          // ── Door-specific types (checked before generic window inswing/outswing) ──
-
-                          // Pivot Door (Pivot, Outswing Pivot, Convert Pivot to Inswing)
-                          if (lo === 'pivot' || lo === 'outswing pivot' || lo.includes('convert pivot')) {
-                            return ['Maco Instinct Motorized Locks'];
-                          }
-                          // Inswing Folding Door (different name from 'Inswing Folding Window')
-                          if (lo === 'inswing folding') {
-                            return ['Threshold #6', '#6C', 'ADA'];
-                          }
-                          // Outswing Folding Door (different name from 'Outswing Folding Window')
-                          if (lo === 'outswing folding') {
-                            return ['Threshold #8', 'ADA'];
-                          }
-                          // L&R Door
-                          if (lo === 'l&r d') {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
-                          }
-                          // Inswing door types: GD, DD, House Door (and French variants)
-                          // Distinguished from window Inswing by presence of 'gd', 'dd', or 'house door'
-                          if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', '#6C', 'ADA'];
-                          }
-                          // Outswing door types: GD, DD, House Door (and French variants)
-                          if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #7', '#8', 'ADA'];
-                          }
-
-                          // ── Window types ──
-
-                          // Offset Simulated DH (must check before generic 'simulated dh')
-                          if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
-                            return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
-                          }
-                          // Simulated DH & French Simulated DH
-                          if (lo.includes('simulated dh') || lo.includes('simulated double hung')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
-                          }
-                          // Single / Double / Triple Hung
-                          if (lo.includes('single hung') || lo.includes('double hung') || lo.includes('triple hung')) {
-                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Vent Locks'];
-                          }
-                          // Direct Glaze (window + door — door adds Threshold to match)
-                          if (lo.includes('direct glaze')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
-                          }
-                          // Fixed with Sash (window + door — door adds Threshold to match)
-                          if (lo.includes('fixed with sash')) {
-                            return ['59mm Thick Sash', '72mm Thick Sash', '82mm Thick Sash', '90mm Thick Sash', 'Threshold to match'];
-                          }
-                          // Tilt-in
-                          if (lo.includes('tilt-in') || lo.includes('tilt in')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
-                          }
-                          // Inswing window (incl. Turn & Tilt, French Inswing)
-                          if (lo.includes('inswing')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
-                          }
-                          // Outswing window, Awning
-                          if (lo.includes('outswing') || lo.includes('awning')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
-                          }
-                          // Lift and Roll Window
-                          if (lo.includes('lift') || lo.includes('roll')) {
-                            return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
-                          }
-                          return ['72mm Thick Sash', '90mm Thick Sash'];
-                        };
+                        // getOptionsForType is defined at module level above DOOR_TYPES
 
                         const pto = (editingSummary.productTypeOptions || {}) as Record<string, string[]>;
 
                         const toggleOpt = (typeKey: string, opt: string) => {
-                          const current = pto[typeKey] || [];
-                          const next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
+                          const validOpts = getOptionsForType(typeKey);
+                          const current = (pto[typeKey] || []).filter((o: string) => validOpts.includes(o));
+                          const next = current.includes(opt) ? current.filter((o: string) => o !== opt) : [...current, opt];
                           setEditingSummary({ ...editingSummary, productTypeOptions: { ...pto, [typeKey]: next } });
                         };
 
@@ -3624,7 +3610,7 @@ export default function SummaryPage() {
                             <label className="block text-sm font-medium text-gray-700">Product Type Options</label>
                             {uniqueTypes.map(typeName => {
                               const opts = getOptionsForType(typeName);
-                              const selected = pto[typeName] || [];
+                              const selected = (pto[typeName] || []).filter((o: string) => opts.includes(o));
                               return (
                                 <div key={typeName} className="flex items-start gap-6 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                                   <div className="min-w-[200px] text-sm font-medium text-gray-800 pt-0.5">{typeName}</div>
