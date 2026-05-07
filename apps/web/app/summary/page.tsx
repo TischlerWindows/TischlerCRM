@@ -1826,8 +1826,17 @@ export default function SummaryPage() {
       ? s.subLocations.flatMap(l => l.doorRows)
       : (s.doorRows || []);
     const allRows = [...allPdfWindowRows, ...allPdfDoorRows];
+    const subOptFieldMap: Record<string, string> = {
+      type: 'typeSubOption', type2: 'type2SubOption',
+      type3: 'type3SubOption', type4: 'type4SubOption',
+    };
     const uniqueTypesForPdf = Array.from(new Set(
-      allRows.flatMap((r: any) => allTypeFields.map(f => r[f]).filter(Boolean))
+      allRows.flatMap((r: any) => allTypeFields.map(f => {
+        const t = r[f];
+        if (!t) return null;
+        if (t === 'Fixed with Sash' && r[subOptFieldMap[f]]) return `Fixed with Sash: ${r[subOptFieldMap[f]]}`;
+        return t;
+      }).filter(Boolean))
     )) as string[];
     if (uniqueTypesForPdf.length > 0) {
       y = drawSectionTitle(doc, y, 'Product Type Options');
@@ -3584,8 +3593,17 @@ export default function SummaryPage() {
                           : (editingSummary.doorRows || []);
                         const allRows = [...winRows, ...doorRows];
                         const typeFields = ['type', 'type2', 'type3', 'type4'] as const;
+                        const subOptFieldMapEd: Record<string, string> = {
+                          type: 'typeSubOption', type2: 'type2SubOption',
+                          type3: 'type3SubOption', type4: 'type4SubOption',
+                        };
                         const uniqueTypes = Array.from(new Set(
-                          allRows.flatMap(r => typeFields.map(f => (r as any)[f]).filter(Boolean))
+                          allRows.flatMap(r => typeFields.map(f => {
+                            const t = (r as any)[f];
+                            if (!t) return null;
+                            if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]]}`;
+                            return t;
+                          }).filter(Boolean))
                         )) as string[];
 
                         // getOptionsForType is defined at module level above DOOR_TYPES
