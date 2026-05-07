@@ -2011,6 +2011,12 @@ export default function SummaryPage() {
         ['Final Contribution', fmt((maTotFinalV - maHidden) / 1000)],
       ];
       if (maTotFull || maTotPct || maTotFinalV) {
+        const caNeeded = 10 + Math.ceil(maFields.length / 3) * 12;
+        if (y + 4 + caNeeded > doc.internal.pageSize.getHeight() - 14) {
+          doc.addPage('a4', 'portrait');
+          drawHeader(doc, 'Quote Summary — Project Summary (cont.)');
+          y = 28;
+        }
         y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
         const caColW = col3W;
         for (let i = 0; i < maFields.length; i += 3) {
@@ -2062,6 +2068,12 @@ export default function SummaryPage() {
         ['Final Contribution', fmt((caTotFinalV - caHidden) / 1000)],
       ];
       if (caGtFull || caGtPct || caGtFinal) {
+        const caNeeded = 10 + Math.ceil(caFields.length / 3) * 12;
+        if (y + 4 + caNeeded > doc.internal.pageSize.getHeight() - 14) {
+          doc.addPage('a4', 'portrait');
+          drawHeader(doc, 'Quote Summary — Project Summary (cont.)');
+          y = 28;
+        }
         y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
         const caColW = col3W;
         for (let i = 0; i < caFields.length; i += 3) {
