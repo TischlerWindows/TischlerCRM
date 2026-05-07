@@ -1994,9 +1994,9 @@ export default function SummaryPage() {
 
       // ── Cost Analysis (multi-location) ──
       const maTotSqFt = tSqFt;
-      const maTotFull   = gtQtSum('full')   + pv(gta?.full);
-      const maTotPct    = gtQtSum('pct')    + pv(gta?.pct);
-      const maTotFinalV = gtQtSum('final')  + pv(gta?.final);
+      const maTotFull   = gtQtSum('full');
+      const maTotPct    = gtQtSum('pct');
+      const maTotFinalV = gtQtSum('final');
       const maGtFull  = maTotFull  ? fmt(maTotFull)  : null;
       const maGtPct   = maTotPct   ? fmt(maTotPct)   : null;
       const maGtFinal = maTotFinalV ? fmt(maTotFinalV) : null;
@@ -2045,9 +2045,9 @@ export default function SummaryPage() {
 
       // ── Cost Analysis (single-location) ──
       const caTotSqFt  = tSqFt;
-      const caTotFull   = qtSum('full')  + pv(gta?.full);
-      const caTotPct    = qtSum('pct')   + pv(gta?.pct);
-      const caTotFinalV = qtSum('final') + pv(gta?.final);
+      const caTotFull   = qtSum('full');
+      const caTotPct    = qtSum('pct');
+      const caTotFinalV = qtSum('final');
       const caGtFull  = caTotFull;
       const caGtPct   = caTotPct;
       const caGtFinal = caTotFinalV;
@@ -4025,10 +4025,9 @@ export default function SummaryPage() {
                       const q = editingSummary.quoteTotals;
                       return p2((q?.euroWindows as any)?.[f]) + p2((q?.doubleHung as any)?.[f]) + p2((q?.euroDoors as any)?.[f]);
                     };
-                    const gta2 = editingSummary.grandTotalAdjustment;
-                    const totFull  = qtotSum('full')  + p2(gta2?.full);
-                    const totPct   = qtotSum('pct')   + p2(gta2?.pct);
-                    const totFinal = qtotSum('final') + p2(gta2?.final);
+                    const totFull  = qtotSum('full');
+                    const totPct   = qtotSum('pct');
+                    const totFinal = qtotSum('final');
                     const hiddenCost = totFull * 0.56;
                     const fmtV = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const rows = [
