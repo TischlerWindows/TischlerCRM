@@ -418,13 +418,16 @@ export async function ensureCoreObjects(): Promise<void> {
   // Fix: ensure name/identity fields that users may have deleted are NOT required.
   // These fields are re-created on startup (ensureFields), so they must never block
   // record creation. Covers both prefixed (Contact__firstName) and bare (firstName) forms.
+  // NOTE: Contact name validation (at least one of firstName/lastName) is enforced
+  // in the records API route, not via schema required flags, because the fields must
+  // remain individually optional for the CompositeText name widget to work.
   try {
     // Un-require Contact firstName/lastName
     const contactObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
     });
     if (contactObj) {
-      await prisma.customField.updateMany({
+      const result = await prisma.customField.updateMany({
         where: {
           objectId: contactObj.id,
           apiName: { in: ['firstName', 'lastName', 'Contact__firstName', 'Contact__lastName', 'status', 'Contact__status'] },
@@ -432,13 +435,14 @@ export async function ensureCoreObjects(): Promise<void> {
         },
         data: { required: false },
       });
+      if (result.count > 0) console.log(`[ensure-core-objects] Un-required ${result.count} Contact identity field(s)`);
     }
     // Un-require Lead lastName
     const leadObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
     });
     if (leadObj) {
-      await prisma.customField.updateMany({
+      const result = await prisma.customField.updateMany({
         where: {
           objectId: leadObj.id,
           apiName: { in: ['firstName', 'lastName'] },
@@ -446,6 +450,7 @@ export async function ensureCoreObjects(): Promise<void> {
         },
         data: { required: false },
       });
+      if (result.count > 0) console.log(`[ensure-core-objects] Un-required ${result.count} Lead identity field(s)`);
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix name field requirements:', err);
@@ -461,20 +466,21 @@ export async function ensureCoreObjects(): Promise<void> {
       'opportunityNumber', 'productCode', 'projectNumber', 'quoteNumber',
       'serviceNumber', 'installationNumber', 'workOrderNumber', 'teamMemberNumber',
     ];
-    await prisma.customField.updateMany({
+    const autoResult = await prisma.customField.updateMany({
       where: {
         apiName: { in: autoNumberFieldNames },
         required: true,
       },
       data: { required: false },
     });
+    if (autoResult.count > 0) console.log(`[ensure-core-objects] Un-required ${autoResult.count} auto-number field(s)`);
 
     // Account 'name' field is stored as 'accountName' in the web schema
     const accountObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Account', mode: 'insensitive' } },
     });
     if (accountObj) {
-      await prisma.customField.updateMany({
+      const nameResult = await prisma.customField.updateMany({
         where: {
           objectId: accountObj.id,
           apiName: 'name',
@@ -482,6 +488,7 @@ export async function ensureCoreObjects(): Promise<void> {
         },
         data: { required: false },
       });
+      if (nameResult.count > 0) console.log('[ensure-core-objects] Un-required Account name field');
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);
@@ -494,7 +501,7 @@ export async function ensureCoreObjects(): Promise<void> {
       where: { apiName: { equals: 'Lead', mode: 'insensitive' } },
     });
     if (leadObj) {
-      await prisma.customField.updateMany({
+      const result = await prisma.customField.updateMany({
         where: {
           objectId: leadObj.id,
           apiName: 'property',
@@ -502,18 +509,22 @@ export async function ensureCoreObjects(): Promise<void> {
         },
         data: { required: true },
       });
+      if (result.count > 0) console.log('[ensure-core-objects] Set Lead property field to required');
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Lead property field requirement:', err);
   }
 
-  // Fix: ensure Opportunity 'probability' field has min=0, max=100 constraints.
+  // Fix: ensure Opportunity probability fields have min=0, max=100 constraints.
+  // This covers both the code-defined 'probability' field AND any user-created
+  // custom fields whose label contains "probability" (e.g. "Salesman Probability").
   try {
     const oppObj = await prisma.customObject.findFirst({
       where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } },
     });
     if (oppObj) {
-      await prisma.customField.updateMany({
+      // Fix the code-defined probability field
+      const codeResult = await prisma.customField.updateMany({
         where: {
           objectId: oppObj.id,
           apiName: 'probability',
@@ -521,63 +532,188 @@ export async function ensureCoreObjects(): Promise<void> {
         },
         data: { min: 0, max: 100 },
       });
+      if (codeResult.count > 0) console.log('[ensure-core-objects] Set min/max on Opportunity.probability field');
+
+      // Fix any user-created probability fields (e.g. "Salesman Probability")
+      const customResult = await prisma.customField.updateMany({
+        where: {
+          objectId: oppObj.id,
+          type: { in: ['Percent', 'Number'] },
+          label: { contains: 'probability', mode: 'insensitive' },
+          OR: [{ max: null }, { max: { not: 100 } }],
+        },
+        data: { min: 0, max: 100 },
+      });
+      if (customResult.count > 0) console.log(`[ensure-core-objects] Set min/max on ${customResult.count} custom probability field(s)`);
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Opportunity probability constraints:', err);
   }
 
-  // Fix: patch orgSchema JSON to add min/max on Opportunity probability field,
-  // and fix "Associated Opportunies" → "Associated Opportunities" typo in
-  // Property layout Associations tab headings.
+  // Fix: ensure Account 'type' (accountType) field is required in the DB.
+  // The CORE_OBJECTS definition has required: true, but the schema-service
+  // fallback may have created it without required, causing a mismatch.
+  try {
+    const accountObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Account', mode: 'insensitive' } },
+    });
+    if (accountObj) {
+      const result = await prisma.customField.updateMany({
+        where: {
+          objectId: accountObj.id,
+          apiName: { in: ['type', 'accountType', 'Account__accountType', 'Account__type'] },
+          type: 'Picklist',
+          required: false,
+        },
+        data: { required: true },
+      });
+      if (result.count > 0) console.log(`[ensure-core-objects] Set Account type field to required (${result.count} field(s))`);
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not fix Account type field requirement:', err);
+  }
+
+  // Fix: patch orgSchema JSON for:
+  //  1. min/max on Opportunity probability fields (code-defined AND user-created)
+  //  2. "Associated Opportunies" → "Associated Opportunities" typo in ALL label locations
+  //  3. Property RelatedList widget that incorrectly queries Account instead of Opportunity
+  //  4. Account type field required flag
+  //  5. Opportunity propertyAddress field visibility (redundant with property Lookup)
   try {
     const schemaSetting = await prisma.setting.findUnique({ where: { key: 'orgSchema' } });
     if (schemaSetting?.value) {
       const orgSchema = schemaSetting.value as any;
       let changed = false;
+      const fixes: string[] = []; // track which fixes fired for logging
 
       for (const obj of orgSchema.objects || []) {
-        // Patch probability min/max
+        // 1. Patch probability min/max — match by label containing "probability"
+        //    (covers both code-defined and user-created fields like "Salesman Probability")
         if (obj.apiName === 'Opportunity') {
           for (const field of obj.fields || []) {
-            if (field.apiName === 'Opportunity__probability' || field.apiName === 'probability') {
-              if (field.min === undefined || field.max === undefined) {
-                field.min = 0;
-                field.max = 100;
-                changed = true;
+            const isProbField =
+              field.apiName === 'Opportunity__probability' ||
+              field.apiName === 'probability' ||
+              (typeof field.label === 'string' &&
+               field.label.toLowerCase().includes('probability') &&
+               (field.type === 'Percent' || field.type === 'Number'));
+            if (isProbField && (field.min === undefined || field.max === undefined || field.max !== 100)) {
+              field.min = 0;
+              field.max = 100;
+              changed = true;
+              fixes.push(`probability min/max on ${field.apiName || field.label}`);
+            }
+          }
+        }
+
+        // 4. Ensure Account type field has required: true in orgSchema
+        if (obj.apiName === 'Account') {
+          for (const field of obj.fields || []) {
+            const isTypeField =
+              field.apiName === 'Account__accountType' ||
+              field.apiName === 'accountType' ||
+              field.apiName === 'type' ||
+              field.apiName === 'Account__type';
+            if (isTypeField && field.type === 'Picklist' && !field.required) {
+              field.required = true;
+              changed = true;
+              fixes.push('Account type required');
+            }
+          }
+        }
+
+        // 5. Hide Opportunity__propertyAddress from layouts — it's redundant
+        //    with the Opportunity__property Lookup field and displays raw IDs.
+        if (obj.apiName === 'Opportunity') {
+          // Check if the Lookup property field exists
+          const hasPropertyLookup = (obj.fields || []).some(
+            (f: any) => (f.apiName === 'Opportunity__property' || f.apiName === 'property') && f.type === 'Lookup'
+          );
+          if (hasPropertyLookup) {
+            for (const layout of obj.pageLayouts || []) {
+              for (const tab of layout.tabs || []) {
+                for (const region of tab.regions || []) {
+                  for (const panel of region.panels || []) {
+                    if (Array.isArray(panel.fields)) {
+                      const before = panel.fields.length;
+                      panel.fields = panel.fields.filter(
+                        (f: any) => {
+                          const fieldApi = typeof f === 'string' ? f : f?.apiName || f?.fieldApiName;
+                          return fieldApi !== 'Opportunity__propertyAddress' && fieldApi !== 'propertyAddress';
+                        }
+                      );
+                      if (panel.fields.length < before) {
+                        changed = true;
+                        fixes.push('removed propertyAddress from Opportunity layout');
+                      }
+                    }
+                  }
+                }
               }
             }
           }
         }
 
-        // Fix "Opportunies" typo in any layout tab/section labels
+        // 2. Fix "Opportunies" typo in ALL label locations:
+        //    tab.label, region.label, panel.label, and widget.config.label
         for (const layout of obj.pageLayouts || []) {
           for (const tab of layout.tabs || []) {
+            // Check tab label
+            if (typeof tab.label === 'string' && tab.label.includes('Opportunies')) {
+              fixes.push(`typo in tab label (was: "${tab.label}")`);
+              tab.label = tab.label.replace(/Opportunies/g, 'Opportunities');
+              changed = true;
+            }
             for (const region of tab.regions || []) {
+              // Check region label
+              if (typeof region.label === 'string' && region.label.includes('Opportunies')) {
+                fixes.push(`typo in region label (was: "${region.label}")`);
+                region.label = region.label.replace(/Opportunies/g, 'Opportunities');
+                changed = true;
+              }
               for (const panel of region.panels || []) {
+                // Check panel label
                 if (typeof panel.label === 'string' && panel.label.includes('Opportunies')) {
+                  fixes.push(`typo in panel label (was: "${panel.label}")`);
                   panel.label = panel.label.replace(/Opportunies/g, 'Opportunities');
                   changed = true;
                 }
               }
             }
-            // Also check tab label
-            if (typeof tab.label === 'string' && tab.label.includes('Opportunies')) {
-              tab.label = tab.label.replace(/Opportunies/g, 'Opportunities');
-              changed = true;
-            }
           }
-          // Fix Related List widget on Property that queries Account instead of Opportunity.
-          // Widgets can be on regions, panels, or tabs.
+
+          // 3. Fix Related List widget on Property that queries Account instead of Opportunity.
+          //    The widget label usually contains "Opportun" (typo or correct) which
+          //    distinguishes it from any legitimate Account widget a user might add.
+          //    Also accept widgets with no label or linkField matching property-related values.
+          // Also fix "Opportunies" typo in widget config labels.
           const fixWidgets = (widgets: any[]) => {
             for (const widget of widgets) {
+              // Fix misconfigured RelatedList — only match if the widget looks like
+              // the Opportunities widget (by label or linkField), not a genuine Account list.
               if (
                 obj.apiName === 'Property' &&
                 widget.widgetType === 'RelatedList' &&
-                widget.config?.objectApiName === 'Account' &&
-                widget.config?.linkField === 'property'
+                widget.config?.objectApiName === 'Account'
               ) {
-                widget.config.objectApiName = 'Opportunity';
+                const wLabel = (widget.config.label || '').toLowerCase();
+                const wLink = (widget.config.linkField || '').toLowerCase();
+                const looksLikeOppWidget =
+                  wLabel.includes('opportun') ||
+                  wLink === 'property' ||
+                  (!wLabel && !wLink);  // no label and no linkField → likely the default misconfigured one
+                if (looksLikeOppWidget) {
+                  widget.config.objectApiName = 'Opportunity';
+                  changed = true;
+                  fixes.push(`Property RelatedList: Account → Opportunity (label="${widget.config.label || ''}", linkField="${widget.config.linkField || ''}")`);
+                }
+              }
+              // Fix typo in widget config label
+              if (typeof widget.config?.label === 'string' && widget.config.label.includes('Opportunies')) {
+                const origLabel = widget.config.label;
+                widget.config.label = widget.config.label.replace(/Opportunies/g, 'Opportunities');
                 changed = true;
+                fixes.push(`typo in widget label: "${origLabel}" → "${widget.config.label}"`);
               }
             }
           };
@@ -598,6 +734,9 @@ export async function ensureCoreObjects(): Promise<void> {
           where: { key: 'orgSchema' },
           data: { value: orgSchema },
         });
+        console.log(`[ensure-core-objects] Patched orgSchema: ${fixes.join('; ')}`);
+      } else {
+        console.log('[ensure-core-objects] orgSchema checked — no patches needed');
       }
     }
   } catch (err) {
