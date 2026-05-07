@@ -1063,6 +1063,7 @@ export default function DynamicForm({
           slotConfig={lf.slotConfig}
           panelField={layoutField as unknown as import('@/lib/schema').PanelField}
           singleCardinalityRoles={singleCardinalityRoles}
+          readOnly={layoutType === 'edit'}
         />
       );
     }
