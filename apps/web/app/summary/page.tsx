@@ -1994,12 +1994,12 @@ export default function SummaryPage() {
 
       // ── Cost Analysis (multi-location) ──
       const maTotSqFt = tSqFt;
-      const maGtFull  = gtQtSum('full') ? fmt(gtQtSum('full')) : null;
-      const maGtPct   = gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : null;
-      const maGtFinal = gtQtSum('final') ? fmt(gtQtSum('final')) : null;
-      const maTotFull = gtQtSum('full');
-      const maTotPct  = gtQtSum('pct');
-      const maTotFinalV = gtQtSum('final');
+      const maTotFull   = gtQtSum('full')   + pv(gta?.full);
+      const maTotPct    = gtQtSum('pct')    + pv(gta?.pct);
+      const maTotFinalV = gtQtSum('final')  + pv(gta?.final);
+      const maGtFull  = maTotFull  ? fmt(maTotFull)  : null;
+      const maGtPct   = maTotPct   ? fmt(maTotPct)   : null;
+      const maGtFinal = maTotFinalV ? fmt(maTotFinalV) : null;
       const maHidden  = maTotFull * 0.56;
       const maFields: [string, string][] = [
         ['Full by Sq Foot',    maTotSqFt ? fmt(maTotFull  / maTotSqFt) : '—'],
@@ -2044,13 +2044,13 @@ export default function SummaryPage() {
       y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors });
 
       // ── Cost Analysis (single-location) ──
-      const caTotSqFt = tSqFt;
-      const caGtFull  = pv(qtSum('full'));
-      const caGtPct   = pv(qtSum('pct'));
-      const caGtFinal = pv(qtSum('final'));
-      const caTotFull = caGtFull;  // Total=Grand Total in single-location
-      const caTotPct  = caGtPct;
-      const caTotFinalV = caGtFinal;
+      const caTotSqFt  = tSqFt;
+      const caTotFull   = qtSum('full')  + pv(gta?.full);
+      const caTotPct    = qtSum('pct')   + pv(gta?.pct);
+      const caTotFinalV = qtSum('final') + pv(gta?.final);
+      const caGtFull  = caTotFull;
+      const caGtPct   = caTotPct;
+      const caGtFinal = caTotFinalV;
       const caHidden   = caTotFull * 0.56;
       const caFields: [string, string][] = [
         ['Full by Sq Foot',    caTotSqFt ? fmt(caGtFull  / caTotSqFt) : '—'],
@@ -4025,9 +4025,10 @@ export default function SummaryPage() {
                       const q = editingSummary.quoteTotals;
                       return p2((q?.euroWindows as any)?.[f]) + p2((q?.doubleHung as any)?.[f]) + p2((q?.euroDoors as any)?.[f]);
                     };
-                    const totFull  = qtotSum('full');
-                    const totPct   = qtotSum('pct');
-                    const totFinal = qtotSum('final');
+                    const gta2 = editingSummary.grandTotalAdjustment;
+                    const totFull  = qtotSum('full')  + p2(gta2?.full);
+                    const totPct   = qtotSum('pct')   + p2(gta2?.pct);
+                    const totFinal = qtotSum('final') + p2(gta2?.final);
                     const hiddenCost = totFull * 0.56;
                     const fmtV = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const rows = [
