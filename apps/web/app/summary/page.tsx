@@ -1512,7 +1512,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[] }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1579,19 +1579,20 @@ export default function SummaryPage() {
           y = 28;
         }
 
-        // Alternating row background
-        if (ri % 2 === 1) {
+        // Per-row color, alternating, or last-row highlight
+        const rowColor = opts?.rowColors?.[ri];
+        const isLast = opts?.highlightLast && ri === rows.length - 1;
+        if (rowColor) {
+          doc.setFillColor(...rowColor);
+          doc.rect(x0, y, totalW, rh, 'F');
+        } else if (isLast) {
+          doc.setFillColor(215, 220, 228);
+          doc.rect(x0, y, totalW, rh, 'F');
+        } else if (ri % 2 === 1) {
           doc.setFillColor(...altRow);
           doc.rect(x0, y, totalW, rh, 'F');
         }
-
-        // Bold last row (grand total)
-        const isLast = opts?.highlightLast && ri === rows.length - 1;
-        if (isLast) {
-          doc.setFillColor(235, 237, 240);
-          doc.rect(x0, y, totalW, rh, 'F');
-          doc.setFont('helvetica', 'bold');
-        }
+        if (isLast) doc.setFont('helvetica', 'bold');
 
         doc.setTextColor(50, 50, 50);
         cx = x0;
@@ -1918,13 +1919,11 @@ export default function SummaryPage() {
           (grandQt[cat] as any)[f] += pv((locQt as any)?.[cat]?.[f]);
         }
       }
-      const rows = [
+      return [
         qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows),
         qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),
         qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),
       ];
-      y = drawTable(doc, y, qtHeaders, qtColW, rows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true });
-      y += 3;
     };
 
     if (s.hasMultipleLocations && s.subLocations?.length) {
@@ -1944,7 +1943,9 @@ export default function SummaryPage() {
         doc.setTextColor(...navy);
         doc.text(loc.label || 'Unnamed Location', 15, y);
         y += 4;
-        renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
+        const locQtRows = renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
+        y = drawTable(doc, y, qtHeaders, qtColW, locQtRows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true });
+        y += 3;
       }
       // Grand Total table — ensure heading + table stay together
       y += 2;
@@ -1988,11 +1989,11 @@ export default function SummaryPage() {
           finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
         }),
       ];
-      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
+      const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
+      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors });
     } else {
       const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
-      renderQtTable(s.rows, s.doorRows, qt);
-      // Grand Total row
+      const baseQtRows = renderQtTable(s.rows, s.doorRows, qt);
       const tQty = grandEwQty + grandDhQty + grandDQty;
       const tFields = grandEwFields + grandDhFields + grandDFields;
       const tSqFt = grandEwSqFt + grandDhSqFt + grandDSqFt;
@@ -2008,7 +2009,8 @@ export default function SummaryPage() {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
       });
-      y = drawTable(doc, y, qtHeaders, qtColW, [totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
+      const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
+      y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors });
     }
     y += 6;
 
