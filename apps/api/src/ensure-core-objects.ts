@@ -1,4 +1,5 @@
 import { prisma } from '@crm/db/client';
+import { Prisma } from '@prisma/client';
 import { generateId } from '@crm/db/record-id';
 
 /**
@@ -541,7 +542,7 @@ export async function ensureCoreObjects(): Promise<void> {
           apiName: 'probability',
           type: 'Picklist',
         },
-        data: { type: 'Percent', min: 0, max: 100 },
+        data: { type: 'Percent', min: 0, max: 100, picklistValues: Prisma.DbNull },
       });
       if (typeFixResult.count > 0) console.log('[ensure-core-objects] Fixed Opportunity.probability type from Picklist to Percent');
 
