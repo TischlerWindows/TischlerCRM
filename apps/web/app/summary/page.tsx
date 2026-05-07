@@ -1983,10 +1983,10 @@ export default function SummaryPage() {
         }),
         ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'],
         qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
-          full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
-          pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
-          final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
-          finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
+          full:     fmt(gtQtSum('full')     + pv(gta?.full)),
+          pct:      fmt(gtQtSum('pct')      + pv(gta?.pct)),
+          final:    fmt(gtQtSum('final')    + pv(gta?.final)),
+          finalAdj: fmt(gtQtSum('finalAdj') + pv(gta?.finalAdj)),
         }),
       ];
       const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
@@ -2035,8 +2035,10 @@ export default function SummaryPage() {
       });
       const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'];
       const grandTotalRow = qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
-        full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
-        final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
+        full:     fmt(qtSum('full')     + pv(gta?.full)),
+        pct:      fmt(qtSum('pct')      + pv(gta?.pct)),
+        final:    fmt(qtSum('final')    + pv(gta?.final)),
+        finalAdj: fmt(qtSum('finalAdj') + pv(gta?.finalAdj)),
       });
       const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
       y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors });
@@ -4528,13 +4530,14 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
+                                  const adj = parseFloat((editingSummary.grandTotalAdjustment as any)?.[f] || '0') || 0;
                                   // When multi-location, sum across all subLocations; otherwise use top-level quoteTotals
-                                  const sumQt = editingSummary.hasMultipleLocations
+                                  const sumQt = (editingSummary.hasMultipleLocations
                                     ? (editingSummary.subLocations ?? []).reduce((acc, l) => {
                                         const qt = l.quoteTotals;
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
-                                    : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
+                                    : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })()) + adj;
                                   return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? fmt(sumQt) : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
