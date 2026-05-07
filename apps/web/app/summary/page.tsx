@@ -2006,9 +2006,9 @@ export default function SummaryPage() {
         ['%_ by Sq Foot',      maTotSqFt ? fmt(maGtPct   / maTotSqFt) : '—'],
         ['Final by Sq Foot',   maTotSqFt ? fmt(maGtFinal / maTotSqFt) : '—'],
         ['Hidden Cost',        maHidden  ? fmt(maHidden)               : '—'],
-        ['Full Contribution',  fmt(maTotFull  - maHidden)],
-        ['%_ Contribution',   fmt(maTotPct   - maHidden)],
-        ['Final Contribution', fmt(maTotFinalV - maHidden)],
+        ['Full Contribution',  fmt((maTotFull  - maHidden) / 1000)],
+        ['%_ Contribution',   fmt((maTotPct   - maHidden) / 1000)],
+        ['Final Contribution', fmt((maTotFinalV - maHidden) / 1000)],
       ];
       if (maTotFull || maTotPct || maTotFinalV) {
         y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
@@ -2057,9 +2057,9 @@ export default function SummaryPage() {
         ['%_ by Sq Foot',      caTotSqFt ? fmt(caGtPct   / caTotSqFt) : '—'],
         ['Final by Sq Foot',   caTotSqFt ? fmt(caGtFinal / caTotSqFt) : '—'],
         ['Hidden Cost',        caHidden  ? fmt(caHidden)               : '—'],
-        ['Full Contribution',  fmt(caTotFull  - caHidden)],
-        ['%_ Contribution',   fmt(caTotPct   - caHidden)],
-        ['Final Contribution', fmt(caTotFinalV - caHidden)],
+        ['Full Contribution',  fmt((caTotFull  - caHidden) / 1000)],
+        ['%_ Contribution',   fmt((caTotPct   - caHidden) / 1000)],
+        ['Final Contribution', fmt((caTotFinalV - caHidden) / 1000)],
       ];
       if (caGtFull || caGtPct || caGtFinal) {
         y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
@@ -4039,9 +4039,9 @@ export default function SummaryPage() {
                       { label: '%_ by Sq Foot',      value: totSqFt ? fmtV(gtPct   / totSqFt) : '—' },
                       { label: 'Final by Sq Foot',   value: totSqFt ? fmtV(gtFinal / totSqFt) : '—' },
                       { label: 'Hidden Cost',        value: fmtV(hiddenCost) },
-                      { label: 'Full Contribution',  value: fmtV(totFull  - hiddenCost) },
-                      { label: '%_ Contribution',    value: fmtV(totPct   - hiddenCost) },
-                      { label: 'Final Contribution', value: fmtV(totFinal - hiddenCost) },
+                      { label: 'Full Contribution',  value: fmtV((totFull  - hiddenCost) / 1000) },
+                      { label: '%_ Contribution',    value: fmtV((totPct   - hiddenCost) / 1000) },
+                      { label: 'Final Contribution', value: fmtV((totFinal - hiddenCost) / 1000) },
                     ];
                     return (
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
