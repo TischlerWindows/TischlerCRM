@@ -1974,6 +1974,12 @@ export default function SummaryPage() {
         qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows),
         qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),
         qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),
+        qtRow('Total', tQty, tFields, tSqFt, tNet, {
+          full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
+          pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
+          final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
+          finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
+        }),
         ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'],
         qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
           full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
@@ -1993,12 +1999,16 @@ export default function SummaryPage() {
       const tNet = grandEwNet + grandDhNet + grandDNet;
       function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
       const gta = s.grandTotalAdjustment;
+      const totalRow = qtRow('Total', tQty, tFields, tSqFt, tNet, {
+        full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
+        final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
+      });
       const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'];
       const grandTotalRow = qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
       });
-      y = drawTable(doc, y, qtHeaders, qtColW, [finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
+      y = drawTable(doc, y, qtHeaders, qtColW, [totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
     }
     y += 6;
 
@@ -4359,6 +4369,27 @@ export default function SummaryPage() {
                                   ))}
                                 </>);
                               })()}
+                              {/* Total (sum of EW+DH+ED before adjustment) */}
+                              <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
+                                <td className="px-4 py-3 text-gray-900">Total</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
+                                {['full','pct','final','finalAdj'].map(f => {
+                                  const sumQt = editingSummary.hasMultipleLocations
+                                    ? (editingSummary.subLocations ?? []).reduce((acc, l) => {
+                                        const qt = l.quoteTotals;
+                                        return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
+                                      }, 0)
+                                    : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
+                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? fmt(sumQt) : '—'}</td>;
+                                })}
+                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
+                              </tr>
                               {/* Final Adjustment */}
                               <tr className="hover:bg-amber-50 border-t border-amber-200">
                                 <td className="px-4 py-3 font-medium text-amber-800">Final Adjustment</td>
