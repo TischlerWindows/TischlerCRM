@@ -114,12 +114,38 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
     .sort((a, b) => a.productType.localeCompare(b.productType));
 }
 
+interface FieldFilters {
+  productType: string;
+  job: string;
+  glassType: string;
+  woodType: string;
+  finish: string;
+  spacerBar: string;
+}
+
+const EMPTY_FILTERS: FieldFilters = { productType: '', job: '', glassType: '', woodType: '', finish: '', spacerBar: '' };
+
+const FILTER_FIELDS: { key: keyof FieldFilters; label: string }[] = [
+  { key: 'productType', label: 'Product Type' },
+  { key: 'job',         label: 'Job / Opp #' },
+  { key: 'glassType',   label: 'Glass Type' },
+  { key: 'woodType',    label: 'Wood Type' },
+  { key: 'finish',      label: 'Finish' },
+  { key: 'spacerBar',   label: 'Spacer Bar' },
+];
+
 export default function ProductsPage() {
   const [groups, setGroups] = useState<ProductLogGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<FieldFilters>(EMPTY_FILTERS);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const setFilter = (field: keyof FieldFilters, value: string) =>
+    setFilters(prev => ({ ...prev, [field]: value }));
+
+  const hasActiveFilters = Object.values(filters).some(v => v.trim() !== '');
 
   useEffect(() => {
     getSetting<any[]>('summaries')
@@ -129,22 +155,31 @@ export default function ProductsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const fPT    = filters.productType.toLowerCase().trim();
+    const fJob   = filters.job.toLowerCase().trim();
+    const fGlass = filters.glassType.toLowerCase().trim();
+    const fWood  = filters.woodType.toLowerCase().trim();
+    const fFinish = filters.finish.toLowerCase().trim();
+    const fSpacer = filters.spacerBar.toLowerCase().trim();
+
     return groups.filter(g => {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-      if (!q) return true;
-      // Match product type name (the grouped type)
-      if (g.productType.toLowerCase().includes(q)) return true;
-      // Match any detail where job identity OR spec fields contain the phrase.
-      // Spec fields are checked per-detail so "28" matches details with glassType
-      // "28 DC Standard..." but not details with "29 DC..." from a different summary.
-      return g.details.some(d => {
-        const identity = `${d.summaryName} ${d.opportunityNumber}`.toLowerCase();
-        const specs = `${d.glassType} ${d.woodType} ${d.finish} ${d.spacerBarType} ${d.spacerBarColors} ${d.sdl} ${d.tdl}`.toLowerCase();
-        return identity.includes(q) || specs.includes(q);
-      });
+      if (fPT && !g.productType.toLowerCase().includes(fPT)) return false;
+      // For spec/job filters — group passes if at least one detail matches ALL active spec filters
+      if (fJob || fGlass || fWood || fFinish || fSpacer) {
+        const anyDetailMatches = g.details.some(d => {
+          if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
+          if (fGlass && !d.glassType.toLowerCase().includes(fGlass)) return false;
+          if (fWood && !d.woodType.toLowerCase().includes(fWood)) return false;
+          if (fFinish && !d.finish.toLowerCase().includes(fFinish)) return false;
+          if (fSpacer && !`${d.spacerBarType} ${d.spacerBarColors}`.toLowerCase().includes(fSpacer)) return false;
+          return true;
+        });
+        if (!anyDetailMatches) return false;
+      }
+      return true;
     });
-  }, [groups, search, categoryFilter]);
+  }, [groups, filters, categoryFilter]);
 
   const totals = useMemo(() => ({
     qty: filtered.reduce((s, g) => s + g.totalQty, 0),
@@ -178,33 +213,71 @@ export default function ProductsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-5">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search product type, job, specs…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 w-80"
-          />
-        </div>
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-          {CATEGORIES.map(cat => (
+      <div className="mb-5 space-y-3">
+        {/* Top row: category tabs + filter toggle */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {CATEGORIES.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`px-3 py-2 text-sm font-medium transition-colors ${
+                  categoryFilter === cat ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setFiltersOpen(o => !o)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              filtersOpen || hasActiveFilters
+                ? 'bg-brand-navy text-white border-brand-navy'
+                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+            Search Fields
+            {hasActiveFilters && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-white/20 text-xs">
+                {Object.values(filters).filter(v => v.trim()).length}
+              </span>
+            )}
+          </button>
+          {hasActiveFilters && (
             <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                categoryFilter === cat ? 'bg-brand-navy text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
+              onClick={() => setFilters(EMPTY_FILTERS)}
+              className="text-xs text-gray-400 hover:text-gray-700 underline"
             >
-              {cat}
+              Clear filters
             </button>
-          ))}
+          )}
+          <div className="ml-auto text-sm text-gray-500 self-center">
+            {filtered.length} {filtered.length === 1 ? 'type' : 'types'}
+          </div>
         </div>
-        <div className="ml-auto text-sm text-gray-500 self-center">
-          {filtered.length} {filtered.length === 1 ? 'type' : 'types'}
-        </div>
+
+        {/* Per-field search inputs */}
+        {filtersOpen && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            {FILTER_FIELDS.map(({ key, label }) => (
+              <div key={key}>
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={filters[key]}
+                    onChange={e => setFilter(key, e.target.value)}
+                    placeholder={`Filter…`}
+                    className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
