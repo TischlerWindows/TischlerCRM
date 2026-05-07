@@ -1991,6 +1991,35 @@ export default function SummaryPage() {
       ];
       const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
       y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors });
+
+      // ── Cost Analysis (multi-location) ──
+      const maTotSqFt = tSqFt;
+      const maGtFull  = gtQtSum('full') ? fmt(gtQtSum('full')) : null;
+      const maGtPct   = gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : null;
+      const maGtFinal = gtQtSum('final') ? fmt(gtQtSum('final')) : null;
+      const maTotFull = gtQtSum('full');
+      const maTotPct  = gtQtSum('pct');
+      const maTotFinalV = gtQtSum('final');
+      const maHidden  = maTotFull * 0.56;
+      const maFields: [string, string][] = [
+        ['Full by Sq Foot',    maTotSqFt ? fmt(maTotFull  / maTotSqFt) : '—'],
+        ['%_ by Sq Foot',      maTotSqFt ? fmt(maTotPct   / maTotSqFt) : '—'],
+        ['Final by Sq Foot',   maTotSqFt ? fmt(maTotFinalV / maTotSqFt) : '—'],
+        ['Hidden Cost',        maHidden  ? fmt(maHidden)               : '—'],
+        ['Full Contribution',  fmt(maTotFull  - maHidden)],
+        ['%_ Contribution',   fmt(maTotPct   - maHidden)],
+        ['Final Contribution', fmt(maTotFinalV - maHidden)],
+      ];
+      if (maTotFull || maTotPct || maTotFinalV) {
+        y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
+        const caColW = col3W;
+        for (let i = 0; i < maFields.length; i += 3) {
+          for (let j = 0; j < 3 && i + j < maFields.length; j++) {
+            drawField(doc, 15 + caColW * j, y, maFields[i + j]![0], maFields[i + j]![1], caColW);
+          }
+          y += 12;
+        }
+      }
     } else {
       const qt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
       const baseQtRows = renderQtTable(s.rows, s.doorRows, qt);
@@ -2011,6 +2040,35 @@ export default function SummaryPage() {
       });
       const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
       y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors });
+
+      // ── Cost Analysis (single-location) ──
+      const caTotSqFt = tSqFt;
+      const caGtFull  = pv(qtSum('full'));
+      const caGtPct   = pv(qtSum('pct'));
+      const caGtFinal = pv(qtSum('final'));
+      const caTotFull = caGtFull;  // Total=Grand Total in single-location
+      const caTotPct  = caGtPct;
+      const caTotFinalV = caGtFinal;
+      const caHidden   = caTotFull * 0.56;
+      const caFields: [string, string][] = [
+        ['Full by Sq Foot',    caTotSqFt ? fmt(caGtFull  / caTotSqFt) : '—'],
+        ['%_ by Sq Foot',      caTotSqFt ? fmt(caGtPct   / caTotSqFt) : '—'],
+        ['Final by Sq Foot',   caTotSqFt ? fmt(caGtFinal / caTotSqFt) : '—'],
+        ['Hidden Cost',        caHidden  ? fmt(caHidden)               : '—'],
+        ['Full Contribution',  fmt(caTotFull  - caHidden)],
+        ['%_ Contribution',   fmt(caTotPct   - caHidden)],
+        ['Final Contribution', fmt(caTotFinalV - caHidden)],
+      ];
+      if (caGtFull || caGtPct || caGtFinal) {
+        y = drawSectionTitle(doc, y + 4, 'Cost Analysis');
+        const caColW = col3W;
+        for (let i = 0; i < caFields.length; i += 3) {
+          for (let j = 0; j < 3 && i + j < caFields.length; j++) {
+            drawField(doc, 15 + caColW * j, y, caFields[i + j]![0], caFields[i + j]![1], caColW);
+          }
+          y += 12;
+        }
+      }
     }
     y += 6;
 
@@ -3942,6 +4000,60 @@ export default function SummaryPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Cost Analysis */}
+                  {(() => {
+                    const allWR: SummaryRow[] = editingSummary.hasMultipleLocations
+                      ? (editingSummary.subLocations ?? []).flatMap(l => l.rows)
+                      : editingSummary.rows;
+                    const allDR: DoorRow[] = editingSummary.hasMultipleLocations
+                      ? (editingSummary.subLocations ?? []).flatMap(l => l.doorRows)
+                      : editingSummary.doorRows;
+                    const p2 = (v: string | undefined) => parseFloat(v || '0') || 0;
+                    const sf = (rows: (SummaryRow | DoorRow)[], field: string) =>
+                      rows.reduce((a, r) => a + (parseFloat((r as any)[field]) || 0), 0);
+                    const totSqFt = sf(allWR, 'sqFeetTotal') + sf(allDR, 'sqFeetTotal');
+                    const qtotSum = (f: 'full'|'pct'|'final'|'finalAdj') => {
+                      if (editingSummary.hasMultipleLocations) {
+                        return (editingSummary.subLocations ?? []).reduce((a, l) => {
+                          const q = l.quoteTotals;
+                          return a + p2((q?.euroWindows as any)?.[f]) + p2((q?.doubleHung as any)?.[f]) + p2((q?.euroDoors as any)?.[f]);
+                        }, 0);
+                      }
+                      const q = editingSummary.quoteTotals;
+                      return p2((q?.euroWindows as any)?.[f]) + p2((q?.doubleHung as any)?.[f]) + p2((q?.euroDoors as any)?.[f]);
+                    };
+                    const totFull  = qtotSum('full');
+                    const totPct   = qtotSum('pct');
+                    const totFinal = qtotSum('final');
+                    const hiddenCost = totFull * 0.56;
+                    const fmtV = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+                    const rows = [
+                      { label: 'Full by Sq Foot',    value: totSqFt ? fmtV(totFull  / totSqFt) : '—' },
+                      { label: '%_ by Sq Foot',      value: totSqFt ? fmtV(totPct   / totSqFt) : '—' },
+                      { label: 'Final by Sq Foot',   value: totSqFt ? fmtV(totFinal / totSqFt) : '—' },
+                      { label: 'Hidden Cost',        value: fmtV(hiddenCost) },
+                      { label: 'Full Contribution',  value: fmtV(totFull  - hiddenCost) },
+                      { label: '%_ Contribution',    value: fmtV(totPct   - hiddenCost) },
+                      { label: 'Final Contribution', value: fmtV(totFinal - hiddenCost) },
+                    ];
+                    if (!totFull && !totPct && !totFinal) return null;
+                    return (
+                      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                          <h3 className="text-lg font-semibold text-gray-900">Cost Analysis</h3>
+                        </div>
+                        <div className="p-6 grid grid-cols-3 gap-x-8 gap-y-4">
+                          {rows.map(r => (
+                            <div key={r.label}>
+                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{r.label}</div>
+                              <div className="text-sm font-semibold text-gray-900">{r.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Aggregate Summary Tables — side by side */}
                   {(() => {
