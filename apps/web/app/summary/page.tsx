@@ -716,6 +716,7 @@ interface Summary {
     doubleHung: { full: string; pct: string; final: string; finalAdj: string };
     euroDoors: { full: string; pct: string; final: string; finalAdj: string };
   };
+  grandTotalAdjustment?: { full: string; pct: string; final: string; finalAdj: string };
   addOns: {
     windowScreens: { qty: string; frameType: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     doorScreenSash: { qty: string; woodFrame: string; meshType: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
@@ -1834,7 +1835,7 @@ export default function SummaryPage() {
       allRows.flatMap((r: any) => allTypeFields.map(f => {
         const t = r[f];
         if (!t) return null;
-        if (t === 'Fixed with Sash' && r[subOptFieldMap[f]]) return `Fixed with Sash: ${r[subOptFieldMap[f]]}`;
+        if (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) return `Fixed with Sash: ${r[subOptFieldMap[f]!]}`;
         return t;
       }).filter(Boolean))
     )) as string[];
@@ -1968,10 +1969,12 @@ export default function SummaryPage() {
       // Use top-level s.quoteTotals for Grand Total financial cols — this is what the Grand Total UI table writes to
       const gtQt = s.quoteTotals || { euroWindows: { full: '', pct: '', final: '', finalAdj: '' }, doubleHung: { full: '', pct: '', final: '', finalAdj: '' }, euroDoors: { full: '', pct: '', final: '', finalAdj: '' } };
       function gtQtSum(f: string) { return pv((gtQt.euroWindows as any)?.[f]) + pv((gtQt.doubleHung as any)?.[f]) + pv((gtQt.euroDoors as any)?.[f]); }
+      const gta = s.grandTotalAdjustment;
       const grandRows = [
         qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows),
         qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),
         qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),
+        ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'],
         qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
           full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
           pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
@@ -1989,11 +1992,13 @@ export default function SummaryPage() {
       const tSqFt = grandEwSqFt + grandDhSqFt + grandDSqFt;
       const tNet = grandEwNet + grandDhNet + grandDNet;
       function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
+      const gta = s.grandTotalAdjustment;
+      const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'];
       const grandTotalRow = qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
       });
-      y = drawTable(doc, y, qtHeaders, qtColW, [grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
+      y = drawTable(doc, y, qtHeaders, qtColW, [finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true });
     }
     y += 6;
 
@@ -3601,7 +3606,7 @@ export default function SummaryPage() {
                           allRows.flatMap(r => typeFields.map(f => {
                             const t = (r as any)[f];
                             if (!t) return null;
-                            if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]]}`;
+                            if (t === 'Fixed with Sash' && (r as any)[subOptFieldMapEd[f]!]) return `Fixed with Sash: ${(r as any)[subOptFieldMapEd[f]!]}`;
                             return t;
                           }).filter(Boolean))
                         )) as string[];
@@ -4354,6 +4359,23 @@ export default function SummaryPage() {
                                   ))}
                                 </>);
                               })()}
+                              {/* Final Adjustment */}
+                              <tr className="hover:bg-amber-50 border-t border-amber-200">
+                                <td className="px-4 py-3 font-medium text-amber-800">Final Adjustment</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                <td className="px-4 py-3 text-right text-gray-400">—</td>
+                                {(['full','pct','final','finalAdj'] as const).map(f => (
+                                  <td key={`adj-${f}`} className="px-1 py-1">
+                                    <input type="text" value={(editingSummary.grandTotalAdjustment as any)?.[f] || ''} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: e.target.value } })} className="w-full px-2 py-1.5 text-right text-sm border border-amber-300 rounded focus:ring-1 focus:ring-amber-400 bg-amber-50/40" placeholder="—" />
+                                  </td>
+                                ))}
+                                <td className="px-4 py-3 border-l-4 border-blue-300 bg-blue-50/30" />
+                                <td className="px-4 py-3 bg-blue-50/30" />
+                                <td className="px-4 py-3 bg-green-50/30" />
+                                <td className="px-4 py-3 bg-purple-50/30" />
+                              </tr>
                               {/* Grand Total */}
                               <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
                                 <td className="px-4 py-3 text-gray-900">Grand Total</td>
