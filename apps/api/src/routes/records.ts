@@ -703,6 +703,34 @@ export async function recordRoutes(app: FastifyInstance) {
       });
     }
 
+    // ---- Min / Max bounds validation ----
+    // Enforce min/max constraints on Number, Percent, and Currency fields so
+    // values like 150% on a probability field are caught server-side even if
+    // the client-side validation is bypassed.
+    const boundsErrors: string[] = [];
+    for (const field of object.fields) {
+      if (field.min == null && field.max == null) continue;
+      const typeLower = (field.type || '').toLowerCase();
+      if (typeLower !== 'number' && typeLower !== 'percent' && typeLower !== 'currency') continue;
+      const unprefixed = field.apiName.replace(/^[A-Za-z]+__/, '');
+      const rawVal = normalizedData[field.apiName] ?? normalizedData[unprefixed];
+      if (rawVal == null || rawVal === '') continue;
+      const num = Number(rawVal);
+      if (isNaN(num)) continue;
+      if (field.min != null && num < field.min) {
+        boundsErrors.push(`${field.label || field.apiName}: value must be at least ${field.min}`);
+      }
+      if (field.max != null && num > field.max) {
+        boundsErrors.push(`${field.label || field.apiName}: value must be at most ${field.max}`);
+      }
+    }
+    if (boundsErrors.length > 0) {
+      return reply.code(400).send({
+        error: boundsErrors.join('; '),
+        fields: boundsErrors.map((e) => e.split(':')[0]),
+      });
+    }
+
     // Create record with data as JSON.
     // Records are no longer pinned to a specific page layout — the active
     // layout wins at render time — so we do not persist pageLayoutId.
@@ -1208,6 +1236,32 @@ export async function recordRoutes(app: FastifyInstance) {
           mergedData.Property__propertyNumber = newPropertyNumber;
         }
       }
+    }
+
+    // ---- Min / Max bounds validation (PUT) ----
+    const putBoundsErrors: string[] = [];
+    for (const field of object.fields) {
+      if (field.min == null && field.max == null) continue;
+      const typeLower = (field.type || '').toLowerCase();
+      if (typeLower !== 'number' && typeLower !== 'percent' && typeLower !== 'currency') continue;
+      const unprefixed = field.apiName.replace(/^[A-Za-z]+__/, '');
+      // Only validate fields that are actually being updated
+      const rawVal = sanitizedUpdate[field.apiName] ?? sanitizedUpdate[unprefixed];
+      if (rawVal == null || rawVal === '') continue;
+      const num = Number(rawVal);
+      if (isNaN(num)) continue;
+      if (field.min != null && num < field.min) {
+        putBoundsErrors.push(`${field.label || field.apiName}: value must be at least ${field.min}`);
+      }
+      if (field.max != null && num > field.max) {
+        putBoundsErrors.push(`${field.label || field.apiName}: value must be at most ${field.max}`);
+      }
+    }
+    if (putBoundsErrors.length > 0) {
+      return reply.code(400).send({
+        error: putBoundsErrors.join('; '),
+        fields: putBoundsErrors.map((e) => e.split(':')[0]),
+      });
     }
 
     const record = await prisma.record.update({

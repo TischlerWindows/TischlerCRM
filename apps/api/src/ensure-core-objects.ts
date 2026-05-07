@@ -534,17 +534,23 @@ export async function ensureCoreObjects(): Promise<void> {
       });
       if (codeResult.count > 0) console.log('[ensure-core-objects] Set min/max on Opportunity.probability field');
 
-      // Fix any user-created probability fields (e.g. "Salesman Probability")
-      const customResult = await prisma.customField.updateMany({
-        where: {
-          objectId: oppObj.id,
-          type: { in: ['Percent', 'Number'] },
-          label: { contains: 'probability', mode: 'insensitive' },
-          OR: [{ max: null }, { max: { not: 100 } }],
-        },
-        data: { min: 0, max: 100 },
-      });
-      if (customResult.count > 0) console.log(`[ensure-core-objects] Set min/max on ${customResult.count} custom probability field(s)`);
+      // Fix any user-created probability fields (e.g. "Salesman Probability").
+      // DB field type may be stored in any case (Percent, percent, PERCENT etc.)
+      // so we match each variant separately.
+      let customTotal = 0;
+      for (const typeName of ['Percent', 'percent', 'Number', 'number']) {
+        const r = await prisma.customField.updateMany({
+          where: {
+            objectId: oppObj.id,
+            type: typeName,
+            label: { contains: 'probability', mode: 'insensitive' },
+            OR: [{ max: null }, { max: { not: 100 } }],
+          },
+          data: { min: 0, max: 100 },
+        });
+        customTotal += r.count;
+      }
+      if (customTotal > 0) console.log(`[ensure-core-objects] Set min/max on ${customTotal} custom probability field(s)`);
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix Opportunity probability constraints:', err);
@@ -591,12 +597,13 @@ export async function ensureCoreObjects(): Promise<void> {
         //    (covers both code-defined and user-created fields like "Salesman Probability")
         if (obj.apiName === 'Opportunity') {
           for (const field of obj.fields || []) {
+            const fieldTypeLower = (field.type || '').toLowerCase();
             const isProbField =
               field.apiName === 'Opportunity__probability' ||
               field.apiName === 'probability' ||
               (typeof field.label === 'string' &&
                field.label.toLowerCase().includes('probability') &&
-               (field.type === 'Percent' || field.type === 'Number'));
+               (fieldTypeLower === 'percent' || fieldTypeLower === 'number'));
             if (isProbField && (field.min === undefined || field.max === undefined || field.max !== 100)) {
               field.min = 0;
               field.max = 100;
@@ -622,14 +629,30 @@ export async function ensureCoreObjects(): Promise<void> {
           }
         }
 
-        // 5. Hide Opportunity__propertyAddress from layouts — it's redundant
+        // 5. Remove Opportunity__propertyAddress entirely — it's redundant
         //    with the Opportunity__property Lookup field and displays raw IDs.
+        //    Remove from both the fields array and all page layouts.
         if (obj.apiName === 'Opportunity') {
           // Check if the Lookup property field exists
           const hasPropertyLookup = (obj.fields || []).some(
-            (f: any) => (f.apiName === 'Opportunity__property' || f.apiName === 'property') && f.type === 'Lookup'
+            (f: any) => {
+              const api = (f.apiName || '').toLowerCase();
+              const t = (f.type || '').toLowerCase();
+              return (api === 'opportunity__property' || api === 'property') && t === 'lookup';
+            }
           );
-          if (hasPropertyLookup) {
+          if (hasPropertyLookup && Array.isArray(obj.fields)) {
+            // Remove propertyAddress from the fields array itself
+            const fieldsBefore = obj.fields.length;
+            obj.fields = obj.fields.filter((f: any) => {
+              const api = (f.apiName || '').toLowerCase();
+              return api !== 'opportunity__propertyaddress' && api !== 'propertyaddress';
+            });
+            if (obj.fields.length < fieldsBefore) {
+              changed = true;
+              fixes.push('removed propertyAddress from Opportunity fields array');
+            }
+            // Also remove from all layout panels
             for (const layout of obj.pageLayouts || []) {
               for (const tab of layout.tabs || []) {
                 for (const region of tab.regions || []) {
@@ -639,7 +662,8 @@ export async function ensureCoreObjects(): Promise<void> {
                       panel.fields = panel.fields.filter(
                         (f: any) => {
                           const fieldApi = typeof f === 'string' ? f : f?.apiName || f?.fieldApiName;
-                          return fieldApi !== 'Opportunity__propertyAddress' && fieldApi !== 'propertyAddress';
+                          const fLower = (fieldApi || '').toLowerCase();
+                          return fLower !== 'opportunity__propertyaddress' && fLower !== 'propertyaddress';
                         }
                       );
                       if (panel.fields.length < before) {
@@ -683,29 +707,25 @@ export async function ensureCoreObjects(): Promise<void> {
           }
 
           // 3. Fix Related List widget on Property that queries Account instead of Opportunity.
-          //    The widget label usually contains "Opportun" (typo or correct) which
-          //    distinguishes it from any legitimate Account widget a user might add.
-          //    Also accept widgets with no label or linkField matching property-related values.
+          //    Property has no direct Account relationship — the only RelatedList should
+          //    show Opportunities. Fix both objectApiName and relatedObjectApiName, and
+          //    ensure linkField is set to "property" for the query to work.
           // Also fix "Opportunies" typo in widget config labels.
           const fixWidgets = (widgets: any[]) => {
             for (const widget of widgets) {
-              // Fix misconfigured RelatedList — only match if the widget looks like
-              // the Opportunities widget (by label or linkField), not a genuine Account list.
-              if (
-                obj.apiName === 'Property' &&
-                widget.widgetType === 'RelatedList' &&
-                widget.config?.objectApiName === 'Account'
-              ) {
-                const wLabel = (widget.config.label || '').toLowerCase();
-                const wLink = (widget.config.linkField || '').toLowerCase();
-                const looksLikeOppWidget =
-                  wLabel.includes('opportun') ||
-                  wLink === 'property' ||
-                  (!wLabel && !wLink);  // no label and no linkField → likely the default misconfigured one
-                if (looksLikeOppWidget) {
+              if (obj.apiName === 'Property' && widget.widgetType === 'RelatedList' && widget.config) {
+                // Check both objectApiName and relatedObjectApiName (case-insensitive)
+                const objApi = (widget.config.objectApiName || '').toLowerCase();
+                const relApi = (widget.config.relatedObjectApiName || '').toLowerCase();
+                if (objApi === 'account' || relApi === 'account') {
                   widget.config.objectApiName = 'Opportunity';
+                  widget.config.relatedObjectApiName = 'Opportunity';
+                  // Ensure linkField is correct for the Opportunity→Property relationship
+                  if (!widget.config.linkField) {
+                    widget.config.linkField = 'property';
+                  }
                   changed = true;
-                  fixes.push(`Property RelatedList: Account → Opportunity (label="${widget.config.label || ''}", linkField="${widget.config.linkField || ''}")`);
+                  fixes.push(`Property RelatedList: Account → Opportunity (objApi="${objApi}", relApi="${relApi}", linkField="${widget.config.linkField}")`);
                 }
               }
               // Fix typo in widget config label
