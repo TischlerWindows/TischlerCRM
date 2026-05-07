@@ -1273,9 +1273,12 @@ class LocalStorageSchemaService implements SchemaService {
     ensureField({
       id: generateId(),
       apiName: 'Opportunity__probability',
-      label: 'Probability',
-      type: 'Picklist',
-      picklistValues: ['25%', '50%', '75%', '90%']
+      label: 'Probability (%)',
+      type: 'Percent',
+      precision: 3,
+      scale: 0,
+      min: 0,
+      max: 100
     });
     ensureField({
       id: generateId(),

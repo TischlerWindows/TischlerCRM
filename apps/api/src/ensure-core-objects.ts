@@ -534,6 +534,17 @@ export async function ensureCoreObjects(): Promise<void> {
       });
       if (codeResult.count > 0) console.log('[ensure-core-objects] Set min/max on Opportunity.probability field');
 
+      // Fix field type from Picklist to Percent if created with old schema definition
+      const typeFixResult = await prisma.customField.updateMany({
+        where: {
+          objectId: oppObj.id,
+          apiName: 'probability',
+          type: 'Picklist',
+        },
+        data: { type: 'Percent', min: 0, max: 100 },
+      });
+      if (typeFixResult.count > 0) console.log('[ensure-core-objects] Fixed Opportunity.probability type from Picklist to Percent');
+
       // Fix any user-created probability fields (e.g. "Salesman Probability").
       // DB field type may be stored in any case (Percent, percent, PERCENT etc.)
       // so we match each variant separately.
@@ -609,6 +620,16 @@ export async function ensureCoreObjects(): Promise<void> {
               field.max = 100;
               changed = true;
               fixes.push(`probability min/max on ${field.apiName || field.label}`);
+            }
+            if (isProbField && fieldTypeLower === 'picklist') {
+              field.type = 'Percent';
+              field.precision = 3;
+              field.scale = 0;
+              field.min = 0;
+              field.max = 100;
+              delete field.picklistValues;
+              changed = true;
+              fixes.push(`probability type Picklist→Percent on ${field.apiName || field.label}`);
             }
           }
         }

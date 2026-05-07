@@ -198,23 +198,44 @@ export function renderValue(
       </Link>
     ) : displayLabel;
 
-    // For Property lookups, show a Google Maps preview if the property has lat/lng
+    // For Property lookups, show the property address as text and a map preview when available
     if (lookupTarget === 'Property' && !compact) {
       const propRecord = getLookupCachedRecord('Property', String(value));
       if (propRecord) {
-        // lat/lng may live inside address_search blob or as top-level fields
         const blob = propRecord.address_search ?? propRecord.Property__address_search ??
           (() => { const k = Object.keys(propRecord).find(x => x.toLowerCase().endsWith('__address_search') || x.toLowerCase() === 'address_search'); return k ? propRecord[k] : undefined; })();
+
+        let address: string | undefined;
+        if (typeof blob === 'object' && blob) {
+          address = [blob.street, blob.city, blob.state, blob.postalCode].filter(Boolean).join(', ') || undefined;
+        }
+        if (!address) {
+          const legacyAddr = propRecord.address ?? propRecord.Property__address ??
+            (() => { const k = Object.keys(propRecord).find(x => (x.toLowerCase().endsWith('__address') || x.toLowerCase() === 'address') && !x.toLowerCase().includes('_search')); return k ? propRecord[k] : undefined; })();
+          if (typeof legacyAddr === 'object' && legacyAddr) {
+            address = [legacyAddr.street, legacyAddr.city, legacyAddr.state, legacyAddr.zip || legacyAddr.postalCode].filter(Boolean).join(', ') || undefined;
+          } else if (typeof legacyAddr === 'string' && legacyAddr) {
+            address = legacyAddr;
+          }
+        }
+        if (!address) {
+          const city = propRecord.city ?? propRecord.Property__city ?? '';
+          const state = propRecord.state ?? propRecord.Property__state ?? '';
+          const zip = propRecord.zipCode ?? propRecord.Property__zipCode ?? '';
+          const parts = [city, state, zip].filter(Boolean);
+          if (parts.length > 0) address = parts.join(', ');
+        }
+
         const lat = parseFloat(String(blob?.lat ?? propRecord.latitude ?? propRecord.Property__latitude ?? ''));
         const lng = parseFloat(String(blob?.lng ?? propRecord.longitude ?? propRecord.Property__longitude ?? ''));
-        const address = typeof blob === 'object' && blob
-          ? [blob.street, blob.city, blob.state, blob.postalCode].filter(Boolean).join(', ')
-          : undefined;
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        const hasMap = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+
+        if (address || hasMap) {
           return (
             <div>
               {link}
-              <LocationMapPreview lat={lat} lng={lng} address={address} className="mt-2" />
+              {address && <p className="text-xs text-gray-500 mt-1">{address}</p>}
+              {hasMap && <LocationMapPreview lat={lat} lng={lng} address={address} className="mt-2" />}
             </div>
           );
         }
