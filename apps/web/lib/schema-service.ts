@@ -1199,13 +1199,19 @@ class LocalStorageSchemaService implements SchemaService {
       lookupObject: 'Property',
       relationshipName: 'Properties'
     });
-    ensureField({
-      id: generateId(),
-      apiName: 'Opportunity__propertyAddress',
-      label: 'Property Address',
-      type: 'TextArea',
-      maxLength: 2000
-    });
+    // NOTE: Opportunity__propertyAddress (TextArea) is intentionally NOT
+    // ensured here. It stored raw Property record IDs instead of actual
+    // addresses, rendering as unresolvable UUIDs. The Opportunity__property
+    // Lookup field already provides proper Property linking with name
+    // resolution. Any existing propertyAddress fields are removed from
+    // layouts by ensure-core-objects.ts on startup.
+
+    // Actively remove propertyAddress from Opportunity fields if it exists
+    // (prevents stale data from prior schema versions from showing up)
+    opp.fields = opp.fields.filter(
+      f => f.apiName !== 'Opportunity__propertyAddress' && f.apiName !== 'propertyAddress'
+    );
+
     ensureField({
       id: generateId(),
       apiName: 'Opportunity__estimatedContractDate',

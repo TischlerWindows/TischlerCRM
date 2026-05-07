@@ -441,6 +441,8 @@ export function FieldInput({
                 ? `0.${'0'.repeat(fieldDef.scale - 1)}1`
                 : '1'
             }
+            min={fieldDef.min}
+            max={fieldDef.max}
             className={cn(
               commonProps.className,
               fieldDef.type === 'Currency' && 'pl-8',
