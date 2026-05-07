@@ -125,13 +125,13 @@ interface FieldFilters {
 
 const EMPTY_FILTERS: FieldFilters = { productType: '', job: '', glassType: '', woodType: '', finish: '', spacerBar: '' };
 
-const FILTER_FIELDS: { key: keyof FieldFilters; label: string }[] = [
+const FILTER_FIELDS: { key: keyof FieldFilters; label: string; detailKey?: keyof ProductLogDetail }[] = [
   { key: 'productType', label: 'Product Type' },
   { key: 'job',         label: 'Job / Opp #' },
-  { key: 'glassType',   label: 'Glass Type' },
-  { key: 'woodType',    label: 'Wood Type' },
-  { key: 'finish',      label: 'Finish' },
-  { key: 'spacerBar',   label: 'Spacer Bar' },
+  { key: 'glassType',   label: 'Glass Type',   detailKey: 'glassType' },
+  { key: 'woodType',    label: 'Wood Type',    detailKey: 'woodType' },
+  { key: 'finish',      label: 'Finish',       detailKey: 'finish' },
+  { key: 'spacerBar',   label: 'Spacer Bar',   detailKey: 'spacerBarType' },
 ];
 
 export default function ProductsPage() {
@@ -155,24 +155,25 @@ export default function ProductsPage() {
   }, []);
 
   const filtered = useMemo(() => {
-    const fPT    = filters.productType.toLowerCase().trim();
+    const fPT    = filters.productType.trim();
     const fJob   = filters.job.toLowerCase().trim();
-    const fGlass = filters.glassType.toLowerCase().trim();
-    const fWood  = filters.woodType.toLowerCase().trim();
-    const fFinish = filters.finish.toLowerCase().trim();
-    const fSpacer = filters.spacerBar.toLowerCase().trim();
+    const fGlass = filters.glassType.trim();
+    const fWood  = filters.woodType.trim();
+    const fFinish = filters.finish.trim();
+    const fSpacer = filters.spacerBar.trim();
 
     return groups.filter(g => {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
-      if (fPT && !g.productType.toLowerCase().includes(fPT)) return false;
-      // For spec/job filters — group passes if at least one detail matches ALL active spec filters
+      // productType: substring match (typed text)
+      if (fPT && !g.productType.toLowerCase().includes(fPT.toLowerCase())) return false;
+      // spec/job filters — group passes if at least one detail matches ALL active filters
       if (fJob || fGlass || fWood || fFinish || fSpacer) {
         const anyDetailMatches = g.details.some(d => {
           if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
-          if (fGlass && !d.glassType.toLowerCase().includes(fGlass)) return false;
-          if (fWood && !d.woodType.toLowerCase().includes(fWood)) return false;
-          if (fFinish && !d.finish.toLowerCase().includes(fFinish)) return false;
-          if (fSpacer && !`${d.spacerBarType} ${d.spacerBarColors}`.toLowerCase().includes(fSpacer)) return false;
+          if (fGlass && d.glassType !== fGlass) return false;
+          if (fWood && d.woodType !== fWood) return false;
+          if (fFinish && d.finish !== fFinish) return false;
+          if (fSpacer && d.spacerBarType !== fSpacer) return false;
           return true;
         });
         if (!anyDetailMatches) return false;
@@ -198,6 +199,19 @@ export default function ProductsPage() {
 
   const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtInt = (v: number) => v.toLocaleString('en-US');
+
+  // Build unique option lists from all loaded groups
+  const allDetails = useMemo(() => groups.flatMap(g => g.details), [groups]);
+  const uniqueOptions = useMemo(() => {
+    const uniq = (vals: string[]) => Array.from(new Set(vals.filter(Boolean))).sort();
+    return {
+      productType: uniq(groups.map(g => g.productType)),
+      glassType:   uniq(allDetails.map(d => d.glassType)),
+      woodType:    uniq(allDetails.map(d => d.woodType)),
+      finish:      uniq(allDetails.map(d => d.finish)),
+      spacerBar:   uniq(allDetails.map(d => d.spacerBarType)),
+    };
+  }, [groups, allDetails]);
 
   return (
     <div className="p-6">
@@ -258,22 +272,32 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* Per-field search inputs */}
+        {/* Per-field dropdowns */}
         {filtersOpen && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
             {FILTER_FIELDS.map(({ key, label }) => (
               <div key={key}>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                {key === 'job' ? (
                   <input
                     type="text"
+                    value={filters.job}
+                    onChange={e => setFilter('job', e.target.value)}
+                    placeholder="Search job…"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
+                  />
+                ) : (
+                  <select
                     value={filters[key]}
                     onChange={e => setFilter(key, e.target.value)}
-                    placeholder={`Filter…`}
-                    className="w-full pl-7 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
-                  />
-                </div>
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
+                  >
+                    <option value="">All</option>
+                    {(uniqueOptions[key as keyof typeof uniqueOptions] ?? []).map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             ))}
           </div>
