@@ -346,8 +346,9 @@ export async function seedQuoteTemplate() {
   return { id: templateId, presetCount: presets.length };
 }
 
-// Run directly if executed as a script
-if (require.main === module) {
+// Run directly if executed as a script (ESM-compatible)
+const isMain = import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`;
+if (isMain) {
   seedQuoteTemplate()
     .then((result) => {
       console.log('Seed complete:', result);

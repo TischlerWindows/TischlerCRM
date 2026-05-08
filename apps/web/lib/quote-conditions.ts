@@ -406,13 +406,14 @@ function evaluateCondition(condition: SpecConditionData, context: QuoteContext):
  * - All AND conditions must be true.
  * - At least one OR condition must be true (if any OR conditions exist).
  * - If both AND and OR conditions exist, both groups must pass.
- * - If no conditions exist, the preset is included (same as isAlwaysIncluded).
+ * - If no conditions exist and the preset is not isAlwaysIncluded, it is excluded.
+ *   (isAlwaysIncluded presets bypass this function entirely in assemblePresets.)
  */
 export function evaluateConditions(
   conditions: SpecConditionData[],
   context: QuoteContext
 ): boolean {
-  if (conditions.length === 0) return true;
+  if (conditions.length === 0) return false;
 
   const andConditions = conditions.filter((c) => c.logic === 'AND');
   const orConditions = conditions.filter((c) => c.logic === 'OR');

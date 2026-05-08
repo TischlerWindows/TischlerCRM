@@ -60,14 +60,15 @@ interface DraftCondition {
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const SECTIONS = ['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'BOILERPLATE'] as const;
+// BOILERPLATE exists in the Prisma enum but is not yet rendered in the PDF,
+// so it's hidden from the UI to avoid creating presets that silently disappear.
+const SECTIONS = ['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 
 const SECTION_COLORS: Record<string, string> = {
   SPECIFICATION: 'bg-blue-100 text-blue-700',
   OPTION: 'bg-amber-100 text-amber-700',
   EXCLUSION: 'bg-red-100 text-red-700',
   INSTALLATION: 'bg-green-100 text-green-700',
-  BOILERPLATE: 'bg-gray-100 text-gray-600',
 };
 
 const CONDITION_FIELDS = [

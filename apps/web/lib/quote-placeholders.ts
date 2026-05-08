@@ -62,7 +62,7 @@ export interface ContactData {
  */
 export function formatDollar(value: string | undefined | null): string {
   if (!value) return '$0.00';
-  const num = parseInt(value, 10);
+  const num = parseFloat(value);
   if (isNaN(num)) return '$0.00';
   return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }

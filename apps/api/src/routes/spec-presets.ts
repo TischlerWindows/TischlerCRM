@@ -15,7 +15,7 @@ const createPresetSchema = z.object({
   order: z.number().int().min(0),
   title: z.string().min(1),
   body: z.string(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'BOILERPLATE']),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION']),
   isAlwaysIncluded: z.boolean().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),
@@ -25,7 +25,7 @@ const updatePresetSchema = z.object({
   order: z.number().int().min(0).optional(),
   title: z.string().min(1).optional(),
   body: z.string().optional(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'BOILERPLATE']).optional(),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION']).optional(),
   isAlwaysIncluded: z.boolean().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),
@@ -57,8 +57,11 @@ export async function specPresetRoutes(app: FastifyInstance) {
     }
   });
 
-  // POST /spec-presets — create preset with conditions
+  // POST /spec-presets — create preset with conditions (admin only)
   app.post('/spec-presets', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const parsed = createPresetSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
@@ -107,8 +110,11 @@ export async function specPresetRoutes(app: FastifyInstance) {
     }
   });
 
-  // PATCH /spec-presets/reorder — batch update order values
+  // PATCH /spec-presets/reorder — batch update order values (admin only)
   app.patch('/spec-presets/reorder', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const parsed = reorderSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
@@ -154,8 +160,11 @@ export async function specPresetRoutes(app: FastifyInstance) {
     }
   });
 
-  // PATCH /spec-presets/:id — update preset and replace conditions
+  // PATCH /spec-presets/:id — update preset and replace conditions (admin only)
   app.patch('/spec-presets/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const { id } = req.params as { id: string };
     const parsed = updatePresetSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -203,8 +212,11 @@ export async function specPresetRoutes(app: FastifyInstance) {
     }
   });
 
-  // DELETE /spec-presets/:id — delete preset (cascades conditions)
+  // DELETE /spec-presets/:id — delete preset (admin only, cascades conditions)
   app.delete('/spec-presets/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const { id } = req.params as { id: string };
     try {
       await prisma.specPreset.delete({ where: { id } });

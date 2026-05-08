@@ -81,8 +81,11 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
     }
   });
 
-  // POST /quote-templates — create template
+  // POST /quote-templates — create template (admin only)
   app.post('/quote-templates', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const parsed = createTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
@@ -112,8 +115,11 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
     }
   });
 
-  // PATCH /quote-templates/:id — update template
+  // PATCH /quote-templates/:id — update template (admin only)
   app.patch('/quote-templates/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const { id } = req.params as { id: string };
     const parsed = updateTemplateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -142,8 +148,11 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
     }
   });
 
-  // DELETE /quote-templates/:id — delete template (cascades presets + conditions)
+  // DELETE /quote-templates/:id — delete template (admin only, cascades presets + conditions)
   app.delete('/quote-templates/:id', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
     const { id } = req.params as { id: string };
     try {
       await prisma.quoteTemplate.delete({ where: { id } });
