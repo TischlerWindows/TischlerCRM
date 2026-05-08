@@ -278,21 +278,13 @@ export async function generateQuotePDF(
   doc.text(greeting, MARGIN_LEFT, y);
   y += 8;
 
-  if (introBoilerplate.length > 0) {
-    for (const preset of introBoilerplate) {
-      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
-      y += 4;
-    }
-    y += 2;
-  } else {
-    const openingText = `Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for ${data.projectName} (${data.projectNumber}), based on plans dated ${data.plansDated}.`;
-    y = writeText(openingText, MARGIN_LEFT, y, { fontSize: 10 });
+  // Intro boilerplate — all text comes from editable BOILERPLATE presets.
+  // If none exist, the opening section is simply skipped (no hardcoded fallback).
+  for (const preset of introBoilerplate) {
+    y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
     y += 4;
-
-    const baseBidText = 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:';
-    y = writeText(baseBidText, MARGIN_LEFT, y, { fontSize: 10 });
-    y += 6;
   }
+  if (introBoilerplate.length > 0) y += 2;
 
   // ════════════════════════════════════════════════════════════════
   // NUMBERED SPECIFICATIONS
@@ -480,14 +472,10 @@ export async function generateQuotePDF(
   drawGrayLine(y);
   y += 6;
 
-  if (closingBoilerplate.length > 0) {
-    for (const preset of closingBoilerplate) {
-      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
-      y += 4;
-    }
-  } else {
-    const closingText = 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.';
-    y = writeText(closingText, MARGIN_LEFT, y, { fontSize: 10 });
+  // Closing boilerplate — all text comes from editable BOILERPLATE presets.
+  for (const preset of closingBoilerplate) {
+    y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
+    y += 4;
   }
   y += 8;
 
