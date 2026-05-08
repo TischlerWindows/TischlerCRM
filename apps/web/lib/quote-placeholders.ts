@@ -1,5 +1,5 @@
 /**
- * Placeholder resolver for the Quote PDF Builder.
+ * Placeholder resolver for the Proposal Builder.
  *
  * Replaces {{token}} markers in preset body text with actual values
  * from the summary and optional contact data.
@@ -73,7 +73,10 @@ export function formatDollar(value: string | undefined | null): string {
  */
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  const dateOnlyMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = dateOnlyMatch
+    ? new Date(Number(dateOnlyMatch[1]), Number(dateOnlyMatch[2]) - 1, Number(dateOnlyMatch[3]))
+    : new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -192,6 +195,29 @@ export function resolveTokens(text: string, tokens: Record<string, string>): str
     const value = tokens[tokenName];
     return value !== undefined ? value : match; // Keep original if no mapping
   });
+}
+
+/** Return unknown token names found in text, deduplicated in document order. */
+export function findUnresolvedTokens(text: string, tokens: Record<string, string>): string[] {
+  const unresolved: string[] = [];
+  text.replace(TOKEN_REGEX, (_match, tokenName: string) => {
+    if (tokens[tokenName] === undefined && !unresolved.includes(tokenName)) {
+      unresolved.push(tokenName);
+    }
+    return _match;
+  });
+  return unresolved;
+}
+
+/** Resolve text and report any placeholders that could not be mapped. */
+export function resolveTokensWithDiagnostics(
+  text: string,
+  tokens: Record<string, string>
+): { text: string; unresolvedTokens: string[] } {
+  return {
+    text: resolveTokens(text, tokens),
+    unresolvedTokens: findUnresolvedTokens(text, tokens),
+  };
 }
 
 /**

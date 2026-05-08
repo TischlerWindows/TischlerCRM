@@ -8,6 +8,14 @@ const conditionSchema = z.object({
   operator: z.enum(['CONTAINS', 'EQUALS', 'NOT_EMPTY', 'IS_TRUE', 'IS_FALSE']),
   value: z.string().nullable().optional(),
   logic: z.enum(['AND', 'OR']).default('AND'),
+}).superRefine((condition, ctx) => {
+  if ((condition.operator === 'CONTAINS' || condition.operator === 'EQUALS') && !condition.value?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['value'],
+      message: `${condition.operator} conditions require a value`,
+    });
+  }
 });
 
 const createPresetSchema = z.object({
@@ -15,7 +23,7 @@ const createPresetSchema = z.object({
   order: z.number().int().min(0),
   title: z.string().min(1),
   body: z.string(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION']),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'BOILERPLATE']),
   isAlwaysIncluded: z.boolean().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),
@@ -25,7 +33,7 @@ const updatePresetSchema = z.object({
   order: z.number().int().min(0).optional(),
   title: z.string().min(1).optional(),
   body: z.string().optional(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION']).optional(),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'BOILERPLATE']).optional(),
   isAlwaysIncluded: z.boolean().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),

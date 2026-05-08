@@ -3,13 +3,16 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer, RefreshCw } from 'lucide-react';
+import { Edit, Trash2, Database, ChevronDown, Settings, ExternalLink, Copy, Printer, RefreshCw, FileText } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import DynamicFormDialog from '@/components/dynamic-form-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/toast';
 import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
+import { assembleProposal } from '@/lib/proposal-assembly';
+import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
+import { generateProposalPDF } from '@/lib/quote-pdf-renderer';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -25,7 +28,7 @@ export interface RecordActionsProps {
   canDelete: boolean;
   canCustomize: boolean;
   /** Visible action buttons (from HeaderHighlights widget config) */
-  visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote'>;
+  visibleActions: Array<'edit' | 'delete' | 'clone' | 'print' | 'requote' | 'proposal'>;
   /** Called after a successful edit to update parent state */
   onRecordUpdated: (raw: RecordData, flat: Record<string, any>) => void;
 }
@@ -59,6 +62,7 @@ export function RecordActions({
   const [showAdminMenu, setShowAdminMenu] = useState(false);
   const [isCloning, setIsCloning] = useState(false);
   const [isRequoting, setIsRequoting] = useState(false);
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [showRequotePrompt, setShowRequotePrompt] = useState(false);
   const [requoteName, setRequoteName] = useState('');
 
@@ -83,6 +87,7 @@ export function RecordActions({
   const showClone = visibleActions.includes('clone');
   const showPrint = visibleActions.includes('print');
   const showRequote = visibleActions.includes('requote');
+  const showProposal = visibleActions.includes('proposal');
 
   // ── Handlers ─────────────────────────────────────────────────────────
   const handleEdit = () => {
@@ -198,6 +203,101 @@ export function RecordActions({
     window.print();
   };
 
+  const readLookupId = (value: unknown): string => {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object') {
+      const lookup = value as Record<string, unknown>;
+      for (const key of ['lookup', 'id', 'value']) {
+        if (typeof lookup[key] === 'string') return lookup[key] as string;
+      }
+    }
+    return '';
+  };
+
+  const resolveProposalContact = async () => {
+    const data = (rawRecord?.data as Record<string, unknown> | undefined) ?? {};
+    const contactLookup = readLookupId(
+      data.individual_receiving_the_quote ??
+      data.Opportunity__individual_receiving_the_quote ??
+      record?.individual_receiving_the_quote ??
+      record?.Opportunity__individual_receiving_the_quote
+    );
+
+    if (!contactLookup) return undefined;
+
+    const contactRecord = await recordsService.getRecord('Contact', contactLookup);
+    const contactData = contactRecord?.data ?? {};
+    const name = contactData.name && typeof contactData.name === 'object'
+      ? contactData.name as Record<string, unknown>
+      : {};
+
+    return {
+      salutation: String(name.Contact__name_salutation ?? contactData.salutation ?? ''),
+      lastName: String(name.Contact__name_lastName ?? contactData.lastName ?? ''),
+    };
+  };
+
+  const handleGenerateProposal = async () => {
+    if (!record) return;
+    const previewWindow = window.open('', '_blank');
+    setIsGeneratingProposal(true);
+    try {
+      const summaries = await getSavedSummaries();
+      const match = findSummaryForOpportunity(summaries, {
+        id: record.id,
+        data: { ...(rawRecord?.data as Record<string, unknown> | undefined), ...record },
+      });
+
+      if (!match.summary) {
+        previewWindow?.close();
+        showToast(`${match.reason} Create or link a Summary before generating a Proposal PDF.`, 'error');
+        return;
+      }
+
+      const template = await apiClient.get<any>('/quote-templates/default');
+      if (!template?.presets?.length) {
+        previewWindow?.close();
+        showToast('No active default proposal template found.', 'error');
+        return;
+      }
+
+      const contact = await resolveProposalContact();
+      const assembled = assembleProposal({
+        summary: match.summary,
+        template: {
+          id: template.id,
+          name: template.name,
+          presets: template.presets,
+        },
+        contact,
+      });
+
+      if (assembled.unresolvedTokens.length > 0) {
+        const proceed = window.confirm(
+          `This proposal has ${assembled.unresolvedTokens.length} unresolved variable(s). Generate the preview anyway?`
+        );
+        if (!proceed) {
+          previewWindow?.close();
+          return;
+        }
+      }
+
+      await generateProposalPDF(assembled.pdfData, 'preview', previewWindow);
+      if (assembled.warnings.length > 0) {
+        showToast(`Proposal preview generated with ${assembled.warnings.length} warning(s).`, 'success');
+      } else {
+        showToast('Proposal preview generated', 'success');
+      }
+    } catch (err) {
+      previewWindow?.close();
+      console.error('Failed to generate proposal:', err);
+      const message = err instanceof Error ? err.message : 'Failed to generate proposal. Please try again.';
+      showToast(message, 'error');
+    } finally {
+      setIsGeneratingProposal(false);
+    }
+  };
+
   // ── Render ───────────────────────────────────────────────────────────
   return (
     <>
@@ -230,6 +330,16 @@ export function RecordActions({
           >
             <RefreshCw className={`w-4 h-4 mr-1.5 ${isRequoting ? 'animate-spin' : ''}`} />
             {isRequoting ? 'Creating\u2026' : 'Create Requote'}
+          </button>
+        )}
+        {showProposal && objectApiName === 'Opportunity' && canEdit && (
+          <button
+            onClick={() => void handleGenerateProposal()}
+            disabled={isGeneratingProposal}
+            className="inline-flex items-center px-4 py-2 border border-brand-navy/30 rounded-lg text-sm font-medium text-brand-navy bg-white hover:bg-brand-navy/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <FileText className="w-4 h-4 mr-1.5" />
+            {isGeneratingProposal ? 'Generating...' : 'Proposal PDF'}
           </button>
         )}
         {showPrint && (

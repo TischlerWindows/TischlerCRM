@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import type { ConfigPanelProps } from '@/lib/widgets/types'
 
-type ActionKey = 'edit' | 'delete' | 'clone' | 'print' | 'requote'
+type ActionKey = 'edit' | 'delete' | 'clone' | 'print' | 'requote' | 'proposal'
 
 const ACTION_OPTIONS: Array<{ key: ActionKey; label: string; description: string }> = [
   { key: 'edit', label: 'Edit', description: 'Open edit form for this record' },
@@ -10,6 +10,7 @@ const ACTION_OPTIONS: Array<{ key: ActionKey; label: string; description: string
   { key: 'clone', label: 'Clone Record', description: 'Duplicate this record' },
   { key: 'print', label: 'Print Page', description: 'Print the current record page' },
   { key: 'requote', label: 'Create Requote', description: 'Create a requote copy (Opportunity only)' },
+  { key: 'proposal', label: 'Proposal PDF', description: 'Generate a proposal from the linked summary (Opportunity only)' },
 ]
 
 export default function HeaderHighlightsConfigPanel({ config, onChange, object }: ConfigPanelProps) {
@@ -24,6 +25,11 @@ export default function HeaderHighlightsConfigPanel({ config, onChange, object }
     : ['edit', 'delete']
 
   const availableFields = object?.fields ?? []
+  const availableActions = ACTION_OPTIONS.filter((action) =>
+    action.key === 'requote' || action.key === 'proposal'
+      ? object?.apiName === 'Opportunity'
+      : true
+  )
 
   const filteredFields = availableFields.filter(
     (f) =>
@@ -142,7 +148,7 @@ export default function HeaderHighlightsConfigPanel({ config, onChange, object }
       <div className="space-y-2">
         <label className="text-[11px] font-semibold text-brand-dark">Action Buttons</label>
         <div className="space-y-2">
-          {ACTION_OPTIONS.map(({ key, label, description }) => (
+          {availableActions.map(({ key, label, description }) => (
             <label
               key={key}
               className="flex items-start gap-2.5 cursor-pointer select-none group"

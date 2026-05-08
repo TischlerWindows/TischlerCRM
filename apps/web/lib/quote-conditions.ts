@@ -1,9 +1,9 @@
 /**
- * Conditions engine for the Quote PDF Builder.
+ * Conditions engine for the Proposal Builder.
  *
  * Evaluates SpecPreset conditions against a QuoteContext built from
  * the summary data to determine which presets should be included
- * in the generated quote letter.
+ * in the generated proposal.
  */
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -134,6 +134,54 @@ export interface SpecPresetData {
   conditions: SpecConditionData[];
 }
 
+export const CONDITION_FIELD_DEFINITIONS = [
+  { value: 'hasWindows', label: 'Has Windows' },
+  { value: 'hasDoors', label: 'Has Doors' },
+  { value: 'hasDoubleHung', label: 'Has Double Hung' },
+  { value: 'hasSingleHung', label: 'Has Single Hung' },
+  { value: 'hasTripleHung', label: 'Has Triple Hung' },
+  { value: 'hasHungWindows', label: 'Has Hung Windows (any)' },
+  { value: 'hasOutswing', label: 'Has Outswing' },
+  { value: 'hasInswing', label: 'Has Inswing' },
+  { value: 'hasGardenDoor', label: 'Has Garden Door' },
+  { value: 'hasLiftRoll', label: 'Has Lift & Roll' },
+  { value: 'hasFolding', label: 'Has Folding' },
+  { value: 'hasPivot', label: 'Has Pivot' },
+  { value: 'hasDirectGlaze', label: 'Has Direct Glaze' },
+  { value: 'hasFixedWithSash', label: 'Has Fixed with Sash' },
+  { value: 'hasTiltIn', label: 'Has Tilt-in' },
+  { value: 'hasAwning', label: 'Has Awning' },
+  { value: 'hasSimulatedDH', label: 'Has Simulated DH' },
+  { value: 'hasInstallation', label: 'Has Installation' },
+  { value: 'hasMagneticContacts', label: 'Has Magnetic Contacts' },
+  { value: 'hasFinalFinish', label: 'Has Final Finish' },
+  { value: 'hasWindowScreens', label: 'Has Window Screens' },
+  { value: 'hasDoorScreenSash', label: 'Has Door Screen Sash' },
+  { value: 'hasEntryDoor', label: 'Has Entry Door' },
+  { value: 'hasJambExtensions', label: 'Has Jamb Extensions' },
+  { value: 'productTypes', label: 'Product Types (array)' },
+  { value: 'glassType', label: 'Glass Type' },
+  { value: 'jobType', label: 'Job Type' },
+  { value: 'finishType', label: 'Finish Type' },
+  { value: 'woodType', label: 'Wood Type' },
+  { value: 'sdlType', label: 'SDL Type' },
+  { value: 'spacerBarType', label: 'Spacer Bar Type' },
+  { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
+  { value: 'hardwareOptions', label: 'Hardware Options (array)' },
+  { value: 'addOnItems', label: 'Add-on Items (array)' },
+  { value: 'projectContains', label: 'Project Contains (array)' },
+  { value: 'quoteType', label: 'Quote Type' },
+] as const;
+
+const SUPPORTED_CONDITION_FIELDS = new Set(CONDITION_FIELD_DEFINITIONS.map((field) => field.value));
+
+export interface PresetConditionDecision {
+  preset: SpecPresetData;
+  included: boolean;
+  reason: string;
+  conditionResults: Array<{ condition: SpecConditionData; passed: boolean }>;
+}
+
 // ── Product type classification ────────────────────────────────────
 
 /** Hung window types (single, double, triple across all balance systems). */
@@ -157,7 +205,7 @@ const TRIPLE_HUNG_TYPES = [
 
 const ALL_HUNG_TYPES = [...SINGLE_HUNG_TYPES, ...DOUBLE_HUNG_TYPES, ...TRIPLE_HUNG_TYPES];
 
-const OUTSWING_TYPES = ['Push Outswing', 'Crank Outswing', 'Outswing French'];
+const OUTSWING_TYPES = ['Push Outswing', 'Crank Outswing', 'Outswing French', 'Outswing GD', 'Outswing French GD'];
 
 const INSWING_TYPES = ['Inswing', 'Inswing T & T', 'Inswing French', 'Inswing T & T French'];
 
@@ -308,7 +356,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     jobType: summary.jobType || '',
     finishType,
     woodType: summary.woodType || '',
-    sdlType: summary.sdl || '',
+    sdlType: summary.sdl || summary.tdl || summary.sdlCustom || summary.tdlCustom || '',
     spacerBarType: summary.spacerBarType || '',
     spacerBarColors: summary.spacerBarColors || '',
     quoteType: summary.quoteType || '',
@@ -358,6 +406,7 @@ function evaluateCondition(condition: SpecConditionData, context: QuoteContext):
 
   switch (condition.operator) {
     case 'CONTAINS': {
+      if (!condValue.trim()) return false;
       // For arrays: check if any element contains the value (case-insensitive)
       if (Array.isArray(fieldValue)) {
         const lower = condValue.toLowerCase();
@@ -370,6 +419,7 @@ function evaluateCondition(condition: SpecConditionData, context: QuoteContext):
     }
 
     case 'EQUALS': {
+      if (!condValue.trim()) return false;
       // For arrays: check if any element equals the value exactly
       if (Array.isArray(fieldValue)) {
         return fieldValue.some(
@@ -397,6 +447,22 @@ function evaluateCondition(condition: SpecConditionData, context: QuoteContext):
     default:
       return false;
   }
+}
+
+export function isSupportedConditionField(field: string): boolean {
+  return SUPPORTED_CONDITION_FIELDS.has(field as typeof CONDITION_FIELD_DEFINITIONS[number]['value']);
+}
+
+export function getUnsupportedConditionFields(presets: SpecPresetData[]): string[] {
+  const unsupported: string[] = [];
+  for (const preset of presets) {
+    for (const condition of preset.conditions) {
+      if (!isSupportedConditionField(condition.field) && !unsupported.includes(condition.field)) {
+        unsupported.push(condition.field);
+      }
+    }
+  }
+  return unsupported;
 }
 
 /**
@@ -427,12 +493,70 @@ export function evaluateConditions(
   return andPass && orPass;
 }
 
+export function evaluatePresetDecision(
+  preset: SpecPresetData,
+  context: QuoteContext
+): PresetConditionDecision {
+  const conditionResults = preset.conditions.map((condition) => ({
+    condition,
+    passed: evaluateCondition(condition, context),
+  }));
+
+  if (!preset.isActive) {
+    return {
+      preset,
+      included: false,
+      reason: 'Preset is inactive.',
+      conditionResults,
+    };
+  }
+
+  if (preset.isAlwaysIncluded) {
+    return {
+      preset,
+      included: true,
+      reason: 'Always included presets bypass conditions.',
+      conditionResults,
+    };
+  }
+
+  const unsupportedFields = preset.conditions
+    .map((condition) => condition.field)
+    .filter((field, index, fields) => !isSupportedConditionField(field) && fields.indexOf(field) === index);
+
+  if (unsupportedFields.length > 0) {
+    return {
+      preset,
+      included: false,
+      reason: `Unsupported condition field${unsupportedFields.length === 1 ? '' : 's'}: ${unsupportedFields.join(', ')}.`,
+      conditionResults,
+    };
+  }
+
+  if (preset.conditions.length === 0) {
+    return {
+      preset,
+      included: false,
+      reason: 'No conditions configured; turn on Always included or add conditions.',
+      conditionResults,
+    };
+  }
+
+  const included = evaluateConditions(preset.conditions, context);
+  return {
+    preset,
+    included,
+    reason: included ? 'Conditions matched the selected summary.' : 'Conditions did not match the selected summary.',
+    conditionResults,
+  };
+}
+
 // ── Preset assembly ────────────────────────────────────────────────
 
 /**
  * Filter and order presets based on conditions evaluation.
  *
- * Returns only the presets that should be included in the quote,
+ * Returns only the presets that should be included in the proposal,
  * already sorted by their `order` field.
  */
 export function assemblePresets(
@@ -440,16 +564,7 @@ export function assemblePresets(
   context: QuoteContext
 ): SpecPresetData[] {
   return presets
-    .filter((preset) => {
-      // Skip inactive presets
-      if (!preset.isActive) return false;
-
-      // Always-included presets bypass condition evaluation
-      if (preset.isAlwaysIncluded) return true;
-
-      // Evaluate conditions
-      return evaluateConditions(preset.conditions, context);
-    })
+    .filter((preset) => evaluatePresetDecision(preset, context).included)
     .sort((a, b) => a.order - b.order);
 }
 

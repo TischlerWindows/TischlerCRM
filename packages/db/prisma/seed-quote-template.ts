@@ -1,8 +1,8 @@
 /**
- * Seed script for the Standard Quote Letter template.
+ * Seed script for the Standard Proposal template.
  *
- * Creates the default QuoteTemplate with ~31 SpecPresets and their conditions.
- * Based on the Tischler und Sohn reference quote letter format.
+ * Creates the default QuoteTemplate with SpecPresets and their conditions.
+ * Based on the Tischler und Sohn reference proposal format.
  *
  * Run: npx tsx packages/db/prisma/seed-quote-template.ts
  * (or import and call seedQuoteTemplate() from another seed script)
@@ -38,7 +38,7 @@ interface PresetSeed {
 export async function seedQuoteTemplate() {
   // Check if the template already exists (by name or default flag)
   const existing = await prisma.quoteTemplate.findFirst({
-    where: { OR: [{ isDefault: true }, { name: 'Standard Quote Letter' }] },
+    where: { OR: [{ isDefault: true }, { name: 'Standard Proposal' }, { name: 'Standard Quote Letter' }] },
   });
   if (existing) {
     console.log(`Template already exists: "${existing.name}" (${existing.id}). Skipping seed.`);
@@ -46,10 +46,25 @@ export async function seedQuoteTemplate() {
   }
 
   const templateId = makeId('042');
-  console.log(`Creating default quote template: ${templateId}`);
+  console.log(`Creating default proposal template: ${templateId}`);
 
   const presets: PresetSeed[] = [
-    // ── SPECIFICATIONS (numbered in the quote letter) ──
+    // ── BOILERPLATE / PROPOSAL TEXT ──
+
+    {
+      title: 'Opening',
+      body: 'Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for {{projectName}} ({{projectNumber}}), based on plans dated {{plansDated}}.',
+      section: 'BOILERPLATE',
+      isAlwaysIncluded: true,
+    },
+    {
+      title: 'Base Bid Introduction',
+      body: 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:',
+      section: 'BOILERPLATE',
+      isAlwaysIncluded: true,
+    },
+
+    // ── SPECIFICATIONS (numbered in the proposal) ──
 
     {
       title: 'Impact Glass',
@@ -58,7 +73,7 @@ export async function seedQuoteTemplate() {
       isAlwaysIncluded: false,
       conditions: [
         { field: 'jobType', operator: 'CONTAINS', value: 'Dade', logic: 'AND' },
-        { field: 'glassType', operator: 'CONTAINS', value: '#28', logic: 'AND' },
+        { field: 'glassType', operator: 'CONTAINS', value: '28', logic: 'AND' },
       ],
     },
     {
@@ -200,7 +215,7 @@ export async function seedQuoteTemplate() {
     },
     {
       title: 'Installation Materials',
-      body: 'Our quote includes all necessary installation hardware, anchors, shims, sealants, and fasteners required for proper installation per Tischler installation guidelines.',
+      body: 'Our proposal includes all necessary installation hardware, anchors, shims, sealants, and fasteners required for proper installation per Tischler installation guidelines.',
       section: 'SPECIFICATION',
       isAlwaysIncluded: true,
     },
@@ -214,6 +229,13 @@ export async function seedQuoteTemplate() {
       title: 'Down Payment & Terms',
       body: 'A 50% deposit is required upon approval of shop drawings to initiate production. The remaining balance is due prior to shipment. Prices are valid for 30 days from the date of this proposal.',
       section: 'SPECIFICATION',
+      isAlwaysIncluded: true,
+    },
+
+    {
+      title: 'Closing',
+      body: 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.',
+      section: 'BOILERPLATE',
       isAlwaysIncluded: true,
     },
 
@@ -302,8 +324,8 @@ export async function seedQuoteTemplate() {
     await tx.quoteTemplate.create({
       data: {
         id: templateId,
-        name: 'Standard Quote Letter',
-        description: 'Default quote letter template for Tischler und Sohn proposals',
+        name: 'Standard Proposal',
+        description: 'Default proposal template for Tischler und Sohn proposals',
         isDefault: true,
         isActive: true,
       },
@@ -342,7 +364,7 @@ export async function seedQuoteTemplate() {
     }
   });
 
-  console.log(`Created "Standard Quote Letter" template with ${presets.length} presets.`);
+  console.log(`Created "Standard Proposal" template with ${presets.length} presets.`);
   return { id: templateId, presetCount: presets.length };
 }
 

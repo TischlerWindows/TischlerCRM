@@ -72,7 +72,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Automation',
     items: [
       { name: 'Automations', href: '/settings/automations', icon: Zap },
-      { name: 'Quote Builder', href: '/settings/quote-builder', icon: ScrollText },
+      { name: 'Proposal Builder', href: '/settings/quote-builder', icon: ScrollText },
       { name: 'Notifications', href: '/settings/notifications', icon: Bell },
       { name: 'Widgets', href: '/settings/widgets', icon: Puzzle },
     ],

@@ -1,8 +1,8 @@
 /**
- * Quote PDF Renderer
+ * Proposal PDF Renderer
  *
- * Generates a professional quote letter PDF using jsPDF.
- * The letter follows the Tischler und Sohn format with:
+ * Generates a professional proposal PDF using jsPDF.
+ * The proposal follows the Tischler und Sohn format with:
  *   1. Letterhead + date + addressee + salutation + opening
  *   2. Numbered specifications
  *   3. Category pricing breakdown + BASE BID PRICE
@@ -39,6 +39,7 @@ export interface QuotePDFData {
   spacerBarColors: string;
 
   // Presets (already filtered and token-resolved)
+  boilerplatePresets?: SpecPresetData[];
   specPresets: SpecPresetData[];
   optionPresets: SpecPresetData[];
   exclusionPresets: SpecPresetData[];
@@ -129,6 +130,13 @@ export async function generateQuotePDF(
   const maxY = ph - 18; // leave room for footer
 
   let y = 0;
+  const boilerplatePresets = data.boilerplatePresets ?? [];
+  const closingBoilerplate = boilerplatePresets.filter((preset) =>
+    /closing|signature|sincerely/i.test(preset.title)
+  );
+  const introBoilerplate = boilerplatePresets.filter((preset) =>
+    !closingBoilerplate.some((closing) => closing.id === preset.id)
+  );
 
   // ── Drawing helpers (scoped to this doc) ──────────────────────
 
@@ -270,15 +278,21 @@ export async function generateQuotePDF(
   doc.text(greeting, MARGIN_LEFT, y);
   y += 8;
 
-  // Opening paragraph
-  const openingText = `Thank you for the opportunity to quote Tischler und Sohn European Wood Windows and Doors for ${data.projectName} (${data.projectNumber}), based on plans dated ${data.plansDated}.`;
-  y = writeText(openingText, MARGIN_LEFT, y, { fontSize: 10 });
-  y += 4;
+  if (introBoilerplate.length > 0) {
+    for (const preset of introBoilerplate) {
+      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
+      y += 4;
+    }
+    y += 2;
+  } else {
+    const openingText = `Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for ${data.projectName} (${data.projectNumber}), based on plans dated ${data.plansDated}.`;
+    y = writeText(openingText, MARGIN_LEFT, y, { fontSize: 10 });
+    y += 4;
 
-  // Base Bid paragraph
-  const baseBidText = 'Per our discussions, we are pleased to submit the following quote for the quantities, sizes, and types outlined in our quote. Our base bid includes the following:';
-  y = writeText(baseBidText, MARGIN_LEFT, y, { fontSize: 10 });
-  y += 6;
+    const baseBidText = 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:';
+    y = writeText(baseBidText, MARGIN_LEFT, y, { fontSize: 10 });
+    y += 6;
+  }
 
   // ════════════════════════════════════════════════════════════════
   // NUMBERED SPECIFICATIONS
@@ -466,8 +480,15 @@ export async function generateQuotePDF(
   drawGrayLine(y);
   y += 6;
 
-  const closingText = 'We appreciate the opportunity to quote this project and look forward to working with you. Please feel free to contact us with any questions.';
-  y = writeText(closingText, MARGIN_LEFT, y, { fontSize: 10 });
+  if (closingBoilerplate.length > 0) {
+    for (const preset of closingBoilerplate) {
+      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
+      y += 4;
+    }
+  } else {
+    const closingText = 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.';
+    y = writeText(closingText, MARGIN_LEFT, y, { fontSize: 10 });
+  }
   y += 8;
 
   doc.setFont('helvetica', 'normal');
@@ -555,7 +576,7 @@ export async function generateQuotePDF(
   drawPageFooter();
 
   // ── Output ──
-  const filename = `${data.projectName || 'Quote'} - Quote Letter.pdf`;
+  const filename = `${data.projectName || 'Proposal'} - Proposal.pdf`;
 
   if (mode === 'preview' && previewWindow) {
     const blobUrl = doc.output('bloburl');
@@ -564,3 +585,5 @@ export async function generateQuotePDF(
     doc.save(filename);
   }
 }
+
+export const generateProposalPDF = generateQuotePDF;
