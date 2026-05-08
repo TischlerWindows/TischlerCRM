@@ -26,11 +26,16 @@ import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
-import { Package } from 'lucide-react';
+import { Package, ScrollText } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
+import { buildQuoteContext, assemblePresetsBySection } from '@/lib/quote-conditions';
+import type { SpecPresetData } from '@/lib/quote-conditions';
+import { buildTokenMap, resolvePresetsTokens } from '@/lib/quote-placeholders';
+import { generateQuotePDF } from '@/lib/quote-pdf-renderer';
+import type { QuotePDFData } from '@/lib/quote-pdf-renderer';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -1421,6 +1426,132 @@ export default function SummaryPage() {
     setSummaries(updatedSummaries);
     setSetting('summaries', updatedSummaries);
     setOpenDropdown(null);
+  };
+
+  // ── Generate Quote Letter PDF ──
+  const handleGenerateQuotePDF = async (mode: 'download' | 'preview' = 'download') => {
+    if (!editingSummary) return;
+    const s = editingSummary;
+
+    // Open preview window NOW (before any awaits) to avoid popup blocker
+    const previewWindow = mode === 'preview' ? window.open('', '_blank') : null;
+
+    try {
+      // 1. Fetch the default template with presets
+      let template: any;
+      try {
+        template = await apiClient.get<any>('/quote-templates/default');
+      } catch {
+        alert('No default quote template found. Please create one in Settings > Quote Builder.');
+        return;
+      }
+
+      const allPresets: SpecPresetData[] = template.presets || [];
+
+      // 2. Fetch Contact record for salutation (best effort)
+      let contactSalutation = '';
+      let contactLastName = '';
+      if (s.linkedOpportunityId) {
+        try {
+          const oppRecord = await recordsService.getById(s.linkedOpportunityId);
+          const contactLookup = oppRecord?.data?.individual_receiving_the_quote?.lookup;
+          if (contactLookup) {
+            const contactRecord = await recordsService.getById(contactLookup);
+            if (contactRecord?.data?.name) {
+              contactSalutation = contactRecord.data.name.Contact__name_salutation || '';
+              contactLastName = contactRecord.data.name.Contact__name_lastName || '';
+            }
+          }
+        } catch {
+          // Fallback: parse from contactReceivingQuote
+        }
+      }
+
+      // Fallback for last name
+      if (!contactLastName && s.contactReceivingQuote) {
+        const parts = s.contactReceivingQuote.trim().split(/\s+/);
+        contactLastName = parts.length > 1 ? parts[parts.length - 1] : '';
+      }
+
+      // 3. Build context and evaluate conditions
+      const context = buildQuoteContext(s as any);
+      const bySection = assemblePresetsBySection(allPresets, context);
+
+      // 4. Build token map and resolve placeholders
+      const tokens = buildTokenMap(s as any, { salutation: contactSalutation, lastName: contactLastName });
+      const resolvedSpecs = resolvePresetsTokens(bySection.SPECIFICATION, tokens);
+      const resolvedOptions = resolvePresetsTokens(bySection.OPTION, tokens);
+      const resolvedExclusions = resolvePresetsTokens(bySection.EXCLUSION, tokens);
+      const resolvedInstallation = resolvePresetsTokens(bySection.INSTALLATION, tokens);
+
+
+      // 5. Check which pricing categories have values
+      const euroWindowsVal = parseInt(s.quoteTotals?.euroWindows?.finalAdj || '0', 10) || 0;
+      const doubleHungVal = parseInt(s.quoteTotals?.doubleHung?.finalAdj || '0', 10) || 0;
+      const euroDoorsVal = parseInt(s.quoteTotals?.euroDoors?.finalAdj || '0', 10) || 0;
+
+      // 6. Render PDF
+      const pdfData: QuotePDFData = {
+        contactName: s.contactReceivingQuote || '',
+        contactSalutation,
+        contactLastName,
+        companyName: s.accountReceivingQuote || '',
+        companyAddress: s.accountShippingAddress || '',
+
+        projectName: s.name || '',
+        projectNumber: s.opportunityNumber || '',
+        plansDated: tokens.plansDated || '',
+        jobType: s.jobType || '',
+        address: s.address || '',
+        salesman: s.salesman || '',
+        estimator: s.estimator || '',
+
+        glassType: tokens.glassType || '',
+        woodType: tokens.woodType || '',
+        finishType: tokens.finishType || '',
+        sdlType: tokens.sdlType || '',
+        spacerBarColors: tokens.spacerBarColor || '',
+
+        specPresets: resolvedSpecs,
+        optionPresets: resolvedOptions,
+        exclusionPresets: resolvedExclusions,
+        installationPresets: resolvedInstallation,
+
+
+        euroWindowsPrice: tokens.euroWindowsPrice || '$0.00',
+        doubleHungPrice: tokens.doubleHungPrice || '$0.00',
+        euroDoorsPrice: tokens.euroDoorsPrice || '$0.00',
+        grandTotal: tokens.grandTotal || '$0.00',
+        hasEuroWindows: euroWindowsVal > 0,
+        hasDoubleHung: doubleHungVal > 0,
+        hasEuroDoors: euroDoorsVal > 0,
+
+        windowScreensPrice: tokens.windowScreensPrice || '$0.00',
+        windowScreensQty: tokens.windowScreensQty || '0',
+        doorScreenSashPrice: tokens.doorScreenSashPrice || '$0.00',
+        doorScreenSashQty: tokens.doorScreenSashQty || '0',
+        entryDoorPrice: tokens.entryDoorPrice || '$0.00',
+        entryDoorQty: tokens.entryDoorQty || '0',
+        jambExtensionsPrice: tokens.jambExtensionsPrice || '$0.00',
+        magneticContactPrice: tokens.magneticContactPrice || '$0.00',
+        magneticContactQty: tokens.magneticContactQty || '0',
+        finalFinishPrice: tokens.finalFinishPrice || '$0.00',
+        installationPrice: tokens.installationPrice || '$0.00',
+
+        hasInstallation: context.hasInstallation,
+        hasMagneticContacts: context.hasMagneticContacts,
+        hasFinalFinish: context.hasFinalFinish,
+        hasWindowScreens: context.hasWindowScreens,
+        hasDoorScreenSash: context.hasDoorScreenSash,
+        hasEntryDoor: context.hasEntryDoor,
+        hasJambExtensions: context.hasJambExtensions,
+      };
+
+      await generateQuotePDF(pdfData, mode, previewWindow);
+    } catch (err: any) {
+      console.error('Quote PDF generation failed:', err);
+      alert(`Failed to generate quote PDF: ${err.message || 'Unknown error'}`);
+    }
   };
 
   // ── Generate Quote Summary PDF using jsPDF ──
@@ -3389,6 +3520,13 @@ export default function SummaryPage() {
                 <p className="text-sm text-gray-600 mt-1">Fill in the summary data</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleGenerateQuotePDF('preview')}
+                  className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-light transition-colors"
+                >
+                  <ScrollText className="w-4 h-4 mr-2" />
+                  Quote Letter
+                </button>
                 <button
                   onClick={() => handlePrintPDF('preview')}
                   className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

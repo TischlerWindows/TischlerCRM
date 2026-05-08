@@ -904,3 +904,72 @@ model ProductLog {
   @@index([linkedOpportunityId])
   @@index([createdAt])
 }
+
+// ============================================
+// Quote PDF Builder
+// ============================================
+
+enum SpecSection {
+  SPECIFICATION
+  OPTION
+  EXCLUSION
+  INSTALLATION
+  BOILERPLATE
+}
+
+enum ConditionOperator {
+  CONTAINS
+  EQUALS
+  NOT_EMPTY
+  IS_TRUE
+  IS_FALSE
+}
+
+enum ConditionLogic {
+  AND
+  OR
+}
+
+model QuoteTemplate {
+  id          String   @id
+  name        String
+  description String?
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  presets SpecPreset[]
+}
+
+model SpecPreset {
+  id               String      @id
+  templateId       String
+  order            Int
+  title            String
+  body             String
+  section          SpecSection
+  isAlwaysIncluded Boolean     @default(false)
+  isActive         Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  template   QuoteTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  conditions SpecCondition[]
+
+  @@index([templateId])
+  @@index([templateId, order])
+}
+
+model SpecCondition {
+  id       String            @id
+  presetId String
+  field    String
+  operator ConditionOperator
+  value    String?
+  logic    ConditionLogic    @default(AND)
+
+  preset SpecPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@index([presetId])
+}
