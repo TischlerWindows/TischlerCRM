@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ScrollText,
   Plus,
@@ -16,6 +16,9 @@ import {
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
+import { getSetting } from '@/lib/preferences';
+import { assembleProposal } from '@/lib/proposal-assembly';
+import { CONDITION_FIELD_DEFINITIONS } from '@/lib/quote-conditions';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -60,55 +63,17 @@ interface DraftCondition {
 
 // ── Constants ──────────────────────────────────────────────────────
 
-// BOILERPLATE exists in the Prisma enum but is not yet rendered in the PDF,
-// so it's hidden from the UI to avoid creating presets that silently disappear.
-const SECTIONS = ['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
+const SECTIONS = ['BOILERPLATE', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 
 const SECTION_COLORS: Record<string, string> = {
+  BOILERPLATE: 'bg-slate-100 text-slate-700',
   SPECIFICATION: 'bg-blue-100 text-blue-700',
   OPTION: 'bg-amber-100 text-amber-700',
   EXCLUSION: 'bg-red-100 text-red-700',
   INSTALLATION: 'bg-green-100 text-green-700',
 };
 
-const CONDITION_FIELDS = [
-  { value: 'hasWindows', label: 'Has Windows' },
-  { value: 'hasDoors', label: 'Has Doors' },
-  { value: 'hasDoubleHung', label: 'Has Double Hung' },
-  { value: 'hasSingleHung', label: 'Has Single Hung' },
-  { value: 'hasTripleHung', label: 'Has Triple Hung' },
-  { value: 'hasHungWindows', label: 'Has Hung Windows (any)' },
-  { value: 'hasOutswing', label: 'Has Outswing' },
-  { value: 'hasInswing', label: 'Has Inswing' },
-  { value: 'hasGardenDoor', label: 'Has Garden Door' },
-  { value: 'hasLiftRoll', label: 'Has Lift & Roll' },
-  { value: 'hasFolding', label: 'Has Folding' },
-  { value: 'hasPivot', label: 'Has Pivot' },
-  { value: 'hasDirectGlaze', label: 'Has Direct Glaze' },
-  { value: 'hasFixedWithSash', label: 'Has Fixed with Sash' },
-  { value: 'hasTiltIn', label: 'Has Tilt-in' },
-  { value: 'hasAwning', label: 'Has Awning' },
-  { value: 'hasSimulatedDH', label: 'Has Simulated DH' },
-  { value: 'hasInstallation', label: 'Has Installation' },
-  { value: 'hasMagneticContacts', label: 'Has Magnetic Contacts' },
-  { value: 'hasFinalFinish', label: 'Has Final Finish' },
-  { value: 'hasWindowScreens', label: 'Has Window Screens' },
-  { value: 'hasDoorScreenSash', label: 'Has Door Screen Sash' },
-  { value: 'hasEntryDoor', label: 'Has Entry Door' },
-  { value: 'hasJambExtensions', label: 'Has Jamb Extensions' },
-  { value: 'productTypes', label: 'Product Types (array)' },
-  { value: 'glassType', label: 'Glass Type' },
-  { value: 'jobType', label: 'Job Type' },
-  { value: 'finishType', label: 'Finish Type' },
-  { value: 'woodType', label: 'Wood Type' },
-  { value: 'sdlType', label: 'SDL Type' },
-  { value: 'spacerBarType', label: 'Spacer Bar Type' },
-  { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
-  { value: 'hardwareOptions', label: 'Hardware Options (array)' },
-  { value: 'addOnItems', label: 'Add-on Items (array)' },
-  { value: 'projectContains', label: 'Project Contains (array)' },
-  { value: 'quoteType', label: 'Quote Type' },
-];
+const CONDITION_FIELDS = CONDITION_FIELD_DEFINITIONS;
 
 const OPERATORS = [
   { value: 'CONTAINS', label: 'Contains' },
@@ -162,6 +127,8 @@ export default function QuoteBuilderPage() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [showNewTemplateInput, setShowNewTemplateInput] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [summaries, setSummaries] = useState<any[]>([]);
+  const [selectedPreviewSummaryId, setSelectedPreviewSummaryId] = useState<string>('');
 
   // ── Data fetching ──────────────────────────────────────────────
 
@@ -181,7 +148,7 @@ export default function QuoteBuilderPage() {
       const data = await apiClient.get<SpecPreset[]>(`/spec-presets?templateId=${templateId}`);
       setPresets(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to load presets');
+      setError(err.message || 'Failed to load proposal blocks');
     }
   }, []);
 
@@ -198,6 +165,16 @@ export default function QuoteBuilderPage() {
       setLoading(false);
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    (async () => {
+      const storedSummaries = (await getSetting<any[]>('summaries', [])) ?? [];
+      setSummaries(storedSummaries);
+      if (storedSummaries.length > 0) {
+        setSelectedPreviewSummaryId((current) => current || storedSummaries[0].id || '');
+      }
+    })();
+  }, []);
 
   // ── Template actions ───────────────────────────────────────────
 
@@ -274,6 +251,17 @@ export default function QuoteBuilderPage() {
       logic: c.logic,
     }));
 
+    const missingValueCondition = conditionsPayload.find(
+      (condition) =>
+        (condition.operator === 'CONTAINS' || condition.operator === 'EQUALS') &&
+        !condition.value?.trim()
+    );
+    if (missingValueCondition) {
+      setSaving(false);
+      setError(`${missingValueCondition.operator} conditions require a value.`);
+      return;
+    }
+
     try {
       if (isNewPreset) {
         const newPreset = await apiClient.post<SpecPreset>('/spec-presets', {
@@ -289,7 +277,7 @@ export default function QuoteBuilderPage() {
         setIsNewPreset(false);
         setSelectedPresetId(newPreset.id);
         await loadPresets(selectedTemplateId);
-        flash('Preset created');
+        flash('Proposal block created');
       } else if (selectedPresetId) {
         await apiClient.patch<SpecPreset>(`/spec-presets/${selectedPresetId}`, {
           title: editTitle.trim(),
@@ -300,10 +288,10 @@ export default function QuoteBuilderPage() {
           conditions: conditionsPayload,
         });
         await loadPresets(selectedTemplateId);
-        flash('Preset saved');
+        flash('Proposal block saved');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to save preset');
+      setError(err.message || 'Failed to save proposal block');
     } finally {
       setSaving(false);
     }
@@ -311,15 +299,15 @@ export default function QuoteBuilderPage() {
 
   const handleDelete = async () => {
     if (!selectedPresetId || !selectedTemplateId) return;
-    if (!confirm('Delete this preset? This cannot be undone.')) return;
+    if (!confirm('Delete this proposal block? This cannot be undone.')) return;
 
     try {
       await apiClient.delete(`/spec-presets/${selectedPresetId}`);
       clearEditor();
       await loadPresets(selectedTemplateId);
-      flash('Preset deleted');
+      flash('Proposal block deleted');
     } catch (err: any) {
-      setError(err.message || 'Failed to delete preset');
+      setError(err.message || 'Failed to delete proposal block');
     }
   };
 
@@ -351,7 +339,7 @@ export default function QuoteBuilderPage() {
     try {
       await apiClient.patch('/spec-presets/reorder', presets.map((p) => ({ id: p.id, order: p.order })));
     } catch (err: any) {
-      setError(err.message || 'Failed to reorder');
+      setError(err.message || 'Failed to reorder proposal blocks');
       await loadPresets(selectedTemplateId);
     }
   };
@@ -368,6 +356,31 @@ export default function QuoteBuilderPage() {
       prev.map((c) => (c._key === key ? { ...c, ...patch } : c))
     );
 
+  const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
+  const selectedPreviewSummary = summaries.find((summary) => summary.id === selectedPreviewSummaryId);
+  const previewState = useMemo(() => {
+    if (!selectedTemplateId || !selectedPreviewSummary) return { result: null, error: null };
+    try {
+      return {
+        result: assembleProposal({
+          summary: selectedPreviewSummary as any,
+          template: {
+            id: selectedTemplateId,
+            name: selectedTemplate?.name ?? 'Selected proposal template',
+            presets: presets as any,
+          },
+        }),
+        error: null,
+      };
+    } catch (err) {
+      return {
+        result: null,
+        error: err instanceof Error ? err.message : 'Unable to assemble preview.',
+      };
+    }
+  }, [selectedPreviewSummary, selectedTemplate?.name, selectedTemplateId, presets]);
+  const previewResult = previewState.result;
+
   // ── Render ─────────────────────────────────────────────────────
 
   if (loading) {
@@ -382,9 +395,9 @@ export default function QuoteBuilderPage() {
     <div className="flex flex-col h-full">
       <SettingsPageHeader
         icon={ScrollText}
-        title="Quote Builder"
-        subtitle="Manage spec presets and templates for quote letter generation"
-        action={{ label: 'New Preset', onClick: handleNewPreset }}
+        title="Proposal Builder"
+        subtitle="Manage proposal clauses, variables, and conditions"
+        action={{ label: 'New Block', onClick: handleNewPreset }}
       />
 
       {/* Error / success banners */}
@@ -465,12 +478,12 @@ export default function QuoteBuilderPage() {
             {presets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                 <ScrollText className="w-10 h-10 text-gray-300 mb-3" />
-                <p className="text-sm text-gray-500">No presets yet</p>
+                <p className="text-sm text-gray-500">No proposal blocks yet</p>
                 <button
                   onClick={handleNewPreset}
                   className="mt-3 text-sm text-brand-navy font-semibold hover:underline"
                 >
-                  + Create first preset
+                  + Create first block
                 </button>
               </div>
             ) : (
@@ -530,14 +543,14 @@ export default function QuoteBuilderPage() {
         <div className="flex-1 flex flex-col border border-gray-200 rounded-xl bg-white overflow-hidden">
           {!selectedPresetId && !isNewPreset ? (
             <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">
-              Select a preset to edit or create a new one
+              Select a proposal block to edit or create a new one
             </div>
           ) : (
             <>
               {/* Editor header */}
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
                 <h3 className="text-base font-semibold text-gray-900">
-                  {isNewPreset ? 'New Preset' : 'Edit Preset'}
+                  {isNewPreset ? 'New Proposal Block' : 'Edit Proposal Block'}
                 </h3>
                 <div className="flex items-center gap-2">
                   {!isNewPreset && (
@@ -650,7 +663,7 @@ export default function QuoteBuilderPage() {
 
                     {editConditions.length === 0 ? (
                       <p className="text-xs text-gray-400 italic">
-                        No conditions — this preset will always be included (same as &quot;Always included&quot;).
+                        No conditions — this block will be excluded unless &quot;Always included&quot; is turned on.
                       </p>
                     ) : (
                       <div className="space-y-2">
@@ -723,6 +736,125 @@ export default function QuoteBuilderPage() {
               </div>
             </>
           )}
+        </div>
+
+        {/* ── Preview panel ── */}
+        <div className="w-[380px] flex-shrink-0 flex flex-col border border-gray-200 rounded-xl bg-white overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Proposal Preview</h3>
+                <p className="text-[11px] text-gray-500 mt-0.5">See variables, included blocks, and warnings.</p>
+              </div>
+              <Eye className="w-4 h-4 text-gray-400" />
+            </div>
+            <select
+              value={selectedPreviewSummaryId}
+              onChange={(e) => setSelectedPreviewSummaryId(e.target.value)}
+              className="mt-3 w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+            >
+              {summaries.length === 0 ? (
+                <option value="">No saved summaries</option>
+              ) : (
+                summaries.map((summary) => (
+                  <option key={summary.id || summary.name} value={summary.id || ''}>
+                    {summary.name || 'Untitled summary'}
+                  </option>
+                ))
+              )}
+            </select>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {!previewResult ? (
+              previewState.error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  Preview could not be assembled: {previewState.error}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-gray-200 p-4 text-sm text-gray-500">
+                  Select a saved summary to preview how this template assembles a proposal.
+                </div>
+              )
+            ) : (
+              <>
+                {previewResult.warnings.length > 0 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <div className="text-xs font-semibold text-amber-800 mb-1">Warnings</div>
+                    <ul className="space-y-1 text-xs text-amber-800">
+                      {previewResult.warnings.map((warning, idx) => (
+                        <li key={`${warning}-${idx}`}>- {warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div>
+                  <div className="text-xs font-semibold text-gray-600 mb-2">Resolved Variables</div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {Object.entries(previewResult.tokens).map(([key, value]) => (
+                      <div key={key} className="flex items-start justify-between gap-3 rounded-md bg-gray-50 px-2 py-1.5">
+                        <span className="font-mono text-[11px] text-brand-navy">{`{{${key}}}`}</span>
+                        <span className="text-[11px] text-gray-700 text-right break-words">{value || '-'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    Included Blocks ({previewResult.includedBlocks.length})
+                  </div>
+                  <div className="space-y-1.5">
+                    {previewResult.includedBlocks.map((block) => (
+                      <div key={block.id} className="rounded-md border border-green-100 bg-green-50 px-2.5 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${SECTION_COLORS[block.section] || ''}`}>
+                            {block.section}
+                          </span>
+                          <span className="text-xs font-medium text-gray-900 truncate">{block.title}</span>
+                        </div>
+                        <p className="text-[11px] text-green-700 mt-1">{block.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                    Excluded Blocks ({previewResult.excludedBlocks.length})
+                  </div>
+                  <div className="space-y-1.5">
+                    {previewResult.excludedBlocks.map((block) => (
+                      <div key={block.id} className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2">
+                        <div className="text-xs font-medium text-gray-700 truncate">{block.title}</div>
+                        <p className="text-[11px] text-gray-500 mt-1">{block.reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold text-gray-600 mb-2">Rendered Text</div>
+                  <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+                    {SECTIONS.map((section) => (
+                      previewResult.sections[section].length > 0 && (
+                        <div key={section}>
+                          <div className="text-[10px] font-bold tracking-wide text-gray-400 mb-1">{section}</div>
+                          {previewResult.sections[section].map((block) => (
+                            <div key={block.id} className="mb-2">
+                              <div className="text-xs font-semibold text-gray-900">{block.title}</div>
+                              <p className="text-[11px] text-gray-700 whitespace-pre-wrap leading-relaxed">{block.body}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

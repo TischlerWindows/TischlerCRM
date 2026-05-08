@@ -1,19 +1,19 @@
-# Quote PDF Builder — Design Spec
+# Proposal Builder — Design Spec
 
 ## Context
 
-Tischler und Sohn sales reps currently compose 5-page quote letters manually for each project. These letters contain ~22 numbered specification paragraphs, many of which are conditionally included based on product types, glass options, hardware selections, and add-on items. The text is largely boilerplate but varies by project configuration.
+Tischler und Sohn sales reps currently compose 5-page proposals manually for each project. These proposals contain ~22 numbered specification paragraphs, many of which are conditionally included based on product types, glass options, hardware selections, and add-on items. The text is largely boilerplate but varies by project configuration.
 
-This system automates quote letter generation by:
+This system automates proposal generation by:
 1. Storing spec paragraphs as reusable presets with conditional inclusion rules
 2. Pulling project data from the existing CRM (Opportunity, Account/Contact, Summary)
-3. Assembling and rendering a professional PDF matching the Tischler quote letter format
+3. Assembling and rendering a professional PDF matching the Tischler proposal format
 
 Multiple sales reps will use this as a self-service tool. An admin manages the spec presets centrally.
 
 ## Data Sources
 
-Summaries are stored as a JSON array in the `Setting` table (key: `"summaries"`), retrieved via `getSetting('summaries')`. Nearly all quote data comes from the summary object directly.
+Summaries are stored as a JSON array in the `Setting` table (key: `"summaries"`), retrieved via `getSetting('summaries')`. Nearly all proposal data comes from the summary object directly.
 
 | Data | Source | Summary Field |
 |------|--------|---------------|
@@ -41,7 +41,7 @@ Summaries are stored as a JSON array in the `Setting` table (key: `"summaries"`)
 | Add-on items + prices | Summary | `addOns.{windowScreens,doorScreenSash,entryDoor,jambExtensions,magneticContact,finalFinish,installation}.final` |
 | Salesman / Estimator | Summary | `salesman` / `estimator` |
 | Project address | Summary | `address` |
-| Quote type | Summary | `quoteType` ("first" or "requote") |
+| Proposal/quote type | Summary | `quoteType` ("first" or "requote") |
 
 ## Data Model
 
@@ -54,7 +54,7 @@ Groups spec presets into a named template.
 | Field | Type | Description |
 |-------|------|-------------|
 | id | String @id | UUID |
-| name | String | Template name (e.g., "Standard Quote Letter") |
+| name | String | Template name (e.g., "Standard Proposal") |
 | description | String? | Optional description |
 | isDefault | Boolean | Whether this is the default template |
 | isActive | Boolean | Whether available for use |
@@ -152,7 +152,7 @@ When generating a quote, the system builds a context object from the summary + o
 
 The engine iterates each SpecPreset in order, evaluates its conditions against this context, and produces an ordered list of included presets with resolved placeholder text.
 
-## Quote Letter Structure
+## Proposal Structure
 
 The assembled PDF follows this fixed section order:
 
@@ -199,7 +199,7 @@ New function `handleGenerateQuotePDF(mode: 'download' | 'preview')` that:
 1. Fetches the active QuoteTemplate with presets + conditions via API
 2. Gathers context from summary state + fetches Opportunity/Account/Contact data
 3. Evaluates conditions and resolves placeholders
-4. Renders the quote letter using existing PDF helpers (drawHeader, drawFooter, drawField, drawTable)
+4. Renders the proposal using existing PDF helpers (drawHeader, drawFooter, drawField, drawTable)
 5. Handles page breaks for long spec paragraphs (existing multi-line text wrapping logic)
 6. Outputs as download or preview (matching existing pattern)
 
@@ -238,7 +238,7 @@ New routes in `apps/api/src/routes/`:
 
 ## Seed Data
 
-V1 ships with a pre-populated "Standard Quote Letter" template containing all ~22 spec presets from the reference PDF (Little Club Rd quote), with their conditions configured per Julian's annotations:
+V1 ships with a pre-populated "Standard Proposal" template containing all ~22 spec presets from the reference PDF (Little Club Rd proposal), with their conditions configured per Julian's annotations:
 
 - Spec 1: Impact glass — condition: jobType = "Dade County Impact" AND glassType = "#28"
 - Spec 2: Sipo mahogany — always included
@@ -274,9 +274,9 @@ V1 ships with a pre-populated "Standard Quote Letter" template containing all ~2
 - Admin page at `/quote-builder`
 - Condition evaluation engine
 - Placeholder token resolution
-- Quote PDF generation from `/summary` page
-- Seed data for Standard Quote Letter
-- Pages 1-5 of the quote letter
+- Proposal PDF generation from the Opportunity header highlights action
+- Seed data for Standard Proposal
+- Pages 1-5 of the proposal
 
 **Out (future):**
 - Inline text editing of assembled quotes before export
@@ -290,6 +290,6 @@ V1 ships with a pre-populated "Standard Quote Letter" template containing all ~2
 
 1. **Admin page:** Create, edit, reorder, and delete spec presets. Verify conditions save and load correctly.
 2. **Condition engine:** Unit test with mock context objects. Verify AND/OR logic, placeholder resolution.
-3. **PDF generation:** Generate a quote PDF from a summary that has Double Hungs + Euro Windows + Doors + installation. Compare output against the reference PDF structure.
+3. **PDF generation:** Generate a proposal PDF from an Opportunity linked to a summary that has Double Hungs + Euro Windows + Doors + installation. Compare output against the reference PDF structure.
 4. **Edge cases:** Summary with only windows (no doors) — door-specific specs should be excluded. Summary with no add-ons — options section should be empty.
 5. **Multi-user:** Two different reps generate quotes from different summaries — verify data isolation.
