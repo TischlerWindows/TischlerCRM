@@ -45,6 +45,9 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   ErrorLog: '039',
   Notification: '040',
   NotificationTypeSetting: '041',
+  QuoteTemplate: '042',
+  SpecPreset: '043',
+  SpecCondition: '044',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
