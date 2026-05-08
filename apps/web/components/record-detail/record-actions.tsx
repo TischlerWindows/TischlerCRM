@@ -332,7 +332,7 @@ export function RecordActions({
             {isRequoting ? 'Creating\u2026' : 'Create Requote'}
           </button>
         )}
-        {showProposal && objectApiName === 'Opportunity' && (
+        {showProposal && objectApiName === 'Opportunity' && canEdit && (
           <button
             onClick={() => void handleGenerateProposal()}
             disabled={isGeneratingProposal}

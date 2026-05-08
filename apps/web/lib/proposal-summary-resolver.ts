@@ -1,7 +1,15 @@
 import { getSetting } from './preferences';
 
+/** Lightweight shape of a stored summary — just the fields the resolver needs for matching. */
+interface StoredSummary {
+  linkedOpportunityId?: string;
+  opportunityNumber?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
 export interface OpportunitySummaryMatch {
-  summary: any | null;
+  summary: StoredSummary | null;
   matchType: 'linkedOpportunityId' | 'opportunityNumber' | 'opportunityName' | 'none';
   reason: string;
 }
@@ -23,7 +31,7 @@ function readOpportunityValue(opportunity: OpportunityLike, keys: string[]): str
 }
 
 export function findSummaryForOpportunity(
-  summaries: any[] | undefined | null,
+  summaries: StoredSummary[] | undefined | null,
   opportunity: OpportunityLike
 ): OpportunitySummaryMatch {
   const allSummaries = Array.isArray(summaries) ? summaries : [];
@@ -88,6 +96,6 @@ export function findSummaryForOpportunity(
   };
 }
 
-export async function getSavedSummaries(): Promise<any[]> {
-  return (await getSetting<any[]>('summaries', [])) ?? [];
+export async function getSavedSummaries(): Promise<StoredSummary[]> {
+  return (await getSetting<StoredSummary[]>('summaries', [])) ?? [];
 }
