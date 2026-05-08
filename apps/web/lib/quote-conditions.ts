@@ -128,7 +128,7 @@ export interface SpecPresetData {
   order: number;
   title: string;
   body: string;
-  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'BOILERPLATE';
+  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'ALWAYS';
   isAlwaysIncluded: boolean;
   isActive: boolean;
   conditions: SpecConditionData[];
@@ -584,7 +584,7 @@ export function assemblePresetsBySection(
     OPTION: [],
     EXCLUSION: [],
     INSTALLATION: [],
-    BOILERPLATE: [],
+    ALWAYS: [],
   };
 
   for (const preset of included) {

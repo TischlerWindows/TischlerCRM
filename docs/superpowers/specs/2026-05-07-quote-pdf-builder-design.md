@@ -73,7 +73,7 @@ A single spec paragraph with its display position and conditions.
 | order | Int | Display position in the letter |
 | title | String | Admin-facing label (e.g., "Impact Glass Specifications") |
 | body | String | Full paragraph text with `{{token}}` placeholders |
-| section | Enum | SPECIFICATION, OPTION, EXCLUSION, INSTALLATION, BOILERPLATE |
+| section | Enum | SPECIFICATION, OPTION, EXCLUSION, INSTALLATION, ALWAYS |
 | isAlwaysIncluded | Boolean | If true, skip condition evaluation — always include |
 | isActive | Boolean | Whether this preset is available |
 | createdAt | DateTime | |
@@ -183,7 +183,7 @@ Settings sub-page at `/settings/quote-builder` with split-view layout (added to 
 
 **Right panel — Preset editor:**
 - Title field
-- Section type selector (SPECIFICATION, OPTION, EXCLUSION, INSTALLATION, BOILERPLATE)
+- Section type selector (SPECIFICATION, OPTION, EXCLUSION, INSTALLATION, ALWAYS)
 - Body text editor with `{{token}}` placeholder highlighting
 - "Always included" toggle (bypasses conditions)
 - Condition builder: rows of (logic AND/OR) + (field dropdown) + (operator dropdown) + (value input)

@@ -25,7 +25,7 @@ function makeId(prefix: string): string {
 interface PresetSeed {
   title: string;
   body: string;
-  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'BOILERPLATE';
+  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'ALWAYS';
   isAlwaysIncluded: boolean;
   conditions?: {
     field: string;
@@ -49,18 +49,18 @@ export async function seedQuoteTemplate() {
   console.log(`Creating default proposal template: ${templateId}`);
 
   const presets: PresetSeed[] = [
-    // ── BOILERPLATE / PROPOSAL TEXT ──
+    // ── ALWAYS / PROPOSAL TEXT ──
 
     {
       title: 'Opening',
       body: 'Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for {{projectName}} ({{projectNumber}}), based on plans dated {{plansDated}}.',
-      section: 'BOILERPLATE',
+      section: 'ALWAYS',
       isAlwaysIncluded: true,
     },
     {
       title: 'Base Bid Introduction',
       body: 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:',
-      section: 'BOILERPLATE',
+      section: 'ALWAYS',
       isAlwaysIncluded: true,
     },
 
@@ -235,7 +235,7 @@ export async function seedQuoteTemplate() {
     {
       title: 'Closing',
       body: 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.',
-      section: 'BOILERPLATE',
+      section: 'ALWAYS',
       isAlwaysIncluded: true,
     },
 

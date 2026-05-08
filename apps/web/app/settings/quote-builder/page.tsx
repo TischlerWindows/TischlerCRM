@@ -38,7 +38,7 @@ interface SpecPreset {
   order: number;
   title: string;
   body: string;
-  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'BOILERPLATE';
+  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'ALWAYS';
   isAlwaysIncluded: boolean;
   isActive: boolean;
   conditions: SpecCondition[];
@@ -65,10 +65,10 @@ interface DraftCondition {
 
 // ── Constants ──────────────────────────────────────────────────────
 
-const SECTIONS = ['BOILERPLATE', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
+const SECTIONS = ['ALWAYS', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 
 const SECTION_COLORS: Record<string, string> = {
-  BOILERPLATE: 'bg-slate-100 text-slate-700',
+  ALWAYS: 'bg-slate-100 text-slate-700',
   SPECIFICATION: 'bg-blue-100 text-blue-700',
   OPTION: 'bg-amber-100 text-amber-700',
   EXCLUSION: 'bg-red-100 text-red-700',

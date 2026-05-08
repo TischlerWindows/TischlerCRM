@@ -58,7 +58,7 @@ describe('proposal assembly', () => {
             order: 0,
             title: 'Opening',
             body: 'We are pleased to propose {{projectName}}.',
-            section: 'BOILERPLATE',
+            section: 'ALWAYS',
             isAlwaysIncluded: true,
             isActive: true,
             conditions: [],
@@ -90,7 +90,7 @@ describe('proposal assembly', () => {
       contact: { salutation: 'Mr.', lastName: 'Holmes' },
     });
 
-    expect(result.sections.BOILERPLATE[0].body).toBe('We are pleased to propose Little Club Road #1.');
+    expect(result.sections.ALWAYS[0].body).toBe('We are pleased to propose Little Club Road #1.');
     expect(result.sections.OPTION[0].body).toContain('$2,670.00');
     expect(result.includedBlocks.map((b) => b.id)).toEqual(['always', 'magnetic']);
     expect(result.excludedBlocks.map((b) => b.id)).toEqual(['missing']);
@@ -110,7 +110,7 @@ describe('proposal assembly', () => {
             order: 0,
             title: 'Unknown Token',
             body: 'Value {{notARealToken}}',
-            section: 'BOILERPLATE',
+            section: 'ALWAYS',
             isAlwaysIncluded: true,
             isActive: true,
             conditions: [],
