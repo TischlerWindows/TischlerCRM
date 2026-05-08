@@ -14,7 +14,7 @@ import {
 } from './quote-placeholders';
 import type { QuotePDFData } from './quote-pdf-renderer';
 
-export type ProposalSection = 'BOILERPLATE' | 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION';
+export type ProposalSection = 'ALWAYS' | 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION';
 
 export interface ProposalTemplateData {
   id: string;
@@ -52,7 +52,7 @@ type ProposalSummary = SummaryForConditions & SummaryForPlaceholders & {
 
 function emptySections(): Record<ProposalSection, SpecPresetData[]> {
   return {
-    BOILERPLATE: [],
+    ALWAYS: [],
     SPECIFICATION: [],
     OPTION: [],
     EXCLUSION: [],
@@ -101,7 +101,7 @@ function buildPdfData(
     sdlType: tokens.sdlType || '',
     spacerBarColors: tokens.spacerBarColor || '',
 
-    boilerplatePresets: sections.BOILERPLATE,
+    alwaysPresets: sections.ALWAYS,
     specPresets: sections.SPECIFICATION,
     optionPresets: sections.OPTION,
     exclusionPresets: sections.EXCLUSION,

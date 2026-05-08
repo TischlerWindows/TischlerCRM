@@ -39,7 +39,7 @@ export interface QuotePDFData {
   spacerBarColors: string;
 
   // Presets (already filtered and token-resolved)
-  boilerplatePresets?: SpecPresetData[];
+  alwaysPresets?: SpecPresetData[];
   specPresets: SpecPresetData[];
   optionPresets: SpecPresetData[];
   exclusionPresets: SpecPresetData[];
@@ -130,12 +130,12 @@ export async function generateQuotePDF(
   const maxY = ph - 18; // leave room for footer
 
   let y = 0;
-  const boilerplatePresets = data.boilerplatePresets ?? [];
-  const closingBoilerplate = boilerplatePresets.filter((preset) =>
+  const alwaysPresets = data.alwaysPresets ?? [];
+  const closingAlways = alwaysPresets.filter((preset) =>
     /closing|signature|sincerely/i.test(preset.title)
   );
-  const introBoilerplate = boilerplatePresets.filter((preset) =>
-    !closingBoilerplate.some((closing) => closing.id === preset.id)
+  const introAlways = alwaysPresets.filter((preset) =>
+    !closingAlways.some((closing) => closing.id === preset.id)
   );
 
   // ── Drawing helpers (scoped to this doc) ──────────────────────
@@ -278,21 +278,13 @@ export async function generateQuotePDF(
   doc.text(greeting, MARGIN_LEFT, y);
   y += 8;
 
-  if (introBoilerplate.length > 0) {
-    for (const preset of introBoilerplate) {
-      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
-      y += 4;
-    }
-    y += 2;
-  } else {
-    const openingText = `Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for ${data.projectName} (${data.projectNumber}), based on plans dated ${data.plansDated}.`;
-    y = writeText(openingText, MARGIN_LEFT, y, { fontSize: 10 });
+  // Intro always — all text comes from editable ALWAYS presets.
+  // If none exist, the opening section is simply skipped (no hardcoded fallback).
+  for (const preset of introAlways) {
+    y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
     y += 4;
-
-    const baseBidText = 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:';
-    y = writeText(baseBidText, MARGIN_LEFT, y, { fontSize: 10 });
-    y += 6;
   }
+  if (introAlways.length > 0) y += 2;
 
   // ════════════════════════════════════════════════════════════════
   // NUMBERED SPECIFICATIONS
@@ -480,14 +472,10 @@ export async function generateQuotePDF(
   drawGrayLine(y);
   y += 6;
 
-  if (closingBoilerplate.length > 0) {
-    for (const preset of closingBoilerplate) {
-      y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
-      y += 4;
-    }
-  } else {
-    const closingText = 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.';
-    y = writeText(closingText, MARGIN_LEFT, y, { fontSize: 10 });
+  // Closing always — all text comes from editable ALWAYS presets.
+  for (const preset of closingAlways) {
+    y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
+    y += 4;
   }
   y += 8;
 
@@ -603,7 +591,7 @@ export async function generateTemplatePreviewPDF(
 ): Promise<void> {
   // Separate presets by section (include ALL active, ignore conditions)
   const active = presets.filter((p) => p.isActive).sort((a, b) => a.order - b.order);
-  const boilerplate = active.filter((p) => p.section === 'BOILERPLATE');
+  const always = active.filter((p) => p.section === 'ALWAYS');
   const specs = active.filter((p) => p.section === 'SPECIFICATION');
   const options = active.filter((p) => p.section === 'OPTION');
   const exclusions = active.filter((p) => p.section === 'EXCLUSION');
@@ -632,7 +620,7 @@ export async function generateTemplatePreviewPDF(
     spacerBarColors: '{{spacerBarColors}}',
 
     // Presets — body text still has raw {{tokens}} since we don't resolve
-    boilerplatePresets: boilerplate,
+    alwaysPresets: always,
     specPresets: specs,
     optionPresets: options,
     exclusionPresets: exclusions,
