@@ -1884,7 +1884,7 @@ export default function SummaryPage() {
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
-    const qtColW = [30, 14, 14, 18, 22, 20, 12, 20, 22];
+    const qtColW = [30, 12, 12, 18, 22, 20, 20, 20, 22];
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
       label, fmtInt(qty), fmtInt(fields), fmt(sqFt),
       net ? '\u20AC' + fmt(net) : '—',
