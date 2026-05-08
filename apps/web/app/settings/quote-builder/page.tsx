@@ -13,12 +13,14 @@ import {
   X,
   Eye,
   EyeOff,
+  FileText,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 import { getSetting } from '@/lib/preferences';
 import { assembleProposal } from '@/lib/proposal-assembly';
 import { CONDITION_FIELD_DEFINITIONS } from '@/lib/quote-conditions';
+import { generateTemplatePreviewPDF } from '@/lib/quote-pdf-renderer';
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -356,6 +358,35 @@ export default function QuoteBuilderPage() {
       prev.map((c) => (c._key === key ? { ...c, ...patch } : c))
     );
 
+  // ── Template PDF preview ───────────────────────────────────────
+
+  const [isPreviewingPDF, setIsPreviewingPDF] = useState(false);
+
+  const handlePreviewTemplatePDF = async () => {
+    if (presets.length === 0) {
+      setError('No blocks to preview. Create some blocks first.');
+      return;
+    }
+    setIsPreviewingPDF(true);
+    setError(null);
+    // Open window before async work to avoid popup blocker
+    const previewWindow = window.open('', '_blank');
+    try {
+      await generateTemplatePreviewPDF(
+        presets.map((p) => ({
+          ...p,
+          conditions: p.conditions.map((c) => ({ ...c })),
+        })),
+        previewWindow
+      );
+    } catch (err: any) {
+      previewWindow?.close();
+      setError(err.message || 'Failed to generate template preview');
+    } finally {
+      setIsPreviewingPDF(false);
+    }
+  };
+
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId);
   const selectedPreviewSummary = summaries.find((summary) => summary.id === selectedPreviewSummaryId);
   const previewState = useMemo(() => {
@@ -399,6 +430,21 @@ export default function QuoteBuilderPage() {
         subtitle="Manage proposal clauses, variables, and conditions"
         action={{ label: 'New Block', onClick: handleNewPreset }}
       />
+
+      {/* Template preview + actions bar */}
+      <div className="mx-8 mt-3 flex items-center gap-3">
+        <button
+          onClick={handlePreviewTemplatePDF}
+          disabled={isPreviewingPDF || presets.length === 0}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-brand-navy/30 rounded-lg text-brand-navy bg-white hover:bg-brand-navy/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <FileText className="w-4 h-4" />
+          {isPreviewingPDF ? 'Generating...' : 'Preview Template PDF'}
+        </button>
+        <span className="text-xs text-gray-400">
+          Shows the full quote layout with {'{{variable}}'} placeholders and all active blocks included
+        </span>
+      </div>
 
       {/* Error / success banners */}
       {error && (

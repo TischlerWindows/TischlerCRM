@@ -587,3 +587,87 @@ export async function generateQuotePDF(
 }
 
 export const generateProposalPDF = generateQuotePDF;
+
+// ── Template Preview ──────────────────────────────────────────────
+
+/**
+ * Generate a "template preview" PDF that shows the full quote layout
+ * with raw {{token}} placeholders instead of resolved data.
+ *
+ * All active presets are included (conditions are ignored) so the user
+ * can see every possible section and how the final PDF will look.
+ */
+export async function generateTemplatePreviewPDF(
+  presets: SpecPresetData[],
+  previewWindow?: Window | null
+): Promise<void> {
+  // Separate presets by section (include ALL active, ignore conditions)
+  const active = presets.filter((p) => p.isActive).sort((a, b) => a.order - b.order);
+  const boilerplate = active.filter((p) => p.section === 'BOILERPLATE');
+  const specs = active.filter((p) => p.section === 'SPECIFICATION');
+  const options = active.filter((p) => p.section === 'OPTION');
+  const exclusions = active.filter((p) => p.section === 'EXCLUSION');
+  const installation = active.filter((p) => p.section === 'INSTALLATION');
+
+  // Build mock data with {{token}} names as values
+  const mockData: QuotePDFData = {
+    contactName: '{{contactName}}',
+    contactSalutation: '{{contactSalutation}}',
+    contactLastName: '{{contactLastName}}',
+    companyName: '{{companyName}}',
+    companyAddress: '{{companyAddress}}',
+
+    projectName: '{{projectName}}',
+    projectNumber: '{{projectNumber}}',
+    plansDated: '{{plansDated}}',
+    jobType: '{{jobType}}',
+    address: '{{address}}',
+    salesman: '{{salesman}}',
+    estimator: '{{estimator}}',
+
+    glassType: '{{glassType}}',
+    woodType: '{{woodType}}',
+    finishType: '{{finishType}}',
+    sdlType: '{{sdlType}}',
+    spacerBarColors: '{{spacerBarColors}}',
+
+    // Presets — body text still has raw {{tokens}} since we don't resolve
+    boilerplatePresets: boilerplate,
+    specPresets: specs,
+    optionPresets: options,
+    exclusionPresets: exclusions,
+    installationPresets: installation,
+
+    // Mock pricing with placeholder labels
+    euroWindowsPrice: '$XX,XXX.00',
+    doubleHungPrice: '$XX,XXX.00',
+    euroDoorsPrice: '$XX,XXX.00',
+    grandTotal: '$XXX,XXX.00',
+    hasEuroWindows: true,
+    hasDoubleHung: true,
+    hasEuroDoors: true,
+
+    windowScreensPrice: '$X,XXX.00',
+    windowScreensQty: 'XX',
+    doorScreenSashPrice: '$X,XXX.00',
+    doorScreenSashQty: 'XX',
+    entryDoorPrice: '$X,XXX.00',
+    entryDoorQty: 'XX',
+    jambExtensionsPrice: '$X,XXX.00',
+    magneticContactPrice: '$X,XXX.00',
+    magneticContactQty: 'XX',
+    finalFinishPrice: '$X,XXX.00',
+    installationPrice: '$XX,XXX.00',
+
+    // Show all sections in preview
+    hasInstallation: installation.length > 0,
+    hasMagneticContacts: true,
+    hasFinalFinish: true,
+    hasWindowScreens: true,
+    hasDoorScreenSash: true,
+    hasEntryDoor: true,
+    hasJambExtensions: true,
+  };
+
+  await generateQuotePDF(mockData, 'preview', previewWindow);
+}
