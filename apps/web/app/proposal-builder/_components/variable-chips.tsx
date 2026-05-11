@@ -1,6 +1,7 @@
 'use client';
 
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface TokenMapping {
   id: string;
@@ -18,13 +19,46 @@ interface Props {
   onNewToken: () => void;
 }
 
+function matchesQuery(m: TokenMapping, q: string): boolean {
+  if (!q) return true;
+  const lower = q.toLowerCase();
+  return (
+    m.tokenName.toLowerCase().includes(lower) ||
+    m.label.toLowerCase().includes(lower) ||
+    m.category.toLowerCase().includes(lower)
+  );
+}
+
 export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props) {
-  const categories = Object.keys(grouped).sort();
+  const [query, setQuery] = useState('');
+
+  const filteredGrouped = useMemo(() => {
+    if (!query.trim()) return grouped;
+    const out: Record<string, TokenMapping[]> = {};
+    for (const [cat, items] of Object.entries(grouped)) {
+      const filtered = items.filter((m) => matchesQuery(m, query));
+      if (filtered.length > 0) out[cat] = filtered;
+    }
+    return out;
+  }, [grouped, query]);
+
+  const categories = Object.keys(filteredGrouped).sort();
+  const totalMatches = useMemo(
+    () => Object.values(filteredGrouped).reduce((sum, list) => sum + list.length, 0),
+    [filteredGrouped],
+  );
 
   return (
     <div className="flex flex-col h-full border-t border-gray-200">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Variables</span>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
+          Variables
+          {query && (
+            <span className="ml-1 font-normal text-gray-400 lowercase tracking-normal">
+              ({totalMatches} of {mappings.length})
+            </span>
+          )}
+        </span>
         <button
           type="button"
           onClick={onNewToken}
@@ -35,15 +69,36 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2.5 py-2">
+      {mappings.length > 0 && (
+        <div className="px-2.5 pt-2 pb-1">
+          <div className="relative">
+            <Search
+              aria-hidden="true"
+              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none"
+            />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search variables"
+              aria-label="Search variables"
+              className="w-full text-[11px] pl-7 pr-2 py-1.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-2.5 pt-1 pb-2">
         {mappings.length === 0 ? (
           <p className="text-xs text-gray-400 italic px-1">No token mappings loaded.</p>
+        ) : categories.length === 0 ? (
+          <p className="text-xs text-gray-400 italic px-1 mt-2">No variables match &quot;{query}&quot;.</p>
         ) : (
           categories.map((cat) => (
             <div key={cat} className="mb-3">
               <div className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-1 px-0.5">{cat}</div>
               <div className="flex flex-wrap gap-1">
-                {grouped[cat].map((m) => (
+                {filteredGrouped[cat].map((m) => (
                   <button
                     key={m.id}
                     type="button"
