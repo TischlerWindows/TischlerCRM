@@ -9,7 +9,7 @@ import { FloatingProperties } from '../floating-properties';
 import { PaletteComponents } from '../palette-components';
 import { PaletteFields } from '../palette-fields';
 import { useEditorStore } from '../editor-store';
-import { useEditorSidePanels } from '../use-editor-side-panels';
+import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useEnabledWidgetIds } from '@/lib/use-widget-settings';
 import type { LayoutSection, LayoutTab } from '../types';
 
@@ -45,22 +45,27 @@ export function EditorCanvas({
   const [paletteTab, setPaletteTab] = useState<'fields' | 'components'>('fields');
 
   const { ids: enabledWidgetIds } = useEnabledWidgetIds();
-  const sidePanels = useEditorSidePanels();
+  const panels = useResizableSidePanels({
+    storageKey: 'pageEditor',
+    left: { min: 200, max: 520, default: 256 },
+    legacyStorageKey: 'pageEditor',
+  });
+  const leftPanel = panels.left!;
   const leftPanelContainerId = `page-editor-left-panel-${encodeURIComponent(routeKey || 'new')}`;
 
   const handleLeftResizeKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
-        sidePanels.adjustLeftWidth(-16);
+        leftPanel.adjustWidth(-16);
         return;
       }
       if (event.key === 'ArrowRight') {
         event.preventDefault();
-        sidePanels.adjustLeftWidth(16);
+        leftPanel.adjustWidth(16);
       }
     },
-    [sidePanels],
+    [leftPanel],
   );
 
   return (
@@ -70,26 +75,26 @@ export function EditorCanvas({
         id={leftPanelContainerId}
         className="relative flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-150"
         style={{
-          width: sidePanels.leftCollapsed ? 40 : sidePanels.leftWidth,
-          minWidth: sidePanels.leftCollapsed ? 40 : undefined,
+          width: leftPanel.collapsed ? 40 : leftPanel.width,
+          minWidth: leftPanel.collapsed ? 40 : undefined,
         }}
       >
         <button
           type="button"
-          title={sidePanels.leftCollapsed ? 'Show fields panel' : 'Hide fields panel'}
-          onClick={() => sidePanels.toggleLeftCollapsed()}
-          aria-label={sidePanels.leftCollapsed ? 'Expand fields panel' : 'Collapse fields panel'}
-          aria-expanded={!sidePanels.leftCollapsed}
+          title={leftPanel.collapsed ? 'Show fields panel' : 'Hide fields panel'}
+          onClick={() => leftPanel.toggleCollapsed()}
+          aria-label={leftPanel.collapsed ? 'Expand fields panel' : 'Collapse fields panel'}
+          aria-expanded={!leftPanel.collapsed}
           aria-controls={leftPanelContainerId}
           className="absolute right-0 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-l-md border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-gray-50"
         >
-          {sidePanels.leftCollapsed ? (
+          {leftPanel.collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
             <PanelLeftClose className="h-4 w-4" />
           )}
         </button>
-        {!sidePanels.leftCollapsed && (
+        {!leftPanel.collapsed && (
           <div className="flex h-full min-h-0 flex-col">
             <div className="grid grid-cols-2 border-b border-gray-200 bg-white p-2">
               <button
@@ -125,16 +130,16 @@ export function EditorCanvas({
           </div>
         )}
       </div>
-      {!sidePanels.leftCollapsed && (
+      {!leftPanel.collapsed && (
         <div
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize fields panel"
           aria-valuemin={200}
           aria-valuemax={520}
-          aria-valuenow={Math.round(sidePanels.leftWidth)}
+          aria-valuenow={Math.round(leftPanel.width)}
           tabIndex={0}
-          onMouseDown={sidePanels.startResizeLeft}
+          onMouseDown={leftPanel.startResize}
           onKeyDown={handleLeftResizeKeyDown}
           className="w-1.5 shrink-0 cursor-col-resize border-r border-transparent bg-gray-200/80 hover:bg-brand-navy/20"
         />
