@@ -8,6 +8,7 @@
  * (or import and call seedQuoteTemplate() from another seed script)
  */
 
+import { pathToFileURL } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -35,14 +36,109 @@ interface PresetSeed {
   }[];
 }
 
+export interface BuiltInTokenMappingSeed {
+  tokenName: string;
+  sourceObject: 'SUMMARY' | 'CONTACT' | 'ACCOUNT' | 'OPPORTUNITY' | 'SYSTEM';
+  sourcePath: string;
+  format: 'TEXT' | 'CURRENCY' | 'DATE' | 'PHONE' | 'PERCENTAGE';
+  label: string;
+  category: string;
+}
+
+export const BUILT_IN_TOKEN_MAPPINGS: BuiltInTokenMappingSeed[] = [
+  // Project info
+  { tokenName: 'projectName', sourceObject: 'SUMMARY', sourcePath: 'name', format: 'TEXT', label: 'Project Name', category: 'Project' },
+  { tokenName: 'projectNumber', sourceObject: 'SUMMARY', sourcePath: 'opportunityNumber', format: 'TEXT', label: 'Project Number', category: 'Project' },
+  { tokenName: 'plansDated', sourceObject: 'SUMMARY', sourcePath: 'plansDated', format: 'DATE', label: 'Plans Dated', category: 'Project' },
+  { tokenName: 'jobType', sourceObject: 'SUMMARY', sourcePath: 'jobType', format: 'TEXT', label: 'Job Type', category: 'Project' },
+  { tokenName: 'quoteType', sourceObject: 'SUMMARY', sourcePath: 'quoteType', format: 'TEXT', label: 'Quote Type', category: 'Project' },
+  { tokenName: 'address', sourceObject: 'SUMMARY', sourcePath: 'address', format: 'TEXT', label: 'Project Address', category: 'Project' },
+  { tokenName: 'salesman', sourceObject: 'SUMMARY', sourcePath: 'salesman', format: 'TEXT', label: 'Salesman', category: 'Project' },
+  { tokenName: 'estimator', sourceObject: 'SUMMARY', sourcePath: 'estimator', format: 'TEXT', label: 'Estimator', category: 'Project' },
+
+  // Materials (custom fields take precedence at resolution time)
+  { tokenName: 'glassType', sourceObject: 'SUMMARY', sourcePath: 'glassType', format: 'TEXT', label: 'Glass Type', category: 'Materials' },
+  { tokenName: 'woodType', sourceObject: 'SUMMARY', sourcePath: 'woodType', format: 'TEXT', label: 'Wood Type', category: 'Materials' },
+  { tokenName: 'finishType', sourceObject: 'SUMMARY', sourcePath: 'finish', format: 'TEXT', label: 'Finish Type', category: 'Materials' },
+  { tokenName: 'sdlType', sourceObject: 'SUMMARY', sourcePath: 'sdl', format: 'TEXT', label: 'SDL Type', category: 'Materials' },
+  { tokenName: 'spacerBarColor', sourceObject: 'SUMMARY', sourcePath: 'spacerBarColors', format: 'TEXT', label: 'Spacer Bar Color', category: 'Materials' },
+  { tokenName: 'spacerBarType', sourceObject: 'SUMMARY', sourcePath: 'spacerBarType', format: 'TEXT', label: 'Spacer Bar Type', category: 'Materials' },
+
+  // Contact
+  { tokenName: 'contactName', sourceObject: 'SUMMARY', sourcePath: 'contactReceivingQuote', format: 'TEXT', label: 'Contact Name', category: 'Contact' },
+  { tokenName: 'contactLastName', sourceObject: 'CONTACT', sourcePath: 'lastName', format: 'TEXT', label: 'Contact Last Name', category: 'Contact' },
+  { tokenName: 'contactSalutation', sourceObject: 'CONTACT', sourcePath: 'salutation', format: 'TEXT', label: 'Salutation', category: 'Contact' },
+  { tokenName: 'contactEmail', sourceObject: 'SUMMARY', sourcePath: 'contactEmail', format: 'TEXT', label: 'Contact Email', category: 'Contact' },
+  { tokenName: 'contactPhone', sourceObject: 'SUMMARY', sourcePath: 'contactPrimaryPhone', format: 'PHONE', label: 'Contact Phone', category: 'Contact' },
+  { tokenName: 'companyName', sourceObject: 'SUMMARY', sourcePath: 'accountReceivingQuote', format: 'TEXT', label: 'Company Name', category: 'Contact' },
+  { tokenName: 'companyAddress', sourceObject: 'SUMMARY', sourcePath: 'accountShippingAddress', format: 'TEXT', label: 'Company Address', category: 'Contact' },
+
+  // Pricing (grandTotal is computed: euroWindows + doubleHung + euroDoors + adjustment)
+  { tokenName: 'euroWindowsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroWindows.finalAdj', format: 'CURRENCY', label: 'Euro Windows Price', category: 'Pricing' },
+  { tokenName: 'doubleHungPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.doubleHung.finalAdj', format: 'CURRENCY', label: 'Double Hung Price', category: 'Pricing' },
+  { tokenName: 'euroDoorsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroDoors.finalAdj', format: 'CURRENCY', label: 'Euro Doors Price', category: 'Pricing' },
+  { tokenName: 'grandTotal', sourceObject: 'SUMMARY', sourcePath: 'computed:grandTotal', format: 'CURRENCY', label: 'Grand Total', category: 'Pricing' },
+  { tokenName: 'grandTotalAdjustment', sourceObject: 'SUMMARY', sourcePath: 'grandTotalAdjustment.finalAdj', format: 'CURRENCY', label: 'Grand Total Adjustment', category: 'Pricing' },
+
+  // Add-on pricing
+  { tokenName: 'windowScreensPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.windowScreens.final', format: 'CURRENCY', label: 'Window Screens Price', category: 'Add-ons' },
+  { tokenName: 'windowScreensQty', sourceObject: 'SUMMARY', sourcePath: 'addOns.windowScreens.qty', format: 'TEXT', label: 'Window Screens Qty', category: 'Add-ons' },
+  { tokenName: 'doorScreenSashPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.doorScreenSash.final', format: 'CURRENCY', label: 'Door Screen Sash Price', category: 'Add-ons' },
+  { tokenName: 'doorScreenSashQty', sourceObject: 'SUMMARY', sourcePath: 'addOns.doorScreenSash.qty', format: 'TEXT', label: 'Door Screen Sash Qty', category: 'Add-ons' },
+  { tokenName: 'entryDoorPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.entryDoor.final', format: 'CURRENCY', label: 'Entry Door Price', category: 'Add-ons' },
+  { tokenName: 'entryDoorQty', sourceObject: 'SUMMARY', sourcePath: 'addOns.entryDoor.qty', format: 'TEXT', label: 'Entry Door Qty', category: 'Add-ons' },
+  { tokenName: 'jambExtensionsPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.jambExtensions.final', format: 'CURRENCY', label: 'Jamb Extensions Price', category: 'Add-ons' },
+  { tokenName: 'magneticContactPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.magneticContact.final', format: 'CURRENCY', label: 'Magnetic Contact Price', category: 'Add-ons' },
+  { tokenName: 'magneticContactQty', sourceObject: 'SUMMARY', sourcePath: 'addOns.magneticContact.qty', format: 'TEXT', label: 'Magnetic Contact Qty', category: 'Add-ons' },
+  { tokenName: 'finalFinishPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.finalFinish.final', format: 'CURRENCY', label: 'Final Finish Price', category: 'Add-ons' },
+  { tokenName: 'installationPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.installation.final', format: 'CURRENCY', label: 'Installation Price', category: 'Add-ons' },
+
+  // System
+  { tokenName: 'todayDate', sourceObject: 'SYSTEM', sourcePath: 'currentDate', format: 'DATE', label: 'Today\'s Date', category: 'Project' },
+];
+
+export function buildBuiltInTokenMappingData(templateId: string) {
+  return BUILT_IN_TOKEN_MAPPINGS.map((t) => ({
+    id: makeId('046'),
+    templateId,
+    tokenName: t.tokenName,
+    sourceObject: t.sourceObject,
+    sourcePath: t.sourcePath,
+    format: t.format,
+    label: t.label,
+    category: t.category,
+    isBuiltIn: true,
+    isActive: true,
+  }));
+}
+
+export function getMissingBuiltInTokenMappings(templateId: string, existingMappings: { tokenName: string }[]) {
+  const existingTokenNames = new Set(existingMappings.map((mapping) => mapping.tokenName));
+  return buildBuiltInTokenMappingData(templateId).filter((mapping) => !existingTokenNames.has(mapping.tokenName));
+}
+
 export async function seedQuoteTemplate() {
   // Check if the template already exists (by name or default flag)
   const existing = await prisma.quoteTemplate.findFirst({
     where: { OR: [{ isDefault: true }, { name: 'Standard Proposal' }, { name: 'Standard Quote Letter' }] },
   });
   if (existing) {
-    console.log(`Template already exists: "${existing.name}" (${existing.id}). Skipping seed.`);
-    return existing;
+    console.log(`Template already exists: "${existing.name}" (${existing.id}). Backfilling built-in token mappings.`);
+    const existingMappings = await prisma.tokenMapping.findMany({
+      where: { templateId: existing.id },
+      select: { tokenName: true },
+    });
+    const missingMappings = getMissingBuiltInTokenMappings(existing.id, existingMappings);
+
+    if (missingMappings.length > 0) {
+      await prisma.tokenMapping.createMany({
+        data: missingMappings,
+        skipDuplicates: true,
+      });
+    }
+
+    console.log(`Built-in token mappings: ${BUILT_IN_TOKEN_MAPPINGS.length - missingMappings.length} existing, ${missingMappings.length} created.`);
+    return { id: existing.id, presetCount: 0, tokenMappingCount: missingMappings.length };
   }
 
   const templateId = makeId('042');
@@ -363,68 +459,26 @@ export async function seedQuoteTemplate() {
       }
     }
 
-    // ── Built-in token mappings ──
-    const tokenSeeds: { tokenName: string; sourceObject: string; sourcePath: string; format: string; label: string; category: string }[] = [
-      { tokenName: 'projectName', sourceObject: 'SUMMARY', sourcePath: 'name', format: 'TEXT', label: 'Project Name', category: 'Project' },
-      { tokenName: 'projectNumber', sourceObject: 'SUMMARY', sourcePath: 'opportunityNumber', format: 'TEXT', label: 'Project Number', category: 'Project' },
-      { tokenName: 'plansDated', sourceObject: 'SUMMARY', sourcePath: 'plansDated', format: 'DATE', label: 'Plans Dated', category: 'Project' },
-      { tokenName: 'jobType', sourceObject: 'SUMMARY', sourcePath: 'jobType', format: 'TEXT', label: 'Job Type', category: 'Project' },
-      { tokenName: 'address', sourceObject: 'SUMMARY', sourcePath: 'address', format: 'TEXT', label: 'Project Address', category: 'Project' },
-      { tokenName: 'salesman', sourceObject: 'SUMMARY', sourcePath: 'salesman', format: 'TEXT', label: 'Salesman', category: 'Project' },
-      { tokenName: 'estimator', sourceObject: 'SUMMARY', sourcePath: 'estimator', format: 'TEXT', label: 'Estimator', category: 'Project' },
-      { tokenName: 'glassType', sourceObject: 'SUMMARY', sourcePath: 'glassType', format: 'TEXT', label: 'Glass Type', category: 'Materials' },
-      { tokenName: 'woodType', sourceObject: 'SUMMARY', sourcePath: 'woodType', format: 'TEXT', label: 'Wood Type', category: 'Materials' },
-      { tokenName: 'finishType', sourceObject: 'SUMMARY', sourcePath: 'finish', format: 'TEXT', label: 'Finish Type', category: 'Materials' },
-      { tokenName: 'sdlType', sourceObject: 'SUMMARY', sourcePath: 'sdl', format: 'TEXT', label: 'SDL Type', category: 'Materials' },
-      { tokenName: 'spacerBarColor', sourceObject: 'SUMMARY', sourcePath: 'spacerBarColors', format: 'TEXT', label: 'Spacer Bar Color', category: 'Materials' },
-      { tokenName: 'contactName', sourceObject: 'SUMMARY', sourcePath: 'contactReceivingQuote', format: 'TEXT', label: 'Contact Name', category: 'Contact' },
-      { tokenName: 'contactLastName', sourceObject: 'CONTACT', sourcePath: 'lastName', format: 'TEXT', label: 'Contact Last Name', category: 'Contact' },
-      { tokenName: 'contactSalutation', sourceObject: 'CONTACT', sourcePath: 'salutation', format: 'TEXT', label: 'Salutation', category: 'Contact' },
-      { tokenName: 'companyName', sourceObject: 'SUMMARY', sourcePath: 'accountReceivingQuote', format: 'TEXT', label: 'Company Name', category: 'Contact' },
-      { tokenName: 'companyAddress', sourceObject: 'SUMMARY', sourcePath: 'accountShippingAddress', format: 'TEXT', label: 'Company Address', category: 'Contact' },
-      { tokenName: 'euroWindowsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroWindows.finalAdj', format: 'CURRENCY', label: 'Euro Windows Price', category: 'Pricing' },
-      { tokenName: 'doubleHungPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.doubleHung.finalAdj', format: 'CURRENCY', label: 'Double Hung Price', category: 'Pricing' },
-      { tokenName: 'euroDoorsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroDoors.finalAdj', format: 'CURRENCY', label: 'Euro Doors Price', category: 'Pricing' },
-      { tokenName: 'grandTotal', sourceObject: 'SUMMARY', sourcePath: 'grandTotalAdjustment.finalAdj', format: 'CURRENCY', label: 'Grand Total', category: 'Pricing' },
-      { tokenName: 'windowScreensPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.windowScreens.final', format: 'CURRENCY', label: 'Window Screens Price', category: 'Add-ons' },
-      { tokenName: 'doorScreenSashPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.doorScreenSash.final', format: 'CURRENCY', label: 'Door Screen Sash Price', category: 'Add-ons' },
-      { tokenName: 'entryDoorPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.entryDoor.final', format: 'CURRENCY', label: 'Entry Door Price', category: 'Add-ons' },
-      { tokenName: 'jambExtensionsPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.jambExtensions.final', format: 'CURRENCY', label: 'Jamb Extensions Price', category: 'Add-ons' },
-      { tokenName: 'magneticContactPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.magneticContact.final', format: 'CURRENCY', label: 'Magnetic Contact Price', category: 'Add-ons' },
-      { tokenName: 'finalFinishPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.finalFinish.final', format: 'CURRENCY', label: 'Final Finish Price', category: 'Add-ons' },
-      { tokenName: 'installationPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.installation.final', format: 'CURRENCY', label: 'Installation Price', category: 'Add-ons' },
-    ];
-
     await tx.tokenMapping.createMany({
-      data: tokenSeeds.map((t) => ({
-        id: makeId('046'),
-        templateId,
-        tokenName: t.tokenName,
-        sourceObject: t.sourceObject as any,
-        sourcePath: t.sourcePath,
-        format: t.format as any,
-        label: t.label,
-        category: t.category,
-        isBuiltIn: true,
-        isActive: true,
-      })),
+      data: buildBuiltInTokenMappingData(templateId),
+      skipDuplicates: true,
     });
   });
 
-  console.log(`Created "Standard Proposal" template with ${presets.length} presets.`);
-  return { id: templateId, presetCount: presets.length };
+  console.log(`Created "Standard Proposal" template with ${presets.length} presets and ${BUILT_IN_TOKEN_MAPPINGS.length} built-in token mappings.`);
+  return { id: templateId, presetCount: presets.length, tokenMappingCount: BUILT_IN_TOKEN_MAPPINGS.length };
 }
 
 // Run directly if executed as a script (ESM-compatible)
-const isMain = import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`;
+const isMain = process.argv[1] ? import.meta.url === pathToFileURL(process.argv[1]).href : false;
 if (isMain) {
   seedQuoteTemplate()
     .then((result) => {
       console.log('Seed complete:', result);
-      process.exit(0);
     })
     .catch((err) => {
       console.error('Seed failed:', err);
-      process.exit(1);
-    });
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
 }
