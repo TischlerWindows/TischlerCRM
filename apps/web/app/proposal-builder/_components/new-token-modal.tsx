@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 const SOURCE_OBJECTS = [
@@ -69,6 +69,9 @@ const FORMATS = [
 
 const CATEGORIES = ['Project', 'Contact', 'Pricing', 'Materials', 'Add-ons', 'Custom'];
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -91,6 +94,57 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
   const [category, setCategory] = useState('Custom');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const firstFieldRef = useRef<HTMLSelectElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Focus management: capture previous focus on open, restore on close,
+  // and set initial focus to the first form field.
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    // Defer until after render so the input exists.
+    const t = window.setTimeout(() => {
+      firstFieldRef.current?.focus();
+    }, 0);
+    return () => {
+      window.clearTimeout(t);
+      previouslyFocusedRef.current?.focus?.();
+    };
+  }, [open]);
+
+  // Escape to close + focus trap.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -135,25 +189,44 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
     }
   };
 
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-[440px] max-h-[90vh] overflow-y-auto">
+    <div
+      onMouseDown={handleBackdropMouseDown}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="bg-white rounded-xl shadow-xl w-[440px] max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-900">New Variable Token</h3>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">
+          <h3 id={titleId} className="text-sm font-semibold text-gray-900">New Variable Token</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close New Variable Token dialog"
+            className="p-1.5 text-gray-400 hover:text-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
           {error && (
-            <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>
+            <div role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">{error}</div>
           )}
 
           {/* Source Object */}
           <div>
             <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Source Object</label>
             <select
+              ref={firstFieldRef}
               value={sourceObject}
               onChange={(e) => handleSourceObjectChange(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
@@ -166,10 +239,14 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
 
           {/* Source Field */}
           <div>
-            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Source Field</label>
+            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
+              Source Field <span aria-hidden="true" className="text-red-500">*</span>
+            </label>
             <select
               value={sourcePath}
               onChange={(e) => handleSourcePathChange(e.target.value)}
+              required
+              aria-required="true"
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
             >
               <option value="">Select a field...</option>
@@ -182,23 +259,30 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
           {/* Token Name */}
           <div>
             <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
-              Token Name <span className="font-normal text-gray-400">({'{{tokenName}}'} in templates)</span>
+              Token Name <span aria-hidden="true" className="text-red-500">*</span>{' '}
+              <span className="font-normal text-gray-400">({'{{tokenName}}'} in templates)</span>
             </label>
             <input
               value={tokenName}
               onChange={(e) => setTokenName(e.target.value)}
               placeholder="e.g., projectName"
+              required
+              aria-required="true"
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
             />
           </div>
 
           {/* Label */}
           <div>
-            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Display Label</label>
+            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
+              Display Label <span aria-hidden="true" className="text-red-500">*</span>
+            </label>
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g., Project Name"
+              required
+              aria-required="true"
               className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
             />
           </div>
@@ -236,15 +320,17 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
 
         <div className="px-5 py-3 border-t border-gray-200 flex justify-end gap-2">
           <button
+            type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 transition-colors"
+            className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/30 transition-colors"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting}
-            className="px-4 py-1.5 text-xs font-semibold bg-[#1e3a5f] text-white rounded-lg hover:bg-[#1e3a5f]/90 transition-colors disabled:opacity-50"
+            className="px-4 py-1.5 text-xs font-semibold bg-[#1e3a5f] text-white rounded-lg hover:bg-[#1e3a5f]/90 focus:outline-none focus:ring-2 focus:ring-brand-navy/40 transition-colors disabled:opacity-50"
           >
             {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Create Token'}
           </button>

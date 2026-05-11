@@ -28,6 +28,22 @@ import {
   type DraftVariant,
 } from './_components/variant-editor';
 
+interface EditorSnapshot {
+  title: string;
+  body: string;
+  section: SpecPresetData['section'];
+  alwaysIncluded: boolean;
+  active: boolean;
+  driverField: string;
+  conditions: DraftCondition[];
+  variants: DraftVariant[];
+}
+
+function snapshotsEqual(a: EditorSnapshot | null, b: EditorSnapshot): boolean {
+  if (!a) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 interface QuoteTemplate {
   id: string;
   name: string;
@@ -68,6 +84,7 @@ export default function QuoteBuilderPage() {
   const [editConditions, setEditConditions] = useState<DraftCondition[]>([]);
   const [editVariants, setEditVariants] = useState<DraftVariant[]>([]);
   const [isNewPreset, setIsNewPreset] = useState(false);
+  const [editorBaseline, setEditorBaseline] = useState<EditorSnapshot | null>(null);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -172,6 +189,39 @@ export default function QuoteBuilderPage() {
     })();
   }, []);
 
+  // Warn before unload when there are unsaved editor changes.
+  useEffect(() => {
+    const baseline = editorBaseline;
+    if (!baseline) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      const current: EditorSnapshot = {
+        title: editTitle,
+        body: editBody,
+        section: editSection,
+        alwaysIncluded: editAlwaysIncluded,
+        active: editActive,
+        driverField: editDriverField,
+        conditions: editConditions,
+        variants: editVariants,
+      };
+      if (snapshotsEqual(baseline, current)) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [
+    editorBaseline,
+    editTitle,
+    editBody,
+    editSection,
+    editAlwaysIncluded,
+    editActive,
+    editDriverField,
+    editConditions,
+    editVariants,
+  ]);
+
   // ── Editor helpers ────────────────────────────────────────────
 
   const clearEditor = () => {
@@ -185,9 +235,12 @@ export default function QuoteBuilderPage() {
     setEditDriverField('');
     setEditConditions([]);
     setEditVariants([]);
+    setEditorBaseline(null);
   };
 
   const loadPresetIntoEditor = (preset: SpecPresetData) => {
+    const conditions = preset.conditions.map(conditionToDraft);
+    const variants = (preset.variants || []).map(variantToDraft);
     setSelectedPresetId(preset.id);
     setIsNewPreset(false);
     setEditTitle(preset.title);
@@ -196,8 +249,18 @@ export default function QuoteBuilderPage() {
     setEditAlwaysIncluded(preset.isAlwaysIncluded);
     setEditActive(preset.isActive);
     setEditDriverField(preset.driverField || '');
-    setEditConditions(preset.conditions.map(conditionToDraft));
-    setEditVariants((preset.variants || []).map(variantToDraft));
+    setEditConditions(conditions);
+    setEditVariants(variants);
+    setEditorBaseline({
+      title: preset.title,
+      body: preset.body ?? '',
+      section: preset.section,
+      alwaysIncluded: preset.isAlwaysIncluded,
+      active: preset.isActive,
+      driverField: preset.driverField || '',
+      conditions,
+      variants,
+    });
   };
 
   const handleNewPreset = () => {
@@ -211,6 +274,16 @@ export default function QuoteBuilderPage() {
     setEditDriverField('');
     setEditConditions([]);
     setEditVariants([]);
+    setEditorBaseline({
+      title: '',
+      body: '',
+      section: 'SPECIFICATION',
+      alwaysIncluded: false,
+      active: true,
+      driverField: '',
+      conditions: [],
+      variants: [],
+    });
   };
 
   const handleSelectTemplate = async (id: string) => {
@@ -283,6 +356,16 @@ export default function QuoteBuilderPage() {
         await loadPresets(selectedTemplateId);
         flash('Block saved');
       }
+      setEditorBaseline({
+        title: editTitle.trim(),
+        body: isVariantMode ? '' : editBody,
+        section: editSection,
+        alwaysIncluded: editAlwaysIncluded,
+        active: editActive,
+        driverField: editDriverField || '',
+        conditions: editConditions,
+        variants: editVariants,
+      });
     } catch (err: any) {
       setError(err.message || 'Failed to save');
     } finally {
@@ -408,6 +491,18 @@ export default function QuoteBuilderPage() {
 
   const canSave = !!(editTitle.trim() && (selectedPresetId || isNewPreset));
 
+  const currentSnapshot: EditorSnapshot = {
+    title: editTitle,
+    body: editBody,
+    section: editSection,
+    alwaysIncluded: editAlwaysIncluded,
+    active: editActive,
+    driverField: editDriverField,
+    conditions: editConditions,
+    variants: editVariants,
+  };
+  const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
+
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       <TopBar
@@ -422,6 +517,7 @@ export default function QuoteBuilderPage() {
         onSave={handleSave}
         saving={saving}
         canSave={canSave}
+        isDirty={isDirty}
       />
 
       {/* Banners */}
@@ -494,7 +590,7 @@ export default function QuoteBuilderPage() {
             tabIndex={0}
             onMouseDown={leftPanel.startResize}
             onKeyDown={handleLeftResizeKeyDown}
-            className="w-1.5 shrink-0 cursor-col-resize bg-gray-200/80 hover:bg-brand-navy/20"
+            className="relative w-1.5 shrink-0 cursor-col-resize bg-gray-200/80 hover:bg-brand-navy/20 focus:outline-none focus-visible:bg-brand-navy/40 before:absolute before:inset-y-0 before:-left-2 before:-right-2 before:content-['']"
           />
         )}
 
@@ -519,7 +615,7 @@ export default function QuoteBuilderPage() {
             tabIndex={0}
             onMouseDown={rightPanel.startResize}
             onKeyDown={handleRightResizeKeyDown}
-            className="w-1.5 shrink-0 cursor-col-resize bg-gray-200/80 hover:bg-brand-navy/20"
+            className="relative w-1.5 shrink-0 cursor-col-resize bg-gray-200/80 hover:bg-brand-navy/20 focus:outline-none focus-visible:bg-brand-navy/40 before:absolute before:inset-y-0 before:-left-2 before:-right-2 before:content-['']"
           />
         )}
 
