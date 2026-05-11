@@ -399,7 +399,7 @@ export default function ProductsPage() {
                                       ['Wood Type', d.woodType],
                                       ['Finish', d.finish],
                                     ['Glass Type', d.glassType],
-                                      ['Hung Type', d.hungType],
+                                      ...(group.category === 'Double Hung' ? [['Hung Type', d.hungType]] : []),
                                       ['Spacer Bar', d.spacerBarType],
                                       ['Spacer Colors', d.spacerBarColors],
                                       ['SDL', d.sdl],
