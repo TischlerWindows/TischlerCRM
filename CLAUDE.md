@@ -58,11 +58,28 @@ pnpm --filter @crm/db run prisma:push:deploy   # push schema with --accept-data-
 
 Run a single Jest test: `pnpm --filter web exec jest path/to/file.test.ts`.
 
-## Environment
+## Environment & deploy — Railway
 
-Copy [.env.example](.env.example) → `.env` at repo root. Required: `DATABASE_URL`, `JWT_SECRET`. Optional: `ENCRYPTION_KEY` (encrypts integration tokens at rest; falls back to `JWT_SECRET` in dev).
+This project runs on **Railway** for deployment, env vars, and the database. **Do not populate `.env` with real config — Railway holds it.** [.env.example](.env.example) documents the *shape* of variables (`DATABASE_URL`, `JWT_SECRET`, `ENCRYPTION_KEY`, …) but you should pull values from Railway, not maintain a local file.
 
-**Integration API keys** (Outlook, Dropbox, Google Maps, etc.) are **not** env vars — they live in the DB, configured through **Settings > Integrations** in the UI, encrypted at rest with `ENCRYPTION_KEY`.
+Use the **Railway CLI** for local work:
+
+```bash
+railway login                   # one-time auth
+railway link                    # link this checkout to the Railway project
+railway run pnpm dev            # run any command with Railway env vars injected
+railway variables               # inspect env vars
+railway logs                    # tail service logs
+```
+
+**Inspecting the database — Railway CLI is the way.** Do not stand up a separate local Postgres:
+
+```bash
+railway connect Postgres        # opens psql against the project DB (use the actual service name)
+railway run psql $DATABASE_URL  # alternative if you want a one-off query
+```
+
+**Integration API keys** (Outlook, Dropbox, Google Maps, etc.) are **not** env vars — they live in the DB, configured through **Settings > Integrations** in the UI, encrypted at rest with `ENCRYPTION_KEY` (set in Railway).
 
 ## Backend conventions
 
@@ -145,15 +162,19 @@ Composite widget types that link parent records to related Contact/Account recor
 
 ## Testing
 
-- Jest in `apps/web` only (no backend tests yet).
+- Jest in `apps/web` only. **No backend test suite exists** and one is not expected.
 - Co-located: `**/__tests__/**/*.test.ts`.
 - Config: [apps/web/jest.config.cjs](apps/web/jest.config.cjs) (ts-jest preset).
 - `apps/web/tsconfig.json` excludes `__tests__/` from the main TS build — tests live outside the production type-check.
+- **Expectation for new work**: write Jest tests for non-trivial frontend logic — pure functions in `lib/`, custom hooks, complex stateful components. Trivial UI tweaks and one-off bug fixes don't need tests. Don't set up a backend test runner without being asked.
 
 ## Working in this repo as an agent
 
+- **Branch + PR**: branch name is `claude/<short-descriptor>`. Open a PR against `main` and **wait for review** — do not auto-merge, do not push to `main` directly, do not enable `--auto`.
 - **One PR per unit of work.** After a PR is pushed, follow-up changes go on a **new** branch — never pile onto a handed-off PR.
+- **Schema is read-only by default.** Do not edit [packages/db/prisma/schema.prisma](packages/db/prisma/schema.prisma) or add a Prisma migration without asking first — schema mistakes are hard to roll back. Surface intent, wait for approval, then change.
 - **Worktree gotcha**: when working inside `.claude/worktrees/<name>`, absolute paths can still resolve to the main repo. After the first edit, run `git status` to confirm changes landed in the worktree, not main.
 - **Specs first**: before changing a feature area (page builder, slots, triggers, widgets, installations, service module, etc.), read the most recent dated spec in [docs/superpowers/specs/](docs/superpowers/specs) for that area.
-- **Schema first**: when touching data, read [packages/db/prisma/schema.prisma](packages/db/prisma/schema.prisma) first. Don't guess model names.
+- **Read the schema before touching data.** Don't guess model names — they're all in `schema.prisma`.
 - **Don't add backwards-compat shims**, dead `// removed` comments, or unused re-exports when removing code. Just delete it.
+- **No `.env` edits.** Real config lives in Railway. If you need a new env var, surface it so the user can add it to Railway and `.env.example`.
