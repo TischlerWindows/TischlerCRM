@@ -480,10 +480,6 @@ export default function SalesforceImportPage() {
         return mapped;
       });
 
-      // DEBUG: log first record to inspect key structure
-      console.log(`[SF Import] ${objectApiName} — column mapping:`, entry.columnMapping);
-      console.log(`[SF Import] ${objectApiName} — first mapped record:`, records[0]);
-
       // Send in batches of 500
       const BATCH_SIZE = 500;
       const totalBatches = Math.ceil(records.length / BATCH_SIZE);
@@ -507,23 +503,6 @@ export default function SalesforceImportPage() {
 
         try {
           const result = await apiClient.importRecords(objectApiName, batch, entry.sfIdColumn ?? undefined);
-          // DEBUG: log API response for first batch
-          if (batchIdx === 0) {
-            console.log(`[SF Import] ${objectApiName} — API response:`, result);
-            console.log(`[SF Import] ${objectApiName} — first 3 errors:`, result.errors?.slice(0, 3));
-            // Fetch back the first created record to inspect what's actually stored
-            const firstCrmId = Object.values(result.idMap ?? {})[0];
-            if (firstCrmId) {
-              try {
-                const fetched = await fetch(`/api/objects/${objectApiName}/records/${firstCrmId}`, { credentials: 'include' });
-                const fetchedData = await fetched.json();
-                console.log(`[SF Import] ${objectApiName} — fetched back first record:`, fetchedData);
-                console.log(`[SF Import] ${objectApiName} — record.data keys:`, Object.keys(fetchedData?.data ?? {}));
-              } catch (fe) {
-                console.log(`[SF Import] ${objectApiName} — fetch-back failed:`, fe);
-              }
-            }
-          }
           totalCreated += result.created;
 
           // Merge returned idMap into global map
