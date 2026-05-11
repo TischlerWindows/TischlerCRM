@@ -2,6 +2,7 @@ import {
   buildQuoteContext,
   evaluatePresetDecision,
   getUnsupportedConditionFields,
+  matchVariants,
   type QuoteContext,
   type SpecPresetData,
   type SummaryForConditions,
@@ -14,7 +15,7 @@ import {
 } from './quote-placeholders';
 import type { QuotePDFData } from './quote-pdf-renderer';
 
-export type ProposalSection = 'ALWAYS' | 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION';
+export type ProposalSection = 'CONSTANT' | 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION';
 
 export interface ProposalTemplateData {
   id: string;
@@ -52,7 +53,7 @@ type ProposalSummary = SummaryForConditions & SummaryForPlaceholders & {
 
 function emptySections(): Record<ProposalSection, SpecPresetData[]> {
   return {
-    ALWAYS: [],
+    CONSTANT: [],
     SPECIFICATION: [],
     OPTION: [],
     EXCLUSION: [],
@@ -101,7 +102,7 @@ function buildPdfData(
     sdlType: tokens.sdlType || '',
     spacerBarColors: tokens.spacerBarColor || '',
 
-    alwaysPresets: sections.ALWAYS,
+    constantPresets: sections.CONSTANT,
     specPresets: sections.SPECIFICATION,
     optionPresets: sections.OPTION,
     exclusionPresets: sections.EXCLUSION,
@@ -171,14 +172,34 @@ export function assembleProposal({
       continue;
     }
 
-    const resolved = resolveTokensWithDiagnostics(preset.body, tokens);
-    const resolvedPreset = { ...preset, body: resolved.text };
-    sections[sectionOf(preset)].push(resolvedPreset);
-    includedBlocks.push(block);
+    if (preset.driverField && preset.variants?.length) {
+      const matched = matchVariants(preset, context);
+      if (matched.length === 0) {
+        excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}".` });
+        continue;
+      }
+      for (const variant of matched) {
+        const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
+        const resolvedPreset = { ...preset, body: resolved.text };
+        sections[sectionOf(preset)].push(resolvedPreset);
+        for (const token of resolved.unresolvedTokens) {
+          unresolvedTokens.push({ presetId: preset.id, token });
+          warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
+        }
+      }
+      includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
+    } else {
+      const bodyText = preset.body ?? '';
+      if (!bodyText) continue;
+      const resolved = resolveTokensWithDiagnostics(bodyText, tokens);
+      const resolvedPreset = { ...preset, body: resolved.text };
+      sections[sectionOf(preset)].push(resolvedPreset);
+      includedBlocks.push(block);
 
-    for (const token of resolved.unresolvedTokens) {
-      unresolvedTokens.push({ presetId: preset.id, token });
-      warnings.push(`${preset.title}: unresolved token {{${token}}}.`);
+      for (const token of resolved.unresolvedTokens) {
+        unresolvedTokens.push({ presetId: preset.id, token });
+        warnings.push(`${preset.title}: unresolved token {{${token}}}.`);
+      }
     }
   }
 

@@ -44,7 +44,10 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
           presets: {
             where: { isActive: true },
             orderBy: { order: 'asc' },
-            include: { conditions: true },
+            include: {
+              conditions: true,
+              variants: { orderBy: { order: 'asc' } },
+            },
           },
         },
       });
@@ -67,7 +70,10 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
         include: {
           presets: {
             orderBy: { order: 'asc' },
-            include: { conditions: true },
+            include: {
+              conditions: true,
+              variants: { orderBy: { order: 'asc' } },
+            },
           },
         },
       });

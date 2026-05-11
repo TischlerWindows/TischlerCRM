@@ -121,17 +121,30 @@ export interface SpecConditionData {
   logic: 'AND' | 'OR';
 }
 
-/** SpecPreset as returned from the API with conditions included. */
+/** SpecVariant as returned from the API. */
+export interface SpecVariantData {
+  id: string;
+  presetId: string;
+  matchValue: string;
+  matchLabel: string | null;
+  body: string;
+  order: number;
+  isActive: boolean;
+}
+
+/** SpecPreset as returned from the API with conditions and variants included. */
 export interface SpecPresetData {
   id: string;
   templateId: string;
   order: number;
   title: string;
-  body: string;
-  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'ALWAYS';
+  body: string | null;
+  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'CONSTANT';
   isAlwaysIncluded: boolean;
+  driverField: string | null;
   isActive: boolean;
   conditions: SpecConditionData[];
+  variants: SpecVariantData[];
 }
 
 export const CONDITION_FIELD_DEFINITIONS = [
@@ -573,6 +586,38 @@ export function assemblePresets(
  *
  * Returns a map of section → included presets for that section.
  */
+/**
+ * Match active variants for a preset against the context.
+ *
+ * Looks up the driver field value(s) in the context. For string fields,
+ * returns variants whose matchValue is contained in the context value.
+ * For array fields (e.g. productTypes), returns variants whose matchValue
+ * is contained in any element. Returns all matching variants sorted by order.
+ */
+export function matchVariants(
+  preset: SpecPresetData,
+  context: QuoteContext
+): SpecVariantData[] {
+  if (!preset.driverField || !preset.variants?.length) return [];
+
+  const driverValue = (context as Record<string, unknown>)[preset.driverField];
+  if (driverValue === undefined || driverValue === null) return [];
+
+  const activeVariants = preset.variants
+    .filter((v) => v.isActive)
+    .sort((a, b) => a.order - b.order);
+
+  return activeVariants.filter((variant) => {
+    const match = variant.matchValue.toLowerCase();
+    if (Array.isArray(driverValue)) {
+      return driverValue.some((item) =>
+        String(item).toLowerCase().includes(match)
+      );
+    }
+    return String(driverValue).toLowerCase().includes(match);
+  });
+}
+
 export function assemblePresetsBySection(
   presets: SpecPresetData[],
   context: QuoteContext
@@ -584,7 +629,7 @@ export function assemblePresetsBySection(
     OPTION: [],
     EXCLUSION: [],
     INSTALLATION: [],
-    ALWAYS: [],
+    CONSTANT: [],
   };
 
   for (const preset of included) {

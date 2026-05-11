@@ -18,25 +18,37 @@ const conditionSchema = z.object({
   }
 });
 
+const variantSchema = z.object({
+  matchValue: z.string().min(1),
+  matchLabel: z.string().nullable().optional(),
+  body: z.string().min(1),
+  order: z.number().int().min(0),
+  isActive: z.boolean().optional(),
+});
+
 const createPresetSchema = z.object({
   templateId: z.string().min(1),
   order: z.number().int().min(0),
   title: z.string().min(1),
-  body: z.string(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'ALWAYS']),
+  body: z.string().nullable().optional(),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'CONSTANT']),
   isAlwaysIncluded: z.boolean().optional(),
+  driverField: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),
+  variants: z.array(variantSchema).optional(),
 });
 
 const updatePresetSchema = z.object({
   order: z.number().int().min(0).optional(),
   title: z.string().min(1).optional(),
-  body: z.string().optional(),
-  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'ALWAYS']).optional(),
+  body: z.string().nullable().optional(),
+  section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'CONSTANT']).optional(),
   isAlwaysIncluded: z.boolean().optional(),
+  driverField: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   conditions: z.array(conditionSchema).optional(),
+  variants: z.array(variantSchema).optional(),
 });
 
 const reorderSchema = z.array(z.object({
@@ -56,7 +68,10 @@ export async function specPresetRoutes(app: FastifyInstance) {
       const presets = await prisma.specPreset.findMany({
         where: { templateId },
         orderBy: { order: 'asc' },
-        include: { conditions: true },
+        include: {
+          conditions: true,
+          variants: { orderBy: { order: 'asc' } },
+        },
       });
       reply.send(presets);
     } catch (err: any) {
@@ -75,7 +90,7 @@ export async function specPresetRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
 
-    const { conditions, ...presetData } = parsed.data;
+    const { conditions, variants, ...presetData } = parsed.data;
 
     try {
       // Verify the referenced template exists
@@ -105,9 +120,26 @@ export async function specPresetRoutes(app: FastifyInstance) {
           });
         }
 
+        if (variants && variants.length > 0) {
+          await tx.specVariant.createMany({
+            data: variants.map((v) => ({
+              id: generateId('SpecVariant'),
+              presetId: created.id,
+              matchValue: v.matchValue,
+              matchLabel: v.matchLabel ?? null,
+              body: v.body,
+              order: v.order,
+              isActive: v.isActive ?? true,
+            })),
+          });
+        }
+
         return tx.specPreset.findUnique({
           where: { id: created.id },
-          include: { conditions: true },
+          include: {
+            conditions: true,
+            variants: { orderBy: { order: 'asc' } },
+          },
         });
       });
 
@@ -179,17 +211,15 @@ export async function specPresetRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
 
-    const { conditions, ...presetData } = parsed.data;
+    const { conditions, variants, ...presetData } = parsed.data;
 
     try {
       const preset = await prisma.$transaction(async (tx) => {
-        // Update preset fields
         await tx.specPreset.update({
           where: { id },
           data: presetData,
         });
 
-        // Replace conditions if provided
         if (conditions !== undefined) {
           await tx.specCondition.deleteMany({ where: { presetId: id } });
 
@@ -207,9 +237,30 @@ export async function specPresetRoutes(app: FastifyInstance) {
           }
         }
 
+        if (variants !== undefined) {
+          await tx.specVariant.deleteMany({ where: { presetId: id } });
+
+          if (variants.length > 0) {
+            await tx.specVariant.createMany({
+              data: variants.map((v) => ({
+                id: generateId('SpecVariant'),
+                presetId: id,
+                matchValue: v.matchValue,
+                matchLabel: v.matchLabel ?? null,
+                body: v.body,
+                order: v.order,
+                isActive: v.isActive ?? true,
+              })),
+            });
+          }
+        }
+
         return tx.specPreset.findUnique({
           where: { id },
-          include: { conditions: true },
+          include: {
+            conditions: true,
+            variants: { orderBy: { order: 'asc' } },
+          },
         });
       });
 

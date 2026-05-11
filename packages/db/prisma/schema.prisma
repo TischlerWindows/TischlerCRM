@@ -914,7 +914,7 @@ enum SpecSection {
   OPTION
   EXCLUSION
   INSTALLATION
-  ALWAYS
+  CONSTANT
 }
 
 enum ConditionOperator {
@@ -930,6 +930,22 @@ enum ConditionLogic {
   OR
 }
 
+enum TokenSourceObject {
+  SUMMARY
+  CONTACT
+  ACCOUNT
+  OPPORTUNITY
+  SYSTEM
+}
+
+enum TokenFormat {
+  TEXT
+  CURRENCY
+  DATE
+  PHONE
+  PERCENTAGE
+}
+
 model QuoteTemplate {
   id          String   @id
   name        String
@@ -939,7 +955,8 @@ model QuoteTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  presets SpecPreset[]
+  presets       SpecPreset[]
+  tokenMappings TokenMapping[]
 }
 
 model SpecPreset {
@@ -947,18 +964,36 @@ model SpecPreset {
   templateId       String
   order            Int
   title            String
-  body             String
+  body             String?
   section          SpecSection
   isAlwaysIncluded Boolean     @default(false)
+  driverField      String?
   isActive         Boolean     @default(true)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
   template   QuoteTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
   conditions SpecCondition[]
+  variants   SpecVariant[]
 
   @@index([templateId])
   @@index([templateId, order])
+}
+
+model SpecVariant {
+  id         String   @id
+  presetId   String
+  matchValue String
+  matchLabel String?
+  body       String
+  order      Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  preset SpecPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
+
+  @@index([presetId])
 }
 
 model SpecCondition {
@@ -972,4 +1007,24 @@ model SpecCondition {
   preset SpecPreset @relation(fields: [presetId], references: [id], onDelete: Cascade)
 
   @@index([presetId])
+}
+
+model TokenMapping {
+  id           String            @id
+  templateId   String
+  tokenName    String
+  sourceObject TokenSourceObject
+  sourcePath   String
+  format       TokenFormat       @default(TEXT)
+  label        String
+  category     String
+  isBuiltIn    Boolean           @default(false)
+  isActive     Boolean           @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  template QuoteTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, tokenName])
+  @@index([templateId])
 }
