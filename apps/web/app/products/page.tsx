@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Search, Package, ChevronDown, ChevronRight } from 'lucide-react';
 import { getSetting } from '@/lib/preferences';
+import { getOptionsForType } from '@/lib/product-type-options';
 
 interface ProductLogDetail {
   summaryId: string;
@@ -445,7 +446,8 @@ export default function ProductsPage() {
                                   </div>
                                 {(() => {
                                   const pto = d.productTypeOptions;
-                                  const opts = Array.isArray(pto[group.productType]) ? pto[group.productType] : [];
+                                  const validOpts = new Set(getOptionsForType(group.productType));
+                                  const opts = (Array.isArray(pto[group.productType]) ? pto[group.productType] : []).filter((o: string) => validOpts.has(o));
                                   if (!opts.length) return null;
                                   return (
                                     <div className="w-full mt-2 pt-2 border-t border-gray-100">
