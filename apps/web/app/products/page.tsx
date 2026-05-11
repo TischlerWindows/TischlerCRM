@@ -447,7 +447,7 @@ export default function ProductsPage() {
                                   <div className="w-full mt-2 pt-2 border-t border-gray-100">
                                     <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Product Type Options</div>
                                     <div className="flex flex-wrap gap-x-6 gap-y-1">
-                                      {Object.entries(d.productTypeOptions).filter(([, opts]) => opts.length > 0).map(([type, opts]) => (
+                                      {Object.entries(d.productTypeOptions).filter(([, opts]) => Array.isArray(opts) && opts.length > 0).map(([type, opts]) => (
                                         <div key={type} className="text-xs text-gray-700">
                                           <span className="font-medium">{type}:</span> {opts.join(', ')}
                                         </div>
