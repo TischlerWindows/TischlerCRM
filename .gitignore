@@ -16,12 +16,6 @@ dist/
 .next/
 coverage/
 
-# PWA generated files (next-pwa build artifacts)
-apps/web/public/sw.js
-apps/web/public/sw.js.map
-apps/web/public/swe-worker-*.js
-apps/web/public/workbox-*.js
-
 # IDE
 .vscode/
 .DS_Store
