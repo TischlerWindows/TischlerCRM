@@ -1946,7 +1946,7 @@ export default function SummaryPage() {
       : (s.rows || []);
     const specHasHung = specWinRows.some(r => r.type?.toLowerCase?.()?.includes('hung'));
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
-    if (specHasHung) addSpec('Hung Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
+    if (specHasHung) addSpec('Hung Glass Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Spacer Bar Type', s.spacerBarType);
@@ -3934,7 +3934,7 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row: Glass Type (+ Hung Type only when hung rows exist) */}
+                      {/* Row: Glass Type (+ Hung Glass Type only when hung rows exist) */}}
                       {(() => {
                         const uiWinRows = editingSummary.hasMultipleLocations && editingSummary.subLocations?.length
                           ? editingSummary.subLocations.flatMap((loc: any) => loc.rows || [])
@@ -3968,13 +3968,13 @@ export default function SummaryPage() {
                             </div>
                             {hasHung && (
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Hung Type</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Hung Glass Type</label>
                                 <select
                                   value={editingSummary.hungType === 'Custom Option' ? 'Custom Option' : (editingSummary.hungType || '#34')}
                                   onChange={(e) => setEditingSummary({ ...editingSummary, hungType: e.target.value, hungTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.hungTypeCustom })}
                                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.hungType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
                                 >
-                                  <option value="">Select hung type...</option>
+                                  <option value="">Select hung glass type...</option>
                                   {getOppPicklist('Opportunity__glassType').map(v => (
                                     <option key={v} value={v}>{v}</option>
                                   ))}

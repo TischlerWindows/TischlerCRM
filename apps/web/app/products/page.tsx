@@ -399,7 +399,7 @@ export default function ProductsPage() {
                                       ['Wood Type', d.woodType],
                                       ['Finish', d.finish],
                                     ['Glass Type', d.glassType],
-                                      ...(group.category === 'Double Hung' ? [['Hung Type', d.hungType]] : []),
+                                      ...(group.category === 'Double Hung' ? [['Hung Glass Type', d.hungType]] : []),
                                       ['Spacer Bar', d.spacerBarType],
                                       ['Spacer Colors', d.spacerBarColors],
                                       ['SDL', d.sdl],
@@ -443,18 +443,17 @@ export default function ProductsPage() {
                                       </div>
                                     )}
                                   </div>
-                                {Object.keys(d.productTypeOptions).length > 0 && (
-                                  <div className="w-full mt-2 pt-2 border-t border-gray-100">
-                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Product Type Options</div>
-                                    <div className="flex flex-wrap gap-x-6 gap-y-1">
-                                      {Object.entries(d.productTypeOptions).filter(([, opts]) => Array.isArray(opts) && opts.length > 0).map(([type, opts]) => (
-                                        <div key={type} className="text-xs text-gray-700">
-                                          <span className="font-medium">{type}:</span> {opts.join(', ')}
-                                        </div>
-                                      ))}
+                                {(() => {
+                                  const pto = d.productTypeOptions;
+                                  const opts = Array.isArray(pto[group.productType]) ? pto[group.productType] : [];
+                                  if (!opts.length) return null;
+                                  return (
+                                    <div className="w-full mt-2 pt-2 border-t border-gray-100">
+                                      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Product Type Options</div>
+                                      <div className="text-xs text-gray-700">{opts.join(', ')}</div>
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                               </div>
                               ))}
                             </div>
