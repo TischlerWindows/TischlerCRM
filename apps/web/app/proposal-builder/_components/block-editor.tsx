@@ -149,9 +149,9 @@ export function BlockEditor({
               ref={bodyTextareaRef}
               value={body}
               onChange={(e) => onBodyChange(e.target.value)}
-              rows={6}
+              rows={12}
               placeholder="All windows and doors shall be glazed with {{glassType}} glass..."
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20 font-mono resize-y"
+              className="w-full min-h-[180px] px-2.5 py-2 text-xs leading-relaxed border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20 font-mono resize-y"
             />
           </div>
         )}

@@ -309,6 +309,7 @@ export default function QuoteBuilderPage() {
       textarea.focus();
       textarea.selectionStart = textarea.selectionEnd = start + text.length;
     });
+    flash(`Inserted {{${tokenName}}}`);
   };
 
   // ── Save / Delete ─────────────────────────────────────────────
@@ -460,6 +461,69 @@ export default function QuoteBuilderPage() {
 
   const selectedSummary = summaries.find((s) => s.id === selectedSummaryId);
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+
+  // Build a preset from the current editor state. Used so the preview
+  // reflects in-progress edits without requiring a Save.
+  const previewPresets = useMemo<SpecPresetData[]>(() => {
+    if (!selectedTemplateId) return presets;
+    const draftFromEditor = (
+      idForDraft: string,
+      templateId: string,
+      order: number,
+    ): SpecPresetData => ({
+      id: idForDraft,
+      templateId,
+      order,
+      title: editTitle,
+      body: editDriverField ? null : editBody,
+      section: editSection,
+      isAlwaysIncluded: editAlwaysIncluded,
+      driverField: editDriverField || null,
+      isActive: editActive,
+      conditions: editConditions.map((c, i) => ({
+        id: `__draft_cond_${i}`,
+        field: c.field,
+        operator: c.operator,
+        value: c.value || null,
+        logic: c.logic,
+      })),
+      variants: editDriverField
+        ? editVariants.map((v, i) => ({
+            id: `__draft_variant_${i}`,
+            presetId: idForDraft,
+            matchValue: v.matchValue,
+            matchLabel: v.matchLabel || null,
+            body: v.body,
+            order: i,
+            isActive: v.isActive,
+          }))
+        : [],
+    });
+
+    if (selectedPresetId) {
+      return presets.map((p) =>
+        p.id === selectedPresetId ? draftFromEditor(p.id, p.templateId, p.order) : p,
+      );
+    }
+    if (isNewPreset && editTitle.trim()) {
+      return [...presets, draftFromEditor('__draft__', selectedTemplateId, presets.length)];
+    }
+    return presets;
+  }, [
+    presets,
+    selectedPresetId,
+    isNewPreset,
+    selectedTemplateId,
+    editTitle,
+    editBody,
+    editSection,
+    editAlwaysIncluded,
+    editActive,
+    editDriverField,
+    editConditions,
+    editVariants,
+  ]);
+
   const previewState = useMemo(() => {
     if (!selectedTemplateId || !selectedSummary) return { result: null, error: null };
     try {
@@ -469,7 +533,7 @@ export default function QuoteBuilderPage() {
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',
-            presets: presets as any,
+            presets: previewPresets as any,
           },
         }),
         error: null,
@@ -477,7 +541,7 @@ export default function QuoteBuilderPage() {
     } catch (err) {
       return { result: null, error: err instanceof Error ? err.message : 'Preview failed.' };
     }
-  }, [selectedSummary, selectedTemplate?.name, selectedTemplateId, presets]);
+  }, [selectedSummary, selectedTemplate?.name, selectedTemplateId, previewPresets]);
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -568,7 +632,7 @@ export default function QuoteBuilderPage() {
                   onDragStart={setDragIdx}
                 />
               </div>
-              <div className="h-[200px] flex-shrink-0 overflow-hidden border-t border-gray-200">
+              <div className="h-[280px] flex-shrink-0 overflow-hidden border-t border-gray-200">
                 <VariableChips
                   mappings={tokenMappings}
                   grouped={tokenGrouped}
