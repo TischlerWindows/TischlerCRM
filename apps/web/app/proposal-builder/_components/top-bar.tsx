@@ -21,6 +21,7 @@ interface Props {
   onSave: () => void;
   saving: boolean;
   canSave: boolean;
+  isDirty?: boolean;
 }
 
 export function TopBar({
@@ -35,6 +36,7 @@ export function TopBar({
   onSave,
   saving,
   canSave,
+  isDirty = false,
 }: Props) {
   return (
     <div className="flex items-center gap-4 px-5 py-2.5 bg-[#1e3a5f] text-white">
@@ -89,6 +91,17 @@ export function TopBar({
       </div>
 
       <div className="flex-1" />
+
+      {isDirty && (
+        <span
+          role="status"
+          aria-live="polite"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-amber-200 bg-amber-500/20 border border-amber-300/40 rounded"
+        >
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+          Unsaved changes
+        </span>
+      )}
 
       <button
         onClick={onPreviewPDF}
