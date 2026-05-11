@@ -677,7 +677,7 @@ export default function OpportunitiesPage() {
   return (
     <div className="flex flex-1 overflow-hidden bg-gray-50">
         {/* Sidebar */}
-        <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+        <div className="hidden md:block md:w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="pb-6 border-b border-gray-200 mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center"><Target className="w-6 h-6 text-brand-navy" /></div>

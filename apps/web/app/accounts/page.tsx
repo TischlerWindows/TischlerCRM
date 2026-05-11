@@ -582,7 +582,7 @@ export default function AccountsPage() {
   return (
     <div className="flex flex-1 overflow-hidden bg-gray-50">
         {/* Sidebar */}
-        <div className="w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+        <div className="hidden md:block md:w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
           <div className="space-y-6">
             {/* Page Header in Sidebar */}
             <div className="pb-6 border-b border-gray-200">
