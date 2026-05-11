@@ -13,10 +13,12 @@ interface ProductLogDetail {
   woodType: string;
   finish: string;
   glassType: string;
+  hungType: string;
   spacerBarType: string;
   spacerBarColors: string;
   sdl: string;
   tdl: string;
+  productTypeOptions: Record<string, string[]>;
   widthFtIn: string;
   heightFtIn: string;
   qty: number;
@@ -55,6 +57,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
     const woodType = s.woodType === 'Custom Option' ? (s.woodTypeCustom || '') : (s.woodType || '');
     const finish = s.finish || '';
     const glassType = s.glassType === 'Custom Option' ? (s.glassTypeCustom || '') : (s.glassType || '');
+    const hungType = s.hungType === 'Custom Option' ? (s.hungTypeCustom || '') : (s.hungType || '');
     const spacerBarType = s.spacerBarType || '';
     const spacerBarColors = s.spacerBarColors || '';
     const sdl = s.sdl === 'Custom Option' ? (s.sdlCustom || '') : (s.sdl || '');
@@ -81,7 +84,8 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
           summaryName: s.name || 'Untitled',
           opportunityNumber: s.opportunityNumber || '',
           date: s.date || null,
-          product, woodType, finish, glassType, spacerBarType, spacerBarColors, sdl, tdl,
+          product, woodType, finish, glassType, hungType, spacerBarType, spacerBarColors, sdl, tdl,
+          productTypeOptions: (s.productTypeOptions && !Array.isArray(s.productTypeOptions)) ? s.productTypeOptions as Record<string, string[]> : {},
           widthFtIn: row.widthFtIn || '',
           heightFtIn: row.heightFtIn || '',
           qty,
@@ -394,7 +398,8 @@ export default function ProductsPage() {
                                       ['Product', d.product],
                                       ['Wood Type', d.woodType],
                                       ['Finish', d.finish],
-                                      ['Glass Type', d.glassType],
+                                    ['Glass Type', d.glassType],
+                                      ['Hung Type', d.hungType],
                                       ['Spacer Bar', d.spacerBarType],
                                       ['Spacer Colors', d.spacerBarColors],
                                       ['SDL', d.sdl],
@@ -438,7 +443,19 @@ export default function ProductsPage() {
                                       </div>
                                     )}
                                   </div>
-                                </div>
+                                {Object.keys(d.productTypeOptions).length > 0 && (
+                                  <div className="w-full mt-2 pt-2 border-t border-gray-100">
+                                    <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Product Type Options</div>
+                                    <div className="flex flex-wrap gap-x-6 gap-y-1">
+                                      {Object.entries(d.productTypeOptions).filter(([, opts]) => opts.length > 0).map(([type, opts]) => (
+                                        <div key={type} className="text-xs text-gray-700">
+                                          <span className="font-medium">{type}:</span> {opts.join(', ')}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                               ))}
                             </div>
                           </div>

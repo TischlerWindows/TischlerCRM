@@ -737,6 +737,8 @@ interface Summary {
   finish: string;
   glassType: string;
   glassTypeCustom: string;
+  hungType: string;
+  hungTypeCustom: string;
   woodTypeCustom: string;
   sdl: string;
   sdlCustom: string;
@@ -745,6 +747,8 @@ interface Summary {
   spacerBars: string;
   spacerBarType: string;
   spacerBarColors: string;
+  finials: string;
+  hingeFinishSpecification: string;
   projectContains: string[];
   shippingContainers: string;
   shippingCostPerContainer: string;
@@ -884,7 +888,7 @@ export default function SummaryPage() {
       router.replace('/summary');
       // Fetch the opportunity record to pre-populate fields
       (async () => {
-        let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; contactPrimaryPhone?: string; contactEmail?: string; contactCellPhone?: string } = {};
+        let oppFields: { woodType?: string; woodTypeCustom?: string; finish?: string; glassType?: string; glassTypeCustom?: string; spacerBars?: string; spacerBarType?: string; spacerBarColors?: string; product?: string; plansDated?: string; finials?: string; hingeFinishSpecification?: string; contactReceivingQuote?: string; accountReceivingQuote?: string; accountShippingAddress?: string; contactPrimaryPhone?: string; contactEmail?: string; contactCellPhone?: string } = {};
         let address = '';
         try {
           const rec = await recordsService.getRecord('Opportunity', opportunityId);
@@ -1341,7 +1345,6 @@ export default function SummaryPage() {
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
       },
-      product: '',
       productTypeOptions: {},
       product: opts?.oppFields?.product || '',
       woodType: opts?.oppFields?.woodType || '',
@@ -1349,6 +1352,8 @@ export default function SummaryPage() {
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
       glassTypeCustom: opts?.oppFields?.glassTypeCustom || '',
+      hungType: '#34',
+      hungTypeCustom: '',
       sdl: '',
       sdlCustom: '',
       tdl: '',
@@ -1941,6 +1946,7 @@ export default function SummaryPage() {
     addSpec('Wood Type', s.woodType === 'Custom Option' ? s.woodTypeCustom : s.woodType);
     addSpec('Finish', s.finish);
     addSpec('Glass Type', s.glassType === 'Custom Option' ? s.glassTypeCustom : s.glassType);
+    addSpec('Hung Type', s.hungType === 'Custom Option' ? s.hungTypeCustom : s.hungType);
     addSpec('SDL', s.sdl === 'Custom Option' ? s.sdlCustom : s.sdl);
     addSpec('TDL', s.tdl === 'Custom Option' ? s.tdlCustom : s.tdl);
     addSpec('Spacer Bar Type', s.spacerBarType);
@@ -3928,30 +3934,54 @@ export default function SummaryPage() {
                         </div>
                       </div>
 
-                      {/* Row: Glass Type */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
-                        <select
-                          value={editingSummary.glassType === 'Custom Option' ? 'Custom Option' : (editingSummary.glassType || '')}
-                          onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.glassTypeCustom })}
-                          className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.glassType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
-                        >
-                          <option value="">Select glass type...</option>
-                          {getOppPicklist('Opportunity__glassType').map(v => (
-                            <option key={v} value={v}>{v}</option>
-                          ))}
-                          <option value="Custom Option">Custom Option</option>
-                        </select>
-                        {editingSummary.glassType === 'Custom Option' && (
-                          <input
-                            type="text"
-                            autoFocus
-                            value={editingSummary.glassTypeCustom || ''}
-                            onChange={(e) => setEditingSummary({ ...editingSummary, glassTypeCustom: e.target.value })}
-                            placeholder="Enter custom value..."
-                            className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
-                          />
-                        )}
+                      {/* Row: Glass Type + Hung Type */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
+                          <select
+                            value={editingSummary.glassType === 'Custom Option' ? 'Custom Option' : (editingSummary.glassType || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, glassType: e.target.value, glassTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.glassTypeCustom })}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.glassType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
+                          >
+                            <option value="">Select glass type...</option>
+                            {getOppPicklist('Opportunity__glassType').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                            <option value="Custom Option">Custom Option</option>
+                          </select>
+                          {editingSummary.glassType === 'Custom Option' && (
+                            <input
+                              type="text"
+                              value={editingSummary.glassTypeCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, glassTypeCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Hung Type</label>
+                          <select
+                            value={editingSummary.hungType === 'Custom Option' ? 'Custom Option' : (editingSummary.hungType || '')}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, hungType: e.target.value, hungTypeCustom: e.target.value !== 'Custom Option' ? '' : editingSummary.hungTypeCustom })}
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white [&>option]:not-italic [&>option]:text-gray-900${editingSummary.hungType === 'Custom Option' ? ' italic text-blue-600' : ''}`}
+                          >
+                            <option value="">Select hung type...</option>
+                            {getOppPicklist('Opportunity__glassType').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                            <option value="Custom Option">Custom Option</option>
+                          </select>
+                          {editingSummary.hungType === 'Custom Option' && (
+                            <input
+                              type="text"
+                              value={editingSummary.hungTypeCustom || ''}
+                              onChange={(e) => setEditingSummary({ ...editingSummary, hungTypeCustom: e.target.value })}
+                              placeholder="Enter custom value..."
+                              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
+                            />
+                          )}
+                        </div>
                       </div>
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
