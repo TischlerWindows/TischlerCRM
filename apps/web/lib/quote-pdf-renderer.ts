@@ -105,14 +105,6 @@ async function loadLogo(): Promise<string | null> {
   }
 }
 
-function todayFormatted(): string {
-  return new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 // ── Main renderer ──────────────────────────────────────────────────
 
 export async function generateQuotePDF(
@@ -239,47 +231,9 @@ export async function generateQuotePDF(
   drawRedLine(y);
   y += 8;
 
-  // Date
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(todayFormatted(), MARGIN_LEFT, y);
-  y += 10;
-
-  // Addressee block
-  const addressLines = [
-    data.contactName,
-    data.companyName,
-    data.companyAddress,
-  ].filter(Boolean);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  for (const line of addressLines) {
-    // Split long address lines
-    const wrapped = doc.splitTextToSize(line, contentWidth) as string[];
-    for (const wl of wrapped) {
-      doc.text(wl, MARGIN_LEFT, y);
-      y += 5;
-    }
-  }
-  y += 5;
-
-  // Salutation
-  const greeting = data.contactSalutation && data.contactLastName
-    ? `Dear ${data.contactSalutation} ${data.contactLastName}:`
-    : data.contactLastName
-      ? `Dear ${data.contactLastName}:`
-      : 'Dear Sir or Madam:';
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(...DARK);
-  doc.text(greeting, MARGIN_LEFT, y);
-  y += 8;
-
-  // Intro constant — all text comes from editable CONSTANT presets.
-  // If none exist, the opening section is simply skipped (no hardcoded fallback).
+  // Intro constant — all text comes from editable CONSTANT presets
+  // (date, addressee, salutation belong here, authored by the user).
+  // If none exist, the opening section is simply skipped.
   for (const preset of introConstant) {
     y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
     y += 4;

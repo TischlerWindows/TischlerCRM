@@ -17,14 +17,6 @@ interface Props {
 const NAVY = '#1e3a5f';
 const RED = '#da291c';
 
-function todayFormatted(): string {
-  return new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 function isClosingConstant(preset: SpecPresetData): boolean {
   return /closing|signature|sincerely/i.test(preset.title);
 }
@@ -59,15 +51,6 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
   const optionPresets = sections.OPTION ?? [];
   const exclusionPresets = sections.EXCLUSION ?? [];
   const installationPresets = sections.INSTALLATION ?? [];
-
-  // Salutation — mirror quote-pdf-renderer.ts:270-274 exactly.
-  const greeting = pdfData.contactSalutation && pdfData.contactLastName
-    ? `Dear ${pdfData.contactSalutation} ${pdfData.contactLastName}:`
-    : pdfData.contactLastName
-      ? `Dear ${pdfData.contactLastName}:`
-      : 'Dear Sir or Madam:';
-
-  const addressLines = [pdfData.contactName, pdfData.companyName, pdfData.companyAddress].filter(Boolean);
 
   const pricingRows: Array<[string, string]> = [];
   if (pdfData.hasEuroWindows) pricingRows.push(['Euro Windows', pdfData.euroWindowsPrice]);
@@ -133,24 +116,10 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
         </div>
         <div className="mt-3 border-t-2" style={{ borderColor: RED }} />
 
-        {/* Date */}
-        <div className="mt-6 text-[10pt]">{todayFormatted()}</div>
-
-        {/* Addressee block */}
-        {addressLines.length > 0 && (
-          <div className="mt-5 text-[10pt] leading-[1.4]">
-            {addressLines.map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
-          </div>
-        )}
-
-        {/* Salutation */}
-        <div className="mt-5 text-[10pt]">{greeting}</div>
-
-        {/* Intro CONSTANT presets */}
+        {/* Intro CONSTANT presets — date, addressee, salutation come from the user's editable
+            constant blocks; we do not hardcode them here (matches quote-pdf-renderer.ts). */}
         {introConstant.length > 0 && (
-          <div className="mt-4 space-y-3">
+          <div className="mt-6 space-y-3">
             {introConstant.map((preset) => (
               <div key={preset.id}>
                 {blockWrap(
