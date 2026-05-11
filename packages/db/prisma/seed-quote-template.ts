@@ -25,7 +25,7 @@ function makeId(prefix: string): string {
 interface PresetSeed {
   title: string;
   body: string;
-  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'ALWAYS';
+  section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'CONSTANT';
   isAlwaysIncluded: boolean;
   conditions?: {
     field: string;
@@ -49,18 +49,18 @@ export async function seedQuoteTemplate() {
   console.log(`Creating default proposal template: ${templateId}`);
 
   const presets: PresetSeed[] = [
-    // ── ALWAYS / PROPOSAL TEXT ──
+    // ── CONSTANT / PROPOSAL TEXT ──
 
     {
       title: 'Opening',
       body: 'Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for {{projectName}} ({{projectNumber}}), based on plans dated {{plansDated}}.',
-      section: 'ALWAYS',
+      section: 'CONSTANT',
       isAlwaysIncluded: true,
     },
     {
       title: 'Base Bid Introduction',
       body: 'Per our discussions, we are pleased to submit the following proposal for the quantities, sizes, and types outlined in our proposal. Our base bid includes the following:',
-      section: 'ALWAYS',
+      section: 'CONSTANT',
       isAlwaysIncluded: true,
     },
 
@@ -235,7 +235,7 @@ export async function seedQuoteTemplate() {
     {
       title: 'Closing',
       body: 'We appreciate the opportunity to propose this project and look forward to working with you. Please feel free to contact us with any questions.',
-      section: 'ALWAYS',
+      section: 'CONSTANT',
       isAlwaysIncluded: true,
     },
 
@@ -362,6 +362,53 @@ export async function seedQuoteTemplate() {
         });
       }
     }
+
+    // ── Built-in token mappings ──
+    const tokenSeeds: { tokenName: string; sourceObject: string; sourcePath: string; format: string; label: string; category: string }[] = [
+      { tokenName: 'projectName', sourceObject: 'SUMMARY', sourcePath: 'name', format: 'TEXT', label: 'Project Name', category: 'Project' },
+      { tokenName: 'projectNumber', sourceObject: 'SUMMARY', sourcePath: 'opportunityNumber', format: 'TEXT', label: 'Project Number', category: 'Project' },
+      { tokenName: 'plansDated', sourceObject: 'SUMMARY', sourcePath: 'plansDated', format: 'DATE', label: 'Plans Dated', category: 'Project' },
+      { tokenName: 'jobType', sourceObject: 'SUMMARY', sourcePath: 'jobType', format: 'TEXT', label: 'Job Type', category: 'Project' },
+      { tokenName: 'address', sourceObject: 'SUMMARY', sourcePath: 'address', format: 'TEXT', label: 'Project Address', category: 'Project' },
+      { tokenName: 'salesman', sourceObject: 'SUMMARY', sourcePath: 'salesman', format: 'TEXT', label: 'Salesman', category: 'Project' },
+      { tokenName: 'estimator', sourceObject: 'SUMMARY', sourcePath: 'estimator', format: 'TEXT', label: 'Estimator', category: 'Project' },
+      { tokenName: 'glassType', sourceObject: 'SUMMARY', sourcePath: 'glassType', format: 'TEXT', label: 'Glass Type', category: 'Materials' },
+      { tokenName: 'woodType', sourceObject: 'SUMMARY', sourcePath: 'woodType', format: 'TEXT', label: 'Wood Type', category: 'Materials' },
+      { tokenName: 'finishType', sourceObject: 'SUMMARY', sourcePath: 'finish', format: 'TEXT', label: 'Finish Type', category: 'Materials' },
+      { tokenName: 'sdlType', sourceObject: 'SUMMARY', sourcePath: 'sdl', format: 'TEXT', label: 'SDL Type', category: 'Materials' },
+      { tokenName: 'spacerBarColor', sourceObject: 'SUMMARY', sourcePath: 'spacerBarColors', format: 'TEXT', label: 'Spacer Bar Color', category: 'Materials' },
+      { tokenName: 'contactName', sourceObject: 'SUMMARY', sourcePath: 'contactReceivingQuote', format: 'TEXT', label: 'Contact Name', category: 'Contact' },
+      { tokenName: 'contactLastName', sourceObject: 'CONTACT', sourcePath: 'lastName', format: 'TEXT', label: 'Contact Last Name', category: 'Contact' },
+      { tokenName: 'contactSalutation', sourceObject: 'CONTACT', sourcePath: 'salutation', format: 'TEXT', label: 'Salutation', category: 'Contact' },
+      { tokenName: 'companyName', sourceObject: 'SUMMARY', sourcePath: 'accountReceivingQuote', format: 'TEXT', label: 'Company Name', category: 'Contact' },
+      { tokenName: 'companyAddress', sourceObject: 'SUMMARY', sourcePath: 'accountShippingAddress', format: 'TEXT', label: 'Company Address', category: 'Contact' },
+      { tokenName: 'euroWindowsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroWindows.finalAdj', format: 'CURRENCY', label: 'Euro Windows Price', category: 'Pricing' },
+      { tokenName: 'doubleHungPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.doubleHung.finalAdj', format: 'CURRENCY', label: 'Double Hung Price', category: 'Pricing' },
+      { tokenName: 'euroDoorsPrice', sourceObject: 'SUMMARY', sourcePath: 'quoteTotals.euroDoors.finalAdj', format: 'CURRENCY', label: 'Euro Doors Price', category: 'Pricing' },
+      { tokenName: 'grandTotal', sourceObject: 'SUMMARY', sourcePath: 'grandTotalAdjustment.finalAdj', format: 'CURRENCY', label: 'Grand Total', category: 'Pricing' },
+      { tokenName: 'windowScreensPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.windowScreens.final', format: 'CURRENCY', label: 'Window Screens Price', category: 'Add-ons' },
+      { tokenName: 'doorScreenSashPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.doorScreenSash.final', format: 'CURRENCY', label: 'Door Screen Sash Price', category: 'Add-ons' },
+      { tokenName: 'entryDoorPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.entryDoor.final', format: 'CURRENCY', label: 'Entry Door Price', category: 'Add-ons' },
+      { tokenName: 'jambExtensionsPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.jambExtensions.final', format: 'CURRENCY', label: 'Jamb Extensions Price', category: 'Add-ons' },
+      { tokenName: 'magneticContactPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.magneticContact.final', format: 'CURRENCY', label: 'Magnetic Contact Price', category: 'Add-ons' },
+      { tokenName: 'finalFinishPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.finalFinish.final', format: 'CURRENCY', label: 'Final Finish Price', category: 'Add-ons' },
+      { tokenName: 'installationPrice', sourceObject: 'SUMMARY', sourcePath: 'addOns.installation.final', format: 'CURRENCY', label: 'Installation Price', category: 'Add-ons' },
+    ];
+
+    await tx.tokenMapping.createMany({
+      data: tokenSeeds.map((t) => ({
+        id: makeId('046'),
+        templateId,
+        tokenName: t.tokenName,
+        sourceObject: t.sourceObject as any,
+        sourcePath: t.sourcePath,
+        format: t.format as any,
+        label: t.label,
+        category: t.category,
+        isBuiltIn: true,
+        isActive: true,
+      })),
+    });
   });
 
   console.log(`Created "Standard Proposal" template with ${presets.length} presets.`);

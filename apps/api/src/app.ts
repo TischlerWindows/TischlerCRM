@@ -46,6 +46,8 @@ import { supportTicketConfigRoutes } from './routes/support-ticket-config.js';
 import { productLogRoutes } from './routes/product-log.js';
 import { quoteTemplateRoutes } from './routes/quote-templates.js';
 import { specPresetRoutes } from './routes/spec-presets.js';
+import { specVariantRoutes } from './routes/spec-variants.js';
+import { tokenMappingRoutes } from './routes/token-mappings.js';
 import { seedCategoriesIfMissing } from './lib/support-tickets/categories.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -505,6 +507,8 @@ export function buildApp() {
   app.register(productLogRoutes);
   app.register(quoteTemplateRoutes);
   app.register(specPresetRoutes);
+  app.register(specVariantRoutes);
+  app.register(tokenMappingRoutes);
 
   // Start the Postgres LISTEN connection so notify() events broadcast
   // from any process reach SSE subscribers on this process.

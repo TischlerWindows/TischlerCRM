@@ -48,6 +48,8 @@ const RECORD_ID_PREFIXES: Record<string, string> = {
   QuoteTemplate: '042',
   SpecPreset: '043',
   SpecCondition: '044',
+  SpecVariant: '045',
+  TokenMapping: '046',
 };
 
 const BASE62_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

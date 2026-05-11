@@ -39,7 +39,7 @@ export interface QuotePDFData {
   spacerBarColors: string;
 
   // Presets (already filtered and token-resolved)
-  alwaysPresets?: SpecPresetData[];
+  constantPresets?: SpecPresetData[];
   specPresets: SpecPresetData[];
   optionPresets: SpecPresetData[];
   exclusionPresets: SpecPresetData[];
@@ -130,12 +130,12 @@ export async function generateQuotePDF(
   const maxY = ph - 18; // leave room for footer
 
   let y = 0;
-  const alwaysPresets = data.alwaysPresets ?? [];
-  const closingAlways = alwaysPresets.filter((preset) =>
+  const constantPresets = data.constantPresets ?? [];
+  const closingConstant = constantPresets.filter((preset) =>
     /closing|signature|sincerely/i.test(preset.title)
   );
-  const introAlways = alwaysPresets.filter((preset) =>
-    !closingAlways.some((closing) => closing.id === preset.id)
+  const introConstant = constantPresets.filter((preset) =>
+    !closingConstant.some((closing) => closing.id === preset.id)
   );
 
   // ── Drawing helpers (scoped to this doc) ──────────────────────
@@ -278,13 +278,13 @@ export async function generateQuotePDF(
   doc.text(greeting, MARGIN_LEFT, y);
   y += 8;
 
-  // Intro always — all text comes from editable ALWAYS presets.
+  // Intro constant — all text comes from editable CONSTANT presets.
   // If none exist, the opening section is simply skipped (no hardcoded fallback).
-  for (const preset of introAlways) {
+  for (const preset of introConstant) {
     y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
     y += 4;
   }
-  if (introAlways.length > 0) y += 2;
+  if (introConstant.length > 0) y += 2;
 
   // ════════════════════════════════════════════════════════════════
   // NUMBERED SPECIFICATIONS
@@ -472,8 +472,8 @@ export async function generateQuotePDF(
   drawGrayLine(y);
   y += 6;
 
-  // Closing always — all text comes from editable ALWAYS presets.
-  for (const preset of closingAlways) {
+  // Closing constant — all text comes from editable CONSTANT presets.
+  for (const preset of closingConstant) {
     y = writeText(preset.body, MARGIN_LEFT, y, { fontSize: 10 });
     y += 4;
   }
@@ -591,7 +591,7 @@ export async function generateTemplatePreviewPDF(
 ): Promise<void> {
   // Separate presets by section (include ALL active, ignore conditions)
   const active = presets.filter((p) => p.isActive).sort((a, b) => a.order - b.order);
-  const always = active.filter((p) => p.section === 'ALWAYS');
+  const constant = active.filter((p) => p.section === 'CONSTANT');
   const specs = active.filter((p) => p.section === 'SPECIFICATION');
   const options = active.filter((p) => p.section === 'OPTION');
   const exclusions = active.filter((p) => p.section === 'EXCLUSION');
@@ -620,7 +620,7 @@ export async function generateTemplatePreviewPDF(
     spacerBarColors: '{{spacerBarColors}}',
 
     // Presets — body text still has raw {{tokens}} since we don't resolve
-    alwaysPresets: always,
+    constantPresets: constant,
     specPresets: specs,
     optionPresets: options,
     exclusionPresets: exclusions,
