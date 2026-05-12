@@ -1,27 +1,10 @@
 'use client';
 
-import { Trash2, Eye, EyeOff, Info, CheckCircle2, XCircle } from 'lucide-react';
+import { Trash2, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { ConditionBuilder, type DraftCondition } from './condition-builder';
 import { VariantEditor, type DraftVariant } from './variant-editor';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
-
-interface HelpProps {
-  text: string;
-  label: string;
-}
-
-function HelpHint({ text, label }: HelpProps) {
-  return (
-    <span
-      title={text}
-      aria-label={label}
-      tabIndex={0}
-      className="inline-flex cursor-help text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:text-gray-700"
-    >
-      <Info className="w-3 h-3" />
-    </span>
-  );
-}
+import { HelpHint } from './help-hint';
 
 const SECTIONS = ['CONSTANT', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 type Section = typeof SECTIONS[number];
@@ -145,7 +128,13 @@ export function BlockEditor({
             <label className="text-[10px] font-semibold text-gray-500">Section</label>
             <HelpHint
               label="Section help"
-              text="Where this block appears in the PDF. SPECIFICATION blocks form the numbered list; OPTION blocks go under 'Additions or Deductions'; EXCLUSION blocks under 'Our Base Bid does not include'; INSTALLATION blocks render on the installation appendix; CONSTANT blocks render without a number (intro and closing)."
+              title="Where this block appears"
+              description="Each section renders in a fixed region of the proposal PDF. Pick the one that matches the role of this block."
+              example={`SPECIFICATION → numbered list ("1. Glass Specification…")
+OPTION → "Additions or Deductions to our base bid"
+EXCLUSION → "Our base bid does not include"
+INSTALLATION → installation appendix page
+CONSTANT → intro paragraphs and closing (no number)`}
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -171,7 +160,12 @@ export function BlockEditor({
             <label className="text-[10px] font-semibold text-gray-500">Driver Variable</label>
             <HelpHint
               label="Driver Variable help"
-              text="A simple block has one Body Text. Set a Driver Variable to switch the body text based on a summary field — e.g., different wording for each Glass Type. Each value gets its own variant."
+              title="Variant by field value"
+              description="A simple block has one Body Text. Set a Driver Variable to make the body change based on a summary field — for example, different wording per Glass Type. Each value gets its own variant card below."
+              example={`Driver = "glassType"
+  → variant matching #28 renders one paragraph
+  → variant matching #3 renders another
+A project with multiple glass types prints all matches.`}
             />
           </div>
           <select
@@ -224,7 +218,11 @@ export function BlockEditor({
             <span className="text-xs text-gray-700">Always included</span>
             <HelpHint
               label="Always included help"
-              text="When on, this block is always included regardless of any conditions below. When off, the block is included only if all of its AND conditions pass and (if any OR conditions exist) at least one OR also passes."
+              title="Bypass conditions"
+              description="When on, this block always renders — conditions below are ignored. When off, the block only renders if every AND condition passes AND (if any OR conditions exist) at least one OR also passes."
+              example={`On  → block always in the PDF.
+Off + no conditions → block never renders.
+Off + conditions → evaluated against the active summary.`}
             />
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer">
@@ -240,7 +238,8 @@ export function BlockEditor({
             </span>
             <HelpHint
               label="Active help"
-              text="When off, this block is treated as a draft — it never renders in any preview or generated PDF, regardless of conditions or Always included. Use to retire a block without deleting it."
+              title="Draft toggle"
+              description="When off, this block is treated as a draft — it never renders in the preview or the generated PDF, regardless of conditions or 'Always included'. Use to retire a block without deleting it."
             />
           </label>
         </div>

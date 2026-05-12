@@ -1,13 +1,16 @@
 'use client';
 
-import { ArrowLeft, FileText, Save, Loader2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, FileText, Save, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 interface QuoteTemplate {
   id: string;
   name: string;
   isDefault: boolean;
 }
+
+export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface Props {
   templates: QuoteTemplate[];
@@ -22,6 +25,27 @@ interface Props {
   saving: boolean;
   canSave: boolean;
   isDirty?: boolean;
+  autosaveStatus?: AutosaveStatus;
+  lastSavedAt?: number | null;
+}
+
+function formatRelative(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  if (sec < 5) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  return `${hr}h ago`;
+}
+
+function useTickEverySecond(): number {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => (n + 1) % 1_000_000), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return Date.now();
 }
 
 export function TopBar({
@@ -37,7 +61,14 @@ export function TopBar({
   saving,
   canSave,
   isDirty = false,
+  autosaveStatus = 'idle',
+  lastSavedAt = null,
 }: Props) {
+  // Tick once per second so the "Saved Ns ago" label keeps counting.
+  const now = useTickEverySecond();
+  const savedLabel =
+    lastSavedAt !== null ? `Saved · ${formatRelative(now - lastSavedAt)}` : null;
+
   return (
     <div className="flex items-center gap-4 px-5 py-2.5 bg-[#1e3a5f] text-white">
       <Link
@@ -92,7 +123,25 @@ export function TopBar({
 
       <div className="flex-1" />
 
-      {isDirty && (
+      {autosaveStatus === 'saving' ? (
+        <span
+          role="status"
+          aria-live="polite"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-white/80 bg-white/10 border border-white/20 rounded"
+        >
+          <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+          Saving…
+        </span>
+      ) : autosaveStatus === 'error' ? (
+        <span
+          role="status"
+          aria-live="polite"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-red-100 bg-red-500/30 border border-red-300/50 rounded"
+        >
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-red-300" />
+          Autosave failed — use Save
+        </span>
+      ) : isDirty ? (
         <span
           role="status"
           aria-live="polite"
@@ -101,7 +150,16 @@ export function TopBar({
           <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-300" />
           Unsaved changes
         </span>
-      )}
+      ) : savedLabel ? (
+        <span
+          role="status"
+          aria-live="polite"
+          className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] font-medium text-emerald-200/90 bg-emerald-500/15 border border-emerald-300/30 rounded"
+        >
+          <Check aria-hidden="true" className="h-3 w-3" />
+          {savedLabel}
+        </span>
+      ) : null}
 
       <button
         onClick={onPreviewPDF}

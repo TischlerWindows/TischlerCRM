@@ -13,6 +13,7 @@ import { TopBar } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
 import { VariableChips } from './_components/variable-chips';
 import { LetterPreview } from './_components/letter-preview';
+import { LintPanel } from './_components/lint-panel';
 import { BlockEditor } from './_components/block-editor';
 import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
@@ -103,6 +104,10 @@ export default function QuoteBuilderPage() {
   const [summaries, setSummaries] = useState<any[]>([]);
   const [selectedSummaryId, setSelectedSummaryId] = useState('');
   const [isPreviewingPDF, setIsPreviewingPDF] = useState(false);
+
+  // Autosave state
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
@@ -314,6 +319,32 @@ export default function QuoteBuilderPage() {
     });
   };
 
+  const handleDuplicatePreset = (source: SpecPresetData) => {
+    const conditions = (source.conditions ?? []).map(conditionToDraft);
+    const variants = (source.variants ?? []).map(variantToDraft);
+    setSelectedPresetId(null);
+    setIsNewPreset(true);
+    const title = `${source.title} (copy)`;
+    setEditTitle(title);
+    setEditBody(source.body ?? '');
+    setEditSection(source.section);
+    setEditAlwaysIncluded(source.isAlwaysIncluded);
+    setEditActive(source.isActive);
+    setEditDriverField(source.driverField || '');
+    setEditConditions(conditions);
+    setEditVariants(variants);
+    setEditorBaseline({
+      title,
+      body: source.body ?? '',
+      section: source.section,
+      alwaysIncluded: source.isAlwaysIncluded,
+      active: source.isActive,
+      driverField: source.driverField || '',
+      conditions,
+      variants,
+    });
+  };
+
   const handleSelectTemplate = async (id: string) => {
     setSelectedTemplateId(id);
     clearEditor();
@@ -333,65 +364,101 @@ export default function QuoteBuilderPage() {
 
   // ── Save / Delete ─────────────────────────────────────────────
 
-  const handleSave = async () => {
-    if (!selectedTemplateId || !editTitle.trim()) return;
-    setSaving(true);
-    setError(null);
-
-    const conds = conditionsPayload(editConditions);
-    const condError = validateConditions(conds);
-    if (condError) {
-      setSaving(false);
-      setError(condError);
-      return;
-    }
-
-    const isVariantMode = !!editDriverField;
-    const vars = isVariantMode ? variantsPayload(editVariants) : [];
-
-    const payload: Record<string, unknown> = {
-      title: editTitle.trim(),
-      body: isVariantMode ? null : editBody,
-      section: editSection,
-      isAlwaysIncluded: editAlwaysIncluded,
-      isActive: editActive,
-      driverField: editDriverField || null,
-      conditions: conds,
-      variants: vars,
-    };
-
-    try {
-      if (isNewPreset) {
-        const created = await apiClient.post<SpecPresetData>('/spec-presets', {
-          ...payload,
-          templateId: selectedTemplateId,
-          order: presets.length,
-        });
-        setIsNewPreset(false);
-        setSelectedPresetId(created.id);
-        await loadPresets(selectedTemplateId);
-        flash('Block created');
-      } else if (selectedPresetId) {
-        await apiClient.patch<SpecPresetData>(`/spec-presets/${selectedPresetId}`, payload);
-        await loadPresets(selectedTemplateId);
-        flash('Block saved');
+  const handleSave = useCallback(
+    async (opts: { silent?: boolean } = {}) => {
+      if (!selectedTemplateId || !editTitle.trim()) return;
+      const silent = opts.silent === true;
+      if (silent) {
+        setAutosaveStatus('saving');
+      } else {
+        setSaving(true);
       }
-      setEditorBaseline({
+      setError(null);
+
+      const conds = conditionsPayload(editConditions);
+      const condError = validateConditions(conds);
+      if (condError) {
+        if (silent) {
+          setAutosaveStatus('error');
+        } else {
+          setSaving(false);
+          setError(condError);
+        }
+        return;
+      }
+
+      const isVariantMode = !!editDriverField;
+      const vars = isVariantMode ? variantsPayload(editVariants) : [];
+
+      const payload: Record<string, unknown> = {
         title: editTitle.trim(),
-        body: isVariantMode ? '' : editBody,
+        body: isVariantMode ? null : editBody,
         section: editSection,
-        alwaysIncluded: editAlwaysIncluded,
-        active: editActive,
-        driverField: editDriverField || '',
-        conditions: editConditions,
-        variants: editVariants,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to save');
-    } finally {
-      setSaving(false);
-    }
-  };
+        isAlwaysIncluded: editAlwaysIncluded,
+        isActive: editActive,
+        driverField: editDriverField || null,
+        conditions: conds,
+        variants: vars,
+      };
+
+      try {
+        if (isNewPreset) {
+          const created = await apiClient.post<SpecPresetData>('/spec-presets', {
+            ...payload,
+            templateId: selectedTemplateId,
+            order: presets.length,
+          });
+          setIsNewPreset(false);
+          setSelectedPresetId(created.id);
+          await loadPresets(selectedTemplateId);
+          if (!silent) flash('Block created');
+        } else if (selectedPresetId) {
+          await apiClient.patch<SpecPresetData>(`/spec-presets/${selectedPresetId}`, payload);
+          await loadPresets(selectedTemplateId);
+          if (!silent) flash('Block saved');
+        }
+        setEditorBaseline({
+          title: editTitle.trim(),
+          body: isVariantMode ? '' : editBody,
+          section: editSection,
+          alwaysIncluded: editAlwaysIncluded,
+          active: editActive,
+          driverField: editDriverField || '',
+          conditions: editConditions,
+          variants: editVariants,
+        });
+        setLastSavedAt(Date.now());
+        setAutosaveStatus('saved');
+      } catch (err: any) {
+        if (silent) {
+          setAutosaveStatus('error');
+        } else {
+          setError(err.message || 'Failed to save');
+          setAutosaveStatus('error');
+        }
+      } finally {
+        if (!silent) setSaving(false);
+      }
+    },
+    // The function reads a lot of editor state; React's exhaustive-deps lint will
+    // flag any miss. We intentionally re-create on each editor change so the
+    // autosave effect always closes over fresh values.
+    [
+      selectedTemplateId,
+      editTitle,
+      editBody,
+      editSection,
+      editAlwaysIncluded,
+      editActive,
+      editDriverField,
+      editConditions,
+      editVariants,
+      isNewPreset,
+      selectedPresetId,
+      presets.length,
+      loadPresets,
+    ],
+  );
 
   const handleDelete = async () => {
     if (!selectedPresetId || !selectedTemplateId) return;
@@ -410,6 +477,50 @@ export default function QuoteBuilderPage() {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 2000);
   };
+
+  // ── Autosave (3s debounced) ──────────────────────────────────
+  //
+  // Fires only for blocks that already exist on the server — new presets must
+  // be saved manually once so they get an id. Switching blocks or templates
+  // clears the timer and resets the indicator.
+  useEffect(() => {
+    if (isNewPreset || !selectedPresetId || !editorBaseline) return;
+    const snapshot: EditorSnapshot = {
+      title: editTitle,
+      body: editBody,
+      section: editSection,
+      alwaysIncluded: editAlwaysIncluded,
+      active: editActive,
+      driverField: editDriverField,
+      conditions: editConditions,
+      variants: editVariants,
+    };
+    if (snapshotsEqual(editorBaseline, snapshot)) return;
+    if (!editTitle.trim()) return;
+    const handle = window.setTimeout(() => {
+      void handleSave({ silent: true });
+    }, 3000);
+    return () => window.clearTimeout(handle);
+  }, [
+    editTitle,
+    editBody,
+    editSection,
+    editAlwaysIncluded,
+    editActive,
+    editDriverField,
+    editConditions,
+    editVariants,
+    editorBaseline,
+    isNewPreset,
+    selectedPresetId,
+    handleSave,
+  ]);
+
+  // Reset autosave indicator when the active block / template changes.
+  useEffect(() => {
+    setAutosaveStatus('idle');
+    setLastSavedAt(null);
+  }, [selectedPresetId, selectedTemplateId, isNewPreset]);
 
   // ── Drag reorder ──────────────────────────────────────────────
 
@@ -691,10 +802,12 @@ export default function QuoteBuilderPage() {
         onSelectSummary={setSelectedSummaryId}
         onPreviewPDF={handlePreviewPDF}
         isPreviewingPDF={isPreviewingPDF}
-        onSave={handleSave}
+        onSave={() => void handleSave()}
         saving={saving}
         canSave={canSave}
         isDirty={isDirty}
+        autosaveStatus={autosaveStatus}
+        lastSavedAt={lastSavedAt}
       />
 
       {/* Banners */}
@@ -739,6 +852,7 @@ export default function QuoteBuilderPage() {
                   selectedPresetId={selectedPresetId}
                   onSelect={loadPresetIntoEditor}
                   onNew={handleNewPreset}
+                  onDuplicate={handleDuplicatePreset}
                   onReorder={handleReorder}
                   onReorderEnd={handleReorderEnd}
                   dragIdx={dragIdx}
@@ -786,8 +900,13 @@ export default function QuoteBuilderPage() {
           />
         )}
 
-        {/* Center panel: letter preview */}
+        {/* Center panel: lint strip + letter preview */}
         <div className="flex-1 min-w-0 bg-gray-100 overflow-hidden flex flex-col">
+          <LintPanel
+            presets={previewPresets}
+            result={previewState.result}
+            onSelectBlock={handleSelectBlock}
+          />
           <LetterPreview
             result={previewState.result}
             error={previewState.error}
