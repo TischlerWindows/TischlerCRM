@@ -224,8 +224,8 @@ export default function ObjectDetailPage() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-[48px] h-[calc(100vh-48px)] bg-white border-r border-gray-200 transition-all duration-300 z-40 flex flex-col',
-          sidebarCollapsed ? 'w-16' : 'w-72'
+          'fixed left-0 top-[48px] h-[calc(100vh-48px)] bg-white border-r border-gray-200 transition-all duration-300 z-40 flex-col max-md:hidden',
+          sidebarCollapsed ? 'w-16 hidden md:flex' : 'w-72 hidden md:flex'
         )}
       >
         {/* Header — collapse only */}
@@ -330,7 +330,7 @@ export default function ObjectDetailPage() {
       <main
         className={cn(
           'flex-1 transition-all duration-300',
-          sidebarCollapsed ? 'ml-16' : 'ml-72'
+          sidebarCollapsed ? 'md:ml-16' : 'md:ml-72'
         )}
       >
         {/* Header Bar */}

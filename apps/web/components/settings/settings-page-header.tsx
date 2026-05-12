@@ -15,13 +15,13 @@ interface SettingsPageHeaderProps {
 
 export function SettingsPageHeader({ icon: Icon, title, subtitle, action }: SettingsPageHeaderProps) {
   return (
-    <div className="px-8 py-6 bg-white border-b border-gray-200 flex items-center justify-between">
+    <div className="px-4 sm:px-8 py-4 sm:py-6 bg-white border-b border-gray-200 flex flex-wrap gap-3 items-start sm:items-center justify-between">
       <div className="flex items-center gap-3.5">
-        <div className="w-11 h-11 rounded-xl bg-[#f0f1f9] flex items-center justify-center flex-shrink-0">
-          <Icon className="w-[22px] h-[22px] text-brand-navy" />
+        <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-[#f0f1f9] flex items-center justify-center flex-shrink-0">
+          <Icon className="w-5 h-5 sm:w-[22px] sm:h-[22px] text-brand-navy" />
         </div>
         <div>
-          <h1 className="text-[22px] font-bold text-brand-dark">{title}</h1>
+          <h1 className="text-lg sm:text-[22px] font-bold text-brand-dark">{title}</h1>
           {subtitle && (
             <p className="text-[13px] text-brand-gray mt-0.5">{subtitle}</p>
           )}

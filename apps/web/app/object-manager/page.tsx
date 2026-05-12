@@ -333,8 +333,8 @@ export default function ObjectManagerPage() {
         </div>
 
         {/* Search and Actions */}
-        <div className="flex justify-between items-center mb-6">
-          <div className="relative w-96">
+        <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
+          <div className="relative w-full sm:w-96">
             <Search className="absolute left-3 top-1/2 h-4 w-4 text-gray-400 transform -translate-y-1/2" />
             <Input
               type="text"
@@ -418,6 +418,7 @@ export default function ObjectManagerPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -510,6 +511,7 @@ export default function ObjectManagerPage() {
                 ))}
               </TableBody>
             </Table>
+            </div>
             
             {filteredObjects.length === 0 && (
               <div className="text-center py-12">
