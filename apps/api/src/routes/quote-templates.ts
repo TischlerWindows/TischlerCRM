@@ -15,6 +15,19 @@ const updateTemplateSchema = z.object({
   description: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
+  // Brand wiring — admin picks which Company Resources the template uses.
+  letterheadLogoId: z.string().nullable().optional(),
+  signatureFontId: z.string().nullable().optional(),
+  accentColorHex: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'Must be #RRGGBB')
+    .nullable()
+    .optional(),
+  emphasisColorHex: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'Must be #RRGGBB')
+    .nullable()
+    .optional(),
 });
 
 export async function quoteTemplateRoutes(app: FastifyInstance) {

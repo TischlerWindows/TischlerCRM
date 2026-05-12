@@ -5,22 +5,22 @@
  * emits a PDF binary. Supports inline bold/italic and bulleted/numbered lists
  * inside block bodies (via the html-to-runs walker).
  *
- * The layout mirrors the in-browser preview in spirit but is intentionally
- * simpler than the legacy jsPDF renderer — Phase 3 focuses on the rich-text
- * pipeline; layout polish lands in a follow-up.
+ * Phase 2 — accepts a BrandResources blob to override the default colors,
+ * use a brand logo in the letterhead, and use a brand font for the closing
+ * signature line. Anything not provided falls back to the Tischler defaults.
  */
 
 import PDFDocument from 'pdfkit';
 import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
 import { htmlToBlocks, type Block, type StyledRun } from './html-to-runs.js';
 
-// ── Brand constants (match the in-browser preview) ──────────────────
+// ── Default brand constants ─────────────────────────────────────────
 
-const NAVY: PDFKit.Mixins.ColorValue = '#1e3a5f';
-const RED: PDFKit.Mixins.ColorValue = '#da291c';
-const TEXT: PDFKit.Mixins.ColorValue = '#1e1e1e';
-const MUTED: PDFKit.Mixins.ColorValue = '#505050';
-const FAINT: PDFKit.Mixins.ColorValue = '#808080';
+const DEFAULT_NAVY = '#1e3a5f';
+const DEFAULT_RED = '#da291c';
+const TEXT = '#1e1e1e';
+const MUTED = '#505050';
+const FAINT = '#808080';
 
 const FONT_REGULAR = 'Helvetica';
 const FONT_BOLD = 'Helvetica-Bold';
@@ -32,9 +32,41 @@ const BODY_FONT_SIZE = 10;
 const SECTION_HEADING_SIZE = 12;
 const FOOTER_SIZE = 7;
 
+// ── Brand resources, supplied per-render by the proposal-pdf route ──
+
+export interface BrandResources {
+  /** Hex string overriding the default navy used for headings/titles. */
+  accentColor?: string;
+  /** Hex string overriding the default red used for the letterhead rule + base bid line. */
+  emphasisColor?: string;
+  /** Raw bytes + mime for the letterhead image. */
+  letterhead?: {
+    bytes: Buffer;
+    mimeType: string;
+  };
+  /** Font for the signature line in the closing. PDFKit registers the bytes
+   *  under `family`; the renderer references it by that family name. */
+  signatureFont?: {
+    bytes: Buffer;
+    family: string;
+  };
+}
+
+interface BrandContext {
+  navy: string;
+  red: string;
+  text: string;
+  muted: string;
+  faint: string;
+  signatureFontFamily: string | null;
+}
+
 // ── Public API ──────────────────────────────────────────────────────
 
-export async function renderProposalPDF(result: ProposalAssemblyResult): Promise<Buffer> {
+export async function renderProposalPDF(
+  result: ProposalAssemblyResult,
+  brand: BrandResources = {},
+): Promise<Buffer> {
   const doc = new PDFDocument({
     size: 'LETTER',
     margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN },
@@ -53,6 +85,29 @@ export async function renderProposalPDF(result: ProposalAssemblyResult): Promise
     doc.on('error', reject);
   });
 
+  // Register the signature font into THIS document so the renderer can use it
+  // by name in `doc.font(...)`. PDFKit embeds it in the produced PDF so the
+  // text renders correctly on any viewer.
+  let signatureFontFamily: string | null = null;
+  if (brand.signatureFont) {
+    try {
+      doc.registerFont(brand.signatureFont.family, brand.signatureFont.bytes);
+      signatureFontFamily = brand.signatureFont.family;
+    } catch {
+      // Bad font bytes: silently fall back to Helvetica for the signature.
+      signatureFontFamily = null;
+    }
+  }
+
+  const ctx: BrandContext = {
+    navy: normalizeHex(brand.accentColor) ?? DEFAULT_NAVY,
+    red: normalizeHex(brand.emphasisColor) ?? DEFAULT_RED,
+    text: TEXT,
+    muted: MUTED,
+    faint: FAINT,
+    signatureFontFamily,
+  };
+
   const constants = result.sections.CONSTANT ?? [];
   const specs = result.sections.SPECIFICATION ?? [];
   const options = result.sections.OPTION ?? [];
@@ -62,20 +117,20 @@ export async function renderProposalPDF(result: ProposalAssemblyResult): Promise
   const closingPresets = constants.filter((p) => isClosing(p));
   const introPresets = constants.filter((p) => !isClosing(p));
 
-  drawLetterhead(doc);
+  drawLetterhead(doc, ctx, brand.letterhead);
   drawIntro(doc, introPresets);
-  drawSpecifications(doc, specs);
-  drawPricing(doc, result);
-  drawOptions(doc, options, result);
-  drawExclusions(doc, exclusions);
-  drawClosing(doc, closingPresets, result);
+  drawSpecifications(doc, specs, ctx);
+  drawPricing(doc, result, ctx);
+  drawOptions(doc, options, result, ctx);
+  drawExclusions(doc, exclusions, ctx);
+  drawClosing(doc, closingPresets, result, ctx);
 
   if (result.pdfData.hasInstallation) {
     doc.addPage();
-    drawInstallationAppendix(doc, installation, result);
+    drawInstallationAppendix(doc, installation, result, ctx, brand.letterhead);
   }
 
-  drawFooter(doc);
+  drawFooter(doc, ctx);
 
   doc.end();
   return done;
@@ -83,20 +138,45 @@ export async function renderProposalPDF(result: ProposalAssemblyResult): Promise
 
 // ── Layout primitives ───────────────────────────────────────────────
 
-function drawLetterhead(doc: PDFKit.PDFDocument): void {
-  // Header band: company name on the left, red rule below.
-  // Logo intentionally omitted in this phase — would require asset loading.
-  doc.fillColor(NAVY).font(FONT_BOLD).fontSize(20).text('TISCHLER UND SOHN', { lineGap: 2 });
-  doc.fillColor(MUTED).font(FONT_REGULAR).fontSize(8).text('European Wood Windows & Doors');
+function drawLetterhead(
+  doc: PDFKit.PDFDocument,
+  ctx: BrandContext,
+  letterhead: BrandResources['letterhead'],
+): void {
+  // If a brand letterhead image is configured, draw it at the top — replacing
+  // the text wordmark. Fits within the page width minus margins, scaled by
+  // height to keep aspect ratio. Falls back to the text wordmark when no
+  // logo is set.
+  if (letterhead) {
+    try {
+      const maxWidth = doc.page.width - 2 * PAGE_MARGIN;
+      // `fit` with a maxWidth scales to the available content area while
+      // preserving aspect ratio. Default x-position with explicit PAGE_MARGIN
+      // keeps the image aligned to the left edge of the body column.
+      doc.image(letterhead.bytes, PAGE_MARGIN, doc.y, { fit: [maxWidth, 70] });
+      doc.moveDown(5); // approximate the space the image took up
+    } catch {
+      // Fall through to text wordmark on any image-decode failure.
+      drawTextWordmark(doc, ctx);
+    }
+  } else {
+    drawTextWordmark(doc, ctx);
+  }
+
   doc
     .moveDown(0.5)
-    .strokeColor(RED)
+    .strokeColor(ctx.red)
     .lineWidth(2)
     .moveTo(PAGE_MARGIN, doc.y)
     .lineTo(doc.page.width - PAGE_MARGIN, doc.y)
     .stroke();
   doc.moveDown(1);
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+}
+
+function drawTextWordmark(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
+  doc.fillColor(ctx.navy).font(FONT_BOLD).fontSize(20).text('TISCHLER UND SOHN', { lineGap: 2 });
+  doc.fillColor(ctx.muted).font(FONT_REGULAR).fontSize(8).text('European Wood Windows & Doors');
 }
 
 function drawIntro(doc: PDFKit.PDFDocument, presets: SpecPresetData[]): void {
@@ -106,27 +186,33 @@ function drawIntro(doc: PDFKit.PDFDocument, presets: SpecPresetData[]): void {
   }
 }
 
-function drawSpecifications(doc: PDFKit.PDFDocument, presets: SpecPresetData[]): void {
+function drawSpecifications(
+  doc: PDFKit.PDFDocument,
+  presets: SpecPresetData[],
+  ctx: BrandContext,
+): void {
   if (presets.length === 0) return;
   doc.moveDown(0.6);
 
   presets.forEach((preset, idx) => {
     doc.moveDown(0.4);
-    doc.fillColor(NAVY).font(FONT_BOLD).fontSize(BODY_FONT_SIZE);
-    // Reference proposals use "(1) Title" with parens — looks more proposal-y
-    // than "1. Title".
+    doc.fillColor(ctx.navy).font(FONT_BOLD).fontSize(BODY_FONT_SIZE);
     const indexLabel = `(${idx + 1})`;
     doc.text(indexLabel, { continued: true, indent: 0 });
     doc.text(`  ${preset.title}`);
 
     if (preset.body && preset.body.trim()) {
-      doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+      doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
       drawRichBody(doc, preset.body, { topGap: 0.1, indent: 18 });
     }
   });
 }
 
-function drawPricing(doc: PDFKit.PDFDocument, result: ProposalAssemblyResult): void {
+function drawPricing(
+  doc: PDFKit.PDFDocument,
+  result: ProposalAssemblyResult,
+  ctx: BrandContext,
+): void {
   const { pdfData } = result;
   const rows: Array<[string, string]> = [];
   if (pdfData.hasEuroWindows) rows.push(['Euro Windows', pdfData.euroWindowsPrice]);
@@ -139,12 +225,12 @@ function drawPricing(doc: PDFKit.PDFDocument, result: ProposalAssemblyResult): v
   drawHorizontalLine(doc);
   doc.moveDown(0.3);
   doc
-    .fillColor(NAVY)
+    .fillColor(ctx.navy)
     .font(FONT_BOLD)
     .fontSize(SECTION_HEADING_SIZE)
     .text('PRICING', { lineGap: 2 });
 
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
   for (const [label, price] of rows) {
     drawKeyValueRow(doc, label, price);
   }
@@ -152,17 +238,18 @@ function drawPricing(doc: PDFKit.PDFDocument, result: ProposalAssemblyResult): v
   doc.moveDown(0.3);
   drawHorizontalLine(doc);
   doc.moveDown(0.2);
-  doc.fillColor(NAVY).font(FONT_BOLD).fontSize(BODY_FONT_SIZE + 1);
+  doc.fillColor(ctx.navy).font(FONT_BOLD).fontSize(BODY_FONT_SIZE + 1);
   drawKeyValueRow(doc, 'BASE BID PRICE', pdfData.grandTotal);
   doc.moveDown(0.2);
   drawHorizontalLine(doc);
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
 }
 
 function drawOptions(
   doc: PDFKit.PDFDocument,
   optionPresets: SpecPresetData[],
   result: ProposalAssemblyResult,
+  ctx: BrandContext,
 ): void {
   const { pdfData } = result;
   const addOnRows: Array<[string, string]> = [];
@@ -177,38 +264,42 @@ function drawOptions(
 
   doc.moveDown(0.8);
   doc
-    .fillColor(NAVY)
+    .fillColor(ctx.navy)
     .font(FONT_BOLD)
     .fontSize(SECTION_HEADING_SIZE)
     .text('ADDITIONS OR DEDUCTIONS TO OUR BASE BID', { lineGap: 2 });
 
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
   for (const [label, price] of addOnRows) {
     drawKeyValueRow(doc, `•  ${label}`, price);
   }
 
   for (const preset of optionPresets) {
     doc.moveDown(0.4);
-    doc.fillColor(NAVY).font(FONT_BOLD).fontSize(BODY_FONT_SIZE).text(preset.title);
+    doc.fillColor(ctx.navy).font(FONT_BOLD).fontSize(BODY_FONT_SIZE).text(preset.title);
     if (preset.body && preset.body.trim()) {
-      doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+      doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
       drawRichBody(doc, preset.body, { topGap: 0.1 });
     }
   }
 }
 
-function drawExclusions(doc: PDFKit.PDFDocument, presets: SpecPresetData[]): void {
+function drawExclusions(
+  doc: PDFKit.PDFDocument,
+  presets: SpecPresetData[],
+  ctx: BrandContext,
+): void {
   if (presets.length === 0) return;
   doc.moveDown(0.8);
   drawHorizontalLine(doc);
   doc.moveDown(0.3);
   doc
-    .fillColor(NAVY)
+    .fillColor(ctx.navy)
     .font(FONT_BOLD)
     .fontSize(SECTION_HEADING_SIZE)
     .text('Our Base Bid does not include:', { lineGap: 2 });
 
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
   for (const preset of presets) {
     doc.moveDown(0.2);
     doc.font(FONT_BOLD).text(`•  ${preset.title}`);
@@ -223,6 +314,7 @@ function drawClosing(
   doc: PDFKit.PDFDocument,
   closingPresets: SpecPresetData[],
   result: ProposalAssemblyResult,
+  ctx: BrandContext,
 ): void {
   doc.moveDown(0.8);
   drawHorizontalLine(doc);
@@ -232,13 +324,26 @@ function drawClosing(
     drawRichBody(doc, preset.body ?? '', { topGap: 0.2 });
   }
 
-  doc.moveDown(0.8).fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE).text('Sincerely,');
-  doc.moveDown(0.8).fillColor(NAVY).font(FONT_BOLD).text('Tischler und Sohn');
+  doc.moveDown(0.8).fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE).text('Sincerely,');
 
   const { salesman, estimator } = result.pdfData;
-  if (salesman) doc.fillColor(MUTED).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE - 1).text(salesman);
+
+  // If we have a brand signature font + a salesman name, render the salesman's
+  // name in that font (large, like a hand signature). Otherwise fall back to
+  // the company line in bold navy. In both cases the typed name (Mr./title)
+  // follows below.
+  if (ctx.signatureFontFamily && salesman) {
+    doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.signatureFontFamily).fontSize(24).text(salesman);
+    doc.fillColor(ctx.muted).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE - 1).text(salesman);
+  } else {
+    doc.moveDown(0.8).fillColor(ctx.navy).font(FONT_BOLD).fontSize(BODY_FONT_SIZE).text('Tischler und Sohn');
+    if (salesman) {
+      doc.fillColor(ctx.muted).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE - 1).text(salesman);
+    }
+  }
+
   if (estimator && estimator !== salesman) {
-    doc.fillColor(MUTED).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE - 1).text(`Estimator: ${estimator}`);
+    doc.fillColor(ctx.muted).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE - 1).text(`Estimator: ${estimator}`);
   }
 }
 
@@ -246,36 +351,38 @@ function drawInstallationAppendix(
   doc: PDFKit.PDFDocument,
   presets: SpecPresetData[],
   result: ProposalAssemblyResult,
+  ctx: BrandContext,
+  letterhead: BrandResources['letterhead'],
 ): void {
-  drawLetterhead(doc);
+  drawLetterhead(doc, ctx, letterhead);
   doc
-    .fillColor(NAVY)
+    .fillColor(ctx.navy)
     .font(FONT_BOLD)
     .fontSize(SECTION_HEADING_SIZE)
     .text('INSTALLATION', { lineGap: 2 });
 
-  doc.fillColor(TEXT).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
+  doc.fillColor(ctx.text).font(FONT_REGULAR).fontSize(BODY_FONT_SIZE);
   drawKeyValueRow(doc, 'Installation Cost:', result.pdfData.installationPrice, { bold: true });
   doc.moveDown(0.3);
   drawHorizontalLine(doc);
 
   for (const preset of presets) {
     doc.moveDown(0.4);
-    doc.fillColor(NAVY).font(FONT_BOLD).text(preset.title);
+    doc.fillColor(ctx.navy).font(FONT_BOLD).text(preset.title);
     if (preset.body && preset.body.trim()) {
-      doc.fillColor(TEXT).font(FONT_REGULAR);
+      doc.fillColor(ctx.text).font(FONT_REGULAR);
       drawRichBody(doc, preset.body, { topGap: 0.05, indent: 12 });
     }
   }
 }
 
-function drawFooter(doc: PDFKit.PDFDocument): void {
+function drawFooter(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     const y = doc.page.height - PAGE_MARGIN + 16;
     doc
-      .fillColor(FAINT)
+      .fillColor(ctx.faint)
       .font(FONT_REGULAR)
       .fontSize(FOOTER_SIZE)
       .text(`Tischler und Sohn  |  Confidential`, PAGE_MARGIN, y, {
@@ -385,4 +492,11 @@ function drawKeyValueRow(
 
 function isClosing(preset: SpecPresetData): boolean {
   return /closing|signature|sincerely/i.test(preset.title);
+}
+
+function normalizeHex(input: string | undefined | null): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) return null;
+  return trimmed.toLowerCase();
 }
