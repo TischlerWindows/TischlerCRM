@@ -2101,14 +2101,16 @@ export default function SummaryPage() {
       const maGtPct   = maTotPct    + pv(gta?.pct);
       const maGtFinal = maTotFinalV + pv(gta?.final);
       const maHidden  = maTotFull * 0.56;
+      const caFmtN = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
+      const caFmtK = (v: number) => v ? Math.round(v).toLocaleString('en-US') + 'K' : '—';
       const maFields: [string, string][] = [
-        ['Full by Sq Foot',    maTotSqFt ? fmt(maGtFull  / maTotSqFt) : '—'],
-        ['%_ by Sq Foot',      maTotSqFt ? fmt(maGtPct   / maTotSqFt) : '—'],
-        ['Final by Sq Foot',   maTotSqFt ? fmt(maGtFinal / maTotSqFt) : '—'],
-        ['Hidden Cost',        maHidden  ? fmt(maHidden)               : '—'],
-        ['Full Contribution',  fmt((maTotFull  - maHidden) / 1000)],
-        ['%_ Contribution',   fmt((maTotPct   - maHidden) / 1000)],
-        ['Final Contribution', fmt((maTotFinalV - maHidden) / 1000)],
+        ['Full by Sq Foot',    maTotSqFt ? caFmtN(maGtFull  / maTotSqFt) : '—'],
+        ['%_ by Sq Foot',      maTotSqFt ? caFmtN(maGtPct   / maTotSqFt) : '—'],
+        ['Final by Sq Foot',   maTotSqFt ? caFmtN(maGtFinal / maTotSqFt) : '—'],
+        ['Hidden Cost',        maHidden  ? caFmtN(maHidden)               : '—'],
+        ['Full Contribution',  caFmtK((maTotFull  - maHidden) / 1000)],
+        ['%_ Contribution',   caFmtK((maTotPct   - maHidden) / 1000)],
+        ['Final Contribution', caFmtK((maTotFinalV - maHidden) / 1000)],
       ];
       if (maTotFull || maTotPct || maTotFinalV) {
         const caNeeded = 10 + Math.ceil(maFields.length / 3) * 12;
@@ -2158,14 +2160,16 @@ export default function SummaryPage() {
       const caGtPct   = caTotPct    + pv(gta?.pct);
       const caGtFinal = caTotFinalV + pv(gta?.final);
       const caHidden   = caTotFull * 0.56;
+      const caFmtN2 = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
+      const caFmtK2 = (v: number) => v ? Math.round(v).toLocaleString('en-US') + 'K' : '—';
       const caFields: [string, string][] = [
-        ['Full by Sq Foot',    caTotSqFt ? fmt(caGtFull  / caTotSqFt) : '—'],
-        ['%_ by Sq Foot',      caTotSqFt ? fmt(caGtPct   / caTotSqFt) : '—'],
-        ['Final by Sq Foot',   caTotSqFt ? fmt(caGtFinal / caTotSqFt) : '—'],
-        ['Hidden Cost',        caHidden  ? fmt(caHidden)               : '—'],
-        ['Full Contribution',  fmt((caTotFull  - caHidden) / 1000)],
-        ['%_ Contribution',   fmt((caTotPct   - caHidden) / 1000)],
-        ['Final Contribution', fmt((caTotFinalV - caHidden) / 1000)],
+        ['Full by Sq Foot',    caTotSqFt ? caFmtN2(caGtFull  / caTotSqFt) : '—'],
+        ['%_ by Sq Foot',      caTotSqFt ? caFmtN2(caGtPct   / caTotSqFt) : '—'],
+        ['Final by Sq Foot',   caTotSqFt ? caFmtN2(caGtFinal / caTotSqFt) : '—'],
+        ['Hidden Cost',        caHidden  ? caFmtN2(caHidden)               : '—'],
+        ['Full Contribution',  caFmtK2((caTotFull  - caHidden) / 1000)],
+        ['%_ Contribution',   caFmtK2((caTotPct   - caHidden) / 1000)],
+        ['Final Contribution', caFmtK2((caTotFinalV - caHidden) / 1000)],
       ];
       if (caGtFull || caGtPct || caGtFinal) {
         const caNeeded = 10 + Math.ceil(caFields.length / 3) * 12;
