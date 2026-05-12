@@ -73,7 +73,11 @@ export function VariantEditor({ variants, onChange, driverField }: Props) {
       </div>
 
       {variants.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">No variants. Add one to define content for each value of {driverField}.</p>
+        <p className="text-xs text-gray-400 italic leading-relaxed">
+          No variants yet. Add one for each value of <span className="font-mono text-gray-500">{driverField}</span> you want to handle —
+          e.g., Match Value <span className="font-mono text-gray-500">28</span> with the spec text that applies when the summary&apos;s{' '}
+          <span className="font-mono text-gray-500">{driverField}</span> is <span className="font-mono text-gray-500">28</span>.
+        </p>
       ) : (
         <div className="space-y-2">
           {variants.map((variant) => {

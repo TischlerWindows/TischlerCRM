@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Info } from 'lucide-react';
 import { CONDITION_FIELD_DEFINITIONS } from '@/lib/quote-conditions';
 
 export interface DraftCondition {
@@ -70,15 +70,26 @@ export function ConditionBuilder({ conditions, onChange }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-xs font-semibold text-gray-600">Conditions</label>
+        <div className="flex items-center gap-1">
+          <label className="text-xs font-semibold text-gray-600">Conditions</label>
+          <span
+            title='This block is included only when all AND conditions pass and (if any OR conditions exist) at least one OR also passes. "Always included" overrides this entirely.'
+            aria-label="Conditions help"
+            tabIndex={0}
+            className="inline-flex cursor-help text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:text-gray-700"
+          >
+            <Info className="w-3 h-3" />
+          </span>
+        </div>
         <button onClick={add} className="text-xs text-brand-navy font-semibold hover:underline flex items-center gap-1">
           <Plus className="w-3 h-3" /> Add Condition
         </button>
       </div>
 
       {conditions.length === 0 ? (
-        <p className="text-xs text-gray-400 italic">
-          No conditions — this block will be excluded unless &quot;Always included&quot; is on.
+        <p className="text-xs text-gray-400 italic leading-relaxed">
+          No conditions yet. Without any, this block is excluded unless <span className="font-semibold not-italic">Always included</span> is on.
+          Add a condition like <span className="font-mono text-gray-500 not-italic">hasDoors IS_TRUE</span> to include this block only when the summary has doors.
         </p>
       ) : (
         <div className="space-y-2">
