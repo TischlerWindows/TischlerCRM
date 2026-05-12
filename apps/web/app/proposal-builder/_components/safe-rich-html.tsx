@@ -1,13 +1,23 @@
 'use client';
 
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtml from 'sanitize-html';
 import parse from 'html-react-parser';
 
 /**
- * Tags emitted by Tiptap's StarterKit that we render in the proposal body.
+ * Tags Tiptap's StarterKit emits that we render in the proposal body.
  * Anything outside this list is stripped before parsing.
  */
 const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i'];
+
+const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: ALLOWED_TAGS,
+  // No attributes anywhere — Tiptap StarterKit doesn't need them, and this
+  // closes off the `style="..."` / `href="javascript:..."` / event-handler
+  // attack surfaces.
+  allowedAttributes: {},
+  // Drop disallowed tags entirely (no fallback to plain text inside <script>).
+  disallowedTagsMode: 'discard',
+};
 
 interface Props {
   /** Rich text body — either HTML (Tiptap output) or plain text (legacy). */
@@ -20,8 +30,10 @@ interface Props {
  * Render a proposal block body safely.
  *
  * Two layers of defense:
- *  1. DOMPurify strips anything outside the strict allowlist (no script, no
- *     iframe, no event handlers, no data: URLs, no attributes at all).
+ *  1. sanitize-html strips anything outside the strict allowlist (no script,
+ *     no iframe, no event handlers, no inline styles, no attributes at all).
+ *     Pure Node — no JSDOM, no DOM polyfills — so it works in Next.js SSR
+ *     without the issues that isomorphic-dompurify exhibits.
  *  2. html-react-parser converts the cleaned HTML into real React elements,
  *     so the rendered output is plain JSX — never a raw HTML string injected
  *     into the DOM.
@@ -29,20 +41,12 @@ interface Props {
  * Backwards-compatible: plain-text bodies (no leading `<`) are wrapped in
  * `<p>` before sanitization so legacy non-HTML content still renders. The
  * wrapper applies `whitespace-pre-wrap` so embedded newlines in legacy bodies
- * are preserved (rich-text content with explicit `<p>`/`<br>` tags is
- * unaffected — block elements handle their own line layout).
+ * are preserved (rich-text content with explicit block tags is unaffected).
  */
 export function SafeRichHtml({ html, className }: Props) {
   const isPlainText = !html.trim().startsWith('<');
   const wrapped = isPlainText ? `<p>${html}</p>` : html;
-  const clean = DOMPurify.sanitize(wrapped, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR: [],
-    ALLOW_DATA_ATTR: false,
-  });
-  // Plain-text bodies use pre-wrap so embedded newlines render as line breaks
-  // (matches the legacy `whitespace-pre-wrap` behavior). Rich HTML bodies
-  // skip it — block tags already handle their own layout.
+  const clean = sanitizeHtml(wrapped, SANITIZE_OPTIONS);
   return (
     <div className={className} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
       {parse(clean)}
