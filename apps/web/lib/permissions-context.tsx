@@ -117,7 +117,10 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       // Permissions failed to load (API error) — be RESTRICTIVE
       if (!permissions) return false;
 
-      const objPerms = permissions.objectPermissions?.[objectApiName];
+      // Try exact key first (custom objects use CamelCase API names),
+      // then lowercase fallback (built-in objects are stored as lowercase e.g. 'properties').
+      const objPerms = permissions.objectPermissions?.[objectApiName]
+        ?? permissions.objectPermissions?.[objectApiName.toLowerCase()];
       // If no permissions configured for this object, DENY by default
       // (admins are already handled above; for regular users, if no
       // department/role/permset mentions an object it stays locked)
