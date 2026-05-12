@@ -102,11 +102,42 @@ body {
   .grid-cols-5 { grid-template-columns: 1fr !important; }
   .grid-cols-6 { grid-template-columns: repeat(2, 1fr) !important; }
 
-  /* ── Inline-flex buttons: slightly reduce padding on mobile ─── */
+  /* ── All inline-flex buttons: compact on mobile ─────────────── */
+  /* Covers Import / Configure Columns / New X and all similar     */
   .inline-flex.items-center.px-4.py-2 {
-    padding-left:  0.625rem !important;
-    padding-right: 0.625rem !important;
+    padding: 0.3rem 0.5rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2rem  !important;
   }
+  /* Icons inside those buttons: shrink to match */
+  .inline-flex.items-center.px-4.py-2 svg {
+    width:  0.85rem !important;
+    height: 0.85rem !important;
+    margin-right: 0.25rem !important;
+    flex-shrink: 0;
+  }
+  /* px-6 py-2 variant (dialog Save / Cancel) */
+  .inline-flex.items-center.px-6.py-2 {
+    padding: 0.3rem 0.625rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2rem  !important;
+  }
+  /* Non-inline-flex px-4 py-2 buttons (standalone modal buttons) */
+  button.px-4.py-2:not(.inline-flex),
+  a.px-4.py-2:not(.inline-flex) {
+    padding: 0.3rem 0.5rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2rem  !important;
+  }
+  button.px-6.py-2:not(.inline-flex),
+  a.px-6.py-2:not(.inline-flex) {
+    padding: 0.3rem 0.625rem !important;
+    font-size: 0.72rem !important;
+    line-height: 1.2rem  !important;
+  }
+  /* Kebab / icon-only row-action buttons: slightly smaller */
+  button.p-2.rounded-lg { padding: 0.3rem !important; }
+  button.p-2.rounded-lg svg { width: 1rem !important; height: 1rem !important; }
 
   /* ── Record detail header: ensure actions wrap below title ───── */
   .record-detail-header {
