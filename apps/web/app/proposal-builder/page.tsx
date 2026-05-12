@@ -434,6 +434,11 @@ export default function QuoteBuilderPage() {
   const handlePreviewPDF = async () => {
     if (!selectedTemplateId) { setError('No template selected.'); return; }
     if (!selectedSummaryId) { setError('Pick a summary to preview against.'); return; }
+    // Open the preview window synchronously inside the user-gesture handler.
+    // Browsers (Safari, Firefox, strict Chrome) block window.open() called
+    // after an `await` — even with target=_blank. We navigate the window once
+    // the PDF blob is ready.
+    const previewWindow = window.open('', '_blank');
     setIsPreviewingPDF(true);
     setError(null);
     try {
@@ -456,9 +461,18 @@ export default function QuoteBuilderPage() {
       }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        // Popup blocker killed the synchronous open — fall back to a download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'proposal.pdf';
+        link.click();
+      }
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err: unknown) {
+      previewWindow?.close();
       const message = err instanceof Error ? err.message : 'Failed to generate proposal PDF';
       setError(message);
     } finally {
