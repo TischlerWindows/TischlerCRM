@@ -302,7 +302,7 @@ export function RecordActions({
   return (
     <>
       {/* Action buttons */}
-      <div className="flex items-center gap-2 shrink-0 ml-4">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         {showEdit && canEdit && (
           <button
             onClick={handleEdit}

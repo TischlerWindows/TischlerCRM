@@ -297,7 +297,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
 
         {/* Center: Search (hidden on settings pages — settings has its own sidebar search) */}
         {!pathname?.startsWith('/settings') && (
-          <div className="flex-1 max-w-xl mx-4">
+          <div className="hidden sm:flex flex-1 max-w-xl mx-4">
             <UniversalSearch
               inputClassName="!bg-white/10 !border-white/20 !text-white !placeholder-white/50 focus:!bg-white/20 focus:!border-white/40 focus:!ring-white/30"
               iconClassName="!text-white/50"

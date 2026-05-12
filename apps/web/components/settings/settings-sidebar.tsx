@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  X,
   LifeBuoy,
   Upload,
   ScrollText,
@@ -102,9 +103,11 @@ const NAV_GROUPS: NavGroup[] = [
 interface SettingsSidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebarProps) {
+export function SettingsSidebar({ collapsed, onToggleCollapse, mobileOpen = false, onMobileClose }: SettingsSidebarProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
@@ -112,10 +115,10 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
     return pathname === href || pathname?.startsWith(href + '/');
   };
 
-  // When collapsed, render only a thin expand strip
-  if (collapsed) {
+  // When collapsed and not mobile-open, render only a thin expand strip (desktop only)
+  if (collapsed && !mobileOpen) {
     return (
-      <aside className="fixed top-12 bottom-0 left-0 z-40 w-[20px] flex items-start justify-center pt-4 transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200">
+      <aside className="fixed top-12 bottom-0 left-0 z-40 w-[20px] hidden md:flex items-start justify-center pt-4 transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200">
         <button
           onClick={onToggleCollapse}
           className="flex items-center justify-center w-5 h-8 rounded-r-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all"
@@ -129,7 +132,12 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
 
   return (
     <aside
-      className="fixed top-12 bottom-0 left-0 z-40 flex flex-col w-[260px] transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200"
+      className={cn(
+        'fixed left-0 z-40 flex flex-col w-[260px] transition-[width] duration-200 ease-in-out bg-white border-r border-gray-200',
+        mobileOpen
+          ? 'top-0 bottom-0 z-50 shadow-2xl'  // full-height overlay on mobile
+          : 'top-12 bottom-0 hidden md:flex'   // desktop only
+      )}
     >
       {/* Header */}
       <div className="flex items-start justify-between border-b border-gray-200 px-5 py-5 pb-3">
@@ -137,13 +145,23 @@ export function SettingsSidebar({ collapsed, onToggleCollapse }: SettingsSidebar
           <h2 className="text-base font-bold text-gray-900">Settings</h2>
           <p className="text-[11px] text-gray-400 mt-0.5">Configure your CRM</p>
         </div>
-        <button
-          onClick={onToggleCollapse}
-          className="flex items-center justify-center rounded-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all flex-shrink-0 w-7 h-7 mt-0.5"
-          title="Collapse sidebar"
-        >
-          <ChevronLeft className="w-3.5 h-3.5" />
-        </button>
+        {mobileOpen ? (
+          <button
+            onClick={onMobileClose}
+            className="flex items-center justify-center rounded-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all flex-shrink-0 w-7 h-7 mt-0.5"
+            aria-label="Close settings menu"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        ) : (
+          <button
+            onClick={onToggleCollapse}
+            className="flex items-center justify-center rounded-md bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-all flex-shrink-0 w-7 h-7 mt-0.5"
+            title="Collapse sidebar"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Object Manager — prominent quick-access button (opens in new tab) */}

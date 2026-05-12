@@ -416,7 +416,7 @@ export default function RecordDetailPage({
           {showHeaderCard && (
             <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-visible">
               {/* Identity + Actions row */}
-              <div className="flex items-center justify-between px-5 py-4 relative z-10">
+              <div className="flex flex-wrap items-start justify-between gap-3 px-4 sm:px-5 py-3 sm:py-4 relative z-10">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-10 h-10 shrink-0 bg-brand-navy/10 rounded-lg flex items-center justify-center">
                     <IconComponent className="w-5 h-5 text-brand-navy" />
@@ -425,7 +425,7 @@ export default function RecordDetailPage({
                     <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-0.5">
                       {objectDef?.label ?? 'Record'}
                     </div>
-                    <h1 className="text-xl font-bold text-gray-900 leading-tight truncate">{title}</h1>
+                    <h1 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight truncate">{title}</h1>
                     {subtitle && subtitle !== title && (
                       <p className="text-sm text-gray-500 truncate">{subtitle}</p>
                     )}

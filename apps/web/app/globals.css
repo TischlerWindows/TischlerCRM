@@ -45,18 +45,85 @@ body {
      Use bg-surface and border-border-default instead (defined in tailwind.config.js). */
 }
 
-/* Responsive: force all region children and panel field cells to full width on mobile */
+/* ====================================================================
+   MOBILE RESPONSIVE — all rules for ≤ 767 px
+   Desktop layout is fully preserved at md: (≥ 768 px).
+   ==================================================================== */
 @media (max-width: 767px) {
+  /* ── Page builder: region + panel field grids (existing) ─────── */
   .region-grid > * {
     grid-column: 1 / -1 !important;
   }
-
   .panel-field-grid {
     grid-template-columns: 1fr !important;
   }
-
   .panel-field-grid > * {
     grid-column: 1 / -1 !important;
+  }
+
+  /* ── Global padding reduction ────────────────────────────────── */
+  /* Reduces wasted whitespace on small screens everywhere          */
+  .p-6  { padding: 0.75rem !important; }
+  .p-8  { padding: 1rem    !important; }
+  .px-6 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  .py-6 { padding-top:   0.75rem !important; padding-bottom: 0.75rem !important; }
+  .px-8 { padding-left:  1rem   !important; padding-right:  1rem   !important; }
+  .py-8 { padding-top:   1rem   !important; padding-bottom: 1rem   !important; }
+
+  /* ── List-page action bars: wrap instead of overflow ─────────── */
+  /* Targets the <div class="px-6 py-6"> > <div class="flex justify-between..."> */
+  .px-6.py-6 > .flex.justify-between,
+  .px-6.py-6 > .flex.items-center.justify-between {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  /* Button group inside action bar */
+  .px-6.py-6 > .flex.justify-between > .flex.gap-3,
+  .px-6.py-6 > .flex.items-center.justify-between > .flex.gap-3 {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* ── Heading sizes: scale down on mobile ─────────────────────── */
+  .text-2xl { font-size: 1.25rem  !important; line-height: 1.75rem !important; }
+  .text-3xl { font-size: 1.375rem !important; line-height: 2rem    !important; }
+
+  /* ── Modals / dialogs: cap width so they fit the screen ─────── */
+  .fixed.inset-0 .max-w-2xl { max-width: calc(100vw - 1rem) !important; }
+  .fixed.inset-0 .max-w-3xl { max-width: calc(100vw - 1rem) !important; }
+  .fixed.inset-0 .max-w-xl  { max-width: calc(100vw - 1rem) !important; }
+
+  /* ── Grid layouts: collapse to 2 or 1 column on mobile ──────── */
+  /* 3 and 4-col grids → 2 cols (balanced tiles on mobile)         */
+  /* Only grids without an explicit sm:/md: responsive prefix      */
+  .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  /* 5 and 6-col grids → 1 col (too wide for mobile)               */
+  .grid-cols-5 { grid-template-columns: 1fr !important; }
+  .grid-cols-6 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* ── Inline-flex buttons: slightly reduce padding on mobile ─── */
+  .inline-flex.items-center.px-4.py-2 {
+    padding-left:  0.625rem !important;
+    padding-right: 0.625rem !important;
+  }
+
+  /* ── Record detail header: ensure actions wrap below title ───── */
+  .record-detail-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  /* ── Settings page: hide the 20-px collapsed sidebar strip ───── */
+  /* The mobile hamburger button in the layout replaces it          */
+  .settings-sidebar-collapsed-strip {
+    display: none !important;
+  }
+
+  /* ── Summary / Products pages: make inner tables scroll ─────── */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
   }
 }
 
