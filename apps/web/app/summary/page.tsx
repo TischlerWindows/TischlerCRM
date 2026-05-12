@@ -32,11 +32,10 @@ import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
-import { buildQuoteContext, assemblePresetsBySection } from '@/lib/quote-conditions';
-import type { SpecPresetData } from '@/lib/quote-conditions';
-import { buildTokenMap, resolvePresetsTokens } from '@/lib/quote-placeholders';
+import { buildQuoteContext, assemblePresetsBySection } from '@crm/proposal-assembly';
+import type { QuotePDFData, SpecPresetData } from '@crm/proposal-assembly';
+import { buildTokenMap, resolvePresetsTokens } from '@crm/proposal-assembly';
 import { generateQuotePDF } from '@/lib/quote-pdf-renderer';
-import type { QuotePDFData } from '@/lib/quote-pdf-renderer';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {

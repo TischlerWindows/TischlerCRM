@@ -112,12 +112,12 @@ export function buildTokenMap(
   let finishType = '';
   if (summary.finish) {
     const match = summary.finish.match(/(\d+)\s*$/);
-    finishType = match ? match[1] : summary.finish;
+    finishType = match?.[1] ?? summary.finish;
   }
 
   // Parse last name from contact name as fallback
   const nameParts = (summary.contactReceivingQuote || '').trim().split(/\s+/);
-  const fallbackLastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+  const fallbackLastName = nameParts.length > 1 ? (nameParts[nameParts.length - 1] ?? '') : '';
 
   // Calculate grand total
   const euroWindowsFinal = parseInt(summary.quoteTotals?.euroWindows?.finalAdj || '0', 10) || 0;
@@ -301,10 +301,10 @@ export function resolveCustomTokens(args: CustomTokenResolverArgs): Record<strin
     let raw: unknown = undefined;
     switch (m.sourceObject) {
       case 'SUMMARY':
-        raw = (args.summary as Record<string, unknown>)[m.sourcePath];
+        raw = (args.summary as unknown as Record<string, unknown>)[m.sourcePath];
         break;
       case 'CONTACT':
-        raw = args.contact ? (args.contact as Record<string, unknown>)[m.sourcePath] : undefined;
+        raw = args.contact ? (args.contact as unknown as Record<string, unknown>)[m.sourcePath] : undefined;
         break;
       case 'OPPORTUNITY':
         raw = readCustomData(args.opportunity, m.sourcePath);

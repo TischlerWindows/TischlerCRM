@@ -1,6 +1,5 @@
-import { assembleProposal } from '@/lib/proposal-assembly';
-import type { SummaryForConditions } from '@/lib/quote-conditions';
-import type { SummaryForPlaceholders } from '@/lib/quote-placeholders';
+import { assembleProposal } from '@crm/proposal-assembly';
+import type { SummaryForConditions, SummaryForPlaceholders } from '@crm/proposal-assembly';
 
 const summary = {
   id: 'summary-1',

@@ -1,4 +1,4 @@
-import { findUnresolvedTokens, formatDate, resolveTokensWithDiagnostics } from '@/lib/quote-placeholders';
+import { findUnresolvedTokens, formatDate, resolveTokensWithDiagnostics } from '@crm/proposal-assembly';
 
 describe('quote placeholder diagnostics', () => {
   it('reports unresolved tokens while preserving the unresolved marker in text', () => {
