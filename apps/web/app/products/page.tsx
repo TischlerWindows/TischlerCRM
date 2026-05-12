@@ -395,22 +395,27 @@ export default function ProductsPage() {
 
                                   {/* Spec grid */}
                                   <div className="flex-1 grid grid-cols-4 gap-x-6 gap-y-3">
-                                    {[
-                                      ['Product', d.product],
-                                      ['Wood Type', d.woodType],
-                                      ['Finish', d.finish],
-                                    ['Glass Type', d.glassType],
-                                      ...(group.category === 'Double Hung' ? [['Hung Glass Type', d.hungType]] : []),
-                                      ['Spacer Bar', d.spacerBarType],
-                                      ['Spacer Colors', d.spacerBarColors],
-                                      ['SDL', d.sdl],
-                                      ['TDL', d.tdl],
-                                    ].filter(([, v]) => v).map(([label, val]) => (
-                                      <div key={label}>
-                                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>
-                                        <div className="text-sm text-gray-800">{val}</div>
-                                      </div>
-                                    ))}
+                                    {(() => {
+                                      const typeParts = (group.productType || '').split(' w/ ');
+                                      const hasHungPart = typeParts.some(p => p.toLowerCase().includes('hung'));
+                                      const hasNonHungPart = typeParts.some(p => !p.toLowerCase().includes('hung'));
+                                      return [
+                                        ['Product', d.product],
+                                        ['Wood Type', d.woodType],
+                                        ['Finish', d.finish],
+                                        ...(hasNonHungPart ? [['Glass Type', d.glassType]] : []),
+                                        ...(hasHungPart ? [['Hung Glass Type', d.hungType]] : []),
+                                        ['Spacer Bar', d.spacerBarType],
+                                        ['Spacer Colors', d.spacerBarColors],
+                                        ['SDL', d.sdl],
+                                        ['TDL', d.tdl],
+                                      ].filter(([, v]) => v).map(([label, val]) => (
+                                        <div key={label}>
+                                          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>
+                                          <div className="text-sm text-gray-800">{val}</div>
+                                        </div>
+                                      ));
+                                    })()}
                                   </div>
 
                                   {/* Numbers */}
