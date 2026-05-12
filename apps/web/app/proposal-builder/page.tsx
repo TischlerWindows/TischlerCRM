@@ -442,9 +442,7 @@ export default function QuoteBuilderPage() {
     setIsPreviewingPDF(true);
     setError(null);
     try {
-      // Server-side render via PDFKit (Phase 3). Returns a PDF blob we open in
-      // a new tab. The jsPDF code path under /lib/quote-pdf-renderer.ts is
-      // deprecated and kept only for emergency rollback.
+      // Server-side render via PDFKit. Returns a PDF blob we open in a new tab.
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const token = apiClient.getToken();
       const response = await fetch(`${apiBase}/proposal-pdf/render`, {

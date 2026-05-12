@@ -1,9 +1,5 @@
 /**
  * Shape of the data the PDF renderer consumes. Output of the assembly layer.
- *
- * Lived in `apps/web/lib/quote-pdf-renderer.ts` before being extracted so the
- * server-side PDFKit renderer in `apps/api` can depend on it without dragging
- * jsPDF into the API workspace.
  */
 
 import type { SpecPresetData } from './quote-conditions.js';

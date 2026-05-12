@@ -38,6 +38,8 @@ export async function renderProposalPDF(result: ProposalAssemblyResult): Promise
   const doc = new PDFDocument({
     size: 'LETTER',
     margins: { top: PAGE_MARGIN, bottom: PAGE_MARGIN, left: PAGE_MARGIN, right: PAGE_MARGIN },
+    // Required so drawFooter() can iterate all pages via bufferedPageRange()/switchToPage().
+    bufferPages: true,
     info: {
       Title: result.pdfData.projectName ? `${result.pdfData.projectName} — Proposal` : 'Tischler Proposal',
       Author: 'Tischler und Sohn',
