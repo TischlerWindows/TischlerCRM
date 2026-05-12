@@ -19,6 +19,8 @@ interface ProductLogDetail {
   spacerBarColors: string;
   sdl: string;
   tdl: string;
+  finials: string;
+  hingeFinishSpecification: string;
   productTypeOptions: Record<string, string[]>;
   widthFtIn: string;
   heightFtIn: string;
@@ -63,6 +65,8 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
     const spacerBarColors = s.spacerBarColors || '';
     const sdl = s.sdl === 'Custom Option' ? (s.sdlCustom || '') : (s.sdl || '');
     const tdl = s.tdl === 'Custom Option' ? (s.tdlCustom || '') : (s.tdl || '');
+    const finials = s.finials || '';
+    const hingeFinishSpecification = s.hingeFinishSpecification || '';
 
     const processRows = (rows: any[], isDoor: boolean) => {
       for (const row of rows) {
@@ -85,7 +89,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
           summaryName: s.name || 'Untitled',
           opportunityNumber: s.opportunityNumber || '',
           date: s.date || null,
-          product, woodType, finish, glassType, hungType, spacerBarType, spacerBarColors, sdl, tdl,
+          product, woodType, finish, glassType, hungType, spacerBarType, spacerBarColors, sdl, tdl, finials, hingeFinishSpecification,
           productTypeOptions: (s.productTypeOptions && !Array.isArray(s.productTypeOptions)) ? s.productTypeOptions as Record<string, string[]> : {},
           widthFtIn: row.widthFtIn || '',
           heightFtIn: row.heightFtIn || '',
@@ -409,6 +413,8 @@ export default function ProductsPage() {
                                         ['Spacer Colors', d.spacerBarColors],
                                         ['SDL', d.sdl],
                                         ['TDL', d.tdl],
+                                        ['Finials', d.finials],
+                                        ['Hinge Finish', d.hingeFinishSpecification],
                                       ].filter(([, v]) => v).map(([label, val]) => (
                                         <div key={label}>
                                           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{label}</div>

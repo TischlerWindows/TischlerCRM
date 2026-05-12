@@ -865,6 +865,8 @@ export default function SummaryPage() {
               spacerBarColors: pick('spacerBarColors'),
               product: pick('productSpecifications'),
               plansDated: pick('plansDated'),
+              finials: pick('finials'),
+              hingeFinishSpecification: pick('hingeFinishSpecification'),
             };
             const { quoteRecipientContact, architectDesignerAccount } = await resolveTeamMemberFields(opportunityId);
             oppFields.contactReceivingQuote = quoteRecipientContact.name;
@@ -1169,6 +1171,8 @@ export default function SummaryPage() {
         spacerBarColors: pick('spacerBarColors'),
         product: pick('productSpecifications'),
         plansDated: pick('plansDated'),
+        finials: pick('finials'),
+        hingeFinishSpecification: pick('hingeFinishSpecification'),
         contactReceivingQuote: quoteRecipientContact.name,
         accountReceivingQuote: architectDesignerAccount.name,
         accountShippingAddress: architectDesignerAccount.shippingAddress,
@@ -4024,6 +4028,36 @@ export default function SummaryPage() {
                               className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 focus:outline-none"
                             />
                           )}
+                        </div>
+                      </div>
+
+                      {/* Row: Finials + Hinge Finish Specification */}
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Finials</label>
+                          <select
+                            value={editingSummary.finials || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, finials: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select...</option>
+                            {getOppPicklist('Opportunity__finials').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Hinge Finish Specification</label>
+                          <select
+                            value={editingSummary.hingeFinishSpecification || ''}
+                            onChange={(e) => setEditingSummary({ ...editingSummary, hingeFinishSpecification: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm bg-white"
+                          >
+                            <option value="">Select...</option>
+                            {getOppPicklist('Opportunity__hingeFinishSpecification').map(v => (
+                              <option key={v} value={v}>{v}</option>
+                            ))}
+                          </select>
                         </div>
                       </div>
 
