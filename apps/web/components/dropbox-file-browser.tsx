@@ -574,28 +574,30 @@ export function DropboxFileBrowser({
             <DropboxLogo className="w-5 h-5" />
             <h3 className="text-sm font-bold text-gray-800">Dropbox</h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
             >
               {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-              Add Files
+              <span>Add Files</span>
             </button>
             <button
               onClick={() => { setShowNewFolder(true); setNewFolderName(''); }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              title="New Folder"
             >
               <FolderPlus className="w-3.5 h-3.5" />
-              New Folder
+              <span className="hidden sm:inline">New Folder</span>
             </button>
             <button
               onClick={() => openInDropbox()}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition"
+              title="Open in Dropbox"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              Open in Dropbox
+              <span className="hidden sm:inline">Open in Dropbox</span>
             </button>
           </div>
         </div>
@@ -735,8 +737,8 @@ export function DropboxFileBrowser({
             <thead>
               <tr className="border-b border-gray-100">
                 <SortHeader field="name" label="Name" className="pl-4" />
-                <SortHeader field="modifiedAt" label="Modified" />
-                <SortHeader field="size" label="Size" />
+                <SortHeader field="modifiedAt" label="Modified" className="hidden sm:table-cell" />
+                <SortHeader field="size" label="Size" className="hidden sm:table-cell" />
                 <th className="w-10" />
               </tr>
             </thead>
@@ -781,10 +783,10 @@ export function DropboxFileBrowser({
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap hidden sm:table-cell">
                     {entry.isFolder ? '—' : formatDate(entry.modifiedAt)}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                  <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap hidden sm:table-cell">
                     {entry.isFolder ? '—' : formatBytes(entry.size)}
                   </td>
                   <td className="px-2 py-2.5">

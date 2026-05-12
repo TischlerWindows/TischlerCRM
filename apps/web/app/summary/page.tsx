@@ -4217,15 +4217,16 @@ export default function SummaryPage() {
                     const gtPct   = totPct   + p2(gta2?.pct);
                     const gtFinal = totFinal + p2(gta2?.final);
                     const hiddenCost = totFull * 0.56;
-                    const fmtV = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+                    const fmtV = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
+                    const fmtK = (v: number) => v ? Math.round(v).toLocaleString('en-US') + 'K' : '—';
                     const rows = [
                       { label: 'Full by Sq Foot',    value: totSqFt ? fmtV(gtFull  / totSqFt) : '—' },
                       { label: '%_ by Sq Foot',      value: totSqFt ? fmtV(gtPct   / totSqFt) : '—' },
                       { label: 'Final by Sq Foot',   value: totSqFt ? fmtV(gtFinal / totSqFt) : '—' },
                       { label: 'Hidden Cost',        value: fmtV(hiddenCost) },
-                      { label: 'Full Contribution',  value: fmtV((totFull  - hiddenCost) / 1000) },
-                      { label: '%_ Contribution',    value: fmtV((totPct   - hiddenCost) / 1000) },
-                      { label: 'Final Contribution', value: fmtV((totFinal - hiddenCost) / 1000) },
+                      { label: 'Full Contribution',  value: fmtK((totFull  - hiddenCost) / 1000) },
+                      { label: '%_ Contribution',    value: fmtK((totPct   - hiddenCost) / 1000) },
+                      { label: 'Final Contribution', value: fmtK((totFinal - hiddenCost) / 1000) },
                     ];
                     return (
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
