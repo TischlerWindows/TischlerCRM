@@ -446,7 +446,6 @@ export function buildApp() {
     });
     if (!user) return reply.code(404).send({ error: 'User not found' });
 
-    const OBJECTS = ['leads','opportunities','projects','service','quotes','installations','properties','contacts','companies','products'];
     const APP_KEYS = [
       'manageUsers','manageProfiles','manageDepartments','manageIntegrations','manageCompanySettings',
       'exportData','importData',
@@ -456,19 +455,41 @@ export function buildApp() {
       'manageSupportTickets',
     ];
 
+    // Map from storage keys (plural/lowercase, as saved by profiles.ts) to canonical
+    // CRM API names (CamelCase singular) used throughout the frontend.
+    const STORAGE_TO_API: Record<string, string> = {
+      properties:    'Property',
+      contacts:      'Contact',
+      companies:     'Account',
+      products:      'Product',
+      leads:         'Lead',
+      opportunities: 'Opportunity',
+      projects:      'Project',
+      service:       'Service',
+      quotes:        'Quote',
+      installations: 'Installation',
+    };
+
+    const FULL_PERM = { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true };
+
     // ADMIN users get full access regardless of profile
     if (user.role === 'ADMIN') {
       return reply.send({
-        objectPermissions: Object.fromEntries(OBJECTS.map(o => [o, { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true }])),
+        objectPermissions: Object.fromEntries(Object.values(STORAGE_TO_API).map(api => [api, FULL_PERM])),
         appPermissions: Object.fromEntries(APP_KEYS.map(k => [k, true])),
       });
     }
 
-    // Normalise stored permissions: profiles may use 'objects'/'app' (old keys)
-    // or 'objectPermissions'/'appPermissions' (canonical keys).
+    // Normalise stored permissions: translate storage keys → canonical API names.
     const stored = (user.profile?.permissions ?? {}) as Record<string, unknown>;
+    const rawObjs = (stored.objectPermissions ?? stored.objects ?? {}) as Record<string, unknown>;
+    const objectPermissions: Record<string, unknown> = {};
+    for (const [storageKey, perms] of Object.entries(rawObjs)) {
+      const apiName = STORAGE_TO_API[storageKey] ?? storageKey;
+      objectPermissions[apiName] = perms;
+    }
     return reply.send({
-      objectPermissions: (stored.objectPermissions ?? stored.objects ?? {}) as Record<string, unknown>,
+      objectPermissions,
       appPermissions: (stored.appPermissions ?? stored.app ?? {}) as Record<string, unknown>,
     });
   });

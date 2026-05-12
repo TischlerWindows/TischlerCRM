@@ -117,8 +117,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       // Permissions failed to load (API error) — be RESTRICTIVE
       if (!permissions) return false;
 
-      // Try exact key first (custom objects use CamelCase API names),
-      // then lowercase fallback (built-in objects are stored as lowercase e.g. 'properties').
+      // Try exact key first (canonical CamelCase API name).
+      // The /me/permissions endpoint normalises storage keys → API names,
+      // so this should always match; the lowercase fallback is a safety net.
       const objPerms = permissions.objectPermissions?.[objectApiName]
         ?? permissions.objectPermissions?.[objectApiName.toLowerCase()];
       // If no permissions configured for this object, DENY by default
