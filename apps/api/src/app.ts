@@ -468,6 +468,7 @@ export function buildApp() {
       service:       'Service',
       quotes:        'Quote',
       installations: 'Installation',
+      workorders:    'WorkOrder',
     };
 
     const FULL_PERM = { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true };

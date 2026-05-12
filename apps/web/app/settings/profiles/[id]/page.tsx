@@ -20,6 +20,7 @@ const OBJECT_MAP: { key: string; label: string }[] = [
   { key: 'service',       label: 'Service' },
   { key: 'quotes',        label: 'Quote' },
   { key: 'installations', label: 'Installation' },
+  { key: 'workorders',    label: 'Work Order' },
 ];
 
 const OBJ_PERM_COLS: { key: string; label: string; width: string }[] = [
