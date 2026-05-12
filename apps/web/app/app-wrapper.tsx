@@ -491,7 +491,7 @@ function AppWrapperInner({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'relative px-4 h-full inline-flex items-center text-[13px] font-medium whitespace-nowrap transition-colors',
+                    'relative px-2.5 sm:px-4 h-full inline-flex items-center text-[12px] sm:text-[13px] font-medium whitespace-nowrap transition-colors',
                     isActive
                       ? 'text-brand-navy'
                       : 'text-brand-dark/70 hover:text-brand-navy'

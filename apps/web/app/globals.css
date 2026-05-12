@@ -125,6 +125,26 @@ body {
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
   }
+
+  /* ── Table cells: compact padding + truncate long content ──────── */
+  /* Reduces row height and keeps each column narrow so more fit    */
+  table thead th {
+    padding-left:  0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top:    0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    font-size: 0.65rem    !important;
+  }
+  table tbody td {
+    padding-left:  0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top:    0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* Hide number input spinners globally */
