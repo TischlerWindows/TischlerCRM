@@ -9,7 +9,27 @@ interface TokenMapping {
   label: string;
   category: string;
   sourceObject: string;
+  sourcePath?: string;
   format: string;
+}
+
+// Sub-headers inside each category group. Users think in domain terms ("this
+// is a price from the Quote", "this is a line item") but everything still
+// resolves through the Summary blob under the hood — we just label the path.
+function sourceSubgroup(m: TokenMapping): string {
+  const path = (m.sourcePath || '').toLowerCase();
+  const obj = m.sourceObject.toUpperCase();
+  if (obj === 'OPPORTUNITY') return 'From Opportunity';
+  if (obj === 'PROJECT') return 'From Project';
+  if (obj === 'CONTACT') return 'From Contact';
+  if (obj === 'ACCOUNT') return 'From Account';
+  if (obj === 'SYSTEM') return 'System';
+  if (path.startsWith('quotetotals')) return 'From Quote Totals';
+  if (path.startsWith('addons')) return 'From Add-ons';
+  if (path.startsWith('rows') || path.startsWith('doorrows')) return 'From Line Items';
+  if (path.startsWith('productytypeoptions') || path.startsWith('producttypeoptions'))
+    return 'From Product Options';
+  return 'From Summary';
 }
 
 interface Props {
@@ -97,25 +117,45 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props
         ) : categories.length === 0 ? (
           <p className="text-xs text-gray-400 italic px-1 mt-2">No variables match &quot;{query}&quot;.</p>
         ) : (
-          categories.map((cat) => (
-            <div key={cat} className="mb-3">
-              <div className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-1 px-0.5">{cat}</div>
-              <div className="flex flex-wrap gap-1">
-                {filteredGrouped[cat].map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => onInsert(m.tokenName)}
-                    title={`{{${m.tokenName}}} — ${m.sourceObject}.${m.label}`}
-                    aria-label={`Insert ${m.tokenName} token`}
-                    className="text-[10px] font-mono leading-tight min-h-[24px] inline-flex items-center px-1.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors cursor-pointer"
-                  >
-                    {m.tokenName}
-                  </button>
+          categories.map((cat) => {
+            // Group items inside each category by where their value comes from.
+            const bySubgroup = new Map<string, TokenMapping[]>();
+            for (const m of filteredGrouped[cat]) {
+              const sg = sourceSubgroup(m);
+              const list = bySubgroup.get(sg);
+              if (list) list.push(m);
+              else bySubgroup.set(sg, [m]);
+            }
+            const subgroupNames = Array.from(bySubgroup.keys()).sort();
+            return (
+              <div key={cat} className="mb-3">
+                <div className="text-[9px] font-bold uppercase tracking-wide text-gray-400 mb-1 px-0.5">{cat}</div>
+                {subgroupNames.map((sg) => (
+                  <div key={sg} className="mb-1.5">
+                    {(subgroupNames.length > 1 || sg !== 'From Summary') && (
+                      <div className="text-[8.5px] font-medium uppercase tracking-wider text-gray-400/80 mb-0.5 px-0.5">
+                        {sg}
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-1">
+                      {bySubgroup.get(sg)!.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => onInsert(m.tokenName)}
+                          title={`{{${m.tokenName}}} — ${m.sourceObject}.${m.label}`}
+                          aria-label={`Insert ${m.tokenName} token`}
+                          className="text-[10px] font-mono leading-tight min-h-[24px] inline-flex items-center px-1.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors cursor-pointer"
+                        >
+                          {m.tokenName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import { Plus, X, Info } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
+import { HelpHint } from './help-hint';
 import { CONDITION_FIELD_DEFINITIONS } from '@crm/proposal-assembly';
 
 export interface DraftCondition {
@@ -72,14 +73,14 @@ export function ConditionBuilder({ conditions, onChange }: Props) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1">
           <label className="text-xs font-semibold text-gray-600">Conditions</label>
-          <span
-            title='This block is included only when all AND conditions pass and (if any OR conditions exist) at least one OR also passes. "Always included" overrides this entirely.'
-            aria-label="Conditions help"
-            tabIndex={0}
-            className="inline-flex cursor-help text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:text-gray-700"
-          >
-            <Info className="w-3 h-3" />
-          </span>
+          <HelpHint
+            label="Conditions help"
+            title="When this block appears"
+            description="This block is included only when all AND conditions pass and (if any OR conditions exist) at least one OR also passes. Turning on 'Always included' overrides this entirely."
+            example={`hasDoors  IS_TRUE       (AND)
+glassType CONTAINS  #28  (AND)
+jobType   EQUALS Dade…   (OR)`}
+          />
         </div>
         <button onClick={add} className="text-xs text-brand-navy font-semibold hover:underline flex items-center gap-1">
           <Plus className="w-3 h-3" /> Add Condition

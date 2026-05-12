@@ -1,7 +1,35 @@
 'use client';
 
-import { GripVertical, Plus, ScrollText, EyeOff, GitBranch, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Copy,
+  EyeOff,
+  FileText,
+  GitBranch,
+  GripVertical,
+  Plus,
+  ScrollText,
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SpecPresetData } from '@crm/proposal-assembly';
+
+const SECTION_ORDER: Array<SpecPresetData['section']> = [
+  'CONSTANT',
+  'SPECIFICATION',
+  'OPTION',
+  'EXCLUSION',
+  'INSTALLATION',
+];
+
+const SECTION_LABEL: Record<SpecPresetData['section'], string> = {
+  CONSTANT: 'Constants',
+  SPECIFICATION: 'Specifications',
+  OPTION: 'Options',
+  EXCLUSION: 'Exclusions',
+  INSTALLATION: 'Installation',
+};
 
 const SECTION_COLORS: Record<string, string> = {
   CONSTANT: 'bg-slate-100 text-slate-700',
@@ -11,11 +39,14 @@ const SECTION_COLORS: Record<string, string> = {
   INSTALLATION: 'bg-green-100 text-green-700',
 };
 
+const COLLAPSED_STORAGE_KEY = 'proposalBuilder.blockGroups.collapsed';
+
 interface Props {
   presets: SpecPresetData[];
   selectedPresetId: string | null;
   onSelect: (preset: SpecPresetData) => void;
   onNew: () => void;
+  onDuplicate?: (preset: SpecPresetData) => void;
   onReorder: (presets: SpecPresetData[]) => void;
   onReorderEnd: () => void;
   dragIdx: number | null;
@@ -29,10 +60,75 @@ function reorderAt(list: SpecPresetData[], from: number, to: number): SpecPreset
   return next.map((p, i) => ({ ...p, order: i }));
 }
 
-export function BlockList({ presets, selectedPresetId, onSelect, onNew, onReorder, onReorderEnd, dragIdx, onDragStart }: Props) {
+function useCollapsedSections(): {
+  collapsed: Set<string>;
+  toggle: (section: string) => void;
+} {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+      if (raw) setCollapsed(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      // ignore — older browsers / disabled storage
+    }
+  }, []);
+  const toggle = useCallback((section: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      try {
+        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify(Array.from(next)));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+  return { collapsed, toggle };
+}
+
+export function BlockList({
+  presets,
+  selectedPresetId,
+  onSelect,
+  onNew,
+  onDuplicate,
+  onReorder,
+  onReorderEnd,
+  dragIdx,
+  onDragStart,
+}: Props) {
+  const { collapsed, toggle } = useCollapsedSections();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const selectedPreset = presets.find((p) => p.id === selectedPresetId) || null;
+
+  // Close the new-block menu when clicking outside.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onDocClick);
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      window.removeEventListener('mousedown', onDocClick);
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [menuOpen]);
+
   const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
     if (dragIdx === null || dragIdx === idx) return;
+    // Within-group only — moving between sections is done via the block editor.
+    if (presets[dragIdx].section !== presets[idx].section) return;
     onReorder(reorderAt(presets, dragIdx, idx));
     onDragStart(idx);
   };
@@ -40,6 +136,8 @@ export function BlockList({ presets, selectedPresetId, onSelect, onNew, onReorde
   const handleMove = (idx: number, dir: -1 | 1) => {
     const target = idx + dir;
     if (target < 0 || target >= presets.length) return;
+    // Within-group only.
+    if (presets[idx].section !== presets[target].section) return;
     onReorder(reorderAt(presets, idx, target));
     onReorderEnd();
   };
@@ -48,14 +146,62 @@ export function BlockList({ presets, selectedPresetId, onSelect, onNew, onReorde
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Blocks</span>
-        <button
-          type="button"
-          onClick={onNew}
-          aria-label="Create new block"
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs text-brand-navy font-semibold rounded hover:bg-brand-navy/10 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" /> New
-        </button>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label="Create new block"
+            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-brand-navy font-semibold rounded hover:bg-brand-navy/10 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" /> New
+            <ChevronDown className="w-3 h-3 -ml-0.5 opacity-70" aria-hidden="true" />
+          </button>
+          {menuOpen && (
+            <div
+              role="menu"
+              className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNew();
+                }}
+                className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+              >
+                <FileText className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                <div>
+                  <div className="font-medium text-gray-900">Blank block</div>
+                  <div className="text-[10.5px] text-gray-500">Start from scratch with an empty body.</div>
+                </div>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!selectedPreset || !onDuplicate}
+                onClick={() => {
+                  if (!selectedPreset || !onDuplicate) return;
+                  setMenuOpen(false);
+                  onDuplicate(selectedPreset);
+                }}
+                className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 focus:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed border-t border-gray-100"
+              >
+                <Copy className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                <div>
+                  <div className="font-medium text-gray-900">Duplicate selected</div>
+                  <div className="text-[10.5px] text-gray-500">
+                    {selectedPreset
+                      ? `Copy "${selectedPreset.title}" — body, conditions, variants.`
+                      : 'Select a block first.'}
+                  </div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -72,87 +218,119 @@ export function BlockList({ presets, selectedPresetId, onSelect, onNew, onReorde
             </button>
           </div>
         ) : (
-          <ul role="list" className="contents">
-            {presets.map((preset, idx) => {
-              const isSelected = preset.id === selectedPresetId;
-              const isFirst = idx === 0;
-              const isLast = idx === presets.length - 1;
-              return (
-                <li
-                  key={preset.id}
-                  draggable
-                  tabIndex={0}
-                  aria-current={isSelected ? 'true' : undefined}
-                  onDragStart={() => onDragStart(idx)}
-                  onDragOver={(e) => handleDragOver(e, idx)}
-                  onDragEnd={onReorderEnd}
-                  onClick={() => onSelect(preset)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      if (e.target === e.currentTarget) {
-                        e.preventDefault();
-                        onSelect(preset);
-                      }
-                    }
-                  }}
-                  className={`group flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors ${
-                    isSelected ? 'bg-[#ede9f5] border-l-[3px] border-l-[#da291c]' : 'hover:bg-gray-50'
-                  } ${!preset.isActive ? 'opacity-50' : ''}`}
+          SECTION_ORDER.map((section) => {
+            const inGroup = presets.filter((p) => p.section === section);
+            if (inGroup.length === 0) return null;
+            const isCollapsed = collapsed.has(section);
+            return (
+              <section key={section} aria-label={SECTION_LABEL[section]}>
+                <button
+                  type="button"
+                  onClick={() => toggle(section)}
+                  aria-expanded={!isCollapsed}
+                  aria-controls={`block-group-${section}`}
+                  className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wide text-gray-500 bg-gray-50/80 border-b border-gray-100 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors"
                 >
-                  <GripVertical
-                    aria-hidden="true"
-                    className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 cursor-grab"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold text-gray-400 tabular-nums w-4 text-right">{idx + 1}</span>
-                      <span className="text-xs font-medium text-gray-900 truncate">{preset.title}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5 ml-5.5 flex-wrap">
-                      <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${SECTION_COLORS[preset.section] || ''}`}>
-                        {preset.section}
-                      </span>
-                      {preset.isAlwaysIncluded && (
-                        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-purple-100 text-purple-700">Always</span>
-                      )}
-                      {preset.driverField && (
-                        <GitBranch className="w-3 h-3 text-indigo-500" aria-label={`Driver field: ${preset.driverField}`} />
-                      )}
-                    </div>
-                  </div>
-                  {!preset.isActive && (
-                    <EyeOff aria-label="Inactive block" className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                  {isCollapsed ? (
+                    <ChevronRight aria-hidden="true" className="w-3 h-3 text-gray-400" />
+                  ) : (
+                    <ChevronDown aria-hidden="true" className="w-3 h-3 text-gray-400" />
                   )}
-                  <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMove(idx, -1);
-                      }}
-                      disabled={isFirst}
-                      aria-label={`Move ${preset.title} up`}
-                      className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMove(idx, 1);
-                      }}
-                      disabled={isLast}
-                      aria-label={`Move ${preset.title} down`}
-                      className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  <span className="flex-1 text-left">{SECTION_LABEL[section]}</span>
+                  <span className="font-normal lowercase tracking-normal text-gray-400">
+                    {inGroup.length}
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <ul role="list" id={`block-group-${section}`} className="contents">
+                    {inGroup.map((preset) => {
+                      const idx = presets.indexOf(preset);
+                      const inGroupIdx = inGroup.indexOf(preset);
+                      const isSelected = preset.id === selectedPresetId;
+                      const isFirstInGroup = inGroupIdx === 0;
+                      const isLastInGroup = inGroupIdx === inGroup.length - 1;
+                      return (
+                        <li
+                          key={preset.id}
+                          draggable
+                          tabIndex={0}
+                          aria-current={isSelected ? 'true' : undefined}
+                          onDragStart={() => onDragStart(idx)}
+                          onDragOver={(e) => handleDragOver(e, idx)}
+                          onDragEnd={onReorderEnd}
+                          onClick={() => onSelect(preset)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              if (e.target === e.currentTarget) {
+                                e.preventDefault();
+                                onSelect(preset);
+                              }
+                            }
+                          }}
+                          className={`group flex items-center gap-1.5 px-2 py-2 border-b border-gray-100 cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-brand-navy/30 transition-colors ${
+                            isSelected ? 'bg-[#ede9f5] border-l-[3px] border-l-[#da291c]' : 'hover:bg-gray-50'
+                          } ${!preset.isActive ? 'opacity-50' : ''}`}
+                        >
+                          <GripVertical
+                            aria-hidden="true"
+                            className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 cursor-grab"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-bold text-gray-400 tabular-nums w-4 text-right">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs font-medium text-gray-900 truncate">{preset.title}</span>
+                            </div>
+                            <div className="flex items-center gap-1 mt-0.5 ml-5.5 flex-wrap">
+                              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${SECTION_COLORS[preset.section] || ''}`}>
+                                {preset.section}
+                              </span>
+                              {preset.isAlwaysIncluded && (
+                                <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-purple-100 text-purple-700">Always</span>
+                              )}
+                              {preset.driverField && (
+                                <GitBranch className="w-3 h-3 text-indigo-500" aria-label={`Driver field: ${preset.driverField}`} />
+                              )}
+                            </div>
+                          </div>
+                          {!preset.isActive && (
+                            <EyeOff aria-label="Inactive block" className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          )}
+                          <div className="flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMove(idx, -1);
+                              }}
+                              disabled={isFirstInGroup}
+                              aria-label={`Move ${preset.title} up`}
+                              className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMove(idx, 1);
+                              }}
+                              disabled={isLastInGroup}
+                              aria-label={`Move ${preset.title} down`}
+                              className="flex h-6 w-6 items-center justify-center rounded text-gray-500 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-navy/30 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            );
+          })
         )}
       </div>
     </div>
