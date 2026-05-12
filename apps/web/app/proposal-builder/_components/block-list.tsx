@@ -1,7 +1,7 @@
 'use client';
 
 import { GripVertical, Plus, ScrollText, EyeOff, GitBranch, ChevronUp, ChevronDown } from 'lucide-react';
-import type { SpecPresetData } from '@/lib/quote-conditions';
+import type { SpecPresetData } from '@crm/proposal-assembly';
 
 const SECTION_COLORS: Record<string, string> = {
   CONSTANT: 'bg-slate-100 text-slate-700',

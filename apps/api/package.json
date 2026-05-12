@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@crm/db": "workspace:*",
+    "@crm/proposal-assembly": "workspace:*",
     "@crm/storage": "workspace:*",
     "@crm/types": "workspace:*",
     "@crm/widgets": "workspace:*",
@@ -32,12 +33,15 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "16.4.5",
     "fastify": "^5.0.0",
+    "node-html-parser": "^6.1.13",
+    "pdfkit": "^0.15.0",
     "pg": "^8.20.0",
     "qs": "^6.15.0",
     "zod": "3.23.8"
   },
   "devDependencies": {
     "@types/node": "20.11.19",
+    "@types/pdfkit": "^0.13.4",
     "dotenv-cli": "7.4.2",
     "esbuild": "0.21.5",
     "tsx": "4.15.7",

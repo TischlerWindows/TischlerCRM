@@ -6,7 +6,7 @@ import {
   type QuoteContext,
   type SpecPresetData,
   type SummaryForConditions,
-} from './quote-conditions';
+} from './quote-conditions.js';
 import {
   buildTokenMap,
   resolveCustomTokens,
@@ -15,8 +15,8 @@ import {
   type CustomObjectData,
   type SummaryForPlaceholders,
   type TokenMappingRow,
-} from './quote-placeholders';
-import type { QuotePDFData } from './quote-pdf-renderer';
+} from './quote-placeholders.js';
+import type { QuotePDFData } from './pdf-data-types.js';
 
 export type ProposalSection = 'CONSTANT' | 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION';
 

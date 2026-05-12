@@ -1,10 +1,6 @@
 'use client';
 
-// TODO: extract a shared proposal-structure module that both this preview
-// and lib/quote-pdf-renderer.ts can walk, to prevent layout drift.
-
-import type { ProposalAssemblyResult } from '@/lib/proposal-assembly';
-import type { SpecPresetData } from '@/lib/quote-conditions';
+import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
 
 interface Props {
   result: ProposalAssemblyResult | null;
