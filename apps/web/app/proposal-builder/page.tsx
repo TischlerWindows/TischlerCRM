@@ -4,9 +4,8 @@ import { useEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent }
 import { Loader2, AlertCircle, X, ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { getSetting } from '@/lib/preferences';
-import { assembleProposal } from '@/lib/proposal-assembly';
-import type { SpecPresetData } from '@/lib/quote-conditions';
-import { generateTemplatePreviewPDF } from '@/lib/quote-pdf-renderer';
+import { assembleProposal } from '@crm/proposal-assembly';
+import type { SpecPresetData } from '@crm/proposal-assembly';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
 
@@ -15,6 +14,7 @@ import { BlockList } from './_components/block-list';
 import { VariableChips } from './_components/variable-chips';
 import { LetterPreview } from './_components/letter-preview';
 import { BlockEditor } from './_components/block-editor';
+import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
 import {
   conditionToDraft,
@@ -104,7 +104,7 @@ export default function QuoteBuilderPage() {
   const [selectedSummaryId, setSelectedSummaryId] = useState('');
   const [isPreviewingPDF, setIsPreviewingPDF] = useState(false);
 
-  const bodyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
   // Resizable side panels (shared with page-editor pattern)
   const panels = useResizableSidePanels({
@@ -326,17 +326,8 @@ export default function QuoteBuilderPage() {
   };
 
   const handleInsertToken = (tokenName: string) => {
-    const textarea = bodyTextareaRef.current;
-    if (!textarea || editDriverField) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = `{{${tokenName}}}`;
-    const newBody = editBody.slice(0, start) + text + editBody.slice(end);
-    setEditBody(newBody);
-    requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.selectionStart = textarea.selectionEnd = start + text.length;
-    });
+    if (editDriverField) return; // body is replaced by Variants in driver mode
+    bodyEditorRef.current?.insertText(`{{${tokenName}}}`);
     flash(`Inserted {{${tokenName}}}`);
   };
 
@@ -441,18 +432,49 @@ export default function QuoteBuilderPage() {
   // ── Template PDF preview ──────────────────────────────────────
 
   const handlePreviewPDF = async () => {
-    if (presets.length === 0) { setError('No blocks to preview.'); return; }
+    if (!selectedTemplateId) { setError('No template selected.'); return; }
+    if (!selectedSummaryId) { setError('Pick a summary to preview against.'); return; }
+    // Open the preview window synchronously inside the user-gesture handler.
+    // Browsers (Safari, Firefox, strict Chrome) block window.open() called
+    // after an `await` — even with target=_blank. We navigate the window once
+    // the PDF blob is ready.
+    const previewWindow = window.open('', '_blank');
     setIsPreviewingPDF(true);
     setError(null);
-    const win = window.open('', '_blank');
     try {
-      await generateTemplatePreviewPDF(
-        presets.map((p) => ({ ...p, body: p.body ?? '', conditions: p.conditions.map((c) => ({ ...c })) })),
-        win
-      );
-    } catch (err: any) {
-      win?.close();
-      setError(err.message || 'Failed to generate preview');
+      // Server-side render via PDFKit (Phase 3). Returns a PDF blob we open in
+      // a new tab. The jsPDF code path under /lib/quote-pdf-renderer.ts is
+      // deprecated and kept only for emergency rollback.
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ templateId: selectedTemplateId, summaryId: selectedSummaryId }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render PDF (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        // Popup blocker killed the synchronous open — fall back to a download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'proposal.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      previewWindow?.close();
+      const message = err instanceof Error ? err.message : 'Failed to generate proposal PDF';
+      setError(message);
     } finally {
       setIsPreviewingPDF(false);
     }
@@ -835,7 +857,7 @@ export default function QuoteBuilderPage() {
                   variants={editVariants}
                   onVariantsChange={setEditVariants}
                   onDelete={handleDelete}
-                  bodyTextareaRef={bodyTextareaRef}
+                  bodyEditorRef={bodyEditorRef}
                   decision={currentDecision}
                 />
               )}

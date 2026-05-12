@@ -1,10 +1,7 @@
 'use client';
 
-// TODO: extract a shared proposal-structure module that both this preview
-// and lib/quote-pdf-renderer.ts can walk, to prevent layout drift.
-
-import type { ProposalAssemblyResult } from '@/lib/proposal-assembly';
-import type { SpecPresetData } from '@/lib/quote-conditions';
+import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
+import { SafeRichHtml } from './safe-rich-html';
 
 interface Props {
   result: ProposalAssemblyResult | null;
@@ -124,7 +121,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
               <div key={preset.id}>
                 {blockWrap(
                   preset.id,
-                  <p className="text-[10pt] leading-[1.5] whitespace-pre-wrap p-1">{preset.body}</p>,
+                  <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body ?? ''} />,
                 )}
               </div>
             ))}
@@ -144,9 +141,10 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                       <span>{preset.title}</span>
                     </div>
                     {preset.body && (
-                      <p className="ml-6 mt-0.5 text-[9pt] leading-[1.55] whitespace-pre-wrap">
-                        {preset.body}
-                      </p>
+                      <SafeRichHtml
+                        className="ml-6 mt-0.5 text-[9pt] leading-[1.55]"
+                        html={preset.body}
+                      />
                     )}
                   </div>,
                 )}
@@ -202,7 +200,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                       <div className="px-1 py-0.5">
                         <div className="text-[9pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
                         {preset.body && (
-                          <p className="mt-0.5 text-[9pt] leading-[1.55] whitespace-pre-wrap">{preset.body}</p>
+                          <SafeRichHtml className="mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
                         )}
                       </div>,
                     )}
@@ -228,7 +226,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                     <div className="px-1">
                       <div className="text-[9pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>
                       {preset.body && preset.body.trim() && (
-                        <p className="ml-4 mt-0.5 text-[9pt] leading-[1.55] whitespace-pre-wrap">{preset.body}</p>
+                        <SafeRichHtml className="ml-4 mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
                       )}
                     </div>,
                   )}
@@ -247,7 +245,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                 <div key={preset.id}>
                   {blockWrap(
                     preset.id,
-                    <p className="text-[10pt] leading-[1.5] whitespace-pre-wrap p-1">{preset.body}</p>,
+                    <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body ?? ''} />,
                   )}
                 </div>
               ))}
@@ -291,7 +289,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                       <div className="px-1">
                         <div className="text-[9pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
                         {preset.body && preset.body.trim() && (
-                          <p className="ml-3 mt-0.5 text-[9pt] leading-[1.55] whitespace-pre-wrap">{preset.body}</p>
+                          <SafeRichHtml className="ml-3 mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
                         )}
                       </div>,
                     )}

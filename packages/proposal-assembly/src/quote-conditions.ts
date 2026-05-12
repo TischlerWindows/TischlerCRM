@@ -325,7 +325,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
   let finishType = '';
   if (summary.finish) {
     const match = summary.finish.match(/(\d+)\s*$/);
-    finishType = match ? match[1] : summary.finish;
+    finishType = match?.[1] ?? summary.finish;
   }
 
   // Check if any rows have types at all (to determine hasWindows / hasDoors)
@@ -406,7 +406,7 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
  */
 function resolveField(field: string, context: QuoteContext): unknown {
   // Direct key lookup on the context object
-  const value = (context as Record<string, unknown>)[field];
+  const value = (context as unknown as Record<string, unknown>)[field];
   return value;
 }
 
@@ -600,7 +600,7 @@ export function matchVariants(
 ): SpecVariantData[] {
   if (!preset.driverField || !preset.variants?.length) return [];
 
-  const driverValue = (context as Record<string, unknown>)[preset.driverField];
+  const driverValue = (context as unknown as Record<string, unknown>)[preset.driverField];
   if (driverValue === undefined || driverValue === null) return [];
 
   const activeVariants = preset.variants
@@ -633,8 +633,9 @@ export function assemblePresetsBySection(
   };
 
   for (const preset of included) {
-    if (bySection[preset.section]) {
-      bySection[preset.section].push(preset);
+    const sectionBucket = bySection[preset.section];
+    if (sectionBucket) {
+      sectionBucket.push(preset);
     }
   }
 

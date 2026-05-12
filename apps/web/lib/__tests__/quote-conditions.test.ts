@@ -4,7 +4,7 @@ import {
   getUnsupportedConditionFields,
   type SpecPresetData,
   type SummaryForConditions,
-} from '@/lib/quote-conditions';
+} from '@crm/proposal-assembly';
 
 const baseSummary: SummaryForConditions = {
   rows: [{ type: 'Double Hung Concealed Balance', type2: '', type3: '', type4: '' }],
