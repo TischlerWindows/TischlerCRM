@@ -148,6 +148,12 @@ export async function seedQuoteTemplate() {
     // ── CONSTANT / PROPOSAL TEXT ──
 
     {
+      title: 'Salutation',
+      body: 'Dear {{contactSalutation}} {{contactLastName}}:',
+      section: 'CONSTANT',
+      isAlwaysIncluded: true,
+    },
+    {
       title: 'Opening',
       body: 'Thank you for the opportunity to propose Tischler und Sohn European Wood Windows and Doors for {{projectName}} ({{projectNumber}}), based on plans dated {{plansDated}}.',
       section: 'CONSTANT',

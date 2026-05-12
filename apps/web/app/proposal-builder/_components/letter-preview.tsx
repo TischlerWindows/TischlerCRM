@@ -137,7 +137,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
                   preset.id,
                   <div className="p-1">
                     <div className="text-[9pt] font-bold" style={{ color: NAVY }}>
-                      <span className="inline-block w-6">{i + 1}.</span>
+                      <span className="inline-block w-7">({i + 1})</span>
                       <span>{preset.title}</span>
                     </div>
                     {preset.body && (

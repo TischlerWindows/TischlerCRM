@@ -277,8 +277,11 @@ export function BlockList({
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
+                              {/* Per-group position. Resets per section so users
+                                  don't see a confusing global index like
+                                  "1, 2, 28, 3" when blocks are grouped. */}
                               <span className="text-[10px] font-bold text-gray-400 tabular-nums w-4 text-right">
-                                {idx + 1}
+                                {inGroupIdx + 1}
                               </span>
                               <span className="text-xs font-medium text-gray-900 truncate">{preset.title}</span>
                             </div>
