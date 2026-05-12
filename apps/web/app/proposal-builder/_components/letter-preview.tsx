@@ -10,7 +10,7 @@ interface Props {
   onSelectBlock: (id: string) => void;
 }
 
-// Tischler brand colors — match the PDF constants (quote-pdf-renderer.ts:82-87).
+// Tischler brand colors — match the PDFKit renderer in apps/api/src/lib/proposal-pdf/renderer.ts.
 const NAVY = '#1e3a5f';
 const RED = '#da291c';
 
@@ -114,7 +114,7 @@ export function LetterPreview({ result, error, selectedPresetId, onSelectBlock }
         <div className="mt-3 border-t-2" style={{ borderColor: RED }} />
 
         {/* Intro CONSTANT presets — date, addressee, salutation come from the user's editable
-            constant blocks; we do not hardcode them here (matches quote-pdf-renderer.ts). */}
+            constant blocks; the PDFKit renderer in apps/api mirrors this. */}
         {introConstant.length > 0 && (
           <div className="mt-6 space-y-3">
             {introConstant.map((preset) => (

@@ -45,11 +45,19 @@ interface Props {
  */
 export function SafeRichHtml({ html, className }: Props) {
   const isPlainText = !html.trim().startsWith('<');
-  const wrapped = isPlainText ? `<p>${html}</p>` : html;
+  // Escape `<`, `>`, `&` in plain-text legacy bodies so they survive sanitize-html
+  // as literal characters. Matches the server-side wrapper in html-to-runs.ts so
+  // the preview and the PDF render identically for bodies that contain those
+  // characters (e.g. "AC < 200 amps", "B & B Restoration").
+  const wrapped = isPlainText ? `<p>${escapeHtml(html)}</p>` : html;
   const clean = sanitizeHtml(wrapped, SANITIZE_OPTIONS);
   return (
     <div className={className} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
       {parse(clean)}
     </div>
   );
+}
+
+function escapeHtml(input: string): string {
+  return input.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

@@ -32,10 +32,6 @@ import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
 import { useSchemaStore } from '@/lib/schema-store';
-import { buildQuoteContext, assemblePresetsBySection } from '@crm/proposal-assembly';
-import type { QuotePDFData, SpecPresetData } from '@crm/proposal-assembly';
-import { buildTokenMap, resolvePresetsTokens } from '@crm/proposal-assembly';
-import { generateQuotePDF } from '@/lib/quote-pdf-renderer';
 
 // Convert millimeters to feet and inches with fractions
 const mmToFeetInches = (mm: string): string => {
@@ -1389,129 +1385,59 @@ export default function SummaryPage() {
     setOpenDropdown(null);
   };
 
-  // ── Generate Quote Letter PDF ──
+  // ── Generate Quote Letter PDF (server-side via PDFKit) ──
   const handleGenerateQuotePDF = async (mode: 'download' | 'preview' = 'download') => {
     if (!editingSummary) return;
-    const s = editingSummary;
+    const summaryId = editingSummary.id;
+    if (!summaryId) {
+      alert('This summary has no ID — save it before generating a proposal.');
+      return;
+    }
 
-    // Open preview window NOW (before any awaits) to avoid popup blocker
+    // Open preview window synchronously inside the user-gesture handler, so
+    // Safari/Firefox/strict Chrome don't block it after the awaits below.
     const previewWindow = mode === 'preview' ? window.open('', '_blank') : null;
 
     try {
-      // 1. Fetch the default template with presets
-      let template: any;
+      let template: { id: string };
       try {
-        template = await apiClient.get<any>('/quote-templates/default');
+        template = await apiClient.get<{ id: string }>('/quote-templates/default');
       } catch {
-        alert('No default quote template found. Please create one in Settings > Quote Builder.');
+        previewWindow?.close();
+        alert('No default proposal template found. Please create one in Proposal Builder.');
         return;
       }
 
-      const allPresets: SpecPresetData[] = template.presets || [];
-
-      // 2. Fetch Contact record for salutation (best effort)
-      let contactSalutation = '';
-      let contactLastName = '';
-      if (s.linkedOpportunityId) {
-        try {
-          const oppRecord = await recordsService.getById(s.linkedOpportunityId);
-          const contactLookup = oppRecord?.data?.individual_receiving_the_quote?.lookup;
-          if (contactLookup) {
-            const contactRecord = await recordsService.getById(contactLookup);
-            if (contactRecord?.data?.name) {
-              contactSalutation = contactRecord.data.name.Contact__name_salutation || '';
-              contactLastName = contactRecord.data.name.Contact__name_lastName || '';
-            }
-          }
-        } catch {
-          // Fallback: parse from contactReceivingQuote
-        }
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ summaryId, templateId: template.id }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render proposal PDF (${response.status})`);
       }
 
-      // Fallback for last name
-      if (!contactLastName && s.contactReceivingQuote) {
-        const parts = s.contactReceivingQuote.trim().split(/\s+/);
-        contactLastName = parts.length > 1 ? parts[parts.length - 1] : '';
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      if (mode === 'preview' && previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${(editingSummary.name || 'Proposal').replace(/[^A-Za-z0-9_-]+/g, '_')}_Quote.pdf`;
+        link.click();
       }
-
-      // 3. Build context and evaluate conditions
-      const context = buildQuoteContext(s as any);
-      const bySection = assemblePresetsBySection(allPresets, context);
-
-      // 4. Build token map and resolve placeholders
-      const tokens = buildTokenMap(s as any, { salutation: contactSalutation, lastName: contactLastName });
-      const resolvedSpecs = resolvePresetsTokens(bySection.SPECIFICATION, tokens);
-      const resolvedOptions = resolvePresetsTokens(bySection.OPTION, tokens);
-      const resolvedExclusions = resolvePresetsTokens(bySection.EXCLUSION, tokens);
-      const resolvedInstallation = resolvePresetsTokens(bySection.INSTALLATION, tokens);
-
-
-      // 5. Check which pricing categories have values
-      const euroWindowsVal = parseInt(s.quoteTotals?.euroWindows?.finalAdj || '0', 10) || 0;
-      const doubleHungVal = parseInt(s.quoteTotals?.doubleHung?.finalAdj || '0', 10) || 0;
-      const euroDoorsVal = parseInt(s.quoteTotals?.euroDoors?.finalAdj || '0', 10) || 0;
-
-      // 6. Render PDF
-      const pdfData: QuotePDFData = {
-        contactName: s.contactReceivingQuote || '',
-        contactSalutation,
-        contactLastName,
-        companyName: s.accountReceivingQuote || '',
-        companyAddress: s.accountShippingAddress || '',
-
-        projectName: s.name || '',
-        projectNumber: s.opportunityNumber || '',
-        plansDated: tokens.plansDated || '',
-        jobType: s.jobType || '',
-        address: s.address || '',
-        salesman: s.salesman || '',
-        estimator: s.estimator || '',
-
-        glassType: tokens.glassType || '',
-        woodType: tokens.woodType || '',
-        finishType: tokens.finishType || '',
-        sdlType: tokens.sdlType || '',
-        spacerBarColors: tokens.spacerBarColor || '',
-
-        specPresets: resolvedSpecs,
-        optionPresets: resolvedOptions,
-        exclusionPresets: resolvedExclusions,
-        installationPresets: resolvedInstallation,
-
-
-        euroWindowsPrice: tokens.euroWindowsPrice || '$0.00',
-        doubleHungPrice: tokens.doubleHungPrice || '$0.00',
-        euroDoorsPrice: tokens.euroDoorsPrice || '$0.00',
-        grandTotal: tokens.grandTotal || '$0.00',
-        hasEuroWindows: euroWindowsVal > 0,
-        hasDoubleHung: doubleHungVal > 0,
-        hasEuroDoors: euroDoorsVal > 0,
-
-        windowScreensPrice: tokens.windowScreensPrice || '$0.00',
-        windowScreensQty: tokens.windowScreensQty || '0',
-        doorScreenSashPrice: tokens.doorScreenSashPrice || '$0.00',
-        doorScreenSashQty: tokens.doorScreenSashQty || '0',
-        entryDoorPrice: tokens.entryDoorPrice || '$0.00',
-        entryDoorQty: tokens.entryDoorQty || '0',
-        jambExtensionsPrice: tokens.jambExtensionsPrice || '$0.00',
-        magneticContactPrice: tokens.magneticContactPrice || '$0.00',
-        magneticContactQty: tokens.magneticContactQty || '0',
-        finalFinishPrice: tokens.finalFinishPrice || '$0.00',
-        installationPrice: tokens.installationPrice || '$0.00',
-
-        hasInstallation: context.hasInstallation,
-        hasMagneticContacts: context.hasMagneticContacts,
-        hasFinalFinish: context.hasFinalFinish,
-        hasWindowScreens: context.hasWindowScreens,
-        hasDoorScreenSash: context.hasDoorScreenSash,
-        hasEntryDoor: context.hasEntryDoor,
-        hasJambExtensions: context.hasJambExtensions,
-      };
-
-      await generateQuotePDF(pdfData, mode, previewWindow);
-    } catch (err: any) {
-      console.error('Quote PDF generation failed:', err);
-      alert(`Failed to generate quote PDF: ${err.message || 'Unknown error'}`);
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err: unknown) {
+      previewWindow?.close();
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      alert(`Failed to generate quote PDF: ${message}`);
     }
   };
 
