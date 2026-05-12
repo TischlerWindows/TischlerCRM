@@ -85,6 +85,9 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props
               className="w-full text-[11px] pl-7 pr-2 py-1.5 border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
             />
           </div>
+          <p className="text-[10px] text-gray-400 mt-1 px-0.5">
+            Click a chip to insert <span className="font-mono">{'{{name}}'}</span> at the cursor in Body Text.
+          </p>
         </div>
       )}
 

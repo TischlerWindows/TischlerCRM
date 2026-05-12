@@ -564,6 +564,18 @@ export default function QuoteBuilderPage() {
     }
   }, [selectedSummary, selectedTemplate?.name, selectedTemplateId, previewPresets]);
 
+  // Decision (included/excluded + reason) for the block currently in the editor,
+  // looked up from the assembled preview against the active summary.
+  const currentDecision = useMemo(() => {
+    if (!selectedPresetId || !previewState.result) return null;
+    const result = previewState.result;
+    const included = result.includedBlocks.find((b) => b.id === selectedPresetId);
+    if (included) return { included: true, reason: included.reason };
+    const excluded = result.excludedBlocks.find((b) => b.id === selectedPresetId);
+    if (excluded) return { included: false, reason: excluded.reason };
+    return null;
+  }, [selectedPresetId, previewState.result]);
+
   // ── Render ────────────────────────────────────────────────────
 
   if (loading) {
@@ -764,6 +776,7 @@ export default function QuoteBuilderPage() {
                   onVariantsChange={setEditVariants}
                   onDelete={handleDelete}
                   bodyTextareaRef={bodyTextareaRef}
+                  decision={currentDecision}
                 />
               )}
             </>

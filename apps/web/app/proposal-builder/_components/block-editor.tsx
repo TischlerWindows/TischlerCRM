@@ -1,8 +1,26 @@
 'use client';
 
-import { Trash2, Eye, EyeOff } from 'lucide-react';
+import { Trash2, Eye, EyeOff, Info, CheckCircle2, XCircle } from 'lucide-react';
 import { ConditionBuilder, type DraftCondition } from './condition-builder';
 import { VariantEditor, type DraftVariant } from './variant-editor';
+
+interface HelpProps {
+  text: string;
+  label: string;
+}
+
+function HelpHint({ text, label }: HelpProps) {
+  return (
+    <span
+      title={text}
+      aria-label={label}
+      tabIndex={0}
+      className="inline-flex cursor-help text-gray-400 hover:text-gray-600 focus:outline-none focus-visible:text-gray-700"
+    >
+      <Info className="w-3 h-3" />
+    </span>
+  );
+}
 
 const SECTIONS = ['CONSTANT', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 type Section = typeof SECTIONS[number];
@@ -38,6 +56,8 @@ interface Props {
   onVariantsChange: (v: DraftVariant[]) => void;
   onDelete: () => void;
   bodyTextareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** Inclusion decision for the currently-edited block against the active summary, if any. */
+  decision?: { included: boolean; reason: string } | null;
 }
 
 export function BlockEditor({
@@ -60,6 +80,7 @@ export function BlockEditor({
   onVariantsChange,
   onDelete,
   bodyTextareaRef,
+  decision,
 }: Props) {
   const isVariantMode = !!driverField;
 
@@ -80,6 +101,29 @@ export function BlockEditor({
         )}
       </div>
 
+      {/* Decision banner — shows whether this block appears in the current preview, and why. */}
+      {decision && !isNew && (
+        <div
+          className={`flex items-start gap-2 px-4 py-2 border-b text-[11px] ${
+            decision.included
+              ? 'bg-green-50 border-green-100 text-green-800'
+              : 'bg-amber-50 border-amber-100 text-amber-800'
+          }`}
+        >
+          {decision.included ? (
+            <CheckCircle2 className="w-3.5 h-3.5 mt-px flex-shrink-0" />
+          ) : (
+            <XCircle className="w-3.5 h-3.5 mt-px flex-shrink-0" />
+          )}
+          <div className="min-w-0">
+            <div className="font-semibold">
+              {decision.included ? 'Included in current preview' : 'Hidden from current preview'}
+            </div>
+            <div className="opacity-80 mt-0.5 break-words">{decision.reason}</div>
+          </div>
+        </div>
+      )}
+
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {/* Title */}
@@ -95,7 +139,13 @@ export function BlockEditor({
 
         {/* Section pills */}
         <div>
-          <label className="text-[10px] font-semibold text-gray-500 mb-1.5 block">Section</label>
+          <div className="flex items-center gap-1 mb-1.5">
+            <label className="text-[10px] font-semibold text-gray-500">Section</label>
+            <HelpHint
+              label="Section help"
+              text="Where this block appears in the PDF. SPECIFICATION blocks form the numbered list; OPTION blocks go under 'Additions or Deductions'; EXCLUSION blocks under 'Our Base Bid does not include'; INSTALLATION blocks render on the installation appendix; CONSTANT blocks render without a number (intro and closing)."
+            />
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {SECTIONS.map((s) => (
               <button
@@ -115,7 +165,13 @@ export function BlockEditor({
 
         {/* Driver field */}
         <div>
-          <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Driver Variable</label>
+          <div className="flex items-center gap-1 mb-1">
+            <label className="text-[10px] font-semibold text-gray-500">Driver Variable</label>
+            <HelpHint
+              label="Driver Variable help"
+              text="A simple block has one Body Text. Set a Driver Variable to switch the body text based on a summary field — e.g., different wording for each Glass Type. Each value gets its own variant."
+            />
+          </div>
           <select
             value={driverField}
             onChange={(e) => onDriverFieldChange(e.target.value)}
@@ -127,7 +183,7 @@ export function BlockEditor({
           </select>
           <p className="text-[10px] text-gray-400 mt-0.5">
             {isVariantMode
-              ? 'Content varies by this field — define variants below.'
+              ? `Body text now varies by ${driverField} — define one variant per value below.`
               : 'Leave empty for a single body text.'}
           </p>
         </div>
@@ -157,7 +213,7 @@ export function BlockEditor({
         )}
 
         {/* Toggles */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-center gap-5 flex-wrap">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
@@ -166,6 +222,10 @@ export function BlockEditor({
               className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
             />
             <span className="text-xs text-gray-700">Always included</span>
+            <HelpHint
+              label="Always included help"
+              text="When on, this block is always included regardless of any conditions below. When off, the block is included only if all of its AND conditions pass and (if any OR conditions exist) at least one OR also passes."
+            />
           </label>
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
@@ -178,6 +238,10 @@ export function BlockEditor({
               {active ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
               Active
             </span>
+            <HelpHint
+              label="Active help"
+              text="When off, this block is treated as a draft — it never renders in any preview or generated PDF, regardless of conditions or Always included. Use to retire a block without deleting it."
+            />
           </label>
         </div>
 
