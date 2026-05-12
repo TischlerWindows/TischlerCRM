@@ -9,9 +9,12 @@ import {
 } from './quote-conditions';
 import {
   buildTokenMap,
+  resolveCustomTokens,
   resolveTokensWithDiagnostics,
   type ContactData,
+  type CustomObjectData,
   type SummaryForPlaceholders,
+  type TokenMappingRow,
 } from './quote-placeholders';
 import type { QuotePDFData } from './quote-pdf-renderer';
 
@@ -142,13 +145,34 @@ export function assembleProposal({
   summary,
   template,
   contact,
+  tokenMappings,
+  opportunity,
+  project,
 }: {
   summary: ProposalSummary;
   template: ProposalTemplateData;
   contact?: ContactData;
+  /** Custom token mappings from the database for the active template. */
+  tokenMappings?: TokenMappingRow[];
+  /** Pre-fetched Opportunity record data (Record.data) for custom token resolution. */
+  opportunity?: CustomObjectData;
+  /** Pre-fetched Project record data (Record.data) for custom token resolution. */
+  project?: CustomObjectData;
 }): ProposalAssemblyResult {
   const context = buildQuoteContext(summary);
-  const tokens = buildTokenMap(summary, contact);
+  const builtInTokens = buildTokenMap(summary, contact);
+  const customTokens = tokenMappings && tokenMappings.length > 0
+    ? resolveCustomTokens({
+        tokenMappings,
+        builtInKeys: new Set(Object.keys(builtInTokens)),
+        summary,
+        contact,
+        opportunity,
+        project,
+      })
+    : {};
+  // Built-in tokens take precedence over custom mappings with the same name.
+  const tokens = { ...customTokens, ...builtInTokens };
   const sections = emptySections();
   const includedBlocks: ProposalBlockDiagnostic[] = [];
   const excludedBlocks: ProposalBlockDiagnostic[] = [];

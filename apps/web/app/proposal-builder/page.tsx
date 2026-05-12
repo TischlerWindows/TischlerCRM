@@ -58,9 +58,10 @@ interface TokenMappingData {
   tokenName: string;
   label: string;
   category: string;
-  sourceObject: string;
+  sourceObject: 'SUMMARY' | 'CONTACT' | 'ACCOUNT' | 'OPPORTUNITY' | 'PROJECT' | 'SYSTEM';
   sourcePath: string;
-  format: string;
+  format: 'TEXT' | 'CURRENCY' | 'DATE' | 'PHONE' | 'PERCENTAGE';
+  isBuiltIn?: boolean;
 }
 
 export default function QuoteBuilderPage() {
@@ -72,6 +73,12 @@ export default function QuoteBuilderPage() {
   // Token mappings
   const [tokenMappings, setTokenMappings] = useState<TokenMappingData[]>([]);
   const [tokenGrouped, setTokenGrouped] = useState<Record<string, TokenMappingData[]>>({});
+
+  // Linked custom-object records fetched for custom token resolution (Phase 2).
+  // Opportunity is looked up via summary.linkedOpportunityId; Project via the
+  // most recently updated Project whose `opportunity` Lookup matches.
+  const [opportunityRecord, setOpportunityRecord] = useState<Record<string, unknown> | null>(null);
+  const [projectRecord, setProjectRecord] = useState<Record<string, unknown> | null>(null);
   const [showNewTokenModal, setShowNewTokenModal] = useState(false);
 
   // Editor state
@@ -483,6 +490,42 @@ export default function QuoteBuilderPage() {
   const selectedSummary = summaries.find((s) => s.id === selectedSummaryId);
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
+  // Fetch linked Opportunity + Project records for the active summary so that
+  // custom tokens with `sourceObject=OPPORTUNITY`/`PROJECT` can resolve. Falls
+  // through silently when no link is present — built-in tokens still work.
+  const linkedOpportunityId = (selectedSummary as { linkedOpportunityId?: string } | undefined)?.linkedOpportunityId;
+  useEffect(() => {
+    let cancelled = false;
+    if (!linkedOpportunityId) {
+      setOpportunityRecord(null);
+      setProjectRecord(null);
+      return;
+    }
+    (async () => {
+      try {
+        const opp = await apiClient.get<{ data?: Record<string, unknown> }>(
+          `/objects/Opportunity/records/${linkedOpportunityId}`,
+        );
+        if (cancelled) return;
+        setOpportunityRecord(opp?.data ?? null);
+      } catch {
+        if (!cancelled) setOpportunityRecord(null);
+      }
+      try {
+        const projectList = await apiClient.get<{ records?: { data?: Record<string, unknown> }[] }>(
+          `/objects/Project/records?filter[opportunity]=${encodeURIComponent(linkedOpportunityId)}&limit=1&orderBy=updatedAt&orderDir=desc`,
+        );
+        if (cancelled) return;
+        setProjectRecord(projectList?.records?.[0]?.data ?? null);
+      } catch {
+        if (!cancelled) setProjectRecord(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [linkedOpportunityId]);
+
   // Build a preset from the current editor state. Used so the preview
   // reflects in-progress edits without requiring a Save.
   const previewPresets = useMemo<SpecPresetData[]>(() => {
@@ -556,13 +599,30 @@ export default function QuoteBuilderPage() {
             name: selectedTemplate?.name ?? '',
             presets: previewPresets as any,
           },
+          tokenMappings: tokenMappings.map((m) => ({
+            tokenName: m.tokenName,
+            sourceObject: m.sourceObject,
+            sourcePath: m.sourcePath,
+            format: m.format,
+            isBuiltIn: m.isBuiltIn ?? false,
+          })),
+          opportunity: opportunityRecord ?? undefined,
+          project: projectRecord ?? undefined,
         }),
         error: null,
       };
     } catch (err) {
       return { result: null, error: err instanceof Error ? err.message : 'Preview failed.' };
     }
-  }, [selectedSummary, selectedTemplate?.name, selectedTemplateId, previewPresets]);
+  }, [
+    selectedSummary,
+    selectedTemplate?.name,
+    selectedTemplateId,
+    previewPresets,
+    tokenMappings,
+    opportunityRecord,
+    projectRecord,
+  ]);
 
   // Decision (included/excluded + reason) for the block currently in the editor,
   // looked up from the assembled preview against the active summary.

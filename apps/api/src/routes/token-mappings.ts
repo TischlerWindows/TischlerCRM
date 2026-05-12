@@ -6,7 +6,7 @@ import { z } from 'zod';
 const createMappingSchema = z.object({
   templateId: z.string().min(1),
   tokenName: z.string().min(1),
-  sourceObject: z.enum(['SUMMARY', 'CONTACT', 'ACCOUNT', 'OPPORTUNITY', 'SYSTEM']),
+  sourceObject: z.enum(['SUMMARY', 'CONTACT', 'ACCOUNT', 'OPPORTUNITY', 'PROJECT', 'SYSTEM']),
   sourcePath: z.string().min(1),
   format: z.enum(['TEXT', 'CURRENCY', 'DATE', 'PHONE', 'PERCENTAGE']).default('TEXT'),
   label: z.string().min(1),

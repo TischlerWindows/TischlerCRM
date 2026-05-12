@@ -2,16 +2,30 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 const SOURCE_OBJECTS = [
   { value: 'SUMMARY', label: 'Summary' },
   { value: 'CONTACT', label: 'Contact' },
   { value: 'ACCOUNT', label: 'Account' },
   { value: 'OPPORTUNITY', label: 'Opportunity' },
+  { value: 'PROJECT', label: 'Project' },
   { value: 'SYSTEM', label: 'System' },
 ];
 
-const SOURCE_FIELDS: Record<string, { value: string; label: string }[]> = {
+interface FieldOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Hardcoded field lists for sources whose data shape isn't a CustomObject
+ * (Summary is a JSON blob in Settings; Contact/Account/System are read by
+ * the built-in token resolver via fixed paths). Opportunity and Project are
+ * fetched dynamically from `/objects/:apiName/fields` since they're
+ * CustomObjects whose field set can vary per deployment.
+ */
+const STATIC_SOURCE_FIELDS: Record<string, FieldOption[]> = {
   SUMMARY: [
     { value: 'name', label: 'Project Name' },
     { value: 'opportunityNumber', label: 'Opportunity Number' },
@@ -46,18 +60,14 @@ const SOURCE_FIELDS: Record<string, { value: string; label: string }[]> = {
     { value: 'billingAddress', label: 'Billing Address' },
     { value: 'phone', label: 'Phone' },
   ],
-  OPPORTUNITY: [
-    { value: 'name', label: 'Name' },
-    { value: 'number', label: 'Number' },
-    { value: 'stage', label: 'Stage' },
-    { value: 'amount', label: 'Amount' },
-  ],
   SYSTEM: [
     { value: 'currentDate', label: 'Current Date' },
     { value: 'companyName', label: 'Company Name' },
     { value: 'companyAddress', label: 'Company Address' },
   ],
 };
+
+const DYNAMIC_SOURCE_OBJECTS = new Set(['OPPORTUNITY', 'PROJECT']);
 
 const FORMATS = [
   { value: 'TEXT', label: 'Text' },
@@ -94,6 +104,10 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
   const [category, setCategory] = useState('Custom');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Dynamically-fetched fields for CustomObject sources (Opportunity, Project).
+  const [dynamicFields, setDynamicFields] = useState<FieldOption[]>([]);
+  const [loadingFields, setLoadingFields] = useState(false);
 
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -146,9 +160,45 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
+  // Fetch CustomField metadata for dynamic source objects when selected.
+  useEffect(() => {
+    if (!open) return;
+    if (!DYNAMIC_SOURCE_OBJECTS.has(sourceObject)) {
+      setDynamicFields([]);
+      setLoadingFields(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingFields(true);
+    apiClient
+      .get<{ id: string; apiName: string; label: string; type: string }[]>(
+        `/objects/${sourceObject.charAt(0) + sourceObject.slice(1).toLowerCase()}/fields`,
+      )
+      .then((res) => {
+        if (cancelled) return;
+        setDynamicFields(
+          res.map((f) => ({
+            value: f.apiName,
+            label: f.label || f.apiName,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDynamicFields([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFields(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sourceObject]);
+
   if (!open) return null;
 
-  const fields = SOURCE_FIELDS[sourceObject] || [];
+  const fields: FieldOption[] = DYNAMIC_SOURCE_OBJECTS.has(sourceObject)
+    ? dynamicFields
+    : STATIC_SOURCE_FIELDS[sourceObject] || [];
 
   const handleSourceObjectChange = (val: string) => {
     setSourceObject(val);
@@ -247,13 +297,21 @@ export function NewTokenModal({ open, onClose, onSubmit }: Props) {
               onChange={(e) => handleSourcePathChange(e.target.value)}
               required
               aria-required="true"
-              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+              disabled={loadingFields}
+              className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20 disabled:bg-gray-50"
             >
-              <option value="">Select a field...</option>
+              <option value="">
+                {loadingFields ? 'Loading fields…' : 'Select a field...'}
+              </option>
               {fields.map((f) => (
                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
+            {DYNAMIC_SOURCE_OBJECTS.has(sourceObject) && !loadingFields && fields.length === 0 && (
+              <p className="text-[10px] text-amber-600 mt-1">
+                No fields defined for {sourceObject.charAt(0) + sourceObject.slice(1).toLowerCase()} yet. Add fields in Object Manager first.
+              </p>
+            )}
           </div>
 
           {/* Token Name */}
