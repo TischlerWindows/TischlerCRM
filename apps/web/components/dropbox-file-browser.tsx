@@ -618,39 +618,43 @@ export function DropboxFileBrowser({
       </div>
 
       {/* Breadcrumb / folder path */}
-      <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-gray-100 text-sm">
-        {currentPath.length > 0 ? (
-          <button
-            onClick={() => setCurrentPath([])}
-            className="text-blue-600 hover:underline font-medium"
-          >
-            {rootLabel || folderName || 'Root'}
-          </button>
-        ) : (
-          <span className="text-gray-700 font-medium flex items-center gap-1">
-            <FolderOpen className="w-3.5 h-3.5 text-gray-400" />
-            {rootLabel || folderName || 'Root'}
-          </span>
-        )}
-        {currentPath.map((segment, i) => (
-          <span key={i} className="flex items-center gap-1">
-            <ChevronRight className="w-3 h-3 text-gray-400" />
-            {i === currentPath.length - 1 ? (
-              <span className="text-gray-700 font-medium">{segment}</span>
-            ) : (
-              <button
-                onClick={() => handleBreadcrumb(i)}
-                className="text-blue-600 hover:underline"
-              >
-                {segment}
-              </button>
-            )}
-          </span>
-        ))}
+      <div className="flex items-center bg-white border-b border-gray-100 text-sm min-h-[36px]">
+        {/* Scrollable breadcrumb trail */}
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide px-4 py-2 flex-1 min-w-0">
+          {currentPath.length > 0 ? (
+            <button
+              onClick={() => setCurrentPath([])}
+              className="text-blue-600 hover:underline font-medium whitespace-nowrap shrink-0"
+            >
+              {rootLabel || folderName || 'Root'}
+            </button>
+          ) : (
+            <span className="text-gray-700 font-medium flex items-center gap-1 whitespace-nowrap">
+              <FolderOpen className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span className="truncate max-w-[220px]">{rootLabel || folderName || 'Root'}</span>
+            </span>
+          )}
+          {currentPath.map((segment, i) => (
+            <span key={i} className="flex items-center gap-1 shrink-0">
+              <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
+              {i === currentPath.length - 1 ? (
+                <span className="text-gray-700 font-medium whitespace-nowrap max-w-[160px] truncate">{segment}</span>
+              ) : (
+                <button
+                  onClick={() => handleBreadcrumb(i)}
+                  className="text-blue-600 hover:underline whitespace-nowrap"
+                >
+                  {segment}
+                </button>
+              )}
+            </span>
+          ))}
+        </div>
+        {/* Back button — fixed right side */}
         {currentPath.length > 0 && (
           <button
             onClick={handleNavigateUp}
-            className="ml-auto text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+            className="shrink-0 px-3 py-2 text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 border-l border-gray-100"
           >
             <ArrowLeft className="w-3 h-3" /> Back
           </button>
