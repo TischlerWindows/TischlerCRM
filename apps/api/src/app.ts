@@ -459,12 +459,18 @@ export function buildApp() {
     // ADMIN users get full access regardless of profile
     if (user.role === 'ADMIN') {
       return reply.send({
-        objects: Object.fromEntries(OBJECTS.map(o => [o, { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true }])),
-        app: Object.fromEntries(APP_KEYS.map(k => [k, true])),
+        objectPermissions: Object.fromEntries(OBJECTS.map(o => [o, { create:true, read:true, edit:true, delete:true, viewAll:true, modifyAll:true }])),
+        appPermissions: Object.fromEntries(APP_KEYS.map(k => [k, true])),
       });
     }
 
-    return reply.send(user.profile?.permissions ?? {});
+    // Normalise stored permissions: profiles may use 'objects'/'app' (old keys)
+    // or 'objectPermissions'/'appPermissions' (canonical keys).
+    const stored = (user.profile?.permissions ?? {}) as Record<string, unknown>;
+    return reply.send({
+      objectPermissions: (stored.objectPermissions ?? stored.objects ?? {}) as Record<string, unknown>,
+      appPermissions: (stored.appPermissions ?? stored.app ?? {}) as Record<string, unknown>,
+    });
   });
 
   // ── Admin route guard ─────────────────────────────────────────────────────

@@ -117,7 +117,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       // Permissions failed to load (API error) — be RESTRICTIVE
       if (!permissions) return false;
 
-      const objPerms = permissions.objectPermissions[objectApiName];
+      const objPerms = permissions.objectPermissions?.[objectApiName];
       // If no permissions configured for this object, DENY by default
       // (admins are already handled above; for regular users, if no
       // department/role/permset mentions an object it stays locked)
@@ -132,7 +132,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (user?.role === 'ADMIN') return true;
       if (loading) return true;
       if (!permissions) return false;
-      return !!permissions.appPermissions?.[perm];
+      return !!(permissions.appPermissions as Record<string, unknown>)?.[perm];
     },
     [permissions, loading, user],
   );
