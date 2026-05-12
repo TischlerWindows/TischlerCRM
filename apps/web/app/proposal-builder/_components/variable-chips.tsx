@@ -49,7 +49,7 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props
   );
 
   return (
-    <div className="flex flex-col h-full border-t border-gray-200">
+    <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
         <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400">
           Variables
