@@ -2,6 +2,7 @@
 
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { BodyEditor } from './body-editor';
 
 export interface DraftVariant {
   _key: string;
@@ -127,12 +128,11 @@ export function VariantEditor({ variants, onChange, driverField }: Props) {
                     </div>
                     <div>
                       <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Body Text</label>
-                      <textarea
+                      <BodyEditor
                         value={variant.body}
-                        onChange={(e) => update(variant._key, { body: e.target.value })}
-                        rows={4}
-                        placeholder="Content for this variant..."
-                        className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20 font-mono resize-y"
+                        onChange={(html) => update(variant._key, { body: html })}
+                        placeholder="Bold, italic, lists supported"
+                        minHeight={120}
                       />
                     </div>
                   </div>

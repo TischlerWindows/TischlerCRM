@@ -3,6 +3,7 @@
 import { Trash2, Eye, EyeOff, Info, CheckCircle2, XCircle } from 'lucide-react';
 import { ConditionBuilder, type DraftCondition } from './condition-builder';
 import { VariantEditor, type DraftVariant } from './variant-editor';
+import { BodyEditor, type BodyEditorHandle } from './body-editor';
 
 interface HelpProps {
   text: string;
@@ -55,7 +56,8 @@ interface Props {
   variants: DraftVariant[];
   onVariantsChange: (v: DraftVariant[]) => void;
   onDelete: () => void;
-  bodyTextareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** Ref to the body editor — used by the Variables chip panel to insert tokens at cursor. */
+  bodyEditorRef?: React.RefObject<BodyEditorHandle | null>;
   /** Inclusion decision for the currently-edited block against the active summary, if any. */
   decision?: { included: boolean; reason: string } | null;
 }
@@ -79,7 +81,7 @@ export function BlockEditor({
   variants,
   onVariantsChange,
   onDelete,
-  bodyTextareaRef,
+  bodyEditorRef,
   decision,
 }: Props) {
   const isVariantMode = !!driverField;
@@ -201,13 +203,11 @@ export function BlockEditor({
               Body Text
               <span className="font-normal text-gray-400 ml-1">Use {'{{tokenName}}'} for variables</span>
             </label>
-            <textarea
-              ref={bodyTextareaRef}
+            <BodyEditor
+              ref={bodyEditorRef}
               value={body}
-              onChange={(e) => onBodyChange(e.target.value)}
-              rows={12}
-              placeholder="All windows and doors shall be glazed with {{glassType}} glass..."
-              className="w-full min-h-[180px] px-2.5 py-2 text-xs leading-relaxed border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20 font-mono resize-y"
+              onChange={onBodyChange}
+              placeholder="Bold, italic, lists supported"
             />
           </div>
         )}
