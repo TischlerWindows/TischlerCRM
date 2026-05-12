@@ -27,14 +27,25 @@ interface Props {
  *     into the DOM.
  *
  * Backwards-compatible: plain-text bodies (no leading `<`) are wrapped in
- * `<p>` before sanitization so legacy non-HTML content still renders.
+ * `<p>` before sanitization so legacy non-HTML content still renders. The
+ * wrapper applies `whitespace-pre-wrap` so embedded newlines in legacy bodies
+ * are preserved (rich-text content with explicit `<p>`/`<br>` tags is
+ * unaffected — block elements handle their own line layout).
  */
 export function SafeRichHtml({ html, className }: Props) {
-  const wrapped = html.trim().startsWith('<') ? html : `<p>${html}</p>`;
+  const isPlainText = !html.trim().startsWith('<');
+  const wrapped = isPlainText ? `<p>${html}</p>` : html;
   const clean = DOMPurify.sanitize(wrapped, {
     ALLOWED_TAGS,
     ALLOWED_ATTR: [],
     ALLOW_DATA_ATTR: false,
   });
-  return <div className={className}>{parse(clean)}</div>;
+  // Plain-text bodies use pre-wrap so embedded newlines render as line breaks
+  // (matches the legacy `whitespace-pre-wrap` behavior). Rich HTML bodies
+  // skip it — block tags already handle their own layout.
+  return (
+    <div className={className} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
+      {parse(clean)}
+    </div>
+  );
 }

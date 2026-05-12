@@ -12,7 +12,6 @@ import { PageLayout, type ObjectDef } from '@/lib/schema';
 import { recordsService, RecordData } from '@/lib/records-service';
 import { assembleProposal } from '@crm/proposal-assembly';
 import { findSummaryForOpportunity, getSavedSummaries } from '@/lib/proposal-summary-resolver';
-import { generateProposalPDF } from '@/lib/quote-pdf-renderer';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -239,6 +238,9 @@ export function RecordActions({
 
   const handleGenerateProposal = async () => {
     if (!record) return;
+    // Open the preview window synchronously inside the user-gesture handler so
+    // popup blockers (Safari, Firefox, strict Chrome) don't kill it. We
+    // navigate the window to the PDF blob URL once the server responds.
     const previewWindow = window.open('', '_blank');
     setIsGeneratingProposal(true);
     try {
@@ -254,27 +256,31 @@ export function RecordActions({
         return;
       }
 
-      const template = await apiClient.get<any>('/quote-templates/default');
+      const template = await apiClient.get<{ id: string; name: string; presets: unknown[] }>(
+        '/quote-templates/default',
+      );
       if (!template?.presets?.length) {
         previewWindow?.close();
         showToast('No active default proposal template found.', 'error');
         return;
       }
 
+      // Pre-flight client-side assembly only to surface the unresolved-tokens
+      // warning. The actual PDF is produced server-side via PDFKit.
       const contact = await resolveProposalContact();
       const assembled = assembleProposal({
         summary: match.summary,
         template: {
           id: template.id,
           name: template.name,
-          presets: template.presets,
+          presets: template.presets as Parameters<typeof assembleProposal>[0]['template']['presets'],
         },
         contact,
       });
 
       if (assembled.unresolvedTokens.length > 0) {
         const proceed = window.confirm(
-          `This proposal has ${assembled.unresolvedTokens.length} unresolved variable(s). Generate the preview anyway?`
+          `This proposal has ${assembled.unresolvedTokens.length} unresolved variable(s). Generate the preview anyway?`,
         );
         if (!proceed) {
           previewWindow?.close();
@@ -282,7 +288,41 @@ export function RecordActions({
         }
       }
 
-      await generateProposalPDF(assembled.pdfData, 'preview', previewWindow);
+      // Server-side render via PDFKit (Phase 3). The render route re-assembles
+      // the proposal — passing only the IDs avoids serializing the full
+      // assembled doc over the wire and keeps the server as the source of
+      // truth for what ends up in the PDF.
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const token = apiClient.getToken();
+      const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          summaryId: (match.summary as { id: string }).id,
+          templateId: template.id,
+        }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(detail.error || `Failed to render proposal PDF (${response.status})`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      if (previewWindow && !previewWindow.closed) {
+        previewWindow.location.href = url;
+      } else {
+        // Popup blocker killed the synchronous open — fall back to a download.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'proposal.pdf';
+        link.click();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+
       if (assembled.warnings.length > 0) {
         showToast(`Proposal preview generated with ${assembled.warnings.length} warning(s).`, 'success');
       } else {
@@ -290,7 +330,6 @@ export function RecordActions({
       }
     } catch (err) {
       previewWindow?.close();
-      console.error('Failed to generate proposal:', err);
       const message = err instanceof Error ? err.message : 'Failed to generate proposal. Please try again.';
       showToast(message, 'error');
     } finally {
