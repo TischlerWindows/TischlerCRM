@@ -220,6 +220,112 @@ export function resolveTokensWithDiagnostics(
   };
 }
 
+// ── Custom token resolution (Phase 2) ──────────────────────────────
+
+/**
+ * Token mapping row from the database. Mirrors the Prisma `TokenMapping` model.
+ * Only the fields needed for resolution are listed here.
+ */
+export interface TokenMappingRow {
+  tokenName: string;
+  sourceObject: 'SUMMARY' | 'CONTACT' | 'ACCOUNT' | 'OPPORTUNITY' | 'PROJECT' | 'SYSTEM';
+  sourcePath: string;
+  format: 'TEXT' | 'CURRENCY' | 'DATE' | 'PHONE' | 'PERCENTAGE';
+  isBuiltIn: boolean;
+}
+
+/**
+ * A `Record.data` blob from a custom-object Record. Field names are CustomField
+ * apiNames (possibly prefixed like `Opportunity__opportunityName` per the
+ * normalization in the records route). We try both prefixed and unprefixed.
+ */
+export type CustomObjectData = Record<string, unknown>;
+
+export interface CustomTokenResolverArgs {
+  tokenMappings: TokenMappingRow[];
+  /** tokenNames already produced by `buildTokenMap` — these take precedence. */
+  builtInKeys: Set<string>;
+  summary: SummaryForPlaceholders;
+  contact?: ContactData;
+  opportunity?: CustomObjectData;
+  project?: CustomObjectData;
+}
+
+/**
+ * Read a single field from custom-object data, trying both the literal path
+ * and the path with a known object prefix stripped (e.g. `Opportunity__name`
+ * vs `name`). Matches the symmetric read in apps/api/src/routes/records.ts.
+ */
+function readCustomData(data: CustomObjectData | undefined, path: string): unknown {
+  if (!data) return undefined;
+  if (path in data) return data[path];
+  const stripped = path.replace(/^[A-Za-z]+__/, '');
+  if (stripped !== path && stripped in data) return data[stripped];
+  return undefined;
+}
+
+function applyFormat(raw: unknown, format: TokenMappingRow['format']): string {
+  if (raw === undefined || raw === null) return '';
+  const str = String(raw);
+  switch (format) {
+    case 'CURRENCY':
+      return formatDollar(str);
+    case 'DATE':
+      return formatDate(str);
+    case 'PHONE':
+      return formatPhone(str);
+    case 'PERCENTAGE': {
+      const num = parseFloat(str);
+      return Number.isFinite(num) ? `${num}%` : str;
+    }
+    case 'TEXT':
+    default:
+      return str;
+  }
+}
+
+/**
+ * Resolve the additional tokens described by `TokenMapping` rows that aren't
+ * already produced by `buildTokenMap`. Returns a flat map suitable for merging
+ * into the main token map.
+ *
+ * Built-in token names (those already produced by `buildTokenMap`) are skipped
+ * here, so the hardcoded resolution always wins for the canonical tokens like
+ * `contactName` or `projectName`.
+ */
+export function resolveCustomTokens(args: CustomTokenResolverArgs): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of args.tokenMappings) {
+    if (m.isBuiltIn || args.builtInKeys.has(m.tokenName)) continue;
+
+    let raw: unknown = undefined;
+    switch (m.sourceObject) {
+      case 'SUMMARY':
+        raw = (args.summary as Record<string, unknown>)[m.sourcePath];
+        break;
+      case 'CONTACT':
+        raw = args.contact ? (args.contact as Record<string, unknown>)[m.sourcePath] : undefined;
+        break;
+      case 'OPPORTUNITY':
+        raw = readCustomData(args.opportunity, m.sourcePath);
+        break;
+      case 'PROJECT':
+        raw = readCustomData(args.project, m.sourcePath);
+        break;
+      case 'ACCOUNT':
+      case 'SYSTEM':
+      default:
+        // Hardcoded path covers these — leave to `buildTokenMap` / the
+        // built-in fallback. If a custom mapping points here we still skip.
+        continue;
+    }
+
+    if (raw === undefined || raw === null || raw === '') continue;
+    out[m.tokenName] = applyFormat(raw, m.format);
+  }
+  return out;
+}
+
 /**
  * Convenience: resolve tokens in all bodies of a preset array.
  * Returns new array with resolved bodies (does not mutate originals).

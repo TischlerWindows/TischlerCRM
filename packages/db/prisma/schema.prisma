@@ -935,6 +935,7 @@ enum TokenSourceObject {
   CONTACT
   ACCOUNT
   OPPORTUNITY
+  PROJECT
   SYSTEM
 }
 
