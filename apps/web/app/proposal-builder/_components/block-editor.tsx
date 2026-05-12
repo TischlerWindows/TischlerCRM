@@ -71,9 +71,10 @@ export function BlockEditor({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">
+      {/* Header — left padding leaves room for the panel-collapse toggle button
+          that page.tsx positions absolute at top-left of this panel. */}
+      <div className="pl-12 pr-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900 truncate">
           {isNew ? 'New Block' : 'Edit Block'}
         </h3>
         {!isNew && (

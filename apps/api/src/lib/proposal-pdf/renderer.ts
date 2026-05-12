@@ -113,7 +113,9 @@ function drawSpecifications(doc: PDFKit.PDFDocument, presets: SpecPresetData[]):
   presets.forEach((preset, idx) => {
     doc.moveDown(0.4);
     doc.fillColor(NAVY).font(FONT_BOLD).fontSize(BODY_FONT_SIZE);
-    const indexLabel = `${idx + 1}.`;
+    // Reference proposals use "(1) Title" with parens — looks more proposal-y
+    // than "1. Title".
+    const indexLabel = `(${idx + 1})`;
     doc.text(indexLabel, { continued: true, indent: 0 });
     doc.text(`  ${preset.title}`);
 
