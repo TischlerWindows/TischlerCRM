@@ -3633,7 +3633,7 @@ export default function SummaryPage() {
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-brand-navy/40 text-sm"
                             placeholder="Enter account"
                           />
-                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Quote Recipient connection</p>
+                          <p className="text-xs text-gray-400 mt-1">Auto-filled from Architect / Designer connection</p>
                         </div>
                       </div>
 
