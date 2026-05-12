@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback, useMemo, useRef, type KeyboardEvent }
 import { Loader2, AlertCircle, X, ChevronLeft, ChevronRight, PanelLeftClose, PanelRightClose } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { getSetting } from '@/lib/preferences';
-import { assembleProposal } from '@/lib/proposal-assembly';
-import type { SpecPresetData } from '@/lib/quote-conditions';
+import { assembleProposal } from '@crm/proposal-assembly';
+import type { SpecPresetData } from '@crm/proposal-assembly';
 import { generateTemplatePreviewPDF } from '@/lib/quote-pdf-renderer';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';

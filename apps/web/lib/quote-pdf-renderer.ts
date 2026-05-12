@@ -1,5 +1,9 @@
 /**
- * Proposal PDF Renderer
+ * Proposal PDF Renderer (legacy — jsPDF)
+ *
+ * @deprecated Phase 3 replaces this with a server-side PDFKit renderer under
+ * `apps/api/src/lib/proposal-pdf/`. This file remains as an emergency fallback
+ * until the new path is verified in prod; the cleanup PR will delete it.
  *
  * Generates a professional proposal PDF using jsPDF.
  * The proposal follows the Tischler und Sohn format with:
@@ -10,72 +14,10 @@
  *   5. Installation page (conditional)
  */
 
-import type { SpecPresetData } from './quote-conditions';
+import type { QuotePDFData, SpecPresetData } from '@crm/proposal-assembly';
 
-// ── Types ──────────────────────────────────────────────────────────
-
-export interface QuotePDFData {
-  // People
-  contactName: string;
-  contactSalutation: string; // "Mr." or "Ms."
-  contactLastName: string;
-  companyName: string;
-  companyAddress: string;
-
-  // Project
-  projectName: string;
-  projectNumber: string;
-  plansDated: string; // formatted date string
-  jobType: string;
-  address: string;
-  salesman: string;
-  estimator: string;
-
-  // Materials
-  glassType: string;
-  woodType: string;
-  finishType: string;
-  sdlType: string;
-  spacerBarColors: string;
-
-  // Presets (already filtered and token-resolved)
-  constantPresets?: SpecPresetData[];
-  specPresets: SpecPresetData[];
-  optionPresets: SpecPresetData[];
-  exclusionPresets: SpecPresetData[];
-  installationPresets: SpecPresetData[];
-
-  // Pricing
-  euroWindowsPrice: string; // formatted dollar string
-  doubleHungPrice: string;
-  euroDoorsPrice: string;
-  grandTotal: string;
-  hasEuroWindows: boolean;
-  hasDoubleHung: boolean;
-  hasEuroDoors: boolean;
-
-  // Add-on pricing
-  windowScreensPrice: string;
-  windowScreensQty: string;
-  doorScreenSashPrice: string;
-  doorScreenSashQty: string;
-  entryDoorPrice: string;
-  entryDoorQty: string;
-  jambExtensionsPrice: string;
-  magneticContactPrice: string;
-  magneticContactQty: string;
-  finalFinishPrice: string;
-  installationPrice: string;
-
-  // Flags
-  hasInstallation: boolean;
-  hasMagneticContacts: boolean;
-  hasFinalFinish: boolean;
-  hasWindowScreens: boolean;
-  hasDoorScreenSash: boolean;
-  hasEntryDoor: boolean;
-  hasJambExtensions: boolean;
-}
+// Re-export so existing callers that import `QuotePDFData` from this file keep working.
+export type { QuotePDFData };
 
 // ── Brand constants ────────────────────────────────────────────────
 

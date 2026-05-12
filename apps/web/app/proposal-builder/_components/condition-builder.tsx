@@ -1,7 +1,7 @@
 'use client';
 
 import { Plus, X, Info } from 'lucide-react';
-import { CONDITION_FIELD_DEFINITIONS } from '@/lib/quote-conditions';
+import { CONDITION_FIELD_DEFINITIONS } from '@crm/proposal-assembly';
 
 export interface DraftCondition {
   _key: string;
