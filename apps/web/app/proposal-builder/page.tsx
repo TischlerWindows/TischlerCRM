@@ -8,6 +8,7 @@ import { assembleProposal } from '@/lib/proposal-assembly';
 import type { SpecPresetData } from '@/lib/quote-conditions';
 import { generateTemplatePreviewPDF } from '@/lib/quote-pdf-renderer';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
+import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
 
 import { TopBar } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
@@ -106,6 +107,26 @@ export default function QuoteBuilderPage() {
   });
   const leftPanel = panels.left!;
   const rightPanel = panels.right!;
+
+  const variablesPanel = useResizableVerticalPanel({
+    storageKey: 'proposalBuilder.variablesH',
+    min: 140,
+    max: 600,
+    default: 280,
+  });
+
+  const handleVariablesResizeKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        variablesPanel.adjustHeight(16);
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        variablesPanel.adjustHeight(-16);
+      }
+    },
+    [variablesPanel],
+  );
 
   const handleLeftResizeKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -632,7 +653,22 @@ export default function QuoteBuilderPage() {
                   onDragStart={setDragIdx}
                 />
               </div>
-              <div className="h-[280px] flex-shrink-0 overflow-hidden border-t border-gray-200">
+              <div
+                role="separator"
+                aria-orientation="horizontal"
+                aria-label="Resize variables panel"
+                aria-valuemin={140}
+                aria-valuemax={600}
+                aria-valuenow={Math.round(variablesPanel.height)}
+                tabIndex={0}
+                onMouseDown={variablesPanel.startResize}
+                onKeyDown={handleVariablesResizeKeyDown}
+                className="relative h-1.5 shrink-0 cursor-row-resize bg-gray-200/80 hover:bg-brand-navy/20 focus:outline-none focus-visible:bg-brand-navy/40 before:absolute before:inset-x-0 before:-top-2 before:-bottom-2 before:content-['']"
+              />
+              <div
+                className="flex-shrink-0 overflow-hidden"
+                style={{ height: variablesPanel.height }}
+              >
                 <VariableChips
                   mappings={tokenMappings}
                   grouped={tokenGrouped}
