@@ -38,10 +38,30 @@ export interface ProposalUnresolvedToken {
   token: string;
 }
 
+/**
+ * A single resolved preset in document order. Multi-variant presets
+ * expand into multiple entries here, all sharing the same `presetId`.
+ * The renderer iterates this list in order and dispatches per
+ * `blockType` (carried by SpecPresetData via the new BlockType column).
+ */
+export interface OrderedBlock {
+  presetId: string;
+  /** Preset with tokens resolved. */
+  preset: SpecPresetData;
+  /** For variant expansions, the matched variant. Undefined otherwise. */
+  variantValue?: string;
+}
+
 export interface ProposalAssemblyResult {
   context: QuoteContext;
   tokens: Record<string, string>;
   sections: Record<ProposalSection, SpecPresetData[]>;
+  /**
+   * Resolved presets in document order. New block-based templates
+   * render exclusively from this list; legacy section-grouped rendering
+   * uses `sections` instead.
+   */
+  orderedBlocks: OrderedBlock[];
   includedBlocks: ProposalBlockDiagnostic[];
   excludedBlocks: ProposalBlockDiagnostic[];
   unresolvedTokens: ProposalUnresolvedToken[];
@@ -174,6 +194,7 @@ export function assembleProposal({
   // Built-in tokens take precedence over custom mappings with the same name.
   const tokens = { ...customTokens, ...builtInTokens };
   const sections = emptySections();
+  const orderedBlocks: OrderedBlock[] = [];
   const includedBlocks: ProposalBlockDiagnostic[] = [];
   const excludedBlocks: ProposalBlockDiagnostic[] = [];
   const unresolvedTokens: ProposalUnresolvedToken[] = [];
@@ -206,6 +227,11 @@ export function assembleProposal({
         const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
         const resolvedPreset = { ...preset, body: resolved.text };
         sections[sectionOf(preset)].push(resolvedPreset);
+        orderedBlocks.push({
+          presetId: preset.id,
+          preset: resolvedPreset,
+          variantValue: variant.matchValue,
+        });
         for (const token of resolved.unresolvedTokens) {
           unresolvedTokens.push({ presetId: preset.id, token });
           warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
@@ -213,11 +239,20 @@ export function assembleProposal({
       }
       includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
     } else {
+      // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)
+      // typically have no body — they're rendered from `config`. Don't
+      // skip them just because `body` is empty.
       const bodyText = preset.body ?? '';
-      if (!bodyText) continue;
-      const resolved = resolveTokensWithDiagnostics(bodyText, tokens);
+      const isLayoutOnly = !!preset.blockType && !bodyText;
+
+      if (!bodyText && !isLayoutOnly) continue;
+
+      const resolved = bodyText
+        ? resolveTokensWithDiagnostics(bodyText, tokens)
+        : { text: '', unresolvedTokens: [] as string[] };
       const resolvedPreset = { ...preset, body: resolved.text };
       sections[sectionOf(preset)].push(resolvedPreset);
+      orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
       includedBlocks.push(block);
 
       for (const token of resolved.unresolvedTokens) {
@@ -235,6 +270,7 @@ export function assembleProposal({
     context,
     tokens,
     sections,
+    orderedBlocks,
     includedBlocks,
     excludedBlocks,
     unresolvedTokens,
