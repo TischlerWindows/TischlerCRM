@@ -30,8 +30,26 @@ async function checkObjectPermission(
   if (!user.profile) return true;
 
   // Check profile object permissions
+  // Profile permissions are stored with lowercase-plural storage keys
+  // (e.g. 'properties', 'contacts', 'companies') but objectApiName is
+  // the canonical CamelCase singular (e.g. 'Property', 'Contact', 'Account').
+  // Map from canonical API name → storage key before looking up.
+  const API_TO_STORAGE: Record<string, string> = {
+    Property:     'properties',
+    Contact:      'contacts',
+    Account:      'companies',
+    Product:      'products',
+    Lead:         'leads',
+    Opportunity:  'opportunities',
+    Project:      'projects',
+    Service:      'service',
+    Quote:        'quotes',
+    Installation: 'installations',
+    WorkOrder:    'workorders',
+  };
   const profilePerms = (user.profile?.permissions as any) || {};
-  const objPerms = profilePerms?.objects?.[objectApiName];
+  const storageKey = API_TO_STORAGE[objectApiName] ?? objectApiName.toLowerCase();
+  const objPerms = profilePerms?.objects?.[storageKey] ?? profilePerms?.objects?.[objectApiName];
   if (objPerms?.[action]) return true;
 
   return false;
