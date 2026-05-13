@@ -2,7 +2,12 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@crm/db/client';
 import { assembleProposal, type TokenMappingRow } from '@crm/proposal-assembly';
-import { renderProposalPDF, type BrandResources } from '../lib/proposal-pdf/renderer.js';
+import { pageLogosSchema, type PageLogoRule } from '@crm/types';
+import {
+  renderProposalPDF,
+  type BrandResources,
+  type PageLogoFile,
+} from '../lib/proposal-pdf/renderer.js';
 
 const renderSchema = z.object({
   summaryId: z.string().min(1),
@@ -37,7 +42,6 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
       include: {
         presets: { include: { conditions: true, variants: true } },
         tokenMappings: true,
-        letterheadLogo: { select: { id: true, mimeType: true, data: true } },
         signatureFont:  { select: fontSelect },
         titleFont:      { select: fontSelect },
         subtitleFont:   { select: fontSelect },
@@ -50,15 +54,17 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     const fontRes = (f: typeof template.titleFont) =>
       f ? { bytes: Buffer.from(f.data), family: f.family } : undefined;
 
+    // ── Resolve per-page logo rules to image bytes ────────────────
+    // pageLogos is a JSON column — validate the shape and silently drop
+    // rules that don't parse rather than 500'ing the whole PDF. Logos are
+    // referenced by id only (no Prisma FK) so a deleted logo just gets
+    // dropped from the list with a log line.
+    const pageLogos = await resolvePageLogos(app, template.pageLogos);
+
     const brand: BrandResources = {
       accentColor: template.accentColorHex ?? undefined,
       emphasisColor: template.emphasisColorHex ?? undefined,
-      letterhead: template.letterheadLogo
-        ? {
-            bytes: Buffer.from(template.letterheadLogo.data),
-            mimeType: template.letterheadLogo.mimeType,
-          }
-        : undefined,
+      pageLogos,
       signatureFont: fontRes(template.signatureFont),
       titleFont:     fontRes(template.titleFont),
       subtitleFont:  fontRes(template.subtitleFont),
@@ -127,6 +133,47 @@ async function fetchLinkedRecord(
     where: { id: recordId, objectId: object.id, deletedAt: null },
   });
   return (record?.data as Record<string, unknown>) ?? null;
+}
+
+/**
+ * Validates the JSON `pageLogos` blob, batch-loads each referenced BrandLogo
+ * by id, and returns the renderer-ready array. Rules with missing logos or
+ * a malformed shape are dropped with a log line — the PDF still renders,
+ * just without those logos.
+ */
+async function resolvePageLogos(
+  app: FastifyInstance,
+  raw: unknown,
+): Promise<PageLogoFile[]> {
+  const parsed = pageLogosSchema.safeParse(raw ?? []);
+  if (!parsed.success) {
+    app.log.warn({ issues: parsed.error.issues }, 'Invalid pageLogos on template; ignoring');
+    return [];
+  }
+  const rules: PageLogoRule[] = parsed.data;
+  if (rules.length === 0) return [];
+
+  const uniqueIds = [...new Set(rules.map((r) => r.logoId))];
+  const logos = await prisma.brandLogo.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, mimeType: true, data: true },
+  });
+  const logoById = new Map(logos.map((l) => [l.id, l]));
+
+  const files: PageLogoFile[] = [];
+  for (const rule of rules) {
+    const logo = logoById.get(rule.logoId);
+    if (!logo) {
+      app.log.warn({ ruleId: rule.id, logoId: rule.logoId }, 'pageLogos rule references missing logo; skipping');
+      continue;
+    }
+    files.push({
+      rule,
+      bytes: Buffer.from(logo.data),
+      mimeType: logo.mimeType,
+    });
+  }
+  return files;
 }
 
 async function fetchProjectForOpportunity(

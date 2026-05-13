@@ -9,7 +9,7 @@ import type { SpecPresetData } from '@crm/proposal-assembly';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
 
-import { TopBar } from './_components/top-bar';
+import { TopBar, type BuilderMode } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
 import { VariableChips } from './_components/variable-chips';
 import { LetterPreview } from './_components/letter-preview';
@@ -17,6 +17,8 @@ import { LintPanel } from './_components/lint-panel';
 import { BlockEditor } from './_components/block-editor';
 import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
+import { BrandingTab } from './_components/branding-tab';
+import { pageLogosSchema, type PageLogoRule } from '@crm/types';
 import {
   conditionToDraft,
   conditionsPayload,
@@ -109,6 +111,12 @@ export default function QuoteBuilderPage() {
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
+  // Builder mode + per-template page-logo rules. Loaded from the template
+  // GET response (pageLogos JSON column). The BrandingTab patches these
+  // via PATCH /quote-templates/:id/page-logos.
+  const [mode, setMode] = useState<BuilderMode>('blocks');
+  const [pageLogos, setPageLogos] = useState<PageLogoRule[]>([]);
+
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
   // Resizable side panels (shared with page-editor pattern)
@@ -188,6 +196,18 @@ export default function QuoteBuilderPage() {
     }
   }, []);
 
+  const loadPageLogos = useCallback(async (templateId: string) => {
+    try {
+      const tpl = await apiClient.get<{ pageLogos?: unknown }>(
+        `/quote-templates/${templateId}`,
+      );
+      const parsed = pageLogosSchema.safeParse(tpl?.pageLogos ?? []);
+      setPageLogos(parsed.success ? parsed.data : []);
+    } catch {
+      setPageLogos([]);
+    }
+  }, []);
+
   const loadTokenMappings = useCallback(async (templateId: string) => {
     try {
       const data = await apiClient.get<{ mappings: TokenMappingData[]; grouped: Record<string, TokenMappingData[]> }>(
@@ -208,7 +228,11 @@ export default function QuoteBuilderPage() {
       const def = data.find((t) => t.isDefault) || data[0];
       if (def) {
         setSelectedTemplateId(def.id);
-        await Promise.all([loadPresets(def.id), loadTokenMappings(def.id)]);
+        await Promise.all([
+          loadPresets(def.id),
+          loadTokenMappings(def.id),
+          loadPageLogos(def.id),
+        ]);
       }
       setLoading(false);
     })();
@@ -348,7 +372,11 @@ export default function QuoteBuilderPage() {
   const handleSelectTemplate = async (id: string) => {
     setSelectedTemplateId(id);
     clearEditor();
-    await Promise.all([loadPresets(id), loadTokenMappings(id)]);
+    await Promise.all([
+      loadPresets(id),
+      loadTokenMappings(id),
+      loadPageLogos(id),
+    ]);
   };
 
   const handleSelectBlock = (id: string) => {
@@ -808,6 +836,8 @@ export default function QuoteBuilderPage() {
         isDirty={isDirty}
         autosaveStatus={autosaveStatus}
         lastSavedAt={lastSavedAt}
+        mode={mode}
+        onChangeMode={setMode}
       />
 
       {/* Banners */}
@@ -900,22 +930,32 @@ export default function QuoteBuilderPage() {
           />
         )}
 
-        {/* Center panel: lint strip + letter preview */}
+        {/* Center panel — swaps between letter preview and Branding tab */}
         <div className="flex-1 min-w-0 bg-gray-100 overflow-hidden flex flex-col">
-          <LintPanel
-            presets={previewPresets}
-            result={previewState.result}
-            onSelectBlock={handleSelectBlock}
-          />
-          <LetterPreview
-            result={previewState.result}
-            error={previewState.error}
-            selectedPresetId={selectedPresetId}
-            onSelectBlock={handleSelectBlock}
-          />
+          {mode === 'branding' ? (
+            <BrandingTab
+              templateId={selectedTemplateId}
+              initialRules={pageLogos}
+              onSaved={setPageLogos}
+            />
+          ) : (
+            <>
+              <LintPanel
+                presets={previewPresets}
+                result={previewState.result}
+                onSelectBlock={handleSelectBlock}
+              />
+              <LetterPreview
+                result={previewState.result}
+                error={previewState.error}
+                selectedPresetId={selectedPresetId}
+                onSelectBlock={handleSelectBlock}
+              />
+            </>
+          )}
         </div>
 
-        {!rightPanel.collapsed && (
+        {mode === 'blocks' && !rightPanel.collapsed && (
           <div
             role="separator"
             aria-orientation="vertical"
@@ -930,7 +970,8 @@ export default function QuoteBuilderPage() {
           />
         )}
 
-        {/* Right panel: block editor */}
+        {/* Right panel: block editor — hidden in Branding mode */}
+        {mode === 'blocks' && (
         <div
           className="relative shrink-0 bg-white border-l border-gray-200 overflow-hidden transition-[width] duration-150"
           style={{
@@ -981,6 +1022,7 @@ export default function QuoteBuilderPage() {
             </>
           )}
         </div>
+        )}
       </div>
 
       <NewTokenModal

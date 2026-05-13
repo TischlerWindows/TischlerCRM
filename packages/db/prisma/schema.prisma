@@ -967,8 +967,14 @@ model QuoteTemplate {
   //   - body     → Aileron Regular               (paragraph text)
   //   - signature→ a script font                 (salesman's name in closing)
   // All nullable — unset fonts fall back to Helvetica variants.
-  letterheadLogoId String?
-  letterheadLogo   BrandLogo? @relation("TemplateLetterhead", fields: [letterheadLogoId], references: [id], onDelete: SetNull)
+  //
+  // pageLogos is a JSON array of PageLogoRule (see @crm/types). Each rule
+  // picks a BrandLogo by id and places it on pages matching the selector
+  // ("first" | "rest" | "last" | "all" | "N" | "N-M" | "even" | "odd").
+  // BrandLogo is referenced by id only — no Prisma FK — so admins can
+  // delete a logo without cascading template breakage; the renderer skips
+  // missing logos and logs a warning.
+  pageLogos        Json     @default("[]")
   signatureFontId  String?
   signatureFont    BrandFont? @relation("TemplateSignatureFont", fields: [signatureFontId], references: [id], onDelete: SetNull)
   titleFontId      String?
@@ -1082,8 +1088,6 @@ model BrandLogo {
   uploadedBy   User?    @relation("UploadedLogos", fields: [uploadedById], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-
-  templates QuoteTemplate[] @relation("TemplateLetterhead")
 }
 
 model BrandFont {
