@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '@crm/db/client';
 import { assembleProposal, type TokenMappingRow } from '@crm/proposal-assembly';
-import { renderProposalPDF } from '../lib/proposal-pdf/renderer.js';
+import { renderProposalPDF, type BrandResources } from '../lib/proposal-pdf/renderer.js';
 
 const renderSchema = z.object({
   summaryId: z.string().min(1),
@@ -27,15 +27,44 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     }
     const { summaryId, templateId } = parsed.data;
 
-    // ── Fetch template + presets + token mappings ─────────────────
+    // ── Fetch template + presets + token mappings + brand wiring ────
+    // The template includes 5 distinct font roles per the brand guide
+    // (title, subtitle, heading, body, signature). Each is nullable — the
+    // renderer falls back to Helvetica variants where unset.
+    const fontSelect = { id: true, family: true, data: true } as const;
     const template = await prisma.quoteTemplate.findUnique({
       where: { id: templateId },
       include: {
         presets: { include: { conditions: true, variants: true } },
         tokenMappings: true,
+        letterheadLogo: { select: { id: true, mimeType: true, data: true } },
+        signatureFont:  { select: fontSelect },
+        titleFont:      { select: fontSelect },
+        subtitleFont:   { select: fontSelect },
+        headingFont:    { select: fontSelect },
+        bodyFont:       { select: fontSelect },
       },
     });
     if (!template) return reply.code(404).send({ error: 'Template not found' });
+
+    const fontRes = (f: typeof template.titleFont) =>
+      f ? { bytes: Buffer.from(f.data), family: f.family } : undefined;
+
+    const brand: BrandResources = {
+      accentColor: template.accentColorHex ?? undefined,
+      emphasisColor: template.emphasisColorHex ?? undefined,
+      letterhead: template.letterheadLogo
+        ? {
+            bytes: Buffer.from(template.letterheadLogo.data),
+            mimeType: template.letterheadLogo.mimeType,
+          }
+        : undefined,
+      signatureFont: fontRes(template.signatureFont),
+      titleFont:     fontRes(template.titleFont),
+      subtitleFont:  fontRes(template.subtitleFont),
+      headingFont:   fontRes(template.headingFont),
+      bodyFont:      fontRes(template.bodyFont),
+    };
 
     // ── Load the summary from the Setting blob (matches client) ────
     const summariesSetting = await prisma.setting.findUnique({ where: { key: 'summaries' } });
@@ -65,7 +94,7 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     // ── Render ────────────────────────────────────────────────────
     let pdfBuffer: Buffer;
     try {
-      pdfBuffer = await renderProposalPDF(result);
+      pdfBuffer = await renderProposalPDF(result, brand);
     } catch (err) {
       app.log.error({ err }, 'PDF render failed');
       return reply.code(500).send({ error: 'Failed to render proposal PDF' });

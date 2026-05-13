@@ -98,6 +98,9 @@ model User {
   notifications              Notification[]      @relation("NotificationRecipient")
   notificationActs           Notification[]      @relation("NotificationLastActor")
 
+  // Company Resources
+  uploadedLogos              BrandLogo[]         @relation("UploadedLogos")
+
   @@index([profileId])
   @@index([departmentId])
   @@index([managerId])
@@ -956,6 +959,29 @@ model QuoteTemplate {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Brand wiring — admins pick which Company Resources this template uses.
+  // Per the Tischler brand guide, each role uses a specific typeface:
+  //   - title    → Helvetica Neue Bold Condensed (wordmark, big headers)
+  //   - subtitle → ITC Fenice Regular            (taglines under wordmark)
+  //   - heading  → Aileron Heavy (Bold)          (section headings, spec titles)
+  //   - body     → Aileron Regular               (paragraph text)
+  //   - signature→ a script font                 (salesman's name in closing)
+  // All nullable — unset fonts fall back to Helvetica variants.
+  letterheadLogoId String?
+  letterheadLogo   BrandLogo? @relation("TemplateLetterhead", fields: [letterheadLogoId], references: [id], onDelete: SetNull)
+  signatureFontId  String?
+  signatureFont    BrandFont? @relation("TemplateSignatureFont", fields: [signatureFontId], references: [id], onDelete: SetNull)
+  titleFontId      String?
+  titleFont        BrandFont? @relation("TemplateTitleFont", fields: [titleFontId], references: [id], onDelete: SetNull)
+  subtitleFontId   String?
+  subtitleFont     BrandFont? @relation("TemplateSubtitleFont", fields: [subtitleFontId], references: [id], onDelete: SetNull)
+  headingFontId    String?
+  headingFont      BrandFont? @relation("TemplateHeadingFont", fields: [headingFontId], references: [id], onDelete: SetNull)
+  bodyFontId       String?
+  bodyFont         BrandFont? @relation("TemplateBodyFont", fields: [bodyFontId], references: [id], onDelete: SetNull)
+  accentColorHex   String?
+  emphasisColorHex String?
+
   presets       SpecPreset[]
   tokenMappings TokenMapping[]
 }
@@ -1028,4 +1054,63 @@ model TokenMapping {
 
   @@unique([templateId, tokenName])
   @@index([templateId])
+}
+
+// ============================================
+// Company Resources — brand assets used by the proposal renderer.
+//
+// Binary data (logos, fonts) is stored directly in the DB so deploys on
+// Railway don't need a persistent volume and the backup story stays
+// trivial. Files are small (logos ~10-100KB, fonts ~50-300KB) and the
+// table sees ~10s of rows total, not millions.
+// ============================================
+
+model BrandLogo {
+  id           String   @id @default(uuid())
+  name         String
+  // Optional brand-guide role tag — lets the admin mark which logo plays
+  // which role ("primary" T-only mark, "letterhead" with address block,
+  // "horizontal" with WINDOWS AND DOORS subtitle, "vertical", "digital-icon"
+  // on navy circle). Free-form string so we don't have to bump it as the
+  // brand guide evolves.
+  role         String?
+  mimeType     String
+  data         Bytes
+  width        Int?
+  height       Int?
+  uploadedById String?
+  uploadedBy   User?    @relation("UploadedLogos", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  templates QuoteTemplate[] @relation("TemplateLetterhead")
+}
+
+model BrandFont {
+  id         String   @id @default(uuid())
+  name       String
+  family     String
+  fileFormat String
+  data       Bytes
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Back-relations for each font role on QuoteTemplate. Prisma requires
+  // named relations on both sides to know which FK each represents.
+  templatesAsSignature QuoteTemplate[] @relation("TemplateSignatureFont")
+  templatesAsTitle     QuoteTemplate[] @relation("TemplateTitleFont")
+  templatesAsSubtitle  QuoteTemplate[] @relation("TemplateSubtitleFont")
+  templatesAsHeading   QuoteTemplate[] @relation("TemplateHeadingFont")
+  templatesAsBody      QuoteTemplate[] @relation("TemplateBodyFont")
+}
+
+model BrandColor {
+  id        String   @id @default(uuid())
+  name      String
+  hex       String
+  pantone   String?
+  role      String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

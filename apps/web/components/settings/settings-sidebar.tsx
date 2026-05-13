@@ -28,6 +28,7 @@ import {
   LifeBuoy,
   Upload,
   ScrollText,
+  FileImage,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -48,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Company',
     items: [
       { name: 'Company Settings', href: '/settings/company', icon: Home },
+      { name: 'Company Resources', href: '/settings/company-resources', icon: FileImage },
       { name: 'Departments', href: '/settings/departments', icon: Building2 },
       { name: 'Security', href: '/settings/security', icon: Lock },
       { name: 'Privacy Center', href: '/settings/privacy', icon: ShieldAlert, disabled: true },
