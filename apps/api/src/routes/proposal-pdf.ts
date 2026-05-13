@@ -28,16 +28,27 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
     const { summaryId, templateId } = parsed.data;
 
     // ── Fetch template + presets + token mappings + brand wiring ────
+    // The template includes 5 distinct font roles per the brand guide
+    // (title, subtitle, heading, body, signature). Each is nullable — the
+    // renderer falls back to Helvetica variants where unset.
+    const fontSelect = { id: true, family: true, data: true } as const;
     const template = await prisma.quoteTemplate.findUnique({
       where: { id: templateId },
       include: {
         presets: { include: { conditions: true, variants: true } },
         tokenMappings: true,
         letterheadLogo: { select: { id: true, mimeType: true, data: true } },
-        signatureFont: { select: { id: true, family: true, data: true } },
+        signatureFont:  { select: fontSelect },
+        titleFont:      { select: fontSelect },
+        subtitleFont:   { select: fontSelect },
+        headingFont:    { select: fontSelect },
+        bodyFont:       { select: fontSelect },
       },
     });
     if (!template) return reply.code(404).send({ error: 'Template not found' });
+
+    const fontRes = (f: typeof template.titleFont) =>
+      f ? { bytes: Buffer.from(f.data), family: f.family } : undefined;
 
     const brand: BrandResources = {
       accentColor: template.accentColorHex ?? undefined,
@@ -48,12 +59,11 @@ export async function proposalPdfRoutes(app: FastifyInstance) {
             mimeType: template.letterheadLogo.mimeType,
           }
         : undefined,
-      signatureFont: template.signatureFont
-        ? {
-            bytes: Buffer.from(template.signatureFont.data),
-            family: template.signatureFont.family,
-          }
-        : undefined,
+      signatureFont: fontRes(template.signatureFont),
+      titleFont:     fontRes(template.titleFont),
+      subtitleFont:  fontRes(template.subtitleFont),
+      headingFont:   fontRes(template.headingFont),
+      bodyFont:      fontRes(template.bodyFont),
     };
 
     // ── Load the summary from the Setting blob (matches client) ────

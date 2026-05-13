@@ -10,24 +10,28 @@ const createTemplateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const hexColor = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, 'Must be #RRGGBB')
+  .nullable()
+  .optional();
+
 const updateTemplateSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
   // Brand wiring — admin picks which Company Resources the template uses.
+  // Each font role maps to a BrandFont. The renderer registers them with
+  // PDFKit and falls back to Helvetica variants when unset.
   letterheadLogoId: z.string().nullable().optional(),
-  signatureFontId: z.string().nullable().optional(),
-  accentColorHex: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, 'Must be #RRGGBB')
-    .nullable()
-    .optional(),
-  emphasisColorHex: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, 'Must be #RRGGBB')
-    .nullable()
-    .optional(),
+  signatureFontId:  z.string().nullable().optional(),
+  titleFontId:      z.string().nullable().optional(),
+  subtitleFontId:   z.string().nullable().optional(),
+  headingFontId:    z.string().nullable().optional(),
+  bodyFontId:       z.string().nullable().optional(),
+  accentColorHex:   hexColor,
+  emphasisColorHex: hexColor,
 });
 
 export async function quoteTemplateRoutes(app: FastifyInstance) {

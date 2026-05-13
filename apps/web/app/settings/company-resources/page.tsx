@@ -20,6 +20,7 @@ import { SettingsPageHeader } from '@/components/settings/settings-page-header';
 interface BrandLogo {
   id: string;
   name: string;
+  role: string | null;
   mimeType: string;
   width: number | null;
   height: number | null;
@@ -27,6 +28,17 @@ interface BrandLogo {
   createdAt: string;
   updatedAt: string;
 }
+
+// Curated role tags for logos. Matches the Tischler brand guide vocabulary so
+// admins can label which logo plays which role. Free-form on the backend.
+const LOGO_ROLES: Array<{ value: string; label: string }> = [
+  { value: 'primary',      label: 'Primary (T icon only)' },
+  { value: 'letterhead',   label: 'Letterhead (with address block)' },
+  { value: 'horizontal',   label: 'Horizontal (with subtitle)' },
+  { value: 'vertical',     label: 'Vertical wordmark' },
+  { value: 'digital-icon', label: 'Digital icon (on background)' },
+  { value: 'monochrome',   label: 'Monochrome' },
+];
 
 interface BrandFont {
   id: string;
@@ -147,6 +159,10 @@ interface DefaultTemplate {
   name: string;
   letterheadLogoId: string | null;
   signatureFontId: string | null;
+  titleFontId: string | null;
+  subtitleFontId: string | null;
+  headingFontId: string | null;
+  bodyFontId: string | null;
   accentColorHex: string | null;
   emphasisColorHex: string | null;
 }
@@ -234,41 +250,94 @@ function TemplateDefaultsBar({ resourceRev }: { resourceRev: number }) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <DefaultPickerSelect
-          label="Letterhead logo"
-          value={template.letterheadLogoId}
-          options={logos.map((l) => ({ value: l.id, label: l.name }))}
-          emptyHint="Upload a logo to pick one"
-          saving={saving === 'letterheadLogoId'}
-          saved={saved === 'letterheadLogoId'}
-          onChange={(v) => patch('letterheadLogoId', v)}
-        />
-        <DefaultPickerSelect
-          label="Signature font"
-          value={template.signatureFontId}
-          options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
-          emptyHint="Upload a font to pick one"
-          saving={saving === 'signatureFontId'}
-          saved={saved === 'signatureFontId'}
-          onChange={(v) => patch('signatureFontId', v)}
-        />
-        <DefaultPickerColor
-          label="Accent color (titles, headings)"
-          value={template.accentColorHex}
-          placeholder="#1e3a5f"
-          saving={saving === 'accentColorHex'}
-          saved={saved === 'accentColorHex'}
-          onChange={(v) => patch('accentColorHex', v)}
-        />
-        <DefaultPickerColor
-          label="Emphasis color (rule, BASE BID PRICE)"
-          value={template.emphasisColorHex}
-          placeholder="#da291c"
-          saving={saving === 'emphasisColorHex'}
-          saved={saved === 'emphasisColorHex'}
-          onChange={(v) => patch('emphasisColorHex', v)}
-        />
+      <div className="space-y-4">
+        {/* Imagery + colors */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <DefaultPickerSelect
+            label="Letterhead logo"
+            value={template.letterheadLogoId}
+            options={logos.map((l) => ({
+              value: l.id,
+              label: l.role ? `${l.name} · ${l.role}` : l.name,
+            }))}
+            emptyHint="Upload a logo to pick one"
+            saving={saving === 'letterheadLogoId'}
+            saved={saved === 'letterheadLogoId'}
+            onChange={(v) => patch('letterheadLogoId', v)}
+          />
+          <div className="grid grid-cols-2 gap-3 sm:col-span-1">
+            <DefaultPickerColor
+              label="Accent color"
+              value={template.accentColorHex}
+              placeholder="#151f6d"
+              saving={saving === 'accentColorHex'}
+              saved={saved === 'accentColorHex'}
+              onChange={(v) => patch('accentColorHex', v)}
+            />
+            <DefaultPickerColor
+              label="Emphasis color"
+              value={template.emphasisColorHex}
+              placeholder="#da291c"
+              saving={saving === 'emphasisColorHex'}
+              saved={saved === 'emphasisColorHex'}
+              onChange={(v) => patch('emphasisColorHex', v)}
+            />
+          </div>
+        </div>
+
+        {/* Font roles — per the brand guide each role has its own typeface. */}
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">
+            Font roles
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <DefaultPickerSelect
+              label="Title font (wordmark, big headers)"
+              value={template.titleFontId}
+              options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
+              emptyHint="Upload a font to pick one"
+              saving={saving === 'titleFontId'}
+              saved={saved === 'titleFontId'}
+              onChange={(v) => patch('titleFontId', v)}
+            />
+            <DefaultPickerSelect
+              label="Subtitle font (tagline under wordmark)"
+              value={template.subtitleFontId}
+              options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
+              emptyHint="Upload a font to pick one"
+              saving={saving === 'subtitleFontId'}
+              saved={saved === 'subtitleFontId'}
+              onChange={(v) => patch('subtitleFontId', v)}
+            />
+            <DefaultPickerSelect
+              label="Heading font (section titles, bold runs)"
+              value={template.headingFontId}
+              options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
+              emptyHint="Upload a font to pick one"
+              saving={saving === 'headingFontId'}
+              saved={saved === 'headingFontId'}
+              onChange={(v) => patch('headingFontId', v)}
+            />
+            <DefaultPickerSelect
+              label="Body font (paragraphs)"
+              value={template.bodyFontId}
+              options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
+              emptyHint="Upload a font to pick one"
+              saving={saving === 'bodyFontId'}
+              saved={saved === 'bodyFontId'}
+              onChange={(v) => patch('bodyFontId', v)}
+            />
+            <DefaultPickerSelect
+              label="Signature font (salesman name in closing)"
+              value={template.signatureFontId}
+              options={fonts.map((f) => ({ value: f.id, label: `${f.name} (${f.family})` }))}
+              emptyHint="Upload a font to pick one"
+              saving={saving === 'signatureFontId'}
+              saved={saved === 'signatureFontId'}
+              onChange={(v) => patch('signatureFontId', v)}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -453,6 +522,16 @@ function LogosTab({ onChange }: { onChange?: () => void }) {
     }
   };
 
+  const setLogoRole = async (id: string, role: string | null) => {
+    try {
+      await apiClient.patch(`/company-resources/logos/${id}`, { role });
+      await load();
+      onChange?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update logo role');
+    }
+  };
+
   return (
     <div>
       {error && (
@@ -522,6 +601,17 @@ function LogosTab({ onChange }: { onChange?: () => void }) {
               >
                 {logo.name}
               </button>
+              <select
+                value={logo.role ?? ''}
+                onChange={(e) => setLogoRole(logo.id, e.target.value || null)}
+                aria-label={`Set role for ${logo.name}`}
+                className="mt-1 w-full text-[10.5px] py-0.5 px-1 border border-gray-200 rounded bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+              >
+                <option value="">— no role —</option>
+                {LOGO_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
               <div className="mt-0.5 flex items-center justify-between text-[11px] text-gray-400">
                 <span className="truncate">{logo.mimeType.replace('image/', '')}</span>
                 <button

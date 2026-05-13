@@ -21,6 +21,9 @@ const ALLOWED_FONT_FORMATS = ['ttf', 'otf'];
 
 const logoCreateSchema = z.object({
   name: z.string().trim().min(1).max(80),
+  // Optional brand-guide role tag. Free-form string so we don't constrain
+  // future role additions, but the UI offers a curated list.
+  role: z.string().trim().max(40).nullable().optional(),
   mimeType: z.string().refine((m) => ALLOWED_LOGO_MIMES.includes(m), {
     message: `mimeType must be one of ${ALLOWED_LOGO_MIMES.join(', ')}`,
   }),
@@ -30,7 +33,8 @@ const logoCreateSchema = z.object({
 });
 
 const logoUpdateSchema = z.object({
-  name: z.string().trim().min(1).max(80),
+  name: z.string().trim().min(1).max(80).optional(),
+  role: z.string().trim().max(40).nullable().optional(),
 });
 
 const fontCreateSchema = z.object({
@@ -76,6 +80,7 @@ export async function companyResourceRoutes(app: FastifyInstance) {
       select: {
         id: true,
         name: true,
+        role: true,
         mimeType: true,
         width: true,
         height: true,
@@ -121,6 +126,7 @@ export async function companyResourceRoutes(app: FastifyInstance) {
     const created = await prisma.brandLogo.create({
       data: {
         name: parsed.data.name,
+        role: parsed.data.role ?? null,
         mimeType: parsed.data.mimeType,
         data: bytes,
         width: parsed.data.width ?? null,
@@ -130,6 +136,7 @@ export async function companyResourceRoutes(app: FastifyInstance) {
       select: {
         id: true,
         name: true,
+        role: true,
         mimeType: true,
         width: true,
         height: true,
@@ -150,7 +157,7 @@ export async function companyResourceRoutes(app: FastifyInstance) {
     reply.code(201).send(created);
   });
 
-  // Rename a logo.
+  // Update a logo's metadata (name and/or role). Neither requires a re-upload.
   app.patch<{ Params: { id: string } }>(
     '/company-resources/logos/:id',
     async (req, reply) => {
@@ -158,11 +165,17 @@ export async function companyResourceRoutes(app: FastifyInstance) {
       if (!parsed.success) {
         return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
       }
+      if (parsed.data.name === undefined && parsed.data.role === undefined) {
+        return reply.code(400).send({ error: 'Provide at least name or role.' });
+      }
       const updated = await prisma.brandLogo
         .update({
           where: { id: req.params.id },
-          data: { name: parsed.data.name },
-          select: { id: true, name: true, updatedAt: true },
+          data: {
+            ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+            ...(parsed.data.role !== undefined ? { role: parsed.data.role } : {}),
+          },
+          select: { id: true, name: true, role: true, updatedAt: true },
         })
         .catch(() => null);
       if (!updated) return reply.code(404).send({ error: 'Logo not found' });
@@ -329,6 +342,14 @@ export async function companyResourceRoutes(app: FastifyInstance) {
   // ──────────────────────────────────────────────────────────────────
 
   app.get('/company-resources/colors', async (_req, reply) => {
+    // On first access, seed the brand-guide palette so admins start with the
+    // canonical Tischler colors. Idempotent because we only seed when empty.
+    const count = await prisma.brandColor.count();
+    if (count === 0) {
+      await prisma.brandColor.createMany({
+        data: BRAND_GUIDE_PALETTE.map((c, i) => ({ ...c, order: i })),
+      });
+    }
     const rows = await prisma.brandColor.findMany({
       orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
@@ -389,6 +410,18 @@ export async function companyResourceRoutes(app: FastifyInstance) {
     },
   );
 }
+
+// ── Brand-guide palette (auto-seeded on first /colors fetch) ──────────
+//
+// From the Tischler und Sohn USA Ltd Brand Guide 2025. Hex codes match the
+// guide exactly; admins can edit / delete / add more after seed.
+const BRAND_GUIDE_PALETTE: Array<{ name: string; hex: string; pantone: string; role: string }> = [
+  { name: 'Tischler Red',   hex: '#da291c', pantone: 'PMS 485 C',  role: 'emphasis' },
+  { name: 'Tischler Navy',  hex: '#151f6d', pantone: 'PMS 2756 C', role: 'primary' },
+  { name: 'Tischler Gray',  hex: '#9f9fa2', pantone: 'PMS 422 C',  role: 'muted' },
+  { name: 'Off-White',      hex: '#f5f5f4', pantone: 'PMS 663 C',  role: 'background' },
+  { name: 'Tischler Dark',  hex: '#293241', pantone: 'PMS 7546 C', role: 'text' },
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────
 

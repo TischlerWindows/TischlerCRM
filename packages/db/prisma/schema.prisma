@@ -960,10 +960,25 @@ model QuoteTemplate {
   updatedAt   DateTime @updatedAt
 
   // Brand wiring — admins pick which Company Resources this template uses.
+  // Per the Tischler brand guide, each role uses a specific typeface:
+  //   - title    → Helvetica Neue Bold Condensed (wordmark, big headers)
+  //   - subtitle → ITC Fenice Regular            (taglines under wordmark)
+  //   - heading  → Aileron Heavy (Bold)          (section headings, spec titles)
+  //   - body     → Aileron Regular               (paragraph text)
+  //   - signature→ a script font                 (salesman's name in closing)
+  // All nullable — unset fonts fall back to Helvetica variants.
   letterheadLogoId String?
   letterheadLogo   BrandLogo? @relation("TemplateLetterhead", fields: [letterheadLogoId], references: [id], onDelete: SetNull)
   signatureFontId  String?
   signatureFont    BrandFont? @relation("TemplateSignatureFont", fields: [signatureFontId], references: [id], onDelete: SetNull)
+  titleFontId      String?
+  titleFont        BrandFont? @relation("TemplateTitleFont", fields: [titleFontId], references: [id], onDelete: SetNull)
+  subtitleFontId   String?
+  subtitleFont     BrandFont? @relation("TemplateSubtitleFont", fields: [subtitleFontId], references: [id], onDelete: SetNull)
+  headingFontId    String?
+  headingFont      BrandFont? @relation("TemplateHeadingFont", fields: [headingFontId], references: [id], onDelete: SetNull)
+  bodyFontId       String?
+  bodyFont         BrandFont? @relation("TemplateBodyFont", fields: [bodyFontId], references: [id], onDelete: SetNull)
   accentColorHex   String?
   emphasisColorHex String?
 
@@ -1053,6 +1068,12 @@ model TokenMapping {
 model BrandLogo {
   id           String   @id @default(uuid())
   name         String
+  // Optional brand-guide role tag — lets the admin mark which logo plays
+  // which role ("primary" T-only mark, "letterhead" with address block,
+  // "horizontal" with WINDOWS AND DOORS subtitle, "vertical", "digital-icon"
+  // on navy circle). Free-form string so we don't have to bump it as the
+  // brand guide evolves.
+  role         String?
   mimeType     String
   data         Bytes
   width        Int?
@@ -1074,7 +1095,13 @@ model BrandFont {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  templates QuoteTemplate[] @relation("TemplateSignatureFont")
+  // Back-relations for each font role on QuoteTemplate. Prisma requires
+  // named relations on both sides to know which FK each represents.
+  templatesAsSignature QuoteTemplate[] @relation("TemplateSignatureFont")
+  templatesAsTitle     QuoteTemplate[] @relation("TemplateTitleFont")
+  templatesAsSubtitle  QuoteTemplate[] @relation("TemplateSubtitleFont")
+  templatesAsHeading   QuoteTemplate[] @relation("TemplateHeadingFont")
+  templatesAsBody      QuoteTemplate[] @relation("TemplateBodyFont")
 }
 
 model BrandColor {
