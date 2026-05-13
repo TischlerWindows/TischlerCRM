@@ -4327,8 +4327,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmt(ewSq)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{ewN ? `€${fmt(ewN)}` : '—'}</td>
                                   {inputCell('euroWindows','full')}{inputCell('euroWindows','pct')}{inputCell('euroWindows','final')}{inputCell('euroWindows','finalAdj')}
-                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEwCalc.full ? `€${fmt(lEwCalc.full)}` : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEwCalc.disc ? `€${fmt(lEwCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEwCalc.full ? fmt(lEwCalc.full) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEwCalc.disc ? fmt(lEwCalc.disc) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{lEwCalc.final ? fmt(lEwCalc.final) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{lEwCalc.finalAdj ? fmt(lEwCalc.finalAdj) : '—'}</td>
                                 </tr>
@@ -4339,8 +4339,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmt(dhSq)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{dhN ? `€${fmt(dhN)}` : '—'}</td>
                                   {inputCell('doubleHung','full')}{inputCell('doubleHung','pct')}{inputCell('doubleHung','final')}{inputCell('doubleHung','finalAdj')}
-                                  <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? `€${fmt(lDhCalc.full)}` : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{lDhCalc.disc ? `€${fmt(lDhCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? fmt(lDhCalc.full) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{lDhCalc.disc ? fmt(lDhCalc.disc) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-400 bg-green-50/30">{lDhCalc.final ? fmt(lDhCalc.final) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-400 bg-purple-50/30">{lDhCalc.finalAdj ? fmt(lDhCalc.finalAdj) : '—'}</td>
                                 </tr>
@@ -4351,8 +4351,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-700">{fmt(dSq)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{dN ? `€${fmt(dN)}` : '—'}</td>
                                   {inputCell('euroDoors','full')}{inputCell('euroDoors','pct')}{inputCell('euroDoors','final')}{inputCell('euroDoors','finalAdj')}
-                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEdCalc.full ? `€${fmt(lEdCalc.full)}` : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEdCalc.disc ? `€${fmt(lEdCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEdCalc.full ? fmt(lEdCalc.full) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEdCalc.disc ? fmt(lEdCalc.disc) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{lEdCalc.final ? fmt(lEdCalc.final) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{lEdCalc.finalAdj ? fmt(lEdCalc.finalAdj) : '—'}</td>
                                 </tr>
@@ -4364,10 +4364,10 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmt(totN)}` : '—'}</td>
                                   {(['full','pct','final','finalAdj'] as const).map(f => {
                                     const s = (p((locQtot?.euroWindows as any)?.[f])||0)+(p((locQtot?.doubleHung as any)?.[f])||0)+(p((locQtot?.euroDoors as any)?.[f])||0);
-                                    return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? fmt(s) : '—'}</td>;
+                                    return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? `$${fmt(s)}` : '—'}</td>;
                                   })}
-                                  <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{lGtCalc.full ? `€${fmt(lGtCalc.full)}` : '—'}</td>
-                                  <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{lGtCalc.disc ? `€${fmt(lGtCalc.disc)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{lGtCalc.full ? fmt(lGtCalc.full) : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{lGtCalc.disc ? fmt(lGtCalc.disc) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{lGtCalc.final ? fmt(lGtCalc.final) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{lGtCalc.finalAdj ? fmt(lGtCalc.finalAdj) : '—'}</td>
                                 </tr>
@@ -4448,8 +4448,8 @@ export default function SummaryPage() {
                                     <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
-                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? `€${fmt(ewCalc.full)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.disc ? `€${fmt(ewCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{ewCalc.disc ? fmt(ewCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{ewCalc.final ? fmt(ewCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{ewCalc.finalAdj ? fmt(ewCalc.finalAdj) : '—'}</td>
                               </tr>
@@ -4505,8 +4505,8 @@ export default function SummaryPage() {
                                     <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
-                                <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? `€${fmt(dhCalc.full)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.disc ? `€${fmt(dhCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{dhCalc.disc ? fmt(dhCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-400 bg-green-50/30">{dhCalc.final ? fmt(dhCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-400 bg-purple-50/30">{dhCalc.finalAdj ? fmt(dhCalc.finalAdj) : '—'}</td>
                               </tr>
@@ -4562,8 +4562,8 @@ export default function SummaryPage() {
                                     <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
-                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? `€${fmt(edCalc.full)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.disc ? `€${fmt(edCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{edCalc.disc ? fmt(edCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-green-50/30">{edCalc.final ? fmt(edCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-700 bg-purple-50/30">{edCalc.finalAdj ? fmt(edCalc.finalAdj) : '—'}</td>
                               </tr>
@@ -4616,10 +4616,10 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
-                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? fmt(sumQt) : '—'}</td>;
+                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmt(sumQt)}` : '—'}</td>;
                                 })}
-                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
                               </tr>
@@ -4656,10 +4656,10 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })()) + adj;
-                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? fmt(sumQt) : '—'}</td>;
+                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmt(sumQt)}` : '—'}</td>;
                                 })}
-                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? `€${fmt(gtCalc.full)}` : '—'}</td>
-                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? `€${fmt(gtCalc.disc)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-green-50/60">{gtCalc.final ? fmt(gtCalc.final) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-purple-50/60">{gtCalc.finalAdj ? fmt(gtCalc.finalAdj) : '—'}</td>
                               </tr>
