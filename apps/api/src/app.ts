@@ -413,6 +413,12 @@ export function buildApp() {
     if (routeUrl === '/health') return;
     if (routeUrl === '/admin/backup/scheduled' && req.headers['x-cron-secret']) return;
     if (routeUrl === '/dropbox/callback') return;
+    // Brand-asset binary endpoints are served unauthenticated so <img src> tags
+    // and @font-face declarations can load them (neither can attach a Bearer
+    // token). The UUIDs are non-enumerable and these assets ultimately ship
+    // inside customer-facing PDFs, so they're not sensitive.
+    if (routeUrl === '/company-resources/logos/:id/bytes') return;
+    if (routeUrl === '/company-resources/fonts/:id/bytes') return;
 
     const auth = req.headers.authorization;
     if (!auth || !auth.startsWith('Bearer ')) {
