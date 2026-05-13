@@ -4207,6 +4207,9 @@ export default function SummaryPage() {
 
                     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                     const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+                    // Format a stored raw number string for display inside the input ($87,600)
+                    const fmtQtInput = (v: string) => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return n ? '$' + n.toLocaleString('en-US') : (v || ''); };
+                    const stripQtInput = (v: string) => v.replace(/[$,]/g, '');
 
                     const totalQty = euroWindowQty + doubleHungQty + doorQty;
                     const totalFields = euroWindowFields + doubleHungFields + doorFields;
@@ -4284,7 +4287,7 @@ export default function SummaryPage() {
                         onQtotChange({ ...base, [cat]: { ...(base as any)[cat], [f]: val } });
                       };
                       const inputCell = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: string) => editable
-                        ? <td className="px-1 py-1"><input type="text" value={(locQtot as any)?.[cat]?.[f] || ''} onChange={e => setLocQt(cat, f, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
+                        ? <td className="px-1 py-1"><input type="text" value={fmtQtInput((locQtot as any)?.[cat]?.[f] || '')} onChange={e => setLocQt(cat, f, stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
                         : <td className="px-4 py-3 text-right text-gray-400">—</td>;
                       return (
                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
@@ -4445,7 +4448,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ew-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.euroWindows as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
@@ -4502,7 +4505,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`dh-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.doubleHung as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
@@ -4559,7 +4562,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ed-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.quoteTotals?.euroDoors as any)?.[f] || ''} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: e.target.value}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
@@ -4632,7 +4635,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => (
                                   <td key={`adj-${f}`} className="px-1 py-1">
-                                    <input type="text" value={(editingSummary.grandTotalAdjustment as any)?.[f] || ''} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: e.target.value } })} className="w-full px-2 py-1.5 text-right text-sm border border-amber-300 rounded focus:ring-1 focus:ring-amber-400 bg-amber-50/40" placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className="w-full px-2 py-1.5 text-right text-sm border border-amber-300 rounded focus:ring-1 focus:ring-amber-400 bg-amber-50/40" placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 border-l-4 border-blue-300 bg-blue-50/30" />
