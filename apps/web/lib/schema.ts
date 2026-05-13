@@ -51,6 +51,7 @@ export function normalizeFieldType(raw: string): FieldType {
     autouser: 'AutoUser',
     lookupuser: 'LookupUser',
     locationsearch: 'LocationSearch',
+    location_search: 'LocationSearch',
     dropboxfiles: 'DropboxFiles',
     dropdownwithcustom: 'DropdownWithCustom',
   };

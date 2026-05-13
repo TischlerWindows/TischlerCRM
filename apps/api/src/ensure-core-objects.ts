@@ -15,9 +15,9 @@ const CORE_OBJECTS = [
     description: 'Real estate properties',
     fields: [
       { apiName: 'propertyNumber', label: 'Property Number', type: 'Text', unique: true },
-      { apiName: 'address', label: 'Address', type: 'Text', required: true },
-      { apiName: 'city', label: 'City', type: 'Text', required: true },
-      { apiName: 'state', label: 'State/Province', type: 'Text', required: true },
+      { apiName: 'address', label: 'Address', type: 'Text' },
+      { apiName: 'city', label: 'City', type: 'Text' },
+      { apiName: 'state', label: 'State/Province', type: 'Text' },
       { apiName: 'zipCode', label: 'Postal / Zip Code', type: 'Text' },
       { apiName: 'country', label: 'Country', type: 'Text' },
       { apiName: 'latitude', label: 'Latitude', type: 'Number' },
@@ -490,6 +490,24 @@ export async function ensureCoreObjects(): Promise<void> {
         data: { required: false },
       });
       if (nameResult.count > 0) console.log('[ensure-core-objects] Un-required Account name field');
+    }
+
+    // Un-require Property address sub-fields (address, city, state).
+    // These are populated automatically from the address_search (LocationSearch)
+    // field and must not block record creation via form validation.
+    const propertyObj = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Property', mode: 'insensitive' } },
+    });
+    if (propertyObj) {
+      const addrResult = await prisma.customField.updateMany({
+        where: {
+          objectId: propertyObj.id,
+          apiName: { in: ['address', 'city', 'state', 'Property__address', 'Property__city', 'Property__state'] },
+          required: true,
+        },
+        data: { required: false },
+      });
+      if (addrResult.count > 0) console.log(`[ensure-core-objects] Un-required ${addrResult.count} Property address sub-field(s)`);
     }
   } catch (err) {
     console.warn('[ensure-core-objects] Could not fix auto-number/name field requirements:', err);

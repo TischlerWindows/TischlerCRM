@@ -91,8 +91,9 @@ export function validateFields(
       }
 
       // LocationSearch: treat a blob with no street as empty
+      // (also handles 'location_search' in case the DB uses the underscored form)
       if (
-        fieldDef.type === 'LocationSearch' &&
+        (fieldDef.type === 'LocationSearch' || fieldDef.type === ('location_search' as string)) &&
         typeof value === 'object' &&
         value !== null
       ) {
