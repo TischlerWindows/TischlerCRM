@@ -12,7 +12,7 @@ import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
 import { TopBar, type BuilderMode } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
 import { VariableChips } from './_components/variable-chips';
-import { LetterPreview } from './_components/letter-preview';
+import { LetterPreview, type BrandFontMap, emptyBrandFonts } from './_components/letter-preview';
 import { LintPanel } from './_components/lint-panel';
 import { BlockEditor } from './_components/block-editor';
 import { type BodyEditorHandle } from './_components/body-editor';
@@ -116,6 +116,11 @@ export default function QuoteBuilderPage() {
   // via PATCH /quote-templates/:id/page-logos.
   const [mode, setMode] = useState<BuilderMode>('blocks');
   const [pageLogos, setPageLogos] = useState<PageLogoRule[]>([]);
+  // Brand-font role ids for the live HTML preview's @font-face injection.
+  // Each value is { id, fileFormat, updatedAt } or null. The renderer
+  // already registers these for the PDF — this brings the preview in sync
+  // so the on-screen render matches what the PDF will look like.
+  const [brandFonts, setBrandFonts] = useState<BrandFontMap>(emptyBrandFonts());
 
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
@@ -196,15 +201,59 @@ export default function QuoteBuilderPage() {
     }
   }, []);
 
-  const loadPageLogos = useCallback(async (templateId: string) => {
+  const loadTemplateMeta = useCallback(async (templateId: string) => {
     try {
-      const tpl = await apiClient.get<{ pageLogos?: unknown }>(
-        `/quote-templates/${templateId}`,
-      );
+      const tpl = await apiClient.get<{
+        pageLogos?: unknown;
+        titleFontId?: string | null;
+        subtitleFontId?: string | null;
+        headingFontId?: string | null;
+        bodyFontId?: string | null;
+        signatureFontId?: string | null;
+      }>(`/quote-templates/${templateId}`);
+
       const parsed = pageLogosSchema.safeParse(tpl?.pageLogos ?? []);
       setPageLogos(parsed.success ? parsed.data : []);
+
+      // Resolve each role's font metadata (id + fileFormat + updatedAt) so
+      // the preview can build @font-face URLs. Skip roles with no id set.
+      const fontIds = [
+        tpl?.titleFontId,
+        tpl?.subtitleFontId,
+        tpl?.headingFontId,
+        tpl?.bodyFontId,
+        tpl?.signatureFontId,
+      ].filter((id): id is string => !!id);
+
+      if (fontIds.length === 0) {
+        setBrandFonts(emptyBrandFonts());
+      } else {
+        try {
+          const allFonts = await apiClient.get<
+            Array<{ id: string; fileFormat: string; updatedAt: string }>
+          >('/company-resources/fonts');
+          const byId = new Map(allFonts.map((f) => [f.id, f]));
+          const pickRole = (id: string | null | undefined) => {
+            if (!id) return null;
+            const f = byId.get(id);
+            return f
+              ? { id: f.id, fileFormat: f.fileFormat, updatedAt: f.updatedAt }
+              : null;
+          };
+          setBrandFonts({
+            title: pickRole(tpl?.titleFontId),
+            subtitle: pickRole(tpl?.subtitleFontId),
+            heading: pickRole(tpl?.headingFontId),
+            body: pickRole(tpl?.bodyFontId),
+            signature: pickRole(tpl?.signatureFontId),
+          });
+        } catch {
+          setBrandFonts(emptyBrandFonts());
+        }
+      }
     } catch {
       setPageLogos([]);
+      setBrandFonts(emptyBrandFonts());
     }
   }, []);
 
@@ -231,7 +280,7 @@ export default function QuoteBuilderPage() {
         await Promise.all([
           loadPresets(def.id),
           loadTokenMappings(def.id),
-          loadPageLogos(def.id),
+          loadTemplateMeta(def.id),
         ]);
       }
       setLoading(false);
@@ -375,7 +424,7 @@ export default function QuoteBuilderPage() {
     await Promise.all([
       loadPresets(id),
       loadTokenMappings(id),
-      loadPageLogos(id),
+      loadTemplateMeta(id),
     ]);
   };
 
@@ -950,6 +999,8 @@ export default function QuoteBuilderPage() {
                 error={previewState.error}
                 selectedPresetId={selectedPresetId}
                 onSelectBlock={handleSelectBlock}
+                brandFonts={brandFonts}
+                pageLogos={pageLogos}
               />
             </>
           )}
