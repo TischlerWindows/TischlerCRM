@@ -588,7 +588,7 @@ function LogosTab({ onChange }: { onChange?: () => void }) {
               <div className="aspect-[4/3] mb-2 flex items-center justify-center rounded bg-gray-50 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`${apiBase()}/company-resources/logos/${logo.id}/bytes`}
+                  src={`${apiBase()}/company-resources/logos/${logo.id}/bytes?v=${encodeURIComponent(logo.updatedAt)}`}
                   alt={logo.name}
                   className="max-h-full max-w-full object-contain"
                 />
@@ -820,9 +820,13 @@ function FontRow({ font, onDelete }: { font: BrandFont; onDelete: () => void }) 
     if (document.getElementById(styleId)) return;
     const style = document.createElement('style');
     style.id = styleId;
+    // Append ?v=updatedAt to the URL so the browser doesn't reuse a stale
+    // cached response (e.g. a pre-#131 fetch without Cross-Origin-Resource-Policy
+    // that's still poisoning the cache). Different ID + updatedAt = different
+    // cache key.
     style.textContent = `@font-face {
       font-family: "brand-${font.id}";
-      src: url("${apiBase()}/company-resources/fonts/${font.id}/bytes") format("${
+      src: url("${apiBase()}/company-resources/fonts/${font.id}/bytes?v=${encodeURIComponent(font.updatedAt)}") format("${
         font.fileFormat.toLowerCase() === 'otf' ? 'opentype' : 'truetype'
       }");
       font-display: swap;
