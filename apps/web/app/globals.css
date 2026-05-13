@@ -201,6 +201,75 @@ body {
   }
 }
 
+/* ====================================================================
+   TABLET RESPONSIVE OVERRIDES  (768 px – 1023 px)
+   Covers iPad mini portrait (768), iPad / Air portrait (810–820),
+   iPad Pro 11" portrait (834), and any tablet in that range.
+   Gentler than the phone block above — preserves two-column layouts
+   but softens spacing so nothing feels cramped on a touch screen.
+   ==================================================================== */
+@media (min-width: 768px) and (max-width: 1023px) {
+  /* ── Page builder grids: leave 2-col but collapse 3-/4-col ───── */
+  .grid-cols-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* ── Padding: moderate reduction ─────────────────────────────── */
+  .p-8  { padding: 1.25rem !important; }
+  .px-8 { padding-left: 1.25rem !important; padding-right: 1.25rem !important; }
+  .py-8 { padding-top:  1.25rem !important; padding-bottom: 1.25rem !important; }
+
+  /* ── Heading sizes: slightly scaled down ─────────────────────── */
+  .text-3xl { font-size: 1.5rem  !important; line-height: 2rem    !important; }
+  .text-2xl { font-size: 1.35rem !important; line-height: 1.85rem !important; }
+
+  /* ── Buttons: slightly smaller, easier to tap ────────────────── */
+  .inline-flex.items-center.px-4.py-2 {
+    padding: 0.4rem 0.65rem !important;
+    font-size: 0.8rem !important;
+  }
+  .inline-flex.items-center.px-6.py-2 {
+    padding: 0.4rem 0.8rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* ── Modals: keep them well within viewport ─────────────────── */
+  .fixed.inset-0 .max-w-3xl { max-width: calc(100vw - 3rem) !important; }
+  .fixed.inset-0 .max-w-2xl { max-width: calc(100vw - 3rem) !important; }
+
+  /* ── Table cells: slightly more compact ─────────────────────── */
+  table thead th {
+    padding-left: 0.875rem !important;
+    padding-right: 0.875rem !important;
+    font-size: 0.72rem !important;
+  }
+  table tbody td {
+    padding-left:  0.875rem !important;
+    padding-right: 0.875rem !important;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Action bars: allow wrapping on narrow tablets ───────────── */
+  .px-6.py-6 > .flex.justify-between,
+  .px-6.py-6 > .flex.items-center.justify-between {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  /* ── Touch-scroll tables ─────────────────────────────────────── */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Record detail header: allow wrap on portrait tablets ──────── */
+  .record-detail-header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}
+
 /* Hide number input spinners globally */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
