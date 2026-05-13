@@ -101,6 +101,9 @@ export async function companyResourceRoutes(app: FastifyInstance) {
   });
 
   // Stream a logo's bytes (used by <img src> previews and the PDF renderer).
+  // Cross-Origin-Resource-Policy: cross-origin lets the frontend on a sibling
+  // Railway domain load the image. Without it, Helmet's default same-origin
+  // policy triggers ERR_BLOCKED_BY_RESPONSE.NotSameOrigin in Chrome.
   app.get<{ Params: { id: string } }>(
     '/company-resources/logos/:id/bytes',
     async (req, reply) => {
@@ -111,7 +114,8 @@ export async function companyResourceRoutes(app: FastifyInstance) {
       if (!logo) return reply.code(404).send({ error: 'Logo not found' });
       reply
         .header('Content-Type', logo.mimeType)
-        .header('Cache-Control', 'private, max-age=300')
+        .header('Cache-Control', 'public, max-age=300')
+        .header('Cross-Origin-Resource-Policy', 'cross-origin')
         .send(logo.data);
     },
   );
@@ -235,6 +239,12 @@ export async function companyResourceRoutes(app: FastifyInstance) {
   // Stream font bytes. Content-Type set per file format so the browser can
   // load it into @font-face for preview, and so the PDFKit renderer can
   // pass it to doc.registerFont().
+  //
+  // Cross-Origin-Resource-Policy: cross-origin lets the frontend on a sibling
+  // Railway domain load the font via @font-face. Without it Helmet's default
+  // same-origin policy triggers ERR_BLOCKED_BY_RESPONSE.NotSameOrigin and the
+  // @font-face declaration silently fails — the preview line renders in the
+  // browser's default font instead of the uploaded typeface.
   app.get<{ Params: { id: string } }>(
     '/company-resources/fonts/:id/bytes',
     async (req, reply) => {
@@ -247,7 +257,8 @@ export async function companyResourceRoutes(app: FastifyInstance) {
         font.fileFormat.toLowerCase() === 'otf' ? 'font/otf' : 'font/ttf';
       reply
         .header('Content-Type', mime)
-        .header('Cache-Control', 'private, max-age=3600')
+        .header('Cache-Control', 'public, max-age=3600')
+        .header('Cross-Origin-Resource-Policy', 'cross-origin')
         .send(font.data);
     },
   );
