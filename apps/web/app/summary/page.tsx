@@ -4327,8 +4327,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 font-medium text-gray-900">Euro Windows</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewF)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(ewSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{ewN ? `€${fmt(ewN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{ewN ? `€${fmtInt(ewN)}` : '—'}</td>
                                   {inputCell('euroWindows','full')}{inputCell('euroWindows','pct')}{inputCell('euroWindows','final')}{inputCell('euroWindows','finalAdj')}
                                   <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEwCalc.full ? fmt(lEwCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEwCalc.disc ? fmt(lEwCalc.disc) : '—'}</td>
@@ -4339,8 +4339,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhF)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(dhSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `€${fmt(dhN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dhN ? `€${fmtInt(dhN)}` : '—'}</td>
                                   {inputCell('doubleHung','full')}{inputCell('doubleHung','pct')}{inputCell('doubleHung','final')}{inputCell('doubleHung','finalAdj')}
                                   <td className="px-4 py-3 text-right text-gray-400 border-l-4 border-blue-300 bg-blue-50/30">{lDhCalc.full ? fmt(lDhCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-400 bg-blue-50/30">{lDhCalc.disc ? fmt(lDhCalc.disc) : '—'}</td>
@@ -4351,8 +4351,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 font-medium text-gray-900">Euro Doors</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{fmt(dSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-700">{dN ? `€${fmt(dN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-700">{dN ? `€${fmtInt(dN)}` : '—'}</td>
                                   {inputCell('euroDoors','full')}{inputCell('euroDoors','pct')}{inputCell('euroDoors','final')}{inputCell('euroDoors','finalAdj')}
                                   <td className="px-4 py-3 text-right text-gray-700 border-l-4 border-blue-300 bg-blue-50/30">{lEdCalc.full ? fmt(lEdCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-700 bg-blue-50/30">{lEdCalc.disc ? fmt(lEdCalc.disc) : '—'}</td>
@@ -4363,8 +4363,8 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-gray-900">Total</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totF)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-900">{fmt(totSq)}</td>
-                                  <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmt(totN)}` : '—'}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totSq)}</td>
+                                  <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmtInt(totN)}` : '—'}</td>
                                   {(['full','pct','final','finalAdj'] as const).map(f => {
                                     const s = (p((locQtot?.euroWindows as any)?.[f])||0)+(p((locQtot?.doubleHung as any)?.[f])||0)+(p((locQtot?.euroDoors as any)?.[f])||0);
                                     return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? `$${fmtInt(s)}` : '—'}</td>;
@@ -4444,8 +4444,8 @@ export default function SummaryPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmt(euroWindowSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmt(euroWindowNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmtInt(euroWindowNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ew-${f}`} className="px-1 py-1">
                                     <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
@@ -4484,8 +4484,8 @@ export default function SummaryPage() {
                                       <td className="pl-8 pr-2 py-1.5 text-xs text-gray-700">{type}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -4501,8 +4501,8 @@ export default function SummaryPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmt(doubleHungSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmt(doubleHungNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmtInt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`dh-${f}`} className="px-1 py-1">
                                     <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
@@ -4541,8 +4541,8 @@ export default function SummaryPage() {
                                       <td className="pl-8 pr-2 py-1.5 text-xs text-gray-700">{type}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -4558,8 +4558,8 @@ export default function SummaryPage() {
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{fmt(doorSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmt(doorNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmtInt(doorNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ed-${f}`} className="px-1 py-1">
                                     <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
@@ -4598,8 +4598,8 @@ export default function SummaryPage() {
                                       <td className="pl-8 pr-2 py-1.5 text-xs text-gray-700">{type}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.qty)}</td>
                                       <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.fields)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmt(vals.sqFt)}</td>
-                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmt(vals.net)}` : '—'}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{fmtInt(vals.sqFt)}</td>
+                                      <td className="px-4 py-1.5 text-right text-xs text-gray-600">{vals.net ? `€${fmtInt(vals.net)}` : '—'}</td>
                                       <td colSpan={8}></td>
                                     </tr>
                                   ))}
@@ -4610,8 +4610,8 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-gray-900">Total</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmtInt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
                                   const sumQt = editingSummary.hasMultipleLocations
                                     ? (editingSummary.subLocations ?? []).reduce((acc, l) => {
@@ -4648,8 +4648,8 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-gray-900">Grand Total</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{fmt(totalSqFt)}</td>
-                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmt(totalNet)}` : '—'}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
+                                <td className="px-4 py-3 text-right text-gray-900">{totalNet ? `€${fmtInt(totalNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => {
                                   const adj = parseFloat((editingSummary.grandTotalAdjustment as any)?.[f] || '0') || 0;
                                   // When multi-location, sum across all subLocations; otherwise use top-level quoteTotals
