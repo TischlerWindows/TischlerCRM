@@ -375,7 +375,15 @@ export default function ProductsPage() {
                         <td colSpan={8} className="p-0">
                           <div className="bg-[#f8f9fb] border-t border-b border-gray-200 px-6 py-4">
                             <div className="grid grid-cols-1 gap-3">
-                              {group.details.map((d, i) => (
+                              {group.details.filter(d => {
+                                const fJobRender = filters.job.toLowerCase().trim();
+                                if (fJobRender && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJobRender)) return false;
+                                if (filters.glassType && d.glassType !== filters.glassType) return false;
+                                if (filters.woodType && d.woodType !== filters.woodType) return false;
+                                if (filters.finish && d.finish !== filters.finish) return false;
+                                if (filters.spacerBar && d.spacerBarType !== filters.spacerBar) return false;
+                                return true;
+                              }).map((d, i) => (
                                 <div
                                   key={`${d.summaryId}-${i}`}
                                   className="bg-white border border-gray-200 rounded-lg px-4 py-3 flex flex-wrap items-start gap-x-8 gap-y-2"
