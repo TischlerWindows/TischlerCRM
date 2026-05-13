@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Check, FileText, Save, Loader2, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Check, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -12,6 +12,7 @@ interface QuoteTemplate {
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export type BuilderMode = 'blocks' | 'branding';
+export type PreviewMode = 'html' | 'pdf';
 
 interface Props {
   templates: QuoteTemplate[];
@@ -30,6 +31,8 @@ interface Props {
   lastSavedAt?: number | null;
   mode: BuilderMode;
   onChangeMode: (m: BuilderMode) => void;
+  previewMode: PreviewMode;
+  onChangePreviewMode: (m: PreviewMode) => void;
 }
 
 function formatRelative(ms: number): string {
@@ -68,6 +71,8 @@ export function TopBar({
   lastSavedAt = null,
   mode,
   onChangeMode,
+  previewMode,
+  onChangePreviewMode,
 }: Props) {
   // Tick once per second so the "Saved Ns ago" label keeps counting.
   const now = useTickEverySecond();
@@ -150,6 +155,43 @@ export function TopBar({
           Branding
         </button>
       </div>
+
+      {mode === 'blocks' && (
+        <div
+          role="tablist"
+          aria-label="Preview type"
+          className="inline-flex items-center rounded-lg border border-white/20 bg-white/5 p-0.5 text-xs"
+        >
+          <button
+            role="tab"
+            aria-selected={previewMode === 'html'}
+            onClick={() => onChangePreviewMode('html')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
+              previewMode === 'html'
+                ? 'bg-white text-[#1e3a5f] font-semibold'
+                : 'text-white/80 hover:text-white'
+            }`}
+            title="Fast HTML preview"
+          >
+            <FileImage className="w-3.5 h-3.5" aria-hidden="true" />
+            HTML
+          </button>
+          <button
+            role="tab"
+            aria-selected={previewMode === 'pdf'}
+            onClick={() => onChangePreviewMode('pdf')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
+              previewMode === 'pdf'
+                ? 'bg-white text-[#1e3a5f] font-semibold'
+                : 'text-white/80 hover:text-white'
+            }`}
+            title="True PDF — exact what the customer will see (slower)"
+          >
+            <FileText className="w-3.5 h-3.5" aria-hidden="true" />
+            True PDF
+          </button>
+        </div>
+      )}
 
       <div className="flex-1" />
 

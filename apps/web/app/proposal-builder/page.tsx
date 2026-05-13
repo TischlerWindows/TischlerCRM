@@ -9,7 +9,7 @@ import type { SpecPresetData } from '@crm/proposal-assembly';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
 
-import { TopBar, type BuilderMode } from './_components/top-bar';
+import { TopBar, type BuilderMode, type PreviewMode } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
 import { VariableChips } from './_components/variable-chips';
 import { LetterPreview, type BrandFontMap, emptyBrandFonts } from './_components/letter-preview';
@@ -18,6 +18,7 @@ import { BlockEditor } from './_components/block-editor';
 import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
 import { BrandingTab } from './_components/branding-tab';
+import { PdfPreviewPane } from './_components/pdf-preview-pane';
 import { pageLogosSchema, type PageLogoRule } from '@crm/types';
 import {
   conditionToDraft,
@@ -121,6 +122,17 @@ export default function QuoteBuilderPage() {
   // already registers these for the PDF — this brings the preview in sync
   // so the on-screen render matches what the PDF will look like.
   const [brandFonts, setBrandFonts] = useState<BrandFontMap>(emptyBrandFonts());
+
+  // ── Hybrid preview state ───────────────────────────────────────
+  // The HTML preview is fast but approximate. The True PDF preview asks
+  // the API to render the actual PDF, streams it as a blob, and shows it
+  // in an iframe. Toggled per-user via the top-bar segmented control.
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('html');
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [isRenderingPdf, setIsRenderingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [lastPdfRenderedAt, setLastPdfRenderedAt] = useState<number | null>(null);
+  const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
 
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
@@ -666,6 +678,92 @@ export default function QuoteBuilderPage() {
     }
   };
 
+  // ── True PDF inline preview ───────────────────────────────────
+  // When previewMode === 'pdf' is selected and a template + summary are
+  // picked, ask the API to render the PDF and pipe it into an iframe. The
+  // effect debounces 700ms so rapid edits don't fire one render per
+  // keystroke. The blob URL is created here and revoked in cleanup to
+  // avoid memory leaks across re-renders.
+  useEffect(() => {
+    if (previewMode !== 'pdf' || mode !== 'blocks') return;
+    if (!selectedTemplateId || !selectedSummaryId) return;
+
+    let cancelled = false;
+    let previousUrl: string | null = null;
+
+    const timer = window.setTimeout(async () => {
+      setIsRenderingPdf(true);
+      setPdfError(null);
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+        const token = apiClient.getToken();
+        const response = await fetch(`${apiBase}/proposal-pdf/render`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            templateId: selectedTemplateId,
+            summaryId: selectedSummaryId,
+          }),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({
+            error: response.statusText,
+          }));
+          throw new Error(
+            detail.error || `Failed to render PDF (${response.status})`,
+          );
+        }
+        const blob = await response.blob();
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        // Hold a reference so the cleanup function below can revoke the
+        // PREVIOUS url (we replace state with the new one immediately).
+        setPdfBlobUrl((prev) => {
+          previousUrl = prev;
+          return url;
+        });
+        setLastPdfRenderedAt(Date.now());
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setPdfError(
+          err instanceof Error ? err.message : 'Failed to render the PDF',
+        );
+      } finally {
+        if (!cancelled) setIsRenderingPdf(false);
+      }
+    }, 700);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+    };
+    // lastSavedAt triggers a re-render on every autosave success; combined
+    // with pdfRefreshKey (manual refresh button) this covers both auto and
+    // explicit refreshes without needing presets/draft state as deps.
+  }, [
+    previewMode,
+    mode,
+    selectedTemplateId,
+    selectedSummaryId,
+    lastSavedAt,
+    pdfRefreshKey,
+  ]);
+
+  // Revoke the blob URL when leaving PDF mode entirely so it doesn't
+  // dangle in memory.
+  useEffect(() => {
+    if (previewMode === 'html' && pdfBlobUrl) {
+      URL.revokeObjectURL(pdfBlobUrl);
+      setPdfBlobUrl(null);
+      setLastPdfRenderedAt(null);
+      setPdfError(null);
+    }
+  }, [previewMode, pdfBlobUrl]);
+
   // ── Token creation ────────────────────────────────────────────
 
   const handleCreateToken = async (data: {
@@ -887,6 +985,8 @@ export default function QuoteBuilderPage() {
         lastSavedAt={lastSavedAt}
         mode={mode}
         onChangeMode={setMode}
+        previewMode={previewMode}
+        onChangePreviewMode={setPreviewMode}
       />
 
       {/* Banners */}
@@ -986,6 +1086,16 @@ export default function QuoteBuilderPage() {
               templateId={selectedTemplateId}
               initialRules={pageLogos}
               onSaved={setPageLogos}
+            />
+          ) : previewMode === 'pdf' ? (
+            <PdfPreviewPane
+              blobUrl={pdfBlobUrl}
+              isRendering={isRenderingPdf}
+              error={pdfError}
+              lastRenderedAt={lastPdfRenderedAt}
+              onRefresh={() => setPdfRefreshKey((k) => k + 1)}
+              hasTemplate={!!selectedTemplateId}
+              hasSummary={!!selectedSummaryId}
             />
           ) : (
             <>
