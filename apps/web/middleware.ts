@@ -12,7 +12,10 @@ export function middleware(request: NextRequest) {
     `script-src 'self' 'unsafe-eval' 'unsafe-inline'`,
     `style-src 'self' 'unsafe-inline'`,
     `img-src 'self' data: blob: https:`,
-    `font-src 'self' data:`,
+    // Company Resources fonts are served by the API on a sibling Railway
+    // domain; @font-face requires the origin to be explicitly listed (unlike
+    // <img src> which is allowed by `https:` above).
+    `font-src 'self' data: https://api-production-e4e8.up.railway.app https://*.up.railway.app`,
     `connect-src 'self' https://api-production-e4e8.up.railway.app https://*.up.railway.app https://*.tile.openstreetmap.org https://maps.googleapis.com`,
     `frame-ancestors 'none'`,
     `object-src 'none'`,
