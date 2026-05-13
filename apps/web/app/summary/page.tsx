@@ -4367,7 +4367,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-gray-900">{totN ? `€${fmt(totN)}` : '—'}</td>
                                   {(['full','pct','final','finalAdj'] as const).map(f => {
                                     const s = (p((locQtot?.euroWindows as any)?.[f])||0)+(p((locQtot?.doubleHung as any)?.[f])||0)+(p((locQtot?.euroDoors as any)?.[f])||0);
-                                    return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? `$${fmt(s)}` : '—'}</td>;
+                                    return <td key={f} className="px-4 py-3 text-right text-gray-900">{s ? `$${fmtInt(s)}` : '—'}</td>;
                                   })}
                                   <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{lGtCalc.full ? fmt(lGtCalc.full) : '—'}</td>
                                   <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{lGtCalc.disc ? fmt(lGtCalc.disc) : '—'}</td>
@@ -4619,7 +4619,7 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
-                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmt(sumQt)}` : '—'}</td>;
+                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
@@ -4659,7 +4659,7 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })()) + adj;
-                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmt(sumQt)}` : '—'}</td>;
+                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-gray-900 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-gray-900 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
