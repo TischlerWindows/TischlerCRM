@@ -792,6 +792,7 @@ export default function DynamicForm({
                   completeData[field.apiName] = { picklist: 'N/A', lookup: '' };
                   break;
                 case 'Address':
+                case 'LocationSearch':
                   completeData[field.apiName] = {
                     street: '',
                     city: '',

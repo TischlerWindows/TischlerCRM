@@ -90,6 +90,16 @@ export function validateFields(
         if (parts.length === 0) empty = true;
       }
 
+      // LocationSearch: treat a blob with no street as empty
+      if (
+        fieldDef.type === 'LocationSearch' &&
+        typeof value === 'object' &&
+        value !== null
+      ) {
+        const street = typeof value.street === 'string' ? value.street.trim() : '';
+        if (!street) empty = true;
+      }
+
       if (empty) {
         errors[panelField.fieldApiName] = `${fieldDef.label} is required`;
         continue; // no point doing further checks on an empty required field
