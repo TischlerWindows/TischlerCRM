@@ -62,8 +62,16 @@ const colorCreateSchema = z.object({
 const colorUpdateSchema = colorCreateSchema.partial();
 
 export async function companyResourceRoutes(app: FastifyInstance) {
-  // ── Auth: admin-only for every route in this module ──
+  // ── Auth: admin-only for every route EXCEPT the public bytes endpoints ──
+  // The bytes routes serve binary assets to <img src> and @font-face, which
+  // can't attach an Authorization header. UUIDs are non-enumerable and these
+  // assets end up embedded in customer-facing PDFs anyway.
+  const PUBLIC_BYTES_ROUTES = new Set([
+    '/company-resources/logos/:id/bytes',
+    '/company-resources/fonts/:id/bytes',
+  ]);
   app.addHook('preHandler', async (req, reply) => {
+    if (PUBLIC_BYTES_ROUTES.has(req.routeOptions?.url ?? '')) return;
     if (req.user?.role !== 'ADMIN') {
       return reply.code(403).send({ error: 'Admin access required.' });
     }
