@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
+import type { ProposalAssemblyResult, OrderedBlock, SpecPresetData } from '@crm/proposal-assembly';
 import {
   parsePageSelector,
   isSelectorError,
+  inferBlockType,
+  type BlockType,
+  type LetterheadConfig,
+  type PricingTableConfig,
+  type BaseBidLineConfig,
+  type AdditionsTableConfig,
+  type ExclusionsHeaderConfig,
+  type ClosingSignatureConfig,
+  type InstallationHeaderConfig,
+  type FooterConfig,
   type PageLogoRule,
 } from '@crm/types';
 import { SafeRichHtml } from './safe-rich-html';
@@ -162,29 +172,15 @@ export function LetterPreview({
     );
   }
 
-  const { pdfData, sections } = result;
-  const constantPresets = sections.CONSTANT ?? [];
-  const closingConstant = constantPresets.filter(isClosingConstant);
-  const introConstant = constantPresets.filter((p) => !closingConstant.some((c) => c.id === p.id));
-  const specPresets = sections.SPECIFICATION ?? [];
-  const optionPresets = sections.OPTION ?? [];
-  const exclusionPresets = sections.EXCLUSION ?? [];
-  const installationPresets = sections.INSTALLATION ?? [];
+  const { pdfData, orderedBlocks } = result;
 
-  const pricingRows: Array<[string, string]> = [];
-  if (pdfData.hasEuroWindows) pricingRows.push(['Euro Windows', pdfData.euroWindowsPrice]);
-  if (pdfData.hasDoubleHung) pricingRows.push(['Double Hung Windows', pdfData.doubleHungPrice]);
-  if (pdfData.hasEuroDoors) pricingRows.push(['Euro Doors', pdfData.euroDoorsPrice]);
-
-  const addOnRows: Array<[string, string]> = [];
-  if (pdfData.hasWindowScreens) addOnRows.push([`Window Screens (${pdfData.windowScreensQty})`, pdfData.windowScreensPrice]);
-  if (pdfData.hasDoorScreenSash) addOnRows.push([`Door Screen Sash (${pdfData.doorScreenSashQty})`, pdfData.doorScreenSashPrice]);
-  if (pdfData.hasEntryDoor) addOnRows.push([`Entry Door (${pdfData.entryDoorQty})`, pdfData.entryDoorPrice]);
-  if (pdfData.hasJambExtensions) addOnRows.push(['Jamb Extensions', pdfData.jambExtensionsPrice]);
-  if (pdfData.hasMagneticContacts) addOnRows.push([`Magnetic Alarm Contacts (${pdfData.magneticContactQty})`, pdfData.magneticContactPrice]);
-  if (pdfData.hasFinalFinish) addOnRows.push(['Final Finish', pdfData.finalFinishPrice]);
-
-  const hasAnyOptions = optionPresets.length > 0 || addOnRows.length > 0;
+  // Footer override: applied by FOOTER blocks. We render only the LAST
+  // footer override in document order (matches the PDF post-pass behavior).
+  let footerOverride: FooterConfig | null = null;
+  for (const ob of orderedBlocks) {
+    const type = (ob.preset.blockType as BlockType | null) ?? inferBlockType(ob.preset.section, ob.preset.title);
+    if (type === 'FOOTER') footerOverride = (ob.preset.config ?? {}) as FooterConfig;
+  }
 
   // Wrapper that makes a block clickable and highlights when selected.
   const blockWrap = (id: string, children: React.ReactNode) => {
@@ -204,6 +200,10 @@ export function LetterPreview({
     );
   };
 
+  // Specification counter — increments only for SPECIFICATION_ITEM blocks
+  // so they get (1)(2)(3) prefixes in document order.
+  let specCounter = 0;
+
   return (
     <div className="flex-1 overflow-y-auto bg-gray-100">
       {/* Paper-like proposal container */}
@@ -216,279 +216,46 @@ export function LetterPreview({
           color: '#1e1e1e',
         }}
       >
-        {/* Letterhead — when the template has a first-page logo rule we
-            render it at the rule's alignment + size. Otherwise we fall
-            back to the legacy hard-coded wordmark layout. */}
-        {firstPageLogo ? (
-          <div
-            className={`flex items-center ${
-              firstPageLogo.alignment === 'center'
-                ? 'justify-center'
-                : firstPageLogo.alignment === 'right'
-                  ? 'justify-end'
-                  : 'justify-start'
-            }`}
-          >
-            <img
-              src={`${apiBase()}/company-resources/logos/${firstPageLogo.logoId}/bytes`}
-              alt=""
-              style={{
-                maxWidth: `${firstPageLogo.maxWidthPt}pt`,
-                maxHeight: `${firstPageLogo.maxHeightPt}pt`,
-                objectFit: 'contain',
-              }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+        {orderedBlocks.length === 0 ? (
+          <div className="py-20 text-center text-gray-400">
+            <p className="text-sm">This template has no blocks yet.</p>
+            <p className="text-xs mt-1">
+              Open the block list and pick a block type from the + New menu,
+              or seed the standard layout.
+            </p>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            <img
-              src="/tces-logo.png"
-              alt=""
-              className="h-12 w-12 flex-shrink-0 object-contain"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-            <div className="flex-1">
-              <div
-                className="text-[18pt] font-bold tracking-wide"
-                style={{ color: NAVY, fontFamily: FONT_FAMILIES.title }}
-              >
-                TISCHLER UND SOHN
-              </div>
-              <div
-                className="text-[8pt] mt-0.5"
-                style={{ color: '#505050', fontFamily: FONT_FAMILIES.subtitle }}
-              >
-                European Wood Windows &amp; Doors
-              </div>
-            </div>
-          </div>
-        )}
-        <div className="mt-3 border-t-2" style={{ borderColor: RED }} />
-
-        {/* Intro CONSTANT presets — date, addressee, salutation come from the user's editable
-            constant blocks; the PDFKit renderer in apps/api mirrors this. */}
-        {introConstant.length > 0 && (
-          <div className="mt-6 space-y-3">
-            {introConstant.map((preset) => (
-              <div key={preset.id}>
-                {blockWrap(
-                  preset.id,
-                  <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body ?? ''} />,
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Numbered SPECIFICATIONS */}
-        {specPresets.length > 0 && (
-          <div className="mt-5 space-y-2">
-            {specPresets.map((preset, i) => (
-              <div key={preset.id}>
-                {blockWrap(
-                  preset.id,
-                  <div className="p-1">
-                    <div className="text-[9pt] font-bold" style={{ color: NAVY }}>
-                      <span className="inline-block w-7">({i + 1})</span>
-                      <span>{preset.title}</span>
-                    </div>
-                    {preset.body && (
-                      <SafeRichHtml
-                        className="ml-6 mt-0.5 text-[9pt] leading-[1.55]"
-                        html={preset.body}
-                      />
-                    )}
-                  </div>,
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* PRICING section */}
-        {(pricingRows.length > 0 || pdfData.grandTotal) && (
-          <div className="mt-6">
-            <div className="border-t border-gray-300" />
-            <div className="mt-2 text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>PRICING</div>
-            <div className="mt-2 space-y-1">
-              {pricingRows.map(([label, price]) => (
-                <div key={label} className="flex justify-between text-[10pt] px-1">
-                  <span>{label}</span>
-                  <span>{price}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 border-t border-gray-300" />
-            <div className="mt-2 flex justify-between text-[12pt] font-bold px-1" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
-              <span>BASE BID PRICE</span>
-              <span>{pdfData.grandTotal}</span>
-            </div>
-            <div className="mt-1 border-t border-gray-300" />
-          </div>
-        )}
-
-        {/* ADDITIONS OR DEDUCTIONS */}
-        {hasAnyOptions && (
-          <div className="mt-6">
-            <div className="text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
-              ADDITIONS OR DEDUCTIONS TO OUR BASE BID
-            </div>
-            {addOnRows.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {addOnRows.map(([label, price]) => (
-                  <div key={label} className="flex justify-between text-[10pt] px-1">
-                    <span>•&nbsp;&nbsp;{label}</span>
-                    <span>{price}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {optionPresets.length > 0 && (
-              <div className="mt-3 space-y-3">
-                {optionPresets.map((preset) => (
-                  <div key={preset.id}>
-                    {blockWrap(
-                      preset.id,
-                      <div className="px-1 py-0.5">
-                        <div className="text-[9pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
-                        {preset.body && (
-                          <SafeRichHtml className="mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
-                        )}
-                      </div>,
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* EXCLUSIONS */}
-        {exclusionPresets.length > 0 && (
-          <div className="mt-6">
-            <div className="border-t border-gray-300" />
-            <div className="mt-2 text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
-              Our Base Bid does not include:
-            </div>
-            <div className="mt-2 space-y-2">
-              {exclusionPresets.map((preset) => (
-                <div key={preset.id}>
-                  {blockWrap(
-                    preset.id,
-                    <div className="px-1">
-                      <div className="text-[9pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>
-                      {preset.body && preset.body.trim() && (
-                        <SafeRichHtml className="ml-4 mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
-                      )}
-                    </div>,
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* CLOSING + SIGNATURE */}
-        <div className="mt-6">
-          <div className="border-t border-gray-300" />
-          {closingConstant.length > 0 && (
-            <div className="mt-3 space-y-3">
-              {closingConstant.map((preset) => (
-                <div key={preset.id}>
-                  {blockWrap(
-                    preset.id,
-                    <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body ?? ''} />,
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="mt-6 text-[10pt]">Sincerely,</div>
-          {fonts.signature && pdfData.salesman ? (
-            <>
-              <div
-                className="mt-6 text-[24pt] leading-none"
-                style={{ color: NAVY, fontFamily: FONT_FAMILIES.signature }}
-              >
-                {pdfData.salesman}
-              </div>
-              <div className="mt-1 text-[9pt]" style={{ color: '#505050' }}>
-                {pdfData.salesman}
-              </div>
-            </>
-          ) : (
-            <>
-              <div
-                className="mt-6 text-[10pt] font-bold"
-                style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}
-              >
-                Tischler und Sohn
-              </div>
-              {pdfData.salesman && (
-                <div className="text-[9pt]" style={{ color: '#505050' }}>
-                  {pdfData.salesman}
-                </div>
-              )}
-            </>
-          )}
-          {pdfData.estimator && pdfData.estimator !== pdfData.salesman && (
-            <div className="text-[9pt]" style={{ color: '#505050' }}>Estimator: {pdfData.estimator}</div>
-          )}
-        </div>
-
-        {/* INSTALLATION page (conditional) */}
-        {pdfData.hasInstallation && (
-          <div className="mt-10 pt-6 border-t-2 border-dashed border-gray-300">
-            <div className="flex items-center gap-3">
-              <img
-                src="/tces-logo.png"
-                alt=""
-                className="h-8 w-8 flex-shrink-0 object-contain"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          orderedBlocks.map((ob, idx) => {
+            const blockType = (ob.preset.blockType as BlockType | null) ?? inferBlockType(ob.preset.section, ob.preset.title);
+            if (blockType === 'SPECIFICATION_ITEM') {
+              specCounter += 1;
+            }
+            return (
+              <BlockPreview
+                key={`${ob.preset.id}-${idx}`}
+                ordered={ob}
+                blockType={blockType}
+                specNumber={blockType === 'SPECIFICATION_ITEM' ? specCounter : undefined}
+                firstPageLogo={blockType === 'LETTERHEAD' ? firstPageLogo : null}
+                isSelected={ob.preset.id === selectedPresetId}
+                onSelect={onSelectBlock}
+                pdfData={pdfData}
+                fonts={fonts}
               />
-              <div
-                className="text-[14pt] font-bold tracking-wide"
-                style={{ color: NAVY, fontFamily: FONT_FAMILIES.title }}
-              >
-                TISCHLER UND SOHN
-              </div>
-            </div>
-            <div className="mt-2 border-t-2" style={{ borderColor: RED }} />
-            <div className="mt-5 text-[12pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>INSTALLATION</div>
-            <div className="mt-2 flex justify-between text-[10pt] px-1">
-              <span>Installation Cost:</span>
-              <span className="font-bold">{pdfData.installationPrice}</span>
-            </div>
-            <div className="mt-3 border-t border-gray-300" />
-            {installationPresets.length > 0 && (
-              <div className="mt-3 space-y-3">
-                {installationPresets.map((preset) => (
-                  <div key={preset.id}>
-                    {blockWrap(
-                      preset.id,
-                      <div className="px-1">
-                        <div className="text-[9pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
-                        {preset.body && preset.body.trim() && (
-                          <SafeRichHtml className="ml-3 mt-0.5 text-[9pt] leading-[1.55]" html={preset.body} />
-                        )}
-                      </div>,
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            );
+          })
         )}
 
-        {/* Footer */}
-        <div className="mt-10 pt-3 border-t border-gray-200 flex justify-between text-[7pt]" style={{ color: '#808080' }}>
-          <span className="flex-1 text-center">Tischler und Sohn &nbsp;|&nbsp; Confidential</span>
-          <span>Page 1</span>
+        {/* Footer — mirrors the PDF post-pass. Uses any FOOTER block's
+            override or falls back to the brand default. */}
+        <div
+          className="mt-10 pt-3 border-t border-gray-200 flex justify-between text-[7pt]"
+          style={{ color: '#808080' }}
+        >
+          <span className="flex-1 text-center">
+            {footerOverride?.text ?? 'Tischler und Sohn  |  Confidential'}
+          </span>
+          {!footerOverride?.hidePageNumbers && <span>Page 1</span>}
         </div>
       </div>
 
@@ -503,6 +270,360 @@ export function LetterPreview({
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Per-block preview component
+// ─────────────────────────────────────────────────────────────────────
+
+interface BlockPreviewProps {
+  ordered: OrderedBlock;
+  blockType: BlockType;
+  specNumber?: number;
+  firstPageLogo: PageLogoRule | null;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  pdfData: ProposalAssemblyResult['pdfData'];
+  fonts: BrandFontMap;
+}
+
+function BlockPreview({
+  ordered,
+  blockType,
+  specNumber,
+  firstPageLogo,
+  isSelected,
+  onSelect,
+  pdfData,
+  fonts,
+}: BlockPreviewProps) {
+  const preset = ordered.preset;
+  const config = (preset.config ?? {}) as Record<string, unknown>;
+
+  const wrap = (children: React.ReactNode) => (
+    <div
+      onClick={() => onSelect(preset.id)}
+      className={`cursor-pointer rounded-sm transition-colors ${
+        isSelected ? 'outline outline-1 outline-offset-2 bg-blue-50/40' : 'hover:bg-gray-50'
+      }`}
+      style={isSelected ? { outlineColor: `${NAVY}66` } : undefined}
+    >
+      {children}
+    </div>
+  );
+
+  switch (blockType) {
+    case 'LETTERHEAD':
+      return wrap(<LetterheadPreview config={config as LetterheadConfig} firstPageLogo={firstPageLogo} />);
+    case 'FREE_TEXT':
+      return wrap(
+        <div className="mt-4">
+          {preset.title && preset.title.trim() && (
+            <div className="text-[10pt] font-bold mb-1" style={{ color: NAVY }}>{preset.title}</div>
+          )}
+          {preset.body && (
+            <SafeRichHtml className="text-[10pt] leading-[1.5] p-1" html={preset.body} />
+          )}
+        </div>,
+      );
+    case 'SPECIFICATION_ITEM':
+      return wrap(
+        <div className="mt-3 p-1">
+          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>
+            <span className="inline-block w-7">({specNumber ?? 1})</span>
+            <span>{preset.title}</span>
+          </div>
+          {preset.body && (
+            <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+          )}
+        </div>,
+      );
+    case 'OPTION_ITEM':
+      return wrap(
+        <div className="mt-3 px-1 py-0.5">
+          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
+          {preset.body && (
+            <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+          )}
+        </div>,
+      );
+    case 'EXCLUSION_ITEM':
+      return wrap(
+        <div className="mt-2 px-1">
+          <div className="text-[10pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>
+          {preset.body && preset.body.trim() && (
+            <SafeRichHtml className="ml-4 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+          )}
+        </div>,
+      );
+    case 'INSTALLATION_ITEM':
+      return wrap(
+        <div className="mt-3 px-1">
+          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
+          {preset.body && preset.body.trim() && (
+            <SafeRichHtml className="ml-3 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+          )}
+        </div>,
+      );
+    case 'PRICING_TABLE':
+      return wrap(<PricingTablePreview config={config as PricingTableConfig} pdfData={pdfData} />);
+    case 'BASE_BID_LINE':
+      return wrap(<BaseBidLinePreview config={config as BaseBidLineConfig} pdfData={pdfData} />);
+    case 'ADDITIONS_TABLE':
+      return wrap(<AdditionsTablePreview config={config as AdditionsTableConfig} pdfData={pdfData} />);
+    case 'EXCLUSIONS_HEADER':
+      return wrap(<ExclusionsHeaderPreview config={config as ExclusionsHeaderConfig} />);
+    case 'CLOSING_SIGNATURE':
+      return wrap(<ClosingSignaturePreview config={config as ClosingSignatureConfig} pdfData={pdfData} fonts={fonts} />);
+    case 'PAGE_BREAK':
+      return wrap(
+        <div className="my-6 border-t-2 border-dashed border-gray-300">
+          <div className="text-[8px] text-gray-400 uppercase tracking-widest text-center -mt-2 bg-white inline-block px-2">
+            Page break
+          </div>
+        </div>,
+      );
+    case 'INSTALLATION_HEADER':
+      return wrap(<InstallationHeaderPreview config={config as InstallationHeaderConfig} pdfData={pdfData} />);
+    case 'FOOTER':
+      // Rendered at the bottom of the paper, not inline.
+      return null;
+    default:
+      return null;
+  }
+}
+
+function LetterheadPreview({
+  config,
+  firstPageLogo,
+}: {
+  config: LetterheadConfig;
+  firstPageLogo: PageLogoRule | null;
+}) {
+  const wordmark = config.wordmarkText ?? 'TISCHLER UND SOHN';
+  const tagline = config.taglineText ?? 'European Wood Windows & Doors';
+  const showRule = config.showRule !== false;
+  return (
+    <div className="mt-2">
+      {firstPageLogo ? (
+        <div
+          className={`flex items-center ${
+            firstPageLogo.alignment === 'center'
+              ? 'justify-center'
+              : firstPageLogo.alignment === 'right'
+                ? 'justify-end'
+                : 'justify-start'
+          }`}
+        >
+          <img
+            src={`${apiBase()}/company-resources/logos/${firstPageLogo.logoId}/bytes`}
+            alt=""
+            style={{
+              maxWidth: `${firstPageLogo.maxWidthPt}pt`,
+              maxHeight: `${firstPageLogo.maxHeightPt}pt`,
+              objectFit: 'contain',
+            }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        </div>
+      ) : (
+        <div>
+          <div className="text-[18pt] font-bold tracking-wide" style={{ color: NAVY, fontFamily: FONT_FAMILIES.title }}>
+            {wordmark}
+          </div>
+          <div className="text-[8pt] mt-0.5" style={{ color: '#505050', fontFamily: FONT_FAMILIES.subtitle }}>
+            {tagline}
+          </div>
+        </div>
+      )}
+      {showRule && <div className="mt-3 border-t-2" style={{ borderColor: RED }} />}
+    </div>
+  );
+}
+
+function PricingTablePreview({
+  config,
+  pdfData,
+}: {
+  config: PricingTableConfig;
+  pdfData: ProposalAssemblyResult['pdfData'];
+}) {
+  const heading = config.heading ?? 'PRICING';
+  const rowLabels = config.rowLabels ?? {};
+  const hide = config.hide ?? {};
+  const rows: Array<[string, string]> = [];
+  if (pdfData.hasEuroWindows && !hide.euroWindows) {
+    rows.push([rowLabels.euroWindows ?? 'Euro Windows', pdfData.euroWindowsPrice]);
+  }
+  if (pdfData.hasDoubleHung && !hide.doubleHung) {
+    rows.push([rowLabels.doubleHung ?? 'Double Hung Windows', pdfData.doubleHungPrice]);
+  }
+  if (pdfData.hasEuroDoors && !hide.euroDoors) {
+    rows.push([rowLabels.euroDoors ?? 'Euro Doors', pdfData.euroDoorsPrice]);
+  }
+  return (
+    <div className="mt-6">
+      <div className="border-t border-gray-300" />
+      <div className="mt-2 text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
+        {heading}
+      </div>
+      <div className="mt-2 space-y-1">
+        {rows.map(([label, price]) => (
+          <div key={label} className="flex justify-between text-[10pt] px-1">
+            <span>{label}</span>
+            <span>{price}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BaseBidLinePreview({
+  config,
+  pdfData,
+}: {
+  config: BaseBidLineConfig;
+  pdfData: ProposalAssemblyResult['pdfData'];
+}) {
+  const label = config.label ?? 'BASE BID PRICE';
+  return (
+    <div className="mt-3">
+      <div className="border-t border-gray-300" />
+      <div
+        className="mt-2 flex justify-between text-[12pt] font-bold px-1"
+        style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}
+      >
+        <span>{label}</span>
+        <span>{pdfData.grandTotal}</span>
+      </div>
+      <div className="mt-1 border-t border-gray-300" />
+    </div>
+  );
+}
+
+function AdditionsTablePreview({
+  config,
+  pdfData,
+}: {
+  config: AdditionsTableConfig;
+  pdfData: ProposalAssemblyResult['pdfData'];
+}) {
+  const heading = config.heading ?? 'ADDITIONS OR DEDUCTIONS TO OUR BASE BID';
+  const rowLabels = config.rowLabels ?? {};
+  const hide = config.hide ?? {};
+  const rows: Array<[string, string]> = [];
+  if (pdfData.hasWindowScreens && !hide.windowScreens) {
+    rows.push([rowLabels.windowScreens ?? `Window Screens (${pdfData.windowScreensQty})`, pdfData.windowScreensPrice]);
+  }
+  if (pdfData.hasDoorScreenSash && !hide.doorScreenSash) {
+    rows.push([rowLabels.doorScreenSash ?? `Door Screen Sash (${pdfData.doorScreenSashQty})`, pdfData.doorScreenSashPrice]);
+  }
+  if (pdfData.hasEntryDoor && !hide.entryDoor) {
+    rows.push([rowLabels.entryDoor ?? `Entry Door (${pdfData.entryDoorQty})`, pdfData.entryDoorPrice]);
+  }
+  if (pdfData.hasJambExtensions && !hide.jambExtensions) {
+    rows.push([rowLabels.jambExtensions ?? 'Jamb Extensions', pdfData.jambExtensionsPrice]);
+  }
+  if (pdfData.hasMagneticContacts && !hide.magneticContacts) {
+    rows.push([rowLabels.magneticContacts ?? `Magnetic Alarm Contacts (${pdfData.magneticContactQty})`, pdfData.magneticContactPrice]);
+  }
+  if (pdfData.hasFinalFinish && !hide.finalFinish) {
+    rows.push([rowLabels.finalFinish ?? 'Final Finish', pdfData.finalFinishPrice]);
+  }
+  return (
+    <div className="mt-6">
+      <div className="text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
+        {heading}
+      </div>
+      <div className="mt-2 space-y-1">
+        {rows.map(([label, price]) => (
+          <div key={label} className="flex justify-between text-[10pt] px-1">
+            <span>•&nbsp;&nbsp;{label}</span>
+            <span>{price}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExclusionsHeaderPreview({ config }: { config: ExclusionsHeaderConfig }) {
+  const heading = config.heading ?? 'Our Base Bid does not include:';
+  return (
+    <div className="mt-6">
+      <div className="border-t border-gray-300" />
+      <div className="mt-2 text-[11pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
+        {heading}
+      </div>
+    </div>
+  );
+}
+
+function ClosingSignaturePreview({
+  config,
+  pdfData,
+  fonts,
+}: {
+  config: ClosingSignatureConfig;
+  pdfData: ProposalAssemblyResult['pdfData'];
+  fonts: BrandFontMap;
+}) {
+  const closingText = config.closingText ?? 'Sincerely,';
+  const companyLine = config.companyLine ?? 'Tischler und Sohn';
+  const useSignatureFont = config.useSignatureFont !== false;
+  const showEstimator = config.showEstimator !== false;
+  return (
+    <div className="mt-6">
+      <div className="border-t border-gray-300" />
+      <div className="mt-3 text-[10pt]">{closingText}</div>
+      {useSignatureFont && fonts.signature && pdfData.salesman ? (
+        <>
+          <div className="mt-6 text-[24pt] leading-none" style={{ color: NAVY, fontFamily: FONT_FAMILIES.signature }}>
+            {pdfData.salesman}
+          </div>
+          <div className="mt-1 text-[9pt]" style={{ color: '#505050' }}>
+            {pdfData.salesman}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="mt-6 text-[10pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
+            {companyLine}
+          </div>
+          {pdfData.salesman && (
+            <div className="text-[9pt]" style={{ color: '#505050' }}>{pdfData.salesman}</div>
+          )}
+        </>
+      )}
+      {showEstimator && pdfData.estimator && pdfData.estimator !== pdfData.salesman && (
+        <div className="text-[9pt]" style={{ color: '#505050' }}>Estimator: {pdfData.estimator}</div>
+      )}
+    </div>
+  );
+}
+
+function InstallationHeaderPreview({
+  config,
+  pdfData,
+}: {
+  config: InstallationHeaderConfig;
+  pdfData: ProposalAssemblyResult['pdfData'];
+}) {
+  const heading = config.heading ?? 'INSTALLATION';
+  const costLabel = config.costLabel ?? 'Installation Cost:';
+  return (
+    <div className="mt-6">
+      <div className="text-[12pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
+        {heading}
+      </div>
+      <div className="mt-2 flex justify-between text-[10pt] px-1">
+        <span>{costLabel}</span>
+        <span className="font-bold">{pdfData.installationPrice}</span>
+      </div>
+      <div className="mt-3 border-t border-gray-300" />
     </div>
   );
 }

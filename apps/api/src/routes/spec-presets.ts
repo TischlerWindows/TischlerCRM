@@ -2,6 +2,33 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
+import { blockTypeSchema, validateBlockConfig, type BlockType } from '@crm/types';
+
+type ConfigOk = { ok: true; blockType: BlockType | null; config: unknown };
+type ConfigErr = { ok: false; error: string };
+
+function parseBlockTypeAndConfig(
+  blockType: string | null | undefined,
+  config: unknown,
+): ConfigOk | ConfigErr {
+  if (!blockType) {
+    // Legacy create/update — no blockType, allow any config (typically null)
+    return { ok: true, blockType: null, config: config ?? null };
+  }
+  const parsed = blockTypeSchema.safeParse(blockType);
+  if (!parsed.success) {
+    return { ok: false, error: `Invalid blockType "${blockType}"` };
+  }
+  const validated = validateBlockConfig(parsed.data, config);
+  if (validated.ok === false) {
+    return { ok: false, error: validated.error };
+  }
+  return { ok: true, blockType: parsed.data, config: validated.value };
+}
+
+function isConfigErr(result: ConfigOk | ConfigErr): result is ConfigErr {
+  return result.ok === false;
+}
 
 const conditionSchema = z.object({
   field: z.string().min(1),
@@ -32,6 +59,8 @@ const createPresetSchema = z.object({
   title: z.string().min(1),
   body: z.string().nullable().optional(),
   section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'CONSTANT']),
+  blockType: z.string().nullable().optional(),
+  config: z.unknown().optional(),
   isAlwaysIncluded: z.boolean().optional(),
   driverField: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
@@ -44,6 +73,8 @@ const updatePresetSchema = z.object({
   title: z.string().min(1).optional(),
   body: z.string().nullable().optional(),
   section: z.enum(['SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION', 'CONSTANT']).optional(),
+  blockType: z.string().nullable().optional(),
+  config: z.unknown().optional(),
   isAlwaysIncluded: z.boolean().optional(),
   driverField: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
@@ -90,7 +121,12 @@ export async function specPresetRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
 
-    const { conditions, variants, ...presetData } = parsed.data;
+    const { conditions, variants, blockType: rawBlockType, config: rawConfig, ...presetData } = parsed.data;
+
+    const validated = parseBlockTypeAndConfig(rawBlockType, rawConfig);
+    if (isConfigErr(validated)) {
+      return reply.code(400).send({ error: validated.error });
+    }
 
     try {
       // Verify the referenced template exists
@@ -104,6 +140,8 @@ export async function specPresetRoutes(app: FastifyInstance) {
           data: {
             id: generateId('SpecPreset'),
             ...presetData,
+            blockType: validated.blockType,
+            config: (validated.config ?? null) as object | null,
           },
         });
 
@@ -211,13 +249,42 @@ export async function specPresetRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
 
-    const { conditions, variants, ...presetData } = parsed.data;
+    const { conditions, variants, blockType: rawBlockType, config: rawConfig, ...presetData } = parsed.data;
+
+    // blockType is optional on PATCH — only validate if provided. Config is
+    // re-validated whenever it's present (even if blockType isn't sent) so
+    // PATCHing {config:{...}} on an existing preset checks the shape.
+    const hasBlockTypeUpdate = rawBlockType !== undefined;
+    const hasConfigUpdate = rawConfig !== undefined;
+    let validatedBlockType: BlockType | null | undefined = undefined;
+    let validatedConfig: unknown = undefined;
+    if (hasBlockTypeUpdate || hasConfigUpdate) {
+      // Need current blockType if only config is being updated
+      let effectiveBlockType: string | null = rawBlockType ?? null;
+      if (!hasBlockTypeUpdate) {
+        const existing = await prisma.specPreset.findUnique({
+          where: { id },
+          select: { blockType: true },
+        });
+        effectiveBlockType = existing?.blockType ?? null;
+      }
+      const validated = parseBlockTypeAndConfig(effectiveBlockType, rawConfig);
+      if (isConfigErr(validated)) {
+        return reply.code(400).send({ error: validated.error });
+      }
+      if (hasBlockTypeUpdate) validatedBlockType = validated.blockType;
+      if (hasConfigUpdate) validatedConfig = validated.config;
+    }
 
     try {
       const preset = await prisma.$transaction(async (tx) => {
         await tx.specPreset.update({
           where: { id },
-          data: presetData,
+          data: {
+            ...presetData,
+            ...(hasBlockTypeUpdate ? { blockType: validatedBlockType } : {}),
+            ...(hasConfigUpdate ? { config: (validatedConfig ?? null) as object | null } : {}),
+          },
         });
 
         if (conditions !== undefined) {
@@ -268,6 +335,70 @@ export async function specPresetRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err, 'PATCH /spec-presets/:id failed');
       reply.code(500).send({ error: 'Failed to update preset', detail: err?.message });
+    }
+  });
+
+  // POST /spec-presets/seed-defaults — seed a template with the standard
+  // block layout (admin only). Appends Letterhead / Pricing / Base Bid /
+  // Additions / Exclusions header / Closing / Footer blocks onto the
+  // end of the existing block list. Idempotent in the sense that a second
+  // call adds another set — caller is expected to confirm with the user.
+  app.post('/spec-presets/seed-defaults', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
+    const schema = z.object({ templateId: z.string().min(1) });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
+    }
+    const { templateId } = parsed.data;
+
+    try {
+      const template = await prisma.quoteTemplate.findUnique({ where: { id: templateId } });
+      if (!template) return reply.code(404).send({ error: 'Template not found' });
+
+      // Append after any existing blocks to avoid clobbering custom work.
+      const existingCount = await prisma.specPreset.count({ where: { templateId } });
+      const baseOrder = existingCount;
+
+      const defaults: Array<{
+        title: string;
+        section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'CONSTANT';
+        blockType: BlockType;
+        body?: string;
+      }> = [
+        { title: 'Letterhead', section: 'CONSTANT', blockType: 'LETTERHEAD' },
+        { title: 'Pricing Table', section: 'CONSTANT', blockType: 'PRICING_TABLE' },
+        { title: 'Base Bid Total', section: 'CONSTANT', blockType: 'BASE_BID_LINE' },
+        { title: 'Additions Table', section: 'CONSTANT', blockType: 'ADDITIONS_TABLE' },
+        { title: 'Exclusions Header', section: 'CONSTANT', blockType: 'EXCLUSIONS_HEADER' },
+        { title: 'Closing Signature', section: 'CONSTANT', blockType: 'CLOSING_SIGNATURE' },
+        { title: 'Footer', section: 'CONSTANT', blockType: 'FOOTER' },
+      ];
+
+      await prisma.specPreset.createMany({
+        data: defaults.map((d, i) => ({
+          id: generateId('SpecPreset'),
+          templateId,
+          order: baseOrder + i,
+          title: d.title,
+          body: d.body ?? null,
+          section: d.section,
+          blockType: d.blockType,
+          isAlwaysIncluded: true,
+        })),
+      });
+
+      const presets = await prisma.specPreset.findMany({
+        where: { templateId },
+        orderBy: { order: 'asc' },
+        include: { conditions: true, variants: { orderBy: { order: 'asc' } } },
+      });
+      reply.send(presets);
+    } catch (err: any) {
+      app.log.error(err, 'POST /spec-presets/seed-defaults failed');
+      reply.code(500).send({ error: 'Failed to seed defaults', detail: err?.message });
     }
   });
 

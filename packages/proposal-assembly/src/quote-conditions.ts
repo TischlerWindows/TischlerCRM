@@ -140,6 +140,14 @@ export interface SpecPresetData {
   title: string;
   body: string | null;
   section: 'SPECIFICATION' | 'OPTION' | 'EXCLUSION' | 'INSTALLATION' | 'CONSTANT';
+  /**
+   * Block-level type for the in-order renderer. Null on legacy presets
+   * that predate the block-type column — the renderer infers a type
+   * from `section` when null so old templates keep rendering.
+   */
+  blockType: string | null;
+  /** Per-blockType configuration (e.g. PricingTableConfig). */
+  config: unknown | null;
   isAlwaysIncluded: boolean;
   driverField: string | null;
   isActive: boolean;

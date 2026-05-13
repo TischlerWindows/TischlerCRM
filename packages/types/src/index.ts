@@ -7,6 +7,34 @@ export {
   isSelectorError,
 } from './page-logo-rule.js';
 export type { PageLogoRule, ParsedSelector, SelectorParseError } from './page-logo-rule.js';
+export {
+  BLOCK_TYPES,
+  BLOCK_TYPE_META,
+  blockTypeSchema,
+  letterheadConfigSchema,
+  pricingTableConfigSchema,
+  baseBidLineConfigSchema,
+  additionsTableConfigSchema,
+  exclusionsHeaderConfigSchema,
+  closingSignatureConfigSchema,
+  installationHeaderConfigSchema,
+  footerConfigSchema,
+  validateBlockConfig,
+  inferBlockType,
+} from './block-type.js';
+export type {
+  BlockType,
+  BlockTypeMeta,
+  LegacySection,
+  LetterheadConfig,
+  PricingTableConfig,
+  BaseBidLineConfig,
+  AdditionsTableConfig,
+  ExclusionsHeaderConfig,
+  ClosingSignatureConfig,
+  InstallationHeaderConfig,
+  FooterConfig,
+} from './block-type.js';
 
 export type UUID = string;
 

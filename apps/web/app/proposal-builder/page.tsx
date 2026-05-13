@@ -19,7 +19,7 @@ import { type BodyEditorHandle } from './_components/body-editor';
 import { NewTokenModal } from './_components/new-token-modal';
 import { BrandingTab } from './_components/branding-tab';
 import { PdfPreviewPane } from './_components/pdf-preview-pane';
-import { pageLogosSchema, type PageLogoRule } from '@crm/types';
+import { pageLogosSchema, BLOCK_TYPE_META, type PageLogoRule, type BlockType } from '@crm/types';
 import {
   conditionToDraft,
   conditionsPayload,
@@ -37,6 +37,8 @@ interface EditorSnapshot {
   title: string;
   body: string;
   section: SpecPresetData['section'];
+  blockType: BlockType | null;
+  config: Record<string, unknown>;
   alwaysIncluded: boolean;
   active: boolean;
   driverField: string;
@@ -90,6 +92,8 @@ export default function QuoteBuilderPage() {
   const [editTitle, setEditTitle] = useState('');
   const [editBody, setEditBody] = useState('');
   const [editSection, setEditSection] = useState<SpecPresetData['section']>('SPECIFICATION');
+  const [editBlockType, setEditBlockType] = useState<BlockType | null>(null);
+  const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const [editAlwaysIncluded, setEditAlwaysIncluded] = useState(false);
   const [editActive, setEditActive] = useState(true);
   const [editDriverField, setEditDriverField] = useState('');
@@ -316,6 +320,8 @@ export default function QuoteBuilderPage() {
         title: editTitle,
         body: editBody,
         section: editSection,
+        blockType: editBlockType,
+        config: editConfig,
         alwaysIncluded: editAlwaysIncluded,
         active: editActive,
         driverField: editDriverField,
@@ -333,6 +339,8 @@ export default function QuoteBuilderPage() {
     editTitle,
     editBody,
     editSection,
+    editBlockType,
+    editConfig,
     editAlwaysIncluded,
     editActive,
     editDriverField,
@@ -348,6 +356,8 @@ export default function QuoteBuilderPage() {
     setEditTitle('');
     setEditBody('');
     setEditSection('SPECIFICATION');
+    setEditBlockType(null);
+    setEditConfig({});
     setEditAlwaysIncluded(false);
     setEditActive(true);
     setEditDriverField('');
@@ -359,11 +369,17 @@ export default function QuoteBuilderPage() {
   const loadPresetIntoEditor = (preset: SpecPresetData) => {
     const conditions = preset.conditions.map(conditionToDraft);
     const variants = (preset.variants || []).map(variantToDraft);
+    const blockType = (preset.blockType as BlockType | null) ?? null;
+    const config = (preset.config && typeof preset.config === 'object'
+      ? (preset.config as Record<string, unknown>)
+      : {}) as Record<string, unknown>;
     setSelectedPresetId(preset.id);
     setIsNewPreset(false);
     setEditTitle(preset.title);
     setEditBody(preset.body ?? '');
     setEditSection(preset.section);
+    setEditBlockType(blockType);
+    setEditConfig(config);
     setEditAlwaysIncluded(preset.isAlwaysIncluded);
     setEditActive(preset.isActive);
     setEditDriverField(preset.driverField || '');
@@ -373,6 +389,8 @@ export default function QuoteBuilderPage() {
       title: preset.title,
       body: preset.body ?? '',
       section: preset.section,
+      blockType,
+      config,
       alwaysIncluded: preset.isAlwaysIncluded,
       active: preset.isActive,
       driverField: preset.driverField || '',
@@ -381,22 +399,43 @@ export default function QuoteBuilderPage() {
     });
   };
 
-  const handleNewPreset = () => {
+  const handleNewPreset = (blockType: BlockType | null) => {
+    // Map block type → default section. Section is a legacy classifier
+    // used for stylistic grouping; new layout blocks all go into CONSTANT.
+    const sectionForBlockType: SpecPresetData['section'] = (() => {
+      switch (blockType) {
+        case 'SPECIFICATION_ITEM':
+          return 'SPECIFICATION';
+        case 'OPTION_ITEM':
+          return 'OPTION';
+        case 'EXCLUSION_ITEM':
+          return 'EXCLUSION';
+        case 'INSTALLATION_ITEM':
+          return 'INSTALLATION';
+        default:
+          return 'CONSTANT';
+      }
+    })();
+    const defaultTitle = blockType ? BLOCK_TYPE_META[blockType].label : '';
     setSelectedPresetId(null);
     setIsNewPreset(true);
-    setEditTitle('');
+    setEditTitle(defaultTitle);
     setEditBody('');
-    setEditSection('SPECIFICATION');
-    setEditAlwaysIncluded(false);
+    setEditSection(sectionForBlockType);
+    setEditBlockType(blockType);
+    setEditConfig({});
+    setEditAlwaysIncluded(blockType !== null); // layout blocks default to always-included
     setEditActive(true);
     setEditDriverField('');
     setEditConditions([]);
     setEditVariants([]);
     setEditorBaseline({
-      title: '',
+      title: defaultTitle,
       body: '',
-      section: 'SPECIFICATION',
-      alwaysIncluded: false,
+      section: sectionForBlockType,
+      blockType,
+      config: {},
+      alwaysIncluded: blockType !== null,
       active: true,
       driverField: '',
       conditions: [],
@@ -404,15 +443,33 @@ export default function QuoteBuilderPage() {
     });
   };
 
+  const handleSeedDefaults = async () => {
+    if (!selectedTemplateId) return;
+    if (!confirm('Add the standard layout (Letterhead, Pricing, Closing, Footer, etc.) to this template?')) return;
+    try {
+      await apiClient.post('/spec-presets/seed-defaults', { templateId: selectedTemplateId });
+      await loadPresets(selectedTemplateId);
+      flash('Standard layout added');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to seed defaults');
+    }
+  };
+
   const handleDuplicatePreset = (source: SpecPresetData) => {
     const conditions = (source.conditions ?? []).map(conditionToDraft);
     const variants = (source.variants ?? []).map(variantToDraft);
+    const blockType = (source.blockType as BlockType | null) ?? null;
+    const config = (source.config && typeof source.config === 'object'
+      ? (source.config as Record<string, unknown>)
+      : {}) as Record<string, unknown>;
     setSelectedPresetId(null);
     setIsNewPreset(true);
     const title = `${source.title} (copy)`;
     setEditTitle(title);
     setEditBody(source.body ?? '');
     setEditSection(source.section);
+    setEditBlockType(blockType);
+    setEditConfig(config);
     setEditAlwaysIncluded(source.isAlwaysIncluded);
     setEditActive(source.isActive);
     setEditDriverField(source.driverField || '');
@@ -422,6 +479,8 @@ export default function QuoteBuilderPage() {
       title,
       body: source.body ?? '',
       section: source.section,
+      blockType,
+      config,
       alwaysIncluded: source.isAlwaysIncluded,
       active: source.isActive,
       driverField: source.driverField || '',
@@ -483,6 +542,8 @@ export default function QuoteBuilderPage() {
         title: editTitle.trim(),
         body: isVariantMode ? null : editBody,
         section: editSection,
+        blockType: editBlockType,
+        config: editConfig,
         isAlwaysIncluded: editAlwaysIncluded,
         isActive: editActive,
         driverField: editDriverField || null,
@@ -510,6 +571,8 @@ export default function QuoteBuilderPage() {
           title: editTitle.trim(),
           body: isVariantMode ? '' : editBody,
           section: editSection,
+          blockType: editBlockType,
+          config: editConfig,
           alwaysIncluded: editAlwaysIncluded,
           active: editActive,
           driverField: editDriverField || '',
@@ -578,6 +641,8 @@ export default function QuoteBuilderPage() {
       title: editTitle,
       body: editBody,
       section: editSection,
+      blockType: editBlockType,
+      config: editConfig,
       alwaysIncluded: editAlwaysIncluded,
       active: editActive,
       driverField: editDriverField,
@@ -594,6 +659,8 @@ export default function QuoteBuilderPage() {
     editTitle,
     editBody,
     editSection,
+    editBlockType,
+    editConfig,
     editAlwaysIncluded,
     editActive,
     editDriverField,
@@ -958,6 +1025,8 @@ export default function QuoteBuilderPage() {
     title: editTitle,
     body: editBody,
     section: editSection,
+    blockType: editBlockType,
+    config: editConfig,
     alwaysIncluded: editAlwaysIncluded,
     active: editActive,
     driverField: editDriverField,
@@ -1034,6 +1103,7 @@ export default function QuoteBuilderPage() {
                   onDuplicate={handleDuplicatePreset}
                   onReorder={handleReorder}
                   onReorderEnd={handleReorderEnd}
+                  onSeedDefaults={handleSeedDefaults}
                   dragIdx={dragIdx}
                   onDragStart={setDragIdx}
                 />
@@ -1165,6 +1235,9 @@ export default function QuoteBuilderPage() {
                   onBodyChange={setEditBody}
                   section={editSection}
                   onSectionChange={setEditSection}
+                  blockType={editBlockType}
+                  config={editConfig}
+                  onConfigChange={setEditConfig}
                   alwaysIncluded={editAlwaysIncluded}
                   onAlwaysIncludedChange={setEditAlwaysIncluded}
                   active={editActive}

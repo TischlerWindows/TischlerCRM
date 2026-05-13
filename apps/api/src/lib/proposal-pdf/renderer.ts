@@ -12,7 +12,20 @@
 
 import PDFDocument from 'pdfkit';
 import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
-import { resolveRulesForPage, type PageLogoRule } from '@crm/types';
+import {
+  resolveRulesForPage,
+  inferBlockType,
+  type BlockType,
+  type PageLogoRule,
+  type LetterheadConfig,
+  type PricingTableConfig,
+  type BaseBidLineConfig,
+  type AdditionsTableConfig,
+  type ExclusionsHeaderConfig,
+  type ClosingSignatureConfig,
+  type InstallationHeaderConfig,
+  type FooterConfig,
+} from '@crm/types';
 import { htmlToBlocks, type Block, type StyledRun } from './html-to-runs.js';
 
 // ── Default brand constants (match the Tischler brand guide 2025) ───
@@ -163,65 +176,87 @@ export async function renderProposalPDF(
     fonts,
   };
 
-  const constants = result.sections.CONSTANT ?? [];
-  const specs = result.sections.SPECIFICATION ?? [];
-  const options = result.sections.OPTION ?? [];
-  const exclusions = result.sections.EXCLUSION ?? [];
-  const installation = result.sections.INSTALLATION ?? [];
+  // ── In-order block dispatch ─────────────────────────────────────
+  // Each preset declares (or implicitly inherits via section) a BlockType.
+  // The renderer walks the resolved presets in declaration order and
+  // dispatches to per-type drawers — there's no global section grouping.
+  //
+  // Two counters live alongside the loop:
+  //   - specCounter: running (1)(2)(3) prefix for SPECIFICATION_ITEM blocks
+  //   - footerOverride: latest FOOTER block's config, applied in post-pass
+  let specCounter = 0;
+  let footerOverride: FooterConfig | null = null;
+  let letterheadDrawn = false;
 
-  const closingPresets = constants.filter((p) => isClosing(p));
-  const introPresets = constants.filter((p) => !isClosing(p));
+  for (const ob of result.orderedBlocks) {
+    const preset = ob.preset;
+    const type: BlockType = (preset.blockType as BlockType | null) ??
+      inferBlockType(preset.section, preset.title);
+    const config = (preset.config ?? {}) as Record<string, unknown>;
 
-  reserveLetterheadSpace(doc, ctx);
-  drawIntro(doc, introPresets, ctx);
-  drawSpecifications(doc, specs, ctx);
-  drawPricing(doc, result, ctx);
-  drawOptions(doc, options, result, ctx);
-  drawExclusions(doc, exclusions, ctx);
-  drawClosing(doc, closingPresets, result, ctx);
-
-  if (result.pdfData.hasInstallation) {
-    doc.addPage();
-    drawInstallationAppendix(doc, installation, result, ctx);
+    switch (type) {
+      case 'LETTERHEAD':
+        drawLetterheadBlock(doc, ctx, config as LetterheadConfig);
+        letterheadDrawn = true;
+        break;
+      case 'FREE_TEXT':
+        drawFreeTextBlock(doc, preset, ctx);
+        break;
+      case 'SPECIFICATION_ITEM':
+        specCounter += 1;
+        drawSpecificationItem(doc, preset, specCounter, ctx);
+        break;
+      case 'OPTION_ITEM':
+        drawOptionItem(doc, preset, ctx);
+        break;
+      case 'EXCLUSION_ITEM':
+        drawExclusionItem(doc, preset, ctx);
+        break;
+      case 'INSTALLATION_ITEM':
+        drawInstallationItem(doc, preset, ctx);
+        break;
+      case 'PRICING_TABLE':
+        drawPricingTableBlock(doc, config as PricingTableConfig, result, ctx);
+        break;
+      case 'BASE_BID_LINE':
+        drawBaseBidBlock(doc, config as BaseBidLineConfig, result, ctx);
+        break;
+      case 'ADDITIONS_TABLE':
+        drawAdditionsBlock(doc, config as AdditionsTableConfig, result, ctx);
+        break;
+      case 'EXCLUSIONS_HEADER':
+        drawExclusionsHeaderBlock(doc, config as ExclusionsHeaderConfig, ctx);
+        break;
+      case 'CLOSING_SIGNATURE':
+        drawClosingSignatureBlock(doc, config as ClosingSignatureConfig, result, ctx);
+        break;
+      case 'PAGE_BREAK':
+        doc.addPage();
+        break;
+      case 'INSTALLATION_HEADER':
+        drawInstallationHeaderBlock(doc, config as InstallationHeaderConfig, result, ctx);
+        break;
+      case 'FOOTER':
+        footerOverride = config as FooterConfig;
+        break;
+    }
   }
 
   // Post-pass: paint per-page logos now that total page count is known.
-  // Runs before drawFooter — order doesn't matter functionally (both use
-  // bufferedPageRange/switchToPage), but logos go first so the footer
-  // stays on top if a footer-positioned logo overlaps the footer band.
+  // Page-1 logo painting requires the renderer to have left a header
+  // band at the top of the page — done by LETTERHEAD blocks. If no
+  // letterhead block existed, page 1 starts at the page margin and logo
+  // overlays may bleed into content. That's fine — admins who want logos
+  // up top should include a LETTERHEAD block.
+  void letterheadDrawn;
   drawPageLogos(doc, ctx, brand.pageLogos ?? []);
-  drawFooter(doc, ctx);
+  drawFooter(doc, ctx, footerOverride);
 
   doc.end();
   return done;
 }
 
 // ── Layout primitives ───────────────────────────────────────────────
-
-/**
- * Reserves vertical space at the top of the current page for a header logo,
- * then draws the red separator rule and resets cursor to body text style.
- *
- * Image painting is deferred to `drawPageLogos`, which runs after all
- * content is laid out (when total page count is known so "last"/"rest"
- * selectors can resolve). This helper just leaves a 70pt gap so the
- * post-pass image lands above the body text instead of on top of it.
- */
-function reserveLetterheadSpace(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
-  // Approximate the height we used to reserve when we drew the image inline:
-  // 70pt image + ~0.5 line gap. Done with moveDown so PDFKit's flowing
-  // text layout continues from below this band.
-  doc.moveDown(5);
-  doc.moveDown(0.5);
-  doc
-    .strokeColor(ctx.red)
-    .lineWidth(2)
-    .moveTo(PAGE_MARGIN, doc.y)
-    .lineTo(doc.page.width - PAGE_MARGIN, doc.y)
-    .stroke();
-  doc.moveDown(1);
-  doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-}
 
 /**
  * Post-pass — switches to each buffered page in turn and paints any
@@ -246,17 +281,7 @@ function drawPageLogos(
     const pageNumber = i + 1;
     const matched = resolveRulesForPage(rules, pageNumber, totalPages);
 
-    if (matched.length === 0) {
-      // Page 1 fallback: text wordmark in the reserved letterhead band.
-      if (pageNumber === 1) {
-        const savedY = doc.y;
-        doc.x = PAGE_MARGIN;
-        doc.y = PAGE_MARGIN;
-        drawTextWordmark(doc, ctx);
-        doc.y = savedY;
-      }
-      continue;
-    }
+    if (matched.length === 0) continue;
 
     for (const rule of matched) {
       const file = byId.get(rule.id);
@@ -282,55 +307,134 @@ function drawPageLogos(
   }
 }
 
-function drawTextWordmark(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
-  // Brand guide: company name uses Helvetica Neue Bold Condensed (title font),
-  // tagline uses ITC Fenice Regular (subtitle font). When uploaded these
-  // override the Helvetica fallbacks automatically.
-  doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(20).text('TISCHLER UND SOHN', { lineGap: 2 });
-  doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(8).text('European Wood Windows & Doors');
+// ── Per-block drawers ───────────────────────────────────────────────
+//
+// Each function corresponds to a BlockType. The orchestration loop in
+// renderProposalPDF picks one based on the preset's blockType (or the
+// section-based inference for legacy data) and passes the type-specific
+// config. All space management (moveDown / horizontal rules) lives
+// inside the drawer so blocks can be reordered freely.
+
+function drawLetterheadBlock(
+  doc: PDFKit.PDFDocument,
+  ctx: BrandContext,
+  config: LetterheadConfig,
+): void {
+  // Reserve ~70pt of vertical space — page-logo post-pass paints into it.
+  // When no first-page logo rule matches, we draw the wordmark fallback
+  // inline (overlaps the reserved band but only one of the two ever
+  // renders text).
+  const wordmark = config.wordmarkText ?? 'TISCHLER UND SOHN';
+  const tagline = config.taglineText ?? 'European Wood Windows & Doors';
+  const showRule = config.showRule !== false;
+
+  doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(20).text(wordmark, { lineGap: 2 });
+  doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(8).text(tagline);
+
+  if (showRule) {
+    doc.moveDown(0.5)
+      .strokeColor(ctx.red)
+      .lineWidth(2)
+      .moveTo(PAGE_MARGIN, doc.y)
+      .lineTo(doc.page.width - PAGE_MARGIN, doc.y)
+      .stroke();
+    doc.moveDown(1);
+  }
+  doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
 }
 
-function drawIntro(doc: PDFKit.PDFDocument, presets: SpecPresetData[], ctx: BrandContext): void {
-  if (presets.length === 0) return;
-  for (const preset of presets) {
-    drawRichBody(doc, preset.body ?? '', ctx, { topGap: 0.4 });
+function drawFreeTextBlock(
+  doc: PDFKit.PDFDocument,
+  preset: SpecPresetData,
+  ctx: BrandContext,
+): void {
+  if (preset.title && preset.title.trim()) {
+    doc.moveDown(0.4);
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  }
+  if (preset.body && preset.body.trim()) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: preset.title ? 0.1 : 0.4 });
   }
 }
 
-function drawSpecifications(
+function drawSpecificationItem(
   doc: PDFKit.PDFDocument,
-  presets: SpecPresetData[],
+  preset: SpecPresetData,
+  number: number,
   ctx: BrandContext,
 ): void {
-  if (presets.length === 0) return;
-  doc.moveDown(0.6);
+  doc.moveDown(0.4);
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
+  doc.text(`(${number})`, { continued: true, indent: 0 });
+  doc.text(`  ${preset.title}`);
 
-  presets.forEach((preset, idx) => {
-    doc.moveDown(0.4);
-    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
-    const indexLabel = `(${idx + 1})`;
-    doc.text(indexLabel, { continued: true, indent: 0 });
-    doc.text(`  ${preset.title}`);
-
-    if (preset.body && preset.body.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 18 });
-    }
-  });
+  if (preset.body && preset.body.trim()) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 18 });
+  }
 }
 
-function drawPricing(
+function drawOptionItem(
   doc: PDFKit.PDFDocument,
+  preset: SpecPresetData,
+  ctx: BrandContext,
+): void {
+  doc.moveDown(0.4);
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  if (preset.body && preset.body.trim()) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.1 });
+  }
+}
+
+function drawExclusionItem(
+  doc: PDFKit.PDFDocument,
+  preset: SpecPresetData,
+  ctx: BrandContext,
+): void {
+  doc.moveDown(0.2);
+  doc.fillColor(ctx.text).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(`•  ${preset.title}`);
+  if (preset.body && preset.body.trim()) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
+  }
+}
+
+function drawInstallationItem(
+  doc: PDFKit.PDFDocument,
+  preset: SpecPresetData,
+  ctx: BrandContext,
+): void {
+  doc.moveDown(0.4);
+  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  if (preset.body && preset.body.trim()) {
+    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
+  }
+}
+
+function drawPricingTableBlock(
+  doc: PDFKit.PDFDocument,
+  config: PricingTableConfig,
   result: ProposalAssemblyResult,
   ctx: BrandContext,
 ): void {
   const { pdfData } = result;
-  const rows: Array<[string, string]> = [];
-  if (pdfData.hasEuroWindows) rows.push(['Euro Windows', pdfData.euroWindowsPrice]);
-  if (pdfData.hasDoubleHung) rows.push(['Double Hung Windows', pdfData.doubleHungPrice]);
-  if (pdfData.hasEuroDoors) rows.push(['Euro Doors', pdfData.euroDoorsPrice]);
+  const heading = config.heading ?? 'PRICING';
+  const rowLabels = config.rowLabels ?? {};
+  const hide = config.hide ?? {};
 
-  if (rows.length === 0 && !pdfData.grandTotal) return;
+  const rows: Array<[string, string]> = [];
+  if (pdfData.hasEuroWindows && !hide.euroWindows) {
+    rows.push([rowLabels.euroWindows ?? 'Euro Windows', pdfData.euroWindowsPrice]);
+  }
+  if (pdfData.hasDoubleHung && !hide.doubleHung) {
+    rows.push([rowLabels.doubleHung ?? 'Double Hung Windows', pdfData.doubleHungPrice]);
+  }
+  if (pdfData.hasEuroDoors && !hide.euroDoors) {
+    rows.push([rowLabels.euroDoors ?? 'Euro Doors', pdfData.euroDoorsPrice]);
+  }
 
   doc.moveDown(0.8);
   drawHorizontalLine(doc);
@@ -339,68 +443,96 @@ function drawPricing(
     .fillColor(ctx.navy)
     .font(ctx.fonts.bold)
     .fontSize(SECTION_HEADING_SIZE)
-    .text('PRICING', { lineGap: 2 });
+    .text(heading, { lineGap: 2 });
 
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
   for (const [label, price] of rows) {
     drawKeyValueRow(doc, ctx, label, price);
   }
+}
 
+function drawBaseBidBlock(
+  doc: PDFKit.PDFDocument,
+  config: BaseBidLineConfig,
+  result: ProposalAssemblyResult,
+  ctx: BrandContext,
+): void {
+  const label = config.label ?? 'BASE BID PRICE';
   doc.moveDown(0.3);
   drawHorizontalLine(doc);
   doc.moveDown(0.2);
   doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE + 1);
-  drawKeyValueRow(doc, ctx, 'BASE BID PRICE', pdfData.grandTotal);
+  drawKeyValueRow(doc, ctx, label, result.pdfData.grandTotal);
   doc.moveDown(0.2);
   drawHorizontalLine(doc);
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
 }
 
-function drawOptions(
+function drawAdditionsBlock(
   doc: PDFKit.PDFDocument,
-  optionPresets: SpecPresetData[],
+  config: AdditionsTableConfig,
   result: ProposalAssemblyResult,
   ctx: BrandContext,
 ): void {
   const { pdfData } = result;
-  const addOnRows: Array<[string, string]> = [];
-  if (pdfData.hasWindowScreens) addOnRows.push([`Window Screens (${pdfData.windowScreensQty})`, pdfData.windowScreensPrice]);
-  if (pdfData.hasDoorScreenSash) addOnRows.push([`Door Screen Sash (${pdfData.doorScreenSashQty})`, pdfData.doorScreenSashPrice]);
-  if (pdfData.hasEntryDoor) addOnRows.push([`Entry Door (${pdfData.entryDoorQty})`, pdfData.entryDoorPrice]);
-  if (pdfData.hasJambExtensions) addOnRows.push(['Jamb Extensions', pdfData.jambExtensionsPrice]);
-  if (pdfData.hasMagneticContacts) addOnRows.push([`Magnetic Alarm Contacts (${pdfData.magneticContactQty})`, pdfData.magneticContactPrice]);
-  if (pdfData.hasFinalFinish) addOnRows.push(['Final Finish', pdfData.finalFinishPrice]);
+  const heading = config.heading ?? 'ADDITIONS OR DEDUCTIONS TO OUR BASE BID';
+  const rowLabels = config.rowLabels ?? {};
+  const hide = config.hide ?? {};
 
-  if (optionPresets.length === 0 && addOnRows.length === 0) return;
+  const addOnRows: Array<[string, string]> = [];
+  if (pdfData.hasWindowScreens && !hide.windowScreens) {
+    addOnRows.push([
+      rowLabels.windowScreens ?? `Window Screens (${pdfData.windowScreensQty})`,
+      pdfData.windowScreensPrice,
+    ]);
+  }
+  if (pdfData.hasDoorScreenSash && !hide.doorScreenSash) {
+    addOnRows.push([
+      rowLabels.doorScreenSash ?? `Door Screen Sash (${pdfData.doorScreenSashQty})`,
+      pdfData.doorScreenSashPrice,
+    ]);
+  }
+  if (pdfData.hasEntryDoor && !hide.entryDoor) {
+    addOnRows.push([
+      rowLabels.entryDoor ?? `Entry Door (${pdfData.entryDoorQty})`,
+      pdfData.entryDoorPrice,
+    ]);
+  }
+  if (pdfData.hasJambExtensions && !hide.jambExtensions) {
+    addOnRows.push([
+      rowLabels.jambExtensions ?? 'Jamb Extensions',
+      pdfData.jambExtensionsPrice,
+    ]);
+  }
+  if (pdfData.hasMagneticContacts && !hide.magneticContacts) {
+    addOnRows.push([
+      rowLabels.magneticContacts ?? `Magnetic Alarm Contacts (${pdfData.magneticContactQty})`,
+      pdfData.magneticContactPrice,
+    ]);
+  }
+  if (pdfData.hasFinalFinish && !hide.finalFinish) {
+    addOnRows.push([rowLabels.finalFinish ?? 'Final Finish', pdfData.finalFinishPrice]);
+  }
 
   doc.moveDown(0.8);
   doc
     .fillColor(ctx.navy)
     .font(ctx.fonts.bold)
     .fontSize(SECTION_HEADING_SIZE)
-    .text('ADDITIONS OR DEDUCTIONS TO OUR BASE BID', { lineGap: 2 });
+    .text(heading, { lineGap: 2 });
 
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
   for (const [label, price] of addOnRows) {
     drawKeyValueRow(doc, ctx, `•  ${label}`, price);
   }
-
-  for (const preset of optionPresets) {
-    doc.moveDown(0.4);
-    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
-    if (preset.body && preset.body.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.1 });
-    }
-  }
 }
 
-function drawExclusions(
+function drawExclusionsHeaderBlock(
   doc: PDFKit.PDFDocument,
-  presets: SpecPresetData[],
+  config: ExclusionsHeaderConfig,
   ctx: BrandContext,
 ): void {
-  if (presets.length === 0) return;
+  const heading = config.heading ?? 'Our Base Bid does not include:';
   doc.moveDown(0.8);
   drawHorizontalLine(doc);
   doc.moveDown(0.3);
@@ -408,85 +540,73 @@ function drawExclusions(
     .fillColor(ctx.navy)
     .font(ctx.fonts.bold)
     .fontSize(SECTION_HEADING_SIZE)
-    .text('Our Base Bid does not include:', { lineGap: 2 });
-
+    .text(heading, { lineGap: 2 });
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-  for (const preset of presets) {
-    doc.moveDown(0.2);
-    doc.font(ctx.fonts.bold).text(`•  ${preset.title}`);
-    if (preset.body && preset.body.trim()) {
-      doc.font(ctx.fonts.regular);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
-    }
-  }
 }
 
-function drawClosing(
+function drawClosingSignatureBlock(
   doc: PDFKit.PDFDocument,
-  closingPresets: SpecPresetData[],
+  config: ClosingSignatureConfig,
   result: ProposalAssemblyResult,
   ctx: BrandContext,
 ): void {
+  const closingText = config.closingText ?? 'Sincerely,';
+  const companyLine = config.companyLine ?? 'Tischler und Sohn';
+  const useSignatureFont = config.useSignatureFont !== false;
+  const showEstimator = config.showEstimator !== false;
+
   doc.moveDown(0.8);
   drawHorizontalLine(doc);
   doc.moveDown(0.3);
 
-  for (const preset of closingPresets) {
-    drawRichBody(doc, preset.body ?? '', ctx, { topGap: 0.2 });
-  }
-
-  doc.moveDown(0.8).fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE).text('Sincerely,');
+  doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE).text(closingText);
 
   const { salesman, estimator } = result.pdfData;
 
-  // If we have a brand signature font + a salesman name, render the salesman's
-  // name in that font (large, like a hand signature). Otherwise fall back to
-  // the company line in bold navy. In both cases the typed name (Mr./title)
-  // follows below.
-  if (ctx.fonts.signature && salesman) {
+  if (useSignatureFont && ctx.fonts.signature && salesman) {
     doc.moveDown(0.6).fillColor(ctx.navy).font(ctx.fonts.signature).fontSize(24).text(salesman);
     doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(salesman);
   } else {
-    doc.moveDown(0.8).fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text('Tischler und Sohn');
+    doc.moveDown(0.8).fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(companyLine);
     if (salesman) {
       doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(salesman);
     }
   }
 
-  if (estimator && estimator !== salesman) {
+  if (showEstimator && estimator && estimator !== salesman) {
     doc.fillColor(ctx.muted).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE - 1).text(`Estimator: ${estimator}`);
   }
 }
 
-function drawInstallationAppendix(
+function drawInstallationHeaderBlock(
   doc: PDFKit.PDFDocument,
-  presets: SpecPresetData[],
+  config: InstallationHeaderConfig,
   result: ProposalAssemblyResult,
   ctx: BrandContext,
 ): void {
-  reserveLetterheadSpace(doc, ctx);
+  const heading = config.heading ?? 'INSTALLATION';
+  const costLabel = config.costLabel ?? 'Installation Cost:';
+
   doc
     .fillColor(ctx.navy)
     .font(ctx.fonts.bold)
     .fontSize(SECTION_HEADING_SIZE)
-    .text('INSTALLATION', { lineGap: 2 });
+    .text(heading, { lineGap: 2 });
 
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-  drawKeyValueRow(doc, ctx, 'Installation Cost:', result.pdfData.installationPrice, { bold: true });
+  drawKeyValueRow(doc, ctx, costLabel, result.pdfData.installationPrice, { bold: true });
   doc.moveDown(0.3);
   drawHorizontalLine(doc);
-
-  for (const preset of presets) {
-    doc.moveDown(0.4);
-    doc.fillColor(ctx.navy).font(ctx.fonts.bold).text(preset.title);
-    if (preset.body && preset.body.trim()) {
-      doc.fillColor(ctx.text).font(ctx.fonts.regular);
-      drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
-    }
-  }
 }
 
-function drawFooter(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
+function drawFooter(
+  doc: PDFKit.PDFDocument,
+  ctx: BrandContext,
+  override: FooterConfig | null,
+): void {
+  const text = override?.text ?? 'Tischler und Sohn  |  Confidential';
+  const hidePageNumbers = override?.hidePageNumbers === true;
+
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
@@ -495,14 +615,16 @@ function drawFooter(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
       .fillColor(ctx.faint)
       .font(ctx.fonts.regular)
       .fontSize(FOOTER_SIZE)
-      .text(`Tischler und Sohn  |  Confidential`, PAGE_MARGIN, y, {
+      .text(text, PAGE_MARGIN, y, {
         width: doc.page.width - 2 * PAGE_MARGIN,
         align: 'center',
       });
-    doc.text(`Page ${i + 1} of ${range.count}`, doc.page.width - PAGE_MARGIN - 60, y, {
-      width: 60,
-      align: 'right',
-    });
+    if (!hidePageNumbers) {
+      doc.text(`Page ${i + 1} of ${range.count}`, doc.page.width - PAGE_MARGIN - 60, y, {
+        width: 60,
+        align: 'right',
+      });
+    }
   }
 }
 
@@ -606,10 +728,6 @@ function drawKeyValueRow(
     width: usable * 0.3,
     align: 'right',
   });
-}
-
-function isClosing(preset: SpecPresetData): boolean {
-  return /closing|signature|sincerely/i.test(preset.title);
 }
 
 function normalizeHex(input: string | undefined | null): string | null {

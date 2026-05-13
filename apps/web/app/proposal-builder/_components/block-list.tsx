@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SpecPresetData } from '@crm/proposal-assembly';
+import { BLOCK_TYPE_META, type BlockType } from '@crm/types';
 
 const SECTION_ORDER: Array<SpecPresetData['section']> = [
   'CONSTANT',
@@ -45,13 +46,28 @@ interface Props {
   presets: SpecPresetData[];
   selectedPresetId: string | null;
   onSelect: (preset: SpecPresetData) => void;
-  onNew: () => void;
+  /** Create a new preset. blockType picks from the palette; null = legacy blank text. */
+  onNew: (blockType: BlockType | null) => void;
   onDuplicate?: (preset: SpecPresetData) => void;
   onReorder: (presets: SpecPresetData[]) => void;
   onReorderEnd: () => void;
+  /** Seed the template with the standard layout (letterhead, pricing, etc.). */
+  onSeedDefaults?: () => void;
   dragIdx: number | null;
   onDragStart: (idx: number) => void;
 }
+
+const PALETTE_GROUPS: Array<{ group: 'Layout' | 'Content' | 'Data'; types: BlockType[] }> = [
+  {
+    group: 'Layout',
+    types: ['LETTERHEAD', 'EXCLUSIONS_HEADER', 'CLOSING_SIGNATURE', 'PAGE_BREAK', 'INSTALLATION_HEADER', 'FOOTER'],
+  },
+  {
+    group: 'Content',
+    types: ['FREE_TEXT', 'SPECIFICATION_ITEM', 'OPTION_ITEM', 'EXCLUSION_ITEM', 'INSTALLATION_ITEM'],
+  },
+  { group: 'Data', types: ['PRICING_TABLE', 'BASE_BID_LINE', 'ADDITIONS_TABLE'] },
+];
 
 function reorderAt(list: SpecPresetData[], from: number, to: number): SpecPresetData[] {
   const next = [...list];
@@ -97,6 +113,7 @@ export function BlockList({
   onDuplicate,
   onReorder,
   onReorderEnd,
+  onSeedDefaults,
   dragIdx,
   onDragStart,
 }: Props) {
@@ -127,8 +144,8 @@ export function BlockList({
   const handleDragOver = (e: React.DragEvent, idx: number) => {
     e.preventDefault();
     if (dragIdx === null || dragIdx === idx) return;
-    // Within-group only — moving between sections is done via the block editor.
-    if (presets[dragIdx].section !== presets[idx].section) return;
+    // Cross-section drag is allowed — the renderer iterates by `order`,
+    // not section, so the block list mirrors document order directly.
     onReorder(reorderAt(presets, dragIdx, idx));
     onDragStart(idx);
   };
@@ -136,8 +153,6 @@ export function BlockList({
   const handleMove = (idx: number, dir: -1 | 1) => {
     const target = idx + dir;
     if (target < 0 || target >= presets.length) return;
-    // Within-group only.
-    if (presets[idx].section !== presets[target].section) return;
     onReorder(reorderAt(presets, idx, target));
     onReorderEnd();
   };
@@ -161,44 +176,78 @@ export function BlockList({
           {menuOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden"
+              className="absolute right-0 top-full mt-1 z-20 w-72 rounded-lg border border-gray-200 bg-white shadow-xl overflow-hidden max-h-[80vh] overflow-y-auto"
             >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onNew();
-                }}
-                className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
-              >
-                <FileText className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                <div>
-                  <div className="font-medium text-gray-900">Blank block</div>
-                  <div className="text-[10.5px] text-gray-500">Start from scratch with an empty body.</div>
-                </div>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                disabled={!selectedPreset || !onDuplicate}
-                onClick={() => {
-                  if (!selectedPreset || !onDuplicate) return;
-                  setMenuOpen(false);
-                  onDuplicate(selectedPreset);
-                }}
-                className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 focus:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed border-t border-gray-100"
-              >
-                <Copy className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" aria-hidden="true" />
-                <div>
-                  <div className="font-medium text-gray-900">Duplicate selected</div>
-                  <div className="text-[10.5px] text-gray-500">
-                    {selectedPreset
-                      ? `Copy "${selectedPreset.title}" — body, conditions, variants.`
-                      : 'Select a block first.'}
+              {PALETTE_GROUPS.map((group) => (
+                <div key={group.group}>
+                  <div className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50 border-y border-gray-100">
+                    {group.group}
                   </div>
+                  {group.types.map((type) => {
+                    const meta = BLOCK_TYPE_META[type];
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onNew(type);
+                        }}
+                        className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-brand-navy flex-shrink-0" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <div className="font-medium text-gray-900">{meta.label}</div>
+                          <div className="text-[10.5px] text-gray-500 leading-snug">{meta.description}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </button>
+              ))}
+              <div className="border-t-2 border-gray-200">
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={!selectedPreset || !onDuplicate}
+                  onClick={() => {
+                    if (!selectedPreset || !onDuplicate) return;
+                    setMenuOpen(false);
+                    onDuplicate(selectedPreset);
+                  }}
+                  className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-gray-50 focus:bg-gray-50 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Copy className="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" aria-hidden="true" />
+                  <div>
+                    <div className="font-medium text-gray-900">Duplicate selected</div>
+                    <div className="text-[10.5px] text-gray-500">
+                      {selectedPreset
+                        ? `Copy "${selectedPreset.title}".`
+                        : 'Select a block first.'}
+                    </div>
+                  </div>
+                </button>
+                {onSeedDefaults && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onSeedDefaults();
+                    }}
+                    className="w-full flex items-start gap-2 px-3 py-2 text-left text-xs hover:bg-amber-50 focus:bg-amber-50 focus:outline-none border-t border-gray-100"
+                  >
+                    <ScrollText className="w-3.5 h-3.5 mt-0.5 text-amber-500 flex-shrink-0" aria-hidden="true" />
+                    <div>
+                      <div className="font-medium text-gray-900">Add standard layout</div>
+                      <div className="text-[10.5px] text-gray-500">
+                        Append Letterhead + Pricing + Closing + Footer blocks.
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -209,13 +258,25 @@ export function BlockList({
           <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
             <ScrollText className="w-8 h-8 text-gray-300 mb-2" />
             <p className="text-xs text-gray-500">No blocks yet</p>
+            <p className="text-[10px] text-gray-400 mt-1 max-w-[180px]">
+              Click + New to add a block from the palette, or seed the standard layout below.
+            </p>
             <button
               type="button"
-              onClick={onNew}
-              className="mt-2 px-3 py-1.5 text-xs text-brand-navy font-semibold rounded hover:bg-brand-navy/10 focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+              onClick={() => onNew('FREE_TEXT')}
+              className="mt-3 px-3 py-1.5 text-xs text-brand-navy font-semibold rounded hover:bg-brand-navy/10 focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
             >
-              + Create first block
+              + Add free text block
             </button>
+            {onSeedDefaults && (
+              <button
+                type="button"
+                onClick={onSeedDefaults}
+                className="mt-1 px-3 py-1.5 text-xs text-amber-700 font-semibold rounded hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+              >
+                Seed standard layout
+              </button>
+            )}
           </div>
         ) : (
           SECTION_ORDER.map((section) => {

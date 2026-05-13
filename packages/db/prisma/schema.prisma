@@ -920,6 +920,31 @@ enum SpecSection {
   CONSTANT
 }
 
+// Block-level type that determines HOW a preset is drawn. When null
+// (legacy presets), the renderer infers a type from `section` so
+// pre-refactor templates keep rendering.
+//
+// Naming convention:
+//   *_ITEM / *_TEXT  — rich-text content blocks the user authors
+//   *_BLOCK / HEADER — structural layout blocks with template-level
+//                      labels and data pulled from the summary
+enum BlockType {
+  LETTERHEAD             // page-1 logo band + red rule + optional wordmark fallback
+  FREE_TEXT              // arbitrary rich text (replaces CONSTANT intro)
+  SPECIFICATION_ITEM     // numbered "(1) Title — body"
+  OPTION_ITEM            // bullet/heading + body (in additions area)
+  EXCLUSION_ITEM         // bullet item (under "Our base bid does not include")
+  INSTALLATION_ITEM      // installation-page body block
+  PRICING_TABLE          // PRICING heading + per-row labels (data from summary)
+  BASE_BID_LINE          // "BASE BID PRICE" label + grand total from summary
+  ADDITIONS_TABLE        // "ADDITIONS OR DEDUCTIONS" heading + addon rows
+  EXCLUSIONS_HEADER      // "Our base bid does not include:" header
+  CLOSING_SIGNATURE      // "Sincerely," + signature + company line
+  PAGE_BREAK             // forces doc.addPage()
+  INSTALLATION_HEADER    // installation-page title + cost row
+  FOOTER                 // footer override (text + page numbers)
+}
+
 enum ConditionOperator {
   CONTAINS
   EQUALS
@@ -999,6 +1024,13 @@ model SpecPreset {
   title            String
   body             String?
   section          SpecSection
+  // Block classification for the in-order renderer. When null, the
+  // renderer falls back to `section` so legacy templates keep working.
+  // New blocks ALWAYS set this — palette items map 1:1 to a BlockType.
+  blockType        BlockType?
+  // Per-type config (e.g. PricingTableConfig with row label overrides).
+  // Schema is validated via Zod in @crm/types before write.
+  config           Json?
   isAlwaysIncluded Boolean     @default(false)
   driverField      String?
   isActive         Boolean     @default(true)
