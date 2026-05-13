@@ -12,6 +12,7 @@
 
 import PDFDocument from 'pdfkit';
 import type { ProposalAssemblyResult, SpecPresetData } from '@crm/proposal-assembly';
+import { resolveRulesForPage, type PageLogoRule } from '@crm/types';
 import { htmlToBlocks, type Block, type StyledRun } from './html-to-runs.js';
 
 // ── Default brand constants (match the Tischler brand guide 2025) ───
@@ -50,16 +51,24 @@ export interface BrandFontFile {
   family: string;
 }
 
+/**
+ * One per-page logo paint instruction. The route resolves a `PageLogoRule`
+ * to a `PageLogoFile` (rule + decoded bytes) before passing it in. A rule
+ * whose logo can no longer be found in the DB is filtered out upstream.
+ */
+export interface PageLogoFile {
+  rule: PageLogoRule;
+  bytes: Buffer;
+  mimeType: string;
+}
+
 export interface BrandResources {
   /** Hex string overriding the default navy used for headings/titles. */
   accentColor?: string;
   /** Hex string overriding the default red used for the letterhead rule + base bid line. */
   emphasisColor?: string;
-  /** Raw bytes + mime for the letterhead image. */
-  letterhead?: {
-    bytes: Buffer;
-    mimeType: string;
-  };
+  /** Per-page logo rules + their decoded image bytes. */
+  pageLogos?: PageLogoFile[];
   /** Salesman signature font (script). */
   signatureFont?: BrandFontFile;
   /** Wordmark / big-headline font. */
@@ -163,7 +172,7 @@ export async function renderProposalPDF(
   const closingPresets = constants.filter((p) => isClosing(p));
   const introPresets = constants.filter((p) => !isClosing(p));
 
-  drawLetterhead(doc, ctx, brand.letterhead);
+  reserveLetterheadSpace(doc, ctx);
   drawIntro(doc, introPresets, ctx);
   drawSpecifications(doc, specs, ctx);
   drawPricing(doc, result, ctx);
@@ -173,9 +182,14 @@ export async function renderProposalPDF(
 
   if (result.pdfData.hasInstallation) {
     doc.addPage();
-    drawInstallationAppendix(doc, installation, result, ctx, brand.letterhead);
+    drawInstallationAppendix(doc, installation, result, ctx);
   }
 
+  // Post-pass: paint per-page logos now that total page count is known.
+  // Runs before drawFooter — order doesn't matter functionally (both use
+  // bufferedPageRange/switchToPage), but logos go first so the footer
+  // stays on top if a footer-positioned logo overlaps the footer band.
+  drawPageLogos(doc, ctx, brand.pageLogos ?? []);
   drawFooter(doc, ctx);
 
   doc.end();
@@ -184,33 +198,22 @@ export async function renderProposalPDF(
 
 // ── Layout primitives ───────────────────────────────────────────────
 
-function drawLetterhead(
-  doc: PDFKit.PDFDocument,
-  ctx: BrandContext,
-  letterhead: BrandResources['letterhead'],
-): void {
-  // If a brand letterhead image is configured, draw it at the top — replacing
-  // the text wordmark. Fits within the page width minus margins, scaled by
-  // height to keep aspect ratio. Falls back to the text wordmark when no
-  // logo is set.
-  if (letterhead) {
-    try {
-      const maxWidth = doc.page.width - 2 * PAGE_MARGIN;
-      // `fit` with a maxWidth scales to the available content area while
-      // preserving aspect ratio. Default x-position with explicit PAGE_MARGIN
-      // keeps the image aligned to the left edge of the body column.
-      doc.image(letterhead.bytes, PAGE_MARGIN, doc.y, { fit: [maxWidth, 70] });
-      doc.moveDown(5); // approximate the space the image took up
-    } catch {
-      // Fall through to text wordmark on any image-decode failure.
-      drawTextWordmark(doc, ctx);
-    }
-  } else {
-    drawTextWordmark(doc, ctx);
-  }
-
+/**
+ * Reserves vertical space at the top of the current page for a header logo,
+ * then draws the red separator rule and resets cursor to body text style.
+ *
+ * Image painting is deferred to `drawPageLogos`, which runs after all
+ * content is laid out (when total page count is known so "last"/"rest"
+ * selectors can resolve). This helper just leaves a 70pt gap so the
+ * post-pass image lands above the body text instead of on top of it.
+ */
+function reserveLetterheadSpace(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
+  // Approximate the height we used to reserve when we drew the image inline:
+  // 70pt image + ~0.5 line gap. Done with moveDown so PDFKit's flowing
+  // text layout continues from below this band.
+  doc.moveDown(5);
+  doc.moveDown(0.5);
   doc
-    .moveDown(0.5)
     .strokeColor(ctx.red)
     .lineWidth(2)
     .moveTo(PAGE_MARGIN, doc.y)
@@ -218,6 +221,65 @@ function drawLetterhead(
     .stroke();
   doc.moveDown(1);
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+}
+
+/**
+ * Post-pass — switches to each buffered page in turn and paints any
+ * matching per-page logo rules. Runs after all content is laid out so
+ * total page count is known and "last"/"rest" selectors resolve.
+ *
+ * When zero rules match page 1, falls back to the text wordmark so the
+ * letterhead area is never blank for templates with no logos configured.
+ */
+function drawPageLogos(
+  doc: PDFKit.PDFDocument,
+  ctx: BrandContext,
+  pageLogos: PageLogoFile[],
+): void {
+  const range = doc.bufferedPageRange();
+  const totalPages = range.count;
+  const rules = pageLogos.map((p) => p.rule);
+  const byId = new Map(pageLogos.map((p) => [p.rule.id, p]));
+
+  for (let i = 0; i < totalPages; i++) {
+    doc.switchToPage(range.start + i);
+    const pageNumber = i + 1;
+    const matched = resolveRulesForPage(rules, pageNumber, totalPages);
+
+    if (matched.length === 0) {
+      // Page 1 fallback: text wordmark in the reserved letterhead band.
+      if (pageNumber === 1) {
+        const savedY = doc.y;
+        doc.x = PAGE_MARGIN;
+        doc.y = PAGE_MARGIN;
+        drawTextWordmark(doc, ctx);
+        doc.y = savedY;
+      }
+      continue;
+    }
+
+    for (const rule of matched) {
+      const file = byId.get(rule.id);
+      if (!file) continue;
+      try {
+        const maxWidth = rule.maxWidthPt;
+        const maxHeight = rule.maxHeightPt;
+        const x =
+          rule.alignment === 'left'
+            ? PAGE_MARGIN
+            : rule.alignment === 'right'
+              ? doc.page.width - PAGE_MARGIN - maxWidth
+              : (doc.page.width - maxWidth) / 2;
+        const y =
+          rule.position === 'header'
+            ? PAGE_MARGIN
+            : doc.page.height - PAGE_MARGIN - maxHeight - 20;
+        doc.image(file.bytes, x, y, { fit: [maxWidth, maxHeight] });
+      } catch {
+        // Skip a broken logo — don't fail the whole PDF.
+      }
+    }
+  }
 }
 
 function drawTextWordmark(doc: PDFKit.PDFDocument, ctx: BrandContext): void {
@@ -401,9 +463,8 @@ function drawInstallationAppendix(
   presets: SpecPresetData[],
   result: ProposalAssemblyResult,
   ctx: BrandContext,
-  letterhead: BrandResources['letterhead'],
 ): void {
-  drawLetterhead(doc, ctx, letterhead);
+  reserveLetterheadSpace(doc, ctx);
   doc
     .fillColor(ctx.navy)
     .font(ctx.fonts.bold)

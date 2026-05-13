@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Check, FileText, Save, Loader2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Check, FileText, Save, Loader2, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -11,6 +11,7 @@ interface QuoteTemplate {
 }
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+export type BuilderMode = 'blocks' | 'branding';
 
 interface Props {
   templates: QuoteTemplate[];
@@ -27,6 +28,8 @@ interface Props {
   isDirty?: boolean;
   autosaveStatus?: AutosaveStatus;
   lastSavedAt?: number | null;
+  mode: BuilderMode;
+  onChangeMode: (m: BuilderMode) => void;
 }
 
 function formatRelative(ms: number): string {
@@ -63,6 +66,8 @@ export function TopBar({
   isDirty = false,
   autosaveStatus = 'idle',
   lastSavedAt = null,
+  mode,
+  onChangeMode,
 }: Props) {
   // Tick once per second so the "Saved Ns ago" label keeps counting.
   const now = useTickEverySecond();
@@ -119,6 +124,31 @@ export function TopBar({
           )}
         </select>
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/60 pointer-events-none" />
+      </div>
+
+      <div role="tablist" aria-label="Builder mode" className="inline-flex items-center rounded-lg border border-white/20 bg-white/5 p-0.5 text-xs">
+        <button
+          role="tab"
+          aria-selected={mode === 'blocks'}
+          onClick={() => onChangeMode('blocks')}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
+            mode === 'blocks' ? 'bg-white text-[#1e3a5f] font-semibold' : 'text-white/80 hover:text-white'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" aria-hidden="true" />
+          Blocks
+        </button>
+        <button
+          role="tab"
+          aria-selected={mode === 'branding'}
+          onClick={() => onChangeMode('branding')}
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
+            mode === 'branding' ? 'bg-white text-[#1e3a5f] font-semibold' : 'text-white/80 hover:text-white'
+          }`}
+        >
+          <ImageIcon className="w-3.5 h-3.5" aria-hidden="true" />
+          Branding
+        </button>
       </div>
 
       <div className="flex-1" />

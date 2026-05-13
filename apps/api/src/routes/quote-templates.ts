@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '@crm/db/client';
 import { generateId } from '@crm/db/record-id';
 import { z } from 'zod';
+import { pageLogosSchema } from '@crm/types';
 
 const createTemplateSchema = z.object({
   name: z.string().min(1),
@@ -24,7 +25,6 @@ const updateTemplateSchema = z.object({
   // Brand wiring — admin picks which Company Resources the template uses.
   // Each font role maps to a BrandFont. The renderer registers them with
   // PDFKit and falls back to Helvetica variants when unset.
-  letterheadLogoId: z.string().nullable().optional(),
   signatureFontId:  z.string().nullable().optional(),
   titleFontId:      z.string().nullable().optional(),
   subtitleFontId:   z.string().nullable().optional(),
@@ -32,6 +32,10 @@ const updateTemplateSchema = z.object({
   bodyFontId:       z.string().nullable().optional(),
   accentColorHex:   hexColor,
   emphasisColorHex: hexColor,
+});
+
+const pageLogosUpdateSchema = z.object({
+  pageLogos: pageLogosSchema,
 });
 
 export async function quoteTemplateRoutes(app: FastifyInstance) {
@@ -168,6 +172,35 @@ export async function quoteTemplateRoutes(app: FastifyInstance) {
     } catch (err: any) {
       app.log.error(err, 'PATCH /quote-templates/:id failed');
       reply.code(500).send({ error: 'Failed to update template', detail: err?.message });
+    }
+  });
+
+  // PATCH /quote-templates/:id/page-logos — replace the per-page logo rules
+  // (admin only). The body is the full new array; the route does a single
+  // wholesale replace rather than merging. Validates each rule via the
+  // shared Zod schema in @crm/types.
+  app.patch('/quote-templates/:id/page-logos', async (req, reply) => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return reply.code(403).send({ error: 'Insufficient permissions.' });
+    }
+    const { id } = req.params as { id: string };
+    const parsed = pageLogosUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
+    }
+
+    try {
+      // Prisma's Json column types as `InputJsonValue` which the Zod-parsed
+      // PageLogoRule[] satisfies structurally. Cast through `unknown` to
+      // avoid TS widening complaints about the parameterized array type.
+      const template = await prisma.quoteTemplate.update({
+        where: { id },
+        data: { pageLogos: parsed.data.pageLogos as unknown as object },
+      });
+      reply.send(template);
+    } catch (err: any) {
+      app.log.error(err, 'PATCH /quote-templates/:id/page-logos failed');
+      reply.code(500).send({ error: 'Failed to update page logos', detail: err?.message });
     }
   });
 

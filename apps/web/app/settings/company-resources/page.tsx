@@ -151,13 +151,12 @@ export default function CompanyResourcesPage() {
 // ── Template defaults bar ──────────────────────────────────────────
 //
 // Shows the resources the default proposal template will use when rendering.
-// Picking a logo here writes letterheadLogoId on the default template; same
-// for the signature font and the accent/emphasis hex colors.
+// Picks the brand fonts + accent/emphasis colors. Per-page logo placement
+// has its own editor in the Proposal Builder → Branding tab.
 
 interface DefaultTemplate {
   id: string;
   name: string;
-  letterheadLogoId: string | null;
   signatureFontId: string | null;
   titleFontId: string | null;
   subtitleFontId: string | null;
@@ -169,7 +168,6 @@ interface DefaultTemplate {
 
 function TemplateDefaultsBar({ resourceRev }: { resourceRev: number }) {
   const [template, setTemplate] = useState<DefaultTemplate | null>(null);
-  const [logos, setLogos] = useState<BrandLogo[]>([]);
   const [fonts, setFonts] = useState<BrandFont[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -179,15 +177,13 @@ function TemplateDefaultsBar({ resourceRev }: { resourceRev: number }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [tpl, logoRows, fontRows] = await Promise.all([
+      const [tpl, fontRows] = await Promise.all([
         apiClient
           .get<DefaultTemplate>('/quote-templates/default')
           .catch(() => null),
-        apiClient.get<BrandLogo[]>('/company-resources/logos').catch(() => []),
         apiClient.get<BrandFont[]>('/company-resources/fonts').catch(() => []),
       ]);
       setTemplate(tpl);
-      setLogos(logoRows);
       setFonts(fontRows);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load defaults');
@@ -251,38 +247,38 @@ function TemplateDefaultsBar({ resourceRev }: { resourceRev: number }) {
       )}
 
       <div className="space-y-4">
-        {/* Imagery + colors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <DefaultPickerSelect
-            label="Letterhead logo"
-            value={template.letterheadLogoId}
-            options={logos.map((l) => ({
-              value: l.id,
-              label: l.role ? `${l.name} · ${l.role}` : l.name,
-            }))}
-            emptyHint="Upload a logo to pick one"
-            saving={saving === 'letterheadLogoId'}
-            saved={saved === 'letterheadLogoId'}
-            onChange={(v) => patch('letterheadLogoId', v)}
+        {/* Logo placement notice — per-page logo rules now live in the
+            Proposal Builder so a template can paint different logos on
+            different pages (first page, subsequent pages, last page). */}
+        <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <span className="font-semibold text-gray-700">Per-page logo placement</span> is configured per template in{' '}
+          <a
+            href="/proposal-builder"
+            className="font-semibold text-brand-navy hover:underline"
+          >
+            Proposal Builder → Branding
+          </a>
+          . Upload logos here; arrange them there.
+        </div>
+
+        {/* Colors */}
+        <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+          <DefaultPickerColor
+            label="Accent color"
+            value={template.accentColorHex}
+            placeholder="#151f6d"
+            saving={saving === 'accentColorHex'}
+            saved={saved === 'accentColorHex'}
+            onChange={(v) => patch('accentColorHex', v)}
           />
-          <div className="grid grid-cols-2 gap-3 sm:col-span-1">
-            <DefaultPickerColor
-              label="Accent color"
-              value={template.accentColorHex}
-              placeholder="#151f6d"
-              saving={saving === 'accentColorHex'}
-              saved={saved === 'accentColorHex'}
-              onChange={(v) => patch('accentColorHex', v)}
-            />
-            <DefaultPickerColor
-              label="Emphasis color"
-              value={template.emphasisColorHex}
-              placeholder="#da291c"
-              saving={saving === 'emphasisColorHex'}
-              saved={saved === 'emphasisColorHex'}
-              onChange={(v) => patch('emphasisColorHex', v)}
-            />
-          </div>
+          <DefaultPickerColor
+            label="Emphasis color"
+            value={template.emphasisColorHex}
+            placeholder="#da291c"
+            saving={saving === 'emphasisColorHex'}
+            saved={saved === 'emphasisColorHex'}
+            onChange={(v) => patch('emphasisColorHex', v)}
+          />
         </div>
 
         {/* Font roles — per the brand guide each role has its own typeface. */}
