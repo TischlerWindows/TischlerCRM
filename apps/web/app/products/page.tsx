@@ -127,20 +127,22 @@ interface FieldFilters {
   productType: string;
   job: string;
   glassType: string;
+  hungType: string;
   woodType: string;
   finish: string;
   spacerBar: string;
 }
 
-const EMPTY_FILTERS: FieldFilters = { productType: '', job: '', glassType: '', woodType: '', finish: '', spacerBar: '' };
+const EMPTY_FILTERS: FieldFilters = { productType: '', job: '', glassType: '', hungType: '', woodType: '', finish: '', spacerBar: '' };
 
 const FILTER_FIELDS: { key: keyof FieldFilters; label: string; detailKey?: keyof ProductLogDetail }[] = [
   { key: 'productType', label: 'Product Type' },
   { key: 'job',         label: 'Job / Opp #' },
-  { key: 'glassType',   label: 'Glass Type',   detailKey: 'glassType' },
-  { key: 'woodType',    label: 'Wood Type',    detailKey: 'woodType' },
-  { key: 'finish',      label: 'Finish',       detailKey: 'finish' },
-  { key: 'spacerBar',   label: 'Spacer Bar',   detailKey: 'spacerBarType' },
+  { key: 'glassType',   label: 'Glass Type',       detailKey: 'glassType' },
+  { key: 'hungType',    label: 'Hung Glass Type',  detailKey: 'hungType' },
+  { key: 'woodType',    label: 'Wood Type',        detailKey: 'woodType' },
+  { key: 'finish',      label: 'Finish',           detailKey: 'finish' },
+  { key: 'spacerBar',   label: 'Spacer Bar',       detailKey: 'spacerBarType' },
 ];
 
 export default function ProductsPage() {
@@ -167,6 +169,7 @@ export default function ProductsPage() {
     const fPT    = filters.productType.trim();
     const fJob   = filters.job.toLowerCase().trim();
     const fGlass = filters.glassType.trim();
+    const fHung  = filters.hungType.trim();
     const fWood  = filters.woodType.trim();
     const fFinish = filters.finish.trim();
     const fSpacer = filters.spacerBar.trim();
@@ -175,11 +178,16 @@ export default function ProductsPage() {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
       // productType: substring match (typed text)
       if (fPT && !g.productType.toLowerCase().includes(fPT.toLowerCase())) return false;
+      // Glass Type only applies to Euro Windows / Euro Doors (not Double Hung — those use Hung Glass Type)
+      if (fGlass && g.category === 'Double Hung') return false;
+      // Hung Glass Type only applies to Double Hung groups
+      if (fHung && g.category !== 'Double Hung') return false;
       // spec/job filters — group passes if at least one detail matches ALL active filters
-      if (fJob || fGlass || fWood || fFinish || fSpacer) {
+      if (fJob || fGlass || fHung || fWood || fFinish || fSpacer) {
         const anyDetailMatches = g.details.some(d => {
           if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
           if (fGlass && d.glassType !== fGlass) return false;
+          if (fHung && d.hungType !== fHung) return false;
           if (fWood && d.woodType !== fWood) return false;
           if (fFinish && d.finish !== fFinish) return false;
           if (fSpacer && d.spacerBarType !== fSpacer) return false;
@@ -215,7 +223,8 @@ export default function ProductsPage() {
     const uniq = (vals: string[]) => Array.from(new Set(vals.filter(Boolean))).sort();
     return {
       productType: uniq(groups.map(g => g.productType)),
-      glassType:   uniq(allDetails.map(d => d.glassType)),
+      glassType:   uniq(allDetails.filter(d => d.glassType).map(d => d.glassType)),
+      hungType:    uniq(allDetails.filter(d => d.hungType).map(d => d.hungType)),
       woodType:    uniq(allDetails.map(d => d.woodType)),
       finish:      uniq(allDetails.map(d => d.finish)),
       spacerBar:   uniq(allDetails.map(d => d.spacerBarType)),
@@ -283,7 +292,7 @@ export default function ProductsPage() {
 
         {/* Per-field dropdowns */}
         {filtersOpen && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 p-4 bg-gray-50 border border-gray-200 rounded-lg">
             {FILTER_FIELDS.map(({ key, label }) => (
               <div key={key}>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{label}</label>
