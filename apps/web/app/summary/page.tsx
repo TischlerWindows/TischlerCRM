@@ -4323,9 +4323,13 @@ export default function SummaryPage() {
                         const base = locQtot ?? defaultQuoteTotals();
                         onQtotChange({ ...base, [cat]: { ...(base as any)[cat], [f]: val } });
                       };
-                      const inputCell = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: string) => editable
-                        ? <td className="px-1 py-1"><input type="text" value={fmtQtInput((locQtot as any)?.[cat]?.[f] || '')} onChange={e => setLocQt(cat, f, stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
-                        : <td className="px-4 py-3 text-right text-gray-400">—</td>;
+                      const inputCell = (cat: 'euroWindows'|'doubleHung'|'euroDoors', f: string) => {
+                        const bgCls = f === 'finalAdj' ? 'bg-purple-50/30' : f === 'final' ? 'bg-green-50/30' : 'bg-blue-50/30';
+                        const txtCls = f === 'finalAdj' ? 'text-purple-700' : f === 'final' ? 'text-green-700' : 'text-blue-700';
+                        return editable
+                          ? <td className={`px-1 py-1 ${bgCls}`}><input type="text" value={fmtQtInput((locQtot as any)?.[cat]?.[f] || '')} onChange={e => setLocQt(cat, f, stripQtInput(e.target.value))} className={`w-full px-2 py-1.5 text-right text-sm ${txtCls} border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40`} placeholder="—" /></td>
+                          : <td className={`px-4 py-3 text-right text-gray-400 ${bgCls}`}>—</td>;
+                      };
                       return (
                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                           <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg flex items-center gap-3">
@@ -4349,10 +4353,10 @@ export default function SummaryPage() {
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL W/ ADJ.</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
+                                  <th className="px-2 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">FINAL W/ ADJ.</th>
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
                                   <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
@@ -4459,10 +4463,10 @@ export default function SummaryPage() {
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL W/ ADJ.</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
+                                <th className="px-2 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">FINAL W/ ADJ.</th>
                                 {/* Calculated Totals headers — separated by thick border */}
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
                                 <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
@@ -4484,8 +4488,8 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmtInt(euroWindowNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`ew-${f}`} className="px-1 py-1">
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  <td key={`ew-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
@@ -4541,8 +4545,8 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmtInt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`dh-${f}`} className="px-1 py-1">
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  <td key={`dh-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
@@ -4598,8 +4602,8 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorSqFt)}</td>
                                 <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmtInt(doorNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
-                                  <td key={`ed-${f}`} className="px-1 py-1">
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder="—" />
+                                  <td key={`ed-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
@@ -4656,7 +4660,7 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })();
-                                  return <td key={`tot-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
+                                  return <td key={`tot-${f}`} className={`px-4 py-3 text-right ${f==='finalAdj'?'text-purple-700 bg-purple-50/30':f==='final'?'text-green-700 bg-green-50/30':'text-blue-700 bg-blue-50/30'}`}>{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-blue-700 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
@@ -4671,7 +4675,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => (
-                                  <td key={`adj-${f}`} className="px-1 py-1">
+                                  <td key={`adj-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
                                     <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className="w-full px-2 py-1.5 text-right text-sm border border-amber-300 rounded focus:ring-1 focus:ring-amber-400 bg-amber-50/40" placeholder="—" />
                                   </td>
                                 ))}
@@ -4696,7 +4700,7 @@ export default function SummaryPage() {
                                         return acc + (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0) + (parseFloat((qt?.doubleHung as any)?.[f]||'0')||0) + (parseFloat((qt?.euroDoors as any)?.[f]||'0')||0);
                                       }, 0)
                                     : (() => { const qt = editingSummary.quoteTotals; return (parseFloat((qt?.euroWindows as any)?.[f]||'0')||0)+(parseFloat((qt?.doubleHung as any)?.[f]||'0')||0)+(parseFloat((qt?.euroDoors as any)?.[f]||'0')||0); })()) + adj;
-                                  return <td key={`gt-${f}`} className="px-4 py-3 text-right text-gray-900">{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
+                                  return <td key={`gt-${f}`} className={`px-4 py-3 text-right ${f==='finalAdj'?'text-purple-700 bg-purple-50/30':f==='final'?'text-green-700 bg-green-50/30':'text-blue-700 bg-blue-50/30'}`}>{sumQt ? `$${fmtInt(sumQt)}` : '—'}</td>;
                                 })}
                                 <td className="px-4 py-3 text-right text-blue-700 border-l-4 border-blue-300 bg-blue-50/60">{gtCalc.full ? fmt(gtCalc.full) : '—'}</td>
                                 <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/60">{gtCalc.disc ? fmt(gtCalc.disc) : '—'}</td>
@@ -4754,7 +4758,8 @@ export default function SummaryPage() {
                           const raw = getAo(key)[field] || '';
                           const displayVal = isDollar ? fmtQtInput(raw) : isEuro ? fmtEuro(raw) : raw;
                           const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[€,]/g, '') : e.target.value);
-                          return <input type="text" value={displayVal} onChange={onChange} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />;
+                          const textColor = isDollar ? (field === 'final' ? 'text-green-700' : 'text-blue-700') : '';
+                          return <input type="text" value={displayVal} onChange={onChange} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${textColor}`} placeholder={placeholder || '—'} />;
                         };
 
                         const inpLeft = (key: string, field: string, placeholder?: string) => (
@@ -4790,9 +4795,9 @@ export default function SummaryPage() {
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Full</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">%__</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">FINAL</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
+                                    <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
                                     <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
@@ -4808,9 +4813,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('windowScreens', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('windowScreens', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('windowScreens', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('windowScreens', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('windowScreens', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('windowScreens', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('windowScreens', 'disc')}</td>
@@ -4824,9 +4829,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('doorScreenSash', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('doorScreenSash', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('doorScreenSash', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('doorScreenSash', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('doorScreenSash', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('doorScreenSash', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('doorScreenSash', 'disc')}</td>
@@ -4839,9 +4844,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('entryDoor', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('entryDoor', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('entryDoor', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('entryDoor', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('entryDoor', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('entryDoor', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('entryDoor', 'disc')}</td>
@@ -4854,9 +4859,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('jambExtensions', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('jambExtensions', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('jambExtensions', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('jambExtensions', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('jambExtensions', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('jambExtensions', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('jambExtensions', 'disc')}</td>
@@ -4869,9 +4874,9 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1">{inp('magneticContact', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('magneticContact', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('magneticContact', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('magneticContact', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('magneticContact', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'disc')}</td>
@@ -4884,9 +4889,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('finalFinish', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('finalFinish', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('finalFinish', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('finalFinish', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('finalFinish', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('finalFinish', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('finalFinish', 'disc')}</td>
@@ -4899,9 +4904,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
-                                    <td className="px-1 py-1">{inp('installation', 'full')}</td>
-                                    <td className="px-1 py-1">{inp('installation', 'pct')}</td>
-                                    <td className="px-1 py-1">{inp('installation', 'final')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'final')}</td>
                                     <td className="px-1 py-1"></td>
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('installation', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
@@ -4914,9 +4919,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('qty'))}</td>
                                     <td colSpan={2}></td>
                                     <td className="px-4 py-3 text-right text-gray-900">{aoSum('netEuro') ? '€' + Math.round(aoSum('netEuro')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('full') ? '$' + Math.round(aoSum('full')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('pct') ? '$' + Math.round(aoSum('pct')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('final') ? '$' + Math.round(aoSum('final')).toLocaleString('en-US') : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/30">{aoSum('full') ? '$' + Math.round(aoSum('full')).toLocaleString('en-US') : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/30">{aoSum('pct') ? '$' + Math.round(aoSum('pct')).toLocaleString('en-US') : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-green-700 bg-green-50/30">{aoSum('final') ? '$' + Math.round(aoSum('final')).toLocaleString('en-US') : '—'}</td>
                                     <td></td>
                                     <td className="px-4 py-3 text-right text-blue-700 border-l-4 border-blue-300 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('full')/n) : '—'; })()}</td>
                                     <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('pct')/n) : '—'; })()}</td>
