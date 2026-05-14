@@ -1921,10 +1921,11 @@ export default function SummaryPage() {
       const r = (v: number) => (net && v) ? (v / net).toFixed(2) : '\u2014';
       return [r(full), r(pct), r(final), r(finalAdj)];
     };
+    const fmtDollar = (v: string | undefined) => { const n = pv(v); return n ? '$' + fmtInt(n) : '—'; };
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
       label, fmtInt(qty), fmtInt(fields), fmtInt(sqFt),
-      net ? '\u20AC' + fmt(net) : '—',
-      cat?.full || '—', cat?.pct || '—', cat?.final || '—', cat?.finalAdj || '—',
+      net ? '\u20AC' + fmtInt(net) : '—',
+      fmtDollar(cat?.full), fmtDollar(cat?.pct), fmtDollar(cat?.final), fmtDollar(cat?.finalAdj),
     ];
 
     // Tracks grand totals for aggregation across locations
@@ -2017,7 +2018,7 @@ export default function SummaryPage() {
           final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
           finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
         }), ...qtCalcCols(tNet, gtQtSum('full'), gtQtSum('pct'), gtQtSum('final'), gtQtSum('finalAdj'))],
-        ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—', '—', '—', '—', '—'],
+        ['Final Adj.', '—', '—', '—', '—', fmtDollar(gta?.full), fmtDollar(gta?.pct), fmtDollar(gta?.final), fmtDollar(gta?.finalAdj), '—', '—', '—', '—'],
         [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
           full:     fmt(gtQtSum('full')     + pv(gta?.full)),
           pct:      fmt(gtQtSum('pct')      + pv(gta?.pct)),
@@ -2077,7 +2078,7 @@ export default function SummaryPage() {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
       }), ...qtCalcCols(tNet, qtSum('full'), qtSum('pct'), qtSum('final'), qtSum('finalAdj'))];
-      const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—', '—', '—', '—', '—'];
+      const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', fmtDollar(gta?.full), fmtDollar(gta?.pct), fmtDollar(gta?.final), fmtDollar(gta?.finalAdj), '—', '—', '—', '—'];
       const grandTotalRow = [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full:     fmt(qtSum('full')     + pv(gta?.full)),
         pct:      fmt(qtSum('pct')      + pv(gta?.pct)),
@@ -2138,14 +2139,15 @@ export default function SummaryPage() {
     const aoColW = [25, 10, 38, 18, 17, 11, 18, 10, 10, 10];
     const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
     const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74], 7: [37, 99, 235], 8: [37, 99, 235], 9: [22, 163, 74] };
+    const aoFmt = (key: string, field: string) => fmtDollar(aoV(key, field));
     const aoRows = [
-      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final'), ...aoCalc('windowScreens')],
-      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
-      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoV('entryDoor', 'full'), aoV('entryDoor', 'pct'), aoV('entryDoor', 'final'), ...aoCalc('entryDoor')],
-      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoV('jambExtensions', 'full'), aoV('jambExtensions', 'pct'), aoV('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
-      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoV('magneticContact', 'full'), aoV('magneticContact', 'pct'), aoV('magneticContact', 'final'), ...aoCalc('magneticContact')],
-      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoV('finalFinish', 'full'), aoV('finalFinish', 'pct'), aoV('finalFinish', 'final'), ...aoCalc('finalFinish')],
-      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoV('installation', 'full'), aoV('installation', 'pct'), aoV('installation', 'final'), ...aoCalc('installation')],
+      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
+      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
+      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
+      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
+      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
+      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ];
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
@@ -4728,9 +4730,10 @@ export default function SummaryPage() {
                           });
                         };
 
-                        const inp = (key: string, field: string, placeholder?: string) => (
-                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
-                        );
+                        const inp = (key: string, field: string, placeholder?: string) => {
+                          const isDollar = field === 'full' || field === 'pct' || field === 'final';
+                          return <input type="text" value={isDollar ? fmtQtInput(getAo(key)[field] || '') : (getAo(key)[field] || '')} onChange={(e) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />;
+                        };
 
                         const inpLeft = (key: string, field: string, placeholder?: string) => (
                           <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
@@ -4889,9 +4892,9 @@ export default function SummaryPage() {
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('qty'))}</td>
                                     <td colSpan={2}></td>
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('netEuro'))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('full'))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('pct'))}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('final'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('full') ? '$' + Math.round(aoSum('full')).toLocaleString('en-US') : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('pct') ? '$' + Math.round(aoSum('pct')).toLocaleString('en-US') : '—'}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('final') ? '$' + Math.round(aoSum('final')).toLocaleString('en-US') : '—'}</td>
                                     <td></td>
                                     <td className="px-4 py-3 text-right text-blue-700 border-l-4 border-blue-300 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('full')/n) : '—'; })()}</td>
                                     <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('pct')/n) : '—'; })()}</td>
