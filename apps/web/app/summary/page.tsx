@@ -3516,7 +3516,7 @@ export default function SummaryPage() {
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                           <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
-                            {editingSummary.date ? new Date(editingSummary.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
+                            {editingSummary.date ? new Date(editingSummary.date + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}
                           </div>
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Page 1</p>
                         </div>
