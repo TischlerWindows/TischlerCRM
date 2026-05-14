@@ -1530,7 +1530,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[] }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; colColors?: { [colIdx: number]: [number, number, number] } }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1615,6 +1615,8 @@ export default function SummaryPage() {
         doc.setTextColor(50, 50, 50);
         cx = x0;
         for (let i = 0; i < (rowLineData[ri]?.length ?? 0); i++) {
+          const colBg = opts?.colColors?.[i];
+          if (colBg) { doc.setFillColor(...colBg); doc.rect(cx, y, colWidths[i] ?? 0, rh, 'F'); }
           const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
           if (isBoldCol) doc.setFont('helvetica', 'bold');
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
@@ -1908,8 +1910,13 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ ADJ'];
-    const qtColW = [30, 12, 12, 18, 22, 20, 20, 20, 22];
+    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
+    const qtColW = [22, 9, 9, 14, 18, 17, 16, 16, 16, 9, 9, 9, 9];
+    const qtColColors: { [colIdx: number]: [number, number, number] } = { 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
+    const qtCalcCols = (net: number, full: number, pct: number, final: number, finalAdj: number) => {
+      const r = (v: number) => (net && v) ? (v / net).toFixed(2) : '\u2014';
+      return [r(full), r(pct), r(final), r(finalAdj)];
+    };
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
       label, fmtInt(qty), fmtInt(fields), fmt(sqFt),
       net ? '\u20AC' + fmt(net) : '—',
@@ -1945,9 +1952,9 @@ export default function SummaryPage() {
         }
       }
       return [
-        qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows),
-        qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),
-        qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),
+        [...qtRow('Euro Windows', ewQ, ewF, ewS, ewN, locQt?.euroWindows), ...qtCalcCols(ewN, pv(locQt?.euroWindows?.full), pv(locQt?.euroWindows?.pct), pv(locQt?.euroWindows?.final), pv(locQt?.euroWindows?.finalAdj))],
+        [...qtRow('Double Hung',  dhQ, dhF, dhS, dhN, locQt?.doubleHung),  ...qtCalcCols(dhN, pv(locQt?.doubleHung?.full),  pv(locQt?.doubleHung?.pct),  pv(locQt?.doubleHung?.final),  pv(locQt?.doubleHung?.finalAdj))],
+        [...qtRow('Euro Doors',   dQ,  dF,  dS,  dN,  locQt?.euroDoors),   ...qtCalcCols(dN,  pv(locQt?.euroDoors?.full),   pv(locQt?.euroDoors?.pct),   pv(locQt?.euroDoors?.final),   pv(locQt?.euroDoors?.finalAdj))],
       ];
     };
 
@@ -1969,7 +1976,7 @@ export default function SummaryPage() {
         doc.text(loc.label || 'Unnamed Location', 15, y);
         y += 4;
         const locQtRows = renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
-        y = drawTable(doc, y, qtHeaders, qtColW, locQtRows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true });
+        y = drawTable(doc, y, qtHeaders, qtColW, locQtRows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true, colColors: qtColColors });
         y += 3;
       }
       // Grand Total table — ensure heading + table stay together
@@ -1997,25 +2004,25 @@ export default function SummaryPage() {
       function gtQtSum(f: string) { return pv((gtQt.euroWindows as any)?.[f]) + pv((gtQt.doubleHung as any)?.[f]) + pv((gtQt.euroDoors as any)?.[f]); }
       const gta = s.grandTotalAdjustment;
       const grandRows = [
-        qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows),
-        qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),
-        qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),
-        qtRow('Total', tQty, tFields, tSqFt, tNet, {
+        [...qtRow('Euro Windows', grandEwQty, grandEwFields, grandEwSqFt, grandEwNet, gtQt.euroWindows), ...qtCalcCols(grandEwNet, pv((gtQt.euroWindows as any)?.full), pv((gtQt.euroWindows as any)?.pct), pv((gtQt.euroWindows as any)?.final), pv((gtQt.euroWindows as any)?.finalAdj))],
+        [...qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),  ...qtCalcCols(grandDhNet, pv((gtQt.doubleHung as any)?.full),  pv((gtQt.doubleHung as any)?.pct),  pv((gtQt.doubleHung as any)?.final),  pv((gtQt.doubleHung as any)?.finalAdj))],
+        [...qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),   ...qtCalcCols(grandDNet,  pv((gtQt.euroDoors as any)?.full),   pv((gtQt.euroDoors as any)?.pct),   pv((gtQt.euroDoors as any)?.final),   pv((gtQt.euroDoors as any)?.finalAdj))],
+        [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
           full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
           pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
           final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
           finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
-        }),
-        ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'],
-        qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+        }), ...qtCalcCols(tNet, gtQtSum('full'), gtQtSum('pct'), gtQtSum('final'), gtQtSum('finalAdj'))],
+        ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—', '—', '—', '—', '—'],
+        [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
           full:     fmt(gtQtSum('full')     + pv(gta?.full)),
           pct:      fmt(gtQtSum('pct')      + pv(gta?.pct)),
           final:    fmt(gtQtSum('final')    + pv(gta?.final)),
           finalAdj: fmt(gtQtSum('finalAdj') + pv(gta?.finalAdj)),
-        }),
+        }), ...qtCalcCols(tNet, gtQtSum('full') + pv(gta?.full), gtQtSum('pct') + pv(gta?.pct), gtQtSum('final') + pv(gta?.final), gtQtSum('finalAdj') + pv(gta?.finalAdj))],
       ];
       const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
-      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors });
+      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors, colColors: qtColColors });
 
       // ── Cost Analysis (multi-location) ──
       const maTotSqFt = tSqFt;
@@ -2062,19 +2069,19 @@ export default function SummaryPage() {
       const tNet = grandEwNet + grandDhNet + grandDNet;
       function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
       const gta = s.grandTotalAdjustment;
-      const totalRow = qtRow('Total', tQty, tFields, tSqFt, tNet, {
+      const totalRow = [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
         full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
         final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
-      });
-      const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—'];
-      const grandTotalRow = qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
+      }), ...qtCalcCols(tNet, qtSum('full'), qtSum('pct'), qtSum('final'), qtSum('finalAdj'))];
+      const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', gta?.full || '—', gta?.pct || '—', gta?.final || '—', gta?.finalAdj || '—', '—', '—', '—', '—'];
+      const grandTotalRow = [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
         full:     fmt(qtSum('full')     + pv(gta?.full)),
         pct:      fmt(qtSum('pct')      + pv(gta?.pct)),
         final:    fmt(qtSum('final')    + pv(gta?.final)),
         finalAdj: fmt(qtSum('finalAdj') + pv(gta?.finalAdj)),
-      });
+      }), ...qtCalcCols(tNet, qtSum('full') + pv(gta?.full), qtSum('pct') + pv(gta?.pct), qtSum('final') + pv(gta?.final), qtSum('finalAdj') + pv(gta?.finalAdj))];
       const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
-      y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors });
+      y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors, colColors: qtColColors });
 
       // ── Cost Analysis (single-location) ──
       const caTotSqFt  = tSqFt;
