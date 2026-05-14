@@ -1530,7 +1530,7 @@ export default function SummaryPage() {
     const drawTable = (
       doc: any, startY: number, headers: string[],
       colWidths: number[], rows: string[][],
-      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; colColors?: { [colIdx: number]: [number, number, number] } }
+      opts?: { rightAlignFrom?: number; boldCol?: number; highlightLast?: boolean; fitOnPage?: boolean; rowColors?: ([number, number, number] | null)[]; colColors?: { [colIdx: number]: [number, number, number] }; colTextColors?: { [colIdx: number]: [number, number, number] } }
     ) => {
       const x0 = 15;
       let y = startY;
@@ -1621,10 +1621,13 @@ export default function SummaryPage() {
           if (isBoldCol) doc.setFont('helvetica', 'bold');
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
           const tx = align === 'right' ? cx + (colWidths[i] ?? 0) - 1.5 : cx + 1.5;
+          const colTxt = opts?.colTextColors?.[i];
+          if (colTxt) doc.setTextColor(...colTxt);
           const lines = rowLineData[ri]?.[i] ?? [];
           lines.forEach((line: string, li: number) => {
             doc.text(line, tx, y + 3 + li * baseRh, { align });
           });
+          if (colTxt) doc.setTextColor(50, 50, 50);
           if (isBoldCol) doc.setFont('helvetica', 'normal');
           cx += colWidths[i] ?? 0;
         }
@@ -1913,6 +1916,7 @@ export default function SummaryPage() {
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
     const qtColW = [22, 9, 9, 14, 18, 17, 16, 16, 16, 9, 9, 9, 9];
     const qtColColors: { [colIdx: number]: [number, number, number] } = { 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
+    const qtColTextColors: { [colIdx: number]: [number, number, number] } = { 5: [37, 99, 235], 6: [37, 99, 235], 7: [22, 163, 74] };
     const qtCalcCols = (net: number, full: number, pct: number, final: number, finalAdj: number) => {
       const r = (v: number) => (net && v) ? (v / net).toFixed(2) : '\u2014';
       return [r(full), r(pct), r(final), r(finalAdj)];
@@ -1976,7 +1980,7 @@ export default function SummaryPage() {
         doc.text(loc.label || 'Unnamed Location', 15, y);
         y += 4;
         const locQtRows = renderQtTable(loc.rows, loc.doorRows, loc.quoteTotals);
-        y = drawTable(doc, y, qtHeaders, qtColW, locQtRows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true, colColors: qtColColors });
+        y = drawTable(doc, y, qtHeaders, qtColW, locQtRows, { rightAlignFrom: 1, boldCol: 0, fitOnPage: true, colColors: qtColColors, colTextColors: qtColTextColors });
         y += 3;
       }
       // Grand Total table — ensure heading + table stay together
@@ -2022,7 +2026,7 @@ export default function SummaryPage() {
         }), ...qtCalcCols(tNet, gtQtSum('full') + pv(gta?.full), gtQtSum('pct') + pv(gta?.pct), gtQtSum('final') + pv(gta?.final), gtQtSum('finalAdj') + pv(gta?.finalAdj))],
       ];
       const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
-      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors, colColors: qtColColors });
+      y = drawTable(doc, y, qtHeaders, qtColW, grandRows, { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: grandRowColors, colColors: qtColColors, colTextColors: qtColTextColors });
 
       // ── Cost Analysis (multi-location) ──
       const maTotSqFt = tSqFt;
@@ -2081,7 +2085,7 @@ export default function SummaryPage() {
         finalAdj: fmt(qtSum('finalAdj') + pv(gta?.finalAdj)),
       }), ...qtCalcCols(tNet, qtSum('full') + pv(gta?.full), qtSum('pct') + pv(gta?.pct), qtSum('final') + pv(gta?.final), qtSum('finalAdj') + pv(gta?.finalAdj))];
       const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
-      y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors, colColors: qtColColors });
+      y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors, colColors: qtColColors, colTextColors: qtColTextColors });
 
       // ── Cost Analysis (single-location) ──
       const caTotSqFt  = tSqFt;
