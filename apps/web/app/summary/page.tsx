@@ -2129,21 +2129,27 @@ export default function SummaryPage() {
     // ── Add-On Items ──
     const ao = (s.addOns || {}) as any;
     const aoV = (key: string, field: string) => (ao[key] as any)?.[field] || '—';
-    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%', 'Final'];
-    const aoColW = [30, 12, 45, 22, 20, 12, 22];
+    const aoCalc = (key: string): string[] => {
+      const net = pv(ao[key]?.netEuro);
+      const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
+      return [r(ao[key]?.full), r(ao[key]?.pct), r(ao[key]?.final)];
+    };
+    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%', 'Final', 'Full', 'Disc', 'Final'];
+    const aoColW = [25, 10, 38, 18, 17, 11, 18, 10, 10, 10];
+    const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
     const aoRows = [
-      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final')],
-      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final')],
-      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoV('entryDoor', 'full'), aoV('entryDoor', 'pct'), aoV('entryDoor', 'final')],
-      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoV('jambExtensions', 'full'), aoV('jambExtensions', 'pct'), aoV('jambExtensions', 'final')],
-      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoV('magneticContact', 'full'), aoV('magneticContact', 'pct'), aoV('magneticContact', 'final')],
-      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoV('finalFinish', 'full'), aoV('finalFinish', 'pct'), aoV('finalFinish', 'final')],
-      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoV('installation', 'full'), aoV('installation', 'pct'), aoV('installation', 'final')],
+      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final'), ...aoCalc('windowScreens')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
+      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoV('entryDoor', 'full'), aoV('entryDoor', 'pct'), aoV('entryDoor', 'final'), ...aoCalc('entryDoor')],
+      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoV('jambExtensions', 'full'), aoV('jambExtensions', 'pct'), aoV('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
+      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoV('magneticContact', 'full'), aoV('magneticContact', 'pct'), aoV('magneticContact', 'final'), ...aoCalc('magneticContact')],
+      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoV('finalFinish', 'full'), aoV('finalFinish', 'pct'), aoV('finalFinish', 'final'), ...aoCalc('finalFinish')],
+      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoV('installation', 'full'), aoV('installation', 'pct'), aoV('installation', 'final'), ...aoCalc('installation')],
     ];
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
