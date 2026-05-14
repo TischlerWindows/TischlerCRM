@@ -1913,7 +1913,7 @@ export default function SummaryPage() {
 
     // ── Quote Totals ──
     y = drawSectionTitle(doc, y, 'Quote Totals');
-    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
+    const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%_', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
     const qtColW = [22, 9, 9, 14, 18, 17, 16, 16, 16, 9, 9, 9, 9];
     const qtColColors: { [colIdx: number]: [number, number, number] } = { 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
     const qtColTextColors: { [colIdx: number]: [number, number, number] } = { 5: [37, 99, 235], 6: [37, 99, 235], 7: [22, 163, 74] };
@@ -2134,9 +2134,10 @@ export default function SummaryPage() {
       const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
       return [r(ao[key]?.full), r(ao[key]?.pct), r(ao[key]?.final)];
     };
-    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%', 'Final', 'Full', 'Disc', 'Final'];
+    const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%_', 'Final', 'Full', 'Disc', 'Final'];
     const aoColW = [25, 10, 38, 18, 17, 11, 18, 10, 10, 10];
     const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
+    const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74] };
     const aoRows = [
       ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoV('windowScreens', 'full'), aoV('windowScreens', 'pct'), aoV('windowScreens', 'final'), ...aoCalc('windowScreens')],
       ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoV('doorScreenSash', 'full'), aoV('doorScreenSash', 'pct'), aoV('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
@@ -2149,7 +2150,7 @@ export default function SummaryPage() {
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
