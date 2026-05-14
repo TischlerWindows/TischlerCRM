@@ -2140,19 +2140,36 @@ export default function SummaryPage() {
     const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
     const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74], 7: [37, 99, 235], 8: [37, 99, 235], 9: [22, 163, 74] };
     const aoFmt = (key: string, field: string) => fmtDollar(aoV(key, field));
+    const aoFmtNet = (key: string) => { const n = pv(aoV(key, 'netEuro')); return n ? '€' + fmtInt(n) : '—'; };
     const aoRows = [
-      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoV('windowScreens', 'netEuro'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
-      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoV('doorScreenSash', 'netEuro'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
-      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoV('entryDoor', 'netEuro'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
-      ['Jamb Extensions', '—', '—', aoV('jambExtensions', 'netEuro'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
-      ['Magnetic Contact', '—', '—', aoV('magneticContact', 'netEuro'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
-      ['Final Finish', '—', '—', aoV('finalFinish', 'netEuro'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
-      ['Installation', '—', '—', aoV('installation', 'netEuro'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
+      ['Window Screens', aoV('windowScreens', 'qty'), `Frame: ${aoV('windowScreens', 'frameType')} | Mesh: ${aoV('windowScreens', 'meshType')}`, aoFmtNet('windowScreens'), aoFmt('windowScreens', 'full'), aoFmt('windowScreens', 'pct'), aoFmt('windowScreens', 'final'), ...aoCalc('windowScreens')],
+      ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoFmtNet('doorScreenSash'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
+      ['Entry Door', aoV('entryDoor', 'qty'), '—', aoFmtNet('entryDoor'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
+      ['Jamb Extensions', '—', '—', aoFmtNet('jambExtensions'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
+      ['Magnetic Contact', '—', '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
+      ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
+      ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
+    ];
+    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
+    const aoTotQty = aoKeys.reduce((s, k) => s + pv(ao[k]?.qty), 0);
+    const aoTotNet = aoKeys.reduce((s, k) => s + pv(ao[k]?.netEuro), 0);
+    const aoTotFull = aoKeys.reduce((s, k) => s + pv(ao[k]?.full), 0);
+    const aoTotPct = aoKeys.reduce((s, k) => s + pv(ao[k]?.pct), 0);
+    const aoTotFinal = aoKeys.reduce((s, k) => s + pv(ao[k]?.final), 0);
+    const aoTotalRow = [
+      'Total', aoTotQty ? fmtInt(aoTotQty) : '—', '—',
+      aoTotNet ? '€' + fmtInt(aoTotNet) : '—',
+      aoTotFull ? '$' + fmtInt(aoTotFull) : '—',
+      aoTotPct ? '$' + fmtInt(aoTotPct) : '—',
+      aoTotFinal ? '$' + fmtInt(aoTotFinal) : '—',
+      aoTotNet && aoTotFull ? (aoTotFull / aoTotNet).toFixed(2) : '—',
+      aoTotNet && aoTotPct ? (aoTotPct / aoTotNet).toFixed(2) : '—',
+      aoTotNet && aoTotFinal ? (aoTotFinal / aoTotNet).toFixed(2) : '—',
     ];
 
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
+    y = drawTable(doc, y, aoHeaders, aoColW, [...aoRows, aoTotalRow], { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, highlightLast: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
@@ -4732,7 +4749,12 @@ export default function SummaryPage() {
 
                         const inp = (key: string, field: string, placeholder?: string) => {
                           const isDollar = field === 'full' || field === 'pct' || field === 'final';
-                          return <input type="text" value={isDollar ? fmtQtInput(getAo(key)[field] || '') : (getAo(key)[field] || '')} onChange={(e) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />;
+                          const isEuro = field === 'netEuro';
+                          const fmtEuro = (v: string) => { const n = parseFloat((v || '').replace(/[€,]/g, '')); return n ? '€' + n.toLocaleString('en-US') : (v || ''); };
+                          const raw = getAo(key)[field] || '';
+                          const displayVal = isDollar ? fmtQtInput(raw) : isEuro ? fmtEuro(raw) : raw;
+                          const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[€,]/g, '') : e.target.value);
+                          return <input type="text" value={displayVal} onChange={onChange} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />;
                         };
 
                         const inpLeft = (key: string, field: string, placeholder?: string) => (
