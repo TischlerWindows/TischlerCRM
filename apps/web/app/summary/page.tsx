@@ -22,6 +22,7 @@ import {
   Printer,
   MapPin,
   FileSpreadsheet,
+  CheckCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getSetting, setSetting } from '@/lib/preferences';
@@ -761,6 +762,7 @@ export default function SummaryPage() {
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
+  const [showSavedToast, setShowSavedToast] = useState(false);
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -2241,12 +2243,8 @@ export default function SummaryPage() {
       date: editingSummary.date || undefined,
       items: logItems,
     }).catch(() => {});
-    const oppId = editingSummary.linkedOpportunityId;
-    setShowNewSummary(false);
-    setEditingSummary(null);
-    if (oppId) {
-      router.push(`/opportunities/${oppId}`);
-    }
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
   };
 
   const defaultQuoteTotals = () => ({
@@ -5652,11 +5650,31 @@ export default function SummaryPage() {
                   <Save className="w-4 h-4 mr-2" />
                   Save Summary
                 </button>
+                <button
+                  onClick={() => {
+                    const oppId = editingSummary?.linkedOpportunityId;
+                    setShowNewSummary(false);
+                    setEditingSummary(null);
+                    setActivePage(1);
+                    if (oppId) {
+                      router.push(`/opportunities/${oppId}`);
+                    }
+                  }}
+                  className="px-6 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
         </div>
       </div>
       </CellNavContext.Provider>
+    )}
+    {showSavedToast && (
+      <div className="fixed top-5 right-5 z-[9999] flex items-center gap-2 bg-green-600 text-white px-5 py-3 rounded-lg shadow-lg" role="status">
+        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+        <span className="text-sm font-medium">Summary saved!</span>
+      </div>
     )}
     </>
   );
