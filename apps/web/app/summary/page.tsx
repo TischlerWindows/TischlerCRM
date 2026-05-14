@@ -174,12 +174,16 @@ interface CellNavCtx {
   editingCellId: string | null;
   setActive: (id: string | null) => void;
   setEditing: (id: string | null) => void;
+  pendingInput: string | null;
+  setPendingInput: (v: string | null) => void;
 }
 const CellNavContext = createContext<CellNavCtx>({
   activeCellId: null,
   editingCellId: null,
   setActive: () => {},
   setEditing: () => {},
+  pendingInput: null,
+  setPendingInput: () => {},
 });
 
 // Searchable dropdown cell component for Type columns
@@ -190,7 +194,7 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
   onChange: (value: string) => void;
   options: string[];
 }) => {
-  const { activeCellId, editingCellId, setActive, setEditing } = useContext(CellNavContext);
+  const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
   const isActive = activeCellId === cellId;
   const isEditing = editingCellId === cellId;
@@ -222,14 +226,19 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
     }
   }, [value, isEditing]);
 
-  // Open dropdown when editing starts
+  // Open dropdown when editing starts; consume pendingInput if set
   useEffect(() => {
     if (isEditing) {
       setIsOpen(true);
+      if (pendingInput !== null) {
+        setSearchTerm(pendingInput);
+        setPendingInput(null);
+      }
     } else {
       setIsOpen(false);
       setSearchTerm('');
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
   useEffect(() => {
@@ -396,7 +405,7 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
   onChange: (value: string) => void;
   onEnterKey?: () => void;
 }) => {
-  const { activeCellId, editingCellId, setActive, setEditing } = useContext(CellNavContext);
+  const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
   const isActive = activeCellId === cellId;
   const isEditing = editingCellId === cellId;
@@ -411,6 +420,15 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
       el.style.height = el.scrollHeight + 'px';
     }
   }, [value, isEditing]);
+
+  // Consume pendingInput: overwrite cell value with the typed char
+  useEffect(() => {
+    if (isEditing && pendingInput !== null) {
+      onChange(pendingInput);
+      setPendingInput(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Escape') {
@@ -742,6 +760,7 @@ export default function SummaryPage() {
   // Excel-like cell selection state
   const [activeCellId, setActiveCellId] = useState<string | null>(null);
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
+  const [pendingInput, setPendingInput] = useState<string | null>(null);
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -806,6 +825,10 @@ export default function SummaryPage() {
         setEditingCellId(activeCellId);
       } else if (e.key === 'Escape') {
         setActiveCellId(null);
+      } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setPendingInput(e.key);
+        setEditingCellId(activeCellId);
       }
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -3430,7 +3453,7 @@ export default function SummaryPage() {
 
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
-      <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId }}>
+      <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[95vh] flex flex-col">
             <div className="p-6 border-b border-gray-200 flex justify-between items-center print:hidden">
