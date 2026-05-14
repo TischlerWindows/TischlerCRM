@@ -4891,7 +4891,7 @@ export default function SummaryPage() {
                                     <td className="px-4 py-3 text-gray-900">Total</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('qty'))}</td>
                                     <td colSpan={2}></td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('netEuro'))}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('netEuro') ? '€' + Math.round(aoSum('netEuro')).toLocaleString('en-US') : '—'}</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{aoSum('full') ? '$' + Math.round(aoSum('full')).toLocaleString('en-US') : '—'}</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{aoSum('pct') ? '$' + Math.round(aoSum('pct')).toLocaleString('en-US') : '—'}</td>
                                     <td className="px-4 py-3 text-right text-gray-900">{aoSum('final') ? '$' + Math.round(aoSum('final')).toLocaleString('en-US') : '—'}</td>
