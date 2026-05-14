@@ -4217,7 +4217,7 @@ export default function SummaryPage() {
                     const doorNet = sumField(allDoorRowsP2, 'netEuroTotal');
 
                     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-                    const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+                    const fmtInt = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
                     // Format a stored raw number string for display inside the input ($87,600)
                     const fmtQtInput = (v: string) => { const n = parseFloat((v || '').replace(/[$,]/g, '')); return n ? '$' + n.toLocaleString('en-US') : (v || ''); };
                     const stripQtInput = (v: string) => v.replace(/[$,]/g, '');
