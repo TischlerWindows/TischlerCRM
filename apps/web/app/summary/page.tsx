@@ -1450,7 +1450,7 @@ export default function SummaryPage() {
     const { jsPDF } = await import('jspdf');
 
     const fmt = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-    const fmtInt = (v: number) => v ? v.toLocaleString('en-US') : '—';
+    const fmtInt = (v: number) => v ? Math.round(v).toLocaleString('en-US') : '—';
     const pv = (x: string | undefined) => parseFloat(x || '0') || 0;
     const sumField = (rows: any[], field: string) => rows.reduce((acc: number, r: any) => acc + (parseFloat(r[field]) || 0), 0);
     const val = (v: string | undefined | null) => v || '—';
@@ -1922,7 +1922,7 @@ export default function SummaryPage() {
       return [r(full), r(pct), r(final), r(finalAdj)];
     };
     const qtRow = (label: string, qty: number, fields: number, sqFt: number, net: number, cat: any): string[] => [
-      label, fmtInt(qty), fmtInt(fields), fmt(sqFt),
+      label, fmtInt(qty), fmtInt(fields), fmtInt(sqFt),
       net ? '\u20AC' + fmt(net) : '—',
       cat?.full || '—', cat?.pct || '—', cat?.final || '—', cat?.finalAdj || '—',
     ];
