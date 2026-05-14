@@ -2151,25 +2151,9 @@ export default function SummaryPage() {
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ];
     const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
-    const aoTotQty = aoKeys.reduce((s, k) => s + pv(ao[k]?.qty), 0);
-    const aoTotNet = aoKeys.reduce((s, k) => s + pv(ao[k]?.netEuro), 0);
-    const aoTotFull = aoKeys.reduce((s, k) => s + pv(ao[k]?.full), 0);
-    const aoTotPct = aoKeys.reduce((s, k) => s + pv(ao[k]?.pct), 0);
-    const aoTotFinal = aoKeys.reduce((s, k) => s + pv(ao[k]?.final), 0);
-    const aoTotalRow = [
-      'Total', aoTotQty ? fmtInt(aoTotQty) : '—', '—',
-      aoTotNet ? '€' + fmtInt(aoTotNet) : '—',
-      aoTotFull ? '$' + fmtInt(aoTotFull) : '—',
-      aoTotPct ? '$' + fmtInt(aoTotPct) : '—',
-      aoTotFinal ? '$' + fmtInt(aoTotFinal) : '—',
-      aoTotNet && aoTotFull ? (aoTotFull / aoTotNet).toFixed(2) : '—',
-      aoTotNet && aoTotPct ? (aoTotPct / aoTotNet).toFixed(2) : '—',
-      aoTotNet && aoTotFinal ? (aoTotFinal / aoTotNet).toFixed(2) : '—',
-    ];
-
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
-    y = drawTable(doc, y, aoHeaders, aoColW, [...aoRows, aoTotalRow], { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, highlightLast: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
+    y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
 
     // ── Add footers to all pages ──
     const totalPages = doc.getNumberOfPages();
@@ -4676,7 +4660,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => (
                                   <td key={`adj-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className="w-full px-2 py-1.5 text-right text-sm border border-amber-300 rounded focus:ring-1 focus:ring-amber-400 bg-amber-50/40" placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 border-l-4 border-blue-300 bg-blue-50/30" />
@@ -4913,21 +4897,7 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
-                                  {/* Total row */}
-                                  <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                                    <td className="px-4 py-3 text-gray-900">Total</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{fmtAo(aoSum('qty'))}</td>
-                                    <td colSpan={2}></td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{aoSum('netEuro') ? '€' + Math.round(aoSum('netEuro')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/30">{aoSum('full') ? '$' + Math.round(aoSum('full')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/30">{aoSum('pct') ? '$' + Math.round(aoSum('pct')).toLocaleString('en-US') : '—'}</td>
-                                    <td className="px-4 py-3 text-right text-green-700 bg-green-50/30">{aoSum('final') ? '$' + Math.round(aoSum('final')).toLocaleString('en-US') : '—'}</td>
-                                    <td></td>
-                                    <td className="px-4 py-3 text-right text-blue-700 border-l-4 border-blue-300 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('full')/n) : '—'; })()}</td>
-                                    <td className="px-4 py-3 text-right text-blue-700 bg-blue-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('pct')/n) : '—'; })()}</td>
-                                    <td className="px-4 py-3 text-right text-green-700 bg-green-50/60">{(() => { const n=aoSum('netEuro'); return n ? fmtAo(aoSum('final')/n) : '—'; })()}</td>
-                                    <td className="bg-purple-50/60"></td>
-                                  </tr>
+
                                 </tbody>
                               </table>
                             </div>
