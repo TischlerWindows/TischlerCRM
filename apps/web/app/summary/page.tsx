@@ -2198,7 +2198,7 @@ export default function SummaryPage() {
       }),
       ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
-    ];
+    ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
     const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
@@ -5016,14 +5016,6 @@ export default function SummaryPage() {
                                       <td className="px-1 py-1 bg-purple-50/30"></td>
                                     </tr>
                                   ))}
-                                  {/* Add Custom Row button */}
-                                  <tr>
-                                    <td colSpan={13} className="px-4 py-2">
-                                      <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
-                                        <Plus className="w-3.5 h-3.5" /> Add Custom Row
-                                      </button>
-                                    </td>
-                                  </tr>
                                   {/* Final Finish */}
                                   <tr className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
@@ -5053,6 +5045,14 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Add Custom Row button */}
+                                  <tr>
+                                    <td colSpan={13} className="px-4 py-2 border-t border-gray-200">
+                                      <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
+                                        <Plus className="w-3.5 h-3.5" /> Add Custom Row
+                                      </button>
+                                    </td>
                                   </tr>
 
                                 </tbody>
