@@ -2175,7 +2175,7 @@ export default function SummaryPage() {
       return [r(ao[key]?.full), r(ao[key]?.pct), r(ao[key]?.final)];
     };
     const aoHeaders = ['Item', 'Qty', 'Details', 'NET \u20AC', 'Full', '%_', 'Final', 'Full', 'Disc', 'Final'];
-    const aoColW = [25, 10, 38, 18, 17, 11, 18, 10, 10, 10];
+    const aoColW = [25, 10, 32, 18, 17, 17, 18, 10, 10, 10];
     const aoCalcColColors: { [colIdx: number]: [number, number, number] } = { 7: [219, 234, 254], 8: [219, 234, 254], 9: [220, 252, 231] };
     const aoColTextColors: { [colIdx: number]: [number, number, number] } = { 4: [37, 99, 235], 5: [37, 99, 235], 6: [22, 163, 74], 7: [37, 99, 235], 8: [37, 99, 235], 9: [22, 163, 74] };
     const aoFmt = (key: string, field: string) => fmtDollar(aoV(key, field));
