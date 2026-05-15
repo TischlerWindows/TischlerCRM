@@ -1467,13 +1467,21 @@ export default function SummaryPage() {
 
     // ── Load logo ──
     let logoDataUrl: string | null = null;
+    let logoAspect = 1;
     try {
-      const res = await fetch('/tces-logo.png');
+      const res = await fetch('/tischler-logo-full.png');
       const blob = await res.blob();
       logoDataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
         reader.readAsDataURL(blob);
+      });
+      // Measure natural dimensions to preserve aspect ratio
+      logoAspect = await new Promise<number>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth / img.naturalHeight);
+        img.onerror = () => resolve(1);
+        img.src = logoDataUrl!;
       });
     } catch { /* logo optional */ }
 
@@ -1489,24 +1497,23 @@ export default function SummaryPage() {
     // ── Helpers ──
     const drawHeader = (doc: any, title: string) => {
       const w = doc.internal.pageSize.getWidth();
-      // Logo (big red T)
+      // Full logo (includes wordmark + subtitle text)
+      const logoH = 14;
+      const logoW = logoH * logoAspect;
       if (logoDataUrl) {
-        doc.addImage(logoDataUrl, 'PNG', 15, 5, 14, 14);
+        doc.addImage(logoDataUrl, 'PNG', 15, 4, logoW, logoH);
       }
-      const textX = logoDataUrl ? 32 : 15;
-      doc.setFontSize(16);
-      doc.setTextColor(...navy);
-      doc.setFont('helvetica', 'bold');
-      doc.text('TISCHLER UND SOHN', textX, 13);
-      doc.setFontSize(9);
+      const textX = logoDataUrl ? 15 : 15;
+      const titleY = logoDataUrl ? 4 + logoH + 3 : 13;
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...gray80);
-      doc.text(title, textX, 20);
+      doc.text(title, textX, titleY);
       doc.text(`${val(s.name)}  |  ${dateStr}`, w - 15, 14, { align: 'right' });
       doc.text(`${val(s.opportunityNumber)}`, w - 15, 20, { align: 'right' });
       doc.setDrawColor(...red);
       doc.setLineWidth(0.6);
-      doc.line(15, 23, w - 15, 23);
+      doc.line(15, titleY + 3, w - 15, titleY + 3);
     };
 
     const drawFooter = (doc: any) => {
