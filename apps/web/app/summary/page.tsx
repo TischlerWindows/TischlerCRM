@@ -1880,13 +1880,24 @@ export default function SummaryPage() {
     )) as string[];
     if (uniqueTypesForPdf.length > 0) {
       y = drawSectionTitle(doc, y, 'Product Type Options');
-      const ptoColW = [60, pw2 - 30 - 60];
-      const ptoHeaders = ['Product Type', 'Selected Options'];
+      const ptoColW = [55, pw2 - 30 - 55 - 50, 50];
+      const ptoHeaders = ['Product Type', 'Selected Options', 'Special Remarks'];
       const ptoRows = uniqueTypesForPdf.map(typeName => {
         const validOpts = new Set(getOptionsForType(typeName));
         const saved = ptoSaved[typeName];
         const selected = Array.isArray(saved) ? saved.filter((o: string) => validOpts.has(o)) : [];
-        return [typeName, selected.length > 0 ? selected.join(', ') : '—'];
+        const remarks = [...new Set(
+          allRows
+            .filter((r: any) => allTypeFields.some(f => {
+              const t = r[f];
+              if (!t) return false;
+              const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : t;
+              return norm === typeName;
+            }))
+            .map((r: any) => (r.specialRemarks || '').trim())
+            .filter(Boolean)
+        )].join(' / ');
+        return [typeName, selected.length > 0 ? selected.join(', ') : '—', remarks || '—'];
       });
       y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0, fitOnPage: true });
       y += 4;
