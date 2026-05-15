@@ -1941,8 +1941,8 @@ export default function SummaryPage() {
     y = drawSectionTitle(doc, y, 'Quote Totals');
     const qtHeaders = ['Category', 'Qty', 'Fields', 'Sq Feet', 'NET \u20AC', 'Full', '%_', 'FINAL', 'FINAL W/ADJ', 'Full', 'Disc', 'Final', 'Adj'];
     const qtColW = [22, 9, 9, 14, 18, 17, 16, 16, 16, 9, 9, 9, 9];
-    const qtColColors: { [colIdx: number]: [number, number, number] } = { 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
-    const qtColTextColors: { [colIdx: number]: [number, number, number] } = { 5: [37, 99, 235], 6: [37, 99, 235], 7: [22, 163, 74], 9: [37, 99, 235], 10: [37, 99, 235], 11: [22, 163, 74], 12: [126, 34, 206] };
+    const qtColColors: { [colIdx: number]: [number, number, number] } = { 8: [243, 232, 255], 9: [219, 234, 254], 10: [219, 234, 254], 11: [220, 252, 231], 12: [243, 232, 255] };
+    const qtColTextColors: { [colIdx: number]: [number, number, number] } = { 5: [37, 99, 235], 6: [37, 99, 235], 7: [22, 163, 74], 8: [126, 34, 206], 9: [37, 99, 235], 10: [37, 99, 235], 11: [22, 163, 74], 12: [126, 34, 206] };
     const qtCalcCols = (net: number, full: number, pct: number, final: number, finalAdj: number) => {
       const r = (v: number) => (net && v) ? (v / net).toFixed(2) : '\u2014';
       return [r(full), r(pct), r(final), r(finalAdj)];
