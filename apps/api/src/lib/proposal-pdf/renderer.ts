@@ -195,10 +195,17 @@ export async function renderProposalPDF(
     const config = (preset.config ?? {}) as Record<string, unknown>;
 
     switch (type) {
-      case 'LETTERHEAD':
-        drawLetterheadBlock(doc, ctx, config as LetterheadConfig);
+      case 'LETTERHEAD': {
+        // Resolve any first-page logo so the letterhead block can reserve space.
+        const firstPageLogoRule =
+          (brand.pageLogos ?? []).find((p) => {
+            const s = p.rule.pageSelector.trim().toLowerCase();
+            return s === 'first' || s === 'all' || s === '1';
+          })?.rule ?? null;
+        drawLetterheadBlock(doc, ctx, config as LetterheadConfig, firstPageLogoRule);
         letterheadDrawn = true;
         break;
+      }
       case 'FREE_TEXT':
         drawFreeTextBlock(doc, preset, ctx);
         break;
@@ -289,16 +296,18 @@ function drawPageLogos(
       try {
         const maxWidth = rule.maxWidthPt;
         const maxHeight = rule.maxHeightPt;
+        // Position logos in the physical page margin — outside the text flow.
+        // Header logos sit in the top margin; footer logos in the bottom margin.
         const x =
           rule.alignment === 'left'
-            ? PAGE_MARGIN
+            ? 15
             : rule.alignment === 'right'
-              ? doc.page.width - PAGE_MARGIN - maxWidth
+              ? doc.page.width - 15 - maxWidth
               : (doc.page.width - maxWidth) / 2;
         const y =
           rule.position === 'header'
-            ? PAGE_MARGIN
-            : doc.page.height - PAGE_MARGIN - maxHeight - 20;
+            ? 10
+            : doc.page.height - 10 - maxHeight;
         doc.image(file.bytes, x, y, { fit: [maxWidth, maxHeight] });
       } catch {
         // Skip a broken logo — don't fail the whole PDF.
@@ -319,17 +328,24 @@ function drawLetterheadBlock(
   doc: PDFKit.PDFDocument,
   ctx: BrandContext,
   config: LetterheadConfig,
+  firstLogoRule?: PageLogoRule | null,
 ): void {
-  // Reserve ~70pt of vertical space — page-logo post-pass paints into it.
-  // When no first-page logo rule matches, we draw the wordmark fallback
-  // inline (overlaps the reserved band but only one of the two ever
-  // renders text).
   const wordmark = config.wordmarkText ?? 'TISCHLER UND SOHN';
   const tagline = config.taglineText ?? 'European Wood Windows & Doors';
   const showRule = config.showRule !== false;
 
-  doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(20).text(wordmark, { lineGap: 2 });
-  doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(8).text(tagline);
+  if (firstLogoRule) {
+    // Logo is painted in the top-left margin by the post-pass (outside the text
+    // flow). Reserve vertical space here so the red rule and all body content
+    // start clearly below the logo image.
+    doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    const lineH = doc.currentLineHeight(true);
+    const reservePt = firstLogoRule.maxHeightPt + 8;
+    doc.moveDown(Math.max(1, reservePt / lineH));
+  } else {
+    doc.fillColor(ctx.navy).font(ctx.fonts.title).fontSize(20).text(wordmark, { lineGap: 2 });
+    doc.fillColor(ctx.muted).font(ctx.fonts.subtitle).fontSize(8).text(tagline);
+  }
 
   if (showRule) {
     doc.moveDown(0.5)
