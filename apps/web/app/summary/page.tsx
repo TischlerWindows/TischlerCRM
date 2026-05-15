@@ -676,6 +676,12 @@ interface Summary {
     entryDoor: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     jambExtensions: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     magneticContact: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    splitFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    integratedContacts: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    poolContacts: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    custom: { item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
   };
@@ -1296,6 +1302,12 @@ export default function SummaryPage() {
         entryDoor: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         jambExtensions: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         magneticContact: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        splitFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        integratedContacts: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        poolContacts: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        custom: { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
       },
@@ -2173,11 +2185,17 @@ export default function SummaryPage() {
       ['Door Screen Sash', aoV('doorScreenSash', 'qty'), `Wood: ${aoV('doorScreenSash', 'woodFrame')} | Mesh: ${aoV('doorScreenSash', 'meshType')}`, aoFmtNet('doorScreenSash'), aoFmt('doorScreenSash', 'full'), aoFmt('doorScreenSash', 'pct'), aoFmt('doorScreenSash', 'final'), ...aoCalc('doorScreenSash')],
       ['Entry Door', aoV('entryDoor', 'qty'), '—', aoFmtNet('entryDoor'), aoFmt('entryDoor', 'full'), aoFmt('entryDoor', 'pct'), aoFmt('entryDoor', 'final'), ...aoCalc('entryDoor')],
       ['Jamb Extensions', '—', '—', aoFmtNet('jambExtensions'), aoFmt('jambExtensions', 'full'), aoFmt('jambExtensions', 'pct'), aoFmt('jambExtensions', 'final'), ...aoCalc('jambExtensions')],
-      ['Magnetic Contact', '—', '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
+      ['Magnetic Contact', aoV('magneticContact', 'qty'), '—', aoFmtNet('magneticContact'), aoFmt('magneticContact', 'full'), aoFmt('magneticContact', 'pct'), aoFmt('magneticContact', 'final'), ...aoCalc('magneticContact')],
+      ['Split Finish', '—', '—', aoFmtNet('splitFinish'), aoFmt('splitFinish', 'full'), aoFmt('splitFinish', 'pct'), aoFmt('splitFinish', 'final'), ...aoCalc('splitFinish')],
+      ['Integrated Contacts', aoV('integratedContacts', 'qty'), '—', aoFmtNet('integratedContacts'), aoFmt('integratedContacts', 'full'), aoFmt('integratedContacts', 'pct'), aoFmt('integratedContacts', 'final'), ...aoCalc('integratedContacts')],
+      ['Pool Contacts', '—', '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
+      ['Shade Boxes', '—', '—', aoFmtNet('shadeBoxes'), aoFmt('shadeBoxes', 'full'), aoFmt('shadeBoxes', 'pct'), aoFmt('shadeBoxes', 'final'), ...aoCalc('shadeBoxes')],
+      ['Genius Lock', aoV('geniusLock', 'qty'), '—', aoFmtNet('geniusLock'), aoFmt('geniusLock', 'full'), aoFmt('geniusLock', 'pct'), aoFmt('geniusLock', 'final'), ...aoCalc('geniusLock')],
+      [aoV('custom', 'item') || 'Custom', aoV('custom', 'qty'), aoV('custom', 'details'), aoFmtNet('custom'), aoFmt('custom', 'full'), aoFmt('custom', 'pct'), aoFmt('custom', 'final'), ...aoCalc('custom')],
       ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ];
-    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
+    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'custom', 'finalFinish', 'installation'];
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
     y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
@@ -4724,7 +4742,7 @@ export default function SummaryPage() {
                         const ao = editingSummary.addOns || {} as any;
                         const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
-                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'finalFinish', 'installation'];
+                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'custom', 'finalFinish', 'installation'];
                         const aoSum = (field: string) => aoKeys.reduce((acc, k) => acc + (parseFloat(getAo(k)[field]) || 0), 0);
                         const fmtAo = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                         const calcAo = (key: string) => {
@@ -4751,6 +4769,12 @@ export default function SummaryPage() {
                               entryDoor: ao.entryDoor || defaultAo,
                               jambExtensions: ao.jambExtensions || defaultAo,
                               magneticContact: ao.magneticContact || defaultAo,
+                              splitFinish: ao.splitFinish || defaultAo,
+                              integratedContacts: ao.integratedContacts || defaultAo,
+                              poolContacts: ao.poolContacts || defaultAo,
+                              shadeBoxes: ao.shadeBoxes || defaultAo,
+                              geniusLock: ao.geniusLock || defaultAo,
+                              custom: ao.custom || defaultAo,
                               finalFinish: ao.finalFinish || defaultAo,
                               installation: ao.installation || defaultAo,
                               [key]: { ...getAo(key), [field]: value },
@@ -4888,6 +4912,96 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'full')}</td>
                                     <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('magneticContact', 'disc')}</td>
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('magneticContact', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Split Finish */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Split Finish</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('splitFinish', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('splitFinish', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('splitFinish', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('splitFinish', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('splitFinish', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('splitFinish', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('splitFinish', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Integrated Contacts */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Integrated Contacts</td>
+                                    <td className="px-1 py-1">{inp('integratedContacts', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('integratedContacts', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('integratedContacts', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('integratedContacts', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('integratedContacts', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('integratedContacts', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('integratedContacts', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('integratedContacts', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Pool Contacts */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Pool Contacts</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('poolContacts', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('poolContacts', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('poolContacts', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('poolContacts', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('poolContacts', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('poolContacts', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('poolContacts', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Shade Boxes */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Shade Boxes</td>
+                                    <td className="px-4 py-2"></td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('shadeBoxes', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('shadeBoxes', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('shadeBoxes', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('shadeBoxes', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('shadeBoxes', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('shadeBoxes', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('shadeBoxes', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Genius Lock */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-4 py-2 font-medium text-gray-900">Genius Lock</td>
+                                    <td className="px-1 py-1">{inp('geniusLock', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}></td>
+                                    <td className="px-1 py-1">{inp('geniusLock', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('geniusLock', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('geniusLock', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('geniusLock', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('geniusLock', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('geniusLock', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('geniusLock', 'final')}</td>
+                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  </tr>
+                                  {/* Custom */}
+                                  <tr className="hover:bg-gray-50">
+                                    <td className="px-1 py-1">{inpLeft('custom', 'item', 'Item name')}</td>
+                                    <td className="px-1 py-1">{inp('custom', 'qty', 'Qty')}</td>
+                                    <td className="px-1 py-1" colSpan={2}>{inpLeft('custom', 'details', 'Details')}</td>
+                                    <td className="px-1 py-1">{inp('custom', 'netEuro')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('custom', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{inp('custom', 'pct')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{inp('custom', 'final')}</td>
+                                    <td className="px-1 py-1"></td>
+                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('custom', 'full')}</td>
+                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('custom', 'disc')}</td>
+                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('custom', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   {/* Final Finish */}
