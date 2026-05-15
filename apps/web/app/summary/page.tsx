@@ -681,7 +681,7 @@ interface Summary {
     poolContacts: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     shadeBoxes: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    custom: { item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
     finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
   };
@@ -1307,7 +1307,7 @@ export default function SummaryPage() {
         poolContacts: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         shadeBoxes: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        custom: { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        customRows: [],
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
       },
@@ -2191,11 +2191,15 @@ export default function SummaryPage() {
       ['Pool Contacts', '—', '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
       ['Shade Boxes', '—', '—', aoFmtNet('shadeBoxes'), aoFmt('shadeBoxes', 'full'), aoFmt('shadeBoxes', 'pct'), aoFmt('shadeBoxes', 'final'), ...aoCalc('shadeBoxes')],
       ['Genius Lock', aoV('geniusLock', 'qty'), '—', aoFmtNet('geniusLock'), aoFmt('geniusLock', 'full'), aoFmt('geniusLock', 'pct'), aoFmt('geniusLock', 'final'), ...aoCalc('geniusLock')],
-      [aoV('custom', 'item') || 'Custom', aoV('custom', 'qty'), aoV('custom', 'details'), aoFmtNet('custom'), aoFmt('custom', 'full'), aoFmt('custom', 'pct'), aoFmt('custom', 'final'), ...aoCalc('custom')],
+      ...(ao.customRows || []).map((cr: any) => {
+        const net = pv(cr.netEuro);
+        const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
+        return [cr.item || 'Custom', cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full), fmtDollar(cr.pct), fmtDollar(cr.final), r(cr.full), r(cr.pct), r(cr.final)];
+      }),
       ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ];
-    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'custom', 'finalFinish', 'installation'];
+    const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
     if (y + 50 > doc.internal.pageSize.getHeight() - 14) { doc.addPage('a4', 'portrait'); drawHeader(doc, 'Quote Summary — Project Summary (cont.)'); y = 28; }
     y = drawSectionTitle(doc, y, 'Add-On Items');
     y = drawTable(doc, y, aoHeaders, aoColW, aoRows, { rightAlignFrom: 3, boldCol: 0, fitOnPage: true, colColors: aoCalcColColors, colTextColors: aoColTextColors });
@@ -4742,7 +4746,13 @@ export default function SummaryPage() {
                         const ao = editingSummary.addOns || {} as any;
                         const defaultAo = { qty: '', frameType: '', woodFrame: '', meshType: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' };
                         const getAo = (key: string) => ({ ...defaultAo, ...(ao as any)[key] });
-                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'custom', 'finalFinish', 'installation'];
+                        const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
+                        const customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }> = (ao.customRows || []) as any;
+                        const addCustomRow = () => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: [...customRows, { item: '', qty: '', details: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' }] } });
+                        const removeCustomRow = (idx: number) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.filter((_, i) => i !== idx) } });
+                        const setCustomRow = (idx: number, field: string, value: string) => setEditingSummary({ ...editingSummary, addOns: { ...ao, customRows: customRows.map((r, i) => i === idx ? { ...r, [field]: value } : r) } });
+                        const calcCr = (cr: typeof customRows[0]) => { const net = parseFloat(cr.netEuro) || 0; return { full: net ? (parseFloat(cr.full) || 0) / net : 0, disc: net ? (parseFloat(cr.pct) || 0) / net : 0, final: net ? (parseFloat(cr.final) || 0) / net : 0 }; };
+                        const aoCalcDisplayCr = (cr: typeof customRows[0], field: 'full' | 'disc' | 'final') => { const v = calcCr(cr)[field]; const color = field === 'final' ? 'text-green-600' : 'text-blue-600'; return <div className={`w-full px-2 py-1.5 text-right text-sm ${color}`}>{v ? fmtAo(v) : '—'}</div>; };
                         const aoSum = (field: string) => aoKeys.reduce((acc, k) => acc + (parseFloat(getAo(k)[field]) || 0), 0);
                         const fmtAo = (v: number) => v ? v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
                         const calcAo = (key: string) => {
@@ -4774,7 +4784,7 @@ export default function SummaryPage() {
                               poolContacts: ao.poolContacts || defaultAo,
                               shadeBoxes: ao.shadeBoxes || defaultAo,
                               geniusLock: ao.geniusLock || defaultAo,
-                              custom: ao.custom || defaultAo,
+                              customRows: ao.customRows || [],
                               finalFinish: ao.finalFinish || defaultAo,
                               installation: ao.installation || defaultAo,
                               [key]: { ...getAo(key), [field]: value },
@@ -4989,20 +4999,30 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('geniusLock', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
-                                  {/* Custom */}
-                                  <tr className="hover:bg-gray-50">
-                                    <td className="px-1 py-1">{inpLeft('custom', 'item', 'Item name')}</td>
-                                    <td className="px-1 py-1">{inp('custom', 'qty', 'Qty')}</td>
-                                    <td className="px-1 py-1" colSpan={2}>{inpLeft('custom', 'details', 'Details')}</td>
-                                    <td className="px-1 py-1">{inp('custom', 'netEuro')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('custom', 'full')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('custom', 'pct')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('custom', 'final')}</td>
-                                    <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('custom', 'full')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('custom', 'disc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('custom', 'final')}</td>
-                                    <td className="px-1 py-1 bg-purple-50/30"></td>
+                                  {/* Custom rows */}
+                                  {customRows.map((cr, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50 bg-amber-50/30">
+                                      <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
+                                      <td className="px-1 py-1" colSpan={2}><input type="text" value={cr.details} onChange={e => setCustomRow(idx, 'details', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Details" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setCustomRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setCustomRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-green-50/30"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setCustomRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-green-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1"><button onClick={() => removeCustomRow(idx)} className="w-full flex items-center justify-center text-red-400 hover:text-red-600" title="Remove row"><X className="w-3.5 h-3.5" /></button></td>
+                                      <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplayCr(cr, 'full')}</td>
+                                      <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplayCr(cr, 'disc')}</td>
+                                      <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplayCr(cr, 'final')}</td>
+                                      <td className="px-1 py-1 bg-purple-50/30"></td>
+                                    </tr>
+                                  ))}
+                                  {/* Add Custom Row button */}
+                                  <tr>
+                                    <td colSpan={13} className="px-4 py-2">
+                                      <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
+                                        <Plus className="w-3.5 h-3.5" /> Add Custom Row
+                                      </button>
+                                    </td>
                                   </tr>
                                   {/* Final Finish */}
                                   <tr className="hover:bg-gray-50">
