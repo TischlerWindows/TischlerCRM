@@ -399,12 +399,11 @@ const CellDropdown = ({ rowId, field, value, onChange, options }: {
 };
 
 // Simple cell input component - defined outside to prevent recreation on every render
-const CellInput = ({ rowId, field, value, onChange, onEnterKey }: { 
+const CellInput = ({ rowId, field, value, onChange }: { 
   rowId: string; 
   field: string; 
   value: string; 
   onChange: (value: string) => void;
-  onEnterKey?: () => void;
 }) => {
   const { activeCellId, editingCellId, setActive, setEditing, pendingInput, setPendingInput } = useContext(CellNavContext);
   const cellId = `${rowId}:${field}`;
@@ -440,22 +439,6 @@ const CellInput = ({ rowId, field, value, onChange, onEnterKey }: {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-
-      if (onEnterKey) {
-        const tbody = e.currentTarget.closest('tbody');
-        setEditing(null);
-        onEnterKey();
-        setTimeout(() => {
-          if (tbody) {
-            const lastRow = tbody.querySelector(':scope > tr:last-child');
-            if (lastRow) {
-              const firstCellId = lastRow.querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-              if (firstCellId) { setActive(firstCellId); setEditing(firstCellId); }
-            }
-          }
-        }, 50);
-        return;
-      }
 
       const td = e.currentTarget.closest('td');
       const tr = td?.closest('tr');
@@ -5320,7 +5303,7 @@ export default function SummaryPage() {
                             <ReadOnlyCellInput value={row.siteMullionsTotal} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateRow(row.id, 'netEuroEach', v)} onEnterKey={handleAddRow} />
+                            <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateRow(row.id, 'netEuroEach', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
@@ -5569,7 +5552,7 @@ export default function SummaryPage() {
                             <ReadOnlyCellInput value={row.siteMullionsTotal} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
-                            <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateDoorRow(row.id, 'netEuroEach', v)} onEnterKey={handleAddDoorRow} />
+                            <CellInput rowId={row.id} field="netEuroEach" value={row.netEuroEach} onChange={(v) => updateDoorRow(row.id, 'netEuroEach', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
                             <ReadOnlyCellInput value={row.netEuroTotal ? `€${parseFloat(row.netEuroTotal).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ''} />
