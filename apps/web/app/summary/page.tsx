@@ -1631,13 +1631,14 @@ export default function SummaryPage() {
         cx = x0;
         for (let i = 0; i < (rowLineData[ri]?.length ?? 0); i++) {
           const colBg = opts?.colColors?.[i];
+          const colTxt = opts?.colTextColors?.[i];
           if (colBg) { doc.setFillColor(...colBg); doc.rect(cx, y, colWidths[i] ?? 0, rh, 'F'); }
+          // Re-assert text color after any fill operation — jsPDF can conflate fill/text state
+          if (colTxt) doc.setTextColor(...colTxt); else doc.setTextColor(50, 50, 50);
           const isBoldCol = opts?.boldCol !== undefined && i === opts.boldCol;
           if (isBoldCol) doc.setFont('helvetica', 'bold');
           const align = (opts?.rightAlignFrom !== undefined && i >= opts.rightAlignFrom) ? 'right' : 'left';
           const tx = align === 'right' ? cx + (colWidths[i] ?? 0) - 1.5 : cx + 1.5;
-          const colTxt = opts?.colTextColors?.[i];
-          if (colTxt) doc.setTextColor(...colTxt);
           const lines = rowLineData[ri]?.[i] ?? [];
           lines.forEach((line: string, li: number) => {
             doc.text(line, tx, y + 3 + li * baseRh, { align });
