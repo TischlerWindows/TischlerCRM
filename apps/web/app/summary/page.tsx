@@ -2191,12 +2191,12 @@ export default function SummaryPage() {
       ['Pool Contacts', '—', '—', aoFmtNet('poolContacts'), aoFmt('poolContacts', 'full'), aoFmt('poolContacts', 'pct'), aoFmt('poolContacts', 'final'), ...aoCalc('poolContacts')],
       ['Shade Boxes', '—', '—', aoFmtNet('shadeBoxes'), aoFmt('shadeBoxes', 'full'), aoFmt('shadeBoxes', 'pct'), aoFmt('shadeBoxes', 'final'), ...aoCalc('shadeBoxes')],
       ['Genius Lock', aoV('geniusLock', 'qty'), '—', aoFmtNet('geniusLock'), aoFmt('geniusLock', 'full'), aoFmt('geniusLock', 'pct'), aoFmt('geniusLock', 'final'), ...aoCalc('geniusLock')],
+      ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
       ...(ao.customRows || []).map((cr: any) => {
         const net = pv(cr.netEuro);
         const r = (v: string | undefined) => (net && pv(v)) ? (pv(v) / net).toFixed(2) : '—';
         return [cr.item || 'Custom', cr.qty || '—', cr.details || '—', net ? '\u20ac' + fmtInt(net) : '—', fmtDollar(cr.full), fmtDollar(cr.pct), fmtDollar(cr.final), r(cr.full), r(cr.pct), r(cr.final)];
       }),
-      ['Final Finish', '—', '—', aoFmtNet('finalFinish'), aoFmt('finalFinish', 'full'), aoFmt('finalFinish', 'pct'), aoFmt('finalFinish', 'final'), ...aoCalc('finalFinish')],
       ['Installation', '—', '—', aoFmtNet('installation'), aoFmt('installation', 'full'), aoFmt('installation', 'pct'), aoFmt('installation', 'final'), ...aoCalc('installation')],
     ].filter(row => [row[3], row[4], row[5], row[6]].some(v => v !== '—'));
     const aoKeys = ['windowScreens', 'doorScreenSash', 'entryDoor', 'jambExtensions', 'magneticContact', 'splitFinish', 'integratedContacts', 'poolContacts', 'shadeBoxes', 'geniusLock', 'finalFinish', 'installation'];
