@@ -2052,17 +2052,17 @@ export default function SummaryPage() {
         [...qtRow('Double Hung',  grandDhQty, grandDhFields, grandDhSqFt, grandDhNet, gtQt.doubleHung),  ...qtCalcCols(grandDhNet, pv((gtQt.doubleHung as any)?.full),  pv((gtQt.doubleHung as any)?.pct),  pv((gtQt.doubleHung as any)?.final),  pv((gtQt.doubleHung as any)?.finalAdj))],
         [...qtRow('Euro Doors',   grandDQty,  grandDFields,  grandDSqFt,  grandDNet,  gtQt.euroDoors),   ...qtCalcCols(grandDNet,  pv((gtQt.euroDoors as any)?.full),   pv((gtQt.euroDoors as any)?.pct),   pv((gtQt.euroDoors as any)?.final),   pv((gtQt.euroDoors as any)?.finalAdj))],
         [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
-          full: gtQtSum('full') ? fmt(gtQtSum('full')) : '—',
-          pct:  gtQtSum('pct')  ? fmt(gtQtSum('pct'))  : '—',
-          final: gtQtSum('final') ? fmt(gtQtSum('final')) : '—',
-          finalAdj: gtQtSum('finalAdj') ? fmt(gtQtSum('finalAdj')) : '—',
+          full: String(gtQtSum('full')),
+          pct:  String(gtQtSum('pct')),
+          final: String(gtQtSum('final')),
+          finalAdj: String(gtQtSum('finalAdj')),
         }), ...qtCalcCols(tNet, gtQtSum('full'), gtQtSum('pct'), gtQtSum('final'), gtQtSum('finalAdj'))],
         ['Final Adj.', '—', '—', '—', '—', fmtDollar(gta?.full), fmtDollar(gta?.pct), fmtDollar(gta?.final), fmtDollar(gta?.finalAdj), '—', '—', '—', '—'],
         [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
-          full:     fmt(gtQtSum('full')     + pv(gta?.full)),
-          pct:      fmt(gtQtSum('pct')      + pv(gta?.pct)),
-          final:    fmt(gtQtSum('final')    + pv(gta?.final)),
-          finalAdj: fmt(gtQtSum('finalAdj') + pv(gta?.finalAdj)),
+          full:     String(gtQtSum('full')     + pv(gta?.full)),
+          pct:      String(gtQtSum('pct')      + pv(gta?.pct)),
+          final:    String(gtQtSum('final')    + pv(gta?.final)),
+          finalAdj: String(gtQtSum('finalAdj') + pv(gta?.finalAdj)),
         }), ...qtCalcCols(tNet, gtQtSum('full') + pv(gta?.full), gtQtSum('pct') + pv(gta?.pct), gtQtSum('final') + pv(gta?.final), gtQtSum('finalAdj') + pv(gta?.finalAdj))],
       ];
       const grandRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
@@ -2114,15 +2114,15 @@ export default function SummaryPage() {
       function qtSum(f: string) { return pv((qt.euroWindows as any)?.[f]) + pv((qt.doubleHung as any)?.[f]) + pv((qt.euroDoors as any)?.[f]); }
       const gta = s.grandTotalAdjustment;
       const totalRow = [...qtRow('Total', tQty, tFields, tSqFt, tNet, {
-        full: qtSum('full') ? fmt(qtSum('full')) : '—', pct: qtSum('pct') ? fmt(qtSum('pct')) : '—',
-        final: qtSum('final') ? fmt(qtSum('final')) : '—', finalAdj: qtSum('finalAdj') ? fmt(qtSum('finalAdj')) : '—',
+        full: String(qtSum('full')), pct: String(qtSum('pct')),
+        final: String(qtSum('final')), finalAdj: String(qtSum('finalAdj')),
       }), ...qtCalcCols(tNet, qtSum('full'), qtSum('pct'), qtSum('final'), qtSum('finalAdj'))];
       const finalAdjRow = ['Final Adj.', '—', '—', '—', '—', fmtDollar(gta?.full), fmtDollar(gta?.pct), fmtDollar(gta?.final), fmtDollar(gta?.finalAdj), '—', '—', '—', '—'];
       const grandTotalRow = [...qtRow('Grand Total', tQty, tFields, tSqFt, tNet, {
-        full:     fmt(qtSum('full')     + pv(gta?.full)),
-        pct:      fmt(qtSum('pct')      + pv(gta?.pct)),
-        final:    fmt(qtSum('final')    + pv(gta?.final)),
-        finalAdj: fmt(qtSum('finalAdj') + pv(gta?.finalAdj)),
+        full:     String(qtSum('full')     + pv(gta?.full)),
+        pct:      String(qtSum('pct')      + pv(gta?.pct)),
+        final:    String(qtSum('final')    + pv(gta?.final)),
+        finalAdj: String(qtSum('finalAdj') + pv(gta?.finalAdj)),
       }), ...qtCalcCols(tNet, qtSum('full') + pv(gta?.full), qtSum('pct') + pv(gta?.pct), qtSum('final') + pv(gta?.final), qtSum('finalAdj') + pv(gta?.finalAdj))];
       const singleRowColors: ([number,number,number]|null)[] = [null, null, null, [232,235,240], [255,243,205], null];
       y = drawTable(doc, y, qtHeaders, qtColW, [...baseQtRows, totalRow, finalAdjRow, grandTotalRow], { rightAlignFrom: 1, boldCol: 0, highlightLast: true, fitOnPage: true, rowColors: singleRowColors, colColors: qtColColors, colTextColors: qtColTextColors });
