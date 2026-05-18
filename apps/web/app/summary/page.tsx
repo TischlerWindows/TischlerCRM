@@ -5313,7 +5313,7 @@ export default function SummaryPage() {
                 </div>
                 <div className="overflow-x-auto max-h-[800px] overflow-y-auto pb-64">
                   <table className="text-sm">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-100 sticky top-0 z-30">
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
@@ -5325,7 +5325,7 @@ export default function SummaryPage() {
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:20} : {minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:40} : {minWidth:'100px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
@@ -5570,7 +5570,7 @@ export default function SummaryPage() {
                 </div>
                 <div className="overflow-x-auto max-h-[800px] overflow-y-auto pb-64">
                   <table className="text-sm">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-gray-100 sticky top-0 z-30">
                       {/* Spanning header row */}
                       <tr>
                         <th className="px-0.5 py-1 bg-gray-100 border-r border-gray-300" colSpan={22 + (showType3 ? 2 : 0) + (showType4 ? 2 : 0)}></th>
@@ -5582,7 +5582,7 @@ export default function SummaryPage() {
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:20} : {minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:40} : {minWidth:'100px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
