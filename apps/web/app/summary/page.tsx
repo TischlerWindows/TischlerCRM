@@ -465,31 +465,6 @@ const CellInput = ({ rowId, field, value, onChange }: {
       return;
     }
 
-    // Move to previous cell on Backspace when current cell is empty
-    if (e.key === 'Backspace' && value === '') {
-      e.preventDefault();
-      const td = e.currentTarget.closest('td');
-      const tr = td?.closest('tr');
-      const tbody = tr?.closest('tbody');
-      if (td && tr && tbody) {
-        const rows = Array.from(tbody.querySelectorAll(':scope > tr'));
-        const cells = Array.from(tr.querySelectorAll(':scope > td'));
-        const rowIdx = rows.indexOf(tr as HTMLTableRowElement);
-        const colIdx = cells.indexOf(td as HTMLTableCellElement);
-        setEditing(null);
-        for (let c = colIdx - 1; c >= 0; c--) {
-          const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-          if (cId) { setActive(cId); setEditing(cId); return; }
-        }
-        if (rowIdx > 0) {
-          const prevCells = Array.from((rows[rowIdx - 1] as Element).querySelectorAll(':scope > td'));
-          for (let c = prevCells.length - 1; c >= 0; c--) {
-            const cId = (prevCells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
-            if (cId) { setActive(cId); setEditing(cId); return; }
-          }
-        }
-      }
-    }
   };
 
   if (!isEditing) {
@@ -1916,17 +1891,21 @@ export default function SummaryPage() {
         const validOpts = new Set(getOptionsForType(typeName));
         const saved = ptoSaved[typeName];
         const selected = Array.isArray(saved) ? saved.filter((o: string) => validOpts.has(o)) : [];
-        const remarks = [...new Set(
-          allRows
-            .filter((r: any) => allTypeFields.some(f => {
-              const t = r[f];
-              if (!t) return false;
-              const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : t;
-              return norm === typeName;
-            }))
-            .map((r: any) => (r.specialRemarks || '').trim())
-            .filter(Boolean)
-        )].join(' / ');
+        const remarkParts = allRows
+          .filter((r: any) => allTypeFields.some(f => {
+            const t = r[f];
+            if (!t) return false;
+            const norm = (t === 'Fixed with Sash' && r[subOptFieldMap[f]!]) ? `Fixed with Sash: ${r[subOptFieldMap[f]!]}` : t;
+            return norm === typeName;
+          }))
+          .map((r: any) => {
+            const remark = (r.specialRemarks || '').trim();
+            if (!remark) return null;
+            const tus = (r.tusPosition || '').trim();
+            return tus ? `${remark} Unit ${tus}` : remark;
+          })
+          .filter(Boolean);
+        const remarks = [...new Set(remarkParts)].join(' / ');
         return [typeName, selected.length > 0 ? selected.join(', ') : '—', remarks || '—'];
       });
       y = drawTable(doc, y, ptoHeaders, ptoColW, ptoRows, { boldCol: 0, fitOnPage: true });
