@@ -16,6 +16,7 @@ import {
   List,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   X,
   Eye,
   Save,
@@ -735,6 +736,7 @@ export default function SummaryPage() {
   const [pendingInput, setPendingInput] = useState<string | null>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [tusPositionLocked, setTusPositionLocked] = useState(true);
+  const [hiddenAoRows, setHiddenAoRows] = useState<Set<string>>(new Set());
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -4802,6 +4804,15 @@ export default function SummaryPage() {
                           <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
                         );
 
+                        const toggleAoRow = (key: string) => setHiddenAoRows(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+                        const aoToggleBtn = (key: string) => (
+                          <td className="px-1 py-1 text-center" style={{ width: '24px' }}>
+                            <button onClick={() => toggleAoRow(key)} className="text-gray-400 hover:text-gray-600" title={hiddenAoRows.has(key) ? 'Show row' : 'Hide row'}>
+                              {hiddenAoRows.has(key) ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          </td>
+                        );
+
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
                             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
@@ -4811,6 +4822,7 @@ export default function SummaryPage() {
                             <div className="overflow-x-auto">
                               <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
                                 <colgroup>
+                                  <col style={{ width: '24px' }} />
                                   <col style={{ width: '11%' }} />
                                   <col style={{ width: '5%' }} />
                                   <col style={{ width: '7%' }} />
@@ -4827,6 +4839,7 @@ export default function SummaryPage() {
                                 </colgroup>
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="py-3" style={{ width: '24px' }}></th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
                                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
                                     <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
@@ -4843,7 +4856,14 @@ export default function SummaryPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                   {/* Window Screens */}
+                                  {hiddenAoRows.has('windowScreens') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('windowScreens')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Window Screens</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('windowScreens')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
@@ -4858,8 +4878,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('windowScreens', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Door Screen Sash */}
+                                  {hiddenAoRows.has('doorScreenSash') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('doorScreenSash')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Door Screen Sash</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('doorScreenSash')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
@@ -4874,8 +4902,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('doorScreenSash', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Entry Door */}
+                                  {hiddenAoRows.has('entryDoor') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('entryDoor')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Entry Door</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('entryDoor')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4889,8 +4925,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('entryDoor', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Jamb Extensions */}
+                                  {hiddenAoRows.has('jambExtensions') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('jambExtensions')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Jamb Extensions</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('jambExtensions')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4904,8 +4948,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('jambExtensions', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Magnetic Contact */}
+                                  {hiddenAoRows.has('magneticContact') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('magneticContact')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Magnetic Contact</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('magneticContact')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4919,8 +4971,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('magneticContact', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Split Finish */}
+                                  {hiddenAoRows.has('splitFinish') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('splitFinish')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Split Finish</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('splitFinish')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Split Finish</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4934,8 +4994,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('splitFinish', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Integrated Contacts */}
+                                  {hiddenAoRows.has('integratedContacts') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('integratedContacts')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Integrated Contacts</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('integratedContacts')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Integrated Contacts</td>
                                     <td className="px-1 py-1">{inp('integratedContacts', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4949,8 +5017,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('integratedContacts', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Pool Contacts */}
+                                  {hiddenAoRows.has('poolContacts') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('poolContacts')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Pool Contacts</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('poolContacts')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Pool Contacts</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4964,8 +5040,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('poolContacts', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Shade Boxes */}
+                                  {hiddenAoRows.has('shadeBoxes') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('shadeBoxes')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Shade Boxes</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('shadeBoxes')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Shade Boxes</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4979,8 +5063,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('shadeBoxes', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Genius Lock */}
+                                  {hiddenAoRows.has('geniusLock') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('geniusLock')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Genius Lock</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('geniusLock')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Genius Lock</td>
                                     <td className="px-1 py-1">{inp('geniusLock', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -4994,9 +5086,11 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('geniusLock', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Custom rows */}
                                   {customRows.map((cr, idx) => (
                                     <tr key={idx} className="hover:bg-gray-50 bg-amber-50/30">
+                                      <td className="px-1 py-1"></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><input type="text" value={cr.details} onChange={e => setCustomRow(idx, 'details', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Details" /></td>
@@ -5012,7 +5106,14 @@ export default function SummaryPage() {
                                     </tr>
                                   ))}
                                   {/* Final Finish */}
+                                  {hiddenAoRows.has('finalFinish') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('finalFinish')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Final Finish</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('finalFinish')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -5026,8 +5127,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('finalFinish', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Installation */}
+                                  {hiddenAoRows.has('installation') ? (
+                                    <tr className="hover:bg-gray-50">
+                                      {aoToggleBtn('installation')}
+                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Installation</td>
+                                    </tr>
+                                  ) : (
                                   <tr className="hover:bg-gray-50">
+                                    {aoToggleBtn('installation')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
@@ -5041,9 +5150,10 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
+                                  )}
                                   {/* Add Custom Row button */}
                                   <tr>
-                                    <td colSpan={13} className="px-4 py-2 border-t border-gray-200">
+                                    <td colSpan={14} className="px-4 py-2 border-t border-gray-200">
                                       <button onClick={addCustomRow} className="inline-flex items-center gap-1.5 text-xs text-brand-navy hover:text-brand-navy/70 font-medium">
                                         <Plus className="w-3.5 h-3.5" /> Add Custom Row
                                       </button>
