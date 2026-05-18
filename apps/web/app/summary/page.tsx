@@ -29,6 +29,7 @@ import { getSetting, setSetting } from '@/lib/preferences';
 import { usePermissions } from '@/lib/permissions-context';
 import { AlertCircle } from 'lucide-react';
 import { Package, ScrollText } from 'lucide-react';
+import { Lock, LockOpen } from 'lucide-react';
 import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import { DateInput } from '@/components/date-input';
@@ -752,6 +753,7 @@ export default function SummaryPage() {
   const [editingCellId, setEditingCellId] = useState<string | null>(null);
   const [pendingInput, setPendingInput] = useState<string | null>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [tusPositionLocked, setTusPositionLocked] = useState(true);
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -788,6 +790,14 @@ export default function SummaryPage() {
           for (let c = colIdx + 1; c < cells.length; c++) {
             const cId = (cells[c] as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
             if (cId) { setActiveCellId(cId); return; }
+          }
+          // End of row: wrap to first cell of next row
+          if (rowIdx + 1 < rows.length) {
+            const nextCells = Array.from((rows[rowIdx + 1] as Element).querySelectorAll(':scope > td'));
+            for (const tc of nextCells) {
+              const cId = (tc as Element).querySelector('[data-cell-id]')?.getAttribute('data-cell-id');
+              if (cId) { setActiveCellId(cId); return; }
+            }
           }
         } else if (dir === 'left') {
           for (let c = colIdx - 1; c >= 0; c--) {
@@ -5245,6 +5255,14 @@ export default function SummaryPage() {
                 <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900">Windows</h3>
                   <div className="flex items-center gap-4 print:hidden">
+                    <button
+                      onClick={() => setTusPositionLocked(v => !v)}
+                      title={tusPositionLocked ? 'Unlock TuS-Position column' : 'Lock TuS-Position column'}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded border transition-colors ${tusPositionLocked ? 'bg-brand-navy text-white border-brand-navy hover:bg-brand-navy-dark' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {tusPositionLocked ? <Lock className="w-3 h-3" /> : <LockOpen className="w-3 h-3" />}
+                      TuS-Col
+                    </button>
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
@@ -5322,7 +5340,7 @@ export default function SummaryPage() {
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:20} : {minWidth:'100px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
@@ -5363,7 +5381,7 @@ export default function SummaryPage() {
                     <tbody className="divide-y divide-gray-200">
                       {getActiveRows(editingSummary).map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
-                          <td className="px-0.5 py-1 align-top">
+                          <td className="px-0.5 py-1 align-top" style={tusPositionLocked ? {position:'sticky',left:0,zIndex:10,background:'white'} : {}}>
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateRow(row.id, 'tusPosition', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">
@@ -5500,6 +5518,14 @@ export default function SummaryPage() {
                 <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
                   <h3 className="text-lg font-semibold text-gray-900">Doors</h3>
                   <div className="flex items-center gap-4 print:hidden">
+                    <button
+                      onClick={() => setTusPositionLocked(v => !v)}
+                      title={tusPositionLocked ? 'Unlock TuS-Position column' : 'Lock TuS-Position column'}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded border transition-colors ${tusPositionLocked ? 'bg-brand-navy text-white border-brand-navy hover:bg-brand-navy-dark' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {tusPositionLocked ? <Lock className="w-3 h-3" /> : <LockOpen className="w-3 h-3" />}
+                      TuS-Col
+                    </button>
                     <label className="flex items-center gap-2 text-sm text-gray-700">
                       <input
                         type="checkbox"
@@ -5571,7 +5597,7 @@ export default function SummaryPage() {
                       </tr>
                       {/* Main header row */}
                       <tr>
-                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'100px'}}>TuS-Position</th>
+                        <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={tusPositionLocked ? {minWidth:'100px',position:'sticky',left:0,zIndex:20} : {minWidth:'100px'}}>TuS-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'170px'}}>Arch-Position</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700 bg-red-100" style={{minWidth:'58px'}}>Qty</th>
                         <th className="px-0.5 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth:'70px'}}>Width (MM)</th>
@@ -5612,7 +5638,7 @@ export default function SummaryPage() {
                     <tbody className="divide-y divide-gray-200">
                       {getActiveDoorRows(editingSummary).map((row) => (
                         <tr key={row.id} className="hover:bg-gray-50">
-                          <td className="px-0.5 py-1 align-top">
+                          <td className="px-0.5 py-1 align-top" style={tusPositionLocked ? {position:'sticky',left:0,zIndex:10,background:'white'} : {}}>
                             <CellInput rowId={row.id} field="tusPosition" value={row.tusPosition} onChange={(v) => updateDoorRow(row.id, 'tusPosition', v)} />
                           </td>
                           <td className="px-0.5 py-1 align-top">

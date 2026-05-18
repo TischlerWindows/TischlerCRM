@@ -170,7 +170,7 @@ Composite widget types that link parent records to related Contact/Account recor
 
 ## Working in this repo as an agent
 
-- **Branch + PR**: branch name is `claude/<short-descriptor>`. Open a PR against `main` and **wait for review** — do not auto-merge, do not push to `main` directly, do not enable `--auto`.
+- **Branch + PR** *(Claude Code CLI only)*: branch name is `claude/<short-descriptor>`. Open a PR against `main` and **wait for review** — do not auto-merge, do not push to `main` directly, do not enable `--auto`. This rule applies to Claude Code CLI sessions only; GitHub Copilot in VS Code may push directly to `main` when instructed by the user.
 - **One PR per unit of work.** After a PR is pushed, follow-up changes go on a **new** branch — never pile onto a handed-off PR.
 - **Schema is read-only by default.** Do not edit [packages/db/prisma/schema.prisma](packages/db/prisma/schema.prisma) or add a Prisma migration without asking first — schema mistakes are hard to roll back. Surface intent, wait for approval, then change.
 - **Worktree gotcha**: when working inside `.claude/worktrees/<name>`, absolute paths can still resolve to the main repo. After the first edit, run `git status` to confirm changes landed in the worktree, not main.
