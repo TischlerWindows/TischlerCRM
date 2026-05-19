@@ -4456,7 +4456,7 @@ export default function SummaryPage() {
                         const bgCls = f === 'finalAdj' ? 'bg-purple-50/30' : f === 'final' ? 'bg-green-50/30' : 'bg-blue-50/30';
                         const txtCls = f === 'finalAdj' ? 'text-purple-700' : f === 'final' ? 'text-green-700' : 'text-blue-700';
                         return editable
-                          ? <td className={`px-1 py-1 ${bgCls}`}><input type="text" value={fmtQtInput((locQtot as any)?.[cat]?.[f] || '')} onChange={e => setLocQt(cat, f, stripQtInput(e.target.value))} className={`w-full px-2 py-1.5 text-right text-sm ${txtCls} border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40`} placeholder="—" /></td>
+                          ? <td className={`px-1 py-1 ${bgCls}`}><input type="text" value={fmtQtInput((locQtot as any)?.[cat]?.[f] || '')} onChange={e => setLocQt(cat, f, stripQtInput(e.target.value))} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm ${txtCls} border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40`} placeholder="—" /></td>
                           : <td className={`px-4 py-3 text-right text-gray-400 ${bgCls}`}>—</td>;
                       };
                       return (
@@ -4468,7 +4468,7 @@ export default function SummaryPage() {
                             {!locLabel && <p className="text-sm text-gray-500">Aggregated from the data entry sheet</p>}
                           </div>
                           <div className="overflow-x-auto">
-                            <table className="min-w-[680px] text-sm">
+                            <table className="min-w-[680px] text-xs sm:text-sm">
                               <thead>
                                 <tr className="bg-gray-50 border-b border-gray-200">
                                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb]"></th>
@@ -4562,7 +4562,7 @@ export default function SummaryPage() {
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="min-w-[680px] text-sm">
+                          <table className="min-w-[680px] text-xs sm:text-sm">
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
@@ -4597,7 +4597,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{euroWindowNet ? `€${fmtInt(euroWindowNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ew-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroWindows as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroWindows: {...(editingSummary.quoteTotals?.euroWindows || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{ewCalc.full ? fmt(ewCalc.full) : '—'}</td>
@@ -4654,7 +4654,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doubleHungNet ? `€${fmtInt(doubleHungNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`dh-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.doubleHung as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), doubleHung: {...(editingSummary.quoteTotals?.doubleHung || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-400 border-l-4 border-blue-300 bg-blue-50/30">{dhCalc.full ? fmt(dhCalc.full) : '—'}</td>
@@ -4711,7 +4711,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-700">{doorNet ? `€${fmtInt(doorNet)}` : '—'}</td>
                                 {['full','pct','final','finalAdj'].map(f => (
                                   <td key={`ed-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.quoteTotals?.euroDoors as any)?.[f] || '')} onChange={(e) => setEditingSummary({...editingSummary, quoteTotals: {...(editingSummary.quoteTotals || {euroWindows:{full:'',pct:'',final:'',finalAdj:''},doubleHung:{full:'',pct:'',final:'',finalAdj:''},euroDoors:{full:'',pct:'',final:'',finalAdj:''}}), euroDoors: {...(editingSummary.quoteTotals?.euroDoors || {full:'',pct:'',final:'',finalAdj:''}), [f]: stripQtInput(e.target.value)}}})} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 text-right text-blue-600 border-l-4 border-blue-300 bg-blue-50/30">{edCalc.full ? fmt(edCalc.full) : '—'}</td>
@@ -4784,7 +4784,7 @@ export default function SummaryPage() {
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 {(['full','pct','final','finalAdj'] as const).map(f => (
                                   <td key={`adj-${f}`} className={`px-1 py-1 ${f==='finalAdj'?'bg-purple-50/30':f==='final'?'bg-green-50/30':'bg-blue-50/30'}`}>
-                                    <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
+                                    <input type="text" value={fmtQtInput((editingSummary.grandTotalAdjustment as any)?.[f] || '')} onChange={(e) => setEditingSummary({ ...editingSummary, grandTotalAdjustment: { full: '', pct: '', final: '', finalAdj: '', ...(editingSummary.grandTotalAdjustment || {}), [f]: stripQtInput(e.target.value) } })} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${f==='finalAdj'?'text-purple-700':f==='final'?'text-green-700':'text-blue-700'}`} placeholder="—" />
                                   </td>
                                 ))}
                                 <td className="px-4 py-3 border-l-4 border-blue-300 bg-blue-50/30" />
@@ -4879,7 +4879,7 @@ export default function SummaryPage() {
                           const displayVal = isDollar ? fmtQtInput(raw) : isEuro ? fmtEuro(raw) : raw;
                           const onChange = (e: React.ChangeEvent<HTMLInputElement>) => setAo(key, field, isDollar ? stripQtInput(e.target.value) : isEuro ? e.target.value.replace(/[€,]/g, '') : e.target.value);
                           const textColor = isDollar ? (field === 'final' ? 'text-green-700' : 'text-blue-700') : '';
-                          return <input type="text" value={displayVal} onChange={onChange} className={`w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${textColor}`} placeholder={placeholder || '—'} />;
+                          return <input type="text" value={displayVal} onChange={onChange} className={`w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 ${textColor}`} placeholder={placeholder || '—'} />;
                         };
 
                         const autoSize = (el: HTMLTextAreaElement | null) => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } };
@@ -4893,7 +4893,7 @@ export default function SummaryPage() {
                               e.target.style.height = 'auto';
                               e.target.style.height = e.target.scrollHeight + 'px';
                             }}
-                            className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 resize-none overflow-hidden"
+                            className="w-full px-2 py-1.5 text-left text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 resize-none overflow-hidden min-w-[75px]"
                             placeholder={placeholder || '—'}
                             style={{ lineHeight: '1.25rem', minHeight: '2rem' }}
                           />
@@ -4916,7 +4916,7 @@ export default function SummaryPage() {
                               <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="min-w-[700px] text-sm">
+                              <table className="min-w-[700px] text-xs sm:text-sm">
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="py-2 sticky left-0 z-10 bg-gray-50" style={{ width: '24px' }}></th>
@@ -5122,12 +5122,12 @@ export default function SummaryPage() {
                                     <tr key={idx} className="hover:bg-gray-50 bg-amber-50/30">
                                       <td className="px-1 py-1"></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
-                                      <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
                                       <td className="px-1 py-1" colSpan={2}><textarea ref={autoSize} rows={1} value={cr.details} onChange={e => { setCustomRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 resize-none overflow-hidden" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
-                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
-                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setCustomRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
-                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setCustomRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
-                                      <td className="px-1 py-1 bg-green-50/30"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setCustomRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-green-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setCustomRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setCustomRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
+                                      <td className="px-1 py-1 bg-green-50/30"><input type="text" value={fmtQtInput(cr.final)} onChange={e => setCustomRow(idx, 'final', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-green-700" placeholder="—" /></td>
                                       <td className="px-1 py-1"><button onClick={() => removeCustomRow(idx)} className="w-full flex items-center justify-center text-red-400 hover:text-red-600" title="Remove row"><X className="w-3.5 h-3.5" /></button></td>
                                       <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplayCr(cr, 'full')}</td>
                                       <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplayCr(cr, 'disc')}</td>
