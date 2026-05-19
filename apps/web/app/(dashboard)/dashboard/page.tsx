@@ -1571,7 +1571,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -1619,7 +1619,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -1649,7 +1649,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -1706,7 +1706,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -1736,7 +1736,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -1778,7 +1778,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -1808,7 +1808,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -1869,7 +1869,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -1899,7 +1899,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -1986,7 +1986,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -2016,7 +2016,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2071,7 +2071,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -2101,7 +2101,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2167,7 +2167,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -2197,7 +2197,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2217,7 +2217,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -2247,7 +2247,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2304,7 +2304,7 @@ export default function DashboardPage() {
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
             {/* Toolbar */}
-            <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
+            <div className={`absolute top-1 right-1 flex gap-0.5 z-10 ${widget.position.w <= 2 && widget.position.h <= 1 ? 'sm:opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-md p-0.5 shadow-sm' : ''}`}>
               <button
                 onClick={() => { setDrillDownWidgetId(isExpanded ? null : widget.id); setDrillDownLabel(null); }}
                 className="p-0.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
@@ -2341,7 +2341,7 @@ export default function DashboardPage() {
             {dashEditMode && (
               <div
                 onMouseDown={(e) => handleResizeStart(e, widget)}
-                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                className="absolute bottom-0 right-0 w-3 h-3 bg-gray-300 rounded-tl cursor-se-resize hover:bg-gray-400 z-20 sm:opacity-0 group-hover:opacity-100 transition-all duration-200"
                 title="Drag to resize"
               />
             )}
@@ -2395,7 +2395,7 @@ export default function DashboardPage() {
             {refreshingWidgetId === widget.id && (
               <div className="absolute inset-0 bg-white/60 rounded-2xl animate-pulse z-20" />
             )}
-            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
+            <div className="absolute top-2.5 right-2.5 flex gap-0.5 z-10 sm:opacity-0 group-hover:opacity-100 transition-all duration-200 bg-white/90 backdrop-blur-md rounded-lg px-1 py-0.5 shadow-sm">
               <button
                 onClick={() => handleRefreshWidget(widget)}
                 className="p-1.5 text-gray-400 hover:text-gray-700 rounded-md transition-colors"
@@ -2878,6 +2878,7 @@ export default function DashboardPage() {
                       </button>
                     ) : (
                       <>
+                      <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => {
                           if (dashEditSnapshot && confirm('Discard all changes made during this editing session?')) {
@@ -2892,8 +2893,8 @@ export default function DashboardPage() {
                         }}
                         className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200 transition-all duration-200"
                       >
-                        <X className="w-4 h-4 mr-1.5" />
-                        Discard
+                        <X className="w-4 h-4 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Discard</span>
                       </button>
                       <button
                         onClick={() => {
@@ -2903,23 +2904,24 @@ export default function DashboardPage() {
                         }}
                         className="inline-flex items-center px-3.5 py-1.5 rounded-lg text-sm bg-gray-800 text-white hover:bg-gray-700 shadow-sm transition-all duration-200"
                       >
-                        <Check className="w-4 h-4 mr-1.5" />
-                        Save &amp; Close
+                        <Check className="w-4 h-4 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Save &amp; Close</span>
                       </button>
                       <button
                         onClick={() => setShowAddSection(true)}
                         className="inline-flex items-center px-3.5 py-1.5 border border-gray-200 text-gray-500 text-sm rounded-lg hover:text-gray-700 hover:border-gray-300 transition-all duration-200"
                       >
-                        <Layers className="w-5 h-5 mr-2" />
-                        Add Section
+                        <Layers className="w-5 h-5 sm:mr-2" />
+                        <span className="hidden sm:inline">Add Section</span>
                       </button>
                       <button
                         onClick={() => setShowWidgetSelector(true)}
                         className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-dark"
                       >
-                        <Plus className="w-5 h-5 mr-2" />
-                        Add Widget
+                        <Plus className="w-5 h-5 sm:mr-2" />
+                        <span className="hidden sm:inline">Add Widget</span>
                       </button>
+                      </div>
                       </>
                     )}
                   </div>
@@ -3238,7 +3240,7 @@ export default function DashboardPage() {
                             return (sectionWidgets.length > 0 || (dashEditMode && draggingWidgetId)) ? (
                             <>
                             <div
-                              className={`grid grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId ? 'min-h-[100px]' : ''}`}
+                              className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-4 auto-rows-[200px] ${dashEditMode && draggingWidgetId ? 'min-h-[100px]' : ''}`}
                               onDragOver={(e) => {
                                 if (!dashEditMode) return;
                                 e.preventDefault();
