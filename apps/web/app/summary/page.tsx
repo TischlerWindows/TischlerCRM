@@ -4838,15 +4838,15 @@ export default function SummaryPage() {
                               <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
                                 <colgroup>
                                   <col style={{ width: '24px' }} />
-                                  <col style={{ width: '11%' }} />
+                                  <col style={{ width: '10%' }} />
                                   <col style={{ width: '5%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '11%' }} />
+                                  <col style={{ width: '11%' }} />
                                   <col style={{ width: '8%' }} />
                                   <col style={{ width: '7%' }} />
-                                  <col style={{ width: '8%' }} />
-                                  <col style={{ width: '9%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '7%' }} />
+                                  <col style={{ width: '5%' }} />
                                   <col style={{ width: '7%' }} />
                                   <col style={{ width: '7%' }} />
                                   <col style={{ width: '8%' }} />
