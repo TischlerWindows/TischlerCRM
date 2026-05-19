@@ -4902,7 +4902,7 @@ export default function SummaryPage() {
                         const hiddenAoRows = new Set<string>((ao.hiddenRows || []) as string[]);
                         const toggleAoRow = (key: string) => { const n = new Set(hiddenAoRows); if (n.has(key)) n.delete(key); else n.add(key); setEditingSummary({ ...editingSummary, addOns: { ...ao, hiddenRows: Array.from(n) } }); };
                         const aoToggleBtn = (key: string) => (
-                          <td className="px-1 py-1 text-center" style={{ width: '24px' }}>
+                          <td className="px-1 py-1 text-center sticky left-0 z-10 bg-white" style={{ width: '24px' }}>
                             <button onClick={() => toggleAoRow(key)} className="text-gray-400 hover:text-gray-600" title={hiddenAoRows.has(key) ? 'Show row' : 'Hide row'}>
                               {hiddenAoRows.has(key) ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
@@ -4916,38 +4916,22 @@ export default function SummaryPage() {
                               <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-                                <colgroup>
-                                  <col style={{ width: '24px' }} />
-                                  <col style={{ width: '10%' }} />
-                                  <col style={{ width: '5%' }} />
-                                  <col style={{ width: '11%' }} />
-                                  <col style={{ width: '11%' }} />
-                                  <col style={{ width: '8%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '5%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '7%' }} />
-                                  <col style={{ width: '8%' }} />
-                                  <col style={{ width: '7%' }} />
-                                </colgroup>
+                              <table className="min-w-[700px] text-sm">
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
-                                    <th className="py-3" style={{ width: '24px' }}></th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Item</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" colSpan={2}>Details</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
-                                    <th className="px-2 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
-                                    <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
+                                    <th className="py-2 sticky left-0 z-10 bg-gray-50" style={{ width: '24px' }}></th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Item</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" colSpan={2}>Details</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">NET €</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Full</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">%</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">Final</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap">€ Full</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Disc</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">€ Final</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -4955,7 +4939,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('windowScreens') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('windowScreens')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Window Screens</td>
                                     <td className="px-1 py-1">{inp('windowScreens', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'frameType', 'Frame Type')}</td>
                                     <td className="px-1 py-1">{inpLeft('windowScreens', 'meshType', 'Mesh Type')}</td>
@@ -4974,7 +4958,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('doorScreenSash') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('doorScreenSash')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Door Screen Sash</td>
                                     <td className="px-1 py-1">{inp('doorScreenSash', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'woodFrame', 'Wood Frame')}</td>
                                     <td className="px-1 py-1">{inpLeft('doorScreenSash', 'meshType', 'Mesh Type')}</td>
@@ -4993,7 +4977,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('entryDoor') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('entryDoor')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Entry Door</td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('entryDoor', 'netEuro')}</td>
@@ -5011,7 +4995,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('jambExtensions') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('jambExtensions')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Jamb Extensions</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('jambExtensions', 'netEuro')}</td>
@@ -5029,7 +5013,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('magneticContact') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('magneticContact')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Magnetic Contact</td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('magneticContact', 'netEuro')}</td>
@@ -5047,7 +5031,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('splitFinish') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('splitFinish')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Split Finish</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Split Finish</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('splitFinish', 'netEuro')}</td>
@@ -5065,7 +5049,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('integratedContacts') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('integratedContacts')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Integrated Contacts</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Integrated Contacts</td>
                                     <td className="px-1 py-1">{inp('integratedContacts', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('integratedContacts', 'netEuro')}</td>
@@ -5083,7 +5067,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('poolContacts') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('poolContacts')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Pool Contacts</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Pool Contacts</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('poolContacts', 'netEuro')}</td>
@@ -5101,7 +5085,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('shadeBoxes') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('shadeBoxes')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Shade Boxes</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Shade Boxes</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('shadeBoxes', 'netEuro')}</td>
@@ -5119,7 +5103,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('geniusLock') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('geniusLock')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Genius Lock</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Genius Lock</td>
                                     <td className="px-1 py-1">{inp('geniusLock', 'qty', 'Qty')}</td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('geniusLock', 'netEuro')}</td>
@@ -5155,7 +5139,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('finalFinish') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('finalFinish')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Final Finish</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('finalFinish', 'netEuro')}</td>
@@ -5173,7 +5157,7 @@ export default function SummaryPage() {
                                   {!hiddenAoRows.has('installation') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('installation')}
-                                    <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
+                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Installation</td>
                                     <td className="px-4 py-2"></td>
                                     <td className="px-1 py-1" colSpan={2}></td>
                                     <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
