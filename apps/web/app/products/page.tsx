@@ -75,7 +75,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
         if (!qty && !netEuro) continue;
 
         const parts = [row.type, row.type2, row.type3, row.type4].filter(Boolean);
-        const productType = parts.length ? parts.join(' w/ ') : '—';
+        const productType = parts.length ? parts.join(' w/ ') : 'ï¿½';
 
         let category: string;
         if (isDoor) {
@@ -112,7 +112,7 @@ function buildGroups(summaries: any[]): ProductLogGroup[] {
 
   return Array.from(map.entries())
     .map(([key, { category, details }]) => ({
-      productType: key.split('|||')[1] ?? '—',
+      productType: key.split('|||')[1] ?? 'ï¿½',
       category,
       totalQty: details.reduce((s, d) => s + d.qty, 0),
       totalFields: details.reduce((s, d) => s + d.fields, 0),
@@ -178,11 +178,11 @@ export default function ProductsPage() {
       if (categoryFilter !== 'All' && g.category !== categoryFilter) return false;
       // productType: substring match (typed text)
       if (fPT && !g.productType.toLowerCase().includes(fPT.toLowerCase())) return false;
-      // Glass Type only applies to Euro Windows / Euro Doors (not Double Hung — those use Hung Glass Type)
+      // Glass Type only applies to Euro Windows / Euro Doors (not Double Hung ï¿½ those use Hung Glass Type)
       if (fGlass && g.category === 'Double Hung') return false;
       // Hung Glass Type only applies to Double Hung groups
       if (fHung && g.category !== 'Double Hung') return false;
-      // spec/job filters — group passes if at least one detail matches ALL active filters
+      // spec/job filters ï¿½ group passes if at least one detail matches ALL active filters
       if (fJob || fGlass || fHung || fWood || fFinish || fSpacer) {
         const anyDetailMatches = g.details.some(d => {
           if (fJob && !`${d.summaryName} ${d.opportunityNumber}`.toLowerCase().includes(fJob)) return false;
@@ -240,7 +240,7 @@ export default function ProductsPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Product Log</h1>
-          <p className="text-sm text-gray-500">Products grouped by type across all summary sheets — click a row to expand</p>
+          <p className="text-sm text-gray-500">Products grouped by type across all summary sheets ï¿½ click a row to expand</p>
         </div>
       </div>
 
@@ -301,7 +301,7 @@ export default function ProductsPage() {
                     type="text"
                     value={filters.job}
                     onChange={e => setFilter('job', e.target.value)}
-                    placeholder="Search job…"
+                    placeholder="Search jobï¿½"
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 bg-white"
                   />
                 ) : (
@@ -325,7 +325,7 @@ export default function ProductsPage() {
       {/* Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         {loading ? (
-          <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
+          <div className="text-center py-16 text-gray-400 text-sm">Loadingï¿½</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400 text-sm">
             {groups.length === 0
@@ -343,7 +343,7 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Qty</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Fields</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total Sq Ft</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total NET €</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Total NET ï¿½</th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Jobs</th>
               </tr>
             </thead>
@@ -376,7 +376,7 @@ export default function ProductsPage() {
                       <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalQty)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{fmtInt(group.totalFields)}</td>
                       <td className="px-4 py-3 text-right text-gray-700">{fmt(group.totalSqFeet)}</td>
-                      <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `€${fmt(group.totalNetEuro)}` : ''}</td>
+                      <td className="px-4 py-3 text-right text-gray-700">{group.totalNetEuro ? `ï¿½${fmt(group.totalNetEuro)}` : ''}</td>
                       <td className="px-4 py-3 text-center text-gray-500 text-xs">{group.details.length}</td>
                     </tr>
 
@@ -409,7 +409,7 @@ export default function ProductsPage() {
                                     {(d.widthFtIn || d.heightFtIn) && (
                                       <div className="text-xs text-gray-600 mt-1">
                                         {d.widthFtIn && <span>W: {d.widthFtIn}</span>}
-                                        {d.widthFtIn && d.heightFtIn && <span className="mx-1 text-gray-300">·</span>}
+                                        {d.widthFtIn && d.heightFtIn && <span className="mx-1 text-gray-300">ï¿½</span>}
                                         {d.heightFtIn && <span>H: {d.heightFtIn}</span>}
                                       </div>
                                     )}
@@ -462,14 +462,14 @@ export default function ProductsPage() {
                                     )}
                                     {d.netEuroEach > 0 && (
                                       <div>
-                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">€ Each</div>
-                                        <div className="text-sm font-medium text-gray-700">€{fmt(d.netEuroEach)}</div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">ï¿½ Each</div>
+                                        <div className="text-sm font-medium text-gray-700">ï¿½{fmt(d.netEuroEach)}</div>
                                       </div>
                                     )}
                                     {d.netEuro > 0 && (
                                       <div>
-                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">NET €</div>
-                                        <div className="text-sm font-semibold text-brand-navy">€{fmt(d.netEuro)}</div>
+                                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">NET ï¿½</div>
+                                        <div className="text-sm font-semibold text-brand-navy">ï¿½{fmt(d.netEuro)}</div>
                                       </div>
                                     )}
                                   </div>
@@ -502,7 +502,7 @@ export default function ProductsPage() {
                 <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.qty)}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{fmtInt(totals.fields)}</td>
                 <td className="px-4 py-3 text-right text-gray-800">{fmt(totals.sqFeet)}</td>
-                <td className="px-4 py-3 text-right text-gray-800">€{fmt(totals.netEuro)}</td>
+                <td className="px-4 py-3 text-right text-gray-800">ï¿½{fmt(totals.netEuro)}</td>
                 <td></td>
               </tr>
             </tfoot>
