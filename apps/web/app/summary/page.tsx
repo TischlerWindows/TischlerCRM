@@ -3210,6 +3210,29 @@ export default function SummaryPage() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
+        {/* Mobile filter bar — visible only on small screens */}
+        <div className="md:hidden flex gap-2 overflow-x-auto px-4 pt-4 pb-2">
+          {([
+            { key: 'recent',       label: 'Recent',       Icon: Clock },
+            { key: 'created-by-me',label: 'Created by Me',Icon: User },
+            { key: 'all',          label: 'All Summaries',Icon: List },
+            { key: 'favorites',    label: 'Favorites',    Icon: Star },
+          ] as const).map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              onClick={() => setSidebarFilter(key)}
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                sidebarFilter === key
+                  ? 'bg-brand-navy text-white border-brand-navy'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+
         <div className="px-6 py-6">
           {/* Actions */}
           <div className="mb-6 flex justify-between items-center">
@@ -3241,7 +3264,88 @@ export default function SummaryPage() {
 
           {/* Summaries List */}
           <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="overflow-x-auto">
+
+            {/* ── Mobile card list (< md) ── */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {filteredSummaries.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <FileSpreadsheet className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 text-sm">No summaries found</p>
+                  {searchTerm && <p className="text-xs text-gray-400 mt-1">Try adjusting your search</p>}
+                </div>
+              ) : filteredSummaries.map(summary => (
+                <div key={summary.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <button
+                      onClick={() => {
+                        setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
+                        setShowNewSummary(true);
+                      }}
+                      className="text-sm font-medium text-brand-navy hover:text-brand-dark text-left truncate w-full"
+                    >
+                      {summary.name || 'Untitled Summary'}
+                    </button>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                      {summary.salesman && <span className="text-xs text-gray-500">{summary.salesman}</span>}
+                      {summary.jobType && <span className="text-xs text-gray-400">{summary.jobType}</span>}
+                    </div>
+                    <div className="flex gap-3 mt-1">
+                      <span className="text-xs text-gray-400">{summary.rows.length} row{summary.rows.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-400">{new Date(summary.lastModifiedAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => handleToggleFavorite(summary.id)}
+                      className={summary.isFavorite ? 'text-yellow-500' : 'text-gray-300'}
+                    >
+                      <Star className="w-4 h-4" fill={summary.isFavorite ? 'currentColor' : 'none'} />
+                    </button>
+                    <div className="relative inline-block">
+                      <button
+                        onClick={() => setOpenDropdown(openDropdown === summary.id ? null : summary.id)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4 text-gray-400" />
+                      </button>
+                      {openDropdown === summary.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
+                          <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                            <button
+                              onClick={() => {
+                                setEditingSummary({ ...summary, hungType: summary.hungType ?? '#34', hungTypeCustom: summary.hungTypeCustom ?? '' });
+                                setShowNewSummary(true);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Edit className="w-4 h-4" />Edit
+                            </button>
+                            <button
+                              onClick={() => handleToggleFavorite(summary.id)}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Star className={cn("w-4 h-4", summary.isFavorite && "fill-yellow-400 text-yellow-400")} />
+                              {summary.isFavorite ? 'Unfavorite' : 'Favorite'}
+                            </button>
+                            <button
+                              onClick={() => { handleDeleteSummary(summary.id); setOpenDropdown(null); }}
+                              className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4" />Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Desktop table (≥ md) ── */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -3474,32 +3578,32 @@ export default function SummaryPage() {
       <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[95vh] flex flex-col">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center print:hidden">
+            <div className="p-3 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Edit Summary</h2>
                 <p className="text-sm text-gray-600 mt-1">Fill in the summary data</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleGenerateQuotePDF('preview')}
-                  className="inline-flex items-center px-4 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-light transition-colors"
+                  className="inline-flex items-center px-3 py-2 bg-brand-navy text-white rounded-lg hover:bg-brand-navy-light transition-colors"
                 >
-                  <ScrollText className="w-4 h-4 mr-2" />
-                  Quote Letter
+                  <ScrollText className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Quote Letter</span>
                 </button>
                 <button
                   onClick={() => handlePrintPDF('preview')}
-                  className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  <Eye className="w-4 h-4 mr-2" />
-                  Preview PDF
+                  <Eye className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Preview PDF</span>
                 </button>
                 <button
                   onClick={() => handlePrintPDF('download')}
-                  className="inline-flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  <Printer className="w-4 h-4 mr-2" />
-                  Download PDF
+                  <Printer className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Download PDF</span>
                 </button>
                 <button
                   onClick={() => {
@@ -3518,8 +3622,8 @@ export default function SummaryPage() {
             </div>
 
             {/* Page Tabs */}
-            <div className="border-b border-gray-200 px-6 print:hidden">
-              <nav className="flex gap-4">
+            <div className="border-b border-gray-200 px-3 sm:px-6 overflow-x-auto print:hidden">
+              <nav className="flex gap-4 min-w-max">
                 <button
                   onClick={() => { setActivePage(1); window.scrollTo(0, 0); }}
                   className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
@@ -3551,7 +3655,7 @@ export default function SummaryPage() {
               </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-6">
 
               {/* ===== PAGE 2 — Project Summary ===== */}
               {activePage === 2 && (
@@ -3563,7 +3667,7 @@ export default function SummaryPage() {
                     </div>
                     <div className="p-6 space-y-5">
                       {/* Row 1: Date + Opportunity # */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
                           <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
@@ -3645,7 +3749,7 @@ export default function SummaryPage() {
                       </div>
 
                       {/* Row 5: Salesman + Estimator */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Salesman</label>
                           <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700">
@@ -3674,7 +3778,7 @@ export default function SummaryPage() {
                       </div>
 
                       {/* Row 7: Contact + Account receiving the quote */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Contact Receiving the Quote</label>
                           <input
@@ -3700,7 +3804,7 @@ export default function SummaryPage() {
                       </div>
 
                       {/* Row 8: Account Shipping Address + Contact Phone Fields */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Account Shipping Address</label>
                           <input
@@ -3724,7 +3828,7 @@ export default function SummaryPage() {
                           <p className="text-xs text-gray-400 mt-1">Auto-filled from Contact</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
                           <input
@@ -3840,7 +3944,7 @@ export default function SummaryPage() {
                       })()}
 
                       {/* Row 3: Wood Type + Finish */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Wood Type</label>
                           <select
@@ -3887,7 +3991,7 @@ export default function SummaryPage() {
                           : (editingSummary.rows || []);
                         const hasHung = uiWinRows.some((r: any) => (r.type || '').toLowerCase().includes('hung'));
                         return (
-                          <div className={hasHung ? 'grid grid-cols-2 gap-6' : ''}>
+                          <div className={hasHung ? 'grid grid-cols-1 sm:grid-cols-2 gap-6' : ''}>
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">Glass Type</label>
                               <select
@@ -3942,7 +4046,7 @@ export default function SummaryPage() {
                       })()}
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Spacer Bar Type</label>
                           <select
@@ -3972,7 +4076,7 @@ export default function SummaryPage() {
                       </div>
 
                       {/* Row: SDL + TDL */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">SDL</label>
                           <select
@@ -4023,7 +4127,7 @@ export default function SummaryPage() {
                       </div>
 
                       {/* Row: Finials + Hinge Finish Specification */}
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Finials</label>
                           <select
@@ -4153,7 +4257,7 @@ export default function SummaryPage() {
                       <h3 className="text-lg font-semibold text-gray-900">Tax Cost</h3>
                     </div>
                     <div className="p-6">
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Use Tax @ Full</label>
                           <input
@@ -5831,7 +5935,7 @@ export default function SummaryPage() {
               </>)}
             </div>
 
-            <div className="p-6 border-t border-gray-200 flex justify-between items-center print:hidden">
+            <div className="p-3 sm:p-6 border-t border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <button
                 onClick={() => {
                   const oppId = editingSummary?.linkedOpportunityId;
