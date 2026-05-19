@@ -4869,12 +4869,7 @@ export default function SummaryPage() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                   {/* Window Screens */}
-                                  {hiddenAoRows.has('windowScreens') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('windowScreens')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Window Screens</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('windowScreens') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('windowScreens')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Window Screens</td>
@@ -4893,12 +4888,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Door Screen Sash */}
-                                  {hiddenAoRows.has('doorScreenSash') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('doorScreenSash')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Door Screen Sash</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('doorScreenSash') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('doorScreenSash')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Door Screen Sash</td>
@@ -4917,12 +4907,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Entry Door */}
-                                  {hiddenAoRows.has('entryDoor') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('entryDoor')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Entry Door</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('entryDoor') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('entryDoor')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Entry Door</td>
@@ -4940,12 +4925,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Jamb Extensions */}
-                                  {hiddenAoRows.has('jambExtensions') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('jambExtensions')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Jamb Extensions</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('jambExtensions') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('jambExtensions')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Jamb Extensions</td>
@@ -4963,12 +4943,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Magnetic Contact */}
-                                  {hiddenAoRows.has('magneticContact') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('magneticContact')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Magnetic Contact</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('magneticContact') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('magneticContact')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Magnetic Contact</td>
@@ -4986,12 +4961,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Split Finish */}
-                                  {hiddenAoRows.has('splitFinish') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('splitFinish')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Split Finish</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('splitFinish') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('splitFinish')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Split Finish</td>
@@ -5009,12 +4979,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Integrated Contacts */}
-                                  {hiddenAoRows.has('integratedContacts') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('integratedContacts')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Integrated Contacts</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('integratedContacts') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('integratedContacts')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Integrated Contacts</td>
@@ -5032,12 +4997,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Pool Contacts */}
-                                  {hiddenAoRows.has('poolContacts') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('poolContacts')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Pool Contacts</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('poolContacts') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('poolContacts')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Pool Contacts</td>
@@ -5055,12 +5015,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Shade Boxes */}
-                                  {hiddenAoRows.has('shadeBoxes') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('shadeBoxes')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Shade Boxes</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('shadeBoxes') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('shadeBoxes')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Shade Boxes</td>
@@ -5078,12 +5033,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Genius Lock */}
-                                  {hiddenAoRows.has('geniusLock') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('geniusLock')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Genius Lock</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('geniusLock') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('geniusLock')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Genius Lock</td>
@@ -5119,12 +5069,7 @@ export default function SummaryPage() {
                                     </tr>
                                   ))}
                                   {/* Final Finish */}
-                                  {hiddenAoRows.has('finalFinish') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('finalFinish')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Final Finish</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('finalFinish') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('finalFinish')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Final Finish</td>
@@ -5142,12 +5087,7 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Installation */}
-                                  {hiddenAoRows.has('installation') ? (
-                                    <tr className="hover:bg-gray-50">
-                                      {aoToggleBtn('installation')}
-                                      <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>Installation</td>
-                                    </tr>
-                                  ) : (
+                                  {!hiddenAoRows.has('installation') && (
                                   <tr className="hover:bg-gray-50">
                                     {aoToggleBtn('installation')}
                                     <td className="px-4 py-2 font-medium text-gray-900">Installation</td>
@@ -5164,6 +5104,16 @@ export default function SummaryPage() {
                                     <td className="px-1 py-1 bg-purple-50/30"></td>
                                   </tr>
                                   )}
+                                  {/* Minimized rows — grouped at bottom */}
+                                  {(() => {
+                                    const aoLabels: Record<string, string> = { windowScreens: 'Window Screens', doorScreenSash: 'Door Screen Sash', entryDoor: 'Entry Door', jambExtensions: 'Jamb Extensions', magneticContact: 'Magnetic Contact', splitFinish: 'Split Finish', integratedContacts: 'Integrated Contacts', poolContacts: 'Pool Contacts', shadeBoxes: 'Shade Boxes', geniusLock: 'Genius Lock', finalFinish: 'Final Finish', installation: 'Installation' };
+                                    return aoKeys.filter(k => hiddenAoRows.has(k)).map(k => (
+                                      <tr key={k} className="hover:bg-gray-50 border-t border-dashed border-gray-200">
+                                        {aoToggleBtn(k)}
+                                        <td className="px-4 py-1.5 text-xs font-medium text-gray-400 italic" colSpan={13}>{aoLabels[k]}</td>
+                                      </tr>
+                                    ));
+                                  })()}
                                   {/* Add Custom Row button */}
                                   <tr>
                                     <td colSpan={14} className="px-4 py-2 border-t border-gray-200">
