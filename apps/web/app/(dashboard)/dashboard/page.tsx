@@ -2670,6 +2670,29 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Mobile filter bar — replaces sidebar on small screens */}
+          <div className="md:hidden flex gap-2 overflow-x-auto px-4 pt-4 pb-2">
+            {([
+              { key: 'recent', label: 'Recent', Icon: Clock },
+              { key: 'createdByMe', label: 'Created by Me', Icon: User },
+              { key: 'all', label: 'All Dashboards', Icon: LayoutDashboard },
+              { key: 'favorites', label: 'Favorites', Icon: Star },
+            ] as const).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                onClick={() => { setSidebarFilter(key); setSelectedDashboard(null); setViewMode('list'); }}
+                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                  sidebarFilter === key && !selectedDashboard
+                    ? 'bg-brand-navy text-white border-brand-navy'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="px-6 py-6">
         {/* Actions */}
         <div className="mb-6 flex justify-between items-center">
