@@ -347,8 +347,8 @@ export function RecordActions({
             onClick={handleEdit}
             className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
-            <Edit className="w-3.5 h-3.5 mr-1" />
-            Edit
+            <Edit className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Edit</span>
           </button>
         )}
         {showClone && canEdit && (
@@ -357,8 +357,8 @@ export function RecordActions({
             disabled={isCloning}
             className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Copy className="w-3.5 h-3.5 mr-1" />
-            {isCloning ? 'Cloning\u2026' : 'Clone'}
+            <Copy className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">{isCloning ? 'Cloning\u2026' : 'Clone'}</span>
           </button>
         )}
         {showRequote && objectApiName === 'Opportunity' && canEdit && (
@@ -367,8 +367,8 @@ export function RecordActions({
             disabled={isRequoting}
             className="inline-flex items-center px-3 py-1.5 border border-blue-300 rounded-lg text-xs font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isRequoting ? 'animate-spin' : ''}`} />
-            {isRequoting ? 'Creating\u2026' : 'Create Requote'}
+            <RefreshCw className={`w-3.5 h-3.5 sm:mr-1 ${isRequoting ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">{isRequoting ? 'Creating…' : 'Create Requote'}</span>
           </button>
         )}
         {showProposal && objectApiName === 'Opportunity' && canEdit && (
@@ -377,8 +377,8 @@ export function RecordActions({
             disabled={isGeneratingProposal}
             className="inline-flex items-center px-3 py-1.5 border border-brand-navy/30 rounded-lg text-xs font-medium text-brand-navy bg-white hover:bg-brand-navy/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FileText className="w-3.5 h-3.5 mr-1" />
-            {isGeneratingProposal ? 'Generating...' : 'Proposal PDF'}
+            <FileText className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">{isGeneratingProposal ? 'Generating...' : 'Proposal PDF'}</span>
           </button>
         )}
         {showPrint && (
@@ -386,8 +386,8 @@ export function RecordActions({
             onClick={handlePrint}
             className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
-            <Printer className="w-3.5 h-3.5 mr-1" />
-            Print
+            <Printer className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Print</span>
           </button>
         )}
         {showDelete && canDelete && (
@@ -395,8 +395,8 @@ export function RecordActions({
             onClick={handleDelete}
             className="inline-flex items-center px-3 py-1.5 border border-red-200 rounded-lg text-xs font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
           >
-            <Trash2 className="w-3.5 h-3.5 mr-1" />
-            Delete
+            <Trash2 className="w-3.5 h-3.5 sm:mr-1" />
+            <span className="hidden sm:inline">Delete</span>
           </button>
         )}
         {canCustomize && (
