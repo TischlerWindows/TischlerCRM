@@ -33,6 +33,7 @@ import {
   GripVertical,
   X,
   CreditCard,
+  ChevronLeft,
   ChevronRight,
   Maximize2,
   Minimize2,
@@ -2860,9 +2861,18 @@ export default function DashboardPage() {
             selectedDashboard ? (
               <div>
                 <div className="mb-8 flex justify-between items-center">
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-800 tracking-tight">{selectedDashboard.name}</h2>
-                    <p className="text-xs text-gray-400 mt-0.5">{selectedDashboard.description}</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => { setSelectedDashboard(null); setViewMode('list'); }}
+                      className="p-1.5 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-300 transition-all duration-200"
+                      title="Back to dashboards"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-800 tracking-tight">{selectedDashboard.name}</h2>
+                      <p className="text-xs text-gray-400 mt-0.5">{selectedDashboard.description}</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     {!dashEditMode ? (
