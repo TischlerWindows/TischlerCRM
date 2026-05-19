@@ -3622,11 +3622,11 @@ export default function SummaryPage() {
             </div>
 
             {/* Page Tabs */}
-            <div className="border-b border-gray-200 px-3 sm:px-6 overflow-x-auto print:hidden">
-              <nav className="flex gap-4 min-w-max">
+            <div className="bg-gray-50 border-b border-gray-200 px-4 sm:px-6 print:hidden flex-shrink-0">
+              <nav className="flex gap-1">
                 <button
                   onClick={() => { setActivePage(1); window.scrollTo(0, 0); }}
-                  className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePage === 1
                       ? 'border-brand-navy text-brand-navy'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -3636,7 +3636,7 @@ export default function SummaryPage() {
                 </button>
                 <button
                   onClick={() => { setActivePage(2); window.scrollTo(0, 0); }}
-                  className={`py-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                  className={`py-3 px-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                     activePage === 2
                       ? 'border-brand-navy text-brand-navy'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
