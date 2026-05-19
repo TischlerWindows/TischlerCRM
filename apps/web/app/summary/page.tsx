@@ -736,7 +736,6 @@ export default function SummaryPage() {
   const [pendingInput, setPendingInput] = useState<string | null>(null);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [tusPositionLocked, setTusPositionLocked] = useState(true);
-  const [hiddenAoRows, setHiddenAoRows] = useState<Set<string>>(new Set());
   // Opportunity picker state
   const [showOpportunityPicker, setShowOpportunityPicker] = useState(false);
   const [opportunityRecords, setOpportunityRecords] = useState<any[]>([]);
@@ -4804,7 +4803,8 @@ export default function SummaryPage() {
                           <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
                         );
 
-                        const toggleAoRow = (key: string) => setHiddenAoRows(prev => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+                        const hiddenAoRows = new Set<string>((ao.hiddenRows || []) as string[]);
+                        const toggleAoRow = (key: string) => { const n = new Set(hiddenAoRows); if (n.has(key)) n.delete(key); else n.add(key); setEditingSummary({ ...editingSummary, addOns: { ...ao, hiddenRows: Array.from(n) } }); };
                         const aoToggleBtn = (key: string) => (
                           <td className="px-1 py-1 text-center" style={{ width: '24px' }}>
                             <button onClick={() => toggleAoRow(key)} className="text-gray-400 hover:text-gray-600" title={hiddenAoRows.has(key) ? 'Show row' : 'Hide row'}>
