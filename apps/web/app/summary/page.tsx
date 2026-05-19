@@ -4588,7 +4588,7 @@ export default function SummaryPage() {
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium text-gray-900 whitespace-nowrap">Euro Windows</span>
-                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroWindows: !p['euroWindows'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroWindows'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroWindows: !p['euroWindows'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroWindows'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(euroWindowQty)}</td>
@@ -4645,7 +4645,7 @@ export default function SummaryPage() {
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium text-gray-900 whitespace-nowrap">Double Hung</span>
-                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, doubleHung: !p['doubleHung'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['doubleHung'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, doubleHung: !p['doubleHung'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['doubleHung'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doubleHungQty)}</td>
@@ -4702,7 +4702,7 @@ export default function SummaryPage() {
                                 <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-medium text-gray-900 whitespace-nowrap">Euro Doors</span>
-                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroDoors: !p['euroDoors'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroDoors'] ? '▾ Hide' : '▸ Breakdown'}</button>
+                                    <button onClick={() => setExpandedQtRows(p => ({ ...p, euroDoors: !p['euroDoors'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroDoors'] ? <><span>▾</span><span className="hidden sm:inline"> Hide</span></> : <><span>▸</span><span className="hidden sm:inline"> Breakdown</span></>}</button>
                                   </div>
                                 </td>
                                 <td className="px-4 py-3 text-right text-gray-700">{fmtInt(doorQty)}</td>
