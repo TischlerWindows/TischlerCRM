@@ -808,7 +808,7 @@ export default function ProjectsPage() {
         {/* Projects List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
-            <table className="w-full divide-y divide-gray-200">
+            <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   {visibleColumns.map(columnId => {
@@ -817,7 +817,7 @@ export default function ProjectsPage() {
                     return (
                       <th 
                         key={column.id} 
-                        className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors whitespace-nowrap"
                         onClick={() => handleSort(column.id)}
                       >
                         <div className="flex items-center gap-2">
