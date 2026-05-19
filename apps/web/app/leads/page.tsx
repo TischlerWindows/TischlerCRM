@@ -647,7 +647,7 @@ export default function LeadsPage() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
-        <div className="px-6 py-6">
+        <div className="px-3 md:px-6 py-6">
         <div className="mb-6 flex justify-between items-center">
           <h3 className="text-lg font-medium text-gray-900">Lead Records</h3>
           <div className="flex gap-3">
