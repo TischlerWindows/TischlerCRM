@@ -3576,8 +3576,8 @@ export default function SummaryPage() {
     {/* Summary Editor Dialog */}
     {showNewSummary && editingSummary && (
       <CellNavContext.Provider value={{ activeCellId, editingCellId, setActive: setActiveCellId, setEditing: setEditingCellId, pendingInput, setPendingInput }}>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-[95vw] max-h-[95vh] flex flex-col">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start sm:items-center justify-center z-50 sm:p-4">
+        <div className="bg-white rounded-none sm:rounded-lg shadow-xl w-full sm:max-w-[95vw] h-full sm:h-auto sm:max-h-[95dvh] flex flex-col">
             <div className="p-3 sm:p-6 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2 print:hidden">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Edit Summary</h2>
@@ -3661,11 +3661,11 @@ export default function SummaryPage() {
               {activePage === 2 && (
                 <div className="max-w-7xl mx-auto space-y-8">
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                       <h3 className="text-lg font-semibold text-gray-900">Project Summary</h3>
                       <p className="text-sm text-gray-500 mt-1">Overview information pulled from the data entry sheet</p>
                     </div>
-                    <div className="p-6 space-y-5">
+                    <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Date + Opportunity # */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
@@ -3857,11 +3857,11 @@ export default function SummaryPage() {
 
                   {/* Product Specifications */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                       <h3 className="text-lg font-semibold text-gray-900">Product Specifications</h3>
                       <p className="text-sm text-gray-500 mt-1">Product details for this project</p>
                     </div>
-                    <div className="p-6 space-y-5">
+                    <div className="p-3 sm:p-6 space-y-5">
                       {/* Row 1: Product (auto-filled from Opportunity, editable) */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
@@ -4186,11 +4186,11 @@ export default function SummaryPage() {
 
                   {/* Delivery Cost */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                       <h3 className="text-lg font-semibold text-gray-900">Delivery Cost</h3>
                     </div>
-                    <div className="p-6">
-                      <div className="grid grid-cols-3 gap-6">
+                    <div className="p-3 sm:p-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1"># of Containers</label>
                           <input
@@ -4253,10 +4253,10 @@ export default function SummaryPage() {
 
                   {/* Tax Cost */}
                   <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                       <h3 className="text-lg font-semibold text-gray-900">Tax Cost</h3>
                     </div>
-                    <div className="p-6">
+                    <div className="p-3 sm:p-6">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Use Tax @ Full</label>
@@ -4325,10 +4325,10 @@ export default function SummaryPage() {
                     ];
                     return (
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                        <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                           <h3 className="text-lg font-semibold text-gray-900">Cost Analysis</h3>
                         </div>
-                        <div className="p-6 grid grid-cols-3 gap-x-8 gap-y-4">
+                        <div className="p-3 sm:p-6 grid grid-cols-2 sm:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-4">
                           {rows.map(r => (
                             <div key={r.label}>
                               <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{r.label}</div>
@@ -4461,7 +4461,7 @@ export default function SummaryPage() {
                       };
                       return (
                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg flex items-center gap-3">
+                          <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg flex items-center gap-3">
                             <h3 className="text-lg font-semibold text-gray-900">
                               {locLabel ? `Quote Totals — Location ${locLabel}` : 'Quote Totals'}
                             </h3>
@@ -4563,7 +4563,7 @@ export default function SummaryPage() {
                       ))}
                       {/* Grand total (or the only table in single-location mode) */}
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                        <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                           <h3 className="text-lg font-semibold text-gray-900">{editingSummary.hasMultipleLocations ? 'Grand Total — All Locations' : 'Quote Totals'}</h3>
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
@@ -4932,7 +4932,7 @@ export default function SummaryPage() {
 
                         return (
                           <div className="bg-white border border-gray-200 rounded-lg shadow-sm mt-6">
-                            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 rounded-t-lg">
+                            <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-b border-gray-200 rounded-t-lg">
                               <h3 className="text-lg font-semibold text-gray-900">Add-On Items</h3>
                               <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
                             </div>
