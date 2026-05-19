@@ -4468,33 +4468,27 @@ export default function SummaryPage() {
                             {!locLabel && <p className="text-sm text-gray-500">Aggregated from the data entry sheet</p>}
                           </div>
                           <div className="overflow-x-auto">
-                            <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-                              <colgroup>
-                                <col style={{ width: '11%' }} /><col style={{ width: '5%' }} /><col style={{ width: '7%' }} />
-                                <col style={{ width: '7%' }} /><col style={{ width: '9%' }} /><col style={{ width: '8%' }} />
-                                <col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '9%' }} />
-                                <col style={{ width: '7%' }} /><col style={{ width: '7%' }} /><col style={{ width: '8%' }} /><col style={{ width: '7%' }} />
-                              </colgroup>
+                            <table className="min-w-[680px] text-sm">
                               <thead>
                                 <tr className="bg-gray-50 border-b border-gray-200">
-                                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
-                                  <th className="px-2 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">FINAL W/ ADJ.</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
-                                  <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">Final W/ Adj</th>
+                                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb]"></th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Fields</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sq Ft</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">NET €</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Full</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">%</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">Final</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap">+Adj</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap">€ Full</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Disc</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">€ Final</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap">+Adj</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-100">
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-gray-900">Euro Windows</td>
+                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Euro Windows</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(ewSq)}</td>
@@ -4506,7 +4500,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-purple-600 bg-purple-50/30">{lEwCalc.finalAdj ? fmt(lEwCalc.finalAdj) : '—'}</td>
                                 </tr>
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-gray-900">Double Hung</td>
+                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Double Hung</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dhSq)}</td>
@@ -4518,7 +4512,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-purple-400 bg-purple-50/30">{lDhCalc.finalAdj ? fmt(lDhCalc.finalAdj) : '—'}</td>
                                 </tr>
                                 <tr className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-gray-900">Euro Doors</td>
+                                  <td className="px-3 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Euro Doors</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-700">{fmtInt(dSq)}</td>
@@ -4530,7 +4524,7 @@ export default function SummaryPage() {
                                   <td className="px-4 py-3 text-right text-purple-600 bg-purple-50/30">{lEdCalc.finalAdj ? fmt(lEdCalc.finalAdj) : '—'}</td>
                                 </tr>
                                 <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                                  <td className="px-4 py-3 text-gray-900">Total</td>
+                                  <td className="px-3 py-3 text-gray-900 sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Total</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totQ)}</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totF)}</td>
                                   <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totSq)}</td>
@@ -4568,47 +4562,32 @@ export default function SummaryPage() {
                           <p className="text-sm text-gray-500 mt-1">Aggregated from the data entry sheet</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
-                            <colgroup>
-                              <col style={{ width: '11%' }} />
-                              <col style={{ width: '5%' }} />
-                              <col style={{ width: '7%' }} />
-                              <col style={{ width: '7%' }} />
-                              <col style={{ width: '9%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '7%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '9%' }} />
-                              <col style={{ width: '7%' }} />
-                              <col style={{ width: '7%' }} />
-                              <col style={{ width: '8%' }} />
-                              <col style={{ width: '7%' }} />
-                            </colgroup>
+                          <table className="min-w-[680px] text-sm">
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Fields</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Sq Feet</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">NET €</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Full</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">%__</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">FINAL</th>
-                                <th className="px-2 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">FINAL W/ ADJ.</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb]"></th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Fields</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sq Ft</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">NET €</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Full</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">%</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">Final</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap">+Adj</th>
                                 {/* Calculated Totals headers — separated by thick border */}
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60">Full</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60">Disc</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60">Final</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60">Final W/ Adj</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap">€ Full</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Disc</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">€ Final</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60 whitespace-nowrap">+Adj</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                               {/* Euro Windows */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3">
+                                <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900">Euro Windows</span>
+                                    <span className="font-medium text-gray-900 whitespace-nowrap">Euro Windows</span>
                                     <button onClick={() => setExpandedQtRows(p => ({ ...p, euroWindows: !p['euroWindows'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroWindows'] ? '▾ Hide' : '▸ Breakdown'}</button>
                                   </div>
                                 </td>
@@ -4663,9 +4642,9 @@ export default function SummaryPage() {
                               })()}
                               {/* Double Hung */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3">
+                                <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900">Double Hung</span>
+                                    <span className="font-medium text-gray-900 whitespace-nowrap">Double Hung</span>
                                     <button onClick={() => setExpandedQtRows(p => ({ ...p, doubleHung: !p['doubleHung'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['doubleHung'] ? '▾ Hide' : '▸ Breakdown'}</button>
                                   </div>
                                 </td>
@@ -4720,9 +4699,9 @@ export default function SummaryPage() {
                               })()}
                               {/* Euro Doors */}
                               <tr className="hover:bg-gray-50">
-                                <td className="px-4 py-3">
+                                <td className="px-2 py-3 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6]">
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-medium text-gray-900">Euro Doors</span>
+                                    <span className="font-medium text-gray-900 whitespace-nowrap">Euro Doors</span>
                                     <button onClick={() => setExpandedQtRows(p => ({ ...p, euroDoors: !p['euroDoors'] }))} className="shrink-0 text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-white">{expandedQtRows['euroDoors'] ? '▾ Hide' : '▸ Breakdown'}</button>
                                   </div>
                                 </td>
@@ -4777,7 +4756,7 @@ export default function SummaryPage() {
                               })()}
                               {/* Total (sum of EW+DH+ED before adjustment) */}
                               <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                                <td className="px-4 py-3 text-gray-900">Total</td>
+                                <td className="px-3 py-3 text-gray-900 sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Total</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
@@ -4798,7 +4777,7 @@ export default function SummaryPage() {
                               </tr>
                               {/* Final Adjustment */}
                               <tr className="hover:bg-amber-50 border-t border-amber-200">
-                                <td className="px-4 py-3 font-medium text-amber-800">Final Adjustment</td>
+                                <td className="px-3 py-3 font-medium text-amber-800 sticky left-0 z-10 bg-white shadow-[inset_-1px_0_0_#fde68a] whitespace-nowrap">Final Adjustment</td>
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
                                 <td className="px-4 py-3 text-right text-gray-400">—</td>
@@ -4815,7 +4794,7 @@ export default function SummaryPage() {
                               </tr>
                               {/* Grand Total */}
                               <tr className="bg-gray-50 font-semibold border-t-2 border-gray-300">
-                                <td className="px-4 py-3 text-gray-900">Grand Total</td>
+                                <td className="px-3 py-3 text-gray-900 sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Grand Total</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalQty)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalFields)}</td>
                                 <td className="px-4 py-3 text-right text-gray-900">{fmtInt(totalSqFt)}</td>
