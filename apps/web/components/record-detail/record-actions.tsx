@@ -345,9 +345,9 @@ export function RecordActions({
         {showEdit && canEdit && (
           <button
             onClick={handleEdit}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
-            <Edit className="w-4 h-4 mr-1.5" />
+            <Edit className="w-3.5 h-3.5 mr-1" />
             Edit
           </button>
         )}
@@ -355,9 +355,9 @@ export function RecordActions({
           <button
             onClick={handleClone}
             disabled={isCloning}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Copy className="w-4 h-4 mr-1.5" />
+            <Copy className="w-3.5 h-3.5 mr-1" />
             {isCloning ? 'Cloning\u2026' : 'Clone'}
           </button>
         )}
@@ -365,9 +365,9 @@ export function RecordActions({
           <button
             onClick={handleRequoteClick}
             disabled={isRequoting}
-            className="inline-flex items-center px-4 py-2 border border-blue-300 rounded-lg text-sm font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-3 py-1.5 border border-blue-300 rounded-lg text-xs font-medium text-blue-700 bg-white hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className={`w-4 h-4 mr-1.5 ${isRequoting ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isRequoting ? 'animate-spin' : ''}`} />
             {isRequoting ? 'Creating\u2026' : 'Create Requote'}
           </button>
         )}
@@ -375,27 +375,27 @@ export function RecordActions({
           <button
             onClick={() => void handleGenerateProposal()}
             disabled={isGeneratingProposal}
-            className="inline-flex items-center px-4 py-2 border border-brand-navy/30 rounded-lg text-sm font-medium text-brand-navy bg-white hover:bg-brand-navy/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center px-3 py-1.5 border border-brand-navy/30 rounded-lg text-xs font-medium text-brand-navy bg-white hover:bg-brand-navy/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <FileText className="w-4 h-4 mr-1.5" />
+            <FileText className="w-3.5 h-3.5 mr-1" />
             {isGeneratingProposal ? 'Generating...' : 'Proposal PDF'}
           </button>
         )}
         {showPrint && (
           <button
             onClick={handlePrint}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
           >
-            <Printer className="w-4 h-4 mr-1.5" />
+            <Printer className="w-3.5 h-3.5 mr-1" />
             Print
           </button>
         )}
         {showDelete && canDelete && (
           <button
             onClick={handleDelete}
-            className="inline-flex items-center px-4 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
+            className="inline-flex items-center px-3 py-1.5 border border-red-200 rounded-lg text-xs font-medium text-red-600 bg-white hover:bg-red-50 transition-colors"
           >
-            <Trash2 className="w-4 h-4 mr-1.5" />
+            <Trash2 className="w-3.5 h-3.5 mr-1" />
             Delete
           </button>
         )}
