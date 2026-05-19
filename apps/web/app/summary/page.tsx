@@ -4800,7 +4800,22 @@ export default function SummaryPage() {
                         };
 
                         const inpLeft = (key: string, field: string, placeholder?: string) => (
-                          <input type="text" value={getAo(key)[field] || ''} onChange={(e) => setAo(key, field, e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40" placeholder={placeholder || '—'} />
+                          <textarea
+                            value={getAo(key)[field] || ''}
+                            rows={1}
+                            onChange={(e) => {
+                              setAo(key, field, e.target.value);
+                              e.target.style.height = 'auto';
+                              e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                            onFocus={(e) => {
+                              e.target.style.height = 'auto';
+                              e.target.style.height = e.target.scrollHeight + 'px';
+                            }}
+                            className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 focus:border-brand-navy/40 resize-none overflow-hidden"
+                            placeholder={placeholder || '—'}
+                            style={{ lineHeight: '1.25rem', minHeight: '2rem' }}
+                          />
                         );
 
                         const hiddenAoRows = new Set<string>((ao.hiddenRows || []) as string[]);
@@ -5093,7 +5108,7 @@ export default function SummaryPage() {
                                       <td className="px-1 py-1"></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.item} onChange={e => setCustomRow(idx, 'item', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Item name" /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.qty} onChange={e => setCustomRow(idx, 'qty', e.target.value)} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Qty" /></td>
-                                      <td className="px-1 py-1" colSpan={2}><input type="text" value={cr.details} onChange={e => setCustomRow(idx, 'details', e.target.value)} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="Details" /></td>
+                                      <td className="px-1 py-1" colSpan={2}><textarea rows={1} value={cr.details} onChange={e => { setCustomRow(idx, 'details', e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} onFocus={e => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} className="w-full px-2 py-1.5 text-left text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 resize-none overflow-hidden" placeholder="Details" style={{ lineHeight: '1.25rem', minHeight: '2rem' }} /></td>
                                       <td className="px-1 py-1"><input type="text" value={cr.netEuro.replace(/[€,]/g, '') ? '\u20ac' + parseFloat(cr.netEuro.replace(/[€,]/g, '')).toLocaleString('en-US') : cr.netEuro} onChange={e => setCustomRow(idx, 'netEuro', e.target.value.replace(/[€,]/g, ''))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.full)} onChange={e => setCustomRow(idx, 'full', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
                                       <td className="px-1 py-1 bg-blue-50/30"><input type="text" value={fmtQtInput(cr.pct)} onChange={e => setCustomRow(idx, 'pct', stripQtInput(e.target.value))} className="w-full px-2 py-1.5 text-right text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40 text-blue-700" placeholder="—" /></td>
