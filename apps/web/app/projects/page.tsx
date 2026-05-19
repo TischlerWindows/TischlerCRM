@@ -808,7 +808,7 @@ export default function ProjectsPage() {
         {/* Projects List */}
         <div className="bg-white border border-gray-200 rounded-lg">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-[900px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   {visibleColumns.map(columnId => {
