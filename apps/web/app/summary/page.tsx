@@ -4910,21 +4910,21 @@ export default function SummaryPage() {
                               <p className="text-sm text-gray-500 mt-1">Additional line items below the quote totals</p>
                             </div>
                             <div className="overflow-x-auto">
-                              <table className="min-w-[940px] text-xs sm:text-sm">
+                              <table className="min-w-[940px] md:min-w-[700px] text-xs sm:text-sm">
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="py-2 sticky left-0 z-10 bg-gray-50" style={{ width: '24px' }}></th>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap" style={{ minWidth: '140px' }}>Item</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '56px' }}>Qty</th>
-                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" colSpan={2} style={{ minWidth: '200px' }}>Details</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" style={{ minWidth: '80px' }}>NET €</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>Full</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>%</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>Final</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider" style={{ minWidth: '16px' }}></th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>€ Full</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>Disc</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap" style={{ minWidth: '76px' }}>€ Final</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Item</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
+                                    <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" colSpan={2}>Details</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">NET €</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Full</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">%</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">Final</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider"></th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider border-l-4 border-blue-300 bg-blue-50/60 whitespace-nowrap">€ Full</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap">Disc</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50/60 whitespace-nowrap">€ Final</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-purple-700 uppercase tracking-wider bg-purple-50/60"></th>
                                   </tr>
                                 </thead>
