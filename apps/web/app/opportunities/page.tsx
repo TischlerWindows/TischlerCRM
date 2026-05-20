@@ -96,7 +96,8 @@ export default function OpportunitiesPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);, setShowNoLayoutsDialog] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [showNoLayoutsDialog, setShowNoLayoutsDialog] = useState(false);
   const [showDynamicForm, setShowDynamicForm] = useState(false);
   const [prefillData, setPrefillData] = useState<Record<string, any>>({});
   const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
