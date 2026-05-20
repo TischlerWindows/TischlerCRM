@@ -240,7 +240,7 @@ export default function ProductsPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Product Log</h1>
-          <p className="text-sm text-gray-500">Products grouped by type across all summary sheets € click a row to expand</p>
+          <p className="text-sm text-gray-500">Products grouped by type across all summary sheets · click a row to expand</p>
         </div>
       </div>
 
