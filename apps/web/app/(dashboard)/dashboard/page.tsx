@@ -273,6 +273,7 @@ export default function DashboardPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [sidebarFilter, setSidebarFilter] = useState<string>('all');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [previewKey, setPreviewKey] = useState(0);
@@ -2589,9 +2590,23 @@ export default function DashboardPage() {
 
   return (
     <>
-    <div className="flex flex-1 bg-gray-50 h-screen">
+    <div className="flex flex-1 bg-gray-50 h-screen relative">
+        {/* Mobile sidebar backdrop */}
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 bg-black/30 z-20 md:hidden" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+        {/* Mobile sidebar open tab */}
+        {!mobileSidebarOpen && (
+          <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-l-0 border-gray-100 rounded-r-md px-0.5 py-3 shadow-sm" aria-label="Open sidebar">
+            <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+        )}
         {/* Sidebar */}
-        <div className="hidden md:block md:w-64 bg-white border-r border-gray-100 p-6 overflow-y-auto flex-shrink-0">
+        <div className={`fixed md:relative top-[88px] md:top-auto bottom-0 md:bottom-auto left-0 w-44 md:w-64 bg-white border-r border-gray-100 p-4 md:p-6 overflow-y-auto flex-shrink-0 z-30 md:z-auto transition-transform duration-200 ease-in-out ${mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}`}>
+          {/* Mobile close arrow */}
+          <button onClick={() => setMobileSidebarOpen(false)} className="md:hidden absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-[#e8eaf6] rounded-lg flex items-center justify-center">
@@ -2671,28 +2686,6 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Mobile filter bar — replaces sidebar on small screens */}
-          <div className="md:hidden flex gap-2 overflow-x-auto px-4 pt-4 pb-2">
-            {([
-              { key: 'recent', label: 'Recent', Icon: Clock },
-              { key: 'createdByMe', label: 'Created by Me', Icon: User },
-              { key: 'all', label: 'All Dashboards', Icon: LayoutDashboard },
-              { key: 'favorites', label: 'Favorites', Icon: Star },
-            ] as const).map(({ key, label, Icon }) => (
-              <button
-                key={key}
-                onClick={() => { setSidebarFilter(key); setSelectedDashboard(null); setViewMode('list'); }}
-                className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                  sidebarFilter === key && !selectedDashboard
-                    ? 'bg-brand-navy text-white border-brand-navy'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {label}
-              </button>
-            ))}
-          </div>
 
           <div className="px-3 md:px-6 py-6">
         {/* Actions */}

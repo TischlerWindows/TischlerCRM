@@ -20,6 +20,8 @@ import {
   Star,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   HelpCircle,
   Cog,
   Edit3,
@@ -78,6 +80,7 @@ export default function QuotesPage() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<string[]>([]);
   const [sidebarFilter, setSidebarFilter] = useState<'recent' | 'created-by-me' | 'all' | 'favorites'>('all');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -523,9 +526,23 @@ export default function QuotesPage() {
   }
 
   return (
-    <div className="flex flex-1 overflow-hidden bg-gray-50">
+    <div className="flex flex-1 overflow-hidden bg-gray-50 relative">
+        {/* Mobile sidebar backdrop */}
+        {mobileSidebarOpen && (
+          <div className="fixed inset-0 bg-black/30 z-20 md:hidden" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+        {/* Mobile sidebar open tab */}
+        {!mobileSidebarOpen && (
+          <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 bg-white border border-l-0 border-gray-200 rounded-r-md px-0.5 py-3 shadow-sm" aria-label="Open sidebar">
+            <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+          </button>
+        )}
         {/* Sidebar */}
-        <div className="hidden md:block md:w-64 bg-white border-r border-gray-200 p-6 overflow-y-auto flex-shrink-0">
+        <div className={`fixed md:relative top-[88px] md:top-auto bottom-0 md:bottom-auto left-0 w-44 md:w-64 bg-white border-r border-gray-200 p-4 md:p-6 overflow-y-auto flex-shrink-0 z-30 md:z-auto transition-transform duration-200 ease-in-out ${mobileSidebarOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}`}>
+          {/* Mobile close arrow */}
+          <button onClick={() => setMobileSidebarOpen(false)} className="md:hidden absolute right-2 top-2 p-1 rounded-md hover:bg-gray-100 text-gray-400" aria-label="Close sidebar">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
           <div className="space-y-6">
             <div className="pb-6 border-b border-gray-200">
               <div className="flex items-center gap-3 mb-2">
