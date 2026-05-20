@@ -4465,10 +4465,10 @@ export default function SummaryPage() {
                             <table className="min-w-[1200px] md:min-w-[680px] text-xs sm:text-sm">
                               <thead>
                                 <tr className="bg-gray-50 border-b border-gray-200">
-                                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb]"></th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Fields</th>
-                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sq Ft</th>
+                                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] min-w-[120px] md:min-w-0"></th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[44px] md:min-w-0">Qty</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[48px] md:min-w-0">Fields</th>
+                                  <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[52px] md:min-w-0">Sq Ft</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
                                   <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">%</th>
@@ -4560,10 +4560,10 @@ export default function SummaryPage() {
                             <thead>
                               <tr className="bg-gray-50 border-b border-gray-200">
                                 {/* Quote Totals headers */}
-                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb]"></th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Fields</th>
-                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Sq Ft</th>
+                                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] min-w-[120px] md:min-w-0"></th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[44px] md:min-w-0">Qty</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[48px] md:min-w-0">Fields</th>
+                                <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[52px] md:min-w-0">Sq Ft</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
                                 <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">%</th>
@@ -4914,8 +4914,8 @@ export default function SummaryPage() {
                                 <thead>
                                   <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="py-2 sticky left-0 z-10 bg-gray-50" style={{ width: '24px' }}></th>
-                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap">Item</th>
-                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
+                                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-[24px] z-10 bg-gray-50 shadow-[inset_-1px_0_0_#e5e7eb] whitespace-nowrap min-w-[120px] md:min-w-0">Item</th>
+                                    <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[52px] md:min-w-0">Qty</th>
                                     <th className="px-2 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" colSpan={2}>Details</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap min-w-[88px] md:min-w-0">NET €</th>
                                     <th className="px-2 py-2 text-right text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50/60 whitespace-nowrap min-w-[104px] md:min-w-0">Full</th>
