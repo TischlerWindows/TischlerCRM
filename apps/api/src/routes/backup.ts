@@ -36,12 +36,16 @@ export async function backupRoutes(app: FastifyInstance) {
     if (backupPool) return backupPool;
     const env = loadEnv();
     const connStr = env.BACKUP_DATABASE_URL || env.DATABASE_URL;
+    const needsSsl =
+      !!connStr &&
+      !connStr.includes('sslmode=disable') &&
+      !connStr.includes('.railway.internal');
     const pool = new Pool({
       connectionString: connStr,
       max: 3,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
-      ssl: connStr?.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+      ssl: needsSsl ? { rejectUnauthorized: false } : false,
     });
     // Reset pool reference on error so the next call creates a fresh pool
     pool.on('error', () => {
