@@ -207,6 +207,93 @@ const FIELD_OPTIONS: Record<string, string[]> = {
 
 const defaultTabs = DEFAULT_TAB_ORDER;
 
+function SearchableFieldSelect({
+  value,
+  onChange,
+  options,
+  placeholder = 'Select field…',
+  className = '',
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = search
+    ? options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    : options;
+
+  const selected = options.find(o => o.value === value);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch('');
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40 text-left flex items-center justify-between bg-white text-sm"
+      >
+        <span className={selected ? 'text-gray-900 truncate' : 'text-gray-400'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-1" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
+          <div className="p-2 border-b border-gray-100">
+            <input
+              autoFocus
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search fields…"
+              className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-brand-navy/40"
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto py-1">
+            <button
+              type="button"
+              onClick={() => { onChange(''); setOpen(false); setSearch(''); }}
+              className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${!value ? 'bg-brand-navy/5 text-brand-navy font-medium' : 'text-gray-500'}`}
+            >
+              {placeholder}
+            </button>
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-gray-400">No fields match</p>
+            ) : (
+              filtered.map(o => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false); setSearch(''); }}
+                  className={`w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 ${value === o.value ? 'bg-brand-navy/5 text-brand-navy font-medium' : 'text-gray-900'}`}
+                >
+                  {o.label}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const { hasAppPermission } = usePermissions();
   const pathname = usePathname();
@@ -3600,30 +3687,22 @@ export default function DashboardPage() {
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis (Group By)</label>
-                        <select
+                        <SearchableFieldSelect
                           value={widgetConfig.xAxis}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                        >
-                          <option value="">Select field…</option>
-                          {objectFields.map(f => (
-                            <option key={f.value} value={f.value}>{f.label}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setWidgetConfig({ ...widgetConfig, xAxis: v })}
+                          options={objectFields}
+                          placeholder="Select field…"
+                        />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis (Measure)</label>
-                        <select
+                        <SearchableFieldSelect
                           value={widgetConfig.yAxis}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                        >
-                          <option value="">Select field…</option>
-                          {objectFields.map(f => (
-                            <option key={f.value} value={f.value}>{f.label}</option>
-                          ))}
-                        </select>
+                          onChange={(v) => setWidgetConfig({ ...widgetConfig, yAxis: v })}
+                          options={objectFields}
+                          placeholder="Select field…"
+                        />
                       </div>
 
                       {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
@@ -3632,16 +3711,12 @@ export default function DashboardPage() {
                             Stack By
                             <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
                           </label>
-                          <select
+                          <SearchableFieldSelect
                             value={widgetConfig.stackBy}
-                            onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                          >
-                            <option value="">Select field…</option>
-                            {objectFields.map(f => (
-                              <option key={f.value} value={f.value}>{f.label}</option>
-                            ))}
-                          </select>
+                            onChange={(v) => setWidgetConfig({ ...widgetConfig, stackBy: v })}
+                            options={objectFields}
+                            placeholder="Select field…"
+                          />
                         </div>
                       )}
 
@@ -3668,20 +3743,17 @@ export default function DashboardPage() {
                         </label>
                         {(widgetConfig.whereFilters || []).map((wf: WhereFilter, idx: number) => (
                           <div key={idx} className="flex gap-1.5 mb-2 items-center">
-                            <select
+                            <SearchableFieldSelect
                               value={wf.field}
-                              onChange={(e) => {
+                              onChange={(v) => {
                                 const updated = [...(widgetConfig.whereFilters || [])];
-                                updated[idx] = { ...wf, field: e.target.value };
+                                updated[idx] = { ...wf, field: v };
                                 setWidgetConfig({ ...widgetConfig, whereFilters: updated });
                               }}
-                              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
-                            >
-                              <option value="">Field…</option>
-                              {objectFields.map(f => (
-                                <option key={f.value} value={f.value}>{f.label}</option>
-                              ))}
-                            </select>
+                              options={objectFields}
+                              placeholder="Field…"
+                              className="flex-1 min-w-0"
+                            />
                             <select
                               value={wf.operator}
                               onChange={(e) => {
@@ -3764,16 +3836,12 @@ export default function DashboardPage() {
                     <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Count Field</label>
-                      <select
+                      <SearchableFieldSelect
                         value={widgetConfig.yAxis}
-                        onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                      >
-                        <option value="">Total record count</option>
-                        {objectFields.map(f => (
-                          <option key={f.value} value={f.value}>{f.label}</option>
-                        ))}
-                      </select>
+                        onChange={(v) => setWidgetConfig({ ...widgetConfig, yAxis: v })}
+                        options={objectFields}
+                        placeholder="Total record count"
+                      />
                     </div>
                     {/* WHERE Filters for metric/card */}
                     <div>
@@ -3783,20 +3851,17 @@ export default function DashboardPage() {
                       </label>
                       {(widgetConfig.whereFilters || []).map((wf: WhereFilter, idx: number) => (
                         <div key={idx} className="flex gap-1.5 mb-2 items-center">
-                          <select
+                          <SearchableFieldSelect
                             value={wf.field}
-                            onChange={(e) => {
+                            onChange={(v) => {
                               const updated = [...(widgetConfig.whereFilters || [])];
-                              updated[idx] = { ...wf, field: e.target.value };
+                              updated[idx] = { ...wf, field: v };
                               setWidgetConfig({ ...widgetConfig, whereFilters: updated });
                             }}
-                            className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
-                          >
-                            <option value="">Field…</option>
-                            {objectFields.map(f => (
-                              <option key={f.value} value={f.value}>{f.label}</option>
-                            ))}
-                          </select>
+                            options={objectFields}
+                            placeholder="Field…"
+                            className="flex-1 min-w-0"
+                          />
                           <select
                             value={wf.operator}
                             onChange={(e) => {
@@ -3905,48 +3970,38 @@ export default function DashboardPage() {
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis</label>
-                        <select
-                          value={widgetConfig.xAxis}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, xAxis: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                        >
-                          <option value="">Select field...</option>
-                          {(() => {
-                            const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                            if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                              return selectedReport.fields.map((field: string) => (
-                                <option key={field} value={field}>{field}</option>
-                              ));
-                            }
-                            const fields = getAvailableFields(widgetConfig.dataSource);
-                            return fields.map(field => (
-                              <option key={field} value={field}>{field}</option>
-                            ));
-                          })()}
-                        </select>
+                        {(() => {
+                          const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                          const reportFieldOptions = selectedReport?.fields && selectedReport.fields.length > 0
+                            ? selectedReport.fields.map((f: string) => ({ value: f, label: f }))
+                            : getAvailableFields(widgetConfig.dataSource).map(f => ({ value: f, label: f }));
+                          return (
+                            <SearchableFieldSelect
+                              value={widgetConfig.xAxis}
+                              onChange={(v) => setWidgetConfig({ ...widgetConfig, xAxis: v })}
+                              options={reportFieldOptions}
+                              placeholder="Select field..."
+                            />
+                          );
+                        })()}
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Y-Axis</label>
-                        <select
-                          value={widgetConfig.yAxis}
-                          onChange={(e) => setWidgetConfig({ ...widgetConfig, yAxis: e.target.value })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                        >
-                          <option value="">Select field...</option>
-                          {(() => {
-                            const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                            if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                              return selectedReport.fields.map((field: string) => (
-                                <option key={field} value={field}>{field}</option>
-                              ));
-                            }
-                            const fields = getAvailableFields(widgetConfig.dataSource);
-                            return fields.map(field => (
-                              <option key={field} value={field}>{field}</option>
-                            ));
-                          })()}
-                        </select>
+                        {(() => {
+                          const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                          const reportFieldOptions = selectedReport?.fields && selectedReport.fields.length > 0
+                            ? selectedReport.fields.map((f: string) => ({ value: f, label: f }))
+                            : getAvailableFields(widgetConfig.dataSource).map(f => ({ value: f, label: f }));
+                          return (
+                            <SearchableFieldSelect
+                              value={widgetConfig.yAxis}
+                              onChange={(v) => setWidgetConfig({ ...widgetConfig, yAxis: v })}
+                              options={reportFieldOptions}
+                              placeholder="Select field..."
+                            />
+                          );
+                        })()}
                       </div>
 
                       {(selectedWidgetType === 'stacked-horizontal-bar' || selectedWidgetType === 'stacked-vertical-bar') && (
@@ -3955,25 +4010,20 @@ export default function DashboardPage() {
                             Stack By
                             <span className="text-xs text-gray-500 ml-2">(Group data by this field)</span>
                           </label>
-                          <select
-                            value={widgetConfig.stackBy}
-                            onChange={(e) => setWidgetConfig({ ...widgetConfig, stackBy: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-navy/40"
-                          >
-                            <option value="">Select field...</option>
-                            {(() => {
-                              const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
-                              if (selectedReport?.fields && selectedReport.fields.length > 0) {
-                                return selectedReport.fields.map((field: string) => (
-                                  <option key={field} value={field}>{field}</option>
-                                ));
-                              }
-                              const fields = getAvailableFields(widgetConfig.dataSource);
-                              return fields.map(field => (
-                                <option key={field} value={field}>{field}</option>
-                              ));
-                            })()}
-                          </select>
+                          {(() => {
+                            const selectedReport = availableReports.find(r => r.id === widgetConfig.reportId);
+                            const reportFieldOptions = selectedReport?.fields && selectedReport.fields.length > 0
+                              ? selectedReport.fields.map((f: string) => ({ value: f, label: f }))
+                              : getAvailableFields(widgetConfig.dataSource).map(f => ({ value: f, label: f }));
+                            return (
+                              <SearchableFieldSelect
+                                value={widgetConfig.stackBy}
+                                onChange={(v) => setWidgetConfig({ ...widgetConfig, stackBy: v })}
+                                options={reportFieldOptions}
+                                placeholder="Select field..."
+                              />
+                            );
+                          })()}
                         </div>
                       )}
 
