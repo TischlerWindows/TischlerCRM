@@ -294,6 +294,117 @@ function SearchableFieldSelect({
   );
 }
 
+// ── TeamMember slot denormalization for dashboard charts ─────────────────────
+
+/** Parent-link field name on TeamMember records for each supported object. */
+const TM_PARENT_FIELD: Record<string, string> = {
+  Property: 'property',
+  Opportunity: 'opportunity',
+  Project: 'project',
+  WorkOrder: 'workOrder',
+  Installation: 'installation',
+  Lead: 'lead',
+};
+
+/** Client-side cache for TeamMember records (1-minute TTL, avoids repeated fetches). */
+let _tmRecordsCache: Record<string, any>[] | null = null;
+let _tmCacheFetchedAt = 0;
+
+async function fetchAllTeamMemberRecords(): Promise<Record<string, any>[]> {
+  const now = Date.now();
+  if (_tmRecordsCache && now - _tmCacheFetchedAt < 60_000) return _tmRecordsCache;
+  try {
+    const raw = await apiClient.getRecords('TeamMember', { limit: 5000 });
+    _tmRecordsCache = Array.isArray(raw) ? raw : [];
+    _tmCacheFetchedAt = now;
+    return _tmRecordsCache;
+  } catch {
+    return _tmRecordsCache ?? [];
+  }
+}
+
+/**
+ * Enriches flattened parent records with synthetic slot-field values so that
+ * dashboard charts can group/filter by Connection fields.  The synthetic key
+ * (e.g. "__tm:flag:quoteRecipient") matches the fieldApiName used in PanelField.
+ */
+async function attachSlotFields(
+  flatRecords: Record<string, any>[],
+  objectApiName: string,
+  schema: any,
+): Promise<Record<string, any>[]> {
+  const parentField = TM_PARENT_FIELD[objectApiName];
+  if (!parentField || flatRecords.length === 0) return flatRecords;
+
+  const objDef = schema?.objects?.find((o: any) => o.apiName === objectApiName);
+  if (!objDef) return flatRecords;
+
+  // Collect unique slot definitions from every layout on this object
+  const slots: Array<{ fieldApiName: string; kind: 'flag' | 'role'; flag?: string; role?: string }> = [];
+  const seen = new Set<string>();
+  for (const layout of (objDef.pageLayouts || [])) {
+    for (const tab of (layout.tabs || [])) {
+      for (const region of (tab.regions || [])) {
+        for (const panel of (region.panels || [])) {
+          for (const pf of (panel.fields || [])) {
+            if (pf.kind === 'teamMemberSlot' && pf.slotConfig && !seen.has(pf.fieldApiName)) {
+              seen.add(pf.fieldApiName);
+              const c = (pf.slotConfig as any).criterion;
+              slots.push({ fieldApiName: pf.fieldApiName, kind: c?.kind ?? 'role', flag: c?.flag, role: c?.role });
+            }
+          }
+        }
+      }
+    }
+  }
+  if (slots.length === 0) return flatRecords;
+
+  const allTm = await fetchAllTeamMemberRecords();
+
+  // Group raw TM records by parent record ID
+  const byParentId: Record<string, Record<string, any>[]> = {};
+  for (const tm of allTm) {
+    const d: Record<string, any> = (tm.data && typeof tm.data === 'object') ? tm.data : tm;
+    const parentId =
+      d[parentField] ??
+      d[`TeamMember__${parentField}`] ??
+      d[`${parentField.charAt(0).toUpperCase()}${parentField.slice(1)}Id`];
+    if (typeof parentId !== 'string' || !parentId) continue;
+    if (!byParentId[parentId]) byParentId[parentId] = [];
+    byParentId[parentId].push(d);
+  }
+
+  return flatRecords.map(record => {
+    const tmRows = byParentId[record.id] ?? [];
+    if (tmRows.length === 0) return record;
+
+    const extra: Record<string, string> = {};
+    for (const slot of slots) {
+      const match = tmRows.find(row => {
+        if (slot.kind === 'flag') {
+          const v = row[slot.flag!] ?? row[`TeamMember__${slot.flag}`];
+          return v === true || v === 'true';
+        }
+        const r = row.role ?? row.TeamMember__role;
+        return r === slot.role;
+      });
+      if (match) {
+        const name =
+          match.contactName ?? match.TeamMember__contactName ??
+          match.accountName ?? match.TeamMember__accountName ??
+          'Unknown';
+        extra[slot.fieldApiName] = String(name);
+      }
+    }
+    return Object.keys(extra).length > 0 ? { ...record, ...extra } : record;
+  });
+}
+
+/** Tracks which object types have had their cached records slot-enriched. */
+const _slotEnrichedObjects = new Set<string>();
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const { hasAppPermission } = usePermissions();
   const pathname = usePathname();
@@ -762,19 +873,30 @@ export default function DashboardPage() {
     if (widgetConfig.dataSourceMode !== 'object' || !widgetConfig.dataSource) return;
     const objType = widgetConfig.dataSource;
     const apiName = PLURAL_TO_API_NAME[objType] || objType;
-    // Skip if already cached
-    if (getCachedRecords(objType).length > 0) return;
+    const alreadyCached = getCachedRecords(objType).length > 0;
+    const alreadyEnriched = _slotEnrichedObjects.has(objType);
+    // Skip if records are cached and already slot-enriched, or schema not loaded yet
+    if (alreadyCached && (alreadyEnriched || !schema)) return;
     (async () => {
       try {
-        const records = await recordsService.getRecords(apiName);
-        const flat = recordsService.flattenRecords(records);
+        let flat: Record<string, any>[];
+        if (alreadyCached) {
+          flat = getCachedRecords(objType);
+        } else {
+          const records = await recordsService.getRecords(apiName);
+          flat = recordsService.flattenRecords(records);
+        }
+        if (schema) {
+          flat = await attachSlotFields(flat, apiName, schema);
+          _slotEnrichedObjects.add(objType);
+        }
         setCachedRecords(objType, flat);
         setRecordsCacheVersion(v => v + 1);
       } catch (e) {
         console.error(`Failed to load records for ${objType}:`, e);
       }
     })();
-  }, [widgetConfig.dataSourceMode, widgetConfig.dataSource]);
+  }, [widgetConfig.dataSourceMode, widgetConfig.dataSource, schema]);
 
   // Load records into cache when user picks an object type in the filter button form
   useEffect(() => {
@@ -810,7 +932,11 @@ export default function DashboardPage() {
         const apiName = PLURAL_TO_API_NAME[objType] || objType;
         try {
           const records = await recordsService.getRecords(apiName);
-          const flat = recordsService.flattenRecords(records);
+          let flat = recordsService.flattenRecords(records);
+          if (schema) {
+            flat = await attachSlotFields(flat, apiName, schema);
+            _slotEnrichedObjects.add(objType);
+          }
           setCachedRecords(objType, flat);
         } catch (e) {
           console.error(`Failed to load records for ${objType}:`, e);
@@ -893,7 +1019,7 @@ export default function DashboardPage() {
         persistDashboard(updatedDashboard);
       }
     })();
-  }, [selectedDashboard?.id]); // Only re-run when switching dashboards
+  }, [selectedDashboard?.id, schema]); // Re-run when switching dashboards or when schema loads
 
   const handleCreateDashboard = async (name: string, description: string) => {
     try {
