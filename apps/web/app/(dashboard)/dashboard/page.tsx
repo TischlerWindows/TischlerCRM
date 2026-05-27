@@ -3664,10 +3664,35 @@ export default function DashboardPage() {
                 const objApiName = widgetConfig.dataSource ? PLURAL_TO_API_NAME[widgetConfig.dataSource] : '';
                 const objSchemaDef = objApiName && schema ? schema.objects.find((o: any) => o.apiName === objApiName) : null;
                 const EXCLUDED = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'];
+                // Collect teamMemberSlot (Connection) fields from the object's page layouts
+                const slotFields: { value: string; label: string }[] = [];
+                if (objSchemaDef) {
+                  const seen = new Set<string>();
+                  for (const layout of (objSchemaDef.pageLayouts || [])) {
+                    for (const tab of (layout.tabs || [])) {
+                      for (const region of (tab.regions || [])) {
+                        for (const panel of (region.panels || [])) {
+                          for (const pf of (panel.fields || [])) {
+                            if (pf.kind === 'teamMemberSlot' && pf.slotConfig && !seen.has(pf.fieldApiName)) {
+                              seen.add(pf.fieldApiName);
+                              const criterion = (pf.slotConfig as any).criterion;
+                              const slotLabel = pf.labelOverride || (pf.slotConfig as any).label ||
+                                (criterion?.kind === 'flag' ? criterion.flag : criterion?.role) || pf.fieldApiName;
+                              slotFields.push({ value: pf.fieldApiName, label: slotLabel });
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
                 const objectFields: { value: string; label: string }[] = objSchemaDef
-                  ? objSchemaDef.fields
-                      .filter((f: any) => !EXCLUDED.includes(f.apiName))
-                      .map((f: any) => ({ value: f.apiName, label: f.label || stripFieldPrefix(f.apiName) }))
+                  ? [
+                      ...objSchemaDef.fields
+                        .filter((f: any) => !EXCLUDED.includes(f.apiName))
+                        .map((f: any) => ({ value: f.apiName, label: f.label || stripFieldPrefix(f.apiName) })),
+                      ...slotFields,
+                    ]
                   : getAvailableFields(widgetConfig.dataSource || '').map(f => ({ value: f, label: stripFieldPrefix(f) }));
                 return (
                 <>
