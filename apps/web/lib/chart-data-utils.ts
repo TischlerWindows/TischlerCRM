@@ -46,6 +46,7 @@ export interface AggregationConfig {
   aggregationType?: 'sum' | 'count' | 'avg' | 'max' | 'min';
   stackByField?: string; // For stacked charts
   whereFilters?: WhereFilter[];
+  excludeBlanks?: boolean; // When true, skip records where X-axis value is null/undefined/empty
 }
 
 /**
@@ -199,6 +200,7 @@ export function aggregateChartData(config: AggregationConfig): ChartDataPoint[] 
     let xValue = record[config.xAxisField] || record[xField];
     
     if (xValue === null || xValue === undefined || xValue === '') {
+      if (config.excludeBlanks) continue; // skip blank/unspecified
       xValue = 'Unspecified';
     } else {
       xValue = formatDisplayValue(xValue);
@@ -418,6 +420,7 @@ export function aggregateStackedChartData(config: AggregationConfig): { data: St
     // Get X-axis value
     let xValue = record[config.xAxisField] || record[xField];
     if (xValue === null || xValue === undefined || xValue === '') {
+      if (config.excludeBlanks) continue; // skip blank/unspecified
       xValue = 'Unspecified';
     } else {
       xValue = formatDisplayValue(xValue);

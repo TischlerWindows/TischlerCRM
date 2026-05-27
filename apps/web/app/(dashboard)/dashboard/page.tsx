@@ -616,6 +616,7 @@ export default function DashboardPage() {
             stackByField: widgetConfig.stackBy,
             aggregationType: widgetConfig.aggregationType || 'sum',
             whereFilters: activeFilters,
+            excludeBlanks: !!widgetConfig.excludeBlanks,
           });
           return data && data.length > 0 ? { data, stackKeys } : { data: [], stackKeys: [] };
         } catch { return { data: [], stackKeys: [] }; }
@@ -629,6 +630,7 @@ export default function DashboardPage() {
           yAxisField: widgetConfig.yAxis,
           aggregationType: widgetConfig.aggregationType || 'sum',
           whereFilters: activeFilters,
+          excludeBlanks: !!widgetConfig.excludeBlanks,
         });
         return aggregatedData && aggregatedData.length > 0 ? { data: aggregatedData } : { data: [] };
       } catch { return { data: [] }; }
@@ -1001,6 +1003,7 @@ export default function DashboardPage() {
                 stackByField,
                 aggregationType: widget.config?.aggregationType || 'sum',
                 whereFilters: wFilters,
+                excludeBlanks: !!widget.config?.excludeBlanks,
               });
               if (data && data.length > 0) {
                 updatedWidgets = updatedWidgets.map(w =>
@@ -1018,6 +1021,7 @@ export default function DashboardPage() {
                 yAxisField: effectiveYField,
                 aggregationType: widget.config?.aggregationType || 'sum',
                 whereFilters: wFilters,
+                excludeBlanks: !!widget.config?.excludeBlanks,
               });
               if (aggregatedData && aggregatedData.length > 0) {
                 updatedWidgets = updatedWidgets.map(w =>
@@ -1378,6 +1382,7 @@ export default function DashboardPage() {
           stackByField: stackByField,
           aggregationType: widget.config?.aggregationType || 'sum',
           whereFilters: wFilters,
+          excludeBlanks: !!widget.config?.excludeBlanks,
         });
 
         if (!data || data.length === 0) {
@@ -1412,6 +1417,7 @@ export default function DashboardPage() {
           yAxisField: yField,
           aggregationType: widget.config?.aggregationType || 'sum',
           whereFilters: wFilters,
+          excludeBlanks: !!widget.config?.excludeBlanks,
         });
 
         if (!aggregatedData || aggregatedData.length === 0) {
@@ -3865,6 +3871,17 @@ export default function DashboardPage() {
                           options={objectFields}
                           placeholder="Select field…"
                         />
+                        {widgetConfig.xAxis && (
+                          <label className="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!widgetConfig.excludeBlanks}
+                              onChange={(e) => setWidgetConfig({ ...widgetConfig, excludeBlanks: e.target.checked })}
+                              className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                            />
+                            <span className="text-xs text-gray-600">Exclude blank / unspecified values</span>
+                          </label>
+                        )}
                       </div>
 
                       <div>
