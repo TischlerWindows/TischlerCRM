@@ -57,25 +57,37 @@ export async function backupRoutes(app: FastifyInstance) {
 
   // ------- helpers -------
 
+  // Once ensured in this process lifetime, skip redundant DDL on every request
+  let backupTableEnsured = false;
+
   async function ensureBackupTable() {
+    if (backupTableEnsured) return;
     const pool = getBackupPool();
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS "BackupSnapshot" (
-        "id"          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-        "name"        TEXT NOT NULL,
-        "type"        TEXT NOT NULL DEFAULT 'manual',
-        "data"        JSONB NOT NULL DEFAULT '{}',
-        "sizeMB"      TEXT NOT NULL DEFAULT '0',
-        "tables"      JSONB NOT NULL DEFAULT '{}',
-        "status"      TEXT NOT NULL DEFAULT 'completed',
-        "createdById" TEXT NOT NULL,
-        "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    // Add type column if missing (migrate existing backups)
-    await pool.query(`
-      ALTER TABLE "BackupSnapshot" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'manual';
-    `);
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "BackupSnapshot" (
+          "id"          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+          "name"        TEXT NOT NULL,
+          "type"        TEXT NOT NULL DEFAULT 'manual',
+          "data"        JSONB NOT NULL DEFAULT '{}',
+          "sizeMB"      TEXT NOT NULL DEFAULT '0',
+          "tables"      JSONB NOT NULL DEFAULT '{}',
+          "status"      TEXT NOT NULL DEFAULT 'completed',
+          "createdById" TEXT NOT NULL,
+          "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      // Add type column if missing (migrate existing backups)
+      await pool.query(`
+        ALTER TABLE "BackupSnapshot" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'manual';
+      `);
+    } catch (err: any) {
+      // 23505 = unique_violation: PostgreSQL race condition when two concurrent
+      // CREATE TABLE IF NOT EXISTS statements collide on pg_type internally.
+      // 42P07 = duplicate_table: table already exists (safe to ignore).
+      if (err.code !== '23505' && err.code !== '42P07') throw err;
+    }
+    backupTableEnsured = true;
   }
 
   async function exportAllData(): Promise<{ tables: Record<string, any[]>; counts: Record<string, number> }> {
