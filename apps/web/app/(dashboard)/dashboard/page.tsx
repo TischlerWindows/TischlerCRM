@@ -335,10 +335,28 @@ async function fetchContactNameMap(): Promise<Record<string, string>> {
     const map: Record<string, string> = {};
     for (const rec of (Array.isArray(raw) ? raw : [])) {
       const d: Record<string, any> = (rec.data && typeof rec.data === 'object') ? rec.data : rec;
-      const fn = String(d.firstName || d.Contact__firstName || '');
-      const ln = String(d.lastName || d.Contact__lastName || '');
-      const name = `${fn} ${ln}`.trim() ||
-        String(d.email || d.Contact__email || d.contactNumber || d.Contact__contactNumber || '');
+
+      // 1. Try composite name object (Contact__name or name field stored as {firstName, lastName})
+      let name = '';
+      const nameObj = d.name || d.Contact__name;
+      if (nameObj && typeof nameObj === 'object') {
+        const fn = String(nameObj.firstName || '').replace(/^N\/A$/i, '').trim();
+        const ln = String(nameObj.lastName || '').replace(/^N\/A$/i, '').trim();
+        name = `${fn} ${ln}`.trim();
+      }
+
+      // 2. Direct firstName / lastName fields (skip "N/A" placeholders)
+      if (!name) {
+        const fn = String(d.firstName || d.Contact__firstName || '').replace(/^N\/A$/i, '').trim();
+        const ln = String(d.lastName || d.Contact__lastName || '').replace(/^N\/A$/i, '').trim();
+        name = `${fn} ${ln}`.trim();
+      }
+
+      // 3. Fallback to contactNumber or email
+      if (!name) {
+        name = String(d.contactNumber || d.Contact__contactNumber || d.email || d.Contact__email || '');
+      }
+
       if (name && rec.id) map[String(rec.id)] = name;
     }
     _contactNameMap = map;
