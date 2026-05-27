@@ -323,6 +323,32 @@ async function fetchAllTeamMemberRecords(): Promise<Record<string, any>[]> {
   }
 }
 
+/** contactId → display name map (1-minute TTL). */
+let _contactNameMap: Record<string, string> | null = null;
+let _contactNameMapFetchedAt = 0;
+
+async function fetchContactNameMap(): Promise<Record<string, string>> {
+  const now = Date.now();
+  if (_contactNameMap && now - _contactNameMapFetchedAt < 60_000) return _contactNameMap;
+  try {
+    const raw = await apiClient.getRecords('Contact', { limit: 5000 });
+    const map: Record<string, string> = {};
+    for (const rec of (Array.isArray(raw) ? raw : [])) {
+      const d: Record<string, any> = (rec.data && typeof rec.data === 'object') ? rec.data : rec;
+      const fn = String(d.firstName || d.Contact__firstName || '');
+      const ln = String(d.lastName || d.Contact__lastName || '');
+      const name = `${fn} ${ln}`.trim() ||
+        String(d.email || d.Contact__email || d.contactNumber || d.Contact__contactNumber || '');
+      if (name && rec.id) map[String(rec.id)] = name;
+    }
+    _contactNameMap = map;
+    _contactNameMapFetchedAt = now;
+    return map;
+  } catch {
+    return _contactNameMap ?? {};
+  }
+}
+
 /**
  * Enriches flattened parent records with synthetic slot-field values so that
  * dashboard charts can group/filter by Connection fields.  The synthetic key
@@ -359,7 +385,10 @@ async function attachSlotFields(
   }
   if (slots.length === 0) return flatRecords;
 
-  const allTm = await fetchAllTeamMemberRecords();
+  const [allTm, contactNameMap] = await Promise.all([
+    fetchAllTeamMemberRecords(),
+    fetchContactNameMap(),
+  ]);
 
   // Group raw TM records by parent record ID
   const byParentId: Record<string, Record<string, any>[]> = {};
@@ -389,8 +418,11 @@ async function attachSlotFields(
         return r === slot.role;
       });
       if (match) {
+        const contactId = String(match.contact ?? match.TeamMember__contact ?? '');
+        const resolvedContact = contactId ? (contactNameMap[contactId] ?? '') : '';
         const name =
           match.contactName ?? match.TeamMember__contactName ??
+          (resolvedContact || undefined) ??
           match.accountName ?? match.TeamMember__accountName ??
           'Unknown';
         extra[slot.fieldApiName] = String(name);
