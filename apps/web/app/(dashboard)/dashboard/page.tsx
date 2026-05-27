@@ -59,7 +59,7 @@ import { recordsService } from '@/lib/records-service';
 import { apiClient } from '@/lib/api-client';
 import PageHeader from '@/components/page-header';
 import UniversalSearch from '@/components/universal-search';
-import { cn } from '@/lib/utils';
+import { cn, preloadLookupRecords, resolveLookupDisplayName } from '@/lib/utils';
 import { DEFAULT_TAB_ORDER } from '@/lib/default-tabs';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
 import { useSchemaStore } from '@/lib/schema-store';
@@ -323,48 +323,14 @@ async function fetchAllTeamMemberRecords(): Promise<Record<string, any>[]> {
   }
 }
 
-/** contactId → display name map (1-minute TTL). */
-let _contactNameMap: Record<string, string> | null = null;
-let _contactNameMapFetchedAt = 0;
-
-async function fetchContactNameMap(): Promise<Record<string, string>> {
-  const now = Date.now();
-  if (_contactNameMap && now - _contactNameMapFetchedAt < 60_000) return _contactNameMap;
-  try {
-    const raw = await apiClient.getRecords('Contact', { limit: 5000 });
-    const map: Record<string, string> = {};
-    for (const rec of (Array.isArray(raw) ? raw : [])) {
-      const d: Record<string, any> = (rec.data && typeof rec.data === 'object') ? rec.data : rec;
-
-      // 1. Try composite name object (Contact__name or name field stored as {firstName, lastName})
-      let name = '';
-      const nameObj = d.name || d.Contact__name;
-      if (nameObj && typeof nameObj === 'object') {
-        const fn = String(nameObj.firstName || '').replace(/^N\/A$/i, '').trim();
-        const ln = String(nameObj.lastName || '').replace(/^N\/A$/i, '').trim();
-        name = `${fn} ${ln}`.trim();
-      }
-
-      // 2. Direct firstName / lastName fields (skip "N/A" placeholders)
-      if (!name) {
-        const fn = String(d.firstName || d.Contact__firstName || '').replace(/^N\/A$/i, '').trim();
-        const ln = String(d.lastName || d.Contact__lastName || '').replace(/^N\/A$/i, '').trim();
-        name = `${fn} ${ln}`.trim();
-      }
-
-      // 3. Fallback to contactNumber or email
-      if (!name) {
-        name = String(d.contactNumber || d.Contact__contactNumber || d.email || d.Contact__email || '');
-      }
-
-      if (name && rec.id) map[String(rec.id)] = name;
-    }
-    _contactNameMap = map;
-    _contactNameMapFetchedAt = now;
-    return map;
-  } catch {
-    return _contactNameMap ?? {};
-  }
+/** Ensure Contact lookup cache is warm (1-minute TTL handled by getLookupRecords internally). */
+let _contactsPreloaded = false;
+async function ensureContactsPreloaded(): Promise<void> {
+  if (_contactsPreloaded) return;
+  await preloadLookupRecords('Contact');
+  _contactsPreloaded = true;
+  // Reset after 1 min so next call re-warms if the TTL cleared the cache
+  setTimeout(() => { _contactsPreloaded = false; }, 60_000);
 }
 
 /**
@@ -403,9 +369,9 @@ async function attachSlotFields(
   }
   if (slots.length === 0) return flatRecords;
 
-  const [allTm, contactNameMap] = await Promise.all([
+  const [allTm] = await Promise.all([
     fetchAllTeamMemberRecords(),
-    fetchContactNameMap(),
+    ensureContactsPreloaded(),
   ]);
 
   // Group raw TM records by parent record ID
@@ -436,14 +402,19 @@ async function attachSlotFields(
         return r === slot.role;
       });
       if (match) {
-        const contactId = String(match.contact ?? match.TeamMember__contact ?? '');
-        const resolvedContact = contactId ? (contactNameMap[contactId] ?? '') : '';
-        const name =
-          match.contactName ?? match.TeamMember__contactName ??
-          (resolvedContact || undefined) ??
-          match.accountName ?? match.TeamMember__accountName ??
-          'Unknown';
-        extra[slot.fieldApiName] = String(name);
+        // Try stored contactName first, then resolve via lookup cache
+        const storedName = match.contactName ?? match.TeamMember__contactName;
+        let name: string;
+        if (storedName && String(storedName) !== 'Unknown') {
+          name = String(storedName);
+        } else {
+          const contactId = match.contact ?? match.TeamMember__contact;
+          const resolved = contactId ? resolveLookupDisplayName(String(contactId), 'Contact') : '';
+          name = (resolved && resolved !== '-' && !/^[0-9a-f-]{32,}$/i.test(resolved))
+            ? resolved
+            : (match.accountName ?? match.TeamMember__accountName ?? 'Unknown');
+        }
+        extra[slot.fieldApiName] = name;
       }
     }
     return Object.keys(extra).length > 0 ? { ...record, ...extra } : record;
