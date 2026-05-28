@@ -249,6 +249,184 @@ export default function HomePage() {
     );
   };
 
+  const renderWidget = (widget: DashboardWidget) => {
+    const title = widget.title || widget.type;
+    const cardBase = "bg-white rounded-lg border border-gray-200 p-3 flex flex-col";
+
+    if (widget.type === 'metric' || widget.type === 'card') {
+      return (
+        <div className={cardBase}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          <div className="text-2xl font-bold text-brand-navy">
+            {widget.config?.prefix}{widget.config?.value?.toLocaleString?.() ?? widget.config?.value}{widget.config?.suffix}
+          </div>
+        </div>
+      );
+    }
+
+    if (widget.type === 'vertical-bar' || widget.type === 'horizontal-bar') {
+      return (
+        <div className={`${cardBase} h-full`}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          {widget.config?.data?.length ? (
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={widget.config.data} layout={widget.type === 'horizontal-bar' ? 'vertical' : 'horizontal'}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey={widget.type === 'horizontal-bar' ? 'value' : 'label'} type={widget.type === 'horizontal-bar' ? 'number' : 'category'} tick={{ fontSize: 9 }} />
+                  <YAxis dataKey={widget.type === 'horizontal-bar' ? 'label' : undefined} type={widget.type === 'horizontal-bar' ? 'category' : 'number'} tick={{ fontSize: 9 }} width={60} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill={widget.config?.barColor || '#151f6d'} radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-xs text-brand-dark/50">No data available.</div>
+          )}
+        </div>
+      );
+    }
+
+    if (widget.type === 'stacked-vertical-bar' || widget.type === 'stacked-horizontal-bar') {
+      const stackKeys = widget.config?.stackKeys || [];
+      const data = widget.config?.data || [];
+      return (
+        <div className={`${cardBase} h-full`}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          {data.length && stackKeys.length ? (
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data} layout={widget.type === 'stacked-horizontal-bar' ? 'vertical' : 'horizontal'}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey={widget.type === 'stacked-horizontal-bar' ? 'value' : 'label'} type={widget.type === 'stacked-horizontal-bar' ? 'number' : 'category'} tick={{ fontSize: 9 }} />
+                  <YAxis dataKey={widget.type === 'stacked-horizontal-bar' ? 'label' : undefined} type={widget.type === 'stacked-horizontal-bar' ? 'category' : 'number'} tick={{ fontSize: 9 }} />
+                  <Tooltip />
+                  {stackKeys.map((key: string, idx: number) => (
+                    <Bar key={key} dataKey={key} stackId="stack" fill={['#151f6d', '#da291c', '#9f9fa2', '#293241', '#1e2a7a'][idx % 5]} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-xs text-brand-dark/50">No data available.</div>
+          )}
+        </div>
+      );
+    }
+
+    if (widget.type === 'line') {
+      return (
+        <div className={`${cardBase} h-full`}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          {widget.config?.data?.length ? (
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={widget.config.data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="label" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 9 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="value" stroke="#151f6d" strokeWidth={2} dot={{ r: 2, fill: '#151f6d' }} activeDot={{ r: 4, fill: '#da291c' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="text-xs text-brand-dark/50">No data available.</div>
+          )}
+        </div>
+      );
+    }
+
+    if (widget.type === 'donut') {
+      return (
+        <div className={cardBase}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          {widget.config?.data?.length ? (
+            <div className="flex flex-col items-center flex-1 justify-center">
+              <div className="relative w-24 h-24">
+                <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                  <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="20" />
+                  {widget.config.data
+                    .reduce((acc: any[], item: any, idx: number) => {
+                      const total = widget.config.data.reduce((sum: number, d: any) => sum + d.value, 0);
+                      const percentage = total ? (item.value / total) * 100 : 0;
+                      const offset = acc.length > 0 ? acc[acc.length - 1].offset : 0;
+                      acc.push({ percentage, offset, color: ['#151f6d', '#da291c', '#9f9fa2', '#293241'][idx % 4] });
+                      return acc;
+                    }, [])
+                    .map((segment: any, idx: number) => (
+                      <circle key={idx} cx="50" cy="50" r="40" fill="none" stroke={segment.color} strokeWidth="20"
+                        strokeDasharray={`${segment.percentage * 2.513} 251.3`} strokeDashoffset={-segment.offset * 2.513} />
+                    ))}
+                </svg>
+              </div>
+              <div className="mt-2 space-y-0.5 w-full">
+                {widget.config.data.slice(0, 4).map((item: any, idx: number) => (
+                  <div key={idx} className="flex items-center gap-1.5 text-xs">
+                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: ['#151f6d', '#da291c', '#9f9fa2', '#293241'][idx % 4] }} />
+                    <span className="text-brand-dark/80 truncate">{item.label}</span>
+                    <span className="text-brand-dark/50 ml-auto">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-brand-dark/50">No data available.</div>
+          )}
+        </div>
+      );
+    }
+
+    if (widget.type === 'gauge') {
+      return (
+        <div className={cardBase}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          <div className="text-2xl font-bold text-brand-navy">{widget.config?.value ?? 75}%</div>
+        </div>
+      );
+    }
+
+    if (widget.type === 'table') {
+      const rows = widget.config?.data || [];
+      return (
+        <div className={cardBase}>
+          <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+          {rows.length ? (
+            <div className="overflow-auto flex-1">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    {Object.keys(rows[0]).slice(0, 4).map((key: string) => (
+                      <th key={key} className="text-left py-1 text-brand-dark/60 font-medium">{key}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0, 5).map((row: any, idx: number) => (
+                    <tr key={idx} className="border-b border-gray-100">
+                      {Object.keys(rows[0]).slice(0, 4).map((key: string) => (
+                        <td key={key} className="py-1 text-brand-dark/80">{String(row[key])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-xs text-brand-dark/50">No data available.</div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={cardBase}>
+        <div className="text-xs font-medium text-brand-dark/60 mb-1 uppercase tracking-wider truncate">{title}</div>
+        <div className="text-sm text-brand-dark/70">Widget preview</div>
+      </div>
+    );
+  };
+
   const renderWidgetPanel = (panel: HomePanel) => {
     const widget = widgetMap.get(panel.sourceId);
     if (!widget) {
@@ -258,9 +436,12 @@ export default function HomePage() {
         </div>
       );
     }
-
-    const title = widget.title || widget.type;
-    const cardBase = "bg-white rounded-lg border border-gray-200 p-5 h-full flex flex-col shadow-sm hover:shadow-md transition-shadow";
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-5 h-full flex flex-col shadow-sm hover:shadow-md transition-shadow">
+        {renderWidget(widget)}
+      </div>
+    );
+  };
 
     if (widget.type === 'metric') {
       return (
@@ -402,90 +583,33 @@ export default function HomePage() {
       );
     }
 
-    if (widget.type === 'gauge') {
-      const value = widget.config?.value ?? 75;
-      return (
-        <div className={cardBase}>
-          <div className="text-xs font-medium text-brand-dark/60 mb-2 uppercase tracking-wider">{title}</div>
-          <div className="text-3xl font-bold text-brand-navy">{value}%</div>
-          <div className="text-xs text-brand-dark/50 mt-1">Goal Achievement</div>
-        </div>
-      );
-    }
-
-    if (widget.type === 'table') {
-      const rows = widget.config?.data || [];
-      return (
-        <div className={cardBase}>
-          <div className="text-xs font-medium text-brand-dark/60 mb-2 uppercase tracking-wider">{title}</div>
-          {rows.length ? (
-            <div className="overflow-x-auto overflow-y-auto flex-1">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    {Object.keys(rows[0]).slice(0, 4).map((key) => (
-                      <th key={key} className="text-left py-1.5 text-brand-dark/60 font-medium">
-                        {key}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 5).map((row: any, idx: number) => (
-                    <tr key={idx} className="border-b border-gray-100 hover:bg-brand-light/50">
-                      {Object.keys(rows[0]).slice(0, 4).map((key) => (
-                        <td key={key} className="py-1.5 text-brand-dark/80">
-                          {String(row[key])}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-xs text-brand-dark/50">No data available.</div>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className={cardBase}>
-        <div className="text-xs font-medium text-brand-dark/60 mb-2 uppercase tracking-wider">{title}</div>
-        <div className="text-sm text-brand-dark/70">Widget preview</div>
-      </div>
-    );
-  };
-
   const renderDashboardPanel = (panel: HomePanel) => {
     const db = dashboardRecordsMap.get(panel.sourceId);
-    const widgetCount = db?.widgets?.length ?? 0;
+    const widgets = db?.widgets || [];
     return (
-      <div className="bg-white rounded-lg border border-gray-200 p-5 h-full flex flex-col shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <div className="text-sm font-semibold text-brand-dark">{db?.name || panel.title}</div>
-            {db?.description && (
-              <div className="text-xs text-brand-dark/50 mt-0.5">{db.description}</div>
-            )}
-            <div className="text-xs text-brand-dark/40 mt-0.5">{widgetCount} widget{widgetCount === 1 ? '' : 's'}</div>
-          </div>
+      <div className="bg-white rounded-lg border border-gray-200 h-full flex flex-col shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 shrink-0">
+          <div className="text-sm font-semibold text-brand-dark truncate">{db?.name || panel.title}</div>
           <Link
             href="/dashboard"
-            className="text-xs font-medium text-brand-navy hover:text-brand-red transition-colors flex items-center gap-1"
+            className="text-xs font-medium text-brand-navy hover:text-brand-red transition-colors flex items-center gap-1 shrink-0 ml-2"
           >
             View <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
-        {db ? (
-          <div className="flex-1 flex items-center justify-center text-xs text-brand-dark/40 border border-dashed border-gray-200 rounded-lg">
-            <LayoutDashboard className="w-5 h-5 mr-1.5 text-brand-navy/30" />
-            {db.name}
+        {widgets.length > 0 ? (
+          <div className="flex-1 overflow-auto p-3">
+            <div className={`grid gap-3 h-full ${widgets.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {widgets.map((w: DashboardWidget) => (
+                <div key={w.id} className="min-h-[220px]">
+                  {renderWidget(w)}
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-xs text-brand-dark/40">
-            Dashboard not found
+            {db ? 'No widgets in this dashboard.' : 'Dashboard not found'}
           </div>
         )}
       </div>
@@ -599,9 +723,12 @@ export default function HomePage() {
               return rowKeys.map((rowKey) => {
                 const rowPanels = rows.get(rowKey)!.slice().sort((a, b) => (a.column - b.column) || (a.order - b.order));
                 const span = rowPanels.length === 1 ? columns : 1;
+                // Dashboard panels need more vertical space to show all their widgets
+                const hasDashboard = rowPanels.some(p => p.type === 'dashboard');
+                const rowHeight = hasDashboard ? 'auto-rows-[560px]' : 'auto-rows-[320px]';
 
                 return (
-                  <div key={rowKey} className={`grid gap-6 ${gridColsClass} auto-rows-[320px]`}>
+                  <div key={rowKey} className={`grid gap-6 ${gridColsClass} ${rowHeight}`}>
                     {rowPanels.map((panel) => (
                       <div
                         key={panel.id}
