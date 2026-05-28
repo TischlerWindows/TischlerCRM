@@ -361,6 +361,10 @@ class ApiClient {
     return this.post(`/admin/users/${id}/impersonate`);
   }
 
+  async setUserPreferenceAdmin(userId: string, key: string, value: any): Promise<void> {
+    return this.put(`/admin/users/${userId}/preferences/${key}`, { value });
+  }
+
   async getUserLoginHistory(id: string): Promise<LoginEventRow[]> {
     return this.get(`/security/login-events?userId=${id}`);
   }

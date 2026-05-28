@@ -20,10 +20,11 @@ import { useAuth } from '@/lib/auth-context';
 import { getPreference, getSetting } from '@/lib/preferences';
 import { recordsService } from '@/lib/records-service';
 import { usePermissions } from '@/lib/permissions-context';
+import { apiClient } from '@/lib/api-client';
 
 type HomePanel = {
   id: string;
-  type: 'report' | 'widget';
+  type: 'report' | 'widget' | 'dashboard';
   sourceId: string;
   title: string;
   row: number;
@@ -56,6 +57,7 @@ type DashboardWidget = {
 type Dashboard = {
   id: string;
   name: string;
+  description?: string;
   widgets: DashboardWidget[];
 };
 
@@ -83,6 +85,7 @@ export default function HomePage() {
   const [homeLayout, setHomeLayout] = useState<HomeLayout | null>(null);
   const [reports, setReports] = useState<ReportConfig[]>([]);
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
+  const [dashboardRecordsMap, setDashboardRecordsMap] = useState<Map<string, Dashboard>>(new Map());
 
   const [reportRecordsCache, setReportRecordsCache] = useState<Record<string, any[]>>({});
 
@@ -147,6 +150,14 @@ export default function HomePage() {
 
       const saved = await getSetting<any[]>('dashboards') || [];
       setDashboards(saved);
+
+      // Fetch real dashboard records from API for dashboard-type panels
+      try {
+        const dbs = await apiClient.getDashboards();
+        setDashboardRecordsMap(new Map((dbs || []).map((d: Dashboard) => [d.id, d])));
+      } catch {
+        // non-critical — dashboard panels show fallback
+      }
     })();
   }, [permissions]);
 
@@ -447,6 +458,40 @@ export default function HomePage() {
     );
   };
 
+  const renderDashboardPanel = (panel: HomePanel) => {
+    const db = dashboardRecordsMap.get(panel.sourceId);
+    const widgetCount = db?.widgets?.length ?? 0;
+    return (
+      <div className="bg-white rounded-lg border border-gray-200 p-5 h-full flex flex-col shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-semibold text-brand-dark">{db?.name || panel.title}</div>
+            {db?.description && (
+              <div className="text-xs text-brand-dark/50 mt-0.5">{db.description}</div>
+            )}
+            <div className="text-xs text-brand-dark/40 mt-0.5">{widgetCount} widget{widgetCount === 1 ? '' : 's'}</div>
+          </div>
+          <Link
+            href="/dashboard"
+            className="text-xs font-medium text-brand-navy hover:text-brand-red transition-colors flex items-center gap-1"
+          >
+            View <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+        {db ? (
+          <div className="flex-1 flex items-center justify-center text-xs text-brand-dark/40 border border-dashed border-gray-200 rounded-lg">
+            <LayoutDashboard className="w-5 h-5 mr-1.5 text-brand-navy/30" />
+            {db.name}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-xs text-brand-dark/40">
+            Dashboard not found
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const firstName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || 'User';
 
   return (
@@ -562,7 +607,7 @@ export default function HomePage() {
                         key={panel.id}
                         className={`${colSpanClass(span)} ${span === 1 ? colStartClass(panel.column ?? 0) : 'col-start-1'}`}
                       >
-                        {panel.type === 'report' ? renderReportPanel(panel) : renderWidgetPanel(panel)}
+                        {panel.type === 'report' ? renderReportPanel(panel) : panel.type === 'dashboard' ? renderDashboardPanel(panel) : renderWidgetPanel(panel)}
                       </div>
                     ))}
                   </div>

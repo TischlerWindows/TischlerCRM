@@ -102,4 +102,28 @@ export async function preferenceRoutes(app: FastifyInstance) {
 
     reply.send(results);
   });
+
+  // Admin: set a preference for any user
+  app.put('/admin/users/:userId/preferences/:key', async (req, reply) => {
+    const adminId = (req as any).user?.sub;
+    if (!adminId) return reply.code(401).send({ error: 'Unauthorized' });
+
+    const requester = await prisma.user.findUnique({ where: { id: adminId }, select: { role: true } });
+    if (requester?.role !== 'ADMIN') return reply.code(403).send({ error: 'Admin access required' });
+
+    const { userId, key } = req.params as { userId: string; key: string };
+    if (!userId || !key) return reply.code(400).send({ error: 'userId and key are required' });
+
+    const schema = z.object({ value: z.unknown() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: 'Request body must include a "value" field' });
+
+    const pref = await prisma.userPreference.upsert({
+      where: { userId_key: { userId, key } },
+      create: { id: generateId('UserPreference'), userId, key, value: parsed.data.value as any },
+      update: { value: parsed.data.value as any },
+    });
+
+    reply.send({ key: pref.key, value: pref.value });
+  });
 }

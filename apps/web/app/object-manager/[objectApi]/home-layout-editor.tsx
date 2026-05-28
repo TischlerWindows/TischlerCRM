@@ -1,9 +1,10 @@
 ﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Save, Trash2, Copy, FileText } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Save, Trash2, Copy, FileText, Users, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getPreference, setPreference, getSetting, setSetting } from '@/lib/preferences';
+import { apiClient } from '@/lib/api-client';
 
 const STORAGE_KEY = 'homeLayout';
 const TEMPLATES_KEY = 'homeLayoutTemplates';
@@ -15,7 +16,13 @@ type HomeLayoutTemplate = {
   createdAt: string;
 };
 
-type PanelType = 'report' | 'widget';
+type PanelType = 'report' | 'widget' | 'dashboard';
+
+interface CrmUser {
+  id: string;
+  name: string | null;
+  email: string;
+}
 
 type HomePanel = {
   id: string;
@@ -99,12 +106,21 @@ export default function HomeLayoutEditor() {
   const [layout, setLayout] = useState<HomeLayout>({ columns: 2, panels: [], updatedAt: '' });
   const [reports, setReports] = useState<SavedReport[]>([]);
   const [widgets, setWidgets] = useState<Array<{ id: string; title: string }>>([]);
+  const [dashboardRecords, setDashboardRecords] = useState<Dashboard[]>([]);
   const [draggedPanelId, setDraggedPanelId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [fadeSaved, setFadeSaved] = useState(false);
   const [templates, setTemplates] = useState<HomeLayoutTemplate[]>([]);
   const [templateName, setTemplateName] = useState('');
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  // User assignment
+  const [users, setUsers] = useState<CrmUser[]>([]);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignSourceId, setAssignSourceId] = useState<'current' | string>('current');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
 
   const getNextAvailableSlot = () => {
     const columns = Math.max(layout.columns, 1);
@@ -174,6 +190,7 @@ export default function HomeLayoutEditor() {
         console.error('Error loading reports:', e);
       }
 
+      // Load individual widgets from settings (legacy) and real dashboards from API
       try {
         const dashboards: Dashboard[] = (await getSetting<Dashboard[]>('dashboards')) || [];
         const flattenedWidgets = dashboards.flatMap((dashboard) =>
@@ -185,6 +202,22 @@ export default function HomeLayoutEditor() {
         setWidgets(flattenedWidgets);
       } catch (e) {
         console.error('Error loading dashboards:', e);
+      }
+
+      // Fetch real dashboard records from API
+      try {
+        const dbs = await apiClient.getDashboards();
+        setDashboardRecords(dbs || []);
+      } catch (e) {
+        console.error('Error loading dashboard records:', e);
+      }
+
+      // Fetch users for layout assignment
+      try {
+        const userList = await apiClient.getUsers();
+        setUsers(userList || []);
+      } catch (e) {
+        // Non-admin users won't be able to fetch users — silently ignore
       }
     })();
   }, []);
@@ -396,6 +429,40 @@ export default function HomeLayoutEditor() {
     persistLayout(next);
   };
 
+  const handleAssign = async () => {
+    if (selectedUserIds.size === 0) return;
+    setAssigning(true);
+    setAssignError(null);
+    setAssignSuccess(null);
+
+    const layoutToAssign: HomeLayout = assignSourceId === 'current'
+      ? { ...layout, updatedAt: new Date().toISOString() }
+      : (() => {
+          const tmpl = templates.find((t) => t.id === assignSourceId);
+          return tmpl ? { ...tmpl.layout, updatedAt: new Date().toISOString() } : { ...layout, updatedAt: new Date().toISOString() };
+        })();
+
+    const errors: string[] = [];
+    for (const userId of Array.from(selectedUserIds)) {
+      try {
+        await apiClient.setUserPreferenceAdmin(userId, 'homeLayout', layoutToAssign);
+      } catch (e: any) {
+        const user = users.find((u) => u.id === userId);
+        errors.push(user?.name || user?.email || userId);
+      }
+    }
+
+    setAssigning(false);
+    if (errors.length > 0) {
+      setAssignError(`Failed to assign layout to: ${errors.join(', ')}`);
+    } else {
+      setAssignSuccess(`Layout assigned to ${selectedUserIds.size} user${selectedUserIds.size === 1 ? '' : 's'}.`);
+      window.setTimeout(() => setAssignSuccess(null), 3000);
+      setShowAssignDialog(false);
+      setSelectedUserIds(new Set());
+    }
+  };
+
   return (
     <div className="flex h-full">
       {showSaved && (
@@ -424,6 +491,32 @@ export default function HomeLayoutEditor() {
                   {report.name}
                 </div>
                 <Button size="sm" variant="outline" onClick={() => addPanel('report', report.id, report.name)}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Dashboards</h3>
+          <div className="space-y-2">
+            {dashboardRecords.length === 0 && (
+              <p className="text-xs text-gray-500">No dashboards found. Create dashboards first.</p>
+            )}
+            {dashboardRecords.map((db) => (
+              <div key={db.id} className="flex items-center justify-between gap-2">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  draggable
+                  onDragStart={(e) => handleSourceDragStart('dashboard', db.id, db.name, e)}
+                  className="flex items-center gap-1.5 flex-1 text-left text-sm text-gray-700 truncate cursor-move"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5 text-brand-navy shrink-0" />
+                  {db.name}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => addPanel('dashboard', db.id, db.name)}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
@@ -466,11 +559,25 @@ export default function HomeLayoutEditor() {
           </Button>
         </div>
 
-        <div className="border-t pt-4">
+        <div className="border-t pt-4 space-y-2">
           <Button onClick={() => setShowTemplateDialog(true)} size="sm" variant="outline" className="w-full">
             <Copy className="h-4 w-4 mr-2" />
             Save as Template
           </Button>
+          {users.length > 0 && (
+            <Button
+              onClick={() => { setAssignSourceId('current'); setSelectedUserIds(new Set()); setAssignError(null); setAssignSuccess(null); setShowAssignDialog(true); }}
+              size="sm"
+              variant="outline"
+              className="w-full"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Assign Layout to Users
+            </Button>
+          )}
+          {assignSuccess && (
+            <p className="text-xs text-green-600 text-center">{assignSuccess}</p>
+          )}
         </div>
 
         {/* Saved Templates */}
@@ -487,6 +594,16 @@ export default function HomeLayoutEditor() {
                   <div className="text-xs text-gray-500">{t.layout.panels?.length || 0} panels · {t.layout.columns} cols</div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {users.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      title="Assign this template to users"
+                      onClick={() => { setAssignSourceId(t.id); setSelectedUserIds(new Set()); setAssignError(null); setAssignSuccess(null); setShowAssignDialog(true); }}
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => loadFromTemplate(t)} title="Load into editor">
                     <FileText className="h-3.5 w-3.5" />
                   </Button>
@@ -499,6 +616,79 @@ export default function HomeLayoutEditor() {
           </div>
         </div>
       </aside>
+
+      {/* Assign Layout to Users Dialog */}
+      {showAssignDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" aria-labelledby="assign-dialog-title">
+          <div className="bg-white rounded-xl shadow-xl w-[480px] max-h-[80vh] flex flex-col p-6">
+            <h3 id="assign-dialog-title" className="text-lg font-semibold mb-1">Assign Layout to Users</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Overwrites the selected users&apos; home page with{' '}
+              {assignSourceId === 'current'
+                ? 'the current layout'
+                : `the &ldquo;${templates.find((t) => t.id === assignSourceId)?.name}&rdquo; template`}.
+            </p>
+
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Layout to assign</label>
+              <select
+                value={assignSourceId}
+                onChange={(e) => setAssignSourceId(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-navy/30"
+              >
+                <option value="current">Current layout (unsaved changes included)</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg mb-4">
+              <div className="p-2 flex items-center justify-between border-b border-gray-100">
+                <span className="text-xs font-medium text-gray-700">Users ({users.length})</span>
+                <button
+                  type="button"
+                  className="text-xs text-brand-navy hover:underline"
+                  onClick={() => setSelectedUserIds(
+                    selectedUserIds.size === users.length ? new Set() : new Set(users.map((u) => u.id))
+                  )}
+                >
+                  {selectedUserIds.size === users.length ? 'Deselect all' : 'Select all'}
+                </button>
+              </div>
+              {users.map((u) => (
+                <label key={u.id} className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedUserIds.has(u.id)}
+                    onChange={(e) => {
+                      const next = new Set(selectedUserIds);
+                      if (e.target.checked) next.add(u.id); else next.delete(u.id);
+                      setSelectedUserIds(next);
+                    }}
+                    className="rounded border-gray-300 text-brand-navy focus:ring-brand-navy/40"
+                  />
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">{u.name || u.email}</div>
+                    {u.name && <div className="text-xs text-gray-500 truncate">{u.email}</div>}
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {assignError && <p className="text-xs text-red-600 mb-3" role="alert">{assignError}</p>}
+
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => { setShowAssignDialog(false); setAssignError(null); }} disabled={assigning}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleAssign} disabled={selectedUserIds.size === 0 || assigning}>
+                {assigning ? 'Assigning…' : `Assign to ${selectedUserIds.size} user${selectedUserIds.size === 1 ? '' : 's'}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save as Template Dialog */}
       {showTemplateDialog && (
@@ -584,7 +774,7 @@ export default function HomeLayoutEditor() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="text-sm font-semibold text-gray-900">{panel.title}</div>
-                            <div className="text-xs text-gray-500">{panel.type === 'report' ? 'Report' : 'Widget'}</div>
+                            <div className="text-xs text-gray-500">{panel.type === 'report' ? 'Report' : panel.type === 'dashboard' ? 'Dashboard' : 'Widget'}</div>
                           </div>
                           <button
                             onClick={() => removePanel(panel.id)}
