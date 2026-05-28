@@ -3317,9 +3317,37 @@ export default function DashboardPage() {
                             // Get fields from schema first, fall back to hardcoded
                             const apiName = newFilterBtn.objectType ? PLURAL_TO_API_NAME[newFilterBtn.objectType] : '';
                             const schemaDef = apiName && schema ? schema.objects.find((o: any) => o.apiName === apiName) : null;
-                            const objFields = schemaDef
-                              ? schemaDef.fields.map((f: any) => f.apiName).filter((a: string) => !['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'].includes(a))
-                              : (newFilterBtn.objectType ? getAvailableFields(newFilterBtn.objectType) : []);
+                            const EXCLUDED_BTN = ['Id', 'CreatedDate', 'LastModifiedDate', 'CreatedById', 'LastModifiedById'];
+                            // Collect teamMemberSlot (Connection) fields from page layouts
+                            const btnSlotFields: { value: string; label: string }[] = [];
+                            if (schemaDef) {
+                              const seenSlots = new Set<string>();
+                              for (const layout of (schemaDef.pageLayouts || [])) {
+                                for (const tab of (layout.tabs || [])) {
+                                  for (const region of (tab.regions || [])) {
+                                    for (const panel of (region.panels || [])) {
+                                      for (const pf of (panel.fields || [])) {
+                                        if (pf.kind === 'teamMemberSlot' && pf.slotConfig && !seenSlots.has(pf.fieldApiName)) {
+                                          seenSlots.add(pf.fieldApiName);
+                                          const criterion = (pf.slotConfig as any).criterion;
+                                          const slotLabel = pf.labelOverride || (pf.slotConfig as any).label ||
+                                            (criterion?.kind === 'flag' ? criterion.flag : criterion?.role) || pf.fieldApiName;
+                                          btnSlotFields.push({ value: pf.fieldApiName, label: slotLabel });
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                            const objFields: { value: string; label: string }[] = schemaDef
+                              ? [
+                                  ...schemaDef.fields
+                                    .filter((f: any) => !EXCLUDED_BTN.includes(f.apiName))
+                                    .map((f: any) => ({ value: f.apiName, label: f.label || stripFieldPrefix(f.apiName) })),
+                                  ...btnSlotFields,
+                                ]
+                              : (newFilterBtn.objectType ? getAvailableFields(newFilterBtn.objectType).map(f => ({ value: f, label: stripFieldPrefix(f) })) : []);
                             const fieldValues: string[] = [];
                             if (newFilterBtn.objectType && newFilterBtn.field) {
                               const records = getCachedRecords(newFilterBtn.objectType);
@@ -3351,18 +3379,13 @@ export default function DashboardPage() {
                                   <option value="">Object type...</option>
                                   {OBJECT_TYPES.map(ot => <option key={ot.value} value={ot.value}>{ot.label}</option>)}
                                 </select>
-                                <select
+                                <SearchableFieldSelect
                                   value={newFilterBtn.field}
-                                  onChange={(e) => setNewFilterBtn({ ...newFilterBtn, field: e.target.value, value: '' })}
-                                  disabled={!newFilterBtn.objectType}
-                                  className="flex-1 min-w-[110px] px-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-brand-navy/40 bg-white disabled:opacity-50"
-                                >
-                                  <option value="">Select field...</option>
-                                  {objFields.map((f: string) => {
-                                    const fieldDef = schemaDef?.fields.find((fd: any) => fd.apiName === f);
-                                    return <option key={f} value={f}>{fieldDef?.label || stripFieldPrefix(f)}</option>;
-                                  })}
-                                </select>
+                                  onChange={(v) => setNewFilterBtn({ ...newFilterBtn, field: v, value: '' })}
+                                  options={objFields}
+                                  placeholder="Select field..."
+                                  className={`flex-1 min-w-[110px] text-xs${!newFilterBtn.objectType ? ' opacity-50 pointer-events-none' : ''}`}
+                                />
                                 <select
                                   value={newFilterBtn.value}
                                   onChange={(e) => {
