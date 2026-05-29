@@ -14,6 +14,7 @@ interface BackupRecord {
   createdAt: string;
   createdById: string;
   status: 'completed' | 'failed';
+  usedFallback?: boolean;
 }
 
 /**
@@ -31,63 +32,85 @@ interface BackupRecord {
 export async function backupRoutes(app: FastifyInstance) {
   // ------- Backup DB connection -------
   let backupPool: pg.Pool | null = null;
+  let mainFallbackPool: pg.Pool | null = null;
 
-  function getBackupPool(): pg.Pool {
-    if (backupPool) return backupPool;
-    const env = loadEnv();
-    const connStr = env.BACKUP_DATABASE_URL || env.DATABASE_URL;
+  function buildPool(connStr: string): pg.Pool {
     const needsSsl =
       !!connStr &&
       !connStr.includes('sslmode=disable') &&
       !connStr.includes('.railway.internal');
-    const pool = new Pool({
+    return new Pool({
       connectionString: connStr,
       max: 3,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
       ssl: needsSsl ? { rejectUnauthorized: false } : false,
     });
-    // Reset pool reference on error so the next call creates a fresh pool
-    pool.on('error', () => {
-      backupPool = null;
-    });
+  }
+
+  function getBackupPool(): pg.Pool {
+    if (backupPool) return backupPool;
+    const env = loadEnv();
+    const connStr = env.BACKUP_DATABASE_URL || env.DATABASE_URL;
+    const pool = buildPool(connStr);
+    pool.on('error', () => { backupPool = null; });
     backupPool = pool;
     return backupPool;
+  }
+
+  /** Returns a pool pointed at the MAIN database — used as last-resort failsafe. */
+  function getMainPool(): pg.Pool {
+    if (mainFallbackPool) return mainFallbackPool;
+    const env = loadEnv();
+    const pool = buildPool(env.DATABASE_URL);
+    pool.on('error', () => { mainFallbackPool = null; });
+    mainFallbackPool = pool;
+    return mainFallbackPool;
   }
 
   // ------- helpers -------
 
   // Once ensured in this process lifetime, skip redundant DDL on every request
   let backupTableEnsured = false;
+  let mainTableEnsured = false;
+
+  const CREATE_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS "BackupSnapshot" (
+      "id"          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      "name"        TEXT NOT NULL,
+      "type"        TEXT NOT NULL DEFAULT 'manual',
+      "data"        JSONB NOT NULL DEFAULT '{}',
+      "sizeMB"      TEXT NOT NULL DEFAULT '0',
+      "tables"      JSONB NOT NULL DEFAULT '{}',
+      "status"      TEXT NOT NULL DEFAULT 'completed',
+      "usedFallback" BOOLEAN NOT NULL DEFAULT false,
+      "createdById" TEXT NOT NULL,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+  const ADD_TYPE_COL_SQL = `ALTER TABLE "BackupSnapshot" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'manual';`;
+  const ADD_FALLBACK_COL_SQL = `ALTER TABLE "BackupSnapshot" ADD COLUMN IF NOT EXISTS "usedFallback" BOOLEAN NOT NULL DEFAULT false;`;
+
+  async function ensureTableOnPool(pool: pg.Pool, flag: 'backup' | 'main'): Promise<void> {
+    try {
+      await pool.query(CREATE_TABLE_SQL);
+      await pool.query(ADD_TYPE_COL_SQL);
+      await pool.query(ADD_FALLBACK_COL_SQL);
+    } catch (err: any) {
+      if (err.code !== '23505' && err.code !== '42P07') throw err;
+    }
+    if (flag === 'backup') backupTableEnsured = true;
+    else mainTableEnsured = true;
+  }
 
   async function ensureBackupTable() {
     if (backupTableEnsured) return;
-    const pool = getBackupPool();
-    try {
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS "BackupSnapshot" (
-          "id"          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-          "name"        TEXT NOT NULL,
-          "type"        TEXT NOT NULL DEFAULT 'manual',
-          "data"        JSONB NOT NULL DEFAULT '{}',
-          "sizeMB"      TEXT NOT NULL DEFAULT '0',
-          "tables"      JSONB NOT NULL DEFAULT '{}',
-          "status"      TEXT NOT NULL DEFAULT 'completed',
-          "createdById" TEXT NOT NULL,
-          "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-      // Add type column if missing (migrate existing backups)
-      await pool.query(`
-        ALTER TABLE "BackupSnapshot" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'manual';
-      `);
-    } catch (err: any) {
-      // 23505 = unique_violation: PostgreSQL race condition when two concurrent
-      // CREATE TABLE IF NOT EXISTS statements collide on pg_type internally.
-      // 42P07 = duplicate_table: table already exists (safe to ignore).
-      if (err.code !== '23505' && err.code !== '42P07') throw err;
-    }
-    backupTableEnsured = true;
+    await ensureTableOnPool(getBackupPool(), 'backup');
+  }
+
+  async function ensureMainTable() {
+    if (mainTableEnsured) return;
+    await ensureTableOnPool(getMainPool(), 'main');
   }
 
   async function exportAllData(): Promise<{ tables: Record<string, any[]>; counts: Record<string, number> }> {
@@ -172,9 +195,9 @@ export async function backupRoutes(app: FastifyInstance) {
   async function createBackupSnapshot(
     type: 'manual' | 'daily' | 'weekly',
     userId: string,
-  ): Promise<{ name: string; sizeMB: string; tables: Record<string, number> }> {
-    await ensureBackupTable();
-    const pool = getBackupPool();
+  ): Promise<{ name: string; sizeMB: string; tables: Record<string, number>; usedFallback?: boolean }> {
+    const env = loadEnv();
+    const hasDedicatedBackupDb = !!env.BACKUP_DATABASE_URL;
 
     const { tables, counts } = await exportAllData();
     const jsonStr = JSON.stringify(tables);
@@ -185,13 +208,33 @@ export async function backupRoutes(app: FastifyInstance) {
     const label = type === 'manual' ? 'backup' : type === 'daily' ? 'daily-backup' : 'weekly-backup';
     const name = `${label}-${timestamp}`;
 
-    await pool.query(
-      `INSERT INTO "BackupSnapshot" ("id", "name", "type", "data", "sizeMB", "tables", "status", "createdById", "createdAt")
-       VALUES (gen_random_uuid()::text, $1, $2, $3::jsonb, $4, $5::jsonb, 'completed', $6, NOW())`,
-      [name, type, jsonStr, sizeMB, JSON.stringify(counts), userId],
-    );
+    const INSERT_SQL = `
+      INSERT INTO "BackupSnapshot" ("id", "name", "type", "data", "sizeMB", "tables", "status", "usedFallback", "createdById", "createdAt")
+      VALUES (gen_random_uuid()::text, $1, $2, $3::jsonb, $4, $5::jsonb, 'completed', $6, $7, NOW())
+    `;
 
-    return { name, sizeMB, tables: counts };
+    // --- Attempt 1: dedicated backup database (or main if BACKUP_DATABASE_URL not set) ---
+    try {
+      await ensureBackupTable();
+      await getBackupPool().query(INSERT_SQL, [name, type, jsonStr, sizeMB, JSON.stringify(counts), false, userId]);
+      return { name, sizeMB, tables: counts };
+    } catch (primaryErr: any) {
+      // If there's no dedicated backup DB, the primary IS the main DB — don't double-write.
+      if (!hasDedicatedBackupDb) throw primaryErr;
+
+      app.log.warn(
+        { err: primaryErr, type },
+        'Backup DB write failed — falling back to main database',
+      );
+      // Reset the broken pool so the next call gets a fresh one.
+      backupPool = null;
+      backupTableEnsured = false;
+    }
+
+    // --- Attempt 2: fall back to main DATABASE_URL ---
+    await ensureMainTable();
+    await getMainPool().query(INSERT_SQL, [name, type, jsonStr, sizeMB, JSON.stringify(counts), true, userId]);
+    return { name, sizeMB, tables: counts, usedFallback: true };
   }
 
   /**
@@ -201,25 +244,77 @@ export async function backupRoutes(app: FastifyInstance) {
    *  - manual: keep 20 most recent
    */
   async function applyRetention() {
-    const pool = getBackupPool();
+    const env = loadEnv();
     const policies: Array<{ type: string; keep: number }> = [
       { type: 'daily', keep: 7 },
       { type: 'weekly', keep: 4 },
       { type: 'manual', keep: 20 },
     ];
-    for (const { type, keep } of policies) {
-      await pool.query(
-        `DELETE FROM "BackupSnapshot"
-         WHERE "type" = $1
-           AND "id" NOT IN (
-             SELECT "id" FROM "BackupSnapshot"
-             WHERE "type" = $1
-             ORDER BY "createdAt" DESC
-             LIMIT $2
-           )`,
-        [type, keep],
-      );
+    const retentionSql = `
+      DELETE FROM "BackupSnapshot"
+      WHERE "type" = $1
+        AND "id" NOT IN (
+          SELECT "id" FROM "BackupSnapshot"
+          WHERE "type" = $1
+          ORDER BY "createdAt" DESC
+          LIMIT $2
+        )`;
+
+    // Apply retention on the primary backup pool
+    try {
+      const pool = getBackupPool();
+      for (const { type, keep } of policies) {
+        await pool.query(retentionSql, [type, keep]);
+      }
+    } catch (err) {
+      app.log.warn({ err }, 'applyRetention: backup pool failed, skipping');
     }
+
+    // If there's also a fallback table on the main DB, clean that up too
+    if (env.BACKUP_DATABASE_URL && mainTableEnsured) {
+      try {
+        const pool = getMainPool();
+        for (const { type, keep } of policies) {
+          await pool.query(retentionSql, [type, keep]);
+        }
+      } catch (err) {
+        app.log.warn({ err }, 'applyRetention: main fallback pool failed, skipping');
+      }
+    }
+  }
+
+  /**
+   * Queries the backup table, transparently merging results from both pools
+   * when fallback snapshots may exist on the main DB.
+   */
+  async function queryBackupsFromAllPools<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+    const env = loadEnv();
+    const rows: T[] = [];
+
+    try {
+      const { rows: r } = await getBackupPool().query<T>(sql, params);
+      rows.push(...r);
+    } catch (err) {
+      app.log.warn({ err }, 'queryBackupsFromAllPools: backup pool failed');
+    }
+
+    // If a dedicated backup DB is configured, also check the main DB for any
+    // fallback snapshots written there during backup DB outages.
+    if (env.BACKUP_DATABASE_URL) {
+      try {
+        await ensureMainTable();
+        const { rows: r } = await getMainPool().query<T>(sql, params);
+        // Merge only rows not already present (dedup by id field if available)
+        const existingIds = new Set((rows as any[]).map((row: any) => row.id).filter(Boolean));
+        for (const row of r) {
+          if (!(row as any).id || !existingIds.has((row as any).id)) rows.push(row);
+        }
+      } catch {
+        // non-critical
+      }
+    }
+
+    return rows;
   }
 
   // ------- Routes -------
@@ -282,16 +377,17 @@ export async function backupRoutes(app: FastifyInstance) {
   app.get('/admin/backups', async (req, reply) => {
     try {
       await ensureBackupTable();
-      const pool = getBackupPool();
 
-      const { rows } = await pool.query<BackupRecord>(
-        `SELECT "id", "name", "type", "sizeMB", "tables", "status", "createdById", "createdAt"
+      const rows = await queryBackupsFromAllPools<BackupRecord>(
+        `SELECT "id", "name", "type", "sizeMB", "tables", "status", "usedFallback", "createdById", "createdAt"
          FROM "BackupSnapshot"
          ORDER BY "createdAt" DESC
-         LIMIT 50`
+         LIMIT 50`,
       );
 
-      reply.send({ backups: rows });
+      rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      reply.send({ backups: rows.slice(0, 50) });
     } catch (error: any) {
       req.log.error(error, 'Failed to list backups');
       reply.code(500).send({ error: error.message });
@@ -302,14 +398,15 @@ export async function backupRoutes(app: FastifyInstance) {
   app.get('/admin/backup/status', async (req, reply) => {
     try {
       await ensureBackupTable();
-      const pool = getBackupPool();
       const env = loadEnv();
 
-      const { rows: allBackups } = await pool.query<BackupRecord>(
+      const allBackups = await queryBackupsFromAllPools<BackupRecord>(
         `SELECT "id", "name", "type", "sizeMB", "status", "createdAt"
          FROM "BackupSnapshot"
-         ORDER BY "createdAt" DESC`
+         ORDER BY "createdAt" DESC`,
       );
+
+      allBackups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       const lastDaily = allBackups.find((b) => b.type === 'daily');
       const lastWeekly = allBackups.find((b) => b.type === 'weekly');
@@ -319,8 +416,11 @@ export async function backupRoutes(app: FastifyInstance) {
       const manualCount = allBackups.filter((b) => b.type === 'manual').length;
       const totalSizeMB = allBackups.reduce((s, b) => s + parseFloat(b.sizeMB || '0'), 0).toFixed(2);
 
+      const fallbackCount = allBackups.filter((b) => b.usedFallback).length;
+
       reply.send({
         usingDedicatedDb: !!env.BACKUP_DATABASE_URL,
+        fallbackCount,
         totalBackups: allBackups.length,
         totalSizeMB,
         daily: { count: dailyCount, maxRetained: 7, lastBackup: lastDaily?.createdAt || null },
@@ -339,9 +439,8 @@ export async function backupRoutes(app: FastifyInstance) {
 
     try {
       await ensureBackupTable();
-      const pool = getBackupPool();
 
-      const { rows } = await pool.query(
+      const rows = await queryBackupsFromAllPools(
         `SELECT "id", "name", "data", "sizeMB", "tables", "status", "createdAt"
          FROM "BackupSnapshot" WHERE "id" = $1 LIMIT 1`,
         [backupId],
@@ -368,14 +467,34 @@ export async function backupRoutes(app: FastifyInstance) {
 
     try {
       await ensureBackupTable();
-      const pool = getBackupPool();
+      const env = loadEnv();
+      let deleted = false;
 
-      const { rowCount } = await pool.query(
-        `DELETE FROM "BackupSnapshot" WHERE "id" = $1`,
-        [backupId],
-      );
+      // Try backup pool first
+      try {
+        const { rowCount } = await getBackupPool().query(
+          `DELETE FROM "BackupSnapshot" WHERE "id" = $1`,
+          [backupId],
+        );
+        if ((rowCount ?? 0) > 0) deleted = true;
+      } catch (err) {
+        app.log.warn({ err }, 'delete backup: backup pool failed');
+      }
 
-      if (rowCount === 0) {
+      // Also try main pool if a dedicated backup DB exists (snapshot may live there)
+      if (!deleted && env.BACKUP_DATABASE_URL && mainTableEnsured) {
+        try {
+          const { rowCount } = await getMainPool().query(
+            `DELETE FROM "BackupSnapshot" WHERE "id" = $1`,
+            [backupId],
+          );
+          if ((rowCount ?? 0) > 0) deleted = true;
+        } catch {
+          // non-critical
+        }
+      }
+
+      if (!deleted) {
         return reply.code(404).send({ error: 'Backup not found' });
       }
 
@@ -392,9 +511,8 @@ export async function backupRoutes(app: FastifyInstance) {
 
     try {
       await ensureBackupTable();
-      const pool = getBackupPool();
 
-      const { rows } = await pool.query(
+      const rows = await queryBackupsFromAllPools(
         `SELECT "data" FROM "BackupSnapshot" WHERE "id" = $1 LIMIT 1`,
         [backupId],
       );
