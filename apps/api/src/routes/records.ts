@@ -669,8 +669,29 @@ export async function recordRoutes(app: FastifyInstance) {
     // are intentionally NOT marked required (the CompositeText widget needs them
     // individually optional), so we enforce this at the API level.
     if (apiName.toLowerCase() === 'contact') {
-      const firstName = (normalizedData.firstName || normalizedData.Contact__firstName || normalizedData.Contact__name_firstName || '').toString().trim();
-      const lastName = (normalizedData.lastName || normalizedData.Contact__lastName || normalizedData.Contact__name_lastName || '').toString().trim();
+      // The DynamicForm stores the name as a nested CompositeText object:
+      //   { name: { Contact__name_firstName: "Tomasz", Contact__name_lastName: "..." } }
+      // so we must also look inside that object, not just at top-level keys.
+      const nameObj: Record<string, any> =
+        typeof normalizedData.name === 'object' && normalizedData.name !== null
+          ? normalizedData.name
+          : {};
+      const firstName = (
+        normalizedData.firstName ||
+        normalizedData.Contact__firstName ||
+        normalizedData.Contact__name_firstName ||
+        nameObj['Contact__name_firstName'] ||
+        nameObj['firstName'] ||
+        ''
+      ).toString().trim();
+      const lastName = (
+        normalizedData.lastName ||
+        normalizedData.Contact__lastName ||
+        normalizedData.Contact__name_lastName ||
+        nameObj['Contact__name_lastName'] ||
+        nameObj['lastName'] ||
+        ''
+      ).toString().trim();
       if (!firstName && !lastName) {
         return reply.code(400).send({
           error: 'Contact name is required — provide at least a first name or last name.',
@@ -1589,8 +1610,11 @@ export async function recordRoutes(app: FastifyInstance) {
 
         // Contact name validation — at least one of firstName / lastName required
         if (apiName.toLowerCase() === 'contact') {
-          const fn = (normalizedData.firstName || normalizedData.Contact__firstName || normalizedData.Contact__name_firstName || '').toString().trim();
-          const ln = (normalizedData.lastName || normalizedData.Contact__lastName || normalizedData.Contact__name_lastName || '').toString().trim();
+          const nameObj: Record<string, any> =
+            typeof normalizedData.name === 'object' && normalizedData.name !== null
+              ? normalizedData.name : {};
+          const fn = (normalizedData.firstName || normalizedData.Contact__firstName || normalizedData.Contact__name_firstName || nameObj['Contact__name_firstName'] || nameObj['firstName'] || '').toString().trim();
+          const ln = (normalizedData.lastName || normalizedData.Contact__lastName || normalizedData.Contact__name_lastName || nameObj['Contact__name_lastName'] || nameObj['lastName'] || '').toString().trim();
           if (!fn && !ln) {
             errors.push({ row: i + 1, error: 'Contact name is required — provide at least a first name or last name.' });
             continue;
