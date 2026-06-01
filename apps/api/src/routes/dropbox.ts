@@ -1225,11 +1225,21 @@ export async function tryEnsureLinkedFolder(
 
     console.log(`[dropbox] Creating linked folder: ${childPath}`);
 
-    // Check if the child record already has a tracked folder
+    // Check if the child record already has a tracked folder.
+    // IMPORTANT: only skip creation if the folder is already at the CORRECT linked
+    // location (under the Property subfolder). If the record was previously opened
+    // before a property was linked, ensure-folder may have created a top-level folder
+    // at /TischlerCRM/Opportunity/... and stored its ID — in that case we must fall
+    // through so the proper linked structure under the property is created.
     const existingChildFolder = await resolveStoredFolder(accessToken, childRecordId);
     if (existingChildFolder?.found) {
-      console.log(`[dropbox] Linked folder already tracked for ${childRecordId} at ${existingChildFolder.fullPath}`);
-      return; // Folder exists (possibly renamed) — nothing to create
+      const expectedPrefix = `${parentPath}/${subfolder}/`.toLowerCase();
+      if (existingChildFolder.fullPath.toLowerCase().startsWith(expectedPrefix)) {
+        console.log(`[dropbox] Linked folder already tracked at correct location for ${childRecordId}: ${existingChildFolder.fullPath}`);
+        return; // Folder already at the right place — nothing to create
+      }
+      console.log(`[dropbox] Stored folder at ${existingChildFolder.fullPath} is NOT under expected location ${parentPath}/${subfolder}/ — proceeding to create linked folder`);
+      // Fall through: create the folder at the correct linked location and update stored ID
     }
 
     let created = false;
@@ -1251,8 +1261,9 @@ export async function tryEnsureLinkedFolder(
       await backfillFolderId(accessToken, childRecordId, childPath);
     }
 
-    // Create subfolders for Opportunity records
-    if (created && childObjectApiName === 'Opportunity') {
+    // Create subfolders for Opportunity records — always attempt (idempotent) so
+    // subfolders are present whether the folder was just created or already existed.
+    if (childObjectApiName === 'Opportunity') {
       for (const sf of OPPORTUNITY_SUBFOLDERS) {
         try {
           await dropboxApi(accessToken, '/files/create_folder_v2', {
