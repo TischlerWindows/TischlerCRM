@@ -1755,7 +1755,7 @@ export default function SummaryPage() {
       if (fWinRows.length > 0 && fDoorRows.length > 0) {
         y += 2;
         const combinedRow = buildTotalRow([...fWinRows, ...fDoorRows]);
-        combinedRow[0] = 'W + D Total';
+        combinedRow[0] = 'W+D';
         y = drawTable(doc, y, dtHeaders, dtColW, [combinedRow], { rightAlignFrom: 2, highlightLast: true });
       }
       return { fWinRows, fDoorRows };
@@ -1787,7 +1787,7 @@ export default function SummaryPage() {
         y += 6;
         y = drawSectionTitle(doc, y, 'Grand Total — All Locations');
         const grandRow = buildTotalRow(grandRows);
-        grandRow[0] = 'Grand Total';
+        grandRow[0] = 'Grand';
         y = drawTable(doc, y, dtHeaders, dtColW, [grandRow], { rightAlignFrom: 2, highlightLast: true });
       }
     } else {
