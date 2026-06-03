@@ -1727,8 +1727,8 @@ export default function SummaryPage() {
         '', '',
         tFieldsV ? String(Math.round(tFieldsV)) : '',
         tSiteMullV ? String(Math.round(tSiteMullV)) : '',
-        unitV ? '\u20AC' + fmt(unitV) : '',
-        tNetV ? '\u20AC' + fmt(tNetV) : '',
+        unitV ? fmt(unitV) : '',
+        tNetV ? fmt(tNetV) : '',
       ];
     };
 
