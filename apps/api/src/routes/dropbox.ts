@@ -1259,7 +1259,18 @@ export async function tryEnsureLinkedFolder(
       const expectedPrefix = `${parentPath}/${subfolder}/`.toLowerCase();
       if (existingChildFolder.fullPath.toLowerCase().startsWith(expectedPrefix)) {
         console.log(`[dropbox] Linked folder already tracked at correct location for ${childRecordId}: ${existingChildFolder.fullPath}`);
-        return; // Folder already at the right place — nothing to create
+        // For Opportunities, always re-ensure the Estimation subfolder even when the
+        // main OPP folder already exists — it may have been manually deleted.
+        if (childObjectApiName === 'Opportunity') {
+          try {
+            await dropboxApi(accessToken, '/files/create_folder_v2', {
+              path: `${childPath}/1. Estimation/${safeName}`,
+              autorename: false,
+            });
+            console.log(`[dropbox] Re-created estimation sub-folder: ${childPath}/1. Estimation/${safeName}`);
+          } catch { /* already exists — fine */ }
+        }
+        return;
       }
       console.log(`[dropbox] Stored folder at ${existingChildFolder.fullPath} is NOT under expected location ${parentPath}/${subfolder}/ — proceeding to create linked folder`);
       // Fall through: create the folder at the correct linked location and update stored ID
