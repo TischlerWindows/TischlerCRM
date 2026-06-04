@@ -654,6 +654,30 @@ export async function ensureCoreObjects(): Promise<void> {
           }
         }
 
+        // 6. Ensure Contact has a contactNumber field in orgSchema
+        if (obj.apiName === 'Contact' && Array.isArray(obj.fields)) {
+          const hasContactNumber = obj.fields.some(
+            (f: any) => {
+              const api = (f.apiName || '').toLowerCase().replace(/^contact__/, '');
+              return api === 'contactnumber';
+            }
+          );
+          if (!hasContactNumber) {
+            obj.fields.unshift({
+              id: `contactNumber-${Date.now()}`,
+              apiName: 'Contact__contactNumber',
+              label: 'Contact Number',
+              type: 'Text',
+              maxLength: 20,
+              unique: true,
+              required: false,
+              helpText: 'Auto-generated unique identifier for the contact',
+            });
+            changed = true;
+            fixes.push('added contactNumber field to Contact in orgSchema');
+          }
+        }
+
         // 4. Ensure Account type field has required: true in orgSchema
         if (obj.apiName === 'Account') {
           for (const field of obj.fields || []) {
