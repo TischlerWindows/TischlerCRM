@@ -25,6 +25,12 @@ interface DynamicFormDialogProps {
    * navigating inside onSubmit, so pending data is saved first.
    */
   onCreated?: (recordId: string) => void;
+  /**
+   * Called after the entire save flow completes (record + staged slots + pending widgets).
+   * Use this to close the dialog in edit mode so the form stays mounted throughout the
+   * full save sequence. In edit mode, do NOT close the dialog inside onSubmit.
+   */
+  onSaved?: () => void;
 }
 
 export default function DynamicFormDialog({
@@ -38,6 +44,7 @@ export default function DynamicFormDialog({
   onSubmit,
   title,
   onCreated,
+  onSaved,
 }: DynamicFormDialogProps) {
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const formTouchedRef = useRef(false);
@@ -125,6 +132,7 @@ export default function DynamicFormDialog({
               onSubmit={handleSubmit}
               onCancel={handleCancel}
               onCreated={onCreated}
+              onSaved={onSaved}
             />
           </div>
         </DialogContent>

@@ -85,6 +85,13 @@ export interface DynamicFormProps {
    * Only relevant for create forms that use widgets.
    */
   onCreated?: (recordId: string) => void;
+  /**
+   * Called after the entire submit flow completes (record save + applyChanges for
+   * staged slots + pending widget saves). Use this to close a parent dialog in
+   * edit mode so the form stays mounted — and slot refs stay valid — throughout
+   * the full save sequence.
+   */
+  onSaved?: () => void;
 }
 
 /**
@@ -136,6 +143,7 @@ export default function DynamicForm({
   onSubmit,
   onCancel,
   onCreated,
+  onSaved,
 }: DynamicFormProps) {
   const { schema } = useSchemaStore();
   const { showToast } = useToast();
@@ -879,6 +887,10 @@ export default function DynamicForm({
         if (recordId && onCreated) {
           onCreated(recordId);
         }
+        // Signal the parent dialog that all save work (record + slots + widgets) is done.
+        // For edit mode, the parent should close the dialog here rather than inside onSubmit,
+        // so that staged slot refs remain valid throughout the full save sequence.
+        onSaved?.();
       } catch (error) {
         const msg =
           error instanceof Error ? error.message : 'Failed to save record';

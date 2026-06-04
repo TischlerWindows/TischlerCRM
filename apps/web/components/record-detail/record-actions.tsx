@@ -115,7 +115,6 @@ export function RecordActions({
       if (updated) {
         onRecordUpdated(updated, recordsService.flattenRecord(updated));
       }
-      setShowEditForm(false);
       showToast('Record updated', 'success');
     } catch (err) {
       console.error('Failed to update record:', err);
@@ -454,6 +453,7 @@ export function RecordActions({
           layoutId={pageLayout.id}
           recordData={record ?? undefined}
           onSubmit={handleEditSubmit}
+          onSaved={() => setShowEditForm(false)}
           title={`Edit ${title}`}
         />
       )}
