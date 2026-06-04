@@ -120,6 +120,26 @@ class LocalStorageSchemaService implements SchemaService {
         // Run the same migrations/fixes as before
         const contactObj = (schema as any).objects?.find((o: any) => o.apiName === 'Contact');
         if (contactObj) {
+          // Ensure contactNumber field exists
+          const hasContactNumber = contactObj.fields?.some(
+            (f: any) => (f.apiName || '').toLowerCase().replace(/^contact__/, '') === 'contactnumber'
+          );
+          if (!hasContactNumber) {
+            contactObj.fields = contactObj.fields || [];
+            contactObj.fields.unshift({
+              id: 'contact-number-field',
+              apiName: 'Contact__contactNumber',
+              label: 'Contact Number',
+              type: 'Text',
+              maxLength: 20,
+              unique: true,
+              required: false,
+              helpText: 'Auto-generated unique identifier for the contact',
+            });
+            await this.saveSchema(schema);
+            return schema;
+          }
+
           const nameFieldIndex = contactObj.fields?.findIndex((f: any) => f.apiName === 'Contact__name');
           if (nameFieldIndex === -1) {
             const nameField = {
