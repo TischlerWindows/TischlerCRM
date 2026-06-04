@@ -804,6 +804,44 @@ export async function ensureCoreObjects(): Promise<void> {
     console.warn('[ensure-core-objects] Could not patch orgSchema:', err);
   }
 
+  // Fix: ensure Contact has a 'contactNumber' field (bare name, used by auto-number
+  // logic and Dropbox folder naming). The schema-service creates it as
+  // 'Contact__contactNumber', but both forms may be missing on existing orgs.
+  // This block is idempotent — it only creates the field if neither variant exists.
+  try {
+    const contactObjFix = await prisma.customObject.findFirst({
+      where: { apiName: { equals: 'Contact', mode: 'insensitive' } },
+    });
+    if (contactObjFix) {
+      const existingBare = await prisma.customField.findFirst({
+        where: { objectId: contactObjFix.id, apiName: 'contactNumber' },
+      });
+      const existingPrefixed = await prisma.customField.findFirst({
+        where: { objectId: contactObjFix.id, apiName: 'Contact__contactNumber' },
+      });
+      if (!existingBare && !existingPrefixed) {
+        await prisma.customField.create({
+          data: {
+            id: generateId('CustomField'),
+            objectId: contactObjFix.id,
+            apiName: 'contactNumber',
+            label: 'Contact Number',
+            type: 'Text',
+            required: false,
+            unique: true,
+            createdById: systemUser.id,
+            modifiedById: systemUser.id,
+          },
+        });
+        console.log('[ensure-core-objects] Created contactNumber field for Contact');
+      } else {
+        console.log(`[ensure-core-objects] contactNumber already exists for Contact (bare=${!!existingBare}, prefixed=${!!existingPrefixed})`);
+      }
+    }
+  } catch (err) {
+    console.warn('[ensure-core-objects] Could not ensure contactNumber field for Contact:', err);
+  }
+
   // Also sync any user-created objects from the schema settings to the DB.
   // The schema (stored in the Setting table under 'orgSchema') may contain
   // objects that were created in the UI but whose apiClient.createObject call
