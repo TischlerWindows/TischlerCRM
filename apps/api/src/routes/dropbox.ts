@@ -959,6 +959,29 @@ export async function tryRenameDropboxFolder(
       autorename: false,
       allow_ownership_transfer: false,
     });
+
+    // ── Rename the Estimation sub-folder for Opportunities ──
+    // Structure: {oppFolder}/1. Estimation/{oppFolder}
+    // After the main move above, the Estimation subfolder retains the old name,
+    // so rename it to match the new Opportunity folder name.
+    if (objectApiName === 'Opportunity' && oldChildName !== newChildName) {
+      const safeOld = oldChildName.replace(/[\\/:*?"<>|]/g, '_').trim();
+      const safeNew = newChildName.replace(/[\\/:*?"<>|]/g, '_').trim();
+      const estimationOldPath = `${newPath}/1. Estimation/${safeOld}`;
+      const estimationNewPath = `${newPath}/1. Estimation/${safeNew}`;
+      try {
+        console.log(`[dropbox] Renaming estimation sub-folder: ${estimationOldPath} → ${estimationNewPath}`);
+        await dropboxApi(accessToken, '/files/move_v2', {
+          from_path: estimationOldPath,
+          to_path: estimationNewPath,
+          autorename: false,
+          allow_ownership_transfer: false,
+        });
+      } catch (estErr: any) {
+        // Non-fatal — subfolder may not exist or may already have the right name
+        console.warn('[dropbox] Estimation sub-folder rename skipped (non-fatal):', estErr.message);
+      }
+    }
   } catch (err: any) {
     // Non-fatal — old folder might not exist yet, or new path already exists
     console.error('[dropbox] tryRenameDropboxFolder failed (non-fatal):', err.message);
