@@ -754,14 +754,54 @@ export async function tryRenameDropboxFolder(
     const subfolder = LINKED_RECORD_SUBFOLDER[objectApiName];
     const isLinked = !!subfolder;
 
-    // ── Skip rename for requote Opportunities ──
-    // Requote folders live inside a parent OPP's 1. Estimation subpath and are
-    // not at the top level of Project Books. tryRenameDropboxFolder builds the
-    // path without that nesting, so it would incorrectly move the folder from
-    // 1. Estimation/ to the top of Project Books/. Skip entirely for requotes.
+    // ── Handle requote Opportunity renames separately ──
+    // Requote folders live inside a parent OPP's 1. Estimation subfolder.
+    // Rename the stored folder to the new name within the same parent directory.
     if (objectApiName === 'Opportunity') {
       const _rnOppNum = (Object.entries(afterData).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
-      if (Boolean(afterData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_rnOppNum)) return;
+      if (Boolean(afterData._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_rnOppNum)) {
+        // Get access token for requote rename
+        let rnAccessToken = await getAccessToken(userId);
+        if (!rnAccessToken) {
+          const integration = await prisma.integration.findUnique({ where: { provider: 'dropbox' } });
+          if (integration) {
+            const connections = await prisma.userIntegration.findMany({
+              where: { integrationId: integration.id, accessToken: { not: null } },
+              select: { userId: true },
+              take: 5,
+            });
+            for (const conn of connections) {
+              rnAccessToken = await getAccessToken(conn.userId);
+              if (rnAccessToken) break;
+            }
+          }
+        }
+        if (rnAccessToken) {
+          const storedRequoteFolder = await resolveStoredFolder(rnAccessToken, recordId);
+          if (storedRequoteFolder?.found) {
+            const oppObj3 = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+            const oppRec3 = oppObj3 ? await prisma.record.findFirst({ where: { id: recordId, objectId: oppObj3.id }, select: { createdAt: true } }) : null;
+            const newRequoteName = deriveOpportunityFolderName(afterData, oppRec3?.createdAt) || deriveDropboxFolderName(afterData, recordId, 'Opportunity');
+            const newRequoteSafe = newRequoteName.replace(/[\\/:*?"<>|]/g, '_').trim();
+            const parentDir = storedRequoteFolder.fullPath.substring(0, storedRequoteFolder.fullPath.lastIndexOf('/'));
+            const newRequotePath = `${parentDir}/${newRequoteSafe}`;
+            if (storedRequoteFolder.fullPath !== newRequotePath) {
+              try {
+                console.log(`[dropbox] Renaming requote folder: ${storedRequoteFolder.fullPath} → ${newRequotePath}`);
+                await dropboxApi(rnAccessToken, '/files/move_v2', {
+                  from_path: storedRequoteFolder.fullPath,
+                  to_path: newRequotePath,
+                  autorename: false,
+                  allow_ownership_transfer: false,
+                });
+              } catch (rnErr: any) {
+                console.warn('[dropbox] Requote folder rename skipped (non-fatal):', rnErr.message);
+              }
+            }
+          }
+        }
+        return;
+      }
     }
 
     // --- Get an access token ---
@@ -2230,6 +2270,29 @@ export async function dropboxRoutes(app: FastifyInstance) {
                 });
                 return reply.send({ created: false, path: newPath, folderName: expectedName });
               } catch { /* rename failed — return existing name */ }
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+      // For Opportunity records, always re-ensure the Estimation subfolder.  It may
+      // have been manually deleted; re-creating it is idempotent (409 = already exists).
+      if (objectApiName === 'Opportunity') {
+        try {
+          const oppObjE = await prisma.customObject.findFirst({ where: { apiName: { equals: 'Opportunity', mode: 'insensitive' } } });
+          const oppRecE = oppObjE ? await prisma.record.findFirst({ where: { id: recordId, objectId: oppObjE.id } }) : null;
+          if (oppRecE) {
+            const rDataE = oppRecE.data as Record<string, any>;
+            // Only for non-requote Opportunities
+            const _eOppNum = (Object.entries(rDataE).find(([k]) => k.replace(/^[A-Za-z]+__/, '') === 'opportunityNumber')?.[1] as string) ?? '';
+            const _eIsReq = Boolean(rDataE._isRequote) || /\s*-\s*Requote\s*\d+$/i.test(_eOppNum);
+            if (!_eIsReq) {
+              const estName = deriveOpportunityFolderName(rDataE, oppRecE.createdAt) || deriveDropboxFolderName(rDataE, recordId, 'Opportunity');
+              const estSafe = estName.replace(/[\\/:*?"<>|]/g, '_').trim();
+              const estimationSubPath = `${storedFolder.fullPath}/1. Estimation/${estSafe}`;
+              try {
+                await dropboxApi(accessToken, '/files/create_folder_v2', { path: estimationSubPath, autorename: false });
+                console.log(`[dropbox] Re-ensured estimation sub-folder: ${estimationSubPath}`);
+              } catch { /* already exists — fine */ }
             }
           }
         } catch { /* non-fatal */ }
