@@ -31,6 +31,7 @@ const CORE_OBJECTS = [
     pluralLabel: 'Contacts',
     description: 'People and contacts',
     fields: [
+      { apiName: 'contactNumber', label: 'Contact Number', type: 'Text', unique: true },
       { apiName: 'firstName', label: 'First Name', type: 'Text', required: true },
       { apiName: 'lastName', label: 'Last Name', type: 'Text' },
       { apiName: 'email', label: 'Email', type: 'Email' },

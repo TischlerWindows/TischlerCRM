@@ -2220,6 +2220,15 @@ class LocalStorageSchemaService implements SchemaService {
         // Contact Information Section
         {
           id: generateId(),
+          apiName: 'Contact__contactNumber',
+          label: 'Contact Number',
+          type: 'Text',
+          maxLength: 20,
+          unique: true,
+          helpText: 'Auto-generated unique identifier for the contact'
+        },
+        {
+          id: generateId(),
           apiName: 'Contact__name',
           label: 'Name',
           type: 'CompositeText',
