@@ -836,11 +836,21 @@ export default function DynamicForm({
         // post-submit" while zero TeamMember POSTs fired. The snapshot
         // pattern below fixes that.
         const pendingSnapshot = pendingCtx?.snapshotPendingWidgets() ?? [];
+        // Snapshot staged-slot applyChanges functions BEFORE calling onSubmit.
+        // The parent's onSubmit handler may close the dialog (e.g. setShowEditForm(false))
+        // which unmounts this form and sets all slotRef.current to null. Capturing the
+        // functions up front — exactly the same pattern used for pendingSnapshot above —
+        // lets us still call them even if the components have been unmounted.
+        const stagedSlotApplyFns: Array<() => Promise<void>> = layoutType === 'edit'
+          ? Array.from(slotRefsRef.current.values())
+              .map(r => r.current?.applyChanges)
+              .filter((fn): fn is () => Promise<void> => typeof fn === 'function')
+          : [];
         const result = await onSubmit(completeData, layoutId);
         // Edit mode: apply staged TeamMemberSlot changes now that the main record saved.
         if (layoutType === 'edit') {
-          for (const slotRef of slotRefsRef.current.values()) {
-            await slotRef.current?.applyChanges();
+          for (const applyFn of stagedSlotApplyFns) {
+            await applyFn();
           }
         }
         const recordId = typeof result === 'string' ? result : undefined;
