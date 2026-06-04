@@ -1142,7 +1142,9 @@ export async function recordRoutes(app: FastifyInstance) {
       return reply.code(404).send({ error: 'Record not found' });
     }
 
-    // Strip auto-number fields — these are system-generated and must not be overwritten.
+    // Strip auto-number fields — these are system-generated and must not be overwritten
+    // by non-admin users. Admins may override them explicitly, but empty values are
+    // always stripped to prevent accidentally clearing an existing number.
     const AUTO_NUMBER_FIELDS = new Set([
       'accountNumber', 'contactNumber', 'leadNumber', 'opportunityNumber',
       'projectNumber', 'propertyNumber', 'productCode', 'quoteNumber',
@@ -1152,7 +1154,13 @@ export async function recordRoutes(app: FastifyInstance) {
     const sanitizedUpdate = { ...updateData };
     for (const key of Object.keys(sanitizedUpdate)) {
       const stripped = key.replace(/^\w+__/, '');
-      if (AUTO_NUMBER_FIELDS.has(stripped)) delete sanitizedUpdate[key];
+      if (AUTO_NUMBER_FIELDS.has(stripped)) {
+        const v = sanitizedUpdate[key];
+        // Non-admins: always strip. Admins: only strip if value is empty.
+        if (userRole !== 'ADMIN' || !v || String(v).trim() === '') {
+          delete sanitizedUpdate[key];
+        }
+      }
     }
 
     const beforeData = existingRecord.data as Record<string, any>;
