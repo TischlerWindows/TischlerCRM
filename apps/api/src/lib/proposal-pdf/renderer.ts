@@ -307,6 +307,7 @@ function drawPageLogos(
       const file = byId.get(rule.id);
       if (!file) continue;
       try {
+        doc.save();
         const maxWidth = rule.maxWidthPt;
         const maxHeight = rule.maxHeightPt;
         // Position logos in the physical page margin — outside the text flow.
@@ -321,7 +322,14 @@ function drawPageLogos(
           rule.position === 'header'
             ? 10
             : doc.page.height - 10 - maxHeight;
-        doc.image(file.bytes, x, y, { fit: [maxWidth, maxHeight] });
+        // Use PDFKit's align/valign so the image is truly centred within the
+        // fit box regardless of aspect ratio.
+        doc.image(file.bytes, x, y, {
+          fit: [maxWidth, maxHeight],
+          align: rule.alignment === 'right' ? 'right' : rule.alignment === 'left' ? 'left' : 'center',
+          valign: 'center',
+        });
+        doc.restore();
       } catch {
         // Skip a broken logo — don't fail the whole PDF.
       }
@@ -639,6 +647,7 @@ function drawFooter(
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
+    doc.save();
     const y = doc.page.height - PAGE_MARGIN + 16;
     doc
       .fillColor(ctx.faint)
@@ -656,6 +665,7 @@ function drawFooter(
         lineBreak: false,
       });
     }
+    doc.restore();
   }
 }
 
