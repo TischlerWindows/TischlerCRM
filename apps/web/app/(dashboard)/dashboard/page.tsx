@@ -3884,7 +3884,7 @@ export default function DashboardPage() {
                     </select>
                   </div>
 
-                  {widgetConfig.dataSource && !['metric', 'table', 'card'].includes(selectedWidgetType) && (
+                  {widgetConfig.dataSource && !['metric', 'card'].includes(selectedWidgetType) && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis (Group By)</label>
@@ -4178,7 +4178,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* Chart Configuration (only for chart types in report mode) */}
-                  {!['metric', 'table', 'card'].includes(selectedWidgetType) && availableReports.length > 0 && (
+                  {!['metric', 'card'].includes(selectedWidgetType) && availableReports.length > 0 && (
                     <>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">X-Axis</label>
@@ -4963,7 +4963,7 @@ export default function DashboardPage() {
                     Select a report or switch to &quot;Manual Entry&quot; to see live data preview
                   </p>
                 )}
-                {widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'table', 'card'].includes(selectedWidgetType) && (
+                {widgetConfig.dataSourceMode === 'report' && widgetConfig.reportId && (!widgetConfig.xAxis || !widgetConfig.yAxis) && !['metric', 'card'].includes(selectedWidgetType) && (
                   <p className="text-xs text-amber-600 mt-2 text-center">
                     Configure <strong>X-Axis</strong> and <strong>Y-Axis</strong> to see data visualization
                   </p>
