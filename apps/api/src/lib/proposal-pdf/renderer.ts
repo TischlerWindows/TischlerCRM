@@ -176,6 +176,19 @@ export async function renderProposalPDF(
     fonts,
   };
 
+  // Strip trailing PAGE_BREAK blocks — they would produce blank last pages.
+  const trimmedBlocks = [...result.orderedBlocks];
+  while (trimmedBlocks.length > 0) {
+    const last = trimmedBlocks[trimmedBlocks.length - 1];
+    const lastType: BlockType = (last.preset.blockType as BlockType | null) ??
+      inferBlockType(last.preset.section, last.preset.title);
+    if (lastType === 'PAGE_BREAK') {
+      trimmedBlocks.pop();
+    } else {
+      break;
+    }
+  }
+
   // ── In-order block dispatch ─────────────────────────────────────
   // Each preset declares (or implicitly inherits via section) a BlockType.
   // The renderer walks the resolved presets in declaration order and
@@ -188,7 +201,7 @@ export async function renderProposalPDF(
   let footerOverride: FooterConfig | null = null;
   let letterheadDrawn = false;
 
-  for (const ob of result.orderedBlocks) {
+  for (const ob of trimmedBlocks) {
     const preset = ob.preset;
     const type: BlockType = (preset.blockType as BlockType | null) ??
       inferBlockType(preset.section, preset.title);
@@ -634,11 +647,13 @@ function drawFooter(
       .text(text, PAGE_MARGIN, y, {
         width: doc.page.width - 2 * PAGE_MARGIN,
         align: 'center',
+        lineBreak: false,
       });
     if (!hidePageNumbers) {
       doc.text(`Page ${i + 1} of ${range.count}`, doc.page.width - PAGE_MARGIN - 60, y, {
         width: 60,
         align: 'right',
+        lineBreak: false,
       });
     }
   }
