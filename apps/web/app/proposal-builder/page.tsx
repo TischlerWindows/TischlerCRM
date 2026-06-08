@@ -748,15 +748,12 @@ export default function QuoteBuilderPage() {
       window.clearTimeout(timer);
       if (previousUrl) URL.revokeObjectURL(previousUrl);
     };
-    // lastSavedAt triggers a re-render on every autosave success; combined
-    // with pdfRefreshKey (manual refresh button) this covers both auto and
-    // explicit refreshes without needing presets/draft state as deps.
+    // pdfRefreshKey covers manual refresh button triggers.
   }, [
     previewMode,
     mode,
     selectedTemplateId,
     selectedSummaryId,
-    lastSavedAt,
     pdfRefreshKey,
   ]);
 
