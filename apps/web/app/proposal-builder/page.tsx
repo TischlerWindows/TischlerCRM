@@ -112,10 +112,6 @@ export default function QuoteBuilderPage() {
   const [selectedSummaryId, setSelectedSummaryId] = useState('');
   const [isPreviewingPDF, setIsPreviewingPDF] = useState(false);
 
-  // Autosave state
-  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-
   // Builder mode + per-template page-logo rules. Loaded from the template
   // GET response (pageLogos JSON column). The BrandingTab patches these
   // via PATCH /quote-templates/:id/page-logos.
@@ -516,9 +512,7 @@ export default function QuoteBuilderPage() {
     async (opts: { silent?: boolean } = {}) => {
       if (!selectedTemplateId || !editTitle.trim()) return;
       const silent = opts.silent === true;
-      if (silent) {
-        setAutosaveStatus('saving');
-      } else {
+      if (!silent) {
         setSaving(true);
       }
       setError(null);
@@ -526,9 +520,7 @@ export default function QuoteBuilderPage() {
       const conds = conditionsPayload(editConditions);
       const condError = validateConditions(conds);
       if (condError) {
-        if (silent) {
-          setAutosaveStatus('error');
-        } else {
+        if (!silent) {
           setSaving(false);
           setError(condError);
         }
@@ -579,14 +571,10 @@ export default function QuoteBuilderPage() {
           conditions: editConditions,
           variants: editVariants,
         });
-        setLastSavedAt(Date.now());
-        setAutosaveStatus('saved');
+
       } catch (err: any) {
-        if (silent) {
-          setAutosaveStatus('error');
-        } else {
+        if (!silent) {
           setError(err.message || 'Failed to save');
-          setAutosaveStatus('error');
         }
       } finally {
         if (!silent) setSaving(false);
@@ -629,54 +617,6 @@ export default function QuoteBuilderPage() {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 2000);
   };
-
-  // ── Autosave (3s debounced) ──────────────────────────────────
-  //
-  // Fires only for blocks that already exist on the server — new presets must
-  // be saved manually once so they get an id. Switching blocks or templates
-  // clears the timer and resets the indicator.
-  useEffect(() => {
-    if (isNewPreset || !selectedPresetId || !editorBaseline) return;
-    const snapshot: EditorSnapshot = {
-      title: editTitle,
-      body: editBody,
-      section: editSection,
-      blockType: editBlockType,
-      config: editConfig,
-      alwaysIncluded: editAlwaysIncluded,
-      active: editActive,
-      driverField: editDriverField,
-      conditions: editConditions,
-      variants: editVariants,
-    };
-    if (snapshotsEqual(editorBaseline, snapshot)) return;
-    if (!editTitle.trim()) return;
-    const handle = window.setTimeout(() => {
-      void handleSave({ silent: true });
-    }, 3000);
-    return () => window.clearTimeout(handle);
-  }, [
-    editTitle,
-    editBody,
-    editSection,
-    editBlockType,
-    editConfig,
-    editAlwaysIncluded,
-    editActive,
-    editDriverField,
-    editConditions,
-    editVariants,
-    editorBaseline,
-    isNewPreset,
-    selectedPresetId,
-    handleSave,
-  ]);
-
-  // Reset autosave indicator when the active block / template changes.
-  useEffect(() => {
-    setAutosaveStatus('idle');
-    setLastSavedAt(null);
-  }, [selectedPresetId, selectedTemplateId, isNewPreset]);
 
   // ── Drag reorder ──────────────────────────────────────────────
 
@@ -1050,8 +990,6 @@ export default function QuoteBuilderPage() {
         saving={saving}
         canSave={canSave}
         isDirty={isDirty}
-        autosaveStatus={autosaveStatus}
-        lastSavedAt={lastSavedAt}
         mode={mode}
         onChangeMode={setMode}
         previewMode={previewMode}
