@@ -308,6 +308,12 @@ function drawPageLogos(
       if (!file) continue;
       try {
         doc.save();
+        const savedBottom = doc.page.margins.bottom;
+        const savedTop = doc.page.margins.top;
+        doc.page.margins.bottom = 0;
+        doc.page.margins.top = 0;
+        const savedX = doc.x;
+        const savedY = doc.y;
         const maxWidth = rule.maxWidthPt;
         const maxHeight = rule.maxHeightPt;
         // Position logos in the physical page margin — outside the text flow.
@@ -329,6 +335,10 @@ function drawPageLogos(
           align: rule.alignment === 'right' ? 'right' : rule.alignment === 'left' ? 'left' : 'center',
           valign: 'center',
         });
+        doc.page.margins.bottom = savedBottom;
+        doc.page.margins.top = savedTop;
+        doc.x = savedX;
+        doc.y = savedY;
         doc.restore();
       } catch {
         // Skip a broken logo — don't fail the whole PDF.
@@ -647,8 +657,13 @@ function drawFooter(
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
-    doc.save();
-    const y = doc.page.height - PAGE_MARGIN + 16;
+    // Temporarily disable PDFKit's auto-pagination guard so we can draw in
+    // the physical bottom margin without triggering a new page.
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    const savedX = doc.x;
+    const savedY = doc.y;
+    const y = doc.page.height - savedBottom + 16;
     doc
       .fillColor(ctx.faint)
       .font(ctx.fonts.regular)
@@ -665,7 +680,10 @@ function drawFooter(
         lineBreak: false,
       });
     }
-    doc.restore();
+    // Restore margins and cursor so subsequent operations aren't affected.
+    doc.page.margins.bottom = savedBottom;
+    doc.x = savedX;
+    doc.y = savedY;
   }
 }
 
