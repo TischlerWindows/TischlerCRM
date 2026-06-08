@@ -1029,7 +1029,7 @@ export default function QuoteBuilderPage() {
           </button>
           {!leftPanel.collapsed && (
             <>
-              <div className="flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-col flex-1 min-h-0">
                 <BlockList
                   presets={presets}
                   selectedPresetId={selectedPresetId}
