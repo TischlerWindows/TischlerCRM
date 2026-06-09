@@ -1139,7 +1139,7 @@ export default function QuoteBuilderPage() {
         {/* Right panel: block editor — hidden in Branding mode */}
         {mode === 'blocks' && (
         <div
-          className="relative shrink-0 min-h-0 bg-white border-l border-gray-200 overflow-y-auto transition-[width] duration-150"
+          className="relative flex shrink-0 flex-col min-h-0 bg-white border-l border-gray-200 overflow-hidden transition-[width] duration-150"
           style={{
             width: rightPanel.collapsed ? 40 : rightPanel.width,
             minWidth: rightPanel.collapsed ? 40 : undefined,
@@ -1155,12 +1155,13 @@ export default function QuoteBuilderPage() {
           >
             {rightPanel.collapsed ? <ChevronLeft className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </button>
-          {!rightPanel.collapsed && !selectedPresetId && !isNewPreset && (
-            <div className="flex-1 flex items-center justify-center text-gray-400 text-xs px-6 text-center">
-              Select a block to edit, or click + New to create one.
-            </div>
-          )}
-          {!rightPanel.collapsed && (selectedPresetId || isNewPreset) && (
+          {!rightPanel.collapsed && (
+            <div className="flex flex-col flex-1 min-h-0">
+              {!selectedPresetId && !isNewPreset ? (
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-xs px-6 text-center">
+                  Select a block to edit, or click + New to create one.
+                </div>
+              ) : (
                 <BlockEditor
                   isNew={isNewPreset}
                   title={editTitle}
@@ -1186,6 +1187,8 @@ export default function QuoteBuilderPage() {
                   bodyEditorRef={bodyEditorRef}
                   decision={currentDecision}
                 />
+              )}
+            </div>
           )}
         </div>
         )}
