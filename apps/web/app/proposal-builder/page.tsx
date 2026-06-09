@@ -973,7 +973,7 @@ export default function QuoteBuilderPage() {
   const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100">
+    <div className="h-screen overflow-hidden flex flex-col bg-gray-100">
       <TopBar
         templates={templates}
         selectedTemplateId={selectedTemplateId}
