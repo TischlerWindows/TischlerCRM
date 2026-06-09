@@ -134,7 +134,7 @@ export function BlockEditor({
       )}
 
       {/* Scrollable body */}
-      <div data-scroll-panel className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-16">
+      <div data-scroll-panel className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4 pb-16">
         {/* Block type badge */}
         {blockTypeMeta && (
           <div className="rounded-md border border-brand-navy/15 bg-brand-navy/[0.03] px-3 py-2">
