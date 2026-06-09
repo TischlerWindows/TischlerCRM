@@ -93,7 +93,7 @@ export function BlockEditor({
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header — left padding leaves room for the panel-collapse toggle button
           that page.tsx positions absolute at top-left of this panel. */}
       <div className="pl-12 pr-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">

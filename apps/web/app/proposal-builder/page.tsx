@@ -1158,7 +1158,7 @@ export default function QuoteBuilderPage() {
           {!rightPanel.collapsed && (
             <>
               {!selectedPresetId && !isNewPreset ? (
-                <div className="h-full flex items-center justify-center text-gray-400 text-xs px-6 text-center">
+                <div className="flex-1 flex items-center justify-center text-gray-400 text-xs px-6 text-center">
                   Select a block to edit, or click + New to create one.
                 </div>
               ) : (
