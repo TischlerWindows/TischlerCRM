@@ -1155,13 +1155,12 @@ export default function QuoteBuilderPage() {
           >
             {rightPanel.collapsed ? <ChevronLeft className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
           </button>
-          {!rightPanel.collapsed && (
-            <>
-              {!selectedPresetId && !isNewPreset ? (
-                <div className="flex-1 flex items-center justify-center text-gray-400 text-xs px-6 text-center">
-                  Select a block to edit, or click + New to create one.
-                </div>
-              ) : (
+          {!rightPanel.collapsed && !selectedPresetId && !isNewPreset && (
+            <div className="flex-1 flex items-center justify-center text-gray-400 text-xs px-6 text-center">
+              Select a block to edit, or click + New to create one.
+            </div>
+          )}
+          {!rightPanel.collapsed && (selectedPresetId || isNewPreset) && (
                 <BlockEditor
                   isNew={isNewPreset}
                   title={editTitle}
@@ -1187,8 +1186,6 @@ export default function QuoteBuilderPage() {
                   bodyEditorRef={bodyEditorRef}
                   decision={currentDecision}
                 />
-              )}
-            </>
           )}
         </div>
         )}
