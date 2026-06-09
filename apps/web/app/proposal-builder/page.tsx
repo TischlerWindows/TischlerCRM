@@ -1011,7 +1011,7 @@ export default function QuoteBuilderPage() {
       <div className="flex flex-1 min-h-0">
         {/* Left panel: block list + variable chips */}
         <div
-          className="relative flex shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-150"
+          className="relative flex shrink-0 flex-col min-h-0 border-r border-gray-200 bg-white transition-[width] duration-150"
           style={{
             width: leftPanel.collapsed ? 40 : leftPanel.width,
             minWidth: leftPanel.collapsed ? 40 : undefined,
