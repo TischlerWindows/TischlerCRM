@@ -133,7 +133,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           <span className="ml-auto text-[10px] text-gray-400 pr-1">{placeholder}</span>
         )}
       </div>
-      <div style={{ minHeight }}>
+      <div style={{ minHeight, maxHeight: 300, overflowY: 'auto' }}>
         <EditorContent editor={editor as Editor} />
       </div>
     </div>
