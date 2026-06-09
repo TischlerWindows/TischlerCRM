@@ -1139,7 +1139,7 @@ export default function QuoteBuilderPage() {
         {/* Right panel: block editor — hidden in Branding mode */}
         {mode === 'blocks' && (
         <div
-          className="relative shrink-0 bg-white border-l border-gray-200 overflow-hidden transition-[width] duration-150"
+          className="relative flex flex-col shrink-0 min-h-0 bg-white border-l border-gray-200 overflow-hidden transition-[width] duration-150"
           style={{
             width: rightPanel.collapsed ? 40 : rightPanel.width,
             minWidth: rightPanel.collapsed ? 40 : undefined,
