@@ -93,7 +93,7 @@ export function BlockEditor({
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col">
       {/* Header — left padding leaves room for the panel-collapse toggle button
           that page.tsx positions absolute at top-left of this panel. */}
       <div className="pl-12 pr-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
@@ -133,8 +133,8 @@ export function BlockEditor({
         </div>
       )}
 
-      {/* Scrollable body */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
+      {/* Body */}
+      <div className="px-4 py-4 space-y-4">
         {/* Block type badge */}
         {blockTypeMeta && (
           <div className="rounded-md border border-brand-navy/15 bg-brand-navy/[0.03] px-3 py-2">
