@@ -133,7 +133,21 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           <span className="ml-auto text-[10px] text-gray-400 pr-1">{placeholder}</span>
         )}
       </div>
-      <div style={{ minHeight, maxHeight: 300, overflowY: 'scroll', overscrollBehavior: 'contain' }}>
+      <div
+        style={{ minHeight, maxHeight: 200, overflowY: 'scroll', overscrollBehavior: 'contain' }}
+        onWheel={(e) => {
+          // If the editor is scrolled to its limit, let the event propagate
+          // to the parent scroll container instead of being swallowed.
+          const el = e.currentTarget;
+          const atTop = el.scrollTop === 0 && e.deltaY < 0;
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1 && e.deltaY > 0;
+          if (atTop || atBottom) {
+            e.stopPropagation();
+            const panel = el.closest('[data-scroll-panel]');
+            if (panel) panel.scrollTop += e.deltaY;
+          }
+        }}
+      >
         <EditorContent editor={editor as Editor} />
       </div>
     </div>
