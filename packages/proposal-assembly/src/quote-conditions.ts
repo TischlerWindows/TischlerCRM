@@ -33,6 +33,7 @@ export interface SummaryForConditions {
   jobType: string;
   glassType: string;
   glassTypeCustom?: string;
+  additionalGlassTypes?: string[];
   woodType: string;
   woodTypeCustom?: string;
   finish: string;
@@ -84,7 +85,7 @@ export interface QuoteContext {
   hasSimulatedDH: boolean;
 
   // Materials & options
-  glassType: string;
+  glassType: string[];  // primary + any additional glass types
   jobType: string;
   finishType: string;
   woodType: string;
@@ -373,7 +374,10 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     hasSimulatedDH: hasAnyType(productTypes, SIMULATED_DH_TYPES),
 
     // Materials
-    glassType: summary.glassType || '',
+    glassType: [
+      summary.glassType || '',
+      ...(summary.additionalGlassTypes || []),
+    ].filter(Boolean),
     jobType: summary.jobType || '',
     finishType,
     woodType: summary.woodType || '',

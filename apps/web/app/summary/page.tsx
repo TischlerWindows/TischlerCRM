@@ -675,6 +675,7 @@ interface Summary {
   finish: string;
   glassType: string;
   glassTypeCustom: string;
+  additionalGlassTypes: string[];
   hungType: string;
   hungTypeCustom: string;
   finials: string;
@@ -1312,6 +1313,7 @@ export default function SummaryPage() {
       finish: opts?.oppFields?.finish || '',
       glassType: opts?.oppFields?.glassType || '',
       glassTypeCustom: opts?.oppFields?.glassTypeCustom || '',
+      additionalGlassTypes: [],
       hungType: '#34',
       hungTypeCustom: '',
       finials: opts?.oppFields?.finials || '',
@@ -4038,6 +4040,33 @@ export default function SummaryPage() {
                           </div>
                         );
                       })()}
+
+                      {/* Additional Glass Types for Proposal */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Additional Glass Types for Proposal</label>
+                        <p className="text-xs text-gray-500 mb-2">Check any additional glass types that should also be included when matching proposal blocks.</p>
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {getOppPicklist('Opportunity__glassType').map(v => (
+                            <label key={v} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={(editingSummary.additionalGlassTypes || []).includes(v)}
+                                onChange={(e) => {
+                                  const current = editingSummary.additionalGlassTypes || [];
+                                  setEditingSummary({
+                                    ...editingSummary,
+                                    additionalGlassTypes: e.target.checked
+                                      ? [...current, v]
+                                      : current.filter(x => x !== v),
+                                  });
+                                }}
+                                className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
+                              />
+                              <span className="text-sm text-gray-700">{v}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
