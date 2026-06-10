@@ -40,9 +40,11 @@ interface Props {
   variants: DraftVariant[];
   onChange: (variants: DraftVariant[]) => void;
   driverField: string;
+  /** If provided, Match Value renders as a dropdown instead of free text. */
+  matchOptions?: string[];
 }
 
-export function VariantEditor({ variants, onChange, driverField }: Props) {
+export function VariantEditor({ variants, onChange, driverField, matchOptions }: Props) {
   const [expandedKey, setExpandedKey] = useState<string | null>(variants[0]?._key || null);
 
   const add = () => {
@@ -109,12 +111,25 @@ export function VariantEditor({ variants, onChange, driverField }: Props) {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Match Value</label>
-                        <input
-                          value={variant.matchValue}
-                          onChange={(e) => update(variant._key, { matchValue: e.target.value })}
-                          placeholder={`e.g., #28`}
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-                        />
+                        {matchOptions ? (
+                          <select
+                            value={variant.matchValue}
+                            onChange={(e) => update(variant._key, { matchValue: e.target.value })}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20 bg-white"
+                          >
+                            <option value="">Select a value…</option>
+                            {matchOptions.map(opt => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={variant.matchValue}
+                            onChange={(e) => update(variant._key, { matchValue: e.target.value })}
+                            placeholder={`e.g., #28`}
+                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                          />
+                        )}
                       </div>
                       <div>
                         <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Label (optional)</label>

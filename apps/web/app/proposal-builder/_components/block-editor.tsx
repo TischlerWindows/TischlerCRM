@@ -7,6 +7,7 @@ import { BodyEditor, type BodyEditorHandle } from './body-editor';
 import { BlockConfigForm } from './block-config-form';
 import { HelpHint } from './help-hint';
 import { BLOCK_TYPE_META, type BlockType } from '@crm/types';
+import { useSchemaStore } from '@/lib/schema-store';
 
 const SECTIONS = ['CONSTANT', 'SPECIFICATION', 'OPTION', 'EXCLUSION', 'INSTALLATION'] as const;
 type Section = typeof SECTIONS[number];
@@ -21,6 +22,19 @@ const DRIVER_FIELDS = [
   { value: 'spacerBarType', label: 'Spacer Bar Type' },
   { value: 'sdlType', label: 'SDL Type' },
 ];
+
+/** Maps driver field key → the Opportunity schema field whose picklistValues provide match choices. */
+const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
+  glassType: 'Opportunity__glassType',
+  woodType: 'Opportunity__woodType',
+  finishType: 'Opportunity__finishSpecifications',
+  spacerBarType: 'Opportunity__spacer_bar_type',
+};
+
+/** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
+const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
+  jobType: ['Premium', 'Coastal', 'Dade County'],
+};
 
 interface Props {
   isNew: boolean;
@@ -91,6 +105,19 @@ export function BlockEditor({
   const isVariantMode = !!driverField;
   const isLayoutOnly = blockType !== null && LAYOUT_ONLY_TYPES.includes(blockType);
   const blockTypeMeta = blockType ? BLOCK_TYPE_META[blockType] : null;
+
+  // Resolve the match-value choices for the current driver field.
+  // Try the schema picklist first, fall back to static options, then free text (undefined).
+  const schema = useSchemaStore(s => s.schema);
+  const matchOptions: string[] | undefined = (() => {
+    if (!driverField) return undefined;
+    if (DRIVER_FIELD_STATIC_OPTIONS[driverField]) return DRIVER_FIELD_STATIC_OPTIONS[driverField];
+    const schemaApiName = DRIVER_FIELD_SCHEMA_MAP[driverField];
+    if (!schemaApiName) return undefined;
+    const oppObj = schema?.objects?.find(o => o.apiName === 'Opportunity');
+    const field = oppObj?.fields?.find(f => f.apiName === schemaApiName);
+    return field?.picklistValues?.length ? field.picklistValues : undefined;
+  })();
 
   return (
     <div className="flex flex-col h-full">
@@ -245,6 +272,7 @@ A project with multiple glass types prints all matches.`}
             variants={variants}
             onChange={onVariantsChange}
             driverField={driverField}
+            matchOptions={matchOptions}
           />
         ) : (
           <div>
