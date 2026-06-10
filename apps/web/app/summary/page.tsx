@@ -4043,29 +4043,41 @@ export default function SummaryPage() {
 
                       {/* Additional Glass Types for Proposal */}
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Additional Glass Types for Proposal</label>
-                        <p className="text-xs text-gray-500 mb-2">Check any additional glass types that should also be included when matching proposal blocks.</p>
-                        <div className="flex flex-wrap gap-x-6 gap-y-2">
-                          {getOppPicklist('Opportunity__glassType').map(v => (
-                            <label key={v} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={(editingSummary.additionalGlassTypes || []).includes(v)}
-                                onChange={(e) => {
-                                  const current = editingSummary.additionalGlassTypes || [];
-                                  setEditingSummary({
-                                    ...editingSummary,
-                                    additionalGlassTypes: e.target.checked
-                                      ? [...current, v]
-                                      : current.filter(x => x !== v),
-                                  });
-                                }}
-                                className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
-                              />
-                              <span className="text-sm text-gray-700">{v}</span>
-                            </label>
-                          ))}
-                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Additional Glass Types for Proposal</label>
+                        {(() => {
+                          const options = getOppPicklist('Opportunity__glassType');
+                          const selected = editingSummary.additionalGlassTypes || [];
+                          return (
+                            <details className="relative">
+                              <summary className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white cursor-pointer flex items-center justify-between select-none list-none focus:outline-none focus:ring-1 focus:ring-brand-navy/40">
+                                {selected.length === 0
+                                  ? <span className="text-gray-400">Select additional glass types…</span>
+                                  : <span className="text-gray-900">{selected.length} selected</span>}
+                                <span className="ml-2 text-gray-400">▾</span>
+                              </summary>
+                              <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto py-1">
+                                {options.map(v => (
+                                  <label key={v} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={selected.includes(v)}
+                                      onChange={(e) => {
+                                        setEditingSummary({
+                                          ...editingSummary,
+                                          additionalGlassTypes: e.target.checked
+                                            ? [...selected, v]
+                                            : selected.filter(x => x !== v),
+                                        });
+                                      }}
+                                      className="w-3.5 h-3.5 rounded border-gray-300 text-brand-navy focus:ring-brand-navy/20"
+                                    />
+                                    <span className="text-sm text-gray-700">{v}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </details>
+                          );
+                        })()}
                       </div>
 
                       {/* Row: Spacer Bar Type + Spacer Bar Colors */}
