@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, FileText, FileImage, Save, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, FileText, FileImage, Save, Loader2, ChevronDown, Layers, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 
 interface QuoteTemplate {
