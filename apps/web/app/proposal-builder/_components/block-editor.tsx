@@ -291,6 +291,41 @@ A project with multiple glass types prints all matches.`}
                 example={`Off → renders as separate items (1), (2)…\nOn  → renders as one item with all matching text combined`}
               />
             </label>
+
+            {/* Universal Text */}
+            <div className="border border-gray-200 rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-semibold text-gray-500">Universal Text</span>
+                  <HelpHint
+                    label="Universal text help"
+                    title="Universal text"
+                    description="Text that always appears in this block regardless of which variant(s) matched. Position it before or after the variant items."
+                    example={`e.g. a closing note that applies to all glass types`}
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  {(['before', 'after'] as const).map((pos) => (
+                    <button
+                      key={pos}
+                      onClick={() => onConfigChange({ ...config, universalBodyPosition: pos })}
+                      className={`px-2 py-0.5 text-[10px] font-semibold rounded border transition-colors ${
+                        (config.universalBodyPosition ?? 'after') === pos
+                          ? 'border-[#1e3a5f] bg-[#1e3a5f] text-white'
+                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <BodyEditor
+                value={typeof config.universalBody === 'string' ? config.universalBody : ''}
+                onChange={(v) => onConfigChange({ ...config, universalBody: v })}
+                placeholder="Optional text that always appears with the matched variants…"
+              />
+            </div>
           </>
         ) : (
           <div>

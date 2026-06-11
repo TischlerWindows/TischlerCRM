@@ -224,7 +224,32 @@ export function assembleProposal({
         continue;
       }
 
-      const mergeVariants = !!(preset.config as Record<string, unknown> | null)?.mergeVariants;
+      const configObj = (preset.config as Record<string, unknown> | null) ?? {};
+      const mergeVariants = !!configObj.mergeVariants;
+      const universalBodyRaw = typeof configObj.universalBody === 'string' ? configObj.universalBody.trim() : '';
+      const universalBodyPosition = configObj.universalBodyPosition === 'before' ? 'before' : 'after';
+
+      // Resolve universal body once (shared across all variants).
+      const resolvedUniversal = universalBodyRaw
+        ? resolveTokensWithDiagnostics(universalBodyRaw, tokens)
+        : null;
+      if (resolvedUniversal) {
+        for (const token of resolvedUniversal.unresolvedTokens) {
+          unresolvedTokens.push({ presetId: preset.id, token });
+          warnings.push(`${preset.title} (universal): unresolved token {{${token}}}.`);
+        }
+      }
+      const universalPreset = resolvedUniversal
+        ? { ...preset, body: resolvedUniversal.text }
+        : null;
+
+      const pushUniversal = () => {
+        if (!universalPreset) return;
+        sections[sectionOf(preset)].push(universalPreset);
+        orderedBlocks.push({ presetId: preset.id, preset: universalPreset });
+      };
+
+      if (universalBodyPosition === 'before') pushUniversal();
 
       if (mergeVariants && matched.length > 1) {
         // Merge all matched variant bodies into one block.
@@ -252,6 +277,8 @@ export function assembleProposal({
         }
         includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
       }
+
+      if (universalBodyPosition === 'after') pushUniversal();
     } else {
       // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)
       // typically have no body — they're rendered from `config`. Don't
