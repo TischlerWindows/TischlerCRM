@@ -35,7 +35,7 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 /** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
-  spacerBarColors: ['White', 'Silver', 'Brown', 'Black'],
+  spacerBarColors: ['Standard White, Silver, Brown, Black', 'Premium C31, C32, C33, C34'],
 };
 
 interface Props {
