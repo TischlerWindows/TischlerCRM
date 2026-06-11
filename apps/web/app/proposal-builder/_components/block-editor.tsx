@@ -20,6 +20,7 @@ const DRIVER_FIELDS = [
   { value: 'woodType', label: 'Wood Type' },
   { value: 'finishType', label: 'Finish Type' },
   { value: 'spacerBarType', label: 'Spacer Bar Type' },
+  { value: 'spacerBarColors', label: 'Spacer Bar Colors' },
   { value: 'sdlType', label: 'SDL Type' },
 ];
 
@@ -34,6 +35,7 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 /** Hard-coded choices for driver fields that aren't a simple picklist in the schema. */
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
+  spacerBarColors: ['White', 'Silver', 'Brown', 'Black'],
 };
 
 interface Props {
