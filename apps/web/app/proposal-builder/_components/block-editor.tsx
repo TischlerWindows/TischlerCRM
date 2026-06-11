@@ -305,7 +305,7 @@ A project with multiple glass types prints all matches.`}
               placeholder="Bold, italic, lists supported"
             />
           </div>
-        </> ))}
+        ) )}
 
         {/* Toggles */}
         <div className="flex items-center gap-5 flex-wrap">
