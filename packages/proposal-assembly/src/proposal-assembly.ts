@@ -239,31 +239,29 @@ export function assembleProposal({
           warnings.push(`${preset.title} (universal): unresolved token {{${token}}}.`);
         }
       }
-      const universalPreset = resolvedUniversal
-        ? { ...preset, body: resolvedUniversal.text }
-        : null;
+      const universalText = resolvedUniversal?.text ?? '';
 
-      const pushUniversal = () => {
-        if (!universalPreset) return;
-        sections[sectionOf(preset)].push(universalPreset);
-        orderedBlocks.push({ presetId: preset.id, preset: universalPreset });
+      // Helper — combine a variant/merged body with the universal text in one item.
+      const withUniversal = (variantBody: string): string => {
+        if (!universalText) return variantBody;
+        return universalBodyPosition === 'before'
+          ? `${universalText}<br/><br/>${variantBody}`
+          : `${variantBody}<br/><br/>${universalText}`;
       };
 
-      if (universalBodyPosition === 'before') pushUniversal();
-
       if (mergeVariants && matched.length > 1) {
-        // Merge all matched variant bodies into one block.
+        // Merge all matched variant bodies into one block, then attach universal text.
         const mergedBody = matched
           .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)
           .join('<br/><br/>');
-        const resolvedPreset = { ...preset, body: mergedBody };
+        const resolvedPreset = { ...preset, body: withUniversal(mergedBody) };
         sections[sectionOf(preset)].push(resolvedPreset);
         orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
         includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
       } else {
         for (const variant of matched) {
           const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
-          const resolvedPreset = { ...preset, body: resolved.text };
+          const resolvedPreset = { ...preset, body: withUniversal(resolved.text) };
           sections[sectionOf(preset)].push(resolvedPreset);
           orderedBlocks.push({
             presetId: preset.id,
@@ -277,8 +275,6 @@ export function assembleProposal({
         }
         includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
       }
-
-      if (universalBodyPosition === 'after') pushUniversal();
     } else {
       // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)
       // typically have no body — they're rendered from `config`. Don't
