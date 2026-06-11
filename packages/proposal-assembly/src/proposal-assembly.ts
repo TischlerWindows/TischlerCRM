@@ -223,21 +223,35 @@ export function assembleProposal({
         excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}".` });
         continue;
       }
-      for (const variant of matched) {
-        const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
-        const resolvedPreset = { ...preset, body: resolved.text };
+
+      const mergeVariants = !!(preset.config as Record<string, unknown> | null)?.mergeVariants;
+
+      if (mergeVariants && matched.length > 1) {
+        // Merge all matched variant bodies into one block.
+        const mergedBody = matched
+          .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)
+          .join('<br/><br/>');
+        const resolvedPreset = { ...preset, body: mergedBody };
         sections[sectionOf(preset)].push(resolvedPreset);
-        orderedBlocks.push({
-          presetId: preset.id,
-          preset: resolvedPreset,
-          variantValue: variant.matchValue,
-        });
-        for (const token of resolved.unresolvedTokens) {
-          unresolvedTokens.push({ presetId: preset.id, token });
-          warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
+        orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
+        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched (merged).` });
+      } else {
+        for (const variant of matched) {
+          const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
+          const resolvedPreset = { ...preset, body: resolved.text };
+          sections[sectionOf(preset)].push(resolvedPreset);
+          orderedBlocks.push({
+            presetId: preset.id,
+            preset: resolvedPreset,
+            variantValue: variant.matchValue,
+          });
+          for (const token of resolved.unresolvedTokens) {
+            unresolvedTokens.push({ presetId: preset.id, token });
+            warnings.push(`${preset.title} (variant ${variant.matchValue}): unresolved token {{${token}}}.`);
+          }
         }
+        includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
       }
-      includedBlocks.push({ ...block, reason: `${matched.length} variant(s) matched.` });
     } else {
       // Layout blocks (PRICING_TABLE, LETTERHEAD, PAGE_BREAK, etc.)
       // typically have no body — they're rendered from `config`. Don't

@@ -268,12 +268,30 @@ A project with multiple glass types prints all matches.`}
 
         {/* Body or Variants — only for content blocks. */}
         {!isLayoutOnly && (isVariantMode ? (
-          <VariantEditor
-            variants={variants}
-            onChange={onVariantsChange}
-            driverField={driverField}
-            matchOptions={matchOptions}
-          />
+          <>
+            <VariantEditor
+              variants={variants}
+              onChange={onVariantsChange}
+              driverField={driverField}
+              matchOptions={matchOptions}
+            />
+            {/* Merge toggle */}
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!(config.mergeVariants)}
+                onChange={(e) => onConfigChange({ ...config, mergeVariants: e.target.checked })}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+              />
+              <span className="text-xs text-gray-700">Merge matched variants into one block</span>
+              <HelpHint
+                label="Merge variants help"
+                title="Merge matched variants"
+                description="When on, all matched variant bodies are joined together into a single numbered item. Use this when multiple glass types apply to the same project and the spec text should appear as one combined entry."
+                example={`Off → renders as separate items (1), (2)…\nOn  → renders as one item with all matching text combined`}
+              />
+            </label>
+          </>
         ) : (
           <div>
             <label className="text-[10px] font-semibold text-gray-500 mb-1 block">
@@ -287,7 +305,7 @@ A project with multiple glass types prints all matches.`}
               placeholder="Bold, italic, lists supported"
             />
           </div>
-        ))}
+        </> ))}
 
         {/* Toggles */}
         <div className="flex items-center gap-5 flex-wrap">
