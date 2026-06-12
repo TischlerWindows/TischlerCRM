@@ -497,7 +497,7 @@ export default function QuoteBuilderPage() {
 
   const handleSelectBlock = (id: string) => {
     // Flush any unsaved changes before switching to another block.
-    if (isDirty && selectedPresetId) void handleSave({ silent: true });
+    if (isDirty && selectedPresetId) void handleSave({ silent: true, switchAway: true });
     const preset = presets.find((p) => p.id === id);
     if (preset) loadPresetIntoEditor(preset);
   };
@@ -511,9 +511,10 @@ export default function QuoteBuilderPage() {
   // ── Save / Delete ─────────────────────────────────────────────
 
   const handleSave = useCallback(
-    async (opts: { silent?: boolean } = {}) => {
+    async (opts: { silent?: boolean; switchAway?: boolean } = {}) => {
       if (!selectedTemplateId || !editTitle.trim()) return;
       const silent = opts.silent === true;
+      const switchAway = opts.switchAway === true;
       if (!silent) {
         setSaving(true);
       }
@@ -561,18 +562,22 @@ export default function QuoteBuilderPage() {
           await loadPresets(selectedTemplateId);
           if (!silent) flash('Block saved');
         }
-        setEditorBaseline({
-          title: editTitle.trim(),
-          body: isVariantMode ? '' : editBody,
-          section: editSection,
-          blockType: editBlockType,
-          config: editConfig,
-          alwaysIncluded: editAlwaysIncluded,
-          active: editActive,
-          driverField: editDriverField || '',
-          conditions: editConditions,
-          variants: editVariants,
-        });
+        // Don't update the baseline when saving before switching to another block —
+        // loadPresetIntoEditor has already set the baseline for the new block.
+        if (!switchAway) {
+          setEditorBaseline({
+            title: editTitle.trim(),
+            body: isVariantMode ? '' : editBody,
+            section: editSection,
+            blockType: editBlockType,
+            config: editConfig,
+            alwaysIncluded: editAlwaysIncluded,
+            active: editActive,
+            driverField: editDriverField || '',
+            conditions: editConditions,
+            variants: editVariants,
+          });
+        }
 
       } catch (err: any) {
         if (!silent) {
@@ -1054,7 +1059,7 @@ export default function QuoteBuilderPage() {
                   selectedPresetId={selectedPresetId}
                   onSelect={(preset) => {
                     // Flush any unsaved changes before switching to another block.
-                    if (isDirty && selectedPresetId) void handleSave({ silent: true });
+                    if (isDirty && selectedPresetId) void handleSave({ silent: true, switchAway: true });
                     loadPresetIntoEditor(preset);
                   }}
                   onNew={handleNewPreset}
