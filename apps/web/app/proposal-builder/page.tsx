@@ -548,11 +548,26 @@ export default function QuoteBuilderPage() {
 
       try {
         if (isNewPreset) {
+          // Compute a document order that inserts the new block after all
+          // existing presets in the same section (so CONSTANTs stay together
+          // ahead of SPECIFICATION items, etc.).
+          const sectionPresets = presets.filter((p) => p.section === editSection);
+          const insertOrder = sectionPresets.length > 0
+            ? Math.max(...sectionPresets.map((p) => p.order)) + 1
+            : presets.length;
           const created = await apiClient.post<SpecPresetData>('/spec-presets', {
             ...payload,
             templateId: selectedTemplateId,
-            order: presets.length,
+            order: insertOrder,
           });
+          // Reassign compact sequential orders: blocks before insertOrder keep
+          // their order, new block gets insertOrder, blocks at insertOrder+ are bumped.
+          const reordered = [
+            ...presets.filter((p) => p.order < insertOrder),
+            { ...created, order: insertOrder },
+            ...presets.filter((p) => p.order >= insertOrder).map((p) => ({ ...p, order: p.order + 1 })),
+          ].map((p, i) => ({ id: p.id, order: i }));
+          await apiClient.patch('/spec-presets/reorder', reordered);
           setIsNewPreset(false);
           setSelectedPresetId(created.id);
           await loadPresets(selectedTemplateId);
