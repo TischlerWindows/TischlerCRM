@@ -395,13 +395,14 @@ function drawFreeTextBlock(
   preset: SpecPresetData,
   ctx: BrandContext,
 ): void {
-  if (preset.title && preset.title.trim()) {
+  const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
+  if (!hideTitle && preset.title && preset.title.trim()) {
     doc.moveDown(0.4);
     doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
   }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: preset.title ? 0.1 : 0.4 });
+    drawRichBody(doc, preset.body, ctx, { topGap: (!hideTitle && preset.title) ? 0.1 : 0.4 });
   }
 }
 
@@ -411,10 +412,15 @@ function drawSpecificationItem(
   number: number,
   ctx: BrandContext,
 ): void {
+  const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
   doc.moveDown(0.4);
   doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
-  doc.text(`(${number})`, { continued: true, indent: 0 });
-  doc.text(`  ${preset.title}`);
+  if (hideTitle) {
+    doc.text(`(${number})`, { continued: false, indent: 0 });
+  } else {
+    doc.text(`(${number})`, { continued: true, indent: 0 });
+    doc.text(`  ${preset.title}`);
+  }
 
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
@@ -427,8 +433,11 @@ function drawOptionItem(
   preset: SpecPresetData,
   ctx: BrandContext,
 ): void {
+  const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
   doc.moveDown(0.4);
-  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  if (!hideTitle) {
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     drawRichBody(doc, preset.body, ctx, { topGap: 0.1 });
@@ -440,8 +449,11 @@ function drawExclusionItem(
   preset: SpecPresetData,
   ctx: BrandContext,
 ): void {
+  const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
   doc.moveDown(0.2);
-  doc.fillColor(ctx.text).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(`•  ${preset.title}`);
+  if (!hideTitle) {
+    doc.fillColor(ctx.text).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(`•  ${preset.title}`);
+  }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });
@@ -453,8 +465,11 @@ function drawInstallationItem(
   preset: SpecPresetData,
   ctx: BrandContext,
 ): void {
+  const hideTitle = !!(preset.config as Record<string, unknown> | null)?.hideTitle;
   doc.moveDown(0.4);
-  doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  if (!hideTitle) {
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE).text(preset.title);
+  }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     drawRichBody(doc, preset.body, ctx, { topGap: 0.05, indent: 12 });

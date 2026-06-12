@@ -349,6 +349,21 @@ A project with multiple glass types prints all matches.`}
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
+              checked={!!(config.hideTitle)}
+              onChange={(e) => onConfigChange({ ...config, hideTitle: e.target.checked })}
+              className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
+            />
+            <span className="text-xs text-gray-700">Hide title in PDF</span>
+            <HelpHint
+              label="Hide title help"
+              title="Hide title in PDF"
+              description="When on, the bold title line is omitted from the rendered PDF. The body text still appears."
+              example={`Useful when the body text is self-contained and the title would be redundant.`}
+            />
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
               checked={alwaysIncluded}
               onChange={(e) => onAlwaysIncludedChange(e.target.checked)}
               className="w-3.5 h-3.5 rounded border-gray-300 text-[#1e3a5f] focus:ring-[#1e3a5f]/20"
