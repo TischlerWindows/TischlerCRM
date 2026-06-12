@@ -64,7 +64,7 @@ const PALETTE_GROUPS: Array<{ group: 'Layout' | 'Content' | 'Data'; types: Block
   },
   {
     group: 'Content',
-    types: ['FREE_TEXT', 'SPECIFICATION_ITEM', 'OPTION_ITEM', 'EXCLUSION_ITEM', 'INSTALLATION_ITEM'],
+    types: ['FREE_TEXT', 'TITLE_BLOCK', 'SPECIFICATION_ITEM', 'OPTION_ITEM', 'EXCLUSION_ITEM', 'INSTALLATION_ITEM'],
   },
   { group: 'Data', types: ['PRICING_TABLE', 'BASE_BID_LINE', 'ADDITIONS_TABLE'] },
 ];
