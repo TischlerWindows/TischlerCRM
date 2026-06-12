@@ -81,7 +81,14 @@ function collectRuns(
 
   for (const child of el.childNodes) {
     if (child.nodeType === NodeType.TEXT_NODE) {
-      const text = decodeEntities(child.text);
+      const raw = decodeEntities(child.text);
+      // PDFKit's word-layout collapses runs of ASCII spaces into a single
+      // word gap. Preserve intentional multi-space runs by replacing every
+      // second space in a sequence with a non-breaking space (\u00A0),
+      // which PDFKit renders at full glyph width.
+      const text = raw.replace(/ {2,}/g, (m) =>
+        m.split('').map((_, i) => (i % 2 === 0 ? ' ' : '\u00A0')).join(''),
+      );
       if (text.length > 0) {
         runs.push({ text, bold: ctx.bold, italic: ctx.italic });
       }
@@ -120,14 +127,9 @@ function decodeEntities(input: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    // Non-breaking spaces from TipTap: preserve as real non-breaking space so
-    // PDFKit doesn't collapse them during rendering.
-    .replace(/&nbsp;/g, '\u00A0')
-    // Multiple consecutive regular spaces → alternate space/nbsp so PDFKit
-    // doesn't collapse them (PDFKit collapses runs of ASCII spaces).
-    .replace(/ {2,}/g, (m) =>
-      m.split('').map((_, i) => (i % 2 === 0 ? ' ' : '\u00A0')).join(''),
-    );
+    // Non-breaking spaces from TipTap: preserve as \u00A0 so PDFKit renders
+    // them at full glyph width rather than collapsing them.
+    .replace(/&nbsp;/g, '\u00A0');
 }
 
 // Used by callers that just need the plain text (e.g. for header lines).
