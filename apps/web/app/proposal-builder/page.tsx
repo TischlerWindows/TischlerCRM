@@ -952,17 +952,9 @@ export default function QuoteBuilderPage() {
     return null;
   }, [selectedPresetId, previewState.result]);
 
-  // ── Render ────────────────────────────────────────────────────
-
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-[#1e3a5f]" />
-      </div>
-    );
-  }
-
-  const canSave = !!(editTitle.trim() && (selectedPresetId || isNewPreset));
+  // ── Dirty tracking + autosave ────────────────────────────────
+  // These must live before any conditional early return so hooks are always
+  // called in the same order on every render (React rules of hooks).
 
   const currentSnapshot: EditorSnapshot = {
     title: editTitle,
@@ -978,11 +970,7 @@ export default function QuoteBuilderPage() {
   };
   const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
 
-  // ── Autosave ─────────────────────────────────────────────────────────────────
   // Silently persist changes 1.5 s after the last edit to an existing block.
-  // This also covers the case where the user edits then immediately clicks
-  // another block — the handleSave closure captures the pre-switch state, so
-  // the API call carries the right body/title even after the editor resets.
   useEffect(() => {
     if (!isDirty || !selectedPresetId) return;
     const timer = window.setTimeout(() => {
@@ -990,6 +978,18 @@ export default function QuoteBuilderPage() {
     }, 1500);
     return () => window.clearTimeout(timer);
   }, [isDirty, selectedPresetId, handleSave]);
+
+  // ── Render ────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-[#1e3a5f]" />
+      </div>
+    );
+  }
+
+  const canSave = !!(editTitle.trim() && (selectedPresetId || isNewPreset));
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-100">
