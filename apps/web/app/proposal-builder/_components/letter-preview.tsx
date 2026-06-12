@@ -329,6 +329,20 @@ function BlockPreview({
           )}
         </div>,
       );
+    case 'TITLE_BLOCK':
+      return wrap(
+        <div className="mt-5 mb-2 text-center">
+          <div
+            className="text-[13pt] font-bold uppercase tracking-wide"
+            style={{ color: NAVY }}
+          >
+            {preset.title}
+          </div>
+          {preset.body && preset.body.trim() && (
+            <SafeRichHtml className="mt-1 text-[10pt] leading-[1.5] text-center" html={preset.body} />
+          )}
+        </div>,
+      );
     case 'SPECIFICATION_ITEM':
       return wrap(
         <div className="mt-3 p-1">

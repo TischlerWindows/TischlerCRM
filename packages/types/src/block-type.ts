@@ -13,6 +13,7 @@ import { z } from 'zod';
 export const BLOCK_TYPES = [
   'LETTERHEAD',
   'FREE_TEXT',
+  'TITLE_BLOCK',
   'SPECIFICATION_ITEM',
   'OPTION_ITEM',
   'EXCLUSION_ITEM',
@@ -237,6 +238,12 @@ export const BLOCK_TYPE_META: Record<BlockType, BlockTypeMeta> = {
     type: 'FREE_TEXT',
     label: 'Free Text',
     description: 'Rich-text paragraph (intro, body, etc.)',
+    group: 'Content',
+  },
+  TITLE_BLOCK: {
+    type: 'TITLE_BLOCK',
+    label: 'Title Block',
+    description: 'Large centered uppercase heading',
     group: 'Content',
   },
   SPECIFICATION_ITEM: {
