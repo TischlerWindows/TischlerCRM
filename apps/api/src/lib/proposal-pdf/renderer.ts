@@ -399,18 +399,22 @@ function drawTitleBlock(
   ctx: BrandContext,
 ): void {
   // Large centered uppercase heading block.
+  const cfg = preset.config as Record<string, unknown> | null | undefined;
+  const hideTitle = !!(cfg?.hideTitle);
   const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.moveDown(0.6);
-  doc.fillColor(ctx.navy)
-    .font(ctx.fonts.bold)
-    .fontSize(SECTION_HEADING_SIZE)
-    .text(preset.title.toUpperCase(), doc.page.margins.left, doc.y, {
-      width: usableWidth,
-      align: 'center',
-    });
+  if (!hideTitle) {
+    doc.fillColor(ctx.navy)
+      .font(ctx.fonts.bold)
+      .fontSize(SECTION_HEADING_SIZE)
+      .text(preset.title.toUpperCase(), doc.page.margins.left, doc.y, {
+        width: usableWidth,
+        align: 'center',
+      });
+  }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: 0.2 });
+    drawRichBody(doc, preset.body, ctx, { topGap: hideTitle ? 0 : 0.2 });
   }
 }
 
@@ -786,7 +790,9 @@ function drawStyledRuns(
   runs.forEach((run, i) => {
     const isLast = i === runs.length - 1;
     doc.font(fontFor(run, ctx.fonts));
+    if (run.fontSize) doc.fontSize(run.fontSize);
     doc.text(run.text, { continued: !isLast, indent: i === 0 ? opts.indent : 0 });
+    if (run.fontSize) doc.fontSize(BODY_FONT_SIZE); // restore default after run
     // Subsequent runs continue from where the last one stopped; no need to
     // explicitly set x. PDFKit handles the wrap.
     void startX; // referenced for clarity, intentionally unused

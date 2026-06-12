@@ -2,8 +2,48 @@
 
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import TextStyle from '@tiptap/extension-text-style';
+import { Extension } from '@tiptap/core';
 import { Bold, Italic, List, ListOrdered } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, type ReactNode } from 'react';
+
+// Custom font-size extension built on TextStyle (TipTap v2 compatible).
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: (el) => el.style.fontSize?.replace('pt', '') || null,
+            renderHTML: (attrs) =>
+              attrs.fontSize ? { style: `font-size: ${attrs.fontSize}pt` } : {},
+          },
+        },
+      },
+    ];
+  },
+  addCommands() {
+    return {
+      setFontSize:
+        (size: string) =>
+        ({ chain }: any) =>
+          chain().setMark('textStyle', { fontSize: size }).run(),
+      unsetFontSize:
+        () =>
+        ({ chain }: any) =>
+          chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+    };
+  },
+});
+
+const FONT_SIZES = ['8', '9', '10', '11', '12', '14', '16', '18', '20', '24'];
+const DEFAULT_SIZE = '10';
 
 export interface BodyEditorHandle {
   /** Insert text at the current cursor position. Used by the Variables chip panel. */
@@ -58,7 +98,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
   ref,
 ) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [StarterKit, TextStyle, FontSize],
     content: value,
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
     editorProps: {
@@ -145,6 +185,25 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
         >
           <ListOrdered className="w-3 h-3" />
         </ToolbarBtn>
+        <div className="w-px h-4 bg-gray-200 mx-1" aria-hidden />
+        {/* Font size selector */}
+        <select
+          aria-label="Font size"
+          value={editor.getAttributes('textStyle').fontSize ?? DEFAULT_SIZE}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === DEFAULT_SIZE) {
+              (editor.chain().focus() as any).unsetFontSize().run();
+            } else {
+              (editor.chain().focus() as any).setFontSize(val).run();
+            }
+          }}
+          className="text-[10px] h-6 rounded border border-gray-300 bg-white px-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-navy/30"
+        >
+          {FONT_SIZES.map((s) => (
+            <option key={s} value={s}>{s}pt</option>
+          ))}
+        </select>
         {placeholder && (
           <span className="ml-auto text-[10px] text-gray-400 pr-1">{placeholder}</span>
         )}

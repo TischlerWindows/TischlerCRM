@@ -7,14 +7,19 @@ import parse from 'html-react-parser';
  * Tags Tiptap's StarterKit emits that we render in the proposal body.
  * Anything outside this list is stripped before parsing.
  */
-const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i'];
+const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'span'];
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ALLOWED_TAGS,
-  // No attributes anywhere — Tiptap StarterKit doesn't need them, and this
-  // closes off the `style="..."` / `href="javascript:..."` / event-handler
-  // attack surfaces.
-  allowedAttributes: {},
+  allowedAttributes: {
+    // Allow span with style restricted to font-size only (for TextStyle/font-size extension).
+    span: ['style'],
+  },
+  allowedStyles: {
+    span: {
+      'font-size': [/^\d+(\.\d+)?pt$/],
+    },
+  },
   // Drop disallowed tags entirely (no fallback to plain text inside <script>).
   disallowedTagsMode: 'discard',
 };

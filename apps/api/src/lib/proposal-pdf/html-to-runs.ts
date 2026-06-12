@@ -16,6 +16,8 @@ export interface StyledRun {
   text: string;
   bold: boolean;
   italic: boolean;
+  /** Font size override in points. Undefined = use block default. */
+  fontSize?: number;
 }
 
 export type Block =
@@ -75,7 +77,7 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
 
 function collectRuns(
   el: HTMLElement,
-  ctx: { bold: boolean; italic: boolean } = { bold: false, italic: false },
+  ctx: { bold: boolean; italic: boolean; fontSize?: number } = { bold: false, italic: false },
 ): StyledRun[] {
   const runs: StyledRun[] = [];
 
@@ -90,7 +92,7 @@ function collectRuns(
         m.split('').map((_, i) => (i % 2 === 0 ? ' ' : '\u00A0')).join(''),
       );
       if (text.length > 0) {
-        runs.push({ text, bold: ctx.bold, italic: ctx.italic });
+        runs.push({ text, bold: ctx.bold, italic: ctx.italic, fontSize: ctx.fontSize });
       }
       continue;
     }
@@ -100,13 +102,22 @@ function collectRuns(
     const tag = childEl.tagName?.toUpperCase();
 
     if (tag === 'BR') {
-      runs.push({ text: '\n', bold: ctx.bold, italic: ctx.italic });
+      runs.push({ text: '\n', bold: ctx.bold, italic: ctx.italic, fontSize: ctx.fontSize });
       continue;
     }
 
     const next = { ...ctx };
     if (tag === 'STRONG' || tag === 'B') next.bold = true;
     if (tag === 'EM' || tag === 'I') next.italic = true;
+    // Parse font-size from <span style="font-size: Xpt"> (TipTap TextStyle output)
+    if (tag === 'SPAN') {
+      const style = childEl.getAttribute('style') ?? '';
+      const match = /font-size:\s*([\d.]+)pt/i.exec(style);
+      if (match) {
+        const parsed = parseFloat(match[1]);
+        if (!isNaN(parsed) && parsed > 0) next.fontSize = parsed;
+      }
+    }
     runs.push(...collectRuns(childEl, next));
   }
 
