@@ -120,7 +120,14 @@ function decodeEntities(input: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+    // Non-breaking spaces from TipTap: preserve as real non-breaking space so
+    // PDFKit doesn't collapse them during rendering.
+    .replace(/&nbsp;/g, '\u00A0')
+    // Multiple consecutive regular spaces → alternate space/nbsp so PDFKit
+    // doesn't collapse them (PDFKit collapses runs of ASCII spaces).
+    .replace(/ {2,}/g, (m) =>
+      m.split('').map((_, i) => (i % 2 === 0 ? ' ' : '\u00A0')).join(''),
+    );
 }
 
 // Used by callers that just need the plain text (e.g. for header lines).
