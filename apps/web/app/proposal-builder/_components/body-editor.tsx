@@ -68,6 +68,22 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           'prose prose-sm max-w-none px-2.5 py-2 text-xs leading-relaxed focus:outline-none' +
           ' [&_p]:my-1 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5',
       },
+      // ProseMirror normalizes runs of ASCII spaces to a single space.
+      // When the user presses Space and the character immediately before the
+      // cursor is already a space (or a non-breaking space), insert a
+      // non-breaking space (\u00A0) instead so ProseMirror preserves it.
+      handleKeyDown: (view, event) => {
+        if (event.key !== ' ') return false;
+        const { state, dispatch } = view;
+        const { $from } = state.selection;
+        const textBefore = $from.nodeBefore?.text ?? '';
+        const charBefore = textBefore[textBefore.length - 1];
+        if (charBefore === ' ' || charBefore === '\u00A0') {
+          dispatch(state.tr.insertText('\u00A0'));
+          return true;
+        }
+        return false;
+      },
     },
     immediatelyRender: false,
   });
