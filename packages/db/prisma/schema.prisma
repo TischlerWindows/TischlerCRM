@@ -931,6 +931,7 @@ enum SpecSection {
 enum BlockType {
   LETTERHEAD             // page-1 logo band + red rule + optional wordmark fallback
   FREE_TEXT              // arbitrary rich text (replaces CONSTANT intro)
+  TITLE_BLOCK            // large centered uppercase heading
   SPECIFICATION_ITEM     // numbered "(1) Title — body"
   OPTION_ITEM            // bullet/heading + body (in additions area)
   EXCLUSION_ITEM         // bullet item (under "Our base bid does not include")

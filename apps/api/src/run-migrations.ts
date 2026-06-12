@@ -100,6 +100,14 @@ const MIGRATIONS: { name: string; sql: string }[] = [
   // Integration and UserIntegration tables are created by prisma db push.
   // These are kept as no-op safety nets (IF NOT EXISTS) and must use single
   // statements per entry because $executeRawUnsafe does not support batches.
+  {
+    name: 'add_title_block_enum_value',
+    sql: `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'TITLE_BLOCK' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'BlockType')) THEN
+        ALTER TYPE "BlockType" ADD VALUE 'TITLE_BLOCK';
+      END IF;
+    END $$`,
+  },
 ];
 
 export async function runPendingMigrations() {
