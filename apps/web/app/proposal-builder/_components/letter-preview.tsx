@@ -301,6 +301,7 @@ function BlockPreview({
 }: BlockPreviewProps) {
   const preset = ordered.preset;
   const config = (preset.config ?? {}) as Record<string, unknown>;
+  const hideTitle = !!config.hideTitle;
 
   const wrap = (children: React.ReactNode) => (
     <div
@@ -320,7 +321,7 @@ function BlockPreview({
     case 'FREE_TEXT':
       return wrap(
         <div className="mt-4">
-          {preset.title && preset.title.trim() && (
+          {!hideTitle && preset.title && preset.title.trim() && (
             <div className="text-[10pt] font-bold mb-1" style={{ color: NAVY }}>{preset.title}</div>
           )}
           {preset.body && (
@@ -333,7 +334,7 @@ function BlockPreview({
         <div className="mt-3 p-1">
           <div className="text-[10pt] font-bold" style={{ color: NAVY }}>
             <span className="inline-block w-7">({specNumber ?? 1})</span>
-            <span>{preset.title}</span>
+            {!hideTitle && <span>{preset.title}</span>}
           </div>
           {preset.body && (
             <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
@@ -343,7 +344,7 @@ function BlockPreview({
     case 'OPTION_ITEM':
       return wrap(
         <div className="mt-3 px-1 py-0.5">
-          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
+          {!hideTitle && <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>}
           {preset.body && (
             <SafeRichHtml className="mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
           )}
@@ -352,7 +353,7 @@ function BlockPreview({
     case 'EXCLUSION_ITEM':
       return wrap(
         <div className="mt-2 px-1">
-          <div className="text-[10pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>
+          {!hideTitle && <div className="text-[10pt] font-bold">•&nbsp;&nbsp;{preset.title}</div>}
           {preset.body && preset.body.trim() && (
             <SafeRichHtml className="ml-4 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
           )}
@@ -361,7 +362,7 @@ function BlockPreview({
     case 'INSTALLATION_ITEM':
       return wrap(
         <div className="mt-3 px-1">
-          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>
+          {!hideTitle && <div className="text-[10pt] font-bold" style={{ color: NAVY }}>{preset.title}</div>}
           {preset.body && preset.body.trim() && (
             <SafeRichHtml className="ml-3 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
           )}
