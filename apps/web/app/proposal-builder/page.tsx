@@ -620,19 +620,6 @@ export default function QuoteBuilderPage() {
     setTimeout(() => setSuccessMsg(null), 2000);
   };
 
-  // ── Autosave ──────────────────────────────────────────────────
-  // Silently persist changes 1.5 s after the last edit to an existing block.
-  // This also covers the case where the user edits then immediately clicks
-  // another block — the handleSave closure captures the pre-switch state, so
-  // the API call carries the right body/title even after the editor resets.
-  useEffect(() => {
-    if (!isDirty || !selectedPresetId) return;
-    const timer = window.setTimeout(() => {
-      void handleSave({ silent: true });
-    }, 1500);
-    return () => window.clearTimeout(timer);
-  }, [isDirty, selectedPresetId, handleSave]);
-
   // ── Drag reorder ──────────────────────────────────────────────
 
   const handleReorder = (reordered: SpecPresetData[]) => {
@@ -990,6 +977,19 @@ export default function QuoteBuilderPage() {
     variants: editVariants,
   };
   const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
+
+  // ── Autosave ─────────────────────────────────────────────────────────────────
+  // Silently persist changes 1.5 s after the last edit to an existing block.
+  // This also covers the case where the user edits then immediately clicks
+  // another block — the handleSave closure captures the pre-switch state, so
+  // the API call carries the right body/title even after the editor resets.
+  useEffect(() => {
+    if (!isDirty || !selectedPresetId) return;
+    const timer = window.setTimeout(() => {
+      void handleSave({ silent: true });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [isDirty, selectedPresetId, handleSave]);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-100">
