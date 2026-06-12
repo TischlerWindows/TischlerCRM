@@ -496,6 +496,8 @@ export default function QuoteBuilderPage() {
   };
 
   const handleSelectBlock = (id: string) => {
+    // Flush any unsaved changes before switching to another block.
+    if (isDirty && selectedPresetId) void handleSave({ silent: true });
     const preset = presets.find((p) => p.id === id);
     if (preset) loadPresetIntoEditor(preset);
   };
@@ -617,6 +619,19 @@ export default function QuoteBuilderPage() {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(null), 2000);
   };
+
+  // ── Autosave ──────────────────────────────────────────────────
+  // Silently persist changes 1.5 s after the last edit to an existing block.
+  // This also covers the case where the user edits then immediately clicks
+  // another block — the handleSave closure captures the pre-switch state, so
+  // the API call carries the right body/title even after the editor resets.
+  useEffect(() => {
+    if (!isDirty || !selectedPresetId) return;
+    const timer = window.setTimeout(() => {
+      void handleSave({ silent: true });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [isDirty, selectedPresetId, handleSave]);
 
   // ── Drag reorder ──────────────────────────────────────────────
 
@@ -1037,7 +1052,11 @@ export default function QuoteBuilderPage() {
                 <BlockList
                   presets={presets}
                   selectedPresetId={selectedPresetId}
-                  onSelect={loadPresetIntoEditor}
+                  onSelect={(preset) => {
+                    // Flush any unsaved changes before switching to another block.
+                    if (isDirty && selectedPresetId) void handleSave({ silent: true });
+                    loadPresetIntoEditor(preset);
+                  }}
                   onNew={handleNewPreset}
                   onDuplicate={handleDuplicatePreset}
                   onReorder={handleReorder}
