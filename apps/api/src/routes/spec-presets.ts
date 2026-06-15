@@ -246,6 +246,7 @@ export async function specPresetRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const parsed = updatePresetSchema.safeParse(req.body);
     if (!parsed.success) {
+      app.log.warn({ detail: parsed.error.format(), body: req.body }, 'PATCH /spec-presets/:id validation failed');
       return reply.code(400).send({ error: 'Invalid request', detail: parsed.error.format() });
     }
 
