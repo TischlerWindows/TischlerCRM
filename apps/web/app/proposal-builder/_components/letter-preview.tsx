@@ -348,12 +348,23 @@ function BlockPreview({
     case 'SPECIFICATION_ITEM':
       return wrap(
         <div className="mt-3 p-1">
-          <div className="text-[10pt] font-bold" style={{ color: NAVY }}>
-            <span className="inline-block w-7">({specNumber ?? 1})</span>
-            {!hideTitle && <span>{preset.title}</span>}
-          </div>
-          {preset.body && (
-            <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+          {hideTitle ? (
+            <div className="flex text-[10pt] leading-[1.55]">
+              <span className="inline-block w-7 font-bold shrink-0" style={{ color: NAVY }}>({specNumber ?? 1})</span>
+              {preset.body && (
+                <SafeRichHtml className="text-[10pt] leading-[1.55]" html={preset.body} />
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="text-[10pt] font-bold" style={{ color: NAVY }}>
+                <span className="inline-block w-7">({specNumber ?? 1})</span>
+                <span>{preset.title}</span>
+              </div>
+              {preset.body && (
+                <SafeRichHtml className="ml-7 mt-0.5 text-[10pt] leading-[1.55]" html={preset.body} />
+              )}
+            </>
           )}
         </div>,
       );
