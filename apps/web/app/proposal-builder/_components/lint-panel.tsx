@@ -47,14 +47,24 @@ function deriveIssues(presets: SpecPresetData[], result: ProposalAssemblyResult 
           message: `Variant block has no active variants — nothing will render.`,
         });
       }
-    } else if (!p.body || !p.body.trim()) {
-      issues.push({
-        id: `empty-body:${p.id}`,
-        severity: 'warning',
-        presetId: p.id,
-        presetTitle: p.title,
-        message: `Body is empty — block will render a blank paragraph.`,
-      });
+    } else {
+      // Only warn about empty body for content blocks that are authored via
+      // rich text. Layout/data blocks (CLOSING_SIGNATURE, PRICING_TABLE, etc.)
+      // render entirely from config and legitimately have no body.
+      const BODY_REQUIRED_TYPES = new Set([
+        'FREE_TEXT', 'TITLE_BLOCK',
+        'SPECIFICATION_ITEM', 'OPTION_ITEM', 'EXCLUSION_ITEM', 'INSTALLATION_ITEM',
+      ]);
+      const needsBody = !p.blockType || BODY_REQUIRED_TYPES.has(p.blockType);
+      if (needsBody && (!p.body || !p.body.trim())) {
+        issues.push({
+          id: `empty-body:${p.id}`,
+          severity: 'warning',
+          presetId: p.id,
+          presetTitle: p.title,
+          message: `Body is empty — block will render a blank paragraph.`,
+        });
+      }
     }
   }
 
