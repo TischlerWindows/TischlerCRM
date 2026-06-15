@@ -414,7 +414,7 @@ function drawTitleBlock(
   }
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: hideTitle ? 0 : 0.2 });
+    drawRichBody(doc, preset.body, ctx, { topGap: hideTitle ? 0 : 0.2, align: 'center' });
   }
 }
 
@@ -734,7 +734,8 @@ function drawFooter(
 
 interface RichOpts {
   topGap?: number; // doc.moveDown(...) before drawing
-  indent?: number; // left indent in pt
+  indent?: number;  // left indent in pt
+  align?: 'left' | 'center' | 'right'; // text alignment (default: left)
 }
 
 function drawRichBody(
@@ -748,13 +749,19 @@ function drawRichBody(
   const blocks = htmlToBlocks(html);
 
   for (const block of blocks) {
-    drawBlock(doc, block, ctx, indent);
+    drawBlock(doc, block, ctx, indent, opts.align);
   }
 }
 
-function drawBlock(doc: PDFKit.PDFDocument, block: Block, ctx: BrandContext, indent: number): void {
+function drawBlock(
+  doc: PDFKit.PDFDocument,
+  block: Block,
+  ctx: BrandContext,
+  indent: number,
+  align?: 'left' | 'center' | 'right',
+): void {
   if (block.kind === 'paragraph') {
-    drawStyledRuns(doc, block.runs, ctx, { indent, lineGap: 1 });
+    drawStyledRuns(doc, block.runs, ctx, { indent, lineGap: 1, align });
     return;
   }
 
@@ -780,22 +787,28 @@ function drawStyledRuns(
   doc: PDFKit.PDFDocument,
   runs: StyledRun[],
   ctx: BrandContext,
-  opts: { indent: number; lineGap: number },
+  opts: { indent: number; lineGap: number; align?: 'left' | 'center' | 'right' },
 ): void {
   if (runs.length === 0) {
     doc.text(' ', { indent: opts.indent });
     return;
   }
-  const startX = PAGE_MARGIN + opts.indent;
+  const textWidth = doc.page.width - 2 * PAGE_MARGIN - opts.indent;
   runs.forEach((run, i) => {
     const isLast = i === runs.length - 1;
     doc.font(fontFor(run, ctx.fonts));
     if (run.fontSize) doc.fontSize(run.fontSize);
-    doc.text(run.text, { continued: !isLast, indent: i === 0 ? opts.indent : 0 });
+    // Normalize non-breaking spaces to regular spaces. \u00A0 is emitted by
+    // html-to-runs for &nbsp; and multi-space runs. Some brand fonts lack a
+    // glyph for U+00A0, which makes PDFKit render a visible box/X character.
+    // Regular ASCII spaces are universally present in every font.
+    const text = run.text.replace(/\u00A0/g, ' ');
+    doc.text(text, {
+      continued: !isLast,
+      indent: i === 0 ? opts.indent : 0,
+      ...(opts.align ? { align: opts.align, width: textWidth } : {}),
+    });
     if (run.fontSize) doc.fontSize(BODY_FONT_SIZE); // restore default after run
-    // Subsequent runs continue from where the last one stopped; no need to
-    // explicitly set x. PDFKit handles the wrap.
-    void startX; // referenced for clarity, intentionally unused
   });
 }
 
