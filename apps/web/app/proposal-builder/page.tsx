@@ -102,6 +102,11 @@ export default function QuoteBuilderPage() {
   const [isNewPreset, setIsNewPreset] = useState(false);
   const [editorBaseline, setEditorBaseline] = useState<EditorSnapshot | null>(null);
 
+  // Pending edits: changes made to blocks that haven't been saved to the API yet.
+  // Keyed by preset ID. Populated when switching away from a dirty block.
+  // Flushed when the Save button is clicked.
+  const [pendingEdits, setPendingEdits] = useState<Record<string, EditorSnapshot>>({});
+
   // UI state
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -324,7 +329,7 @@ export default function QuoteBuilderPage() {
         conditions: editConditions,
         variants: editVariants,
       };
-      if (snapshotsEqual(baseline, current)) return;
+      if (snapshotsEqual(baseline, current) && Object.keys(pendingEdits).length === 0) return;
       e.preventDefault();
       e.returnValue = '';
     };
@@ -342,6 +347,7 @@ export default function QuoteBuilderPage() {
     editDriverField,
     editConditions,
     editVariants,
+    pendingEdits,
   ]);
 
   // ── Editor helpers ────────────────────────────────────────────
@@ -360,9 +366,45 @@ export default function QuoteBuilderPage() {
     setEditConditions([]);
     setEditVariants([]);
     setEditorBaseline(null);
+    setPendingEdits({});
   };
 
   const loadPresetIntoEditor = (preset: SpecPresetData) => {
+    // If we have stashed local edits for this preset, restore them instead of
+    // loading from the DB — the user's unsaved work should come back.
+    const pending = pendingEdits[preset.id];
+    if (pending) {
+      setSelectedPresetId(preset.id);
+      setIsNewPreset(false);
+      setEditTitle(pending.title);
+      setEditBody(pending.body);
+      setEditSection(pending.section);
+      setEditBlockType(pending.blockType);
+      setEditConfig(pending.config);
+      setEditAlwaysIncluded(pending.alwaysIncluded);
+      setEditActive(pending.active);
+      setEditDriverField(pending.driverField);
+      setEditConditions(pending.conditions);
+      setEditVariants(pending.variants);
+      // Baseline = DB state so isDirty stays true (pending differs from DB)
+      const blockType = (preset.blockType as BlockType | null) ?? null;
+      const config = (preset.config && typeof preset.config === 'object'
+        ? (preset.config as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+      setEditorBaseline({
+        title: preset.title,
+        body: preset.body ?? '',
+        section: preset.section,
+        blockType,
+        config,
+        alwaysIncluded: preset.isAlwaysIncluded,
+        active: preset.isActive,
+        driverField: preset.driverField || '',
+        conditions: preset.conditions.map(conditionToDraft),
+        variants: (preset.variants || []).map(variantToDraft),
+      });
+      return;
+    }
     const conditions = preset.conditions.map(conditionToDraft);
     const variants = (preset.variants || []).map(variantToDraft);
     const blockType = (preset.blockType as BlockType | null) ?? null;
@@ -496,8 +538,15 @@ export default function QuoteBuilderPage() {
   };
 
   const handleSelectBlock = (id: string) => {
-    // Flush any unsaved changes before switching to another block.
-    if (isDirty && selectedPresetId) void handleSave({ silent: true, switchAway: true });
+    // Stash dirty changes locally instead of saving to the API.
+    // New presets have no ID yet — they still need a real save before we can stash.
+    if (isDirty && selectedPresetId && !isNewPreset) {
+      setPendingEdits((prev) => ({ ...prev, [selectedPresetId]: currentSnapshot }));
+    }
+    // New unsaved blocks: save them so they get an ID before we navigate away.
+    if (isDirty && isNewPreset) {
+      void handleSave({ silent: true, switchAway: true });
+    }
     const preset = presets.find((p) => p.id === id);
     if (preset) loadPresetIntoEditor(preset);
   };
@@ -512,56 +561,58 @@ export default function QuoteBuilderPage() {
 
   const handleSave = useCallback(
     async (opts: { silent?: boolean; switchAway?: boolean } = {}) => {
-      if (!selectedTemplateId || !editTitle.trim()) return;
+      if (!selectedTemplateId) return;
       const silent = opts.silent === true;
-      const switchAway = opts.switchAway === true;
-      if (!silent) {
-        setSaving(true);
-      }
+      if (!silent) setSaving(true);
       setError(null);
 
-      const conds = conditionsPayload(editConditions);
-      const condError = validateConditions(conds);
-      if (condError) {
-        if (!silent) {
-          setSaving(false);
-          setError(condError);
-        }
-        return;
-      }
-
-      const isVariantMode = !!editDriverField;
-      const vars = isVariantMode ? variantsPayload(editVariants) : [];
-
-      const payload: Record<string, unknown> = {
-        title: editTitle.trim(),
-        body: isVariantMode ? null : editBody,
-        section: editSection,
-        blockType: editBlockType,
-        config: editConfig,
-        isAlwaysIncluded: editAlwaysIncluded,
-        isActive: editActive,
-        driverField: editDriverField || null,
-        conditions: conds,
-        variants: vars,
+      // Helper: build the API payload from an editor snapshot.
+      const buildPayload = (snap: EditorSnapshot): Record<string, unknown> => {
+        const isVariantMode = !!snap.driverField;
+        const conds = conditionsPayload(snap.conditions);
+        const vars = isVariantMode ? variantsPayload(snap.variants) : [];
+        return {
+          title: snap.title.trim(),
+          body: isVariantMode ? null : snap.body,
+          section: snap.section,
+          blockType: snap.blockType,
+          config: snap.config,
+          isAlwaysIncluded: snap.alwaysIncluded,
+          isActive: snap.active,
+          driverField: snap.driverField || null,
+          conditions: conds,
+          variants: vars,
+        };
       };
 
       try {
-        if (isNewPreset) {
-          // Compute a document order that inserts the new block after all
-          // existing presets in the same section (so CONSTANTs stay together
-          // ahead of SPECIFICATION items, etc.).
+        // ── Save the currently-active block ──────────────────────
+        if (isNewPreset && editTitle.trim()) {
+          const conds = conditionsPayload(editConditions);
+          const condError = validateConditions(conds);
+          if (condError) {
+            if (!silent) { setSaving(false); setError(condError); }
+            return;
+          }
           const sectionPresets = presets.filter((p) => p.section === editSection);
           const insertOrder = sectionPresets.length > 0
             ? Math.max(...sectionPresets.map((p) => p.order)) + 1
             : presets.length;
+          const isVariantMode = !!editDriverField;
           const created = await apiClient.post<SpecPresetData>('/spec-presets', {
-            ...payload,
+            title: editTitle.trim(),
+            body: isVariantMode ? null : editBody,
+            section: editSection,
+            blockType: editBlockType,
+            config: editConfig,
+            isAlwaysIncluded: editAlwaysIncluded,
+            isActive: editActive,
+            driverField: editDriverField || null,
+            conditions: conds,
+            variants: isVariantMode ? variantsPayload(editVariants) : [],
             templateId: selectedTemplateId,
             order: insertOrder,
           });
-          // Reassign compact sequential orders: blocks before insertOrder keep
-          // their order, new block gets insertOrder, blocks at insertOrder+ are bumped.
           const reordered = [
             ...presets.filter((p) => p.order < insertOrder),
             { ...created, order: insertOrder },
@@ -570,41 +621,49 @@ export default function QuoteBuilderPage() {
           await apiClient.patch('/spec-presets/reorder', reordered);
           setIsNewPreset(false);
           setSelectedPresetId(created.id);
-          await loadPresets(selectedTemplateId);
-          if (!silent) flash('Block created');
-        } else if (selectedPresetId) {
-          await apiClient.patch<SpecPresetData>(`/spec-presets/${selectedPresetId}`, payload);
-          await loadPresets(selectedTemplateId);
-          if (!silent) flash('Block saved');
-        }
-        // Don't update the baseline when saving before switching to another block —
-        // loadPresetIntoEditor has already set the baseline for the new block.
-        if (!switchAway) {
-          setEditorBaseline({
-            title: editTitle.trim(),
-            body: isVariantMode ? '' : editBody,
-            section: editSection,
-            blockType: editBlockType,
-            config: editConfig,
-            alwaysIncluded: editAlwaysIncluded,
-            active: editActive,
-            driverField: editDriverField || '',
-            conditions: editConditions,
-            variants: editVariants,
-          });
+        } else if (selectedPresetId && isDirty) {
+          const conds = conditionsPayload(editConditions);
+          const condError = validateConditions(conds);
+          if (condError) {
+            if (!silent) { setSaving(false); setError(condError); }
+            return;
+          }
+          await apiClient.patch<SpecPresetData>(`/spec-presets/${selectedPresetId}`, buildPayload(currentSnapshot));
         }
 
-      } catch (err: any) {
-        if (!silent) {
-          setError(err.message || 'Failed to save');
+        // ── Flush all pending (stashed) edits ────────────────────
+        const pendingEntries = Object.entries(pendingEdits);
+        for (const [presetId, snap] of pendingEntries) {
+          const condError = validateConditions(conditionsPayload(snap.conditions));
+          if (condError) continue; // skip invalid; leave in pending
+          await apiClient.patch<SpecPresetData>(`/spec-presets/${presetId}`, buildPayload(snap));
         }
+        // Clear pending edits that were successfully flushed
+        if (pendingEntries.length > 0) setPendingEdits({});
+
+        await loadPresets(selectedTemplateId);
+
+        // Update baseline for the active block
+        setEditorBaseline({
+          title: editTitle.trim(),
+          body: !!editDriverField ? '' : editBody,
+          section: editSection,
+          blockType: editBlockType,
+          config: editConfig,
+          alwaysIncluded: editAlwaysIncluded,
+          active: editActive,
+          driverField: editDriverField || '',
+          conditions: editConditions,
+          variants: editVariants,
+        });
+
+        if (!silent) flash('Saved');
+      } catch (err: any) {
+        if (!silent) setError(err.message || 'Failed to save');
       } finally {
         if (!silent) setSaving(false);
       }
     },
-    // The function reads a lot of editor state; React's exhaustive-deps lint will
-    // flag any miss. We intentionally re-create on each editor change so the
-    // autosave effect always closes over fresh values.
     [
       selectedTemplateId,
       editTitle,
@@ -612,12 +671,17 @@ export default function QuoteBuilderPage() {
       editSection,
       editAlwaysIncluded,
       editActive,
+      editBlockType,
+      editConfig,
       editDriverField,
       editConditions,
       editVariants,
       isNewPreset,
       selectedPresetId,
-      presets.length,
+      isDirty,
+      pendingEdits,
+      currentSnapshot,
+      presets,
       loadPresets,
     ],
   );
@@ -863,33 +927,28 @@ export default function QuoteBuilderPage() {
   // reflects in-progress edits without requiring a Save.
   const previewPresets = useMemo<SpecPresetData[]>(() => {
     if (!selectedTemplateId) return presets;
-    const draftFromEditor = (
-      idForDraft: string,
-      templateId: string,
-      order: number,
-    ): SpecPresetData => ({
-      id: idForDraft,
-      templateId,
-      order,
-      title: editTitle,
-      body: editDriverField ? null : editBody,
-      section: editSection,
-      blockType: editBlockType,
-      config: editConfig,
-      isAlwaysIncluded: editAlwaysIncluded,
-      driverField: editDriverField || null,
-      isActive: editActive,
-      conditions: editConditions.map((c, i) => ({
-        id: `__draft_cond_${i}`,
+
+    const snapToPreset = (p: SpecPresetData, snap: EditorSnapshot): SpecPresetData => ({
+      ...p,
+      title: snap.title,
+      body: snap.driverField ? null : snap.body,
+      section: snap.section,
+      blockType: snap.blockType,
+      config: snap.config,
+      isAlwaysIncluded: snap.alwaysIncluded,
+      driverField: snap.driverField || null,
+      isActive: snap.active,
+      conditions: snap.conditions.map((c, i) => ({
+        id: `__draft_cond_${p.id}_${i}`,
         field: c.field,
         operator: c.operator,
         value: c.value || null,
         logic: c.logic,
       })),
-      variants: editDriverField
-        ? editVariants.map((v, i) => ({
-            id: `__draft_variant_${i}`,
-            presetId: idForDraft,
+      variants: snap.driverField
+        ? snap.variants.map((v, i) => ({
+            id: `__draft_variant_${p.id}_${i}`,
+            presetId: p.id,
             matchValue: v.matchValue,
             matchLabel: v.matchLabel || null,
             body: v.body,
@@ -899,30 +958,51 @@ export default function QuoteBuilderPage() {
         : [],
     });
 
-    if (selectedPresetId) {
-      return presets.map((p) =>
-        p.id === selectedPresetId ? draftFromEditor(p.id, p.templateId, p.order) : p,
-      );
-    }
+    // Apply pending edits + active editor state on top of the DB presets
+    let result = presets.map((p) => {
+      if (p.id === selectedPresetId) {
+        return snapToPreset(p, currentSnapshot);
+      }
+      const pending = pendingEdits[p.id];
+      if (pending) return snapToPreset(p, pending);
+      return p;
+    });
+
     if (isNewPreset && editTitle.trim()) {
-      return [...presets, draftFromEditor('__draft__', selectedTemplateId, presets.length)];
+      result = [...result, snapToPreset(
+        {
+          id: '__draft__',
+          templateId: selectedTemplateId,
+          order: presets.length,
+          title: '',
+          body: null,
+          section: editSection,
+          blockType: editBlockType,
+          config: editConfig,
+          isAlwaysIncluded: editAlwaysIncluded,
+          driverField: editDriverField || null,
+          isActive: editActive,
+          conditions: [],
+          variants: [],
+        },
+        currentSnapshot,
+      )];
     }
-    return presets;
+    return result;
   }, [
     presets,
     selectedPresetId,
     isNewPreset,
     selectedTemplateId,
+    pendingEdits,
+    currentSnapshot,
     editTitle,
-    editBody,
     editSection,
     editAlwaysIncluded,
     editActive,
     editBlockType,
     editConfig,
     editDriverField,
-    editConditions,
-    editVariants,
   ]);
 
   const previewState = useMemo(() => {
@@ -973,7 +1053,7 @@ export default function QuoteBuilderPage() {
     return null;
   }, [selectedPresetId, previewState.result]);
 
-  // ── Dirty tracking + autosave ────────────────────────────────
+  // ── Dirty tracking ────────────────────────────────────────────
   // These must live before any conditional early return so hooks are always
   // called in the same order on every render (React rules of hooks).
 
@@ -990,15 +1070,8 @@ export default function QuoteBuilderPage() {
     variants: editVariants,
   };
   const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
-
-  // Silently persist changes 1.5 s after the last edit to an existing block.
-  useEffect(() => {
-    if (!isDirty || !selectedPresetId) return;
-    const timer = window.setTimeout(() => {
-      void handleSave({ silent: true });
-    }, 1500);
-    return () => window.clearTimeout(timer);
-  }, [isDirty, selectedPresetId, handleSave]);
+  // Any unsaved changes — either current block or stashed blocks.
+  const hasAnyUnsavedChanges = isDirty || Object.keys(pendingEdits).length > 0;
 
   // ── Render ────────────────────────────────────────────────────
 
@@ -1010,7 +1083,7 @@ export default function QuoteBuilderPage() {
     );
   }
 
-  const canSave = !!(editTitle.trim() && (selectedPresetId || isNewPreset));
+  const canSave = !!(hasAnyUnsavedChanges || isNewPreset);
 
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-gray-100">
@@ -1026,7 +1099,7 @@ export default function QuoteBuilderPage() {
         onSave={() => void handleSave()}
         saving={saving}
         canSave={canSave}
-        isDirty={isDirty}
+        isDirty={hasAnyUnsavedChanges}
         mode={mode}
         onChangeMode={setMode}
         previewMode={previewMode}
