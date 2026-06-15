@@ -319,7 +319,7 @@ export function BlockList({
                           aria-current={isSelected ? 'true' : undefined}
                           onDragStart={() => onDragStart(idx)}
                           onDragOver={(e) => handleDragOver(e, idx)}
-                          onDragEnd={onReorderEnd}
+                          onDragEnd={() => onReorderEnd()}
                           onClick={() => onSelect(preset)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
