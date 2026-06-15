@@ -139,6 +139,25 @@ export default function QuoteBuilderPage() {
   const [lastPdfRenderedAt, setLastPdfRenderedAt] = useState<number | null>(null);
   const [pdfRefreshKey, setPdfRefreshKey] = useState(0);
 
+  // ── Dirty tracking ────────────────────────────────────────────
+  // Defined early (before callbacks) so that useCallback dependency arrays
+  // that reference currentSnapshot/isDirty don't hit a TDZ at runtime.
+  const currentSnapshot: EditorSnapshot = {
+    title: editTitle,
+    body: editBody,
+    section: editSection,
+    blockType: editBlockType,
+    config: editConfig,
+    alwaysIncluded: editAlwaysIncluded,
+    active: editActive,
+    driverField: editDriverField,
+    conditions: editConditions,
+    variants: editVariants,
+  };
+  const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
+  // Any unsaved changes — either current block or stashed blocks.
+  const hasAnyUnsavedChanges = isDirty || Object.keys(pendingEdits).length > 0;
+
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
 
   // Resizable side panels (shared with page-editor pattern)
@@ -1052,26 +1071,6 @@ export default function QuoteBuilderPage() {
     if (excluded) return { included: false, reason: excluded.reason };
     return null;
   }, [selectedPresetId, previewState.result]);
-
-  // ── Dirty tracking ────────────────────────────────────────────
-  // These must live before any conditional early return so hooks are always
-  // called in the same order on every render (React rules of hooks).
-
-  const currentSnapshot: EditorSnapshot = {
-    title: editTitle,
-    body: editBody,
-    section: editSection,
-    blockType: editBlockType,
-    config: editConfig,
-    alwaysIncluded: editAlwaysIncluded,
-    active: editActive,
-    driverField: editDriverField,
-    conditions: editConditions,
-    variants: editVariants,
-  };
-  const isDirty = editorBaseline !== null && !snapshotsEqual(editorBaseline, currentSnapshot);
-  // Any unsaved changes — either current block or stashed blocks.
-  const hasAnyUnsavedChanges = isDirty || Object.keys(pendingEdits).length > 0;
 
   // ── Render ────────────────────────────────────────────────────
 
