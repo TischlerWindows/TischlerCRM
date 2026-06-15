@@ -647,11 +647,12 @@ export default function QuoteBuilderPage() {
     setDragIdx(reordered.findIndex((p) => p.id === presets[dragIdx!]?.id));
   };
 
-  const handleReorderEnd = async () => {
+  const handleReorderEnd = async (reorderedPresets?: SpecPresetData[]) => {
     setDragIdx(null);
     if (!selectedTemplateId) return;
+    const list = reorderedPresets ?? presets;
     try {
-      await apiClient.patch('/spec-presets/reorder', presets.map((p) => ({ id: p.id, order: p.order })));
+      await apiClient.patch('/spec-presets/reorder', list.map((p) => ({ id: p.id, order: p.order })));
     } catch (err: any) {
       setError(err.message || 'Failed to reorder');
       await loadPresets(selectedTemplateId);

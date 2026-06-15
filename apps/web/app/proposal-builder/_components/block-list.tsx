@@ -50,7 +50,7 @@ interface Props {
   onNew: (blockType: BlockType | null) => void;
   onDuplicate?: (preset: SpecPresetData) => void;
   onReorder: (presets: SpecPresetData[]) => void;
-  onReorderEnd: () => void;
+  onReorderEnd: (reordered?: SpecPresetData[]) => void;
   /** Seed the template with the standard layout (letterhead, pricing, etc.). */
   onSeedDefaults?: () => void;
   dragIdx: number | null;
@@ -153,8 +153,9 @@ export function BlockList({
   const handleMove = (idx: number, dir: -1 | 1) => {
     const target = idx + dir;
     if (target < 0 || target >= presets.length) return;
-    onReorder(reorderAt(presets, idx, target));
-    onReorderEnd();
+    const reordered = reorderAt(presets, idx, target);
+    onReorder(reordered);
+    onReorderEnd(reordered);
   };
 
   return (
