@@ -217,17 +217,17 @@ export function assembleProposal({
       continue;
     }
 
-    if (preset.driverField && preset.variants?.length) {
-      const matched = matchVariants(preset, context);
-      if (matched.length === 0) {
-        excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}".` });
-        continue;
-      }
-
+    if (preset.driverField) {
       const configObj = (preset.config as Record<string, unknown> | null) ?? {};
       const mergeVariants = !!configObj.mergeVariants;
       const universalBodyRaw = typeof configObj.universalBody === 'string' ? configObj.universalBody.trim() : '';
       const universalBodyPosition = configObj.universalBodyPosition === 'before' ? 'before' : 'after';
+
+      const matched = preset.variants?.length ? matchVariants(preset, context) : [];
+      if (matched.length === 0 && !universalBodyRaw) {
+        excludedBlocks.push({ ...block, reason: `No variant matched for driver "${preset.driverField}" and no universal text.` });
+        continue;
+      }
 
       // Resolve universal body once (shared across all variants).
       const resolvedUniversal = universalBodyRaw
@@ -249,7 +249,13 @@ export function assembleProposal({
           : `${variantBody}<br/><br/>${universalText}`;
       };
 
-      if (mergeVariants && matched.length > 1) {
+      // No variants matched — render universal text alone.
+      if (matched.length === 0 && universalText) {
+        const resolvedPreset = { ...preset, body: universalText };
+        sections[sectionOf(preset)].push(resolvedPreset);
+        orderedBlocks.push({ presetId: preset.id, preset: resolvedPreset });
+        includedBlocks.push({ ...block, reason: 'No variant matched; universal text rendered.' });
+      } else if (mergeVariants && matched.length > 1) {
         // Merge all matched variant bodies into one block, then attach universal text.
         const mergedBody = matched
           .map((v) => resolveTokensWithDiagnostics(v.body, tokens).text)

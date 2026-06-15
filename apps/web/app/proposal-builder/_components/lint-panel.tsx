@@ -35,7 +35,10 @@ function deriveIssues(presets: SpecPresetData[], result: ProposalAssemblyResult 
     if (p.driverField) {
       const variants = p.variants ?? [];
       const activeVariants = variants.filter((v) => v.isActive !== false);
-      if (activeVariants.length === 0) {
+      const universalBody = typeof (p.config as Record<string, unknown> | null)?.universalBody === 'string'
+        ? ((p.config as Record<string, unknown>).universalBody as string).trim()
+        : '';
+      if (activeVariants.length === 0 && !universalBody) {
         issues.push({
           id: `no-variants:${p.id}`,
           severity: 'error',
