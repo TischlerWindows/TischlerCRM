@@ -36,6 +36,51 @@ const DRIVER_FIELD_SCHEMA_MAP: Record<string, string> = {
 const DRIVER_FIELD_STATIC_OPTIONS: Record<string, string[]> = {
   jobType: ['Premium', 'Coastal', 'Dade County'],
   spacerBarColors: ['Standard White, Silver, Brown, Black', 'Premium C31, C32, C33, C34'],
+  productTypes: [
+    // Hung windows
+    'Single Hung Concealed Balance',
+    'Single Hung Weight and Chain',
+    'Single Hung Cross Cable Balance System',
+    'Double Hung Concealed Balance',
+    'Double Hung Weight and Chain',
+    'Double Hung Cross Cable Balance System',
+    'Triple Hung Concealed Balance',
+    'Triple Hung Weight and Chain',
+    'Triple Hung Cross Cable Balance System',
+    // Outswing
+    'Push Outswing',
+    'Crank Outswing',
+    'Outswing French',
+    'Outswing GD',
+    'Outswing French GD',
+    // Inswing
+    'Inswing',
+    'Inswing T & T',
+    'Inswing French',
+    'Inswing T & T French',
+    'Inswing GD',
+    'Inswing French GD',
+    // Lift & Roll / Folding / Pivot
+    'L&R D',
+    'Lift and Roll Window',
+    'Inswing Folding Window',
+    'Outswing Folding Window',
+    'Outswing Folding',
+    'Inswing Folding',
+    'Pivot',
+    'Outswing Pivot',
+    'Convert Pivot to Inswing',
+    // Simulated DH
+    'Offset Simulated DH (2 Glass Fields)',
+    'Simulated DH (1 glass Field and a 44MM)',
+    'French Offset Simulated DH (2 Glass Fields)',
+    'French Simulated DH (1 glass Field and a 44MM)',
+    // Other
+    'Direct Glaze',
+    'Fixed with Sash',
+    'Tilt-in',
+    'Awning',
+  ],
 };
 
 interface Props {
