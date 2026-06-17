@@ -893,6 +893,16 @@ export default function QuoteBuilderPage() {
     await loadTokenMappings(selectedTemplateId);
   };
 
+  const handleDeleteToken = async (id: string, tokenName: string) => {
+    if (!confirm(`Delete variable {{${tokenName}}}? This cannot be undone.`)) return;
+    try {
+      await apiClient.delete(`/token-mappings/${id}`);
+      if (selectedTemplateId) await loadTokenMappings(selectedTemplateId);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to delete token');
+    }
+  };
+
   // ── Driver field change handler ───────────────────────────────
 
   const handleDriverFieldChange = (value: string) => {
@@ -1184,6 +1194,7 @@ export default function QuoteBuilderPage() {
                   grouped={tokenGrouped}
                   onInsert={handleInsertToken}
                   onNewToken={() => setShowNewTokenModal(true)}
+                  onDeleteToken={handleDeleteToken}
                 />
               </div>
             </>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 interface TokenMapping {
@@ -37,6 +37,7 @@ interface Props {
   grouped: Record<string, TokenMapping[]>;
   onInsert: (tokenName: string) => void;
   onNewToken: () => void;
+  onDeleteToken?: (id: string, tokenName: string) => void;
 }
 
 function matchesQuery(m: TokenMapping, q: string): boolean {
@@ -49,7 +50,7 @@ function matchesQuery(m: TokenMapping, q: string): boolean {
   );
 }
 
-export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props) {
+export function VariableChips({ mappings, grouped, onInsert, onNewToken, onDeleteToken }: Props) {
   const [query, setQuery] = useState('');
 
   const filteredGrouped = useMemo(() => {
@@ -139,16 +140,31 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken }: Props
                     )}
                     <div className="flex flex-wrap gap-1">
                       {bySubgroup.get(sg)!.map((m) => (
-                        <button
+                        <span
                           key={m.id}
-                          type="button"
-                          onClick={() => onInsert(m.tokenName)}
-                          title={`{{${m.tokenName}}} — ${m.sourceObject}.${m.label}`}
-                          aria-label={`Insert ${m.tokenName} token`}
-                          className="text-[10px] font-mono leading-tight min-h-[24px] inline-flex items-center px-1.5 py-1 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors cursor-pointer"
+                          className="inline-flex items-center text-[10px] font-mono leading-tight min-h-[24px] rounded bg-indigo-50 text-indigo-700 border border-indigo-200"
                         >
-                          {m.tokenName}
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => onInsert(m.tokenName)}
+                            title={`{{${m.tokenName}}} — ${m.sourceObject}.${m.label}`}
+                            aria-label={`Insert ${m.tokenName} token`}
+                            className="px-1.5 py-1 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors cursor-pointer rounded-l"
+                          >
+                            {m.tokenName}
+                          </button>
+                          {!m.isBuiltIn && onDeleteToken && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onDeleteToken(m.id, m.tokenName); }}
+                              title={`Delete {{${m.tokenName}}}`}
+                              aria-label={`Delete ${m.tokenName} token`}
+                              className="px-1 py-1 text-indigo-400 hover:text-red-500 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 transition-colors cursor-pointer rounded-r border-l border-indigo-200"
+                            >
+                              <X className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </span>
                       ))}
                     </div>
                   </div>
