@@ -5209,7 +5209,8 @@ export default function SummaryPage() {
                                       setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows } } });
                                     };
                                     const fmtInstPrice = (v: string | number) => { const n = typeof v === 'number' ? v : parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
-                                    const instBase = parseFloat(getAo('installation').final) || 0;
+                                    const instAo = getAo('installation');
+                                    const instBase = (parseFloat(instAo.netEuro) || 0) + (parseFloat(instAo.full) || 0) + (parseFloat(instAo.pct) || 0) + (parseFloat(instAo.final) || 0);
                                     const instGrandTotal = instBase + instTotal;
                                     return (
                                       <>
