@@ -5196,22 +5196,21 @@ export default function SummaryPage() {
                                     const addInstRow = () => {
                                       const cur = getAo('installation');
                                       const newRows = [...(cur.installationRows || []), { label: '', price: '' }];
-                                      const newTotal = newRows.reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
-                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : cur.final } } });
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows } } });
                                     };
                                     const removeInstRow = (idx: number) => {
                                       const cur = getAo('installation');
                                       const newRows = (cur.installationRows || []).filter((_: any, i: number) => i !== idx);
-                                      const newTotal = newRows.reduce((s: number, r: any) => s + (parseFloat(r.price) || 0), 0);
-                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : '' } } });
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows } } });
                                     };
                                     const updateInstRow = (idx: number, field: 'label' | 'price', value: string) => {
                                       const cur = getAo('installation');
                                       const newRows = (cur.installationRows || []).map((r: any, i: number) => i === idx ? { ...r, [field]: value } : r);
-                                      const newTotal = newRows.reduce((s: number, r: any) => s + (parseFloat(r.price) || 0), 0);
-                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : '' } } });
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows } } });
                                     };
-                                    const fmtInstPrice = (v: string) => { const n = parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+                                    const fmtInstPrice = (v: string | number) => { const n = typeof v === 'number' ? v : parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
+                                    const instBase = parseFloat(getAo('installation').final) || 0;
+                                    const instGrandTotal = instBase + instTotal;
                                     return (
                                       <>
                                       <tr className="hover:bg-gray-50">
@@ -5229,11 +5228,7 @@ export default function SummaryPage() {
                                         <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
                                         <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'full')}</td>
                                         <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'pct')}</td>
-                                        <td className="px-1 py-1 bg-green-50/30">
-                                          {hasSubRows
-                                            ? <div className="w-full px-2 py-1.5 text-right text-sm text-green-700 font-semibold">{fmtInstPrice(instTotal.toFixed(2))}</div>
-                                            : inp('installation', 'final')}
-                                        </td>
+                                        <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'final')}</td>
                                         <td className="px-1 py-1"></td>
                                         <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('installation', 'full')}</td>
                                         <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
@@ -5270,6 +5265,14 @@ export default function SummaryPage() {
                                           </td>
                                         </tr>
                                       ))}
+                                      {hasSubRows && (
+                                        <tr className="border-t-2 border-gray-300 bg-gray-100/60">
+                                          <td className="sticky left-0 z-10 bg-gray-100/60"></td>
+                                          <td className="pl-7 pr-1 py-1.5 sticky left-[24px] z-10 bg-gray-100/60 shadow-[inset_-1px_0_0_#f3f4f6] font-semibold text-xs text-gray-700" colSpan={6}>Installation Total</td>
+                                          <td className="px-2 py-1.5 text-right text-sm font-bold text-green-700 bg-green-50/60">{fmtInstPrice(instGrandTotal)}</td>
+                                          <td colSpan={6}></td>
+                                        </tr>
+                                      )}
                                       </>
                                     );
                                   })()}
