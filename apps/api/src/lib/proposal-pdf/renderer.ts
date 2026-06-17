@@ -676,6 +676,7 @@ function drawInstallationHeaderBlock(
 ): void {
   const heading = config.heading ?? 'INSTALLATION';
   const costLabel = config.costLabel ?? 'Installation Cost:';
+  const rows: Array<{ label: string; price: string }> = (result.pdfData as any).installationRows || [];
 
   doc
     .fillColor(ctx.navy)
@@ -685,6 +686,20 @@ function drawInstallationHeaderBlock(
 
   doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
   drawKeyValueRow(doc, ctx, costLabel, result.pdfData.installationPrice, { bold: true });
+
+  if (rows.length > 0) {
+    doc.moveDown(0.3);
+    for (const row of rows) {
+      doc
+        .fillColor(ctx.text)
+        .font(ctx.fonts.regular)
+        .fontSize(BODY_FONT_SIZE)
+        .text(`${row.label}: ${row.price}`, { lineGap: 2 });
+    }
+    doc.moveDown(0.3);
+    drawKeyValueRow(doc, ctx, 'Total:', (result.pdfData as any).installationTotalPrice || result.pdfData.installationPrice, { bold: true });
+  }
+
   doc.moveDown(0.3);
   drawHorizontalLine(doc);
 }
@@ -761,7 +776,7 @@ function drawBlock(
   align?: 'left' | 'center' | 'right',
 ): void {
   if (block.kind === 'paragraph') {
-    drawStyledRuns(doc, block.runs, ctx, { indent, lineGap: 1, align });
+    drawStyledRuns(doc, block.runs, ctx, { indent, lineGap: 1, align: block.align ?? align });
     return;
   }
 
@@ -789,8 +804,9 @@ function drawStyledRuns(
   ctx: BrandContext,
   opts: { indent: number; lineGap: number; align?: 'left' | 'center' | 'right' },
 ): void {
-  if (runs.length === 0) {
-    doc.text(' ', { indent: opts.indent });
+  // Empty runs or all-blank text (empty <p> in TipTap) — produce one blank line.
+  if (runs.length === 0 || runs.every((r) => !r.text)) {
+    doc.moveDown(1.0);
     return;
   }
   const textWidth = doc.page.width - 2 * PAGE_MARGIN - opts.indent;
@@ -806,6 +822,9 @@ function drawStyledRuns(
     doc.text(text, {
       continued: !isLast,
       indent: i === 0 ? opts.indent : 0,
+      // Add a small paragraph gap after the final run so consecutive
+      // paragraphs have breathing room (mirrors CSS paragraph margin).
+      ...(isLast ? { paragraphGap: 4 } : {}),
       ...(opts.align ? { align: opts.align, width: textWidth } : {}),
     });
     if (run.fontSize) doc.fontSize(BODY_FONT_SIZE); // restore default after run

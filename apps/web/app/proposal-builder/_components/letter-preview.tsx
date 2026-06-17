@@ -642,6 +642,7 @@ function InstallationHeaderPreview({
 }) {
   const heading = config.heading ?? 'INSTALLATION';
   const costLabel = config.costLabel ?? 'Installation Cost:';
+  const rows: Array<{ label: string; price: string }> = pdfData.installationRows || [];
   return (
     <div className="mt-6">
       <div className="text-[12pt] font-bold" style={{ color: NAVY, fontFamily: FONT_FAMILIES.heading }}>
@@ -651,6 +652,19 @@ function InstallationHeaderPreview({
         <span>{costLabel}</span>
         <span className="font-bold">{pdfData.installationPrice}</span>
       </div>
+      {rows.length > 0 && (
+        <div className="mt-2 text-[10pt] px-1 space-y-1">
+          {rows.map((row, i) => (
+            <div key={i}>
+              {row.label}: {row.price}
+            </div>
+          ))}
+          <div className="flex justify-between pt-1 font-bold">
+            <span>Total:</span>
+            <span>{pdfData.installationTotalPrice}</span>
+          </div>
+        </div>
+      )}
       <div className="mt-3 border-t border-gray-300" />
     </div>
   );

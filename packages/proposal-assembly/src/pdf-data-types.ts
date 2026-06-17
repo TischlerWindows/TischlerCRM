@@ -56,6 +56,8 @@ export interface QuotePDFData {
   magneticContactQty: string;
   finalFinishPrice: string;
   installationPrice: string;
+  installationTotalPrice: string;
+  installationRows: Array<{ label: string; price: string }>;
 
   // Flags
   hasInstallation: boolean;

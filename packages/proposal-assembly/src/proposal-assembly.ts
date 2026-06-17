@@ -150,6 +150,8 @@ function buildPdfData(
     magneticContactQty: tokens.magneticContactQty || '0',
     finalFinishPrice: tokens.finalFinishPrice || '$0.00',
     installationPrice: tokens.installationPrice || '$0.00',
+    installationTotalPrice: tokens.installationTotalPrice || '$0.00',
+    installationRows: (summary.addOns?.installation as any)?.installationRows || [],
 
     hasInstallation: context.hasInstallation,
     hasMagneticContacts: context.hasMagneticContacts,
