@@ -44,7 +44,7 @@ export interface SummaryForPlaceholders {
     jambExtensions: { final: string; [k: string]: unknown };
     magneticContact: { qty: string; final: string; [k: string]: unknown };
     finalFinish: { final: string; [k: string]: unknown };
-    installation: { final: string; [k: string]: unknown };
+    installation: { final: string; installationRows?: Array<{ label: string; price: string }>; [k: string]: unknown };
   };
 }
 
@@ -176,6 +176,16 @@ export function buildTokenMap(
     magneticContactQty: summary.addOns?.magneticContact?.qty || '0',
     finalFinishPrice: formatDollar(summary.addOns?.finalFinish?.final),
     installationPrice: formatDollar(summary.addOns?.installation?.final),
+    installationTotalPrice: (() => {
+      const inst = summary.addOns?.installation;
+      const base = parseFloat((inst?.final || '').replace(/[^0-9.-]/g, '')) || 0;
+      const subTotal = (inst?.installationRows || []).reduce(
+        (s: number, r: { label: string; price: string }) =>
+          s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0),
+        0
+      );
+      return formatDollar(String(base + subTotal));
+    })(),
   };
 
   return tokens;
@@ -301,6 +311,17 @@ export function resolveCustomTokens(args: CustomTokenResolverArgs): Record<strin
     let raw: unknown = undefined;
     switch (m.sourceObject) {
       case 'SUMMARY':
+        if (m.sourcePath === 'installationTotal') {
+          const inst = args.summary.addOns?.installation;
+          const base = parseFloat((inst?.final || '').replace(/[^0-9.-]/g, '')) || 0;
+          const subTotal = (inst?.installationRows || []).reduce(
+            (s: number, r: { label: string; price: string }) =>
+              s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0),
+            0
+          );
+          out[m.tokenName] = applyFormat(String(base + subTotal), m.format);
+          continue;
+        }
         raw = (args.summary as unknown as Record<string, unknown>)[m.sourcePath];
         break;
       case 'CONTACT':

@@ -46,6 +46,7 @@ const STATIC_SOURCE_FIELDS: Record<string, FieldOption[]> = {
     { value: 'contactPrimaryPhone', label: 'Contact Phone' },
     { value: 'accountReceivingQuote', label: 'Company Name' },
     { value: 'accountShippingAddress', label: 'Company Address' },
+    { value: 'installationTotal', label: 'Installation Total (inc. sub-rows)' },
   ],
   CONTACT: [
     { value: 'salutation', label: 'Salutation' },
