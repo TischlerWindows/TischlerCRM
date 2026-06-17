@@ -667,7 +667,7 @@ interface Summary {
     geniusLock: { qty: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
     customRows: Array<{ item: string; qty: string; details: string; netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string }>;
     finalFinish: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
-    installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string };
+    installation: { netEuro: string; full: string; pct: string; final: string; calcFull: string; calcDisc: string; calcFinal: string; installationRows?: Array<{ label: string; price: string }> };
   };
   product: string;
   productTypeOptions: Record<string, string[]>;
@@ -1304,7 +1304,7 @@ export default function SummaryPage() {
         geniusLock: { qty: '', netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
         customRows: [],
         finalFinish: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
-        installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '' },
+        installation: { netEuro: '', full: '', pct: '', final: '', calcFull: '', calcDisc: '', calcFinal: '', installationRows: [] },
       },
       productTypeOptions: {},
       product: opts?.oppFields?.product || '',
@@ -5189,23 +5189,90 @@ export default function SummaryPage() {
                                   </tr>
                                   )}
                                   {/* Installation */}
-                                  {!hiddenAoRows.has('installation') && (
-                                  <tr className="hover:bg-gray-50">
-                                    {aoToggleBtn('installation')}
-                                    <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">Installation</td>
-                                    <td className="px-4 py-2"></td>
-                                    <td className="px-1 py-1" colSpan={2}></td>
-                                    <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'full')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'pct')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{inp('installation', 'final')}</td>
-                                    <td className="px-1 py-1"></td>
-                                    <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('installation', 'full')}</td>
-                                    <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
-                                    <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
-                                    <td className="px-1 py-1 bg-purple-50/30"></td>
-                                  </tr>
-                                  )}
+                                  {!hiddenAoRows.has('installation') && (() => {
+                                    const instRows: Array<{ label: string; price: string }> = (getAo('installation').installationRows || []) as any;
+                                    const instTotal = instRows.reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
+                                    const hasSubRows = instRows.length > 0;
+                                    const addInstRow = () => {
+                                      const cur = getAo('installation');
+                                      const newRows = [...(cur.installationRows || []), { label: '', price: '' }];
+                                      const newTotal = newRows.reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : cur.final } } });
+                                    };
+                                    const removeInstRow = (idx: number) => {
+                                      const cur = getAo('installation');
+                                      const newRows = (cur.installationRows || []).filter((_: any, i: number) => i !== idx);
+                                      const newTotal = newRows.reduce((s: number, r: any) => s + (parseFloat(r.price) || 0), 0);
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : '' } } });
+                                    };
+                                    const updateInstRow = (idx: number, field: 'label' | 'price', value: string) => {
+                                      const cur = getAo('installation');
+                                      const newRows = (cur.installationRows || []).map((r: any, i: number) => i === idx ? { ...r, [field]: value } : r);
+                                      const newTotal = newRows.reduce((s: number, r: any) => s + (parseFloat(r.price) || 0), 0);
+                                      setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows, final: newTotal ? newTotal.toFixed(2) : '' } } });
+                                    };
+                                    const fmtInstPrice = (v: string) => { const n = parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''; };
+                                    return (
+                                      <>
+                                      <tr className="hover:bg-gray-50">
+                                        {aoToggleBtn('installation')}
+                                        <td className="px-3 py-2 font-medium text-gray-900 sticky left-[24px] z-10 bg-white shadow-[inset_-1px_0_0_#f3f4f6] whitespace-nowrap">
+                                          <div className="flex items-center gap-1.5">
+                                            Installation
+                                            <button onClick={addInstRow} className="text-brand-navy hover:text-brand-navy/70" title="Add installation row">
+                                              <Plus className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-2"></td>
+                                        <td className="px-1 py-1" colSpan={2}></td>
+                                        <td className="px-1 py-1">{inp('installation', 'netEuro')}</td>
+                                        <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'full')}</td>
+                                        <td className="px-1 py-1 bg-blue-50/30">{inp('installation', 'pct')}</td>
+                                        <td className="px-1 py-1 bg-green-50/30">
+                                          {hasSubRows
+                                            ? <div className="w-full px-2 py-1.5 text-right text-sm text-green-700 font-semibold">{fmtInstPrice(instTotal.toFixed(2))}</div>
+                                            : inp('installation', 'final')}
+                                        </td>
+                                        <td className="px-1 py-1"></td>
+                                        <td className="px-1 py-1 border-l-4 border-blue-300 bg-blue-50/30">{aoCalcDisplay('installation', 'full')}</td>
+                                        <td className="px-1 py-1 bg-blue-50/30">{aoCalcDisplay('installation', 'disc')}</td>
+                                        <td className="px-1 py-1 bg-green-50/30">{aoCalcDisplay('installation', 'final')}</td>
+                                        <td className="px-1 py-1 bg-purple-50/30"></td>
+                                      </tr>
+                                      {instRows.map((row, idx) => (
+                                        <tr key={idx} className="bg-gray-50/50 hover:bg-gray-100/50">
+                                          <td className="sticky left-0 z-10 bg-gray-50/50"></td>
+                                          <td className="pl-7 pr-1 py-1 sticky left-[24px] z-10 bg-gray-50/50 shadow-[inset_-1px_0_0_#f3f4f6]" colSpan={4}>
+                                            <input
+                                              type="text"
+                                              value={row.label}
+                                              onChange={e => updateInstRow(idx, 'label', e.target.value)}
+                                              placeholder="Label (e.g. Window Installation)"
+                                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                                            />
+                                          </td>
+                                          <td className="px-1 py-1" colSpan={2}></td>
+                                          <td className="px-1 py-1 bg-green-50/50">
+                                            <input
+                                              type="text"
+                                              value={row.price}
+                                              onChange={e => updateInstRow(idx, 'price', e.target.value)}
+                                              placeholder="0.00"
+                                              className="w-full px-2 py-1 text-xs text-right text-green-700 border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
+                                            />
+                                          </td>
+                                          <td className="px-1 py-1" colSpan={5}></td>
+                                          <td className="px-1 py-1 text-center">
+                                            <button onClick={() => removeInstRow(idx)} className="text-gray-400 hover:text-red-500" title="Remove row">
+                                              <Trash2 className="w-3 h-3" />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                      </>
+                                    );
+                                  })()}
                                   {/* Minimized rows — grouped at bottom */}
                                   {(() => {
                                     const aoLabels: Record<string, string> = { windowScreens: 'Window Screens', doorScreenSash: 'Door Screen Sash', entryDoor: 'Entry Door', jambExtensions: 'Jamb Extensions', magneticContact: 'Magnetic Contact', splitFinish: 'Split Finish', integratedContacts: 'Integrated Contacts', poolContacts: 'Pool Contacts', shadeBoxes: 'Shade Boxes', geniusLock: 'Genius Lock', finalFinish: 'Final Finish', installation: 'Installation' };
