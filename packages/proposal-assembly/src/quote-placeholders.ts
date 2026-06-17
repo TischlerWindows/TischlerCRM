@@ -313,13 +313,21 @@ export function resolveCustomTokens(args: CustomTokenResolverArgs): Record<strin
       case 'SUMMARY':
         if (m.sourcePath === 'installationTotal') {
           const inst = args.summary.addOns?.installation;
+          const rows = (inst?.installationRows || []) as Array<{ label: string; price: string }>;
           const base = parseFloat((inst?.final || '').replace(/[^0-9.-]/g, '')) || 0;
-          const subTotal = (inst?.installationRows || []).reduce(
+          const subTotal = rows.reduce(
             (s: number, r: { label: string; price: string }) =>
               s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0),
             0
           );
-          out[m.tokenName] = applyFormat(String(base + subTotal), m.format);
+          const grandTotal = base + subTotal;
+          if (rows.length === 0) {
+            out[m.tokenName] = formatDollar(String(grandTotal));
+          } else {
+            const lines = rows.map(r => `${r.label}: ${r.price}`);
+            lines.push(`Total: ${formatDollar(String(grandTotal))}`);
+            out[m.tokenName] = lines.join('<br>');
+          }
           continue;
         }
         raw = (args.summary as unknown as Record<string, unknown>)[m.sourcePath];
