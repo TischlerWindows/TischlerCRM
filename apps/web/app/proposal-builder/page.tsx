@@ -1041,21 +1041,42 @@ export default function QuoteBuilderPage() {
   const previewState = useMemo(() => {
     if (!selectedTemplateId || !selectedSummary) return { result: null, error: null };
     try {
+      // Pre-compute installationDetails so it resolves in both old and new package builds.
+      const inst = (selectedSummary as any)?.addOns?.installation;
+      const instRows: Array<{ label: string; price: string }> = inst?.installationRows || [];
+      const parseP = (v: string) => parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0;
+      const instBase = parseP(inst?.final);
+      const instSubTotal = instRows.reduce((s: number, r: { label: string; price: string }) => s + parseP(r.price), 0);
+      const instGrand = instBase + instSubTotal;
+      const fmtUSD = (n: number) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const installationDetailsValue = instRows.length === 0
+        ? fmtUSD(instGrand)
+        : [...instRows.map((r: { label: string; price: string }) => `${r.label}: ${r.price}`), `Total: ${fmtUSD(instGrand)}`].join('<br>');
+      const patchedSummary = { ...(selectedSummary as any), installationDetails: installationDetailsValue, installationTotalPrice: fmtUSD(instGrand) };
+
+      const baseTokenMappings = tokenMappings.map((m) => ({
+        tokenName: m.tokenName,
+        sourceObject: m.sourceObject,
+        sourcePath: m.sourcePath,
+        format: m.format,
+        isBuiltIn: m.isBuiltIn ?? false,
+      }));
+      // Inject synthetic mappings for new built-ins if the DB hasn't been seeded yet.
+      const syntheticNames = new Set(baseTokenMappings.map((m) => m.tokenName));
+      const syntheticMappings = [
+        { tokenName: 'installationDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'installationDetails', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY' as const, sourcePath: 'installationTotalPrice', format: 'TEXT' as const, isBuiltIn: false },
+      ].filter((m) => !syntheticNames.has(m.tokenName));
+
       return {
         result: assembleProposal({
-          summary: selectedSummary as any,
+          summary: patchedSummary as any,
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',
             presets: previewPresets as any,
           },
-          tokenMappings: tokenMappings.map((m) => ({
-            tokenName: m.tokenName,
-            sourceObject: m.sourceObject,
-            sourcePath: m.sourcePath,
-            format: m.format,
-            isBuiltIn: m.isBuiltIn ?? false,
-          })),
+          tokenMappings: [...baseTokenMappings, ...syntheticMappings],
           opportunity: opportunityRecord ?? undefined,
           project: projectRecord ?? undefined,
         }),
