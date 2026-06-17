@@ -1,7 +1,7 @@
 'use client';
 
+import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
 
 export interface DraftVariant {
@@ -121,14 +121,22 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
   ref,
 ) {
   const [expandedKey, setExpandedKey] = useState<string | null>(variants[0]?._key || null);
-  const editorRefs = useRef<Map<string, BodyEditorHandle>>(new Map());
+  // Stable ref objects per variant key — avoids re-triggering useImperativeHandle
+  // on every render (which callback refs would do).
+  const editorRefsMap = useRef<Map<string, { current: BodyEditorHandle | null }>>(new Map());
+  const getEditorRef = (key: string) => {
+    if (!editorRefsMap.current.has(key)) {
+      editorRefsMap.current.set(key, { current: null });
+    }
+    return editorRefsMap.current.get(key)!;
+  };
 
   useImperativeHandle(ref, () => ({
     insertText: (text: string) => {
-      if (expandedKey) editorRefs.current.get(expandedKey)?.insertText(text);
+      if (expandedKey) editorRefsMap.current.get(expandedKey)?.current?.insertText(text);
     },
     focus: () => {
-      if (expandedKey) editorRefs.current.get(expandedKey)?.focus();
+      if (expandedKey) editorRefsMap.current.get(expandedKey)?.current?.focus();
     },
   }), [expandedKey]);
 
@@ -226,10 +234,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                     <div>
                       <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Body Text</label>
                       <BodyEditor
-                        ref={(handle) => {
-                          if (handle) editorRefs.current.set(variant._key, handle);
-                          else editorRefs.current.delete(variant._key);
-                        }}
+                        ref={getEditorRef(variant._key) as React.RefObject<BodyEditorHandle | null>}
                         value={variant.body}
                         onChange={(html) => update(variant._key, { body: html })}
                         placeholder="Bold, italic, lists supported"
