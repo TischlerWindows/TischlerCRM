@@ -32,6 +32,23 @@ export async function tokenMappingRoutes(app: FastifyInstance) {
     }
 
     try {
+      // Auto-upsert any missing built-in tokens so new tokens added in code
+      // appear immediately without requiring a re-seed.
+      const NEW_BUILT_INS = [
+        { tokenName: 'installationDetails', sourceObject: 'SUMMARY', sourcePath: 'installationDetails', format: 'TEXT', label: 'Installation Details (sub-rows + total)', category: 'Add-ons' },
+        { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY', sourcePath: 'installationTotalPrice', format: 'CURRENCY', label: 'Installation Total Price', category: 'Add-ons' },
+      ] as const;
+      const existingNames = new Set(
+        (await prisma.tokenMapping.findMany({ where: { templateId, isBuiltIn: true }, select: { tokenName: true } })).map((m) => m.tokenName)
+      );
+      const toCreate = NEW_BUILT_INS.filter((b) => !existingNames.has(b.tokenName));
+      if (toCreate.length > 0) {
+        await prisma.tokenMapping.createMany({
+          data: toCreate.map((b) => ({ id: generateId('TokenMapping'), templateId, ...b, isBuiltIn: true, isActive: true })),
+          skipDuplicates: true,
+        });
+      }
+
       const mappings = await prisma.tokenMapping.findMany({
         where: { templateId, isActive: true },
         orderBy: [{ category: 'asc' }, { label: 'asc' }],

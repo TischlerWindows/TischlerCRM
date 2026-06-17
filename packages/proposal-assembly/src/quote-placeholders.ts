@@ -186,6 +186,21 @@ export function buildTokenMap(
       );
       return formatDollar(String(base + subTotal));
     })(),
+    installationDetails: (() => {
+      const inst = summary.addOns?.installation;
+      const rows = (inst?.installationRows || []) as Array<{ label: string; price: string }>;
+      const base = parseFloat((inst?.final || '').replace(/[^0-9.-]/g, '')) || 0;
+      const subTotal = rows.reduce(
+        (s: number, r: { label: string; price: string }) =>
+          s + (parseFloat((r.price || '').replace(/[^0-9.-]/g, '')) || 0),
+        0
+      );
+      const grandTotal = base + subTotal;
+      if (rows.length === 0) return formatDollar(String(grandTotal));
+      const lines = rows.map(r => `${r.label}: ${r.price}`);
+      lines.push(`Total: ${formatDollar(String(grandTotal))}`);
+      return lines.join('<br>');
+    })(),
   };
 
   return tokens;
