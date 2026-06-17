@@ -159,6 +159,7 @@ export default function QuoteBuilderPage() {
   const hasAnyUnsavedChanges = isDirty || Object.keys(pendingEdits).length > 0;
 
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
+  const variantEditorRef = useRef<BodyEditorHandle | null>(null);
 
   // Resizable side panels (shared with page-editor pattern)
   const panels = useResizableSidePanels({
@@ -571,8 +572,11 @@ export default function QuoteBuilderPage() {
   };
 
   const handleInsertToken = (tokenName: string) => {
-    if (editDriverField) return; // body is replaced by Variants in driver mode
-    bodyEditorRef.current?.insertText(`{{${tokenName}}}`);
+    if (editDriverField) {
+      variantEditorRef.current?.insertText(`{{${tokenName}}}`);
+    } else {
+      bodyEditorRef.current?.insertText(`{{${tokenName}}}`);
+    }
     flash(`Inserted {{${tokenName}}}`);
   };
 
@@ -1301,6 +1305,7 @@ export default function QuoteBuilderPage() {
                   onVariantsChange={setEditVariants}
                   onDelete={handleDelete}
                   bodyEditorRef={bodyEditorRef}
+                  variantEditorRef={variantEditorRef}
                   decision={currentDecision}
                 />
               )}

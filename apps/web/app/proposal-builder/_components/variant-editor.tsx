@@ -1,8 +1,8 @@
 'use client';
 
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
-import { BodyEditor } from './body-editor';
+import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { BodyEditor, type BodyEditorHandle } from './body-editor';
 
 export interface DraftVariant {
   _key: string;
@@ -40,12 +40,97 @@ interface Props {
   variants: DraftVariant[];
   onChange: (variants: DraftVariant[]) => void;
   driverField: string;
-  /** If provided, Match Value renders as a dropdown instead of free text. */
+  /** If provided, Match Value renders as a multi-select dropdown instead of free text. */
   matchOptions?: string[];
 }
 
-export function VariantEditor({ variants, onChange, driverField, matchOptions }: Props) {
+// ── Multi-select dropdown ──────────────────────────────────────────
+function MultiSelectDropdown({
+  options,
+  selected,
+  onChange,
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (opt: string) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter((v) => v !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  const displayLabel =
+    selected.length === 0
+      ? 'Select values…'
+      : selected.length === 1
+        ? selected[0]
+        : `${selected.length} values selected`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20 text-left"
+      >
+        <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-900 truncate pr-1'}>
+          {displayLabel}
+        </span>
+        <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full min-w-[320px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
+          {options.map((opt) => {
+            const checked = selected.includes(opt);
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => toggle(opt)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 text-left"
+              >
+                <div className={`w-3.5 h-3.5 flex-shrink-0 border rounded flex items-center justify-center ${checked ? 'bg-brand-navy border-brand-navy' : 'border-gray-300'}`}>
+                  {checked && <Check className="w-2.5 h-2.5 text-white" />}
+                </div>
+                <span className="truncate text-gray-800">{opt}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function VariantEditor(
+  { variants, onChange, driverField, matchOptions },
+  ref,
+) {
   const [expandedKey, setExpandedKey] = useState<string | null>(variants[0]?._key || null);
+  const editorRefs = useRef<Map<string, BodyEditorHandle>>(new Map());
+
+  useImperativeHandle(ref, () => ({
+    insertText: (text: string) => {
+      if (expandedKey) editorRefs.current.get(expandedKey)?.insertText(text);
+    },
+    focus: () => {
+      if (expandedKey) editorRefs.current.get(expandedKey)?.focus();
+    },
+  }), [expandedKey]);
 
   const add = () => {
     const v = emptyDraftVariant(variants.length);
@@ -92,8 +177,10 @@ export function VariantEditor({ variants, onChange, driverField, matchOptions }:
                   className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                 >
                   {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-                  <span className="text-xs font-medium text-gray-900 flex-1">
-                    {variant.matchValue || <span className="text-gray-400 italic">untitled</span>}
+                  <span className="text-xs font-medium text-gray-900 flex-1 truncate">
+                    {variant.matchValue
+                      ? variant.matchValue.split(',').map(v => v.trim()).filter(Boolean).join(', ')
+                      : <span className="text-gray-400 italic">untitled</span>}
                   </span>
                   {variant.matchLabel && (
                     <span className="text-[10px] text-gray-500">{variant.matchLabel}</span>
@@ -112,16 +199,11 @@ export function VariantEditor({ variants, onChange, driverField, matchOptions }:
                       <div>
                         <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Match Value</label>
                         {matchOptions ? (
-                          <select
-                            value={variant.matchValue}
-                            onChange={(e) => update(variant._key, { matchValue: e.target.value })}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20 bg-white"
-                          >
-                            <option value="">Select a value…</option>
-                            {matchOptions.map(opt => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
+                          <MultiSelectDropdown
+                            options={matchOptions}
+                            selected={variant.matchValue ? variant.matchValue.split(',').map(v => v.trim()).filter(Boolean) : []}
+                            onChange={(vals) => update(variant._key, { matchValue: vals.join(',') })}
+                          />
                         ) : (
                           <input
                             value={variant.matchValue}
@@ -144,6 +226,10 @@ export function VariantEditor({ variants, onChange, driverField, matchOptions }:
                     <div>
                       <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Body Text</label>
                       <BodyEditor
+                        ref={(handle) => {
+                          if (handle) editorRefs.current.set(variant._key, handle);
+                          else editorRefs.current.delete(variant._key);
+                        }}
                         value={variant.body}
                         onChange={(html) => update(variant._key, { body: html })}
                         placeholder="Bold, italic, lists supported"
@@ -159,4 +245,4 @@ export function VariantEditor({ variants, onChange, driverField, matchOptions }:
       )}
     </div>
   );
-}
+});

@@ -107,6 +107,8 @@ interface Props {
   onDelete: () => void;
   /** Ref to the body editor — used by the Variables chip panel to insert tokens at cursor. */
   bodyEditorRef?: React.RefObject<BodyEditorHandle | null>;
+  /** Ref to the variant editor — used by the Variables chip panel in driver mode. */
+  variantEditorRef?: React.RefObject<BodyEditorHandle | null>;
   /** Inclusion decision for the currently-edited block against the active summary, if any. */
   decision?: { included: boolean; reason: string } | null;
 }
@@ -147,6 +149,7 @@ export function BlockEditor({
   onVariantsChange,
   onDelete,
   bodyEditorRef,
+  variantEditorRef,
   decision,
 }: Props) {
   const isVariantMode = !!driverField;
@@ -317,6 +320,7 @@ A project with multiple glass types prints all matches.`}
         {!isLayoutOnly && (isVariantMode ? (
           <>
             <VariantEditor
+              ref={variantEditorRef}
               variants={variants}
               onChange={onVariantsChange}
               driverField={driverField}
