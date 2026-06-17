@@ -5211,7 +5211,7 @@ export default function SummaryPage() {
                                     };
                                     const fmtInstPrice = (v: string | number) => { const n = typeof v === 'number' ? v : parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
                                     const instAo = (ao as any)?.installation || {};
-                                    const instBase = parseInstPrice(instAo.netEuro) + parseInstPrice(instAo.full) + parseInstPrice(instAo.pct) + parseInstPrice(instAo.final);
+                                    const instBase = parseInstPrice(instAo.final);
                                     const instGrandTotal = instBase + instTotal;
                                     return (
                                       <>
@@ -5249,7 +5249,7 @@ export default function SummaryPage() {
                                               className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
                                             />
                                           </td>
-                                          <td className="px-1 py-1" colSpan={2}></td>
+                                          <td className="px-1 py-1" colSpan={3}></td>
                                           <td className="px-1 py-1 bg-green-50/50">
                                             <input
                                               type="text"
@@ -5259,7 +5259,7 @@ export default function SummaryPage() {
                                               className="w-full px-2 py-1 text-xs text-right text-green-700 border border-gray-300 rounded focus:ring-1 focus:ring-brand-navy/40"
                                             />
                                           </td>
-                                          <td className="px-1 py-1" colSpan={5}></td>
+                                          <td className="px-1 py-1" colSpan={4}></td>
                                           <td className="px-1 py-1 text-center">
                                             <button onClick={() => removeInstRow(idx)} className="text-gray-400 hover:text-red-500" title="Remove row">
                                               <Trash2 className="w-3 h-3" />
@@ -5270,9 +5270,9 @@ export default function SummaryPage() {
                                       {hasSubRows && (
                                         <tr className="border-t-2 border-gray-300 bg-gray-100/60">
                                           <td className="sticky left-0 z-10 bg-gray-100/60"></td>
-                                          <td className="pl-7 pr-1 py-1.5 sticky left-[24px] z-10 bg-gray-100/60 shadow-[inset_-1px_0_0_#f3f4f6] font-semibold text-xs text-gray-700" colSpan={6}>Installation Total</td>
+                                          <td className="pl-7 pr-1 py-1.5 sticky left-[24px] z-10 bg-gray-100/60 shadow-[inset_-1px_0_0_#f3f4f6] font-semibold text-xs text-gray-700" colSpan={7}>Installation Total</td>
                                           <td className="px-2 py-1.5 text-right text-sm font-bold text-green-700 bg-green-50/60">{fmtInstPrice(instGrandTotal)}</td>
-                                          <td colSpan={6}></td>
+                                          <td colSpan={5}></td>
                                         </tr>
                                       )}
                                       </>
