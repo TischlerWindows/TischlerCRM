@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
 
