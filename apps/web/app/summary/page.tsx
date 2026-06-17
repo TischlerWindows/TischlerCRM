@@ -5190,8 +5190,9 @@ export default function SummaryPage() {
                                   )}
                                   {/* Installation */}
                                   {!hiddenAoRows.has('installation') && (() => {
-                                    const instRows: Array<{ label: string; price: string }> = (getAo('installation').installationRows || []) as any;
-                                    const instTotal = instRows.reduce((s, r) => s + (parseFloat(r.price) || 0), 0);
+                                    const instRows: Array<{ label: string; price: string }> = ((ao as any)?.installation?.installationRows || []);
+                                    const parseInstPrice = (v: string) => parseFloat((v || '').replace(/[^0-9.-]/g, '')) || 0;
+                                    const instTotal = instRows.reduce((s, r) => s + parseInstPrice(r.price), 0);
                                     const hasSubRows = instRows.length > 0;
                                     const addInstRow = () => {
                                       const cur = getAo('installation');
@@ -5209,8 +5210,8 @@ export default function SummaryPage() {
                                       setEditingSummary({ ...editingSummary, addOns: { ...ao, installation: { ...cur, installationRows: newRows } } });
                                     };
                                     const fmtInstPrice = (v: string | number) => { const n = typeof v === 'number' ? v : parseFloat(v); return n ? '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; };
-                                    const instAo = getAo('installation');
-                                    const instBase = (parseFloat(instAo.netEuro) || 0) + (parseFloat(instAo.full) || 0) + (parseFloat(instAo.pct) || 0) + (parseFloat(instAo.final) || 0);
+                                    const instAo = (ao as any)?.installation || {};
+                                    const instBase = parseInstPrice(instAo.netEuro) + parseInstPrice(instAo.full) + parseInstPrice(instAo.pct) + parseInstPrice(instAo.final);
                                     const instGrandTotal = instBase + instTotal;
                                     return (
                                       <>
