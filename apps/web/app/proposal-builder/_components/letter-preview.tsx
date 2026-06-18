@@ -331,7 +331,7 @@ function BlockPreview({
       );
     case 'TITLE_BLOCK':
       return wrap(
-        <div className="mt-5 mb-2 text-center">
+        <div className="mt-5 mb-2 text-center border border-gray-200 rounded py-3 px-4">
           {!hideTitle && (
             <div
               className="text-[13pt] font-bold uppercase tracking-wide"
