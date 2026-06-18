@@ -425,9 +425,12 @@ function drawTitleBlock(
       doc.x = PAGE_MARGIN;
       if (block.kind === 'paragraph') {
         const allRuns = block.runs ?? [];
-        const text = allRuns.map((r: StyledRun) => r.text).join('');
-        if (text.trim()) {
-          doc.text(text, PAGE_MARGIN, doc.y, { width: usableWidth, align: 'center' });
+        if (allRuns.length > 0 && allRuns.some((r: StyledRun) => r.text.trim())) {
+          // Snap to explicit position before each paragraph so centered text
+          // doesn't drift when doc.x is left at an unexpected offset.
+          doc.text('', PAGE_MARGIN, doc.y, { continued: false });
+          doc.x = PAGE_MARGIN;
+          drawStyledRuns(doc, allRuns, ctx, { indent: 0, lineGap: 1, align: 'center' });
           doc.x = PAGE_MARGIN;
         } else {
           doc.moveDown(0.8);
