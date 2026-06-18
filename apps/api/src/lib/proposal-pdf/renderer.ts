@@ -420,12 +420,15 @@ function drawTitleBlock(
     // AND keeps doc.x at PAGE_MARGIN in PDFKit 0.15.x.
     doc.x = PAGE_MARGIN;
     doc.text(titleText, { width: usableWidth, align: 'center' });
+    const yAfterTitle = doc.y;
     // Force doc.y to the pre-measured bottom of the title. Math.max keeps
     // any further advancement PDFKit already made (single-line titles).
     doc.y = Math.max(doc.y, titleStartY + titleH);
     doc.x = PAGE_MARGIN;
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     doc.y += doc.currentLineHeight(true) * 0.3;
+    // eslint-disable-next-line no-console
+    console.log('[drawTitleBlock] titleStartY=%o titleH=%o yAfterTitle=%o bodyStartY=%o font=%o', titleStartY, titleH, yAfterTitle, doc.y, ctx.fonts.bold);
   }
 
   if (preset.body && preset.body.trim()) {
