@@ -402,34 +402,39 @@ function drawTitleBlock(
   const hideTitle = !!(cfg?.hideTitle);
   const usableWidth = doc.page.width - 2 * PAGE_MARGIN;
 
-  doc.x = PAGE_MARGIN;
-  doc.moveDown(0.6);
+  // Use explicit y-tracking throughout to avoid PDFKit doc.y drift that
+  // occurs after centered text drawn in flow mode (no explicit x,y args).
+  // Set body font first so the initial gap uses body-size line height.
+  doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+  doc.y += doc.currentLineHeight(true) * 0.6;
 
   if (!hideTitle) {
-    doc
-      .fillColor(ctx.navy)
-      .font(ctx.fonts.bold)
-      .fontSize(SECTION_HEADING_SIZE)
-      .text(preset.title.toUpperCase(), { width: usableWidth, align: 'center' });
-    // Centered text leaves doc.x at the right edge — snap it back.
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
+    // Explicit (PAGE_MARGIN, doc.y) ensures PDFKit advances doc.y to the
+    // bottom of the title text. Without explicit coords, PDFKit centered
+    // text in flow mode does not reliably update doc.y.
+    doc.text(preset.title.toUpperCase(), PAGE_MARGIN, doc.y, {
+      width: usableWidth,
+      align: 'center',
+    });
+    // Snap x back (centered text leaves doc.x at the right edge of the box).
     doc.x = PAGE_MARGIN;
-    doc.moveDown(0.2);
+    // Gap between title and body using body font line height.
+    doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    doc.y += doc.currentLineHeight(true) * 0.3;
   }
 
   if (preset.body && preset.body.trim()) {
-    doc.x = PAGE_MARGIN;
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     for (const block of htmlToBlocks(preset.body)) {
-      // Reset x before every paragraph — centered text can leave doc.x at
-      // the right edge of the text box after the last run completes.
-      doc.x = PAGE_MARGIN;
       if (block.kind === 'paragraph') {
         const allRuns = block.runs ?? [];
         if (allRuns.some((r: StyledRun) => r.text.trim())) {
           drawStyledRuns(doc, allRuns, ctx, { indent: 0, lineGap: 1, align: 'center' });
           doc.x = PAGE_MARGIN;
         } else {
-          doc.moveDown(0.8);
+          doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+          doc.y += doc.currentLineHeight(true) * 0.8;
         }
       }
     }
