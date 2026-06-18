@@ -419,17 +419,13 @@ function drawTitleBlock(
   if (preset.body && preset.body.trim()) {
     doc.x = PAGE_MARGIN;
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    // Draw each paragraph with an explicit x,y to prevent cursor drift
-    // that occurs when centered text leaves doc.x at the right margin.
     for (const block of htmlToBlocks(preset.body)) {
+      // Reset x before every paragraph — centered text can leave doc.x at
+      // the right edge of the text box after the last run completes.
       doc.x = PAGE_MARGIN;
       if (block.kind === 'paragraph') {
         const allRuns = block.runs ?? [];
-        if (allRuns.length > 0 && allRuns.some((r: StyledRun) => r.text.trim())) {
-          // Snap to explicit position before each paragraph so centered text
-          // doesn't drift when doc.x is left at an unexpected offset.
-          doc.text('', PAGE_MARGIN, doc.y, { continued: false });
-          doc.x = PAGE_MARGIN;
+        if (allRuns.some((r: StyledRun) => r.text.trim())) {
           drawStyledRuns(doc, allRuns, ctx, { indent: 0, lineGap: 1, align: 'center' });
           doc.x = PAGE_MARGIN;
         } else {
@@ -847,19 +843,24 @@ function drawStyledRuns(
     const isLast = i === runs.length - 1;
     doc.font(fontFor(run, ctx.fonts));
     if (run.fontSize) doc.fontSize(run.fontSize);
-    // Normalize non-breaking spaces to regular spaces. \u00A0 is emitted by
-    // html-to-runs for &nbsp; and multi-space runs. Some brand fonts lack a
-    // glyph for U+00A0, which makes PDFKit render a visible box/X character.
-    // Regular ASCII spaces are universally present in every font.
     const text = run.text.replace(/\u00A0/g, ' ');
-    doc.text(text, {
-      continued: !isLast,
-      indent: i === 0 ? opts.indent : 0,
-      // Add a small paragraph gap after the final run so consecutive
-      // paragraphs have breathing room (mirrors CSS paragraph margin).
-      ...(isLast ? { paragraphGap: 4 } : {}),
-      ...(opts.align ? { align: opts.align, width: textWidth } : {}),
-    });
+    // For centered paragraphs, anchor the first run to PAGE_MARGIN so the
+    // text box always starts from the left margin regardless of doc.x drift.
+    if (i === 0 && opts.align === 'center') {
+      doc.text(text, PAGE_MARGIN, doc.y, {
+        continued: !isLast,
+        width: textWidth,
+        align: 'center',
+        ...(isLast ? { paragraphGap: 4 } : {}),
+      });
+    } else {
+      doc.text(text, {
+        continued: !isLast,
+        indent: i === 0 ? opts.indent : 0,
+        ...(isLast ? { paragraphGap: 4 } : {}),
+        ...(opts.align ? { align: opts.align, width: textWidth } : {}),
+      });
+    }
     if (run.fontSize) doc.fontSize(BODY_FONT_SIZE); // restore default after run
   });
 }
