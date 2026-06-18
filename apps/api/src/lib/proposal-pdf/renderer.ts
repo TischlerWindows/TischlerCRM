@@ -444,15 +444,23 @@ function drawSpecificationItem(
   doc.moveDown(0.4);
   doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(BODY_FONT_SIZE);
   if (hideTitle) {
-    doc.text(`(${number})`, { continued: false, indent: 0 });
+    // Number inline with body text: emit "(N)  " with continued:true so
+    // PDFKit keeps the cursor on the same line, then let drawRichBody flow.
+    doc.text(`(${number})  `, { continued: true, indent: 0 });
+    if (preset.body && preset.body.trim()) {
+      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+      drawRichBody(doc, preset.body, ctx, { topGap: 0, indent: 0 });
+    } else {
+      doc.text(''); // close the continued line
+    }
   } else {
     doc.text(`(${number})`, { continued: true, indent: 0 });
     doc.text(`  ${preset.title}`);
-  }
 
-  if (preset.body && preset.body.trim()) {
-    doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 18 });
+    if (preset.body && preset.body.trim()) {
+      doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+      drawRichBody(doc, preset.body, ctx, { topGap: 0.1, indent: 18 });
+    }
   }
 }
 
