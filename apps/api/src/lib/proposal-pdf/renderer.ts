@@ -433,17 +433,24 @@ function drawTitleBlock(
 
   if (preset.body && preset.body.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    doc.y += doc.currentLineHeight(true) * 0.3;
     for (const block of htmlToBlocks(preset.body)) {
-      if (block.kind === 'paragraph') {
-        const allRuns = block.runs ?? [];
-        if (allRuns.some((r: StyledRun) => r.text.trim())) {
-          drawStyledRuns(doc, allRuns, ctx, { indent: 0, lineGap: 1, align: 'center' });
-          doc.x = PAGE_MARGIN;
-        } else {
-          doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-          doc.y += doc.currentLineHeight(true) * 0.8;
-        }
+      if (block.kind !== 'paragraph') continue;
+      const runs = (block.runs ?? []) as StyledRun[];
+      // Combine all run texts into one string and render as a single doc.text()
+      // call. This avoids `continued`-chain cursor drift that occurs when mixing
+      // explicit-coord first runs with flow-mode subsequent runs mid-paragraph.
+      const text = runs.map((r: StyledRun) => r.text.replace(/\u00A0/g, ' ')).join('');
+      if (!text.trim()) {
+        doc.y += doc.currentLineHeight(true) * 0.8;
+        continue;
       }
+      // eslint-disable-next-line no-console
+      console.log('[drawTitleBlock body] y=%o text=%o', doc.y, text.slice(0, 40));
+      doc.text(text, PAGE_MARGIN, doc.y, { width: usableWidth, align: 'center' });
+      // eslint-disable-next-line no-console
+      console.log('[drawTitleBlock body] after y=%o', doc.y);
+      doc.x = PAGE_MARGIN;
     }
   }
 }
