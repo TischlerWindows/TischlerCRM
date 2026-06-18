@@ -402,64 +402,98 @@ function drawTitleBlock(
   const hideTitle = !!(cfg?.hideTitle);
   const usableWidth = doc.page.width - 2 * PAGE_MARGIN;
 
-  // Use explicit y-tracking throughout to avoid PDFKit doc.y drift that
-  // occurs after centered text drawn in flow mode (no explicit x,y args).
-  // Set body font first so the initial gap uses body-size line height.
+  // Use a manual curY tracker throughout. Never rely on doc.y after a text
+  // draw call — PDFKit's internal cursor can drift with centered text and
+  // custom brand fonts. We only trust doc.y after confirmed-working calls
+  // (explicit coords for single text draws).
   doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-  doc.y += doc.currentLineHeight(true) * 0.6;
+  const bodyLineH = doc.currentLineHeight(true);
+  let curY = doc.y + bodyLineH * 0.6;
 
-  if (!hideTitle) {
-    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
+  if (!hideTitle && preset.title?.trim()) {
     const titleText = preset.title.toUpperCase();
-    // Measure BEFORE drawing — heightOfString pre-draw correctly accounts for
-    // multi-line wrapping in brand fonts, which currentLineHeight cannot.
-    // After doc.text() the internal state can produce stale values.
-    const titleH = (doc as any).heightOfString(titleText, { width: usableWidth });
-    const titleStartY = doc.y;
-    // Flow-mode draw (no explicit x,y): confirmed to advance doc.y correctly
-    // AND keeps doc.x at PAGE_MARGIN in PDFKit 0.15.x.
-    doc.x = PAGE_MARGIN;
-    doc.text(titleText, { width: usableWidth, align: 'center' });
-    // Force doc.y to the pre-measured bottom of the title. Math.max keeps
-    // any further advancement PDFKit already made (single-line titles).
-    doc.y = Math.max(doc.y, titleStartY + titleH);
+    doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
+    const titleLineH = doc.currentLineHeight(true);
+    // Pre-measure height before drawing — correct for wrapped titles.
+    const measuredTitleH = (doc as any).heightOfString(titleText, { width: usableWidth });
+    // Safety: use at least 1.2× one lineH in case heightOfString misbehaves.
+    const titleH = Math.max(measuredTitleH || 0, titleLineH * 1.2);
+    // Draw at explicit (PAGE_MARGIN, curY) — this reliably advances doc.y.
+    doc.text(titleText, PAGE_MARGIN, curY, { width: usableWidth, align: 'center' });
+    // Advance curY by pre-measured height regardless of what doc.y now is.
+    curY += titleH;
     doc.x = PAGE_MARGIN;
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
+    curY += doc.currentLineHeight(true) * 0.4;
   }
 
-  if (preset.body && preset.body.trim()) {
+  if (preset.body?.trim()) {
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    doc.y += doc.currentLineHeight(true) * 0.3;
+
     for (const block of htmlToBlocks(preset.body)) {
       if (block.kind !== 'paragraph') continue;
       const runs = (block.runs ?? []) as StyledRun[];
-      const nonEmpty = runs.filter((r: StyledRun) => r.text.trim());
-      if (nonEmpty.length === 0) {
-        doc.y += doc.currentLineHeight(true) * 0.8;
+
+      if (!runs.some((r: StyledRun) => r.text.trim())) {
+        curY += bodyLineH * 0.8;
         continue;
       }
-      // Render per-run with font/size switching for bold/italic, using pure
-      // flow mode (no explicit x,y coords). doc.x is snapped to PAGE_MARGIN
-      // before the first run so the text box is anchored correctly.
-      // Mixing explicit-coord first run with flow-mode subsequent runs caused
-      // cursor drift — flow-only mode is the safe approach here.
-      doc.x = PAGE_MARGIN;
-      runs.forEach((run: StyledRun, i: number) => {
-        const isLast = i === runs.length - 1;
-        doc.font(fontFor(run, ctx.fonts));
-        if (run.fontSize) doc.fontSize(run.fontSize);
-        const text = run.text.replace(/\u00A0/g, ' ');
-        doc.text(text, {
-          continued: !isLast,
+
+      // Render the paragraph by grouping consecutive runs that share the same
+      // bold/italic/fontSize into style-segments and drawing each segment as a
+      // standalone doc.text() call at explicit (PAGE_MARGIN, curY).
+      //
+      // WHY NOT continued:true chains: production logs confirmed that
+      // continued:true + align:center + flow-mode with multi-run paragraphs
+      // causes the body to render at the title's y position when a custom
+      // brand heading font is registered (single-run paragraphs work fine).
+      // Avoiding continued chains eliminates the cursor drift entirely.
+      //
+      // TRADE-OFF: each style-segment gets its own text box, so a bold word
+      // in the middle of a sentence wraps onto its own line rather than
+      // flowing inline. This is acceptable for the heading-block use case
+      // where mixed inline styling is uncommon.
+      const segments: { text: string; bold: boolean; italic: boolean; fontSize?: number }[] = [];
+      for (const run of runs) {
+        const t = run.text.replace(/\u00A0/g, ' ');
+        if (!t) continue;
+        const last = segments[segments.length - 1];
+        if (
+          last &&
+          last.bold === !!run.bold &&
+          last.italic === !!run.italic &&
+          last.fontSize === run.fontSize
+        ) {
+          last.text += t;
+        } else {
+          segments.push({ text: t, bold: !!run.bold, italic: !!run.italic, fontSize: run.fontSize });
+        }
+      }
+
+      for (const seg of segments) {
+        if (!seg.text.trim()) continue;
+        doc.font(
+          seg.bold && seg.italic ? ctx.fonts.boldItalic :
+          seg.bold               ? ctx.fonts.bold :
+          seg.italic             ? ctx.fonts.italic :
+                                   ctx.fonts.regular,
+        );
+        if (seg.fontSize) doc.fontSize(seg.fontSize);
+        doc.text(seg.text, PAGE_MARGIN, curY, {
           width: usableWidth,
           align: 'center',
-          ...(isLast ? { paragraphGap: 4 } : {}),
+          paragraphGap: 2,
         });
-        if (run.fontSize) doc.fontSize(BODY_FONT_SIZE);
-      });
-      doc.x = PAGE_MARGIN;
+        curY = doc.y;
+        doc.x = PAGE_MARGIN;
+        if (seg.fontSize) doc.fontSize(BODY_FONT_SIZE);
+      }
     }
   }
+
+  // Sync doc state to our final tracked position.
+  doc.y = curY;
+  doc.x = PAGE_MARGIN;
 }
 
 function drawFreeTextBlock(
