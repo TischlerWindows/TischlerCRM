@@ -411,17 +411,16 @@ function drawTitleBlock(
   if (!hideTitle) {
     doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
     const titleText = preset.title.toUpperCase();
-    // Capture y before drawing so we can manually advance past the title.
-    // PDFKit does not reliably update doc.y after centered text regardless
-    // of whether explicit coordinates are passed.
+    // Measure ONE line height before drawing — this is the guaranteed safe API.
+    // heightOfString is unreliable after a draw call; currentLineHeight always works.
+    const titleLineH = doc.currentLineHeight(true);
     const titleStartY = doc.y;
     doc.text(titleText, PAGE_MARGIN, titleStartY, { width: usableWidth, align: 'center' });
-    // heightOfString measures exactly how tall the title is (handles wrapping).
-    const titleHeight = (doc as any).heightOfString(titleText, { width: usableWidth });
-    // Manually place doc.y at the bottom of the title — don't trust doc.y.
-    doc.y = titleStartY + titleHeight;
+    // Forcibly advance doc.y past the title regardless of what PDFKit did internally.
+    // Math.max: if PDFKit already advanced further (multi-line title), keep that.
+    doc.y = Math.max(doc.y, titleStartY + titleLineH);
     doc.x = PAGE_MARGIN;
-    // Gap between title and body using body font line height.
+    // Gap between title and body.
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     doc.y += doc.currentLineHeight(true) * 0.3;
   }
@@ -851,10 +850,13 @@ function drawStyledRuns(
     doc.font(fontFor(run, ctx.fonts));
     if (run.fontSize) doc.fontSize(run.fontSize);
     const text = run.text.replace(/\u00A0/g, ' ');
-    // For centered paragraphs, anchor the first run to PAGE_MARGIN so the
-    // text box always starts from the left margin regardless of doc.x drift.
+    // For centered paragraphs, pass explicit x=PAGE_MARGIN to reset doc.x drift
+    // caused by prior centered text, but pass null for y so PDFKit flows from
+    // the current doc.y naturally (passing explicit y can fight with PDFKit's
+    // internal cursor and produce incorrect positioning).
     if (i === 0 && opts.align === 'center') {
-      doc.text(text, PAGE_MARGIN, doc.y, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      doc.text(text, PAGE_MARGIN, null as any, {
         continued: !isLast,
         width: textWidth,
         align: 'center',
