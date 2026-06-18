@@ -402,35 +402,38 @@ function drawTitleBlock(
   const hideTitle = !!(cfg?.hideTitle);
   const usableWidth = doc.page.width - 2 * PAGE_MARGIN;
 
-  // Snap x back to the left margin — centred text in a previous block can
-  // leave doc.x at an unexpected offset which shifts the text box origin.
   doc.x = PAGE_MARGIN;
   doc.moveDown(0.6);
 
   if (!hideTitle) {
-    // Capture y BEFORE drawing so we can compute where the body starts.
-    const titleY = doc.y;
     doc
       .fillColor(ctx.navy)
       .font(ctx.fonts.bold)
       .fontSize(SECTION_HEADING_SIZE)
-      .text(preset.title.toUpperCase(), PAGE_MARGIN, titleY, {
-        width: usableWidth,
-        align: 'center',
-        lineBreak: true,
-      });
-    // doc.y is now below the title. If PDFKit didn't advance it (very rare
-    // continued-mode edge case), force it past at least one line height.
-    const minY = titleY + doc.currentLineHeight(true) + 2;
-    if (doc.y < minY) doc.y = minY;
+      .text(preset.title.toUpperCase(), { width: usableWidth, align: 'center' });
+    // Centered text leaves doc.x at the right edge — snap it back.
+    doc.x = PAGE_MARGIN;
+    doc.moveDown(0.2);
   }
 
   if (preset.body && preset.body.trim()) {
-    // Always reset x and give a small gap below the title.
     doc.x = PAGE_MARGIN;
-    doc.moveDown(hideTitle ? 0 : 0.2);
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: 0, align: 'center' });
+    // Draw each paragraph with an explicit x,y to prevent cursor drift
+    // that occurs when centered text leaves doc.x at the right margin.
+    for (const block of htmlToBlocks(preset.body)) {
+      doc.x = PAGE_MARGIN;
+      if (block.kind === 'paragraph') {
+        const allRuns = block.runs ?? [];
+        const text = allRuns.map((r: StyledRun) => r.text).join('');
+        if (text.trim()) {
+          doc.text(text, PAGE_MARGIN, doc.y, { width: usableWidth, align: 'center' });
+          doc.x = PAGE_MARGIN;
+        } else {
+          doc.moveDown(0.8);
+        }
+      }
+    }
   }
 }
 
