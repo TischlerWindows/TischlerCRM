@@ -398,25 +398,39 @@ function drawTitleBlock(
   preset: SpecPresetData,
   ctx: BrandContext,
 ): void {
-  // Large centered uppercase heading block.
   const cfg = preset.config as Record<string, unknown> | null | undefined;
   const hideTitle = !!(cfg?.hideTitle);
-  const usableWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const usableWidth = doc.page.width - 2 * PAGE_MARGIN;
+
+  // Snap x back to the left margin — centred text in a previous block can
+  // leave doc.x at an unexpected offset which shifts the text box origin.
+  doc.x = PAGE_MARGIN;
   doc.moveDown(0.6);
-  // Reset x to left margin before drawing — centered text in PDFKit can leave
-  // doc.x at an unexpected position, which causes the title to overlap content
-  // if explicit coordinates are used. Flow-based positioning is more reliable.
-  doc.x = doc.page.margins.left;
+
   if (!hideTitle) {
-    doc.fillColor(ctx.navy)
+    // Capture y BEFORE drawing so we can compute where the body starts.
+    const titleY = doc.y;
+    doc
+      .fillColor(ctx.navy)
       .font(ctx.fonts.bold)
       .fontSize(SECTION_HEADING_SIZE)
-      .text(preset.title.toUpperCase(), { width: usableWidth, align: 'center' });
+      .text(preset.title.toUpperCase(), PAGE_MARGIN, titleY, {
+        width: usableWidth,
+        align: 'center',
+        lineBreak: true,
+      });
+    // doc.y is now below the title. If PDFKit didn't advance it (very rare
+    // continued-mode edge case), force it past at least one line height.
+    const minY = titleY + doc.currentLineHeight(true) + 2;
+    if (doc.y < minY) doc.y = minY;
   }
+
   if (preset.body && preset.body.trim()) {
-    doc.x = doc.page.margins.left;
+    // Always reset x and give a small gap below the title.
+    doc.x = PAGE_MARGIN;
+    doc.moveDown(hideTitle ? 0 : 0.2);
     doc.fillColor(ctx.text).font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    drawRichBody(doc, preset.body, ctx, { topGap: hideTitle ? 0 : 0.2, align: 'center' });
+    drawRichBody(doc, preset.body, ctx, { topGap: 0, align: 'center' });
   }
 }
 
@@ -771,9 +785,12 @@ function drawRichBody(
 ): void {
   if (opts.topGap) doc.moveDown(opts.topGap);
   const indent = opts.indent ?? 0;
+  // Centred text in PDFKit can leave doc.x offset; snap back before drawing.
+  if (opts.align === 'center') doc.x = PAGE_MARGIN;
   const blocks = htmlToBlocks(html);
 
   for (const block of blocks) {
+    if (opts.align === 'center') doc.x = PAGE_MARGIN;
     drawBlock(doc, block, ctx, indent, opts.align);
   }
 }
