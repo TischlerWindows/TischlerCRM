@@ -860,12 +860,16 @@ function drawStyledRuns(
     // doc.y is correctly pre-set by drawTitleBlock using heightOfString, so
     // this places the body text exactly where it should be.
     if (i === 0 && opts.align === 'center') {
+      // eslint-disable-next-line no-console
+      console.log('[drawStyledRuns] centered i=0 doc.y=%o doc.x=%o text=%o continued=%o', doc.y, doc.x, text.slice(0, 30), !isLast);
       doc.text(text, PAGE_MARGIN, doc.y, {
         continued: !isLast,
         width: textWidth,
         align: 'center',
         ...(isLast ? { paragraphGap: 4 } : {}),
       });
+      // eslint-disable-next-line no-console
+      console.log('[drawStyledRuns] after text doc.y=%o doc.x=%o', doc.y, doc.x);
     } else {
       doc.text(text, {
         continued: !isLast,
