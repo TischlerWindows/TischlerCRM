@@ -411,16 +411,19 @@ function drawTitleBlock(
   if (!hideTitle) {
     doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
     const titleText = preset.title.toUpperCase();
-    // Measure ONE line height before drawing — this is the guaranteed safe API.
-    // heightOfString is unreliable after a draw call; currentLineHeight always works.
-    const titleLineH = doc.currentLineHeight(true);
+    // Measure BEFORE drawing — heightOfString pre-draw correctly accounts for
+    // multi-line wrapping in brand fonts, which currentLineHeight cannot.
+    // After doc.text() the internal state can produce stale values.
+    const titleH = (doc as any).heightOfString(titleText, { width: usableWidth });
     const titleStartY = doc.y;
-    doc.text(titleText, PAGE_MARGIN, titleStartY, { width: usableWidth, align: 'center' });
-    // Forcibly advance doc.y past the title regardless of what PDFKit did internally.
-    // Math.max: if PDFKit already advanced further (multi-line title), keep that.
-    doc.y = Math.max(doc.y, titleStartY + titleLineH);
+    // Flow-mode draw (no explicit x,y): confirmed to advance doc.y correctly
+    // AND keeps doc.x at PAGE_MARGIN in PDFKit 0.15.x.
     doc.x = PAGE_MARGIN;
-    // Gap between title and body.
+    doc.text(titleText, { width: usableWidth, align: 'center' });
+    // Force doc.y to the pre-measured bottom of the title. Math.max keeps
+    // any further advancement PDFKit already made (single-line titles).
+    doc.y = Math.max(doc.y, titleStartY + titleH);
+    doc.x = PAGE_MARGIN;
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
     doc.y += doc.currentLineHeight(true) * 0.3;
   }
@@ -850,13 +853,11 @@ function drawStyledRuns(
     doc.font(fontFor(run, ctx.fonts));
     if (run.fontSize) doc.fontSize(run.fontSize);
     const text = run.text.replace(/\u00A0/g, ' ');
-    // For centered paragraphs, pass explicit x=PAGE_MARGIN to reset doc.x drift
-    // caused by prior centered text, but pass null for y so PDFKit flows from
-    // the current doc.y naturally (passing explicit y can fight with PDFKit's
-    // internal cursor and produce incorrect positioning).
+    // For centered paragraphs: explicit (PAGE_MARGIN, doc.y) anchors both axes.
+    // doc.y is correctly pre-set by drawTitleBlock using heightOfString, so
+    // this places the body text exactly where it should be.
     if (i === 0 && opts.align === 'center') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      doc.text(text, PAGE_MARGIN, null as any, {
+      doc.text(text, PAGE_MARGIN, doc.y, {
         continued: !isLast,
         width: textWidth,
         align: 'center',
