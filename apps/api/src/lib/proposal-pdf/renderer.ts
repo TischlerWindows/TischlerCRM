@@ -420,15 +420,11 @@ function drawTitleBlock(
     // AND keeps doc.x at PAGE_MARGIN in PDFKit 0.15.x.
     doc.x = PAGE_MARGIN;
     doc.text(titleText, { width: usableWidth, align: 'center' });
-    const yAfterTitle = doc.y;
     // Force doc.y to the pre-measured bottom of the title. Math.max keeps
     // any further advancement PDFKit already made (single-line titles).
     doc.y = Math.max(doc.y, titleStartY + titleH);
     doc.x = PAGE_MARGIN;
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
-    doc.y += doc.currentLineHeight(true) * 0.3;
-    // eslint-disable-next-line no-console
-    console.log('[drawTitleBlock] titleStartY=%o titleH=%o yAfterTitle=%o bodyStartY=%o font=%o', titleStartY, titleH, yAfterTitle, doc.y, ctx.fonts.bold);
   }
 
   if (preset.body && preset.body.trim()) {
@@ -437,19 +433,30 @@ function drawTitleBlock(
     for (const block of htmlToBlocks(preset.body)) {
       if (block.kind !== 'paragraph') continue;
       const runs = (block.runs ?? []) as StyledRun[];
-      // Combine all run texts into one string and render as a single doc.text()
-      // call. This avoids `continued`-chain cursor drift that occurs when mixing
-      // explicit-coord first runs with flow-mode subsequent runs mid-paragraph.
-      const text = runs.map((r: StyledRun) => r.text.replace(/\u00A0/g, ' ')).join('');
-      if (!text.trim()) {
+      const nonEmpty = runs.filter((r: StyledRun) => r.text.trim());
+      if (nonEmpty.length === 0) {
         doc.y += doc.currentLineHeight(true) * 0.8;
         continue;
       }
-      // eslint-disable-next-line no-console
-      console.log('[drawTitleBlock body] y=%o text=%o', doc.y, text.slice(0, 40));
-      doc.text(text, PAGE_MARGIN, doc.y, { width: usableWidth, align: 'center' });
-      // eslint-disable-next-line no-console
-      console.log('[drawTitleBlock body] after y=%o', doc.y);
+      // Render per-run with font/size switching for bold/italic, using pure
+      // flow mode (no explicit x,y coords). doc.x is snapped to PAGE_MARGIN
+      // before the first run so the text box is anchored correctly.
+      // Mixing explicit-coord first run with flow-mode subsequent runs caused
+      // cursor drift — flow-only mode is the safe approach here.
+      doc.x = PAGE_MARGIN;
+      runs.forEach((run: StyledRun, i: number) => {
+        const isLast = i === runs.length - 1;
+        doc.font(fontFor(run, ctx.fonts));
+        if (run.fontSize) doc.fontSize(run.fontSize);
+        const text = run.text.replace(/\u00A0/g, ' ');
+        doc.text(text, {
+          continued: !isLast,
+          width: usableWidth,
+          align: 'center',
+          ...(isLast ? { paragraphGap: 4 } : {}),
+        });
+        if (run.fontSize) doc.fontSize(BODY_FONT_SIZE);
+      });
       doc.x = PAGE_MARGIN;
     }
   }
@@ -867,16 +874,12 @@ function drawStyledRuns(
     // doc.y is correctly pre-set by drawTitleBlock using heightOfString, so
     // this places the body text exactly where it should be.
     if (i === 0 && opts.align === 'center') {
-      // eslint-disable-next-line no-console
-      console.log('[drawStyledRuns] centered i=0 doc.y=%o doc.x=%o text=%o continued=%o', doc.y, doc.x, text.slice(0, 30), !isLast);
       doc.text(text, PAGE_MARGIN, doc.y, {
         continued: !isLast,
         width: textWidth,
         align: 'center',
         ...(isLast ? { paragraphGap: 4 } : {}),
       });
-      // eslint-disable-next-line no-console
-      console.log('[drawStyledRuns] after text doc.y=%o doc.x=%o', doc.y, doc.x);
     } else {
       doc.text(text, {
         continued: !isLast,
