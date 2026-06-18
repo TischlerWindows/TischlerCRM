@@ -410,14 +410,16 @@ function drawTitleBlock(
 
   if (!hideTitle) {
     doc.fillColor(ctx.navy).font(ctx.fonts.bold).fontSize(SECTION_HEADING_SIZE);
-    // Explicit (PAGE_MARGIN, doc.y) ensures PDFKit advances doc.y to the
-    // bottom of the title text. Without explicit coords, PDFKit centered
-    // text in flow mode does not reliably update doc.y.
-    doc.text(preset.title.toUpperCase(), PAGE_MARGIN, doc.y, {
-      width: usableWidth,
-      align: 'center',
-    });
-    // Snap x back (centered text leaves doc.x at the right edge of the box).
+    const titleText = preset.title.toUpperCase();
+    // Capture y before drawing so we can manually advance past the title.
+    // PDFKit does not reliably update doc.y after centered text regardless
+    // of whether explicit coordinates are passed.
+    const titleStartY = doc.y;
+    doc.text(titleText, PAGE_MARGIN, titleStartY, { width: usableWidth, align: 'center' });
+    // heightOfString measures exactly how tall the title is (handles wrapping).
+    const titleHeight = (doc as any).heightOfString(titleText, { width: usableWidth });
+    // Manually place doc.y at the bottom of the title — don't trust doc.y.
+    doc.y = titleStartY + titleHeight;
     doc.x = PAGE_MARGIN;
     // Gap between title and body using body font line height.
     doc.font(ctx.fonts.regular).fontSize(BODY_FONT_SIZE);
