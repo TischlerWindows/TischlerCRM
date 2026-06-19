@@ -42,6 +42,8 @@ interface Props {
   driverField: string;
   /** If provided, Match Value renders as a multi-select dropdown instead of free text. */
   matchOptions?: string[];
+  /** Called when any variant body editor receives focus. */
+  onFocus?: () => void;
 }
 
 // ── Multi-select dropdown ──────────────────────────────────────────
@@ -117,7 +119,7 @@ function MultiSelectDropdown({
 }
 
 export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function VariantEditor(
-  { variants, onChange, driverField, matchOptions },
+  { variants, onChange, driverField, matchOptions, onFocus },
   ref,
 ) {
   const [expandedKey, setExpandedKey] = useState<string | null>(variants[0]?._key || null);
@@ -237,6 +239,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                         ref={getEditorRef(variant._key) as React.RefObject<BodyEditorHandle | null>}
                         value={variant.body}
                         onChange={(html) => update(variant._key, { body: html })}
+                        onFocus={onFocus}
                         placeholder="Bold, italic, lists supported"
                         minHeight={120}
                       />

@@ -109,6 +109,16 @@ interface Props {
   bodyEditorRef?: React.RefObject<BodyEditorHandle | null>;
   /** Ref to the variant editor — used by the Variables chip panel in driver mode. */
   variantEditorRef?: React.RefObject<BodyEditorHandle | null>;
+  /** Ref to the title input — used by the Variables chip panel to insert tokens at cursor. */
+  titleRef?: React.RefObject<HTMLInputElement | null>;
+  /** Ref to the universal body editor — used by the Variables chip panel in driver mode. */
+  universalBodyEditorRef?: React.RefObject<BodyEditorHandle | null>;
+  /** Called when the title input is focused — used to route token inserts. */
+  onTitleFocus?: () => void;
+  /** Called when the universal body editor is focused — used to route token inserts. */
+  onUniversalBodyFocus?: () => void;
+  /** Called when the body/variant editor is focused — used to route token inserts. */
+  onBodyFocus?: () => void;
   /** Inclusion decision for the currently-edited block against the active summary, if any. */
   decision?: { included: boolean; reason: string } | null;
 }
@@ -150,6 +160,11 @@ export function BlockEditor({
   onDelete,
   bodyEditorRef,
   variantEditorRef,
+  titleRef,
+  universalBodyEditorRef,
+  onTitleFocus,
+  onUniversalBodyFocus,
+  onBodyFocus,
   decision,
 }: Props) {
   const isVariantMode = !!driverField;
@@ -233,8 +248,10 @@ export function BlockEditor({
             {isLayoutOnly ? 'Internal name' : 'Title'}
           </label>
           <input
+            ref={titleRef}
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
+            onFocus={() => onTitleFocus?.()}
             placeholder={isLayoutOnly ? 'Shown only in the block list' : 'e.g., Glass Specification'}
             className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
           />
@@ -325,6 +342,7 @@ A project with multiple glass types prints all matches.`}
               onChange={onVariantsChange}
               driverField={driverField}
               matchOptions={matchOptions}
+              onFocus={() => onBodyFocus?.()}
             />
             {/* Merge toggle */}
             <label className="flex items-center gap-1.5 cursor-pointer">
@@ -372,8 +390,10 @@ A project with multiple glass types prints all matches.`}
                 </div>
               </div>
               <BodyEditor
+                ref={universalBodyEditorRef}
                 value={typeof config.universalBody === 'string' ? config.universalBody : ''}
                 onChange={(v) => onConfigChange({ ...config, universalBody: v })}
+                onFocus={() => onUniversalBodyFocus?.()}
                 placeholder="Optional text that always appears with the matched variants…"
               />
             </div>
@@ -388,6 +408,7 @@ A project with multiple glass types prints all matches.`}
               ref={bodyEditorRef}
               value={body}
               onChange={onBodyChange}
+              onFocus={() => onBodyFocus?.()}
               placeholder="Bold, italic, lists supported"
             />
           </div>

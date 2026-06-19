@@ -160,6 +160,10 @@ export default function QuoteBuilderPage() {
 
   const bodyEditorRef = useRef<BodyEditorHandle | null>(null);
   const variantEditorRef = useRef<BodyEditorHandle | null>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
+  const universalBodyEditorRef = useRef<BodyEditorHandle | null>(null);
+  // Track which editor/field last received focus so token inserts go to the right place.
+  const focusedFieldRef = useRef<'title' | 'body' | 'variant' | 'universalBody'>('body');
 
   // Resizable side panels (shared with page-editor pattern)
   const panels = useResizableSidePanels({
@@ -572,10 +576,27 @@ export default function QuoteBuilderPage() {
   };
 
   const handleInsertToken = (tokenName: string) => {
-    if (editDriverField) {
-      variantEditorRef.current?.insertText(`{{${tokenName}}}`);
+    const token = `{{${tokenName}}}`;
+    const focused = focusedFieldRef.current;
+    if (focused === 'title') {
+      const input = titleRef.current;
+      if (input) {
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        const next = input.value.slice(0, start) + token + input.value.slice(end);
+        setEditTitle(next);
+        // Restore cursor after React re-render
+        requestAnimationFrame(() => {
+          input.focus();
+          input.setSelectionRange(start + token.length, start + token.length);
+        });
+      }
+    } else if (focused === 'universalBody') {
+      universalBodyEditorRef.current?.insertText(token);
+    } else if (focused === 'variant' || editDriverField) {
+      variantEditorRef.current?.insertText(token);
     } else {
-      bodyEditorRef.current?.insertText(`{{${tokenName}}}`);
+      bodyEditorRef.current?.insertText(token);
     }
     flash(`Inserted {{${tokenName}}}`);
   };
@@ -1349,6 +1370,11 @@ export default function QuoteBuilderPage() {
                   onDelete={handleDelete}
                   bodyEditorRef={bodyEditorRef}
                   variantEditorRef={variantEditorRef}
+                  titleRef={titleRef}
+                  universalBodyEditorRef={universalBodyEditorRef}
+                  onTitleFocus={() => { focusedFieldRef.current = 'title'; }}
+                  onUniversalBodyFocus={() => { focusedFieldRef.current = 'universalBody'; }}
+                  onBodyFocus={() => { focusedFieldRef.current = editDriverField ? 'variant' : 'body'; }}
                   decision={currentDecision}
                 />
               )}

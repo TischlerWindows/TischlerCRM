@@ -58,6 +58,8 @@ interface Props {
   placeholder?: string;
   /** Min-height for the editing area in pixels. */
   minHeight?: number;
+  /** Called when the editor receives focus. */
+  onFocus?: () => void;
 }
 
 interface ToolbarBtnProps {
@@ -94,13 +96,14 @@ function ToolbarBtn({ active, onClick, label, children }: ToolbarBtnProps) {
  * the cursor via the exposed `insertText` handle.
  */
 export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEditor(
-  { value, onChange, placeholder, minHeight = 180 },
+  { value, onChange, placeholder, minHeight = 180, onFocus },
   ref,
 ) {
   const editor = useEditor({
     extensions: [StarterKit, TextStyle, FontSize],
     content: value,
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+    onFocus: () => onFocus?.(),
     editorProps: {
       attributes: {
         // tiptap-prose-* selectors make body content look right without a global stylesheet
