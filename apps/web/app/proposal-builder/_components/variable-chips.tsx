@@ -146,6 +146,13 @@ export function VariableChips({ mappings, grouped, onInsert, onNewToken, onDelet
                         >
                           <button
                             type="button"
+                            onMouseDown={(e) => {
+                              // Prevent the editor/input from losing focus when clicking a chip.
+                              // Without this, TipTap clears its selection before onClick fires,
+                              // causing insertText to fail silently. The title input also loses
+                              // its cursor position. preventDefault here keeps focus in place.
+                              e.preventDefault();
+                            }}
                             onClick={() => onInsert(m.tokenName)}
                             title={`{{${m.tokenName}}} — ${m.sourceObject}.${m.label}`}
                             aria-label={`Insert ${m.tokenName} token`}

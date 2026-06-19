@@ -103,7 +103,6 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
     extensions: [StarterKit, TextStyle, FontSize],
     content: value,
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
-    onFocus: () => onFocus?.(),
     editorProps: {
       attributes: {
         // tiptap-prose-* selectors make body content look right without a global stylesheet
@@ -157,7 +156,10 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
   if (!editor) return null;
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-brand-navy/20 focus-within:border-brand-navy/40">
+    <div
+        className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-brand-navy/20 focus-within:border-brand-navy/40"
+        onFocus={onFocus}
+      >
       <div className="flex items-center gap-0.5 px-1.5 py-1 border-b border-gray-200 bg-gray-50">
         <ToolbarBtn
           active={editor.isActive('bold')}
