@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
+import { getOptionsForType } from '@/lib/product-type-options';
 
 export interface DraftVariant {
   _key: string;
@@ -246,9 +247,10 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                     {(() => {
                       const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
                       const selectedTypes = typePart.split(',').map(t => t.trim()).filter(Boolean);
-                      // Available options = union of options for all currently-selected product types
-                      const availableOptions = productTypeOptionsMap && driverField === 'productTypes'
-                        ? [...new Set(selectedTypes.flatMap(t => productTypeOptionsMap[t] ?? []))]
+                      // Available options = union of ALL possible options for selected product types
+                      // (from the static definition, not just what's checked in the summary)
+                      const availableOptions = driverField === 'productTypes'
+                        ? [...new Set(selectedTypes.flatMap(t => getOptionsForType(t)))]
                         : [];
                       const selectedOptions = optionPart.split(',').map(o => o.trim()).filter(Boolean);
                       return (
@@ -302,9 +304,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                                 />
                               ) : (
                                 <p className="text-[10px] text-gray-400 italic px-1">
-                                  {selectedTypes.length === 0
-                                    ? 'Select product types above to see available options.'
-                                    : 'No options found for the selected product types in the current summary.'}
+                                  Select product types above to see available options.
                                 </p>
                               )}
                             </div>
