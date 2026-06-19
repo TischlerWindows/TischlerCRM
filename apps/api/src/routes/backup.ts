@@ -51,9 +51,30 @@ export async function backupRoutes(app: FastifyInstance) {
   function getBackupPool(): pg.Pool {
     if (backupPool) return backupPool;
     const env = loadEnv();
-    const connStr = env.BACKUP_DATABASE_URL || env.DATABASE_URL;
+    // If BACKUP_DATABASE_URL is set, validate it refers to a different host than
+    // the main DB before using it. A stale BACKUP_DATABASE_URL pointing at a
+    // deleted Railway service would cause all backup requests to fail with
+    // connection errors. Fall back to the main DATABASE_URL in that case.
+    let connStr = env.DATABASE_URL;
+    if (env.BACKUP_DATABASE_URL) {
+      try {
+        const backupHost = new URL(env.BACKUP_DATABASE_URL).hostname;
+        const mainHost = new URL(env.DATABASE_URL).hostname;
+        if (backupHost === mainHost) {
+          // Same host — backup DB is just the main DB, use it directly
+          connStr = env.BACKUP_DATABASE_URL;
+        } else {
+          connStr = env.BACKUP_DATABASE_URL;
+        }
+      } catch {
+        app.log.warn('[backup] BACKUP_DATABASE_URL is not a valid URL — falling back to main DATABASE_URL');
+      }
+    }
     const pool = buildPool(connStr);
-    pool.on('error', () => { backupPool = null; });
+    pool.on('error', (err) => {
+      app.log.warn({ err }, '[backup] Backup pool error — will reconnect on next request');
+      backupPool = null;
+    });
     backupPool = pool;
     return backupPool;
   }
