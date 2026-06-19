@@ -21,7 +21,7 @@ export interface StyledRun {
 }
 
 export type Block =
-  | { kind: 'paragraph'; runs: StyledRun[] }
+  | { kind: 'paragraph'; runs: StyledRun[]; align?: 'left' | 'center' | 'right' }
   | { kind: 'bullet'; runs: StyledRun[] }
   | { kind: 'number'; index: number; runs: StyledRun[] };
 
@@ -49,11 +49,30 @@ function pushBlocks(el: HTMLElement, out: Block[]): void {
   const tag = el.tagName?.toUpperCase();
   if (tag === 'P') {
     const runs = collectRuns(el);
-    if (runs.length === 0 || runs.every((r) => !r.text.trim())) {
-      // Empty paragraph — preserve as a blank line.
-      out.push({ kind: 'paragraph', runs: [{ text: '', bold: false, italic: false }] });
-    } else {
-      out.push({ kind: 'paragraph', runs });
+    // Parse text-align from TipTap's inline style (e.g. text-align: right)
+    const style = el.getAttribute('style') ?? '';
+    const alignMatch = /text-align:\s*(left|center|right)/i.exec(style);
+    const align = alignMatch ? (alignMatch[1].toLowerCase() as 'left' | 'center' | 'right') : undefined;
+
+    // Split on \n runs produced by <br> tags. PDFKit's doc.text('\n', {continued:true})
+    // is unreliable — it can silently drop the line advance. Splitting at <br>
+    // positions creates separate paragraph blocks, each rendered with their own
+    // doc.text({continued:false}) call, which reliably advances the cursor.
+    const segments: StyledRun[][] = [[]];
+    for (const run of runs) {
+      if (run.text === '\n') {
+        segments.push([]);
+      } else {
+        segments[segments.length - 1].push(run);
+      }
+    }
+
+    for (const seg of segments) {
+      if (seg.length === 0 || seg.every((r) => !r.text.trim())) {
+        out.push({ kind: 'paragraph', runs: [{ text: '', bold: false, italic: false }], align });
+      } else {
+        out.push({ kind: 'paragraph', runs: seg, align });
+      }
     }
     return;
   }
