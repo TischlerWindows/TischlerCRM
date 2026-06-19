@@ -119,6 +119,11 @@ interface Props {
   onUniversalBodyFocus?: () => void;
   /** Called when the body/variant editor is focused — used to route token inserts. */
   onBodyFocus?: () => void;
+  /**
+   * For productTypes driver blocks: the available options per product type from the
+   * current summary, passed down to VariantEditor for the options sub-dropdown.
+   */
+  productTypeOptionsMap?: Record<string, string[]>;
   /** Inclusion decision for the currently-edited block against the active summary, if any. */
   decision?: { included: boolean; reason: string } | null;
 }
@@ -165,6 +170,7 @@ export function BlockEditor({
   onTitleFocus,
   onUniversalBodyFocus,
   onBodyFocus,
+  productTypeOptionsMap,
   decision,
 }: Props) {
   const isVariantMode = !!driverField;
@@ -342,6 +348,7 @@ A project with multiple glass types prints all matches.`}
               onChange={onVariantsChange}
               driverField={driverField}
               matchOptions={matchOptions}
+              productTypeOptionsMap={productTypeOptionsMap}
               onFocus={() => onBodyFocus?.()}
             />
             {/* Merge toggle */}

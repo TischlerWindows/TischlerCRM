@@ -1375,6 +1375,7 @@ export default function QuoteBuilderPage() {
                   onTitleFocus={() => { focusedFieldRef.current = 'title'; }}
                   onUniversalBodyFocus={() => { focusedFieldRef.current = 'universalBody'; }}
                   onBodyFocus={() => { focusedFieldRef.current = editDriverField ? 'variant' : 'body'; }}
+                  productTypeOptionsMap={(selectedSummary as any)?.productTypeOptions as Record<string, string[]> | undefined}
                   decision={currentDecision}
                 />
               )}

@@ -605,6 +605,12 @@ export function assemblePresets(
  * returns variants whose matchValue is contained in the context value.
  * For array fields (e.g. productTypes), returns variants whose matchValue
  * is contained in any element. Returns all matching variants sorted by order.
+ *
+ * matchValue may encode an optional product-type-option filter separated by '||':
+ *   "Inswing GD,Inswing French GD||KFV RH,72mm Thick Sash"
+ * The part before '||' is the standard driver match; the part after is an option
+ * filter checked against context.hardwareOptions (flattened productTypeOptions).
+ * If an option filter is present, ALL checks must pass for the variant to match.
  */
 export function matchVariants(
   preset: SpecPresetData,
@@ -620,13 +626,44 @@ export function matchVariants(
     .sort((a, b) => a.order - b.order);
 
   return activeVariants.filter((variant) => {
-    const match = variant.matchValue.toLowerCase();
+    // Split matchValue into the type-match part and optional option-filter part.
+    const pipeIdx = variant.matchValue.indexOf('||');
+    const typeMatchStr = pipeIdx === -1 ? variant.matchValue : variant.matchValue.slice(0, pipeIdx);
+    const optionFilterStr = pipeIdx === -1 ? '' : variant.matchValue.slice(pipeIdx + 2);
+
+    // matchValue may be comma-separated (multi-select): split and check each.
+    const matchParts = typeMatchStr
+      .split(',')
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+    if (matchParts.length === 0) return false;
+
+    // Check the driver field value.
+    let typeMatch: boolean;
     if (Array.isArray(driverValue)) {
-      return driverValue.some((item) =>
-        String(item).toLowerCase().includes(match)
+      typeMatch = matchParts.some((match) =>
+        driverValue.some((item) => String(item).toLowerCase().includes(match))
       );
+    } else {
+      const ctxStr = String(driverValue).toLowerCase();
+      typeMatch = matchParts.some((match) => ctxStr.includes(match));
     }
-    return String(driverValue).toLowerCase().includes(match);
+    if (!typeMatch) return false;
+
+    // If an option filter is encoded, also check against hardwareOptions.
+    if (optionFilterStr) {
+      const optionParts = optionFilterStr
+        .split(',')
+        .map((p) => p.trim().toLowerCase())
+        .filter(Boolean);
+      if (optionParts.length > 0) {
+        const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
+        const optionMatch = optionParts.some((opt) => hwLower.some((hw) => hw.includes(opt)));
+        if (!optionMatch) return false;
+      }
+    }
+
+    return true;
   });
 }
 

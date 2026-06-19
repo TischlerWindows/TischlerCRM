@@ -42,8 +42,29 @@ interface Props {
   driverField: string;
   /** If provided, Match Value renders as a multi-select dropdown instead of free text. */
   matchOptions?: string[];
+  /**
+   * When driverField === 'productTypes', the available options per product type
+   * from the current summary (Record<productTypeName, optionName[]>).
+   * Used to populate the "Product Type Options" sub-dropdown.
+   */
+  productTypeOptionsMap?: Record<string, string[]>;
   /** Called when any variant body editor receives focus. */
   onFocus?: () => void;
+}
+
+// ── matchValue encoding helpers ────────────────────────────────────
+// matchValue may encode an optional product-type-option filter after '||':
+//   "Inswing GD,Inswing French GD||KFV RH,72mm Thick Sash"
+// Parts before || → product type match values (comma-separated)
+// Parts after  || → option filter (comma-separated); absent = no filter
+function parseMatchValueParts(mv: string): { typePart: string; optionPart: string } {
+  const idx = mv.indexOf('||');
+  if (idx === -1) return { typePart: mv, optionPart: '' };
+  return { typePart: mv.slice(0, idx), optionPart: mv.slice(idx + 2) };
+}
+function buildMatchValue(typePart: string, optionPart: string): string {
+  if (!optionPart) return typePart;
+  return `${typePart}||${optionPart}`;
 }
 
 // ── Multi-select dropdown ──────────────────────────────────────────
@@ -119,7 +140,7 @@ function MultiSelectDropdown({
 }
 
 export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function VariantEditor(
-  { variants, onChange, driverField, matchOptions, onFocus },
+  { variants, onChange, driverField, matchOptions, productTypeOptionsMap, onFocus },
   ref,
 ) {
   const [expandedKey, setExpandedKey] = useState<string | null>(variants[0]?._key || null);
@@ -187,13 +208,29 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                   className="w-full flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
                 >
                   {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
-                  <span className="text-xs font-medium text-gray-900 flex-1 truncate">
-                    {variant.matchValue
-                      ? variant.matchValue.split(',').map(v => v.trim()).filter(Boolean).join(', ')
-                      : <span className="text-gray-400 italic">untitled</span>}
+                  <span className="text-xs font-medium text-gray-900 flex-1 truncate min-w-0">
+                    {(() => {
+                      const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
+                      const typeLabel = typePart
+                        ? typePart.split(',').map(v => v.trim()).filter(Boolean).join(', ')
+                        : null;
+                      const optLabel = optionPart
+                        ? optionPart.split(',').map(v => v.trim()).filter(Boolean).join(', ')
+                        : null;
+                      return (
+                        <span className="flex flex-col min-w-0">
+                          <span className="truncate">
+                            {typeLabel ?? <span className="text-gray-400 italic">untitled</span>}
+                          </span>
+                          {optLabel && (
+                            <span className="text-[10px] text-indigo-600 truncate">{optLabel}</span>
+                          )}
+                        </span>
+                      );
+                    })()}
                   </span>
                   {variant.matchLabel && (
-                    <span className="text-[10px] text-gray-500">{variant.matchLabel}</span>
+                    <span className="text-[10px] text-gray-500 flex-shrink-0">{variant.matchLabel}</span>
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); remove(variant._key); }}
@@ -205,34 +242,77 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
 
                 {isOpen && (
                   <div className="px-3 py-3 space-y-3 border-t border-gray-200">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Match Value</label>
-                        {matchOptions ? (
-                          <MultiSelectDropdown
-                            options={matchOptions}
-                            selected={variant.matchValue ? variant.matchValue.split(',').map(v => v.trim()).filter(Boolean) : []}
-                            onChange={(vals) => update(variant._key, { matchValue: vals.join(',') })}
-                          />
-                        ) : (
-                          <input
-                            value={variant.matchValue}
-                            onChange={(e) => update(variant._key, { matchValue: e.target.value })}
-                            placeholder={`e.g., #28`}
-                            className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-                          />
-                        )}
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Label (optional)</label>
-                        <input
-                          value={variant.matchLabel}
-                          onChange={(e) => update(variant._key, { matchLabel: e.target.value })}
-                          placeholder="Glass #28"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
-                        />
-                      </div>
-                    </div>
+                    {/* Match Value + optional Product Type Options sub-row */}
+                    {(() => {
+                      const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
+                      const selectedTypes = typePart.split(',').map(t => t.trim()).filter(Boolean);
+                      // Available options = union of options for all currently-selected product types
+                      const availableOptions = productTypeOptionsMap && driverField === 'productTypes'
+                        ? [...new Set(selectedTypes.flatMap(t => productTypeOptionsMap[t] ?? []))]
+                        : [];
+                      const selectedOptions = optionPart.split(',').map(o => o.trim()).filter(Boolean);
+                      return (
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Match Value</label>
+                              {matchOptions ? (
+                                <MultiSelectDropdown
+                                  options={matchOptions}
+                                  selected={selectedTypes}
+                                  onChange={(vals) =>
+                                    update(variant._key, { matchValue: buildMatchValue(vals.join(','), optionPart) })
+                                  }
+                                />
+                              ) : (
+                                <input
+                                  value={typePart}
+                                  onChange={(e) =>
+                                    update(variant._key, { matchValue: buildMatchValue(e.target.value, optionPart) })
+                                  }
+                                  placeholder="e.g., #28"
+                                  className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Label (optional)</label>
+                              <input
+                                value={variant.matchLabel}
+                                onChange={(e) => update(variant._key, { matchLabel: e.target.value })}
+                                placeholder="Glass #28"
+                                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                              />
+                            </div>
+                          </div>
+                          {/* Product Type Options sub-filter — only for productTypes driver */}
+                          {driverField === 'productTypes' && productTypeOptionsMap !== undefined && (
+                            <div>
+                              <div className="flex items-center gap-1 mb-1">
+                                <label className="text-[10px] font-semibold text-gray-500">Product Type Options</label>
+                                <span className="text-[9px] text-gray-400">(optional — further filter by specific options)</span>
+                              </div>
+                              {availableOptions.length > 0 ? (
+                                <MultiSelectDropdown
+                                  options={availableOptions}
+                                  selected={selectedOptions}
+                                  onChange={(vals) =>
+                                    update(variant._key, { matchValue: buildMatchValue(typePart, vals.join(',')) })
+                                  }
+                                />
+                              ) : (
+                                <p className="text-[10px] text-gray-400 italic px-1">
+                                  {selectedTypes.length === 0
+                                    ? 'Select product types above to see available options.'
+                                    : 'No options found for the selected product types in the current summary.'}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                    {/* end match value section */}
                     <div>
                       <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Body Text</label>
                       <BodyEditor
