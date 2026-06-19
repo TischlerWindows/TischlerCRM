@@ -201,6 +201,14 @@ export function buildTokenMap(
       lines.push(`Total: ${formatDollar(String(grandTotal))}`);
       return lines.join('<br>');
     })(),
+    productTypeDetails: (() => {
+      const pto = (summary as any).productTypeOptions as Record<string, string[]> | undefined;
+      if (!pto) return '';
+      const lines = Object.entries(pto)
+        .filter(([, opts]) => Array.isArray(opts) && opts.length > 0)
+        .map(([typeName, opts]) => `${typeName} with ${opts.join(', ')}`);
+      return lines.join('<br>');
+    })(),
   };
 
   return tokens;

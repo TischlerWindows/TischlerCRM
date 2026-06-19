@@ -1054,6 +1054,16 @@ export default function QuoteBuilderPage() {
         : [...instRows.map((r: { label: string; price: string }) => `${r.label}: ${r.price}`), `Total: ${fmtUSD(instGrand)}`].join('<br>');
       const patchedSummary = { ...(selectedSummary as any), installationDetails: installationDetailsValue, installationTotalPrice: fmtUSD(instGrand) };
 
+      // Pre-compute productTypeDetails: "Type with Option1, Option2" per line.
+      const pto = (selectedSummary as any)?.productTypeOptions as Record<string, string[]> | undefined;
+      const productTypeDetailsValue = pto
+        ? Object.entries(pto)
+            .filter(([, opts]) => Array.isArray(opts) && opts.length > 0)
+            .map(([typeName, opts]) => `${typeName} with ${(opts as string[]).join(', ')}`)
+            .join('<br>')
+        : '';
+      const patchedSummary2 = { ...patchedSummary, productTypeDetails: productTypeDetailsValue };
+
       const baseTokenMappings = tokenMappings.map((m) => ({
         tokenName: m.tokenName,
         sourceObject: m.sourceObject,
@@ -1066,11 +1076,12 @@ export default function QuoteBuilderPage() {
       const syntheticMappings = [
         { tokenName: 'installationDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'installationDetails', format: 'TEXT' as const, isBuiltIn: false },
         { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY' as const, sourcePath: 'installationTotalPrice', format: 'TEXT' as const, isBuiltIn: false },
+        { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'productTypeDetails', format: 'TEXT' as const, isBuiltIn: false },
       ].filter((m) => !syntheticNames.has(m.tokenName));
 
       return {
         result: assembleProposal({
-          summary: patchedSummary as any,
+          summary: patchedSummary2 as any,
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',

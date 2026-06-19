@@ -37,6 +37,7 @@ export async function tokenMappingRoutes(app: FastifyInstance) {
       const NEW_BUILT_INS = [
         { tokenName: 'installationDetails', sourceObject: 'SUMMARY', sourcePath: 'installationDetails', format: 'TEXT', label: 'Installation Details (sub-rows + total)', category: 'Add-ons' },
         { tokenName: 'installationTotalPrice', sourceObject: 'SUMMARY', sourcePath: 'installationTotalPrice', format: 'CURRENCY', label: 'Installation Total Price', category: 'Add-ons' },
+        { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY', sourcePath: 'productTypeDetails', format: 'TEXT', label: 'Product Type Details', category: 'Products' },
       ] as const;
       const existingNames = new Set(
         (await prisma.tokenMapping.findMany({ where: { templateId, isBuiltIn: true }, select: { tokenName: true } })).map((m) => m.tokenName)
