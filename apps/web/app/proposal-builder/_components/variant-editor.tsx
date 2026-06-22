@@ -58,12 +58,40 @@ interface Props {
 // instead of comma because many option names (e.g. glass types) contain
 // commas themselves — comma-splitting would fragment them on re-render.
 // The '||' sub-separator still divides type-part from option-part.
-// Legacy data (no \n) falls back to comma-splitting for backward compat.
-function splitValues(s: string): string[] {
+// New format: \n-separated. Legacy data (no \n) is recovered by greedy-matching
+// against the known options list — required because some option names contain commas.
+function splitValues(s: string, knownOptions?: string[]): string[] {
   if (!s) return [];
   // New format: newline-separated
   if (s.includes('\n')) return s.split('\n').map(v => v.trim()).filter(Boolean);
-  // Legacy format: comma-separated (product types only, no commas in names)
+  // Legacy format: try greedy forward-match against known options first so that
+  // options whose names contain commas are not split incorrectly.
+  if (knownOptions?.length) {
+    const result: string[] = [];
+    let rem = s;
+    while (rem.length > 0) {
+      rem = rem.trimStart();
+      if (!rem) break;
+      // Pick the longest known option that matches the start of the remainder
+      const match = knownOptions
+        .filter(opt => rem.startsWith(opt))
+        .sort((a, b) => b.length - a.length)[0];
+      if (match) {
+        result.push(match);
+        rem = rem.slice(match.length);
+        if (rem.startsWith(', ')) rem = rem.slice(2);
+        else if (rem.startsWith(',')) rem = rem.slice(1);
+      } else {
+        // No known option at this position — consume up to the next comma
+        const ci = rem.indexOf(',');
+        if (ci === -1) { result.push(rem.trim()); break; }
+        result.push(rem.slice(0, ci).trim());
+        rem = rem.slice(ci + 1);
+      }
+    }
+    return result.filter(Boolean);
+  }
+  // Fallback: naive comma split (safe when option names have no commas)
   return s.split(',').map(v => v.trim()).filter(Boolean);
 }
 function joinValues(vals: string[]): string {
@@ -262,13 +290,13 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                     {/* Match Value + optional Product Type Options sub-row */}
                     {(() => {
                       const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
-                      const selectedTypes = splitValues(typePart);
+                      const selectedTypes = splitValues(typePart, matchOptions);
                       // Available options = union of ALL possible options for selected product types
                       // (from the static definition, not just what's checked in the summary)
                       const availableOptions = driverField === 'productTypes'
                         ? [...new Set(selectedTypes.flatMap(t => getOptionsForType(t)))]
                         : [];
-                      const selectedOptions = splitValues(optionPart);
+                      const selectedOptions = splitValues(optionPart, availableOptions);
                       return (
                         <>
                           <div className="grid grid-cols-2 gap-3">
