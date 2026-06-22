@@ -1051,6 +1051,7 @@ model SpecVariant {
   presetId   String
   matchValue String
   matchLabel String?
+  title      String?
   body       String
   order      Int
   isActive   Boolean  @default(true)

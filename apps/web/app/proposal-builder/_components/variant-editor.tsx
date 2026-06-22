@@ -9,6 +9,7 @@ export interface DraftVariant {
   _key: string;
   matchValue: string;
   matchLabel: string;
+  title: string;
   body: string;
   order: number;
   isActive: boolean;
@@ -20,17 +21,18 @@ export function nextVariantKey(): string {
 }
 
 export function emptyDraftVariant(order: number): DraftVariant {
-  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', body: '', order, isActive: true };
+  return { _key: nextVariantKey(), matchValue: '', matchLabel: '', title: '', body: '', order, isActive: true };
 }
 
-export function variantToDraft(v: { matchValue: string; matchLabel: string | null; body: string; order: number; isActive: boolean }): DraftVariant {
-  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', body: v.body, order: v.order, isActive: v.isActive };
+export function variantToDraft(v: { matchValue: string; matchLabel: string | null; title?: string | null; body: string; order: number; isActive: boolean }): DraftVariant {
+  return { _key: nextVariantKey(), matchValue: v.matchValue, matchLabel: v.matchLabel || '', title: v.title || '', body: v.body, order: v.order, isActive: v.isActive };
 }
 
 export function variantsPayload(variants: DraftVariant[]) {
   return variants.map((v, i) => ({
     matchValue: v.matchValue,
     matchLabel: v.matchLabel || null,
+    title: v.title || null,
     body: v.body,
     order: i,
     isActive: v.isActive,
@@ -274,8 +276,8 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                       );
                     })()}
                   </span>
-                  {variant.matchLabel && (
-                    <span className="text-[10px] text-gray-500 flex-shrink-0">{variant.matchLabel}</span>
+                  {(variant.title || variant.matchLabel) && (
+                    <span className="text-[10px] text-gray-500 flex-shrink-0 truncate max-w-[120px]">{variant.title || variant.matchLabel}</span>
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); remove(variant._key); }}
@@ -330,6 +332,16 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                                 className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
                               />
                             </div>
+                          </div>
+                          {/* Per-variant title override */}
+                          <div>
+                            <label className="text-[10px] font-semibold text-gray-500 mb-1 block">Title (optional — overrides block title for this variant)</label>
+                            <input
+                              value={variant.title}
+                              onChange={(e) => update(variant._key, { title: e.target.value })}
+                              placeholder="e.g., 28 DC Standard Insulated Glass"
+                              className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-brand-navy/20"
+                            />
                           </div>
                           {/* Product Type Options sub-filter — only for productTypes driver */}
                           {driverField === 'productTypes' && productTypeOptionsMap !== undefined && (

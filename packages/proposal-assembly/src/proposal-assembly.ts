@@ -269,7 +269,13 @@ export function assembleProposal({
       } else {
         for (const variant of matched) {
           const resolved = resolveTokensWithDiagnostics(variant.body, tokens);
-          const resolvedPreset = { ...preset, body: withUniversal(resolved.text) };
+          // If the variant has its own title, override the block title for this entry.
+          const variantTitle = variant.title?.trim() || null;
+          const resolvedPreset = {
+            ...preset,
+            ...(variantTitle ? { title: variantTitle } : {}),
+            body: withUniversal(resolved.text),
+          };
           sections[sectionOf(preset)].push(resolvedPreset);
           orderedBlocks.push({
             presetId: preset.id,

@@ -48,6 +48,7 @@ const conditionSchema = z.object({
 const variantSchema = z.object({
   matchValue: z.string().min(1),
   matchLabel: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
   body: z.string().min(1),
   order: z.number().int().min(0),
   isActive: z.boolean().optional(),
@@ -165,6 +166,7 @@ export async function specPresetRoutes(app: FastifyInstance) {
               presetId: created.id,
               matchValue: v.matchValue,
               matchLabel: v.matchLabel ?? null,
+              title: v.title ?? null,
               body: v.body,
               order: v.order,
               isActive: v.isActive ?? true,
@@ -314,6 +316,7 @@ export async function specPresetRoutes(app: FastifyInstance) {
                 presetId: id,
                 matchValue: v.matchValue,
                 matchLabel: v.matchLabel ?? null,
+                title: v.title ?? null,
                 body: v.body,
                 order: v.order,
                 isActive: v.isActive ?? true,

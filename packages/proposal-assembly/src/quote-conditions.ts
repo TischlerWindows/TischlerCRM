@@ -130,6 +130,7 @@ export interface SpecVariantData {
   presetId: string;
   matchValue: string;
   matchLabel: string | null;
+  title: string | null;
   body: string;
   order: number;
   isActive: boolean;
