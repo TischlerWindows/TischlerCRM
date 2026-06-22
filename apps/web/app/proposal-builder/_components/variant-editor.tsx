@@ -82,19 +82,23 @@ function MultiSelectDropdown({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!open) return;
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    // Use capture:false so inner button onClick fires before this closes the dropdown
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [open]);
 
   const toggle = (opt: string) => {
-    if (selected.includes(opt)) {
-      onChange(selected.filter((v) => v !== opt));
-    } else {
-      onChange([...selected, opt]);
-    }
+    // Read selected directly — no stale closure since this is called inline from onClick
+    onChange(
+      selected.includes(opt)
+        ? selected.filter((v) => v !== opt)
+        : [...selected, opt],
+    );
+    // Keep dropdown open after selection (multi-select UX)
   };
 
   const displayLabel =
@@ -124,6 +128,7 @@ function MultiSelectDropdown({
               <button
                 key={opt}
                 type="button"
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={() => toggle(opt)}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 text-left"
               >
