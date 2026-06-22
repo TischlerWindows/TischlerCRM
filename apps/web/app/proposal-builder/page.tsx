@@ -1085,6 +1085,17 @@ export default function QuoteBuilderPage() {
         : '';
       const patchedSummary2 = { ...patchedSummary, productTypeDetails: productTypeDetailsValue };
 
+      // Ensure Hung Glass Type is included in additionalGlassTypes so it registers as
+      // a glassType variant match. This bypasses any stale package dist — buildQuoteContext
+      // already picks up additionalGlassTypes from the summary before the hungType fix.
+      const s = selectedSummary as any;
+      const resolvedHungType: string =
+        s?.hungType === 'Custom Option' ? (s?.hungTypeCustom || '') : (s?.hungType || '');
+      const existingAdditional: string[] = Array.isArray(s?.additionalGlassTypes) ? s.additionalGlassTypes : [];
+      const patchedSummary3 = resolvedHungType && !existingAdditional.includes(resolvedHungType)
+        ? { ...patchedSummary2, additionalGlassTypes: [...existingAdditional, resolvedHungType] }
+        : patchedSummary2;
+
       const baseTokenMappings = tokenMappings.map((m) => ({
         tokenName: m.tokenName,
         sourceObject: m.sourceObject,
@@ -1102,7 +1113,7 @@ export default function QuoteBuilderPage() {
 
       return {
         result: assembleProposal({
-          summary: patchedSummary2 as any,
+          summary: patchedSummary3 as any,
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',
