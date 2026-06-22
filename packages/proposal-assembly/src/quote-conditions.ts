@@ -34,6 +34,8 @@ export interface SummaryForConditions {
   glassType: string;
   glassTypeCustom?: string;
   additionalGlassTypes?: string[];
+  hungType?: string;
+  hungTypeCustom?: string;
   woodType: string;
   woodTypeCustom?: string;
   finish: string;
@@ -377,6 +379,9 @@ export function buildQuoteContext(summary: SummaryForConditions): QuoteContext {
     glassType: [
       summary.glassType || '',
       ...(summary.additionalGlassTypes || []),
+      // Hung Glass Type is a separate field for double-hung windows but should
+      // also match glassType variants so blocks can target it directly.
+      summary.hungType === 'Custom Option' ? (summary.hungTypeCustom || '') : (summary.hungType || ''),
     ].filter(Boolean),
     jobType: summary.jobType || '',
     finishType,
