@@ -1111,13 +1111,24 @@ export default function QuoteBuilderPage() {
         { tokenName: 'productTypeDetails', sourceObject: 'SUMMARY' as const, sourcePath: 'productTypeDetails', format: 'TEXT' as const, isBuiltIn: false },
       ].filter((m) => !syntheticNames.has(m.tokenName));
 
+      // Normalize matchValues in presets: convert newline-separated values (new format)
+      // to comma-separated (legacy format) so a stale package dist still produces
+      // correct substring matches. The rebuilt dist handles both formats natively.
+      const normalizedPresets = previewPresets.map((preset: any) => ({
+        ...preset,
+        variants: (preset.variants ?? []).map((v: any) => ({
+          ...v,
+          matchValue: typeof v.matchValue === 'string' ? v.matchValue.replace(/\n/g, ',') : v.matchValue,
+        })),
+      }));
+
       return {
         result: assembleProposal({
           summary: patchedSummary3 as any,
           template: {
             id: selectedTemplateId,
             name: selectedTemplate?.name ?? '',
-            presets: previewPresets as any,
+            presets: normalizedPresets as any,
           },
           tokenMappings: [...baseTokenMappings, ...syntheticMappings],
           opportunity: opportunityRecord ?? undefined,

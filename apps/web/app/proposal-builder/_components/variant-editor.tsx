@@ -54,10 +54,21 @@ interface Props {
 }
 
 // ── matchValue encoding helpers ────────────────────────────────────
-// matchValue may encode an optional product-type-option filter after '||':
-//   "Inswing GD,Inswing French GD||KFV RH,72mm Thick Sash"
-// Parts before || → product type match values (comma-separated)
-// Parts after  || → option filter (comma-separated); absent = no filter
+// matchValue encodes selected items as newline-separated. Newline is used
+// instead of comma because many option names (e.g. glass types) contain
+// commas themselves — comma-splitting would fragment them on re-render.
+// The '||' sub-separator still divides type-part from option-part.
+// Legacy data (no \n) falls back to comma-splitting for backward compat.
+function splitValues(s: string): string[] {
+  if (!s) return [];
+  // New format: newline-separated
+  if (s.includes('\n')) return s.split('\n').map(v => v.trim()).filter(Boolean);
+  // Legacy format: comma-separated (product types only, no commas in names)
+  return s.split(',').map(v => v.trim()).filter(Boolean);
+}
+function joinValues(vals: string[]): string {
+  return vals.join('\n');
+}
 function parseMatchValueParts(mv: string): { typePart: string; optionPart: string } {
   const idx = mv.indexOf('||');
   if (idx === -1) return { typePart: mv, optionPart: '' };
@@ -218,10 +229,10 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                     {(() => {
                       const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
                       const typeLabel = typePart
-                        ? typePart.split(',').map(v => v.trim()).filter(Boolean).join(', ')
+                        ? typePart.split('\n').map(v => v.trim()).filter(Boolean).join(', ')
                         : null;
                       const optLabel = optionPart
-                        ? optionPart.split(',').map(v => v.trim()).filter(Boolean).join(', ')
+                        ? optionPart.split('\n').map(v => v.trim()).filter(Boolean).join(', ')
                         : null;
                       return (
                         <span className="flex flex-col min-w-0">
@@ -251,13 +262,13 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                     {/* Match Value + optional Product Type Options sub-row */}
                     {(() => {
                       const { typePart, optionPart } = parseMatchValueParts(variant.matchValue);
-                      const selectedTypes = typePart.split(',').map(t => t.trim()).filter(Boolean);
+                      const selectedTypes = splitValues(typePart);
                       // Available options = union of ALL possible options for selected product types
                       // (from the static definition, not just what's checked in the summary)
                       const availableOptions = driverField === 'productTypes'
                         ? [...new Set(selectedTypes.flatMap(t => getOptionsForType(t)))]
                         : [];
-                      const selectedOptions = optionPart.split(',').map(o => o.trim()).filter(Boolean);
+                      const selectedOptions = splitValues(optionPart);
                       return (
                         <>
                           <div className="grid grid-cols-2 gap-3">
@@ -268,7 +279,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                                   options={matchOptions}
                                   selected={selectedTypes}
                                   onChange={(vals) =>
-                                    update(variant._key, { matchValue: buildMatchValue(vals.join(','), optionPart) })
+                                    update(variant._key, { matchValue: buildMatchValue(joinValues(vals), optionPart) })
                                   }
                                 />
                               ) : (
@@ -304,7 +315,7 @@ export const VariantEditor = forwardRef<BodyEditorHandle, Props>(function Varian
                                   options={availableOptions}
                                   selected={selectedOptions}
                                   onChange={(vals) =>
-                                    update(variant._key, { matchValue: buildMatchValue(typePart, vals.join(',')) })
+                                    update(variant._key, { matchValue: buildMatchValue(typePart, joinValues(vals)) })
                                   }
                                 />
                               ) : (

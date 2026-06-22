@@ -631,14 +631,16 @@ export function matchVariants(
     .sort((a, b) => a.order - b.order);
 
   return activeVariants.filter((variant) => {
-    // Split matchValue into the type-match part and optional option-filter part.
+    // Split matchValue on newline (new format) or comma (legacy format).
+    // Newline is used as separator because option names (e.g. glass types)
+    // can contain commas, which would fragment them if split on comma.
+    const sep = variant.matchValue.includes('\n') ? '\n' : ',';
     const pipeIdx = variant.matchValue.indexOf('||');
     const typeMatchStr = pipeIdx === -1 ? variant.matchValue : variant.matchValue.slice(0, pipeIdx);
     const optionFilterStr = pipeIdx === -1 ? '' : variant.matchValue.slice(pipeIdx + 2);
 
-    // matchValue may be comma-separated (multi-select): split and check each.
     const matchParts = typeMatchStr
-      .split(',')
+      .split(sep)
       .map((p) => p.trim().toLowerCase())
       .filter(Boolean);
     if (matchParts.length === 0) return false;
@@ -657,8 +659,9 @@ export function matchVariants(
 
     // If an option filter is encoded, also check against hardwareOptions.
     if (optionFilterStr) {
+      const optSep = optionFilterStr.includes('\n') ? '\n' : ',';
       const optionParts = optionFilterStr
-        .split(',')
+        .split(optSep)
         .map((p) => p.trim().toLowerCase())
         .filter(Boolean);
       if (optionParts.length > 0) {
