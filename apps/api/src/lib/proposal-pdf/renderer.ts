@@ -912,12 +912,14 @@ function drawStyledRuns(
         continued: !isLast,
         width: textWidth,
         align: 'center',
+        underline: !!run.underline,
         ...(isLast ? { paragraphGap: 4 } : {}),
       });
     } else {
       doc.text(text, {
         continued: !isLast,
         indent: i === 0 ? opts.indent : 0,
+        underline: !!run.underline,
         ...(isLast ? { paragraphGap: 4 } : {}),
         ...(opts.align ? { align: opts.align, width: textWidth } : {}),
       });

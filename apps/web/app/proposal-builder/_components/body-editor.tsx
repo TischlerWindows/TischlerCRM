@@ -3,8 +3,9 @@
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextStyle from '@tiptap/extension-text-style';
+import Underline from '@tiptap/extension-underline';
 import { Extension } from '@tiptap/core';
-import { Bold, Italic, List, ListOrdered } from 'lucide-react';
+import { Bold, Italic, Underline as UnderlineIcon, List, ListOrdered } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, type ReactNode } from 'react';
 
 // Custom font-size extension built on TextStyle (TipTap v2 compatible).
@@ -100,7 +101,7 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
   ref,
 ) {
   const editor = useEditor({
-    extensions: [StarterKit, TextStyle, FontSize],
+    extensions: [StarterKit, TextStyle, Underline, FontSize],
     content: value,
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
     editorProps: {
@@ -174,6 +175,13 @@ export const BodyEditor = forwardRef<BodyEditorHandle, Props>(function BodyEdito
           label="Italic"
         >
           <Italic className="w-3 h-3" />
+        </ToolbarBtn>
+        <ToolbarBtn
+          active={editor.isActive('underline')}
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          label="Underline"
+        >
+          <UnderlineIcon className="w-3 h-3" />
         </ToolbarBtn>
         <div className="w-px h-4 bg-gray-200 mx-1" aria-hidden />
         <ToolbarBtn

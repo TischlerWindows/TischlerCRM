@@ -7,7 +7,7 @@ import parse from 'html-react-parser';
  * Tags Tiptap's StarterKit emits that we render in the proposal body.
  * Anything outside this list is stripped before parsing.
  */
-const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'span'];
+const ALLOWED_TAGS = ['p', 'br', 'ul', 'ol', 'li', 'strong', 'em', 'b', 'i', 'u', 'span'];
 
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: ALLOWED_TAGS,
