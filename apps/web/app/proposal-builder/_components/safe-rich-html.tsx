@@ -56,8 +56,11 @@ export function SafeRichHtml({ html, className }: Props) {
   // characters (e.g. "AC < 200 amps", "B & B Restoration").
   const wrapped = isPlainText ? `<p>${escapeHtml(html)}</p>` : html;
   const clean = sanitizeHtml(wrapped, SANITIZE_OPTIONS);
+  // Tailwind preflight resets <p> margins to 0 and strips <ul>/<ol> list markers,
+  // so we always apply base rich-text styles in addition to the caller's className.
+  const baseClasses = '[&_p]:min-h-[1em] [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:pl-0.5';
   return (
-    <div className={className} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
+    <div className={`${baseClasses}${className ? ` ${className}` : ''}`} style={isPlainText ? { whiteSpace: 'pre-wrap' } : undefined}>
       {parse(clean)}
     </div>
   );
