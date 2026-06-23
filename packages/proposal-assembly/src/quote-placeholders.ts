@@ -115,6 +115,7 @@ function expandProductTypeName(name: string): string {
     .replace(/\bL&R D\b/g, 'Lift & Roll Door')
     .replace(/\bT & T\b/g, 'Turn & Tilt')
     .replace(/\bGD\b/g, 'Garden Door')
+    .replace(/\bDD\b/g, 'Domestic Door')
     .replace(/\bDH\b/g, 'Double Hung');
 }
 

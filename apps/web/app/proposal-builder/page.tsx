@@ -1088,6 +1088,7 @@ export default function QuoteBuilderPage() {
           .replace(/\bL&R D\b/g, 'Lift & Roll Door')
           .replace(/\bT & T\b/g, 'Turn & Tilt')
           .replace(/\bGD\b/g, 'Garden Door')
+          .replace(/\bDD\b/g, 'Domestic Door')
           .replace(/\bDH\b/g, 'Double Hung');
       const mmToFracIn = (mm: number): string => {
         const totalIn = mm / 25.4;
