@@ -121,7 +121,7 @@ function expandProductTypeName(name: string): string {
 /** Format a single product type option, converting "XXmm Thick Sash" to fractional inches. */
 function formatProductTypeOption(opt: string): string {
   const m = opt.match(/^(\d+(?:\.\d+)?)mm Thick Sash$/i);
-  if (m) return `${mmToFractionalInches(parseFloat(m[1]))} Thick Sash`;
+  if (m && m[1]) return `${mmToFractionalInches(parseFloat(m[1]))} Thick Sash`;
   return opt;
 }
 
