@@ -654,9 +654,11 @@ export function matchVariants(
     const typeValueMatch = (contextItem: string, matchPart: string): boolean => {
       const v = contextItem.toLowerCase().trim();
       if (v === matchPart) return true;
-      // Short numeric prefix (e.g. "8") matching "8 Bullet Resistant..." or "7.1 ..."
+      // Prefix matching: "8" matches "8 Bullet Resistant..." but NOT "28 DC..." or "7.1 ...".
+      // Exclude "." from the allowed trailing chars so that short code "7" does NOT
+      // ghost-match sub-variants "7.1" or "7.2" (the decimal IS part of the numeric code).
       const afterMatch = v.slice(matchPart.length);
-      return v.startsWith(matchPart) && (afterMatch === '' || /^[\s.,;-]/.test(afterMatch));
+      return v.startsWith(matchPart) && (afterMatch === '' || /^[\s,;-]/.test(afterMatch));
     };
 
     let typeMatch: boolean;
