@@ -8,6 +8,7 @@ import { assembleProposal } from '@crm/proposal-assembly';
 import type { SpecPresetData } from '@crm/proposal-assembly';
 import { useResizableSidePanels } from '@/lib/use-resizable-side-panels';
 import { useResizableVerticalPanel } from '@/lib/use-resizable-vertical-panel';
+import { useSchemaStore } from '@/lib/schema-store';
 
 import { TopBar, type BuilderMode, type PreviewMode } from './_components/top-bar';
 import { BlockList } from './_components/block-list';
@@ -71,6 +72,8 @@ interface TokenMappingData {
 }
 
 export default function QuoteBuilderPage() {
+  const loadSchema = useSchemaStore(s => s.loadSchema);
+
   // Template state
   const [templates, setTemplates] = useState<QuoteTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -314,6 +317,9 @@ export default function QuoteBuilderPage() {
 
   useEffect(() => {
     (async () => {
+      // Refresh schema so driver-field dropdowns (glass type, etc.) always show
+      // the full current picklist, not a stale localStorage-cached version.
+      loadSchema();
       const data = await loadTemplates();
       const def = data.find((t) => t.isDefault) || data[0];
       if (def) {
