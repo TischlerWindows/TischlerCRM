@@ -1081,12 +1081,33 @@ export default function QuoteBuilderPage() {
         : [...instRows.map((r: { label: string; price: string }) => `${r.label}: ${r.price}`), `Total: ${fmtUSD(instGrand)}`].join('<br>');
       const patchedSummary = { ...(selectedSummary as any), installationDetails: installationDetailsValue, installationTotalPrice: fmtUSD(instGrand) };
 
-      // Pre-compute productTypeDetails: "Type with Option1, Option2" per line.
+      // Pre-compute productTypeDetails: "Full Type Name with Option1, Option2" per line.
+      // Expands abbreviations and converts XXmm Thick Sash to fractional inches.
+      const expandPTName = (name: string) =>
+        name
+          .replace(/\bL&R D\b/g, 'Lift & Roll Door')
+          .replace(/\bT & T\b/g, 'Turn & Tilt')
+          .replace(/\bGD\b/g, 'Garden Door')
+          .replace(/\bDH\b/g, 'Double Hung');
+      const mmToFracIn = (mm: number): string => {
+        const totalIn = mm / 25.4;
+        const whole = Math.floor(totalIn);
+        const s16 = Math.round((totalIn - whole) * 16);
+        const w = whole + (s16 === 16 ? 1 : 0);
+        const fi = s16 === 16 ? 0 : s16;
+        const fracs = ['', '1/16', '1/8', '3/16', '1/4', '5/16', '3/8', '7/16', '1/2', '9/16', '5/8', '11/16', '3/4', '13/16', '7/8', '15/16'];
+        const f = fracs[fi] ?? '';
+        return f ? `${w}-${f}"` : `${w}"`;
+      };
+      const fmtPTOpt = (opt: string): string => {
+        const m = opt.match(/^(\d+(?:\.\d+)?)mm Thick Sash$/i);
+        return m ? `${mmToFracIn(parseFloat(m[1]))} Thick Sash` : opt;
+      };
       const pto = (selectedSummary as any)?.productTypeOptions as Record<string, string[]> | undefined;
       const productTypeDetailsValue = pto
         ? Object.entries(pto)
             .filter(([, opts]) => Array.isArray(opts) && opts.length > 0)
-            .map(([typeName, opts]) => `${typeName} with ${(opts as string[]).join(', ')}`)
+            .map(([typeName, opts]) => `${expandPTName(typeName)} with ${(opts as string[]).map(fmtPTOpt).join(', ')}`)
             .join('<br>')
         : '';
       const patchedSummary2 = { ...patchedSummary, productTypeDetails: productTypeDetailsValue };

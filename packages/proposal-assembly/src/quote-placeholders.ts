@@ -97,6 +97,34 @@ export function formatPhone(phone: string): string {
   return phone; // Return as-is if not 10 digits
 }
 
+/** Convert a millimeter value to a fractional-inch string like 2-13/16" */
+function mmToFractionalInches(mm: number): string {
+  const totalInches = mm / 25.4;
+  const wholeIn = Math.floor(totalInches);
+  const sixteenth = Math.round((totalInches - wholeIn) * 16);
+  const adjWhole = wholeIn + (sixteenth === 16 ? 1 : 0);
+  const fracIndex = sixteenth === 16 ? 0 : sixteenth;
+  const fracs = ['', '1/16', '1/8', '3/16', '1/4', '5/16', '3/8', '7/16', '1/2', '9/16', '5/8', '11/16', '3/4', '13/16', '7/8', '15/16'];
+  const frac = fracs[fracIndex] ?? '';
+  return frac ? `${adjWhole}-${frac}"` : `${adjWhole}"`;
+}
+
+/** Expand product type abbreviations to full names. */
+function expandProductTypeName(name: string): string {
+  return name
+    .replace(/\bL&R D\b/g, 'Lift & Roll Door')
+    .replace(/\bT & T\b/g, 'Turn & Tilt')
+    .replace(/\bGD\b/g, 'Garden Door')
+    .replace(/\bDH\b/g, 'Double Hung');
+}
+
+/** Format a single product type option, converting "XXmm Thick Sash" to fractional inches. */
+function formatProductTypeOption(opt: string): string {
+  const m = opt.match(/^(\d+(?:\.\d+)?)mm Thick Sash$/i);
+  if (m) return `${mmToFractionalInches(parseFloat(m[1]))} Thick Sash`;
+  return opt;
+}
+
 // ── Token map builder ──────────────────────────────────────────────
 
 /**
@@ -206,7 +234,7 @@ export function buildTokenMap(
       if (!pto) return '';
       const lines = Object.entries(pto)
         .filter(([, opts]) => Array.isArray(opts) && opts.length > 0)
-        .map(([typeName, opts]) => `${typeName} with ${opts.join(', ')}`);
+        .map(([typeName, opts]) => `${expandProductTypeName(typeName)} with ${opts.map(formatProductTypeOption).join(', ')}`);
       return lines.join('<br>');
     })(),
   };
