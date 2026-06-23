@@ -647,14 +647,25 @@ export function matchVariants(
     if (matchParts.length === 0) return false;
 
     // Check the driver field value.
+    // Use exact-or-prefix matching, NOT substring matching.
+    // Substring caused false positives: matchValue "8" would match glassType
+    // "28 DC Standard..." because "28..." contains "8". Prefix matching ensures
+    // "8" only matches "8 Bullet Resistant..." (starts with "8 " / "8." / etc.).
+    const typeValueMatch = (contextItem: string, matchPart: string): boolean => {
+      const v = contextItem.toLowerCase().trim();
+      if (v === matchPart) return true;
+      // Short numeric prefix (e.g. "8") matching "8 Bullet Resistant..." or "7.1 ..."
+      const afterMatch = v.slice(matchPart.length);
+      return v.startsWith(matchPart) && (afterMatch === '' || /^[\s.,;-]/.test(afterMatch));
+    };
+
     let typeMatch: boolean;
     if (Array.isArray(driverValue)) {
       typeMatch = matchParts.some((match) =>
-        driverValue.some((item) => String(item).toLowerCase().includes(match))
+        driverValue.some((item) => typeValueMatch(String(item), match))
       );
     } else {
-      const ctxStr = String(driverValue).toLowerCase();
-      typeMatch = matchParts.some((match) => ctxStr.includes(match));
+      typeMatch = matchParts.some((match) => typeValueMatch(String(driverValue), match));
     }
     if (!typeMatch) return false;
 
@@ -667,7 +678,7 @@ export function matchVariants(
         .filter(Boolean);
       if (optionParts.length > 0) {
         const hwLower = context.hardwareOptions.map((o) => o.toLowerCase());
-        const optionMatch = optionParts.some((opt) => hwLower.some((hw) => hw.includes(opt)));
+        const optionMatch = optionParts.some((opt) => hwLower.some((hw) => typeValueMatch(hw, opt)));
         if (!optionMatch) return false;
       }
     }
