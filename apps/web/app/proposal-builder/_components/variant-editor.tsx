@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Trash2, ChevronDown, ChevronRight, Check } from 'lucide-react';
 import { BodyEditor, type BodyEditorHandle } from './body-editor';
 import { getOptionsForType } from '@/lib/product-type-options';
@@ -120,26 +121,38 @@ function MultiSelectDropdown({
   onChange: (values: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number; width: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
+  // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        menuRef.current && !menuRef.current.contains(target)
+      ) setOpen(false);
     };
-    // Use capture:false so inner button onClick fires before this closes the dropdown
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  const handleOpen = () => {
+    if (!open && triggerRef.current) {
+      const r = triggerRef.current.getBoundingClientRect();
+      setMenuStyle({ top: r.bottom + 4, left: r.left, width: r.width });
+    }
+    setOpen((o) => !o);
+  };
+
   const toggle = (opt: string) => {
-    // Read selected directly — no stale closure since this is called inline from onClick
     onChange(
       selected.includes(opt)
         ? selected.filter((v) => v !== opt)
         : [...selected, opt],
     );
-    // Keep dropdown open after selection (multi-select UX)
   };
 
   const displayLabel =
@@ -149,11 +162,39 @@ function MultiSelectDropdown({
         ? selected[0]
         : `${selected.length} values selected`;
 
+  const menu = open && menuStyle ? createPortal(
+    <div
+      ref={menuRef}
+      style={{ position: 'fixed', top: menuStyle.top, left: menuStyle.left, width: Math.max(320, menuStyle.width), zIndex: 9999 }}
+      className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto"
+    >
+      {options.map((opt) => {
+        const checked = selected.includes(opt);
+        return (
+          <button
+            key={opt}
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={() => toggle(opt)}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 text-left"
+          >
+            <div className={`w-3.5 h-3.5 flex-shrink-0 border rounded flex items-center justify-center ${checked ? 'bg-brand-navy border-brand-navy' : 'border-gray-300'}`}>
+              {checked && <Check className="w-2.5 h-2.5 text-white" />}
+            </div>
+            <span className="truncate text-gray-800">{opt}</span>
+          </button>
+        );
+      })}
+    </div>,
+    document.body,
+  ) : null;
+
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleOpen}
         className="w-full flex items-center justify-between px-3 py-2 text-xs border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-brand-navy/20 text-left"
       >
         <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-900 truncate pr-1'}>
@@ -161,27 +202,7 @@ function MultiSelectDropdown({
         </span>
         <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
       </button>
-      {open && (
-        <div className="absolute z-50 mt-1 w-full min-w-[320px] bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-y-auto">
-          {options.map((opt) => {
-            const checked = selected.includes(opt);
-            return (
-              <button
-                key={opt}
-                type="button"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={() => toggle(opt)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 text-left"
-              >
-                <div className={`w-3.5 h-3.5 flex-shrink-0 border rounded flex items-center justify-center ${checked ? 'bg-brand-navy border-brand-navy' : 'border-gray-300'}`}>
-                  {checked && <Check className="w-2.5 h-2.5 text-white" />}
-                </div>
-                <span className="truncate text-gray-800">{opt}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {menu}
     </div>
   );
 }
