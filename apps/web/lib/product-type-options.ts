@@ -4,24 +4,24 @@ export function getOptionsForType(t: string): string[] {
     return ['Maco Instinct Motorized Locks'];
   }
   if (lo === 'inswing folding') {
-    return ['Threshold #6C', 'Threshold ADA'];
+    return ['Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
   if (lo === 'outswing folding') {
-    return ['Threshold #8', 'Threshold ADA'];
+    return ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
   if (lo.includes('folding')) {
     return lo.includes('inswing')
-      ? ['Threshold #6C', 'Threshold ADA']
-      : ['Threshold #8', 'Threshold ADA'];
+      ? ['Threshold #6', 'Threshold #6C', 'Threshold ADA']
+      : ['Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
   if (lo === 'l&r d') {
     return ['72mm Thick Sash', '90mm Thick Sash', 'Standard RH', 'SS RH'];
   }
   if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
-    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6C', 'Threshold ADA'];
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #6', 'Threshold #6C', 'Threshold ADA'];
   }
   if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes(' dd') || lo.includes('house door'))) {
-    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #8', 'Threshold ADA'];
+    return ['72mm Thick Sash', '90mm Thick Sash', 'KFV RH', 'Siegenia RH', 'Threshold #7', 'Threshold #8', 'Threshold ADA'];
   }
   if (lo.includes('offset simulated') || lo.includes('offset french simulated')) {
     return ['72mm Thick Sash', '84mm Thick Sash', 'Corrosion Resistance RH', 'Titan RH'];
