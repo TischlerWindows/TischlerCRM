@@ -166,8 +166,9 @@ function parseGlassNum(glassType: string): string | null {
 /**
  * Format NFRC data for a product type + glass type combination.
  * Returns multi-line HTML (using <br>) or null if no NFRC entry is found.
+ * First line is "[expanded name] with [formattedOpts]", followed by grid then no-grid rows.
  */
-function formatNfrcBlock(typeName: string, glassType: string): string | null {
+function formatNfrcBlock(typeName: string, glassType: string, formattedOpts: string): string | null {
   const cat = getProductNfrcCategory(typeName);
   if (!cat) return null;
   const gNum = parseGlassNum(glassType);
@@ -178,17 +179,18 @@ function formatNfrcBlock(typeName: string, glassType: string): string | null {
   if (!entry) return null;
 
   const displayName = expandProductTypeName(typeName);
+  const firstLine = formattedOpts ? `${displayName} with ${formattedOpts}` : displayName;
+
   const ng = entry.noGrid;
   const gr = entry.grid;
-
-  const ngLine = `No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}`;
-  // Only show grid row if it has real data
   const hasGridData = gr.u !== '0.00' && gr.s !== 'N/A';
-  const grLine = hasGridData
-    ? `<1" Grid: U-Factor ${gr.u} / SHGC ${gr.s} | IGU: ${gr.igu} | Coating: ${gr.coat}`
-    : null;
 
-  const blockLines = [displayName, ngLine, ...(grLine ? [grLine] : [])];
+  const blockLines = [firstLine];
+  if (hasGridData) {
+    blockLines.push(`<1" Grid: U-Factor ${gr.u} / SHGC ${gr.s} | IGU: ${gr.igu} | Coating: ${gr.coat}`);
+  }
+  blockLines.push(`No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}`);
+
   return blockLines.join('<br>');
 }
 
@@ -304,12 +306,12 @@ export function buildTokenMap(
       const lines: string[] = [];
       for (const [typeName, opts] of Object.entries(pto)) {
         if (!Array.isArray(opts) || opts.length === 0) continue;
-        // Try NFRC lookup first; fall back to option list format
-        const nfrcBlock = formatNfrcBlock(typeName, glassType);
+        const formattedOpts = opts.map(formatProductTypeOption).join(', ');
+        const nfrcBlock = formatNfrcBlock(typeName, glassType, formattedOpts);
         if (nfrcBlock) {
           lines.push(nfrcBlock);
         } else {
-          lines.push(`${expandProductTypeName(typeName)} with ${opts.map(formatProductTypeOption).join(', ')}`);
+          lines.push(`${expandProductTypeName(typeName)} with ${formattedOpts}`);
         }
       }
       return lines.join('<br>');
