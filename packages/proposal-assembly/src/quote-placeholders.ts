@@ -189,11 +189,101 @@ function parseGlassNum(glassType: string): string | null {
 }
 
 /**
+ * Return the jamb depth string for a given product type + sash thickness in mm.
+ * Returns null if the depth is unknown or varies by sash configuration.
+ */
+function getJambDepth(typeName: string, sashMm: number): string | null {
+  const lo = typeName.toLowerCase();
+  // Triple hung — must be before generic "hung" check
+  if (lo.includes('triple hung')) {
+    if (sashMm === 65) return '10-9/16"';
+    if (sashMm === 72) return '11-5/8"';
+    return null;
+  }
+  // Single / Double hung
+  if (lo.includes('hung')) {
+    if (sashMm === 59) return '7"';
+    if (sashMm === 61) return '7-3/16"';
+    if (sashMm === 65) return '7-1/4"';
+    if (sashMm === 72) return '8-1/16"';
+    if (sashMm === 90) return '9-7/16"';
+    return null;
+  }
+  // L&R D / Lift and Roll — varies by sash configuration
+  if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling')))) {
+    return null;
+  }
+  // Outswing folding
+  if (lo.includes('outswing') && lo.includes('folding')) {
+    if (sashMm === 72) return '4-3/16"';
+    if (sashMm === 84) return '3-5/16"';
+    return null;
+  }
+  // Outswing garden / domestic door
+  if (lo.includes('outswing') && (lo.includes(' gd') || lo.includes('garden door') || lo.includes(' dd') || lo.includes('domestic') || lo.includes('house door') || lo.includes('french house'))) {
+    if (sashMm === 72) return '4-3/16"';
+    if (sashMm === 84 || sashMm === 92) return '3-1/8"';
+    return null;
+  }
+  // Inswing garden / domestic door
+  if (lo.includes('inswing') && (lo.includes(' gd') || lo.includes('garden door') || lo.includes(' dd') || lo.includes('domestic') || lo.includes('house door') || lo.includes('french house'))) {
+    if (sashMm === 92) return '3-5/16"';
+    return null; // 72mm rabbetted — not specified
+  }
+  // Generic outswing casements (push, crank, french window, etc.)
+  if (lo.includes('outswing')) {
+    if (sashMm === 72) return '4-3/16"';
+    if (sashMm === 84) return '3-1/8"';
+    return null;
+  }
+  // Inswing T&T / Tilt and Turn
+  if (lo.includes('t & t') || lo.includes('tilt and turn') || lo.includes('tilt & turn') ||
+      (lo.includes('tilt') && lo.includes('turn'))) {
+    if (sashMm === 84) return '3-5/16"';
+    return null; // 72mm rabbetted — not specified
+  }
+  // Fixed with Sash (flush profile)
+  if (lo.includes('fixed with sash') || lo.includes('fixed sash')) {
+    if (sashMm === 72) return '4-3/16"';
+    return null;
+  }
+  // Pivot house door
+  if (lo.includes('pivot') && (lo.includes('house') || lo.includes('door'))) {
+    if (sashMm === 90) return '5-1/8"';
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Build the bolded first-line string for a product type entry.
+ * Inserts jamb depth (if known) between the sash thickness and any remaining options.
+ */
+function buildFirstLine(typeName: string, rawOpts: string[]): string {
+  const sashRe = /^\d+(\.\d+)?mm Thick Sash$/i;
+  const sashOpt = rawOpts.find(o => sashRe.test(o));
+  const sashMm = sashOpt ? parseFloat(sashOpt) : null;
+  const jambDepth = sashMm !== null ? getJambDepth(typeName, sashMm) : null;
+
+  const specParts: string[] = [];
+  if (sashOpt) specParts.push(formatProductTypeOption(sashOpt));
+  if (jambDepth) specParts.push(`${jambDepth} Jamb Depth`);
+  rawOpts
+    .filter(o => !sashRe.test(o))
+    .map(formatProductTypeOption)
+    .forEach(p => specParts.push(p));
+
+  const displayName = expandProductTypeName(typeName);
+  return specParts.length > 0
+    ? `<strong>${displayName}</strong> with ${specParts.join(', ')}`
+    : `<strong>${displayName}</strong>`;
+}
+
+/**
  * Format NFRC data for a product type + glass type combination.
  * Returns multi-line HTML (using <br>) or null if no NFRC entry is found.
- * First line is "[expanded name] with [formattedOpts]", followed by grid then no-grid rows.
  */
-function formatNfrcBlock(typeName: string, glassType: string, formattedOpts: string): string | null {
+function formatNfrcBlock(typeName: string, glassType: string, rawOpts: string[]): string | null {
   const cat = getProductNfrcCategory(typeName);
   if (!cat) return null;
   const gNum = parseGlassNum(glassType);
@@ -203,10 +293,7 @@ function formatNfrcBlock(typeName: string, glassType: string, formattedOpts: str
   const entry = catData[gNum];
   if (!entry) return null;
 
-  const displayName = expandProductTypeName(typeName);
-  const firstLine = formattedOpts
-    ? `<strong>${displayName}</strong> with ${formattedOpts}`
-    : `<strong>${displayName}</strong>`;
+  const firstLine = buildFirstLine(typeName, rawOpts);
 
   const ng = entry.noGrid;
   const gr = entry.grid;
@@ -333,12 +420,11 @@ export function buildTokenMap(
       const lines: string[] = [];
       for (const [typeName, opts] of Object.entries(pto)) {
         if (!Array.isArray(opts) || opts.length === 0) continue;
-        const formattedOpts = opts.map(formatProductTypeOption).join(', ');
-        const nfrcBlock = formatNfrcBlock(typeName, glassType, formattedOpts);
+        const nfrcBlock = formatNfrcBlock(typeName, glassType, opts);
         if (nfrcBlock) {
           lines.push(nfrcBlock);
         } else {
-          lines.push(`${expandProductTypeName(typeName)} with ${formattedOpts}`);
+          lines.push(buildFirstLine(typeName, opts));
         }
       }
       return lines.join('<br>');
