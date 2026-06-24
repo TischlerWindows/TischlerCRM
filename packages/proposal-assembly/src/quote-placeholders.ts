@@ -433,12 +433,26 @@ export function buildTokenMap(
         const typeNames = typeName.includes(':')
           ? typeName.split(':').map((s: string) => s.trim()).filter(Boolean)
           : [typeName];
+        // If any part of the compound is a door type, the prefix (e.g. "Fixed with Sash")
+        // should pluralize as "Doors" rather than "Windows".
+        const isDoorCompound = typeNames.some(n => {
+          const lo = n.toLowerCase();
+          return /\bgd\b/.test(lo) || lo.includes('garden door') ||
+                 /\bdd\b/.test(lo) || lo.includes('domestic door') ||
+                 lo.includes('house door') || lo.includes('french house');
+        });
         for (const singleName of typeNames) {
-          const nfrcBlock = formatNfrcBlock(singleName, glassType, opts);
+          // For a door compound, rename "Fixed with Sash" → "Fixed with Sash Door"
+          // so pluralizeTypeName produces "Doors" instead of "Windows".
+          const resolvedName =
+            isDoorCompound && singleName.toLowerCase() === 'fixed with sash'
+              ? 'Fixed with Sash Door'
+              : singleName;
+          const nfrcBlock = formatNfrcBlock(resolvedName, glassType, opts);
           if (nfrcBlock) {
             lines.push(nfrcBlock);
           } else {
-            lines.push(buildFirstLine(singleName, opts));
+            lines.push(buildFirstLine(resolvedName, opts));
           }
         }
       }
