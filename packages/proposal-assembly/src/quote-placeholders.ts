@@ -426,7 +426,35 @@ export function buildTokenMap(
       if (!pto) return '';
       const glassType = summary.glassTypeCustom || summary.glassType || '';
       const lines: string[] = [];
+
+      // Derive the active product type keys from actual rows so that types
+      // deleted from Page 1 don't appear as ghost entries here.
+      const typeFields = ['type', 'type2', 'type3', 'type4'];
+      const subOptMap: Record<string, string> = {
+        type: 'typeSubOption', type2: 'type2SubOption',
+        type3: 'type3SubOption', type4: 'type4SubOption',
+      };
+      const allRows: unknown[] = [
+        ...((summary as any).rows || []),
+        ...((summary as any).doorRows || []),
+        ...(((summary as any).subLocations || []) as any[]).flatMap(
+          (l: any) => [...(l.rows || []), ...(l.doorRows || [])]
+        ),
+      ];
+      const activeTypes = new Set<string>(
+        allRows.flatMap((r: any) =>
+          typeFields.map(f => {
+            const t = r[f];
+            if (!t) return null;
+            if (t === 'Fixed with Sash' && r[subOptMap[f]!]) return `Fixed with Sash: ${r[subOptMap[f]!]}`;
+            return t;
+          }).filter((t): t is string => Boolean(t))
+        )
+      );
+
       for (const [typeName, opts] of Object.entries(pto)) {
+        // Skip types not present in any current row (deleted ghost entries)
+        if (activeTypes.size > 0 && !activeTypes.has(typeName)) continue;
         if (!Array.isArray(opts) || opts.length === 0) continue;
         // Split colon-compound types into two entries, e.g.
         // "Fixed with Sash: Push Outswing" → "Fixed with Sash" + "Push Outswing"
