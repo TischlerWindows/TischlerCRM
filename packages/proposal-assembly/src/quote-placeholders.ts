@@ -214,9 +214,9 @@ function getJambDepth(typeName: string, sashMm: number): string | null {
     if (sashMm === 90) return '9-7/16"';
     return null;
   }
-  // L&R D / Lift and Roll — varies by sash configuration
+  // L&R D / Lift and Roll — jamb depth varies by sash configuration
   if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling')))) {
-    return null;
+    return 'Jamb depth varies depending upon sash configuration';
   }
   // Outswing folding
   if (lo.includes('outswing') && lo.includes('folding')) {
@@ -272,7 +272,10 @@ function buildFirstLine(typeName: string, rawOpts: string[]): string {
 
   const specParts: string[] = [];
   if (sashOpt) specParts.push(formatProductTypeOption(sashOpt));
-  if (jambDepth) specParts.push(`${jambDepth} Jamb Depth`);
+  if (jambDepth) {
+    // Fractional-inch value → "X" Jamb Depth"; full note → show as-is
+    specParts.push(jambDepth.endsWith('"') ? `${jambDepth} Jamb Depth` : jambDepth);
+  }
   rawOpts
     .filter(o => !sashRe.test(o))
     .map(formatProductTypeOption)
@@ -425,11 +428,18 @@ export function buildTokenMap(
       const lines: string[] = [];
       for (const [typeName, opts] of Object.entries(pto)) {
         if (!Array.isArray(opts) || opts.length === 0) continue;
-        const nfrcBlock = formatNfrcBlock(typeName, glassType, opts);
-        if (nfrcBlock) {
-          lines.push(nfrcBlock);
-        } else {
-          lines.push(buildFirstLine(typeName, opts));
+        // Split colon-compound types into two entries, e.g.
+        // "Fixed with Sash: Push Outswing" → "Fixed with Sash" + "Push Outswing"
+        const typeNames = typeName.includes(':')
+          ? typeName.split(':').map((s: string) => s.trim()).filter(Boolean)
+          : [typeName];
+        for (const singleName of typeNames) {
+          const nfrcBlock = formatNfrcBlock(singleName, glassType, opts);
+          if (nfrcBlock) {
+            lines.push(nfrcBlock);
+          } else {
+            lines.push(buildFirstLine(singleName, opts));
+          }
         }
       }
       return lines.join('<br>');
