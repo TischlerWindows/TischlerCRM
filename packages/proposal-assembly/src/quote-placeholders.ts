@@ -119,14 +119,21 @@ function pluralizeTypeName(name: string): string {
     const idx = name.indexOf(':');
     return `${name.slice(0, idx)}: ${pluralizeTypeName(name.slice(idx + 1).trim())}`;
   }
-  const lastWord = name.split(/\s+/).pop() ?? '';
+  // Strip trailing parenthetical before checking last word
+  // e.g. "Offset Simulated Double Hung (2 Glass Fields)" → base + " Windows" + " (2 Glass Fields)"
+  const parenMatch = name.match(/^(.*?)\s*(\(.*\))\s*$/);
+  const base = parenMatch ? (parenMatch[1] ?? name).trimEnd() : name;
+  const paren = parenMatch ? ` ${parenMatch[2]}` : '';
+
+  const lastWord = base.split(/\s+/).pop() ?? '';
   // These last words simply take an 's'
-  if (/^(Door|Outswing|Inswing|Window|Lock|Bolt)$/.test(lastWord)) return name + 's';
+  if (/^(Door|Outswing|Inswing|Window|Lock|Bolt)$/.test(lastWord)) return base + 's' + paren;
   // These last words indicate a window/door type — append "Windows"
-  if (/^(Balance|Sash|Glaze|French|Tilt|Turn|Hung|Pivot|Folding|Awning)$/.test(lastWord)) {
-    return name + ' Windows';
+  if (/^(Balance|Sash|Glaze|French|Tilt|Turn|Hung|Pivot|Folding|Awning|Chain|Tilt-in)$/i.test(lastWord)) {
+    return base + ' Windows' + paren;
   }
-  return name + 's';
+  // Default: add s
+  return base + 's' + paren;
 }
 
 function expandProductTypeName(name: string): string {
