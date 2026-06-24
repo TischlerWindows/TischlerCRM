@@ -154,6 +154,13 @@ function formatProductTypeOption(opt: string): string {
   // Convert mm sash sizes to fractional inches
   const m = opt.match(/^(\d+(?:\.\d+)?)mm Thick Sash$/i);
   if (m && m[1]) return `${mmToFractionalInches(parseFloat(m[1]))} Thick Sash`;
+  // Expand legacy short-form threshold labels saved before the full-name rename
+  const thresholdAliases: Record<string, string> = {
+    '#6': 'Threshold #6', '#6C': 'Threshold #6C',
+    '#7': 'Threshold #7', '#8': 'Threshold #8',
+    'ADA': 'Threshold ADA',
+  };
+  if (Object.prototype.hasOwnProperty.call(thresholdAliases, opt)) return thresholdAliases[opt]!;
   // Expand "SS" prefix → "Stainless Steel"
   let result = opt.replace(/\bSS\b/g, 'Stainless Steel');
   // Expand trailing " RH" → " Rough Hardware"
