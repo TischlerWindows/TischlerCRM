@@ -5,6 +5,8 @@
  * from the summary and optional contact data.
  */
 
+import { NFRC_DATA } from './nfrc-data.js';
+
 // ── Types ──────────────────────────────────────────────────────────
 
 /** Subset of Summary fields used for token resolution. */
@@ -126,6 +128,71 @@ function formatProductTypeOption(opt: string): string {
   return opt;
 }
 
+/**
+ * Map a product type name to an NFRC lookup category key.
+ * Returns null if no matching category is found.
+ */
+function getProductNfrcCategory(typeName: string): string | null {
+  const lo = typeName.toLowerCase();
+  // Lift & Roll Door / L&R D
+  if (lo.includes('l&r') || (lo.includes('lift') && (lo.includes('roll') || lo.includes('rolling')))) return 'liftRollingDoor';
+  // Tilt & Turn
+  if (lo.includes('t & t') || (lo.includes('tilt') && lo.includes('turn')) || lo.includes('tilt and turn')) return 'isTiltAndTurn';
+  // Inswing entry / French House Door
+  if (lo.includes('inswing') && (lo.includes('house door') || lo.includes('french house'))) return 'isEntryDoor';
+  // Outswing entry / French House Door
+  if (lo.includes('outswing') && (lo.includes('house door') || lo.includes('french house'))) return 'osEntryDoor';
+  // OS Casement: Push Outswing, Crank Outswing, Outswing French window (not door)
+  if (lo.includes('push outswing') || lo.includes('crank outswing')) return 'osCasement';
+  if (lo.includes('outswing') && lo.includes('french') && !lo.includes('house') && !lo.includes('door')) return 'osCasement';
+  // Direct Glaze / Fixed with Sash (Fixed Simulation)
+  if (lo.includes('direct glaze') || lo.includes('fixed with sash') || lo.includes('fixed sash')) return 'fixedSimulation';
+  // Double / Single / Triple Hung, or standalone DH abbreviation
+  if (lo.includes('double hung') || lo.includes('single hung') || lo.includes('triple hung') || /\bdh\b/.test(lo)) return 'doubleHung';
+  // Curtain Wall, Garden Door, Domestic Door
+  if (lo.includes('curtain wall') || /\bgd\b/.test(lo) || lo.includes('garden door') || /\bdd\b/.test(lo) || lo.includes('domestic door')) return 'curtainWall';
+  return null;
+}
+
+/**
+ * Parse the glass number prefix from a glassType string (e.g. "2 Standard Insulated..." → "2").
+ * Returns null if the string doesn't start with a recognisable number.
+ */
+function parseGlassNum(glassType: string): string | null {
+  const m = (glassType || '').match(/^(\d+(?:\.\d+)?)/);
+  return m?.[1] ?? null;
+}
+
+/**
+ * Format NFRC data for a product type + glass type combination.
+ * Returns multi-line HTML (using <br>) or null if no NFRC entry is found.
+ */
+function formatNfrcBlock(typeName: string, glassType: string): string | null {
+  const cat = getProductNfrcCategory(typeName);
+  if (!cat) return null;
+  const gNum = parseGlassNum(glassType);
+  if (!gNum) return null;
+  const catData = NFRC_DATA[cat];
+  if (!catData) return null;
+  const entry = catData[gNum];
+  if (!entry) return null;
+
+  const displayName = expandProductTypeName(typeName);
+  const ng = entry.noGrid;
+  const gr = entry.grid;
+
+  const ngLine = `No Grid: U-Factor ${ng.u} / SHGC ${ng.s} | IGU: ${ng.igu} | Coating: ${ng.coat}`;
+  // Only show grid row if it has real data
+  const hasGridData = gr.u !== '0.00' && gr.s !== 'N/A';
+  const grLine = hasGridData
+    ? `<1" Grid: U-Factor ${gr.u} / SHGC ${gr.s} | IGU: ${gr.igu} | Coating: ${gr.coat}`
+    : null;
+
+  const blockLines = [displayName, ngLine, ...(grLine ? [grLine] : [])];
+  return blockLines.join('<br>');
+}
+
+
 // ── Token map builder ──────────────────────────────────────────────
 
 /**
@@ -233,9 +300,18 @@ export function buildTokenMap(
     productTypeDetails: (() => {
       const pto = (summary as any).productTypeOptions as Record<string, string[]> | undefined;
       if (!pto) return '';
-      const lines = Object.entries(pto)
-        .filter(([, opts]) => Array.isArray(opts) && opts.length > 0)
-        .map(([typeName, opts]) => `${expandProductTypeName(typeName)} with ${opts.map(formatProductTypeOption).join(', ')}`);
+      const glassType = summary.glassTypeCustom || summary.glassType || '';
+      const lines: string[] = [];
+      for (const [typeName, opts] of Object.entries(pto)) {
+        if (!Array.isArray(opts) || opts.length === 0) continue;
+        // Try NFRC lookup first; fall back to option list format
+        const nfrcBlock = formatNfrcBlock(typeName, glassType);
+        if (nfrcBlock) {
+          lines.push(nfrcBlock);
+        } else {
+          lines.push(`${expandProductTypeName(typeName)} with ${opts.map(formatProductTypeOption).join(', ')}`);
+        }
+      }
       return lines.join('<br>');
     })(),
   };
