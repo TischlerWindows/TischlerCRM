@@ -112,13 +112,31 @@ function mmToFractionalInches(mm: number): string {
 }
 
 /** Expand product type abbreviations to full names. */
+function pluralizeTypeName(name: string): string {
+  // Colon-separated compound names: pluralize the suffix only
+  // e.g. "Fixed with Sash: Push Outswing" → "Fixed with Sash: Push Outswings"
+  if (name.includes(':')) {
+    const idx = name.indexOf(':');
+    return `${name.slice(0, idx)}: ${pluralizeTypeName(name.slice(idx + 1).trim())}`;
+  }
+  const lastWord = name.split(/\s+/).pop() ?? '';
+  // These last words simply take an 's'
+  if (/^(Door|Outswing|Inswing|Window|Lock|Bolt)$/.test(lastWord)) return name + 's';
+  // These last words indicate a window/door type — append "Windows"
+  if (/^(Balance|Sash|Glaze|French|Tilt|Turn|Hung|Pivot|Folding|Awning)$/.test(lastWord)) {
+    return name + ' Windows';
+  }
+  return name + 's';
+}
+
 function expandProductTypeName(name: string): string {
-  return name
+  const expanded = name
     .replace(/\bL&R D\b/g, 'Lift & Roll Door')
     .replace(/\bT & T\b/g, 'Turn & Tilt')
     .replace(/\bGD\b/g, 'Garden Door')
     .replace(/\bDD\b/g, 'Domestic Door')
     .replace(/\bDH\b/g, 'Double Hung');
+  return pluralizeTypeName(expanded);
 }
 
 /** Format a single product type option, converting "XXmm Thick Sash" to fractional inches. */
